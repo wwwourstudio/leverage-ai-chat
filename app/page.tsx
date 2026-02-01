@@ -1976,13 +1976,13 @@ export default function UnifiedAIPlatform() {
                         simulateResponse(action.label);
                       }, 0);
                     }}
-                    className={`group/prompt flex items-center gap-2.5 px-5 py-3 rounded-full border text-sm font-medium whitespace-nowrap transition-all duration-300 ${
+                    className={`group/prompt flex items-center gap-2.5 px-4 py-2.5 rounded-full border text-sm font-medium whitespace-nowrap transition-all duration-200 ${
                       isSuggested 
-                        ? 'bg-gradient-to-br from-blue-600/15 via-purple-600/15 to-blue-600/15 border-blue-500/40 text-white hover:from-blue-600/25 hover:via-purple-600/25 hover:to-blue-600/25 hover:border-blue-400/60 hover:shadow-lg hover:shadow-blue-500/20' 
-                        : 'bg-gray-900/40 border-gray-800/60 text-gray-300 hover:bg-gray-800/60 hover:border-gray-700/80 hover:text-white'
+                        ? 'bg-gray-900/60 border-blue-500/50 text-gray-200 hover:bg-gradient-to-r hover:from-blue-600/20 hover:via-purple-600/20 hover:to-blue-600/20 hover:border-blue-400/70' 
+                        : 'bg-gray-900/60 border-gray-800/70 text-gray-400 hover:bg-gray-800/70 hover:border-gray-700 hover:text-gray-200'
                     }`}
                   >
-                    <Icon className={`w-4 h-4 ${isSuggested ? 'text-blue-400' : 'text-gray-500'}`} />
+                    <Icon className={`w-4 h-4 ${isSuggested ? 'text-gray-400 group-hover/prompt:text-blue-400' : 'text-gray-500 group-hover/prompt:text-gray-400'}`} />
                     <span>{action.label}</span>
                   </button>
                 );

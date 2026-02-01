@@ -111,6 +111,7 @@ export default function UnifiedAIPlatform() {
   const [showLimitNotification, setShowLimitNotification] = useState(false);
   const [chatsRemaining, setChatsRemaining] = useState(5);
   const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
+  const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -429,6 +430,88 @@ export default function UnifiedAIPlatform() {
     ));
   };
 
+  const generateContextualSuggestions = (userMessage: string, responseCards: InsightCard[]) => {
+    const msgLower = userMessage.toLowerCase();
+    const suggestions: Array<{ label: string; icon: any; category: string }> = [];
+
+    // Analyze user message context
+    const isBetting = msgLower.includes('bet') || msgLower.includes('odds') || msgLower.includes('line');
+    const isFantasy = msgLower.includes('draft') || msgLower.includes('fantasy') || msgLower.includes('adp');
+    const isDFS = msgLower.includes('dfs') || msgLower.includes('lineup') || msgLower.includes('draftkings') || msgLower.includes('fanduel');
+    const isKalshi = msgLower.includes('kalshi') || msgLower.includes('market') || msgLower.includes('prediction');
+    const isNBA = msgLower.includes('nba') || msgLower.includes('lakers') || msgLower.includes('warriors');
+    const isNFL = msgLower.includes('nfl') || msgLower.includes('chiefs') || msgLower.includes('football');
+    const isMLB = msgLower.includes('mlb') || msgLower.includes('baseball');
+
+    // Generate contextual follow-ups based on conversation
+    if (isBetting) {
+      suggestions.push(
+        { label: 'What are the best player props for tonight?', icon: Target, category: 'betting' },
+        { label: 'Show me live arbitrage opportunities', icon: Zap, category: 'betting' },
+        { label: 'Compare this with DFS value plays', icon: Layers, category: 'all' }
+      );
+    } else if (isDFS) {
+      suggestions.push(
+        { label: 'Build a low-ownership tournament stack', icon: Users, category: 'dfs' },
+        { label: 'Find value plays under $5K', icon: DollarSign, category: 'dfs' },
+        { label: 'What betting lines support this lineup?', icon: TrendingUp, category: 'all' }
+      );
+    } else if (isFantasy) {
+      suggestions.push(
+        { label: 'Show me ADP risers this week', icon: TrendingUp, category: 'fantasy' },
+        { label: 'Best ball stacking strategy?', icon: Medal, category: 'fantasy' },
+        { label: 'Auction value targets for this week', icon: ShoppingCart, category: 'fantasy' }
+      );
+    } else if (isKalshi) {
+      suggestions.push(
+        { label: 'Weather markets affecting game totals', icon: Activity, category: 'kalshi' },
+        { label: 'Cross-market arbitrage opportunities', icon: Sparkles, category: 'all' },
+        { label: 'Economic events with betting implications', icon: BarChart3, category: 'kalshi' }
+      );
+    }
+
+    // Sport-specific follow-ups
+    if (isNBA) {
+      suggestions.push(
+        { label: 'NBA injury updates affecting tonight\'s games', icon: AlertCircle, category: 'betting' },
+        { label: 'Best NBA DFS stacks for tonight', icon: Award, category: 'dfs' }
+      );
+    } else if (isNFL) {
+      suggestions.push(
+        { label: 'NFL weather impact on this week\'s totals', icon: Activity, category: 'betting' },
+        { label: 'Week 8 showdown captain picks', icon: Medal, category: 'dfs' }
+      );
+    } else if (isMLB) {
+      suggestions.push(
+        { label: 'MLB pitcher-batter matchup analysis', icon: Target, category: 'betting' },
+        { label: 'Baseball DFS stacking strategy', icon: Layers, category: 'dfs' }
+      );
+    }
+
+    // Card-based suggestions
+    if (responseCards.some(card => card.type === 'live-odds')) {
+      suggestions.push({ label: 'How has this line moved in the last hour?', icon: TrendingUp, category: 'betting' });
+    }
+    if (responseCards.some(card => card.type === 'dfs-lineup')) {
+      suggestions.push({ label: 'What\'s the leverage in this lineup?', icon: Award, category: 'dfs' });
+    }
+    if (responseCards.some(card => card.type === 'cross-platform')) {
+      suggestions.push({ label: 'More correlated betting + DFS opportunities?', icon: Sparkles, category: 'all' });
+    }
+
+    // General follow-ups if no specific context
+    if (suggestions.length === 0) {
+      suggestions.push(
+        { label: 'What are tonight\'s best value opportunities?', icon: Sparkles, category: 'all' },
+        { label: 'Show me high-confidence plays across platforms', icon: CheckCircle, category: 'all' },
+        { label: 'Any sharp money movements to track?', icon: TrendingUp, category: 'betting' }
+      );
+    }
+
+    // Limit to 4 suggestions max
+    return suggestions.slice(0, 4);
+  };
+
   const simulateResponse = (userMessage: string) => {
     setIsTyping(true);
     
@@ -537,6 +620,12 @@ export default function UnifiedAIPlatform() {
         adjustedTone
       }
     }]);
+
+    // Generate contextual suggestions based on the conversation
+    const contextualSuggestions = generateContextualSuggestions(userMessage, response.cards);
+    setSuggestedPrompts(contextualSuggestions);
+    console.log('[v0] Generated contextual suggestions:', contextualSuggestions.length);
+
     setIsTyping(false);
   }, 1500);
 };
@@ -1819,52 +1908,71 @@ export default function UnifiedAIPlatform() {
           )}
 
           <div className="relative max-w-5xl mx-auto">
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-0 mb-5">
-              {quickActions.map((action) => {
-                const Icon = action.icon;
-                const categoryColor = categories.find(c => c.id === action.category)?.color || 'text-blue-400';
-                return (
-                  <button
-                    key={action.label}
-                    onClick={() => {
-                      setInput(action.label);
-                      // Trigger submit after a brief delay to ensure state is updated
-                      setTimeout(() => {
-                        const userMessage: Message = {
-                          role: 'user',
-                          content: action.label,
-                          timestamp: new Date()
-                        };
-                        setMessages(prev => [...prev, userMessage]);
-                        
-                        // Update chat metadata
-                        setChats(prevChats => prevChats.map(chat => {
-                          if (chat.id === activeChat) {
-                            const updatedChat = { ...chat };
-                            updatedChat.preview = action.label.slice(0, 50) + (action.label.length > 50 ? '...' : '');
-                            updatedChat.timestamp = new Date();
-                            if (chat.title === 'New Analysis') {
-                              const words = action.label.split(' ').slice(0, 5).join(' ');
-                              updatedChat.title = words + (action.label.split(' ').length > 5 ? '...' : '');
+            {/* Dynamic Contextual Suggestions or Platform Prompts */}
+            <div className="mb-5">
+              {/* Header for suggested prompts */}
+              {suggestedPrompts.length > 0 && messages.length > 1 && (
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <Sparkles className="w-4 h-4 text-blue-400 animate-pulse" />
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Suggested Follow-up Questions
+                  </span>
+                </div>
+              )}
+              
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-0">
+                {(suggestedPrompts.length > 0 && messages.length > 1 ? suggestedPrompts : quickActions).map((action, idx) => {
+                  const Icon = action.icon;
+                  const categoryColor = categories.find(c => c.id === action.category)?.color || 'text-blue-400';
+                  const isSuggested = suggestedPrompts.length > 0 && messages.length > 1;
+                  
+                  return (
+                    <button
+                      key={`${action.label}-${idx}`}
+                      onClick={() => {
+                        setInput(action.label);
+                        // Trigger submit after a brief delay to ensure state is updated
+                        setTimeout(() => {
+                          const userMessage: Message = {
+                            role: 'user',
+                            content: action.label,
+                            timestamp: new Date()
+                          };
+                          setMessages(prev => [...prev, userMessage]);
+                          
+                          // Update chat metadata
+                          setChats(prevChats => prevChats.map(chat => {
+                            if (chat.id === activeChat) {
+                              const updatedChat = { ...chat };
+                              updatedChat.preview = action.label.slice(0, 50) + (action.label.length > 50 ? '...' : '');
+                              updatedChat.timestamp = new Date();
+                              if (chat.title === 'New Analysis') {
+                                const words = action.label.split(' ').slice(0, 5).join(' ');
+                                updatedChat.title = words + (action.label.split(' ').length > 5 ? '...' : '');
+                              }
+                              return updatedChat;
                             }
-                            return updatedChat;
-                          }
-                          return chat;
-                        }));
-                        
-                        setInput('');
-                        simulateResponse(action.label);
-                      }, 0);
-                    }}
-                    className="group/quick flex items-center py-2.5 bg-gradient-to-r from-gray-800/60 to-gray-900/60 hover:from-gray-700/80 hover:to-gray-800/80 border border-gray-700/50 hover:border-gray-600 text-xs font-bold text-gray-300 hover:text-white whitespace-nowrap transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-95 backdrop-blur-sm px-2.5 gap-1 rounded-full pl-1.5 pr-3.5"
-                  >
-                    <div className="p-1 bg-gray-900/50 rounded-lg group-hover/quick:bg-gray-800 transition-colors">
-                      <Icon className={`w-3.5 h-3.5 text-gray-500 group-hover/quick:${categoryColor} transition-colors`} />
-                    </div>
-                    {action.label}
-                  </button>
-                );
-              })}
+                            return chat;
+                          }));
+                          
+                          setInput('');
+                          simulateResponse(action.label);
+                        }, 0);
+                      }}
+                      className={`group/quick flex items-center py-2.5 ${
+                        isSuggested 
+                          ? 'bg-gradient-to-r from-blue-600/20 to-purple-600/20 hover:from-blue-600/30 hover:to-purple-600/30 border-blue-500/40 shadow-lg shadow-blue-500/10' 
+                          : 'bg-gradient-to-r from-gray-800/60 to-gray-900/60 hover:from-gray-700/80 hover:to-gray-800/80 border-gray-700/50'
+                      } hover:border-gray-600 border text-xs font-bold text-gray-300 hover:text-white whitespace-nowrap transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-95 backdrop-blur-sm px-2.5 gap-1 rounded-full pl-1.5 pr-3.5`}
+                    >
+                      <div className={`p-1 ${isSuggested ? 'bg-blue-900/30' : 'bg-gray-900/50'} rounded-lg group-hover/quick:bg-gray-800 transition-colors`}>
+                        <Icon className={`w-3.5 h-3.5 ${isSuggested ? 'text-blue-400' : 'text-gray-500'} group-hover/quick:${categoryColor} transition-colors`} />
+                      </div>
+                      {action.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* File Upload Preview */}

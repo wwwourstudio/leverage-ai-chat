@@ -3,15 +3,16 @@
 import React from "react"
 
 import { useState, useRef, useEffect } from 'react';
-import { 
-  Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, 
-  MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, 
-  DollarSign, Activity, Award, ChevronRight, Bell, Settings, 
-  ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles,
-  TrendingDown, Flame, Users, RefreshCw, Search, Calendar,
-  Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X,
-  CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info
-} from 'lucide-react';
+import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon } from 'lucide-react';
+
+interface FileAttachment {
+  id: string;
+  name: string;
+  type: 'image' | 'csv';
+  url: string;
+  size: number;
+  data?: any; // For CSV parsed data
+}
 
 interface TrustMetrics {
   benfordIntegrity: number;
@@ -57,6 +58,7 @@ interface Message {
   modelUsed?: string;
   processingTime?: number;
   trustMetrics?: TrustMetrics;
+  attachments?: FileAttachment[];
 }
 
 interface Chat {
@@ -108,6 +110,8 @@ export default function UnifiedAIPlatform() {
   const [editingChatTitle, setEditingChatTitle] = useState('');
   const [showLimitNotification, setShowLimitNotification] = useState(false);
   const [chatsRemaining, setChatsRemaining] = useState(5);
+  const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Rate limiting utilities
@@ -537,17 +541,87 @@ export default function UnifiedAIPlatform() {
   }, 1500);
 };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newAttachments: FileAttachment[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileType = file.type;
+
+      // Validate file type
+      if (!fileType.startsWith('image/') && fileType !== 'text/csv') {
+        alert(`File type not supported: ${file.name}. Please upload images (JPEG, PNG) or CSV files.`);
+        continue;
+      }
+
+      // Create file URL
+      const fileUrl = URL.createObjectURL(file);
+
+      const attachment: FileAttachment = {
+        id: `${Date.now()}-${i}`,
+        name: file.name,
+        type: fileType.startsWith('image/') ? 'image' : 'csv',
+        url: fileUrl,
+        size: file.size
+      };
+
+      // Parse CSV if needed
+      if (fileType === 'text/csv') {
+        const text = await file.text();
+        const parsed = parseCSV(text);
+        attachment.data = parsed;
+      }
+
+      newAttachments.push(attachment);
+    }
+
+    setUploadedFiles(prev => [...prev, ...newAttachments]);
+    console.log('[v0] Files uploaded:', newAttachments.length);
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const parseCSV = (text: string) => {
+    const lines = text.split('\n').filter(line => line.trim());
+    if (lines.length === 0) return { headers: [], rows: [] };
+
+    const headers = lines[0].split(',').map(h => h.trim());
+    const rows = lines.slice(1).map(line => 
+      line.split(',').map(cell => cell.trim())
+    );
+
+    return { headers, rows };
+  };
+
+  const removeAttachment = (id: string) => {
+    setUploadedFiles(prev => {
+      const file = prev.find(f => f.id === id);
+      if (file) {
+        URL.revokeObjectURL(file.url);
+      }
+      return prev.filter(f => f.id !== id);
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() && uploadedFiles.length === 0) return;
 
     const userMessage: Message = {
       role: 'user',
-      content: input,
-      timestamp: new Date()
+      content: input || '📎 Attached files',
+      timestamp: new Date(),
+      attachments: uploadedFiles.length > 0 ? [...uploadedFiles] : undefined
     };
 
     setMessages(prev => [...prev, userMessage]);
+    setUploadedFiles([]);
     
     // Update chat preview and title based on first user message
     setChats(prevChats => prevChats.map(chat => {
@@ -1207,6 +1281,76 @@ export default function UnifiedAIPlatform() {
                     ) : (
                       <>
                         <p className="text-sm leading-relaxed font-medium">{message.content}</p>
+                        
+                        {/* File Attachments Display */}
+                        {message.attachments && message.attachments.length > 0 && (
+                          <div className="mt-4 space-y-3">
+                            {message.attachments.map((attachment) => (
+                              <div key={attachment.id}>
+                                {attachment.type === 'image' && (
+                                  <div className="relative group/img rounded-xl overflow-hidden border border-gray-700/50 bg-gray-900/50">
+                                    <img 
+                                      src={attachment.url || "/placeholder.svg"} 
+                                      alt={attachment.name}
+                                      className="w-full max-w-xl rounded-xl"
+                                    />
+                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                      <div className="flex items-center gap-2">
+                                        <ImageIcon className="w-4 h-4 text-gray-400" />
+                                        <span className="text-xs font-bold text-gray-300">{attachment.name}</span>
+                                        <span className="text-xs text-gray-500 ml-auto">{(attachment.size / 1024).toFixed(1)} KB</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {attachment.type === 'csv' && attachment.data && (
+                                  <div className="rounded-xl border border-gray-700/50 bg-gray-900/50 overflow-hidden">
+                                    <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-800/50 border-b border-gray-700/50">
+                                      <FileText className="w-4 h-4 text-green-400" />
+                                      <span className="text-xs font-bold text-gray-300">{attachment.name}</span>
+                                      <span className="text-xs text-gray-500 ml-auto">
+                                        {attachment.data.rows.length} rows × {attachment.data.headers.length} columns
+                                      </span>
+                                    </div>
+                                    <div className="overflow-x-auto max-h-96 custom-scrollbar">
+                                      <table className="w-full text-xs">
+                                        <thead className="sticky top-0 bg-gray-800/80 backdrop-blur-sm">
+                                          <tr>
+                                            {attachment.data.headers.map((header: string, idx: number) => (
+                                              <th key={idx} className="px-4 py-2.5 text-left font-bold text-gray-300 border-b border-gray-700/50">
+                                                {header}
+                                              </th>
+                                            ))}
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {attachment.data.rows.slice(0, 100).map((row: string[], rowIdx: number) => (
+                                            <tr key={rowIdx} className="hover:bg-gray-800/30 transition-colors border-b border-gray-800/30">
+                                              {row.map((cell: string, cellIdx: number) => (
+                                                <td key={cellIdx} className="px-4 py-2.5 text-gray-400 font-medium">
+                                                  {cell}
+                                                </td>
+                                              ))}
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                      {attachment.data.rows.length > 100 && (
+                                        <div className="px-4 py-3 bg-gray-800/30 text-center">
+                                          <span className="text-xs text-gray-500">
+                                            Showing first 100 rows of {attachment.data.rows.length}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
                         {message.editHistory && message.editHistory.length > 0 && (
                           <div className="mt-3 pt-3 border-t border-gray-700/50">
                             <details className="text-xs text-gray-500">
@@ -1723,8 +1867,57 @@ export default function UnifiedAIPlatform() {
               })}
             </div>
 
+            {/* File Upload Preview */}
+            {uploadedFiles.length > 0 && (
+              <div className="mb-4 space-y-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <Paperclip className="w-4 h-4 text-blue-400" />
+                  <span className="text-xs font-bold text-gray-400">
+                    {uploadedFiles.length} file{uploadedFiles.length !== 1 ? 's' : ''} attached
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {uploadedFiles.map((file) => (
+                    <div
+                      key={file.id}
+                      className="flex items-center gap-2 px-3 py-2 bg-gray-800/60 border border-gray-700/50 rounded-xl group/file hover:border-gray-600 transition-all"
+                    >
+                      {file.type === 'image' ? (
+                        <ImageIcon className="w-4 h-4 text-blue-400" />
+                      ) : (
+                        <FileText className="w-4 h-4 text-green-400" />
+                      )}
+                      <span className="text-xs font-bold text-gray-300 max-w-[150px] truncate">
+                        {file.name}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {(file.size / 1024).toFixed(1)} KB
+                      </span>
+                      <button
+                        onClick={() => removeAttachment(file.id)}
+                        className="p-1 hover:bg-gray-700/50 rounded transition-all ml-1"
+                        title="Remove file"
+                      >
+                        <X className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="flex gap-3">
               <div className="flex-1 relative group/input">
+                {/* Hidden File Input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/jpg,text/csv"
+                  multiple
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                
                 <input
                   type="text"
                   value={input}
@@ -1736,11 +1929,20 @@ export default function UnifiedAIPlatform() {
                     }
                   }}
                   placeholder="Ask about betting odds, fantasy strategy, DFS lineups, or Kalshi markets..."
-                  className="w-full bg-gradient-to-r from-gray-900/80 to-gray-850/80 border border-gray-700/50 hover:border-gray-600/50 focus:border-blue-500/50 rounded-2xl px-6 py-4.5 pr-24 font-medium text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all backdrop-blur-sm shadow-inner text-xs"
+                  className="w-full bg-gradient-to-r from-gray-900/80 to-gray-850/80 border border-gray-700/50 hover:border-gray-600/50 focus:border-blue-500/50 rounded-2xl px-6 py-4.5 pr-32 font-medium text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all backdrop-blur-sm shadow-inner text-xs"
                   disabled={isTyping}
                   maxLength={500}
                 />
                 <div className="absolute right-5 top-1/2 -translate-y-1/2 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2 hover:bg-gray-800/70 rounded-lg transition-all group/attach border-none bg-transparent"
+                    title="Attach image or CSV file"
+                    disabled={isTyping}
+                  >
+                    <Paperclip className="w-4.5 h-4.5 text-gray-500 group-hover/attach:text-blue-400 transition-colors" />
+                  </button>
                   <span className={`text-xs font-bold transition-colors ${input.length > 450 ? 'text-orange-400' : 'text-gray-600'}`}>
                     {input.length}/500
                   </span>
@@ -1748,7 +1950,7 @@ export default function UnifiedAIPlatform() {
               </div>
               <button
                 type="submit"
-                disabled={!input.trim() || isTyping}
+                disabled={(!input.trim() && uploadedFiles.length === 0) || isTyping}
                 className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-800 disabled:to-gray-900 disabled:cursor-not-allowed text-white rounded-2xl px-8 py-4.5 transition-all duration-300 shadow-xl shadow-blue-500/25 hover:shadow-blue-500/50 hover:shadow-2xl disabled:shadow-none flex items-center gap-2.5 font-bold group overflow-hidden hover:scale-[1.02] active:scale-95 disabled:hover:scale-100"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>

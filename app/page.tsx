@@ -3,7 +3,7 @@
 import React from "react"
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon } from 'lucide-react';
+import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2 } from 'lucide-react';
 
 interface FileAttachment {
   id: string;
@@ -1892,24 +1892,60 @@ export default function UnifiedAIPlatform() {
 
                                 {/* Next Steps CTA */}
                                 <div className="bg-gradient-to-r from-indigo-900/30 via-purple-900/30 to-pink-900/30 border border-indigo-600/30 rounded-xl p-5">
-                                  <p className="text-sm text-gray-300 leading-relaxed mb-4">
-                                    <span className="font-bold text-white">Next Steps:</span> Would you like me to show correlated opportunities or dive deeper into any specific metric?
-                                  </p>
-                                  <div className="flex flex-wrap gap-3">
+                                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                    <p className="text-sm text-gray-300 leading-relaxed">
+                                      <span className="font-bold text-white">Next Steps:</span> Would you like me to show correlated opportunities or dive deeper into any specific metric?
+                                    </p>
                                     <button
-                                      onClick={() => handleFollowUp('correlated', card)}
-                                      className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 hover:scale-105 active:scale-95"
+                                      onClick={() => {
+                                        console.log('[v0] Yes button clicked - showing correlated opportunities');
+                                        handleFollowUp('correlated', card);
+                                      }}
+                                      disabled={isTyping}
+                                      className="group relative flex items-center justify-center gap-2.5 px-8 py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-600 disabled:via-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-black text-base rounded-xl transition-all duration-300 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:shadow-xl hover:scale-105 active:scale-95 min-w-[140px] flex-shrink-0"
                                     >
-                                      <Sparkles className="w-4 h-4" />
-                                      Show Correlated Opportunities
+                                      {isTyping ? (
+                                        <>
+                                          <Loader2 className="w-5 h-5 animate-spin" />
+                                          <span>Loading...</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <CheckCircle2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                          <span className="tracking-wide">YES</span>
+                                          <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                        </>
+                                      )}
                                     </button>
-                                    <button
-                                      onClick={() => handleFollowUp('metrics', card)}
-                                      className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-sm rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 hover:scale-105 active:scale-95"
-                                    >
-                                      <BarChart className="w-4 h-4" />
-                                      Dive Deeper into Metrics
-                                    </button>
+                                  </div>
+                                  
+                                  {/* Secondary Options */}
+                                  <div className="mt-4 pt-4 border-t border-indigo-600/20">
+                                    <p className="text-xs text-gray-400 mb-3 font-semibold">Or choose a specific action:</p>
+                                    <div className="flex flex-wrap gap-2">
+                                      <button
+                                        onClick={() => {
+                                          console.log('[v0] Correlated opportunities button clicked');
+                                          handleFollowUp('correlated', card);
+                                        }}
+                                        disabled={isTyping}
+                                        className="flex items-center gap-2 px-3.5 py-2 bg-gray-800/50 hover:bg-gray-700/50 disabled:bg-gray-800/30 disabled:cursor-not-allowed border border-gray-700/50 hover:border-blue-500/50 text-gray-300 hover:text-white font-semibold text-xs rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+                                      >
+                                        <Sparkles className="w-3.5 h-3.5" />
+                                        Correlated Plays
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          console.log('[v0] Metrics analysis button clicked');
+                                          handleFollowUp('metrics', card);
+                                        }}
+                                        disabled={isTyping}
+                                        className="flex items-center gap-2 px-3.5 py-2 bg-gray-800/50 hover:bg-gray-700/50 disabled:bg-gray-800/30 disabled:cursor-not-allow border border-gray-700/50 hover:border-purple-500/50 text-gray-300 hover:text-white font-semibold text-xs rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+                                      >
+                                        <BarChart className="w-3.5 h-3.5" />
+                                        Deep Metrics
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               </div>

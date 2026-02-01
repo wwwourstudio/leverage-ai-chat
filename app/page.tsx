@@ -3,7 +3,15 @@
 import React from "react"
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, Check, XCircle, Info, ChevronDown, ChevronUp, Lock, TrendingDown as TrendingUpDown } from 'lucide-react';
+import { 
+  Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, 
+  MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, 
+  DollarSign, Activity, Award, ChevronRight, Bell, Settings, 
+  ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles,
+  TrendingDown, Flame, Users, RefreshCw, Search, Calendar,
+  Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X,
+  CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info
+} from 'lucide-react';
 
 interface TrustMetrics {
   benfordIntegrity: number;
@@ -12,7 +20,11 @@ interface TrustMetrics {
   historicalAccuracy: number;
   finalConfidence: number;
   trustLevel: 'high' | 'medium' | 'low';
-  flags?: string[];
+  flags?: Array<{
+    type: string;
+    message: string;
+    severity: 'info' | 'warning' | 'error';
+  }>;
   riskLevel: 'low' | 'medium' | 'high';
   adjustedTone?: string;
 }
@@ -451,34 +463,54 @@ export default function UnifiedAIPlatform() {
       .sort(() => Math.random() - 0.5)
       .slice(0, 2 + Math.floor(Math.random() * 2));
 
-    // Generate Trust & Integrity metrics
+    // Generate AI Trust & Integrity metrics
     const benfordIntegrity = 75 + Math.floor(Math.random() * 23);
-    const oddsAlignment = 70 + Math.floor(Math.random() * 28);
-    const marketConsensus = 72 + Math.floor(Math.random() * 26);
+    const oddsAlignment = 80 + Math.floor(Math.random() * 18);
+    const marketConsensus = 70 + Math.floor(Math.random() * 25);
     const historicalAccuracy = 78 + Math.floor(Math.random() * 20);
-    
-    // Calculate final confidence (weighted average)
+
     const finalConfidence = Math.round(
-      (benfordIntegrity * 0.20) +
-      (oddsAlignment * 0.30) +
-      (marketConsensus * 0.30) +
-      (historicalAccuracy * 0.20)
+      benfordIntegrity * 0.20 +
+      oddsAlignment * 0.30 +
+      marketConsensus * 0.30 +
+      historicalAccuracy * 0.20
     );
 
     const trustLevel: 'high' | 'medium' | 'low' = 
-      finalConfidence >= 80 ? 'high' : finalConfidence >= 60 ? 'medium' : 'low';
+      finalConfidence >= 80 ? 'high' : 
+      finalConfidence >= 60 ? 'medium' : 'low';
 
     const riskLevel: 'low' | 'medium' | 'high' = 
-      finalConfidence >= 80 ? 'low' : finalConfidence >= 60 ? 'medium' : 'high';
+      finalConfidence >= 80 ? 'low' : 
+      finalConfidence >= 60 ? 'medium' : 'high';
 
-    const adjustedTone = trustLevel === 'high' ? 'High conviction signal' :
-                        trustLevel === 'medium' ? 'Moderate edge detected' :
-                        'Speculative - High uncertainty';
+    const flags: Array<{ type: string; message: string; severity: 'info' | 'warning' | 'error' }> = [];
+    
+    if (benfordIntegrity < 70) {
+      flags.push({ 
+        type: 'benford', 
+        message: 'AI numeric outputs show deviation from market odds distribution', 
+        severity: 'warning' 
+      });
+    }
+    if (oddsAlignment < 85) {
+      flags.push({ 
+        type: 'odds', 
+        message: `AI recommendation differs from live market by ${(100 - oddsAlignment) / 10}%`, 
+        severity: oddsAlignment < 70 ? 'error' : 'warning' 
+      });
+    }
+    if (marketConsensus < 70) {
+      flags.push({ 
+        type: 'consensus', 
+        message: 'Significant divergence from market consensus detected', 
+        severity: 'warning' 
+      });
+    }
 
-    const flags: string[] = [];
-    if (benfordIntegrity < 60) flags.push('Benford validation warning');
-    if (oddsAlignment < 70) flags.push('Significant odds deviation detected');
-    if (marketConsensus < 65) flags.push('Diverges from market consensus');
+    const adjustedTone = trustLevel === 'high' ? 'Strong signal' : 
+                        trustLevel === 'medium' ? 'Moderate edge' : 
+                        'High uncertainty';
 
     setMessages(prev => [...prev, {
       role: 'assistant',
@@ -496,9 +528,9 @@ export default function UnifiedAIPlatform() {
         historicalAccuracy,
         finalConfidence,
         trustLevel,
+        flags: flags.length > 0 ? flags : undefined,
         riskLevel,
-        adjustedTone,
-        flags: flags.length > 0 ? flags : undefined
+        adjustedTone
       }
     }]);
     setIsTyping(false);
@@ -1276,153 +1308,248 @@ export default function UnifiedAIPlatform() {
                           )}
                         </div>
                       )}
+                    </div>
+                  )}
 
-                      {/* AI Trust & Integrity Section */}
-                      {message.trustMetrics && (
-                        <div className="mt-4 pt-4 border-t border-gray-800/30 space-y-3">
-                          <div className="flex items-center gap-2 pb-2 border-b border-gray-800/50">
-                            <Lock className="w-4 h-4 text-emerald-400" />
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">AI Trust & Integrity</span>
+                  {/* AI Trust & Integrity - Hidden for welcome message */}
+                  {message.role === 'assistant' && !message.isWelcome && message.trustMetrics && (
+                    <div className="mt-5 ml-11 space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b border-gray-800/50">
+                        <Shield className="w-4 h-4 text-green-400" />
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">AI Trust & Integrity</span>
+                      </div>
+
+                      {/* Trust Indicators */}
+                      <div className="flex flex-wrap gap-2">
+                        {/* Benford Market Integrity */}
+                        <div 
+                          className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border cursor-default transition-all hover:scale-[1.02] ${
+                            message.trustMetrics.benfordIntegrity >= 80 
+                              ? 'text-green-400 border-green-500/30 bg-green-500/5' 
+                              : message.trustMetrics.benfordIntegrity >= 60 
+                              ? 'text-yellow-400 border-yellow-500/30 bg-yellow-500/5'
+                              : 'text-red-400 border-red-500/30 bg-red-500/5'
+                          }`}
+                          title="AI numeric outputs are statistically validated against live sportsbook odds distributions"
+                          role="status"
+                        >
+                          <div className="p-1 rounded-lg bg-gray-900/50">
+                            {message.trustMetrics.benfordIntegrity >= 80 ? (
+                              <CheckCheck className="w-3.5 h-3.5" />
+                            ) : message.trustMetrics.benfordIntegrity >= 60 ? (
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                            ) : (
+                              <XCircle className="w-3.5 h-3.5" />
+                            )}
                           </div>
+                          <span className="text-xs font-bold">Benford Market Integrity</span>
+                          <div className="w-px h-4 bg-gray-700/50"></div>
+                          <span className="text-xs font-black tabular-nums">{message.trustMetrics.benfordIntegrity}%</span>
+                        </div>
 
-                          {/* Trust Indicators */}
-                          <div className="flex flex-wrap gap-2">
-                            {[
-                              {
-                                label: 'Benford Market Integrity',
-                                score: message.trustMetrics.benfordIntegrity,
-                                tooltip: 'AI numeric outputs are statistically validated against live sportsbook odds distributions'
-                              },
-                              {
-                                label: 'Odds Alignment',
-                                score: message.trustMetrics.oddsAlignment,
-                                tooltip: 'Measures how closely AI recommendations align with live sportsbook odds'
-                              },
-                              {
-                                label: 'Market Consensus',
-                                score: message.trustMetrics.marketConsensus,
-                                tooltip: 'Compares AI outputs to aggregated market consensus'
-                              },
-                              {
-                                label: 'Historical AI Accuracy',
-                                score: message.trustMetrics.historicalAccuracy,
-                                tooltip: 'Historical accuracy of this model on similar markets'
-                              }
-                            ].map((indicator, idx) => {
-                              const statusColor = indicator.score >= 80 ? 'text-green-400 border-green-500/30 bg-green-500/5' :
-                                                indicator.score >= 60 ? 'text-yellow-400 border-yellow-500/30 bg-yellow-500/5' :
-                                                'text-red-400 border-red-500/30 bg-red-500/5';
-                              const StatusIcon = indicator.score >= 80 ? Check : 
-                                               indicator.score >= 60 ? AlertCircle : 
-                                               XCircle;
-                              return (
-                                <div
-                                  key={idx}
-                                  className={`group/indicator flex items-center gap-2.5 px-3.5 py-2 rounded-xl border ${statusColor} cursor-help transition-all hover:scale-[1.02]`}
-                                  title={indicator.tooltip}
-                                  role="status"
-                                  aria-label={`${indicator.label}: ${indicator.score}%`}
-                                >
-                                  <div className="p-1 rounded-lg bg-gray-900/50">
-                                    <StatusIcon className="w-3.5 h-3.5" />
-                                  </div>
-                                  <span className="text-xs font-bold">{indicator.label}</span>
-                                  <div className="w-px h-4 bg-gray-700/50"></div>
-                                  <span className="text-xs font-black tabular-nums">{indicator.score}%</span>
-                                  <Info className="w-3 h-3 opacity-0 group-hover/indicator:opacity-100 transition-opacity ml-0.5" />
-                                </div>
-                              );
-                            })}
+                        {/* Odds Alignment */}
+                        <div 
+                          className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border cursor-default transition-all hover:scale-[1.02] ${
+                            message.trustMetrics.oddsAlignment >= 80 
+                              ? 'text-green-400 border-green-500/30 bg-green-500/5' 
+                              : message.trustMetrics.oddsAlignment >= 60 
+                              ? 'text-yellow-400 border-yellow-500/30 bg-yellow-500/5'
+                              : 'text-red-400 border-red-500/30 bg-red-500/5'
+                          }`}
+                          title="Measures how closely AI recommendations align with live sportsbook odds"
+                          role="status"
+                        >
+                          <div className="p-1 rounded-lg bg-gray-900/50">
+                            {message.trustMetrics.oddsAlignment >= 80 ? (
+                              <CheckCheck className="w-3.5 h-3.5" />
+                            ) : message.trustMetrics.oddsAlignment >= 60 ? (
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                            ) : (
+                              <XCircle className="w-3.5 h-3.5" />
+                            )}
                           </div>
+                          <span className="text-xs font-bold">Odds Alignment</span>
+                          <div className="w-px h-4 bg-gray-700/50"></div>
+                          <span className="text-xs font-black tabular-nums">{message.trustMetrics.oddsAlignment}%</span>
+                        </div>
 
-                          {/* Final Confidence Score */}
-                          <div className="flex items-center gap-3 pt-2 border-t border-gray-800/30">
-                            <div className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border ${
-                              message.trustMetrics.trustLevel === 'high' ? 'text-green-400 border-green-500/40 bg-green-500/10' :
-                              message.trustMetrics.trustLevel === 'medium' ? 'text-yellow-400 border-yellow-500/40 bg-yellow-500/10' :
-                              'text-red-400 border-red-500/40 bg-red-500/10'
+                        {/* Market Consensus */}
+                        <div 
+                          className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border cursor-default transition-all hover:scale-[1.02] ${
+                            message.trustMetrics.marketConsensus >= 80 
+                              ? 'text-green-400 border-green-500/30 bg-green-500/5' 
+                              : message.trustMetrics.marketConsensus >= 60 
+                              ? 'text-yellow-400 border-yellow-500/30 bg-yellow-500/5'
+                              : 'text-red-400 border-red-500/30 bg-red-500/5'
+                          }`}
+                          title="Compares AI outputs to aggregated market consensus"
+                          role="status"
+                        >
+                          <div className="p-1 rounded-lg bg-gray-900/50">
+                            {message.trustMetrics.marketConsensus >= 80 ? (
+                              <CheckCheck className="w-3.5 h-3.5" />
+                            ) : message.trustMetrics.marketConsensus >= 60 ? (
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                            ) : (
+                              <XCircle className="w-3.5 h-3.5" />
+                            )}
+                          </div>
+                          <span className="text-xs font-bold">Market Consensus</span>
+                          <div className="w-px h-4 bg-gray-700/50"></div>
+                          <span className="text-xs font-black tabular-nums">{message.trustMetrics.marketConsensus}%</span>
+                        </div>
+
+                        {/* Historical AI Accuracy */}
+                        <div 
+                          className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border cursor-default transition-all hover:scale-[1.02] ${
+                            message.trustMetrics.historicalAccuracy >= 80 
+                              ? 'text-green-400 border-green-500/30 bg-green-500/5' 
+                              : message.trustMetrics.historicalAccuracy >= 60 
+                              ? 'text-yellow-400 border-yellow-500/30 bg-yellow-500/5'
+                              : 'text-red-400 border-red-500/30 bg-red-500/5'
+                          }`}
+                          title="Historical accuracy of this model on similar markets"
+                          role="status"
+                        >
+                          <div className="p-1 rounded-lg bg-gray-900/50">
+                            {message.trustMetrics.historicalAccuracy >= 80 ? (
+                              <CheckCheck className="w-3.5 h-3.5" />
+                            ) : message.trustMetrics.historicalAccuracy >= 60 ? (
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                            ) : (
+                              <XCircle className="w-3.5 h-3.5" />
+                            )}
+                          </div>
+                          <span className="text-xs font-bold">Historical AI Accuracy</span>
+                          <div className="w-px h-4 bg-gray-700/50"></div>
+                          <span className="text-xs font-black tabular-nums">{message.trustMetrics.historicalAccuracy}%</span>
+                        </div>
+                      </div>
+
+                      {/* Final Confidence Score & Risk-Adjusted Recommendation */}
+                      <div className="grid md:grid-cols-2 gap-3 pt-2 border-t border-gray-800/30">
+                        <div className={`p-4 rounded-xl border ${
+                          message.trustMetrics.trustLevel === 'high' 
+                            ? 'bg-green-500/5 border-green-500/30' 
+                            : message.trustMetrics.trustLevel === 'medium'
+                            ? 'bg-blue-500/5 border-blue-500/30'
+                            : 'bg-orange-500/5 border-orange-500/30'
+                        }`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Shield className={`w-4 h-4 ${
+                              message.trustMetrics.trustLevel === 'high' ? 'text-green-400' :
+                              message.trustMetrics.trustLevel === 'medium' ? 'text-blue-400' :
+                              'text-orange-400'
+                            }`} />
+                            <span className="text-xs font-bold text-gray-400 uppercase">Final Confidence</span>
+                          </div>
+                          <div className="flex items-baseline gap-2">
+                            <span className={`text-2xl font-black tabular-nums ${
+                              message.trustMetrics.trustLevel === 'high' ? 'text-green-400' :
+                              message.trustMetrics.trustLevel === 'medium' ? 'text-blue-400' :
+                              'text-orange-400'
                             }`}>
-                              <Shield className="w-4 h-4" />
-                              <span className="text-xs font-bold">Final Confidence</span>
-                              <div className="w-px h-4 bg-gray-700/50"></div>
-                              <span className="text-sm font-black tabular-nums">{message.trustMetrics.finalConfidence}%</span>
-                              <span className="text-[10px] font-bold opacity-75 uppercase">
-                                ({message.trustMetrics.trustLevel} trust)
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-gray-500">
-                              <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />
-                              <span className="font-semibold">Confidence Adjusted:</span>
-                              <span className="font-bold text-gray-400">{message.trustMetrics.adjustedTone}</span>
-                            </div>
+                              {message.trustMetrics.finalConfidence}%
+                            </span>
+                            <span className={`text-xs font-bold px-2 py-1 rounded-lg ${
+                              message.trustMetrics.trustLevel === 'high' 
+                                ? 'bg-green-500/20 text-green-400' 
+                                : message.trustMetrics.trustLevel === 'medium'
+                                ? 'bg-blue-500/20 text-blue-400'
+                                : 'bg-orange-500/20 text-orange-400'
+                            }`}>
+                              {message.trustMetrics.trustLevel === 'high' ? 'High Trust' : 
+                               message.trustMetrics.trustLevel === 'medium' ? 'Medium Trust' : 
+                               'Low Trust'}
+                            </span>
                           </div>
+                          <p className="text-xs text-gray-500 mt-2">
+                            Confidence: {message.trustMetrics.adjustedTone}
+                          </p>
+                        </div>
 
-                          {/* Risk-Adjusted Recommendation */}
-                          <div className="mt-3 p-3.5 rounded-xl bg-gradient-to-br from-gray-900/50 to-gray-800/30 border border-gray-700/30">
-                            <div className="flex items-start gap-3">
-                              <div className={`p-2 rounded-lg ${
-                                message.trustMetrics.riskLevel === 'low' ? 'bg-green-500/10' :
-                                message.trustMetrics.riskLevel === 'medium' ? 'bg-yellow-500/10' :
-                                'bg-red-500/10'
-                              }`}>
-                                <Target className={`w-4 h-4 ${
-                                  message.trustMetrics.riskLevel === 'low' ? 'text-green-400' :
-                                  message.trustMetrics.riskLevel === 'medium' ? 'text-yellow-400' :
-                                  'text-red-400'
-                                }`} />
-                              </div>
-                              <div className="flex-1">
-                                <h4 className="text-xs font-bold text-white mb-1.5">Risk-Adjusted Recommendation</h4>
-                                <div className="flex items-center gap-3 mb-2">
-                                  <span className="text-[10px] font-bold text-gray-500 uppercase">
-                                    Confidence: <span className="text-gray-400">{message.trustMetrics.finalConfidence}%</span>
-                                  </span>
-                                  <span className={`text-[10px] font-bold uppercase ${
-                                    message.trustMetrics.riskLevel === 'low' ? 'text-green-400' :
-                                    message.trustMetrics.riskLevel === 'medium' ? 'text-yellow-400' :
-                                    'text-red-400'
-                                  }`}>
-                                    Risk: {message.trustMetrics.riskLevel}
-                                  </span>
+                        <div className={`p-4 rounded-xl border ${
+                          message.trustMetrics.riskLevel === 'low' 
+                            ? 'bg-green-500/5 border-green-500/30' 
+                            : message.trustMetrics.riskLevel === 'medium'
+                            ? 'bg-yellow-500/5 border-yellow-500/30'
+                            : 'bg-red-500/5 border-red-500/30'
+                        }`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertCircle className={`w-4 h-4 ${
+                              message.trustMetrics.riskLevel === 'low' ? 'text-green-400' :
+                              message.trustMetrics.riskLevel === 'medium' ? 'text-yellow-400' :
+                              'text-red-400'
+                            }`} />
+                            <span className="text-xs font-bold text-gray-400 uppercase">Risk-Adjusted Recommendation</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-sm font-bold px-2.5 py-1 rounded-lg ${
+                              message.trustMetrics.riskLevel === 'low' 
+                                ? 'bg-green-500/20 text-green-400' 
+                                : message.trustMetrics.riskLevel === 'medium'
+                                ? 'bg-yellow-500/20 text-yellow-400'
+                                : 'bg-red-500/20 text-red-400'
+                            }`}>
+                              {message.trustMetrics.riskLevel === 'low' ? 'Low Risk' : 
+                               message.trustMetrics.riskLevel === 'medium' ? 'Medium Risk' : 
+                               'High Risk'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-2">
+                            {message.trustMetrics.riskLevel === 'low' 
+                              ? 'AI outputs align well with market data'
+                              : message.trustMetrics.riskLevel === 'medium'
+                              ? 'Some divergence from market consensus'
+                              : 'Significant deviation from market baselines'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Advanced View: "Why Flagged?" */}
+                      {message.trustMetrics.flags && message.trustMetrics.flags.length > 0 && (
+                        <details className="pt-2 border-t border-gray-800/30">
+                          <summary className="cursor-pointer hover:text-gray-300 text-xs font-bold text-gray-400 flex items-center gap-2 py-2">
+                            <Info className="w-4 h-4 text-orange-400" />
+                            Advanced View: Why Flagged? ({message.trustMetrics.flags.length} {message.trustMetrics.flags.length === 1 ? 'issue' : 'issues'})
+                          </summary>
+                          <div className="mt-3 space-y-2">
+                            {message.trustMetrics.flags.map((flag, idx) => (
+                              <div 
+                                key={idx} 
+                                className={`flex items-start gap-3 p-3 rounded-lg border ${
+                                  flag.severity === 'error' 
+                                    ? 'bg-red-500/5 border-red-500/30' 
+                                    : flag.severity === 'warning'
+                                    ? 'bg-yellow-500/5 border-yellow-500/30'
+                                    : 'bg-blue-500/5 border-blue-500/30'
+                                }`}
+                              >
+                                <div className="p-1 rounded-lg bg-gray-900/50 flex-shrink-0">
+                                  {flag.severity === 'error' ? (
+                                    <XCircle className="w-4 h-4 text-red-400" />
+                                  ) : flag.severity === 'warning' ? (
+                                    <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                                  ) : (
+                                    <Info className="w-4 h-4 text-blue-400" />
+                                  )}
                                 </div>
-                                <p className="text-xs text-gray-400 leading-relaxed">
-                                  {message.trustMetrics.trustLevel === 'high' 
-                                    ? 'All validation checks passed. AI recommendation aligns strongly with market data and historical performance.'
-                                    : message.trustMetrics.trustLevel === 'medium'
-                                    ? 'Most validation checks passed. AI recommendation shows moderate alignment with market data. Consider additional research.'
-                                    : 'Some validation checks flagged concerns. AI recommendation diverges from market consensus. Approach with caution.'
-                                  }
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Advanced View: Why Flagged? */}
-                          {message.trustMetrics.flags && message.trustMetrics.flags.length > 0 && (
-                            <details className="group/details mt-3">
-                              <summary className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-orange-500/5 border border-orange-500/20 cursor-pointer hover:bg-orange-500/10 transition-all">
-                                <AlertCircle className="w-4 h-4 text-orange-400" />
-                                <span className="text-xs font-bold text-orange-400">Advanced View: Why Flagged?</span>
-                                <ChevronDown className="w-3.5 h-3.5 text-orange-400 ml-auto group-open/details:rotate-180 transition-transform" />
-                              </summary>
-                              <div className="mt-2 p-3.5 rounded-xl bg-gray-900/30 border border-gray-800/50 space-y-2">
-                                <p className="text-xs font-bold text-gray-400 mb-2">The following integrity checks raised concerns:</p>
-                                {message.trustMetrics.flags.map((flag, idx) => (
-                                  <div key={idx} className="flex items-start gap-2">
-                                    <AlertCircle className="w-3.5 h-3.5 text-orange-400 mt-0.5 flex-shrink-0" />
-                                    <p className="text-xs text-gray-400 leading-relaxed">{flag}</p>
-                                  </div>
-                                ))}
-                                <div className="mt-3 pt-3 border-t border-gray-800/50">
-                                  <p className="text-[11px] text-gray-500 leading-relaxed">
-                                    These flags indicate the AI output may not fully align with live market data. 
-                                    We recommend cross-checking with multiple sources before making decisions.
+                                <div className="flex-1">
+                                  <p className={`text-xs font-bold mb-1 ${
+                                    flag.severity === 'error' ? 'text-red-400' :
+                                    flag.severity === 'warning' ? 'text-yellow-400' :
+                                    'text-blue-400'
+                                  }`}>
+                                    {flag.type.charAt(0).toUpperCase() + flag.type.slice(1)} Check
+                                  </p>
+                                  <p className="text-xs text-gray-400 leading-relaxed">
+                                    {flag.message}
                                   </p>
                                 </div>
                               </div>
-                            </details>
-                          )}
-                        </div>
+                            ))}
+                          </div>
+                        </details>
                       )}
                     </div>
                   )}

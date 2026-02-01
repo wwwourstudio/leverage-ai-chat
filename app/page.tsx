@@ -110,14 +110,57 @@ export default function UnifiedAIPlatform() {
   const [editingChatTitle, setEditingChatTitle] = useState('');
   const [showLimitNotification, setShowLimitNotification] = useState(false);
   const [chatsRemaining, setChatsRemaining] = useState(5);
+  const [creditsRemaining, setCreditsRemaining] = useState(15);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [purchaseAmount, setPurchaseAmount] = useState('');
   const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
   const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Rate limiting utilities
-  const CHAT_LIMIT = 5;
+  // Credit system utilities
+  const MESSAGE_LIMIT = 15;
+  const CHAT_LIMIT = 10;
   const LIMIT_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+  const getCreditData = () => {
+    if (typeof window === 'undefined') return { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
+    const data = localStorage.getItem('userCredits');
+    if (!data) {
+      const initial = { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
+      localStorage.setItem('userCredits', JSON.stringify(initial));
+      return initial;
+    }
+    const parsed = JSON.parse(data);
+    // Check if reset time has passed
+    if (Date.now() > parsed.resetTime) {
+      const reset = { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
+      localStorage.setItem('userCredits', JSON.stringify(reset));
+      return reset;
+    }
+    return parsed;
+  };
+
+  const consumeCredit = () => {
+    const data = getCreditData();
+    if (data.credits <= 0) {
+      setShowPurchaseModal(true);
+      return false;
+    }
+    const updated = { ...data, credits: data.credits - 1 };
+    localStorage.setItem('userCredits', JSON.stringify(updated));
+    setCreditsRemaining(updated.credits);
+    return true;
+  };
+
+  const addCredits = (amount: number) => {
+    const data = getCreditData();
+    const updated = { ...data, credits: data.credits + amount };
+    localStorage.setItem('userCredits', JSON.stringify(updated));
+    setCreditsRemaining(updated.credits);
+  };
 
   const getRateLimitData = () => {
     if (typeof window === 'undefined') return { count: 0, resetTime: Date.now() + LIMIT_DURATION };
@@ -137,6 +180,11 @@ export default function UnifiedAIPlatform() {
     return parsed;
   };
 
+  const canCreateNewChat = () => {
+    const data = getRateLimitData();
+    return data.count < CHAT_LIMIT;
+  };
+
   const updateRateLimitCount = () => {
     const data = getRateLimitData();
     const updated = { ...data, count: data.count + 1 };
@@ -144,15 +192,12 @@ export default function UnifiedAIPlatform() {
     return updated;
   };
 
-  const canCreateNewChat = () => {
-    const data = getRateLimitData();
-    return data.count < CHAT_LIMIT;
-  };
-
-  // Initialize chats remaining on mount
+  // Initialize credits on mount
   useEffect(() => {
-    const data = getRateLimitData();
-    setChatsRemaining(CHAT_LIMIT - data.count);
+    const data = getCreditData();
+    setCreditsRemaining(data.credits);
+    const rateData = getRateLimitData();
+    setChatsRemaining(CHAT_LIMIT - rateData.count);
   }, []);
 
   const [chats, setChats] = useState<Chat[]>([
@@ -730,6 +775,12 @@ export default function UnifiedAIPlatform() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() && uploadedFiles.length === 0) return;
+
+    // Check if user has credits
+    if (!consumeCredit()) {
+      console.log('[v0] No credits remaining, showing purchase modal');
+      return;
+    }
 
     const userMessage: Message = {
       role: 'user',
@@ -1943,12 +1994,12 @@ export default function UnifiedAIPlatform() {
               </p>
               <div className="flex items-center gap-3">
                 <div className={`flex items-center gap-2 text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all ${
-                  chatsRemaining <= 1 
+                  creditsRemaining <= 3 
                     ? 'text-orange-400 bg-orange-500/10 border-orange-500/30' 
                     : 'text-gray-500 bg-gray-900/30 border-gray-800'
                 }`}>
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  <span>{chatsRemaining} {chatsRemaining === 1 ? 'chat' : 'chats'} remaining</span>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{creditsRemaining} {creditsRemaining === 1 ? 'credit' : 'credits'} remaining</span>
                 </div>
                 <div className="flex items-center gap-2 text-[11px] font-bold text-gray-600">
                   <div className="relative flex items-center justify-center">
@@ -1962,6 +2013,239 @@ export default function UnifiedAIPlatform() {
           </div>
         </div>
       </div>
+
+      {/* Purchase Credits Modal */}
+      {showPurchaseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowPurchaseModal(false)}>
+          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowPurchaseModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="p-8">
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-orange-500/10 border border-orange-500/30 mb-4">
+                  <AlertCircle className="w-6 h-6 text-orange-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Out of Credits</h2>
+                <p className="text-sm text-gray-400">Purchase more credits to continue using AI analysis</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-400 mb-2">Amount (min $10)</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
+                    <input
+                      type="number"
+                      min="10"
+                      value={purchaseAmount}
+                      onChange={(e) => setPurchaseAmount(e.target.value)}
+                      placeholder="10"
+                      className="w-full pl-8 pr-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {[20, 50, 100, 250].map((amount) => (
+                    <button
+                      key={amount}
+                      onClick={() => setPurchaseAmount(amount.toString())}
+                      className="flex-1 min-w-[80px] px-4 py-2.5 rounded-xl border border-gray-800 bg-gray-950 hover:bg-gray-800 hover:border-gray-700 text-white font-semibold text-sm transition-all"
+                    >
+                      ${amount}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => {
+                    const amount = parseInt(purchaseAmount) || 20;
+                    if (amount >= 10) {
+                      // Calculate credits: $1 = 1 credit
+                      addCredits(amount);
+                      setShowPurchaseModal(false);
+                      setPurchaseAmount('');
+                    }
+                  }}
+                  disabled={!purchaseAmount || parseInt(purchaseAmount) < 10}
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all"
+                >
+                  Purchase Credits
+                </button>
+
+                <div className="flex items-center justify-between pt-4 border-t border-gray-800">
+                  <button
+                    onClick={() => {
+                      setShowPurchaseModal(false);
+                      setShowSubscriptionModal(true);
+                    }}
+                    className="text-sm text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+                  >
+                    View Subscription
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowPurchaseModal(false);
+                      setShowLoginModal(true);
+                    }}
+                    className="text-sm text-gray-400 hover:text-gray-300 font-semibold transition-colors"
+                  >
+                    Login
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Subscription Modal */}
+      {showSubscriptionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowSubscriptionModal(false)}>
+          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowSubscriptionModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="p-8">
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-purple-500/10 border border-purple-500/30 mb-4">
+                  <Sparkles className="w-6 h-6 text-purple-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Monthly Subscription</h2>
+                <p className="text-sm text-gray-400">Get 20 credits every month for continuous access</p>
+              </div>
+
+              <div className="bg-gradient-to-br from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-xl p-6 mb-6">
+                <div className="flex items-baseline justify-center mb-4">
+                  <span className="text-4xl font-black text-white">$20</span>
+                  <span className="text-gray-400 ml-2">/month</span>
+                </div>
+                <div className="space-y-2 text-sm text-gray-300">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                    <span>20 credits per month</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                    <span>Auto-renews on the 1st</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                    <span>Cancel anytime</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                    <span>Priority support</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  // Mock subscription - in production this would integrate with Stripe
+                  addCredits(20);
+                  setShowSubscriptionModal(false);
+                }}
+                className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition-all mb-3"
+              >
+                Subscribe Now
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowSubscriptionModal(false);
+                  setShowPurchaseModal(true);
+                }}
+                className="w-full py-3 text-sm text-gray-400 hover:text-gray-300 font-semibold transition-colors"
+              >
+                One-time purchase instead
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowLoginModal(false)}>
+          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowLoginModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="p-8">
+              <div className="text-center mb-6">
+                <h2 className="text-2xl font-bold text-white mb-2">Welcome Back</h2>
+                <p className="text-sm text-gray-400">Sign in to access your account</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-400 mb-2">Email</label>
+                  <input
+                    type="email"
+                    placeholder="your@email.com"
+                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-400 mb-2">Password</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  />
+                </div>
+
+                <button
+                  onClick={() => {
+                    // Mock login - in production this would use Supabase
+                    setShowLoginModal(false);
+                  }}
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all"
+                >
+                  Sign In
+                </button>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-800"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-gray-900 text-gray-500">or</span>
+                  </div>
+                </div>
+
+                <button
+                  className="w-full py-3 border border-gray-800 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all"
+                >
+                  Continue with Google
+                </button>
+
+                <p className="text-center text-sm text-gray-500">
+                  Don't have an account?{' '}
+                  <button className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
+                    Sign up
+                  </button>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>
         {`

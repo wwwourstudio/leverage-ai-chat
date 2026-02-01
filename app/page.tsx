@@ -682,33 +682,45 @@ export default function UnifiedAIPlatform() {
     setIsTyping(true);
     
     setTimeout(() => {
-      const detailedAnalysisText = `Here's the comprehensive deep-dive analysis for ${card.title}:
+      // Extract metrics dynamically from card data
+      const metrics = Object.entries(card.data).map(([key, value]) => ({
+        label: key.replace(/([A-Z])/g, ' $1').trim(),
+        value: value
+      }));
 
-**Market Context & Edge Analysis**
-Based on my advanced AI models analyzing ${card.category} data across multiple platforms, I've identified key insights that provide significant edge in this ${card.subcategory.toLowerCase()} opportunity.
+      // Build comprehensive structured analysis
+      const detailedAnalysisText = `## ${card.title} - Complete Analysis
 
-**Detailed Breakdown:**
-${Object.entries(card.data).map(([key, value]) => `• **${key.replace(/([A-Z])/g, ' $1').trim()}**: ${value} - This metric suggests strong correlation with profitable outcomes based on historical patterns.`).join('\n')}
+### Overview
+${card.category} ${card.subcategory} opportunity identified with **${card.status.toUpperCase()}** confidence. Based on multi-platform analysis, this presents significant edge potential.
 
-**Risk Assessment & Strategy:**
-The ${card.status} status indicates this is a high-conviction play. My recommendation is to approach this with calculated position sizing, accounting for the inherent variance in ${card.category} markets.
+### Key Metrics
 
-**Cross-Platform Correlation:**
-This opportunity aligns well with similar patterns I'm detecting in related betting markets, DFS slates, and prediction markets. Consider stacking this with correlated plays for maximum leverage.
+${metrics.map(m => `**${m.label}**: ${m.value}`).join('  \n')}
 
-**Action Items:**
-1. Monitor line movements over the next 2-4 hours
-2. Compare with sharp money indicators
-3. Validate against contrarian ownership metrics
-4. Execute within optimal timing window
+### Market Context & Edge
+My AI models have analyzed ${card.category} data across multiple platforms including live odds feeds, historical databases, and prediction markets. This ${card.subcategory.toLowerCase()} opportunity shows strong alignment with profitable historical patterns.
 
+### Risk Assessment
+- **Conviction Level**: ${card.status === 'hot' || card.status === 'strong' || card.status === 'elite' ? 'High' : card.status === 'value' || card.status === 'optimal' ? 'Medium-High' : 'Medium'}
+- **Risk Category**: ${card.status === 'hot' ? 'Time-sensitive play' : card.status === 'value' ? 'Measured opportunity' : 'Standard variance'}
+- **Position Sizing**: Recommended ${card.status === 'elite' || card.status === 'strong' ? '15-20%' : card.status === 'value' ? '10-15%' : '8-12%'} of allocated bankroll
+
+### Strategic Recommendations
+1. **Entry Strategy**: ${card.status === 'hot' ? 'Act quickly - market moving fast' : 'Monitor for optimal entry window'}
+2. **Cross-Platform Plays**: Consider correlating with ${card.category === 'NBA' || card.category === 'NFL' ? 'DFS lineups and player props' : card.category === 'NFFC' || card.category === 'NFBC' ? 'auction values and stacks' : 'related betting markets'}
+3. **Exit Conditions**: ${card.status === 'hot' ? 'Lock in if line moves significantly against position' : 'Standard variance management'}
+4. **Leverage Opportunities**: Stack with ${card.type === 'live-odds' ? 'correlated player props' : card.type === 'dfs-lineup' ? 'betting totals' : card.type === 'kalshi-market' ? 'sportsbook arbitrage' : 'related plays'}
+
+### Next Steps
 Would you like me to show correlated opportunities or dive deeper into any specific metric?`;
 
       const aiMessage: Message = {
         role: 'assistant',
         content: detailedAnalysisText,
         timestamp: new Date(),
-        cards: [card],
+        // Remove cards array to eliminate duplicate display
+        cards: [],
         sources: [
           { name: 'Advanced AI Model', type: 'model', reliability: 94 },
           { name: 'Historical Database', type: 'database', reliability: 96 },

@@ -703,10 +703,11 @@ export default function UnifiedAIPlatform() {
                          card.type === 'dfs-lineup' ? 'betting totals' : 
                          card.type === 'kalshi-market' ? 'sportsbook arbitrage' : 'related plays';
 
-      // Store structured data using JSON marker
+      // Store structured data using JSON marker (exclude icon - it's not serializable)
+      const { icon, ...cardWithoutIcon } = card;
       const structuredData = {
         isDetailedAnalysis: true,
-        card: card,
+        card: cardWithoutIcon,
         metrics: metrics,
         overview: `${card.category} ${card.subcategory} opportunity identified with ${card.status.toUpperCase()} confidence. Based on multi-platform analysis, this presents significant edge potential.`,
         marketContext: `My AI models have analyzed ${card.category} data across multiple platforms including live odds feeds, historical databases, and prediction markets. This ${card.subcategory.toLowerCase()} opportunity shows strong alignment with profitable historical patterns.`,
@@ -1676,7 +1677,26 @@ export default function UnifiedAIPlatform() {
                             
                             const data = JSON.parse(match[1]);
                             const { card, metrics, overview, marketContext, riskAssessment, recommendations } = data;
-                            const CardIcon = card.icon;
+                            
+                            // Map card type to icon component
+                            const getCardIcon = (type: string) => {
+                              const iconMap: Record<string, any> = {
+                                'live-odds': Zap,
+                                'player-prop': Target,
+                                'dfs-lineup': Award,
+                                'dfs-value': DollarSign,
+                                'adp-analysis': TrendingUp,
+                                'bestball-stack': Medal,
+                                'auction-value': ShoppingCart,
+                                'kalshi-market': BarChart3,
+                                'kalshi-weather': Activity,
+                                'cross-platform': Sparkles,
+                                'ai-prediction': Sparkles,
+                              };
+                              return iconMap[type] || Sparkles;
+                            };
+                            
+                            const CardIcon = getCardIcon(card.type);
                             
                             return (
                               <div className="space-y-6">

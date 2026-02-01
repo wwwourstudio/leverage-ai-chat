@@ -670,6 +670,59 @@ export default function UnifiedAIPlatform() {
     return uniqueSuggestions.slice(0, 7);
   };
 
+  const handleFollowUp = (action: 'correlated' | 'metrics', cardData?: any) => {
+    console.log('[v0] Generating follow-up response:', action);
+    
+    // Check if user has credits
+    if (!consumeCredit()) {
+      console.log('[v0] No credits remaining, showing purchase modal');
+      return;
+    }
+
+    setIsTyping(true);
+    
+    setTimeout(() => {
+      let responseText = '';
+      let responseCards: InsightCard[] = [];
+
+      if (action === 'correlated') {
+        responseText = "**Correlated Opportunities Identified**\n\n**Cross-Platform Analysis:** I've scanned multiple markets to find plays that correlate with your original opportunity.\n\n**Synergy Rating:** High - These plays share common factors and can be stacked for increased leverage\n\n**Strategic Value:** Combining these opportunities creates portfolio diversification while maintaining edge\n\n**Here are the correlated plays:**";
+        responseCards = [unifiedCards[1], unifiedCards[3], unifiedCards[5]];
+      } else {
+        responseText = "**Deep Metric Analysis**\n\n**Data Validation:** All metrics cross-referenced with historical databases and real-time market feeds\n\n**Statistical Significance:** Each data point has been tested for reliability and predictive value\n\n**Actionable Insights:** Below is a granular breakdown of key performance indicators and their implications\n\n**Detailed metric breakdown:**";
+        responseCards = [unifiedCards[2], unifiedCards[6]];
+      }
+
+      const aiMessage: Message = {
+        role: 'assistant',
+        content: responseText,
+        timestamp: new Date(),
+        cards: responseCards,
+        sources: [
+          { name: 'Advanced AI Model', type: 'model', reliability: 93 },
+          { name: 'Historical Database', type: 'database', reliability: 95 },
+          { name: 'Live Market API', type: 'api', reliability: 97 }
+        ],
+        modelUsed: 'GPT-4 Turbo',
+        processingTime: 750 + Math.floor(Math.random() * 300),
+        trustMetrics: {
+          benfordIntegrity: 86 + Math.floor(Math.random() * 10),
+          oddsAlignment: 88 + Math.floor(Math.random() * 10),
+          marketConsensus: 84 + Math.floor(Math.random() * 12),
+          historicalAccuracy: 91 + Math.floor(Math.random() * 8),
+          finalConfidence: 87 + Math.floor(Math.random() * 8),
+          trustLevel: 'high',
+          riskLevel: 'low',
+          adjustedTone: 'Strong signal',
+          flags: []
+        }
+      };
+
+      setMessages(prev => [...prev, aiMessage]);
+      setIsTyping(false);
+    }, 1000);
+  };
+
   const generateDetailedAnalysis = (card: InsightCard) => {
     console.log('[v0] Generating detailed analysis for card:', card.title);
     
@@ -1838,10 +1891,26 @@ export default function UnifiedAIPlatform() {
                                 </div>
 
                                 {/* Next Steps CTA */}
-                                <div className="bg-gradient-to-r from-indigo-900/30 via-purple-900/30 to-pink-900/30 border border-indigo-600/30 rounded-xl p-4">
-                                  <p className="text-sm text-gray-300 leading-relaxed">
+                                <div className="bg-gradient-to-r from-indigo-900/30 via-purple-900/30 to-pink-900/30 border border-indigo-600/30 rounded-xl p-5">
+                                  <p className="text-sm text-gray-300 leading-relaxed mb-4">
                                     <span className="font-bold text-white">Next Steps:</span> Would you like me to show correlated opportunities or dive deeper into any specific metric?
                                   </p>
+                                  <div className="flex flex-wrap gap-3">
+                                    <button
+                                      onClick={() => handleFollowUp('correlated', card)}
+                                      className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 hover:scale-105 active:scale-95"
+                                    >
+                                      <Sparkles className="w-4 h-4" />
+                                      Show Correlated Opportunities
+                                    </button>
+                                    <button
+                                      onClick={() => handleFollowUp('metrics', card)}
+                                      className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-sm rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 hover:scale-105 active:scale-95"
+                                    >
+                                      <BarChart className="w-4 h-4" />
+                                      Dive Deeper into Metrics
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             );

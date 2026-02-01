@@ -114,7 +114,10 @@ export default function UnifiedAIPlatform() {
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showSignupModal, setShowSignupModal] = useState(false);
   const [purchaseAmount, setPurchaseAmount] = useState('');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState<{ name: string; email: string; avatar?: string } | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
   const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1380,14 +1383,54 @@ export default function UnifiedAIPlatform() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              
-              <button className="relative p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 border border-gray-800 hover:border-gray-700 hover:shadow-lg group active:scale-95 border-none bg-transparent">
-                <Bell className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" />
-                <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-gray-950 shadow-lg shadow-red-500/50 animate-pulse"></div>
-              </button>
-              <button className="p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 border border-gray-800 hover:border-gray-700 hover:shadow-lg group active:scale-95 border-none bg-transparent">
-                <Settings className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors group-hover:rotate-90 transition-transform" />
-              </button>
+              {isLoggedIn && user ? (
+                <>
+                  {/* User Profile Info */}
+                  <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-900/50 border border-gray-800">
+                    <div className="flex items-center gap-2.5">
+                      <div className="relative">
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                          {user.avatar ? (
+                            <img src={user.avatar || "/placeholder.svg"} alt={user.name} className="w-full h-full rounded-full object-cover" />
+                          ) : (
+                            user.name.charAt(0).toUpperCase()
+                          )}
+                        </div>
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-950"></div>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-white">{user.name}</span>
+                        <span className="text-[10px] text-gray-500">{user.email}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notifications and Settings for logged-in users */}
+                  <button className="relative p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 border border-gray-800 hover:border-gray-700 hover:shadow-lg group active:scale-95 border-none bg-transparent">
+                    <Bell className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" />
+                    <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-gray-950 shadow-lg shadow-red-500/50 animate-pulse"></div>
+                  </button>
+                  <button className="p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 border border-gray-800 hover:border-gray-700 hover:shadow-lg group active:scale-95 border-none bg-transparent">
+                    <Settings className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors group-hover:rotate-90 transition-transform" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  {/* Login and Sign Up buttons for non-authenticated users */}
+                  <button
+                    onClick={() => setShowLoginModal(true)}
+                    className="px-4 py-2 rounded-xl border border-gray-800 bg-gray-900/50 hover:bg-gray-800/70 hover:border-gray-700 text-gray-300 hover:text-white text-sm font-semibold transition-all"
+                  >
+                    Log in
+                  </button>
+                  <button
+                    onClick={() => setShowSignupModal(true)}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-sm font-bold transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40"
+                  >
+                    Sign up
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -2195,6 +2238,7 @@ export default function UnifiedAIPlatform() {
                 <div>
                   <label className="block text-sm font-semibold text-gray-400 mb-2">Email</label>
                   <input
+                    id="login-email"
                     type="email"
                     placeholder="your@email.com"
                     className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
@@ -2204,6 +2248,7 @@ export default function UnifiedAIPlatform() {
                 <div>
                   <label className="block text-sm font-semibold text-gray-400 mb-2">Password</label>
                   <input
+                    id="login-password"
                     type="password"
                     placeholder="••••••••"
                     className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
@@ -2212,8 +2257,18 @@ export default function UnifiedAIPlatform() {
 
                 <button
                   onClick={() => {
+                    const emailInput = document.getElementById('login-email') as HTMLInputElement;
+                    const email = emailInput?.value || 'user@example.com';
+                    const name = email.split('@')[0];
+                    
                     // Mock login - in production this would use Supabase
+                    setIsLoggedIn(true);
+                    setUser({
+                      name: name.charAt(0).toUpperCase() + name.slice(1),
+                      email: email
+                    });
                     setShowLoginModal(false);
+                    console.log('[v0] User logged in:', { name, email });
                   }}
                   className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all"
                 >
@@ -2230,15 +2285,141 @@ export default function UnifiedAIPlatform() {
                 </div>
 
                 <button
+                  onClick={() => {
+                    // Mock Google login
+                    setIsLoggedIn(true);
+                    setUser({
+                      name: 'Demo User',
+                      email: 'demo@google.com'
+                    });
+                    setShowLoginModal(false);
+                  }}
                   className="w-full py-3 border border-gray-800 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all"
                 >
                   Continue with Google
                 </button>
 
                 <p className="text-center text-sm text-gray-500">
-                  Don't have an account?{' '}
-                  <button className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
+                  Don&apos;t have an account?{' '}
+                  <button 
+                    onClick={() => {
+                      setShowLoginModal(false);
+                      setShowSignupModal(true);
+                    }}
+                    className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+                  >
                     Sign up
+                  </button>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sign Up Modal */}
+      {showSignupModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowSignupModal(false)}>
+          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowSignupModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="p-8">
+              <div className="text-center mb-6">
+                <h2 className="text-2xl font-bold text-white mb-2">Create Account</h2>
+                <p className="text-sm text-gray-400">Sign up to get started with Leverage AI</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-400 mb-2">Full Name</label>
+                  <input
+                    id="signup-name"
+                    type="text"
+                    placeholder="John Doe"
+                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-400 mb-2">Email</label>
+                  <input
+                    id="signup-email"
+                    type="email"
+                    placeholder="your@email.com"
+                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-400 mb-2">Password</label>
+                  <input
+                    id="signup-password"
+                    type="password"
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  />
+                </div>
+
+                <button
+                  onClick={() => {
+                    const nameInput = document.getElementById('signup-name') as HTMLInputElement;
+                    const emailInput = document.getElementById('signup-email') as HTMLInputElement;
+                    const name = nameInput?.value || 'New User';
+                    const email = emailInput?.value || 'newuser@example.com';
+                    
+                    // Mock signup - in production this would use Supabase
+                    setIsLoggedIn(true);
+                    setUser({
+                      name: name,
+                      email: email
+                    });
+                    setShowSignupModal(false);
+                    console.log('[v0] User signed up:', { name, email });
+                  }}
+                  className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl transition-all shadow-lg"
+                >
+                  Create Account
+                </button>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-800"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-gray-900 text-gray-500">or</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    // Mock Google signup
+                    setIsLoggedIn(true);
+                    setUser({
+                      name: 'Google User',
+                      email: 'user@gmail.com'
+                    });
+                    setShowSignupModal(false);
+                  }}
+                  className="w-full py-3 border border-gray-800 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all"
+                >
+                  Sign up with Google
+                </button>
+
+                <p className="text-center text-sm text-gray-500">
+                  Already have an account?{' '}
+                  <button 
+                    onClick={() => {
+                      setShowSignupModal(false);
+                      setShowLoginModal(true);
+                    }}
+                    className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+                  >
+                    Log in
                   </button>
                 </p>
               </div>

@@ -670,6 +670,75 @@ export default function UnifiedAIPlatform() {
     return uniqueSuggestions.slice(0, 7);
   };
 
+  const generateDetailedAnalysis = (card: InsightCard) => {
+    console.log('[v0] Generating detailed analysis for card:', card.title);
+    
+    // Check if user has credits
+    if (!consumeCredit()) {
+      console.log('[v0] No credits remaining, showing purchase modal');
+      return;
+    }
+
+    setIsTyping(true);
+    
+    setTimeout(() => {
+      const detailedAnalysisText = `Here's the comprehensive deep-dive analysis for ${card.title}:
+
+**Market Context & Edge Analysis**
+Based on my advanced AI models analyzing ${card.category} data across multiple platforms, I've identified key insights that provide significant edge in this ${card.subcategory.toLowerCase()} opportunity.
+
+**Detailed Breakdown:**
+${Object.entries(card.data).map(([key, value]) => `• **${key.replace(/([A-Z])/g, ' $1').trim()}**: ${value} - This metric suggests strong correlation with profitable outcomes based on historical patterns.`).join('\n')}
+
+**Risk Assessment & Strategy:**
+The ${card.status} status indicates this is a high-conviction play. My recommendation is to approach this with calculated position sizing, accounting for the inherent variance in ${card.category} markets.
+
+**Cross-Platform Correlation:**
+This opportunity aligns well with similar patterns I'm detecting in related betting markets, DFS slates, and prediction markets. Consider stacking this with correlated plays for maximum leverage.
+
+**Action Items:**
+1. Monitor line movements over the next 2-4 hours
+2. Compare with sharp money indicators
+3. Validate against contrarian ownership metrics
+4. Execute within optimal timing window
+
+Would you like me to show correlated opportunities or dive deeper into any specific metric?`;
+
+      const aiMessage: Message = {
+        role: 'assistant',
+        content: detailedAnalysisText,
+        timestamp: new Date(),
+        cards: [card],
+        sources: [
+          { name: 'Advanced AI Model', type: 'model', reliability: 94 },
+          { name: 'Historical Database', type: 'database', reliability: 96 },
+          { name: 'Live Market API', type: 'api', reliability: 98 }
+        ],
+        modelUsed: 'GPT-4 Turbo',
+        processingTime: 850 + Math.floor(Math.random() * 300),
+        trustMetrics: {
+          benfordIntegrity: 85 + Math.floor(Math.random() * 10),
+          oddsAlignment: 87 + Math.floor(Math.random() * 10),
+          marketConsensus: 83 + Math.floor(Math.random() * 12),
+          historicalAccuracy: 90 + Math.floor(Math.random() * 8),
+          finalConfidence: 86 + Math.floor(Math.random() * 8),
+          trustLevel: 'high',
+          riskLevel: 'low',
+          adjustedTone: 'Strong signal',
+          flags: []
+        }
+      };
+
+      setMessages(prev => [...prev, aiMessage]);
+      
+      // Generate contextual suggestions based on the detailed analysis
+      const contextualSuggestions = generateContextualSuggestions(card.title, [card]);
+      setSuggestedPrompts(contextualSuggestions);
+      
+      setIsTyping(false);
+    }, 1200);
+  };
+
   const simulateResponse = (userMessage: string) => {
     setIsTyping(true);
     
@@ -1130,7 +1199,10 @@ export default function UnifiedAIPlatform() {
         </div>
 
         <div className="relative mt-4 pt-4 border-t border-gray-700/50">
-          <button className="w-full flex items-center justify-center gap-2 text-xs font-bold text-gray-400 hover:text-white transition-colors group/btn">
+          <button 
+            onClick={() => generateDetailedAnalysis(card)}
+            className="w-full flex items-center justify-center gap-2 text-xs font-bold text-gray-400 hover:text-white transition-colors group/btn"
+          >
             <span>View Full Analysis</span>
             <ChevronRight className="w-3.5 h-3.5 group-hover/btn:translate-x-1 transition-transform" />
           </button>

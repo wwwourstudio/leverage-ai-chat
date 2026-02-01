@@ -3,14 +3,32 @@
 import React from "react"
 
 import { useState, useRef, useEffect } from 'react';
-import { 
-  Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, 
-  MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, 
-  DollarSign, Activity, Award, ChevronRight, Bell, Settings, 
-  ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles,
-  TrendingDown, Flame, Users, RefreshCw, Search, Calendar,
-  Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X
-} from 'lucide-react';
+import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon } from 'lucide-react';
+
+interface FileAttachment {
+  id: string;
+  name: string;
+  type: 'image' | 'csv';
+  url: string;
+  size: number;
+  data?: any; // For CSV parsed data
+}
+
+interface TrustMetrics {
+  benfordIntegrity: number;
+  oddsAlignment: number;
+  marketConsensus: number;
+  historicalAccuracy: number;
+  finalConfidence: number;
+  trustLevel: 'high' | 'medium' | 'low';
+  flags?: Array<{
+    type: string;
+    message: string;
+    severity: 'info' | 'warning' | 'error';
+  }>;
+  riskLevel: 'low' | 'medium' | 'high';
+  adjustedTone?: string;
+}
 
 interface Message {
   role: 'user' | 'assistant';
@@ -39,6 +57,8 @@ interface Message {
   }>;
   modelUsed?: string;
   processingTime?: number;
+  trustMetrics?: TrustMetrics;
+  attachments?: FileAttachment[];
 }
 
 interface Chat {
@@ -90,11 +110,60 @@ export default function UnifiedAIPlatform() {
   const [editingChatTitle, setEditingChatTitle] = useState('');
   const [showLimitNotification, setShowLimitNotification] = useState(false);
   const [chatsRemaining, setChatsRemaining] = useState(5);
+  const [creditsRemaining, setCreditsRemaining] = useState(15);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showSignupModal, setShowSignupModal] = useState(false);
+  const [purchaseAmount, setPurchaseAmount] = useState('');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState<{ name: string; email: string; avatar?: string } | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
+  const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string }>>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Rate limiting utilities
-  const CHAT_LIMIT = 5;
+  // Credit system utilities
+  const MESSAGE_LIMIT = 15;
+  const CHAT_LIMIT = 10;
   const LIMIT_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+  const getCreditData = () => {
+    if (typeof window === 'undefined') return { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
+    const data = localStorage.getItem('userCredits');
+    if (!data) {
+      const initial = { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
+      localStorage.setItem('userCredits', JSON.stringify(initial));
+      return initial;
+    }
+    const parsed = JSON.parse(data);
+    // Check if reset time has passed
+    if (Date.now() > parsed.resetTime) {
+      const reset = { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
+      localStorage.setItem('userCredits', JSON.stringify(reset));
+      return reset;
+    }
+    return parsed;
+  };
+
+  const consumeCredit = () => {
+    const data = getCreditData();
+    if (data.credits <= 0) {
+      setShowPurchaseModal(true);
+      return false;
+    }
+    const updated = { ...data, credits: data.credits - 1 };
+    localStorage.setItem('userCredits', JSON.stringify(updated));
+    setCreditsRemaining(updated.credits);
+    return true;
+  };
+
+  const addCredits = (amount: number) => {
+    const data = getCreditData();
+    const updated = { ...data, credits: data.credits + amount };
+    localStorage.setItem('userCredits', JSON.stringify(updated));
+    setCreditsRemaining(updated.credits);
+  };
 
   const getRateLimitData = () => {
     if (typeof window === 'undefined') return { count: 0, resetTime: Date.now() + LIMIT_DURATION };
@@ -114,6 +183,11 @@ export default function UnifiedAIPlatform() {
     return parsed;
   };
 
+  const canCreateNewChat = () => {
+    const data = getRateLimitData();
+    return data.count < CHAT_LIMIT;
+  };
+
   const updateRateLimitCount = () => {
     const data = getRateLimitData();
     const updated = { ...data, count: data.count + 1 };
@@ -121,15 +195,12 @@ export default function UnifiedAIPlatform() {
     return updated;
   };
 
-  const canCreateNewChat = () => {
-    const data = getRateLimitData();
-    return data.count < CHAT_LIMIT;
-  };
-
-  // Initialize chats remaining on mount
+  // Initialize credits on mount
   useEffect(() => {
-    const data = getRateLimitData();
-    setChatsRemaining(CHAT_LIMIT - data.count);
+    const data = getCreditData();
+    setCreditsRemaining(data.credits);
+    const rateData = getRateLimitData();
+    setChatsRemaining(CHAT_LIMIT - rateData.count);
   }, []);
 
   const [chats, setChats] = useState<Chat[]>([
@@ -407,6 +478,267 @@ export default function UnifiedAIPlatform() {
     ));
   };
 
+  const generateContextualSuggestions = (userMessage: string, responseCards: InsightCard[]) => {
+    const msgLower = userMessage.toLowerCase();
+    const suggestions: Array<{ label: string; icon: any; category: string }> = [];
+    
+    console.log('[v0] Generating dynamic suggestions based on response cards:', responseCards.length);
+    
+    // Analyze the AI's response cards to understand what was provided
+    const cardTypes = responseCards.map(card => card.type);
+    const categories = [...new Set(responseCards.map(card => card.category))];
+    const hasLiveOdds = cardTypes.includes('live-odds');
+    const hasDFSLineup = cardTypes.includes('dfs-lineup') || cardTypes.includes('dfs-value');
+    const hasFantasy = cardTypes.includes('adp-analysis') || cardTypes.includes('bestball-stack') || cardTypes.includes('auction-value');
+    const hasKalshi = cardTypes.includes('kalshi-market') || cardTypes.includes('kalshi-weather');
+    const hasCrossPlatform = cardTypes.includes('cross-platform');
+    const hasPlayerProps = cardTypes.includes('player-prop');
+    
+    // Analyze user message context for deeper understanding
+    const isBetting = msgLower.includes('bet') || msgLower.includes('odds') || msgLower.includes('line');
+    const isFantasy = msgLower.includes('draft') || msgLower.includes('fantasy') || msgLower.includes('adp');
+    const isDFS = msgLower.includes('dfs') || msgLower.includes('lineup') || msgLower.includes('draftkings') || msgLower.includes('fanduel');
+    const isKalshi = msgLower.includes('kalshi') || msgLower.includes('market') || msgLower.includes('prediction');
+    const isNBA = msgLower.includes('nba') || msgLower.includes('lakers') || msgLower.includes('warriors') || msgLower.includes('basketball');
+    const isNFL = msgLower.includes('nfl') || msgLower.includes('chiefs') || msgLower.includes('football');
+    const isMLB = msgLower.includes('mlb') || msgLower.includes('baseball');
+    
+    // PRIORITY 1: Generate suggestions based on what the AI just showed (response cards)
+    if (hasLiveOdds) {
+      suggestions.push(
+        { label: 'How has this line moved in the last hour?', icon: TrendingUp, category: 'betting' },
+        { label: 'Show me correlated player props for this game', icon: Target, category: 'betting' },
+        { label: 'Compare this with sharp money direction', icon: Activity, category: 'betting' }
+      );
+    }
+    
+    if (hasDFSLineup) {
+      suggestions.push(
+        { label: 'What is the leverage score for this lineup?', icon: Award, category: 'dfs' },
+        { label: 'Build a low-ownership contrarian version', icon: Users, category: 'dfs' },
+        { label: 'Show me the betting lines supporting these picks', icon: TrendingUp, category: 'all' }
+      );
+    }
+    
+    if (hasPlayerProps) {
+      suggestions.push(
+        { label: 'Stack this prop with correlated DFS plays', icon: Layers, category: 'all' },
+        { label: 'What is the historical hit rate for this player?', icon: BarChart, category: 'betting' },
+        { label: 'Find similar props across other games', icon: Search, category: 'betting' }
+      );
+    }
+    
+    if (hasFantasy) {
+      suggestions.push(
+        { label: 'Show me waiver wire adds in this range', icon: Star, category: 'fantasy' },
+        { label: 'What are the trade targets with similar value?', icon: RefreshCw, category: 'fantasy' },
+        { label: 'Compare this to betting market expectations', icon: Layers, category: 'all' }
+      );
+    }
+    
+    if (hasKalshi) {
+      suggestions.push(
+        { label: 'How does this correlate with betting markets?', icon: Sparkles, category: 'all' },
+        { label: 'Show me arbitrage between Kalshi and sportsbooks', icon: DollarSign, category: 'kalshi' },
+        { label: 'What other Kalshi markets are related?', icon: BarChart3, category: 'kalshi' }
+      );
+    }
+    
+    if (hasCrossPlatform) {
+      suggestions.push(
+        { label: 'Find more cross-platform correlation plays', icon: Sparkles, category: 'all' },
+        { label: 'Optimize my bankroll across these opportunities', icon: PieChart, category: 'all' }
+      );
+    }
+    
+    // PRIORITY 2: Sport-specific deep dives based on response
+    if (categories.includes('NBA')) {
+      suggestions.push(
+        { label: 'Deep dive NBA rest advantage tonight', icon: AlertCircle, category: 'betting' },
+        { label: 'Show me NBA pace-up game environments', icon: Zap, category: 'dfs' }
+      );
+    }
+    
+    if (categories.includes('NFL')) {
+      suggestions.push(
+        { label: 'Analyze weather impact on these games', icon: Activity, category: 'betting' },
+        { label: 'Show me correlated TD scorer + game total bets', icon: Medal, category: 'betting' }
+      );
+    }
+    
+    // PRIORITY 3: Generate contextual follow-ups based on user message context
+    if (isBetting && suggestions.length < 5) {
+      suggestions.push(
+        { label: 'What are the best player props for tonight?', icon: Target, category: 'betting' },
+        { label: 'Show me live arbitrage opportunities', icon: Zap, category: 'betting' },
+        { label: 'Sharp money movement on these games?', icon: Activity, category: 'betting' }
+      );
+    } else if (isDFS && suggestions.length < 5) {
+      suggestions.push(
+        { label: 'Build a low-ownership tournament stack', icon: Users, category: 'dfs' },
+        { label: 'Find value plays under $5K', icon: DollarSign, category: 'dfs' },
+        { label: 'Showdown slate captain picks with leverage', icon: Medal, category: 'dfs' }
+      );
+    } else if (isFantasy && suggestions.length < 5) {
+      suggestions.push(
+        { label: 'Show me ADP risers this week', icon: TrendingUp, category: 'fantasy' },
+        { label: 'Best ball stacking strategy?', icon: Medal, category: 'fantasy' },
+        { label: 'Auction value targets for this week', icon: ShoppingCart, category: 'fantasy' }
+      );
+    } else if (isKalshi && suggestions.length < 5) {
+      suggestions.push(
+        { label: 'Weather markets affecting game totals', icon: Activity, category: 'kalshi' },
+        { label: 'Cross-market arbitrage opportunities', icon: Sparkles, category: 'all' },
+        { label: 'Political markets with sharp edge', icon: TrendingUp, category: 'kalshi' }
+      );
+    }
+    
+    // PRIORITY 4: Predictive next-step suggestions based on card data
+    responseCards.forEach(card => {
+      if (suggestions.length >= 7) return;
+      
+      // Generate specific suggestions based on card type and data
+      if (card.type === 'live-odds' && card.data.movement) {
+        suggestions.push({ 
+          label: `Track ${card.data.matchup} live until game time`, 
+          icon: Clock, 
+          category: 'betting' 
+        });
+      }
+      
+      if (card.type === 'dfs-lineup' && card.data.topPlay) {
+        suggestions.push({ 
+          label: `Build alternate lineup fading ${card.data.topPlay}`, 
+          icon: Users, 
+          category: 'dfs' 
+        });
+      }
+      
+      if (card.type === 'player-prop' && card.data.player) {
+        suggestions.push({ 
+          label: `Find correlated ${card.data.player} same-game parlays`, 
+          icon: Medal, 
+          category: 'betting' 
+        });
+      }
+      
+      if (card.type === 'adp-analysis' && card.data.player) {
+        suggestions.push({ 
+          label: `Show similar value picks in this ADP range`, 
+          icon: Search, 
+          category: 'fantasy' 
+        });
+      }
+      
+      if (card.type === 'kalshi-market' && card.data.event) {
+        suggestions.push({ 
+          label: `Alert me on ${card.data.market} price movements`, 
+          icon: Bell, 
+          category: 'kalshi' 
+        });
+      }
+    });
+    
+    // PRIORITY 5: Intelligent universal suggestions based on what wasn't covered
+    const universalSuggestions = [
+      { label: 'What are tonight\'s best value opportunities?', icon: Sparkles, category: 'all' },
+      { label: 'Show me high-confidence plays across platforms', icon: CheckCircle, category: 'all' },
+      { label: 'Compare live odds across all sportsbooks', icon: BarChart, category: 'betting' },
+      { label: 'Find contrarian tournament plays', icon: Users, category: 'dfs' },
+      { label: 'Track sharp money movements in real-time', icon: TrendingUp, category: 'betting' },
+      { label: 'Optimize my overall portfolio allocation', icon: PieChart, category: 'all' },
+      { label: 'Breaking news and injury updates', icon: AlertCircle, category: 'all' },
+      { label: 'Show me arbitrage opportunities', icon: DollarSign, category: 'all' }
+    ];
+    
+    // Add contextual universal suggestions
+    for (const suggestion of universalSuggestions) {
+      if (suggestions.length >= 7) break;
+      if (!suggestions.some(s => s.label === suggestion.label)) {
+        suggestions.push(suggestion);
+      }
+    }
+    
+    // PRIORITY 6: Ensure we have exactly 5-7 suggestions with intelligent deduplication
+    const uniqueSuggestions = suggestions.filter((suggestion, index, self) =>
+      index === self.findIndex((s) => s.label === suggestion.label)
+    );
+    
+    console.log('[v0] Final contextual suggestions count:', uniqueSuggestions.length);
+    
+    // Return 5-7 unique suggestions for optimal UX
+    return uniqueSuggestions.slice(0, 7);
+  };
+
+  const generateDetailedAnalysis = (card: InsightCard) => {
+    console.log('[v0] Generating detailed analysis for card:', card.title);
+    
+    // Check if user has credits
+    if (!consumeCredit()) {
+      console.log('[v0] No credits remaining, showing purchase modal');
+      return;
+    }
+
+    setIsTyping(true);
+    
+    setTimeout(() => {
+      const detailedAnalysisText = `Here's the comprehensive deep-dive analysis for ${card.title}:
+
+**Market Context & Edge Analysis**
+Based on my advanced AI models analyzing ${card.category} data across multiple platforms, I've identified key insights that provide significant edge in this ${card.subcategory.toLowerCase()} opportunity.
+
+**Detailed Breakdown:**
+${Object.entries(card.data).map(([key, value]) => `• **${key.replace(/([A-Z])/g, ' $1').trim()}**: ${value} - This metric suggests strong correlation with profitable outcomes based on historical patterns.`).join('\n')}
+
+**Risk Assessment & Strategy:**
+The ${card.status} status indicates this is a high-conviction play. My recommendation is to approach this with calculated position sizing, accounting for the inherent variance in ${card.category} markets.
+
+**Cross-Platform Correlation:**
+This opportunity aligns well with similar patterns I'm detecting in related betting markets, DFS slates, and prediction markets. Consider stacking this with correlated plays for maximum leverage.
+
+**Action Items:**
+1. Monitor line movements over the next 2-4 hours
+2. Compare with sharp money indicators
+3. Validate against contrarian ownership metrics
+4. Execute within optimal timing window
+
+Would you like me to show correlated opportunities or dive deeper into any specific metric?`;
+
+      const aiMessage: Message = {
+        role: 'assistant',
+        content: detailedAnalysisText,
+        timestamp: new Date(),
+        cards: [card],
+        sources: [
+          { name: 'Advanced AI Model', type: 'model', reliability: 94 },
+          { name: 'Historical Database', type: 'database', reliability: 96 },
+          { name: 'Live Market API', type: 'api', reliability: 98 }
+        ],
+        modelUsed: 'GPT-4 Turbo',
+        processingTime: 850 + Math.floor(Math.random() * 300),
+        trustMetrics: {
+          benfordIntegrity: 85 + Math.floor(Math.random() * 10),
+          oddsAlignment: 87 + Math.floor(Math.random() * 10),
+          marketConsensus: 83 + Math.floor(Math.random() * 12),
+          historicalAccuracy: 90 + Math.floor(Math.random() * 8),
+          finalConfidence: 86 + Math.floor(Math.random() * 8),
+          trustLevel: 'high',
+          riskLevel: 'low',
+          adjustedTone: 'Strong signal',
+          flags: []
+        }
+      };
+
+      setMessages(prev => [...prev, aiMessage]);
+      
+      // Generate contextual suggestions based on the detailed analysis
+      const contextualSuggestions = generateContextualSuggestions(card.title, [card]);
+      setSuggestedPrompts(contextualSuggestions);
+      
+      setIsTyping(false);
+    }, 1200);
+  };
+
   const simulateResponse = (userMessage: string) => {
     setIsTyping(true);
     
@@ -445,6 +777,55 @@ export default function UnifiedAIPlatform() {
       .sort(() => Math.random() - 0.5)
       .slice(0, 2 + Math.floor(Math.random() * 2));
 
+    // Generate AI Trust & Integrity metrics
+    const benfordIntegrity = 75 + Math.floor(Math.random() * 23);
+    const oddsAlignment = 80 + Math.floor(Math.random() * 18);
+    const marketConsensus = 70 + Math.floor(Math.random() * 25);
+    const historicalAccuracy = 78 + Math.floor(Math.random() * 20);
+
+    const finalConfidence = Math.round(
+      benfordIntegrity * 0.20 +
+      oddsAlignment * 0.30 +
+      marketConsensus * 0.30 +
+      historicalAccuracy * 0.20
+    );
+
+    const trustLevel: 'high' | 'medium' | 'low' = 
+      finalConfidence >= 80 ? 'high' : 
+      finalConfidence >= 60 ? 'medium' : 'low';
+
+    const riskLevel: 'low' | 'medium' | 'high' = 
+      finalConfidence >= 80 ? 'low' : 
+      finalConfidence >= 60 ? 'medium' : 'high';
+
+    const flags: Array<{ type: string; message: string; severity: 'info' | 'warning' | 'error' }> = [];
+    
+    if (benfordIntegrity < 70) {
+      flags.push({ 
+        type: 'benford', 
+        message: 'AI numeric outputs show deviation from market odds distribution', 
+        severity: 'warning' 
+      });
+    }
+    if (oddsAlignment < 85) {
+      flags.push({ 
+        type: 'odds', 
+        message: `AI recommendation differs from live market by ${(100 - oddsAlignment) / 10}%`, 
+        severity: oddsAlignment < 70 ? 'error' : 'warning' 
+      });
+    }
+    if (marketConsensus < 70) {
+      flags.push({ 
+        type: 'consensus', 
+        message: 'Significant divergence from market consensus detected', 
+        severity: 'warning' 
+      });
+    }
+
+    const adjustedTone = trustLevel === 'high' ? 'Strong signal' : 
+                        trustLevel === 'medium' ? 'Moderate edge' : 
+                        'High uncertainty';
+
     setMessages(prev => [...prev, {
       role: 'assistant',
       content: response.text,
@@ -453,23 +834,116 @@ export default function UnifiedAIPlatform() {
       confidence: 85 + Math.floor(Math.random() * 13),
       sources: randomSources,
       modelUsed: 'GPT-4 Turbo',
-      processingTime: 850 + Math.floor(Math.random() * 500)
+      processingTime: 850 + Math.floor(Math.random() * 500),
+      trustMetrics: {
+        benfordIntegrity,
+        oddsAlignment,
+        marketConsensus,
+        historicalAccuracy,
+        finalConfidence,
+        trustLevel,
+        flags: flags.length > 0 ? flags : undefined,
+        riskLevel,
+        adjustedTone
+      }
     }]);
+
+    // Generate contextual suggestions based on the conversation
+    const contextualSuggestions = generateContextualSuggestions(userMessage, response.cards);
+    setSuggestedPrompts(contextualSuggestions);
+    console.log('[v0] Generated contextual suggestions:', contextualSuggestions.length);
+
     setIsTyping(false);
   }, 1500);
 };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newAttachments: FileAttachment[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileType = file.type;
+
+      // Validate file type
+      if (!fileType.startsWith('image/') && fileType !== 'text/csv') {
+        alert(`File type not supported: ${file.name}. Please upload images (JPEG, PNG) or CSV files.`);
+        continue;
+      }
+
+      // Create file URL
+      const fileUrl = URL.createObjectURL(file);
+
+      const attachment: FileAttachment = {
+        id: `${Date.now()}-${i}`,
+        name: file.name,
+        type: fileType.startsWith('image/') ? 'image' : 'csv',
+        url: fileUrl,
+        size: file.size
+      };
+
+      // Parse CSV if needed
+      if (fileType === 'text/csv') {
+        const text = await file.text();
+        const parsed = parseCSV(text);
+        attachment.data = parsed;
+      }
+
+      newAttachments.push(attachment);
+    }
+
+    setUploadedFiles(prev => [...prev, ...newAttachments]);
+    console.log('[v0] Files uploaded:', newAttachments.length);
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const parseCSV = (text: string) => {
+    const lines = text.split('\n').filter(line => line.trim());
+    if (lines.length === 0) return { headers: [], rows: [] };
+
+    const headers = lines[0].split(',').map(h => h.trim());
+    const rows = lines.slice(1).map(line => 
+      line.split(',').map(cell => cell.trim())
+    );
+
+    return { headers, rows };
+  };
+
+  const removeAttachment = (id: string) => {
+    setUploadedFiles(prev => {
+      const file = prev.find(f => f.id === id);
+      if (file) {
+        URL.revokeObjectURL(file.url);
+      }
+      return prev.filter(f => f.id !== id);
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() && uploadedFiles.length === 0) return;
+
+    // Check if user has credits
+    if (!consumeCredit()) {
+      console.log('[v0] No credits remaining, showing purchase modal');
+      return;
+    }
 
     const userMessage: Message = {
       role: 'user',
-      content: input,
-      timestamp: new Date()
+      content: input || '📎 Attached files',
+      timestamp: new Date(),
+      attachments: uploadedFiles.length > 0 ? [...uploadedFiles] : undefined
     };
 
     setMessages(prev => [...prev, userMessage]);
+    setUploadedFiles([]);
     
     // Update chat preview and title based on first user message
     setChats(prevChats => prevChats.map(chat => {
@@ -725,7 +1199,10 @@ export default function UnifiedAIPlatform() {
         </div>
 
         <div className="relative mt-4 pt-4 border-t border-gray-700/50">
-          <button className="w-full flex items-center justify-center gap-2 text-xs font-bold text-gray-400 hover:text-white transition-colors group/btn">
+          <button 
+            onClick={() => generateDetailedAnalysis(card)}
+            className="w-full flex items-center justify-center gap-2 text-xs font-bold text-gray-400 hover:text-white transition-colors group/btn"
+          >
             <span>View Full Analysis</span>
             <ChevronRight className="w-3.5 h-3.5 group-hover/btn:translate-x-1 transition-transform" />
           </button>
@@ -1059,14 +1536,54 @@ export default function UnifiedAIPlatform() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              
-              <button className="relative p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 border border-gray-800 hover:border-gray-700 hover:shadow-lg group active:scale-95 border-none bg-transparent">
-                <Bell className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" />
-                <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-gray-950 shadow-lg shadow-red-500/50 animate-pulse"></div>
-              </button>
-              <button className="p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 border border-gray-800 hover:border-gray-700 hover:shadow-lg group active:scale-95 border-none bg-transparent">
-                <Settings className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors group-hover:rotate-90 transition-transform" />
-              </button>
+              {isLoggedIn && user ? (
+                <>
+                  {/* User Profile Info */}
+                  <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-900/50 border border-gray-800">
+                    <div className="flex items-center gap-2.5">
+                      <div className="relative">
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                          {user.avatar ? (
+                            <img src={user.avatar || "/placeholder.svg"} alt={user.name} className="w-full h-full rounded-full object-cover" />
+                          ) : (
+                            user.name.charAt(0).toUpperCase()
+                          )}
+                        </div>
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-950"></div>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-white">{user.name}</span>
+                        <span className="text-[10px] text-gray-500">{user.email}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notifications and Settings for logged-in users */}
+                  <button className="relative p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 border border-gray-800 hover:border-gray-700 hover:shadow-lg group active:scale-95 border-none bg-transparent">
+                    <Bell className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" />
+                    <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-gray-950 shadow-lg shadow-red-500/50 animate-pulse"></div>
+                  </button>
+                  <button className="p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 border border-gray-800 hover:border-gray-700 hover:shadow-lg group active:scale-95 border-none bg-transparent">
+                    <Settings className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors group-hover:rotate-90 transition-transform" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  {/* Login and Sign Up buttons for non-authenticated users */}
+                  <button
+                    onClick={() => setShowLoginModal(true)}
+                    className="px-4 py-2 rounded-xl border border-gray-800 bg-gray-900/50 hover:bg-gray-800/70 hover:border-gray-700 text-gray-300 hover:text-white text-sm font-semibold transition-all"
+                  >
+                    Log in
+                  </button>
+                  <button
+                    onClick={() => setShowSignupModal(true)}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-sm font-bold transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40"
+                  >
+                    Sign up
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1129,6 +1646,76 @@ export default function UnifiedAIPlatform() {
                     ) : (
                       <>
                         <p className="text-sm leading-relaxed font-medium">{message.content}</p>
+                        
+                        {/* File Attachments Display */}
+                        {message.attachments && message.attachments.length > 0 && (
+                          <div className="mt-4 space-y-3">
+                            {message.attachments.map((attachment) => (
+                              <div key={attachment.id}>
+                                {attachment.type === 'image' && (
+                                  <div className="relative group/img rounded-xl overflow-hidden border border-gray-700/50 bg-gray-900/50">
+                                    <img 
+                                      src={attachment.url || "/placeholder.svg"} 
+                                      alt={attachment.name}
+                                      className="w-full max-w-xl rounded-xl"
+                                    />
+                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                      <div className="flex items-center gap-2">
+                                        <ImageIcon className="w-4 h-4 text-gray-400" />
+                                        <span className="text-xs font-bold text-gray-300">{attachment.name}</span>
+                                        <span className="text-xs text-gray-500 ml-auto">{(attachment.size / 1024).toFixed(1)} KB</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {attachment.type === 'csv' && attachment.data && (
+                                  <div className="rounded-xl border border-gray-700/50 bg-gray-900/50 overflow-hidden">
+                                    <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-800/50 border-b border-gray-700/50">
+                                      <FileText className="w-4 h-4 text-green-400" />
+                                      <span className="text-xs font-bold text-gray-300">{attachment.name}</span>
+                                      <span className="text-xs text-gray-500 ml-auto">
+                                        {attachment.data.rows.length} rows × {attachment.data.headers.length} columns
+                                      </span>
+                                    </div>
+                                    <div className="overflow-x-auto max-h-96 custom-scrollbar">
+                                      <table className="w-full text-xs">
+                                        <thead className="sticky top-0 bg-gray-800/80 backdrop-blur-sm">
+                                          <tr>
+                                            {attachment.data.headers.map((header: string, idx: number) => (
+                                              <th key={idx} className="px-4 py-2.5 text-left font-bold text-gray-300 border-b border-gray-700/50">
+                                                {header}
+                                              </th>
+                                            ))}
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {attachment.data.rows.slice(0, 100).map((row: string[], rowIdx: number) => (
+                                            <tr key={rowIdx} className="hover:bg-gray-800/30 transition-colors border-b border-gray-800/30">
+                                              {row.map((cell: string, cellIdx: number) => (
+                                                <td key={cellIdx} className="px-4 py-2.5 text-gray-400 font-medium">
+                                                  {cell}
+                                                </td>
+                                              ))}
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                      {attachment.data.rows.length > 100 && (
+                                        <div className="px-4 py-3 bg-gray-800/30 text-center">
+                                          <span className="text-xs text-gray-500">
+                                            Showing first 100 rows of {attachment.data.rows.length}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
                         {message.editHistory && message.editHistory.length > 0 && (
                           <div className="mt-3 pt-3 border-t border-gray-700/50">
                             <details className="text-xs text-gray-500">
@@ -1178,60 +1765,159 @@ export default function UnifiedAIPlatform() {
                     </div>
                   )}
 
-                  {/* Source Attribution & Reliability - Hidden for welcome message */}
-                  {message.role === 'assistant' && !message.isWelcome && message.sources && message.sources.length > 0 && (
-                    <div className="mt-5 ml-11 space-y-3">
-                      <div className="flex items-center gap-2 pb-2 border-b border-gray-800/50">
-                        <Shield className="w-4 h-4 text-blue-400" />
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Source Credibility</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {message.sources.map((source, idx) => {
-                          const reliabilityColor = source.reliability >= 95 ? 'text-green-400 border-green-500/30 bg-green-500/5' :
-                                                  source.reliability >= 90 ? 'text-blue-400 border-blue-500/30 bg-blue-500/5' :
-                                                  'text-yellow-400 border-yellow-500/30 bg-yellow-500/5';
-                          const Icon = source.type === 'database' ? Database : 
-                                      source.type === 'api' ? Activity : 
-                                      source.type === 'model' ? Sparkles : 
-                                      RefreshCw;
-                          return (
-                            <div 
-                              key={idx} 
-                              className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border ${reliabilityColor} group/source cursor-default transition-all hover:scale-[1.02]`}
-                              role="status"
-                              aria-label={`${source.name} source with ${source.reliability}% reliability`}
-                            >
-                              <div className="p-1 rounded-lg bg-gray-900/50">
-                                <Icon className="w-3.5 h-3.5" />
-                              </div>
-                              <span className="text-xs font-bold">{source.name}</span>
-                              <div className="w-px h-4 bg-gray-700/50"></div>
-                              <span className="text-xs font-black tabular-nums">{source.reliability}%</span>
-                              {source.url && (
-                                <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover/source:opacity-100 transition-opacity ml-0.5" />
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {message.modelUsed && (
-                        <div className="flex items-center gap-4 pt-2 border-t border-gray-800/30">
-                          <span className="flex items-center gap-2 text-xs text-gray-500">
-                            <BookOpen className="w-3.5 h-3.5 text-purple-400" />
-                            <span className="font-semibold">Model:</span>
-                            <span className="font-bold text-gray-400">{message.modelUsed}</span>
+                  {/* Combined Metadata: Source Credibility & AI Trust - Hidden for welcome message */}
+                  {message.role === 'assistant' && !message.isWelcome && (message.sources || message.trustMetrics) && (
+                    <div className="mt-4 ml-11">
+                      {/* Compact Metadata Summary */}
+                      <div className="flex items-center gap-3 text-[11px] text-gray-600">
+                        {message.modelUsed && (
+                          <span className="flex items-center gap-1.5">
+                            <BookOpen className="w-3 h-3 text-purple-500/60" />
+                            <span>Model: <span className="text-gray-500 font-semibold">{message.modelUsed}</span></span>
                           </span>
-                          {message.processingTime && (
-                            <span className="flex items-center gap-2 text-xs text-gray-500">
-                              <Zap className="w-3.5 h-3.5 text-yellow-400" />
-                              <span className="font-semibold">Processed in:</span>
-                              <span className="font-bold text-gray-400 tabular-nums">{message.processingTime}ms</span>
+                        )}
+                        {message.processingTime && (
+                          <span className="flex items-center gap-1.5">
+                            <Zap className="w-3 h-3 text-yellow-500/60" />
+                            <span>Processed in: <span className="text-gray-500 font-semibold tabular-nums">{message.processingTime}ms</span></span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Collapsible Source Credibility */}
+                      {message.sources && message.sources.length > 0 && (
+                        <details className="mt-3 group/sources">
+                          <summary className="cursor-pointer list-none flex items-center gap-2 text-[11px] text-gray-600 hover:text-gray-500 transition-colors">
+                            <Shield className="w-3.5 h-3.5 text-blue-500/60" />
+                            <span className="font-semibold uppercase tracking-wide">Source Credibility</span>
+                            <span className="text-gray-700">({message.sources.length} sources)</span>
+                            <ChevronRight className="w-3 h-3 group-open/sources:rotate-90 transition-transform" />
+                          </summary>
+                          <div className="mt-3 flex flex-wrap gap-2 pl-5">
+                            {message.sources.map((source, idx) => {
+                              const reliabilityColor = source.reliability >= 95 ? 'text-green-500 border-green-600/20' :
+                                                      source.reliability >= 90 ? 'text-blue-500 border-blue-600/20' :
+                                                      'text-yellow-500 border-yellow-600/20';
+                              const Icon = source.type === 'database' ? Database : 
+                                          source.type === 'api' ? Activity : 
+                                          source.type === 'model' ? Sparkles : 
+                                          RefreshCw;
+                              return (
+                                <div 
+                                  key={idx} 
+                                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border bg-gray-900/30 ${reliabilityColor} text-[11px]`}
+                                  title={`${source.name} - ${source.reliability}% reliability`}
+                                >
+                                  <Icon className="w-3 h-3" />
+                                  <span className="font-semibold">{source.name}</span>
+                                  <span className="font-bold tabular-nums">{source.reliability}%</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </details>
+                      )}
+
+                      {/* Collapsible AI Trust & Integrity */}
+                      {message.trustMetrics && (
+                        <details className="mt-3 group/trust">
+                          <summary className="cursor-pointer list-none flex items-center gap-2 text-[11px] text-gray-600 hover:text-gray-500 transition-colors">
+                            <Shield className="w-3.5 h-3.5 text-green-500/60" />
+                            <span className="font-semibold uppercase tracking-wide">AI Trust & Integrity</span>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              message.trustMetrics.trustLevel === 'high' ? 'bg-green-600/20 text-green-500' :
+                              message.trustMetrics.trustLevel === 'medium' ? 'bg-blue-600/20 text-blue-500' :
+                              'bg-orange-600/20 text-orange-500'
+                            }`}>
+                              {message.trustMetrics.finalConfidence}% {message.trustMetrics.trustLevel === 'high' ? 'High' : message.trustMetrics.trustLevel === 'medium' ? 'Med' : 'Low'} Trust
                             </span>
-                          )}
-                        </div>
+                            <ChevronRight className="w-3 h-3 group-open/trust:rotate-90 transition-transform" />
+                          </summary>
+                          <div className="mt-3 space-y-3 pl-5">
+                            {/* Trust Metrics Grid */}
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
+                                <span className="text-[10px] text-gray-600 font-semibold">Benford Market</span>
+                                <span className={`text-[11px] font-bold tabular-nums ${
+                                  message.trustMetrics.benfordIntegrity >= 80 ? 'text-green-500' :
+                                  message.trustMetrics.benfordIntegrity >= 60 ? 'text-yellow-500' : 'text-red-500'
+                                }`}>
+                                  {message.trustMetrics.benfordIntegrity}%
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
+                                <span className="text-[10px] text-gray-600 font-semibold">Odds Alignment</span>
+                                <span className={`text-[11px] font-bold tabular-nums ${
+                                  message.trustMetrics.oddsAlignment >= 80 ? 'text-green-500' :
+                                  message.trustMetrics.oddsAlignment >= 60 ? 'text-yellow-500' : 'text-red-500'
+                                }`}>
+                                  {message.trustMetrics.oddsAlignment}%
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
+                                <span className="text-[10px] text-gray-600 font-semibold">Market Consensus</span>
+                                <span className={`text-[11px] font-bold tabular-nums ${
+                                  message.trustMetrics.marketConsensus >= 80 ? 'text-green-500' :
+                                  message.trustMetrics.marketConsensus >= 60 ? 'text-yellow-500' : 'text-red-500'
+                                }`}>
+                                  {message.trustMetrics.marketConsensus}%
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
+                                <span className="text-[10px] text-gray-600 font-semibold">Historical Accuracy</span>
+                                <span className={`text-[11px] font-bold tabular-nums ${
+                                  message.trustMetrics.historicalAccuracy >= 80 ? 'text-green-500' :
+                                  message.trustMetrics.historicalAccuracy >= 60 ? 'text-yellow-500' : 'text-red-500'
+                                }`}>
+                                  {message.trustMetrics.historicalAccuracy}%
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Risk Assessment */}
+                            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
+                              <span className="text-[10px] text-gray-600 font-semibold">Risk Level:</span>
+                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${
+                                message.trustMetrics.riskLevel === 'low' ? 'bg-green-600/20 text-green-500' :
+                                message.trustMetrics.riskLevel === 'medium' ? 'bg-yellow-600/20 text-yellow-500' :
+                                'bg-red-600/20 text-red-500'
+                              }`}>
+                                {message.trustMetrics.riskLevel.charAt(0).toUpperCase() + message.trustMetrics.riskLevel.slice(1)} Risk
+                              </span>
+                              <span className="text-[10px] text-gray-700">• {message.trustMetrics.adjustedTone}</span>
+                            </div>
+
+                            {/* Flags if present */}
+                            {message.trustMetrics.flags && message.trustMetrics.flags.length > 0 && (
+                              <details className="group/flags">
+                                <summary className="cursor-pointer list-none flex items-center gap-1.5 text-[10px] text-orange-600 hover:text-orange-500 transition-colors">
+                                  <AlertCircle className="w-3 h-3" />
+                                  <span className="font-semibold">{message.trustMetrics.flags.length} issue{message.trustMetrics.flags.length !== 1 ? 's' : ''} flagged</span>
+                                  <ChevronRight className="w-2.5 h-2.5 group-open/flags:rotate-90 transition-transform" />
+                                </summary>
+                                <div className="mt-2 space-y-1.5">
+                                  {message.trustMetrics.flags.map((flag, idx) => (
+                                    <div 
+                                      key={idx}
+                                      className={`px-2.5 py-1.5 rounded-lg border text-[10px] ${
+                                        flag.severity === 'error' ? 'bg-red-600/10 border-red-600/20 text-red-500' :
+                                        flag.severity === 'warning' ? 'bg-yellow-600/10 border-yellow-600/20 text-yellow-500' :
+                                        'bg-blue-600/10 border-blue-600/20 text-blue-500'
+                                      }`}
+                                    >
+                                      <div className="font-bold mb-0.5">{flag.type.charAt(0).toUpperCase() + flag.type.slice(1)} Check</div>
+                                      <div className="text-gray-600">{flag.message}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
+                            )}
+                          </div>
+                        </details>
                       )}
                     </div>
                   )}
+
 
                   {/* Message Actions - Hidden for welcome message */}
                   {!message.isWelcome && (
@@ -1354,13 +2040,15 @@ export default function UnifiedAIPlatform() {
           )}
 
           <div className="relative max-w-5xl mx-auto">
+            {/* Dynamic Contextual Suggestions or Platform Prompts */}
             <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-0 mb-5">
-              {quickActions.map((action) => {
+              {(suggestedPrompts.length > 0 && messages.length > 1 ? suggestedPrompts : quickActions).map((action, idx) => {
                 const Icon = action.icon;
-                const categoryColor = categories.find(c => c.id === action.category)?.color || 'text-blue-400';
+                const isSuggested = suggestedPrompts.length > 0 && messages.length > 1;
+                
                 return (
                   <button
-                    key={action.label}
+                    key={`${action.label}-${idx}`}
                     onClick={() => {
                       setInput(action.label);
                       // Trigger submit after a brief delay to ensure state is updated
@@ -1391,19 +2079,70 @@ export default function UnifiedAIPlatform() {
                         simulateResponse(action.label);
                       }, 0);
                     }}
-                    className="group/quick flex items-center py-2.5 bg-gradient-to-r from-gray-800/60 to-gray-900/60 hover:from-gray-700/80 hover:to-gray-800/80 border border-gray-700/50 hover:border-gray-600 text-xs font-bold text-gray-300 hover:text-white whitespace-nowrap transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-95 backdrop-blur-sm px-2.5 gap-1 rounded-full pl-1.5 pr-3.5"
+                    className={`group/prompt flex items-center gap-2.5 px-4 py-2.5 rounded-full border text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                      isSuggested 
+                        ? 'bg-gray-900/60 border-blue-500/50 text-gray-200 hover:bg-gradient-to-r hover:from-blue-600/20 hover:via-purple-600/20 hover:to-blue-600/20 hover:border-blue-400/70' 
+                        : 'bg-gray-900/60 border-gray-800/70 text-gray-400 hover:bg-gray-800/70 hover:border-gray-700 hover:text-gray-200'
+                    }`}
                   >
-                    <div className="p-1 bg-gray-900/50 rounded-lg group-hover/quick:bg-gray-800 transition-colors">
-                      <Icon className={`w-3.5 h-3.5 text-gray-500 group-hover/quick:${categoryColor} transition-colors`} />
-                    </div>
-                    {action.label}
+                    <Icon className={`w-4 h-4 ${isSuggested ? 'text-gray-400 group-hover/prompt:text-blue-400' : 'text-gray-500 group-hover/prompt:text-gray-400'}`} />
+                    <span>{action.label}</span>
                   </button>
                 );
               })}
             </div>
 
+            {/* File Upload Preview */}
+            {uploadedFiles.length > 0 && (
+              <div className="mb-4 space-y-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <Paperclip className="w-4 h-4 text-blue-400" />
+                  <span className="text-xs font-bold text-gray-400">
+                    {uploadedFiles.length} file{uploadedFiles.length !== 1 ? 's' : ''} attached
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {uploadedFiles.map((file) => (
+                    <div
+                      key={file.id}
+                      className="flex items-center gap-2 px-3 py-2 bg-gray-800/60 border border-gray-700/50 rounded-xl group/file hover:border-gray-600 transition-all"
+                    >
+                      {file.type === 'image' ? (
+                        <ImageIcon className="w-4 h-4 text-blue-400" />
+                      ) : (
+                        <FileText className="w-4 h-4 text-green-400" />
+                      )}
+                      <span className="text-xs font-bold text-gray-300 max-w-[150px] truncate">
+                        {file.name}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {(file.size / 1024).toFixed(1)} KB
+                      </span>
+                      <button
+                        onClick={() => removeAttachment(file.id)}
+                        className="p-1 hover:bg-gray-700/50 rounded transition-all ml-1"
+                        title="Remove file"
+                      >
+                        <X className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="flex gap-3">
               <div className="flex-1 relative group/input">
+                {/* Hidden File Input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/jpg,text/csv"
+                  multiple
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                
                 <input
                   type="text"
                   value={input}
@@ -1415,11 +2154,20 @@ export default function UnifiedAIPlatform() {
                     }
                   }}
                   placeholder="Ask about betting odds, fantasy strategy, DFS lineups, or Kalshi markets..."
-                  className="w-full bg-gradient-to-r from-gray-900/80 to-gray-850/80 border border-gray-700/50 hover:border-gray-600/50 focus:border-blue-500/50 rounded-2xl px-6 py-4.5 pr-24 font-medium text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all backdrop-blur-sm shadow-inner text-xs"
+                  className="w-full bg-gradient-to-r from-gray-900/80 to-gray-850/80 border border-gray-700/50 hover:border-gray-600/50 focus:border-blue-500/50 rounded-2xl px-6 py-4.5 pr-32 font-medium text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all backdrop-blur-sm shadow-inner text-xs"
                   disabled={isTyping}
                   maxLength={500}
                 />
                 <div className="absolute right-5 top-1/2 -translate-y-1/2 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2 hover:bg-gray-800/70 rounded-lg transition-all group/attach border-none bg-transparent"
+                    title="Attach image or CSV file"
+                    disabled={isTyping}
+                  >
+                    <Paperclip className="w-4.5 h-4.5 text-gray-500 group-hover/attach:text-blue-400 transition-colors" />
+                  </button>
                   <span className={`text-xs font-bold transition-colors ${input.length > 450 ? 'text-orange-400' : 'text-gray-600'}`}>
                     {input.length}/500
                   </span>
@@ -1427,7 +2175,7 @@ export default function UnifiedAIPlatform() {
               </div>
               <button
                 type="submit"
-                disabled={!input.trim() || isTyping}
+                disabled={(!input.trim() && uploadedFiles.length === 0) || isTyping}
                 className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-800 disabled:to-gray-900 disabled:cursor-not-allowed text-white rounded-2xl px-8 py-4.5 transition-all duration-300 shadow-xl shadow-blue-500/25 hover:shadow-blue-500/50 hover:shadow-2xl disabled:shadow-none flex items-center gap-2.5 font-bold group overflow-hidden hover:scale-[1.02] active:scale-95 disabled:hover:scale-100"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
@@ -1442,12 +2190,12 @@ export default function UnifiedAIPlatform() {
               </p>
               <div className="flex items-center gap-3">
                 <div className={`flex items-center gap-2 text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all ${
-                  chatsRemaining <= 1 
+                  creditsRemaining <= 3 
                     ? 'text-orange-400 bg-orange-500/10 border-orange-500/30' 
                     : 'text-gray-500 bg-gray-900/30 border-gray-800'
                 }`}>
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  <span>{chatsRemaining} {chatsRemaining === 1 ? 'chat' : 'chats'} remaining</span>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{creditsRemaining} {creditsRemaining === 1 ? 'credit' : 'credits'} remaining</span>
                 </div>
                 <div className="flex items-center gap-2 text-[11px] font-bold text-gray-600">
                   <div className="relative flex items-center justify-center">
@@ -1461,6 +2209,377 @@ export default function UnifiedAIPlatform() {
           </div>
         </div>
       </div>
+
+      {/* Purchase Credits Modal */}
+      {showPurchaseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowPurchaseModal(false)}>
+          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowPurchaseModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="p-8">
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-orange-500/10 border border-orange-500/30 mb-4">
+                  <AlertCircle className="w-6 h-6 text-orange-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Out of Credits</h2>
+                <p className="text-sm text-gray-400">Purchase more credits to continue using AI analysis</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-400 mb-2">Amount (min $10)</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
+                    <input
+                      type="number"
+                      min="10"
+                      value={purchaseAmount}
+                      onChange={(e) => setPurchaseAmount(e.target.value)}
+                      placeholder="10"
+                      className="w-full pl-8 pr-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {[20, 50, 100, 250].map((amount) => (
+                    <button
+                      key={amount}
+                      onClick={() => setPurchaseAmount(amount.toString())}
+                      className="flex-1 min-w-[80px] px-4 py-2.5 rounded-xl border border-gray-800 bg-gray-950 hover:bg-gray-800 hover:border-gray-700 text-white font-semibold text-sm transition-all"
+                    >
+                      ${amount}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => {
+                    const amount = parseInt(purchaseAmount) || 20;
+                    if (amount >= 10) {
+                      // Calculate credits: $1 = 1 credit
+                      addCredits(amount);
+                      setShowPurchaseModal(false);
+                      setPurchaseAmount('');
+                    }
+                  }}
+                  disabled={!purchaseAmount || parseInt(purchaseAmount) < 10}
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all"
+                >
+                  Purchase Credits
+                </button>
+
+                <div className="flex items-center justify-between pt-4 border-t border-gray-800">
+                  <button
+                    onClick={() => {
+                      setShowPurchaseModal(false);
+                      setShowSubscriptionModal(true);
+                    }}
+                    className="text-sm text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+                  >
+                    View Subscription
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowPurchaseModal(false);
+                      setShowLoginModal(true);
+                    }}
+                    className="text-sm text-gray-400 hover:text-gray-300 font-semibold transition-colors"
+                  >
+                    Login
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Subscription Modal */}
+      {showSubscriptionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowSubscriptionModal(false)}>
+          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowSubscriptionModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="p-8">
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-purple-500/10 border border-purple-500/30 mb-4">
+                  <Sparkles className="w-6 h-6 text-purple-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Monthly Subscription</h2>
+                <p className="text-sm text-gray-400">Get 20 credits every month for continuous access</p>
+              </div>
+
+              <div className="bg-gradient-to-br from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-xl p-6 mb-6">
+                <div className="flex items-baseline justify-center mb-4">
+                  <span className="text-4xl font-black text-white">$20</span>
+                  <span className="text-gray-400 ml-2">/month</span>
+                </div>
+                <div className="space-y-2 text-sm text-gray-300">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                    <span>20 credits per month</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                    <span>Auto-renews on the 1st</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                    <span>Cancel anytime</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                    <span>Priority support</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  // Mock subscription - in production this would integrate with Stripe
+                  addCredits(20);
+                  setShowSubscriptionModal(false);
+                }}
+                className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition-all mb-3"
+              >
+                Subscribe Now
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowSubscriptionModal(false);
+                  setShowPurchaseModal(true);
+                }}
+                className="w-full py-3 text-sm text-gray-400 hover:text-gray-300 font-semibold transition-colors"
+              >
+                One-time purchase instead
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowLoginModal(false)}>
+          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowLoginModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="p-8">
+              <div className="text-center mb-6">
+                <h2 className="text-2xl font-bold text-white mb-2">Welcome Back</h2>
+                <p className="text-sm text-gray-400">Sign in to access your account</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-400 mb-2">Email</label>
+                  <input
+                    id="login-email"
+                    type="email"
+                    placeholder="your@email.com"
+                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-400 mb-2">Password</label>
+                  <input
+                    id="login-password"
+                    type="password"
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  />
+                </div>
+
+                <button
+                  onClick={() => {
+                    const emailInput = document.getElementById('login-email') as HTMLInputElement;
+                    const email = emailInput?.value || 'user@example.com';
+                    const name = email.split('@')[0];
+                    
+                    // Mock login - in production this would use Supabase
+                    setIsLoggedIn(true);
+                    setUser({
+                      name: name.charAt(0).toUpperCase() + name.slice(1),
+                      email: email
+                    });
+                    setShowLoginModal(false);
+                    console.log('[v0] User logged in:', { name, email });
+                  }}
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all"
+                >
+                  Sign In
+                </button>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-800"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-gray-900 text-gray-500">or</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    // Mock Google login
+                    setIsLoggedIn(true);
+                    setUser({
+                      name: 'Demo User',
+                      email: 'demo@google.com'
+                    });
+                    setShowLoginModal(false);
+                  }}
+                  className="w-full py-3 border border-gray-800 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all"
+                >
+                  Continue with Google
+                </button>
+
+                <p className="text-center text-sm text-gray-500">
+                  Don&apos;t have an account?{' '}
+                  <button 
+                    onClick={() => {
+                      setShowLoginModal(false);
+                      setShowSignupModal(true);
+                    }}
+                    className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+                  >
+                    Sign up
+                  </button>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sign Up Modal */}
+      {showSignupModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowSignupModal(false)}>
+          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowSignupModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="p-8">
+              <div className="text-center mb-6">
+                <h2 className="text-2xl font-bold text-white mb-2">Create Account</h2>
+                <p className="text-sm text-gray-400">Sign up to get started with Leverage AI</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-400 mb-2">Full Name</label>
+                  <input
+                    id="signup-name"
+                    type="text"
+                    placeholder="John Doe"
+                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-400 mb-2">Email</label>
+                  <input
+                    id="signup-email"
+                    type="email"
+                    placeholder="your@email.com"
+                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-400 mb-2">Password</label>
+                  <input
+                    id="signup-password"
+                    type="password"
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  />
+                </div>
+
+                <button
+                  onClick={() => {
+                    const nameInput = document.getElementById('signup-name') as HTMLInputElement;
+                    const emailInput = document.getElementById('signup-email') as HTMLInputElement;
+                    const name = nameInput?.value || 'New User';
+                    const email = emailInput?.value || 'newuser@example.com';
+                    
+                    // Mock signup - in production this would use Supabase
+                    setIsLoggedIn(true);
+                    setUser({
+                      name: name,
+                      email: email
+                    });
+                    setShowSignupModal(false);
+                    console.log('[v0] User signed up:', { name, email });
+                  }}
+                  className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl transition-all shadow-lg"
+                >
+                  Create Account
+                </button>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-800"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-gray-900 text-gray-500">or</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    // Mock Google signup
+                    setIsLoggedIn(true);
+                    setUser({
+                      name: 'Google User',
+                      email: 'user@gmail.com'
+                    });
+                    setShowSignupModal(false);
+                  }}
+                  className="w-full py-3 border border-gray-800 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all"
+                >
+                  Sign up with Google
+                </button>
+
+                <p className="text-center text-sm text-gray-500">
+                  Already have an account?{' '}
+                  <button 
+                    onClick={() => {
+                      setShowSignupModal(false);
+                      setShowLoginModal(true);
+                    }}
+                    className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+                  >
+                    Log in
+                  </button>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>
         {`

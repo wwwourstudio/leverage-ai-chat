@@ -433,61 +433,72 @@ export default function UnifiedAIPlatform() {
   const generateContextualSuggestions = (userMessage: string, responseCards: InsightCard[]) => {
     const msgLower = userMessage.toLowerCase();
     const suggestions: Array<{ label: string; icon: any; category: string }> = [];
-
+    
     // Analyze user message context
     const isBetting = msgLower.includes('bet') || msgLower.includes('odds') || msgLower.includes('line');
     const isFantasy = msgLower.includes('draft') || msgLower.includes('fantasy') || msgLower.includes('adp');
     const isDFS = msgLower.includes('dfs') || msgLower.includes('lineup') || msgLower.includes('draftkings') || msgLower.includes('fanduel');
     const isKalshi = msgLower.includes('kalshi') || msgLower.includes('market') || msgLower.includes('prediction');
-    const isNBA = msgLower.includes('nba') || msgLower.includes('lakers') || msgLower.includes('warriors');
+    const isNBA = msgLower.includes('nba') || msgLower.includes('lakers') || msgLower.includes('warriors') || msgLower.includes('basketball');
     const isNFL = msgLower.includes('nfl') || msgLower.includes('chiefs') || msgLower.includes('football');
     const isMLB = msgLower.includes('mlb') || msgLower.includes('baseball');
-
+    
     // Generate contextual follow-ups based on conversation
     if (isBetting) {
       suggestions.push(
         { label: 'What are the best player props for tonight?', icon: Target, category: 'betting' },
         { label: 'Show me live arbitrage opportunities', icon: Zap, category: 'betting' },
-        { label: 'Compare this with DFS value plays', icon: Layers, category: 'all' }
+        { label: 'Compare this with DFS value plays', icon: Layers, category: 'all' },
+        { label: 'Sharp money movement on these games?', icon: Activity, category: 'betting' },
+        { label: 'Best correlated parlays for tonight', icon: Medal, category: 'betting' }
       );
     } else if (isDFS) {
       suggestions.push(
         { label: 'Build a low-ownership tournament stack', icon: Users, category: 'dfs' },
         { label: 'Find value plays under $5K', icon: DollarSign, category: 'dfs' },
-        { label: 'What betting lines support this lineup?', icon: TrendingUp, category: 'all' }
+        { label: 'What betting lines support this lineup?', icon: TrendingUp, category: 'all' },
+        { label: 'Showdown slate captain picks with leverage', icon: Medal, category: 'dfs' },
+        { label: 'Optimal cash game lineup for tonight', icon: CheckCircle, category: 'dfs' }
       );
     } else if (isFantasy) {
       suggestions.push(
         { label: 'Show me ADP risers this week', icon: TrendingUp, category: 'fantasy' },
         { label: 'Best ball stacking strategy?', icon: Medal, category: 'fantasy' },
-        { label: 'Auction value targets for this week', icon: ShoppingCart, category: 'fantasy' }
+        { label: 'Auction value targets for this week', icon: ShoppingCart, category: 'fantasy' },
+        { label: 'Waiver wire priority adds', icon: Star, category: 'fantasy' },
+        { label: 'Trade value charts and buy-low targets', icon: RefreshCw, category: 'fantasy' }
       );
     } else if (isKalshi) {
       suggestions.push(
         { label: 'Weather markets affecting game totals', icon: Activity, category: 'kalshi' },
         { label: 'Cross-market arbitrage opportunities', icon: Sparkles, category: 'all' },
-        { label: 'Economic events with betting implications', icon: BarChart3, category: 'kalshi' }
+        { label: 'Economic events with betting implications', icon: BarChart3, category: 'kalshi' },
+        { label: 'Political markets with sharp edge', icon: TrendingUp, category: 'kalshi' },
+        { label: 'High-volume mispriced contracts', icon: Target, category: 'kalshi' }
       );
     }
-
+    
     // Sport-specific follow-ups
     if (isNBA) {
       suggestions.push(
         { label: 'NBA injury updates affecting tonight\'s games', icon: AlertCircle, category: 'betting' },
-        { label: 'Best NBA DFS stacks for tonight', icon: Award, category: 'dfs' }
+        { label: 'Best NBA DFS stacks for tonight', icon: Award, category: 'dfs' },
+        { label: 'Lakers vs Warriors player prop edges', icon: Target, category: 'betting' }
       );
     } else if (isNFL) {
       suggestions.push(
         { label: 'NFL weather impact on this week\'s totals', icon: Activity, category: 'betting' },
-        { label: 'Week 8 showdown captain picks', icon: Medal, category: 'dfs' }
+        { label: 'Week 8 showdown captain picks', icon: Medal, category: 'dfs' },
+        { label: 'Best anytime TD scorer bets', icon: Trophy, category: 'betting' }
       );
     } else if (isMLB) {
       suggestions.push(
         { label: 'MLB pitcher-batter matchup analysis', icon: Target, category: 'betting' },
-        { label: 'Baseball DFS stacking strategy', icon: Layers, category: 'dfs' }
+        { label: 'Baseball DFS stacking strategy', icon: Layers, category: 'dfs' },
+        { label: 'Run line value plays tonight', icon: TrendingUp, category: 'betting' }
       );
     }
-
+    
     // Card-based suggestions
     if (responseCards.some(card => card.type === 'live-odds')) {
       suggestions.push({ label: 'How has this line moved in the last hour?', icon: TrendingUp, category: 'betting' });
@@ -498,18 +509,36 @@ export default function UnifiedAIPlatform() {
     if (responseCards.some(card => card.type === 'cross-platform')) {
       suggestions.push({ label: 'More correlated betting + DFS opportunities?', icon: Sparkles, category: 'all' });
     }
-
-    // General follow-ups if no specific context
-    if (suggestions.length === 0) {
+    
+    // Additional universal suggestions to ensure minimum of 5
+    const universalSuggestions = [
+      { label: 'What are tonight\'s best value opportunities?', icon: Sparkles, category: 'all' },
+      { label: 'Show me high-confidence plays across platforms', icon: CheckCircle, category: 'all' },
+      { label: 'Any sharp money movements to track?', icon: TrendingUp, category: 'betting' },
+      { label: 'Compare live odds across sportsbooks', icon: BarChart, category: 'betting' },
+      { label: 'Best risk-reward plays for my bankroll', icon: Shield, category: 'all' },
+      { label: 'Top contrarian plays for tournaments', icon: Users, category: 'dfs' },
+      { label: 'Injury news impacting tonight\'s slate', icon: AlertCircle, category: 'all' }
+    ];
+    
+    // Add universal suggestions until we have at least 5
+    for (const suggestion of universalSuggestions) {
+      if (suggestions.length >= 7) break;
+      if (!suggestions.some(s => s.label === suggestion.label)) {
+        suggestions.push(suggestion);
+      }
+    }
+    
+    // Ensure minimum of 5 suggestions
+    if (suggestions.length < 5) {
       suggestions.push(
-        { label: 'What are tonight\'s best value opportunities?', icon: Sparkles, category: 'all' },
-        { label: 'Show me high-confidence plays across platforms', icon: CheckCircle, category: 'all' },
-        { label: 'Any sharp money movements to track?', icon: TrendingUp, category: 'betting' }
+        { label: 'Analyze cross-platform value opportunities', icon: Layers, category: 'all' },
+        { label: 'Show me AI-recommended plays for tonight', icon: Sparkles, category: 'all' }
       );
     }
-
-    // Limit to 4 suggestions max
-    return suggestions.slice(0, 4);
+    
+    // Return 5-7 suggestions for optimal scrolling experience
+    return suggestions.slice(0, 7);
   };
 
   const simulateResponse = (userMessage: string) => {

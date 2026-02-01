@@ -1938,70 +1938,55 @@ export default function UnifiedAIPlatform() {
 
           <div className="relative max-w-5xl mx-auto">
             {/* Dynamic Contextual Suggestions or Platform Prompts */}
-            <div className="mb-5">
-              {/* Header for suggested prompts */}
-              {suggestedPrompts.length > 0 && messages.length > 1 && (
-                <div className="flex items-center gap-2 mb-3 px-1">
-                  <Sparkles className="w-4 h-4 text-blue-400 animate-pulse" />
-                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                    Suggested Follow-up Questions
-                  </span>
-                </div>
-              )}
-              
-              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-0">
-                {(suggestedPrompts.length > 0 && messages.length > 1 ? suggestedPrompts : quickActions).map((action, idx) => {
-                  const Icon = action.icon;
-                  const categoryColor = categories.find(c => c.id === action.category)?.color || 'text-blue-400';
-                  const isSuggested = suggestedPrompts.length > 0 && messages.length > 1;
-                  
-                  return (
-                    <button
-                      key={`${action.label}-${idx}`}
-                      onClick={() => {
-                        setInput(action.label);
-                        // Trigger submit after a brief delay to ensure state is updated
-                        setTimeout(() => {
-                          const userMessage: Message = {
-                            role: 'user',
-                            content: action.label,
-                            timestamp: new Date()
-                          };
-                          setMessages(prev => [...prev, userMessage]);
-                          
-                          // Update chat metadata
-                          setChats(prevChats => prevChats.map(chat => {
-                            if (chat.id === activeChat) {
-                              const updatedChat = { ...chat };
-                              updatedChat.preview = action.label.slice(0, 50) + (action.label.length > 50 ? '...' : '');
-                              updatedChat.timestamp = new Date();
-                              if (chat.title === 'New Analysis') {
-                                const words = action.label.split(' ').slice(0, 5).join(' ');
-                                updatedChat.title = words + (action.label.split(' ').length > 5 ? '...' : '');
-                              }
-                              return updatedChat;
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-0 mb-5">
+              {(suggestedPrompts.length > 0 && messages.length > 1 ? suggestedPrompts : quickActions).map((action, idx) => {
+                const Icon = action.icon;
+                const isSuggested = suggestedPrompts.length > 0 && messages.length > 1;
+                
+                return (
+                  <button
+                    key={`${action.label}-${idx}`}
+                    onClick={() => {
+                      setInput(action.label);
+                      // Trigger submit after a brief delay to ensure state is updated
+                      setTimeout(() => {
+                        const userMessage: Message = {
+                          role: 'user',
+                          content: action.label,
+                          timestamp: new Date()
+                        };
+                        setMessages(prev => [...prev, userMessage]);
+                        
+                        // Update chat metadata
+                        setChats(prevChats => prevChats.map(chat => {
+                          if (chat.id === activeChat) {
+                            const updatedChat = { ...chat };
+                            updatedChat.preview = action.label.slice(0, 50) + (action.label.length > 50 ? '...' : '');
+                            updatedChat.timestamp = new Date();
+                            if (chat.title === 'New Analysis') {
+                              const words = action.label.split(' ').slice(0, 5).join(' ');
+                              updatedChat.title = words + (action.label.split(' ').length > 5 ? '...' : '');
                             }
-                            return chat;
-                          }));
-                          
-                          setInput('');
-                          simulateResponse(action.label);
-                        }, 0);
-                      }}
-                      className={`group/quick flex items-center py-2.5 ${
-                        isSuggested 
-                          ? 'bg-gradient-to-r from-blue-600/20 to-purple-600/20 hover:from-blue-600/30 hover:to-purple-600/30 border-blue-500/40 shadow-lg shadow-blue-500/10' 
-                          : 'bg-gradient-to-r from-gray-800/60 to-gray-900/60 hover:from-gray-700/80 hover:to-gray-800/80 border-gray-700/50'
-                      } hover:border-gray-600 border text-xs font-bold text-gray-300 hover:text-white whitespace-nowrap transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-95 backdrop-blur-sm px-2.5 gap-1 rounded-full pl-1.5 pr-3.5`}
-                    >
-                      <div className={`p-1 ${isSuggested ? 'bg-blue-900/30' : 'bg-gray-900/50'} rounded-lg group-hover/quick:bg-gray-800 transition-colors`}>
-                        <Icon className={`w-3.5 h-3.5 ${isSuggested ? 'text-blue-400' : 'text-gray-500'} group-hover/quick:${categoryColor} transition-colors`} />
-                      </div>
-                      {action.label}
-                    </button>
-                  );
-                })}
-              </div>
+                            return updatedChat;
+                          }
+                          return chat;
+                        }));
+                        
+                        setInput('');
+                        simulateResponse(action.label);
+                      }, 0);
+                    }}
+                    className={`group/prompt flex items-center gap-2.5 px-5 py-3 rounded-full border text-sm font-medium whitespace-nowrap transition-all duration-300 ${
+                      isSuggested 
+                        ? 'bg-gradient-to-br from-blue-600/15 via-purple-600/15 to-blue-600/15 border-blue-500/40 text-white hover:from-blue-600/25 hover:via-purple-600/25 hover:to-blue-600/25 hover:border-blue-400/60 hover:shadow-lg hover:shadow-blue-500/20' 
+                        : 'bg-gray-900/40 border-gray-800/60 text-gray-300 hover:bg-gray-800/60 hover:border-gray-700/80 hover:text-white'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 ${isSuggested ? 'text-blue-400' : 'text-gray-500'}`} />
+                    <span>{action.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* File Upload Preview */}

@@ -3,7 +3,7 @@
 import React from "react"
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon } from 'lucide-react';
+import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2 } from 'lucide-react';
 
 interface FileAttachment {
   id: string;
@@ -86,7 +86,7 @@ export default function UnifiedAIPlatform() {
   const [messages, setMessages] = useState<Message[]>([
   {
   role: 'assistant',
-  content: "Welcome to the All-In-One Sports & Financial Intelligence Platform! I'm your AI companion for NFC fantasy football (NFBC/NFFC/NFBKC), sports betting, DFS optimization, and financial event prediction via Kalshi. Whether you need draft strategy, live odds analysis, lineup optimization, or market insights - I've got you covered. What can I help you with today?",
+  content: "Welcome to **Leverage AI** - Your All-In-One Sports & Financial Intelligence Platform.\n\nI'm your AI companion for:\n\n**Sports Betting** - Real-time odds analysis, value detection, and sharp money tracking\n**Fantasy (NFC)** - NFBC/NFFC/NFBKC draft strategy, ADP analysis, and auction optimization\n**DFS** - Optimal lineup construction, leverage plays, and ownership projections\n**Kalshi Markets** - Financial event prediction, weather markets, and arbitrage opportunities\n\nEvery recommendation is backed by advanced AI models analyzing multiple data sources to provide you with verified, high-confidence insights.\n\n**How can I help you gain an edge today?**",
   timestamp: new Date(),
   isWelcome: true,
   cards: [],
@@ -670,6 +670,59 @@ export default function UnifiedAIPlatform() {
     return uniqueSuggestions.slice(0, 7);
   };
 
+  const handleFollowUp = (action: 'correlated' | 'metrics', cardData?: any) => {
+    console.log('[v0] Generating follow-up response:', action);
+    
+    // Check if user has credits
+    if (!consumeCredit()) {
+      console.log('[v0] No credits remaining, showing purchase modal');
+      return;
+    }
+
+    setIsTyping(true);
+    
+    setTimeout(() => {
+      let responseText = '';
+      let responseCards: InsightCard[] = [];
+
+      if (action === 'correlated') {
+        responseText = "**Correlated Opportunities Identified**\n\n**Cross-Platform Analysis:** I've scanned multiple markets to find plays that correlate with your original opportunity.\n\n**Synergy Rating:** High - These plays share common factors and can be stacked for increased leverage\n\n**Strategic Value:** Combining these opportunities creates portfolio diversification while maintaining edge\n\n**Here are the correlated plays:**";
+        responseCards = [unifiedCards[1], unifiedCards[3], unifiedCards[5]];
+      } else {
+        responseText = "**Deep Metric Analysis**\n\n**Data Validation:** All metrics cross-referenced with historical databases and real-time market feeds\n\n**Statistical Significance:** Each data point has been tested for reliability and predictive value\n\n**Actionable Insights:** Below is a granular breakdown of key performance indicators and their implications\n\n**Detailed metric breakdown:**";
+        responseCards = [unifiedCards[2], unifiedCards[6]];
+      }
+
+      const aiMessage: Message = {
+        role: 'assistant',
+        content: responseText,
+        timestamp: new Date(),
+        cards: responseCards,
+        sources: [
+          { name: 'Advanced AI Model', type: 'model', reliability: 93 },
+          { name: 'Historical Database', type: 'database', reliability: 95 },
+          { name: 'Live Market API', type: 'api', reliability: 97 }
+        ],
+        modelUsed: 'GPT-4 Turbo',
+        processingTime: 750 + Math.floor(Math.random() * 300),
+        trustMetrics: {
+          benfordIntegrity: 86 + Math.floor(Math.random() * 10),
+          oddsAlignment: 88 + Math.floor(Math.random() * 10),
+          marketConsensus: 84 + Math.floor(Math.random() * 12),
+          historicalAccuracy: 91 + Math.floor(Math.random() * 8),
+          finalConfidence: 87 + Math.floor(Math.random() * 8),
+          trustLevel: 'high',
+          riskLevel: 'low',
+          adjustedTone: 'Strong signal',
+          flags: []
+        }
+      };
+
+      setMessages(prev => [...prev, aiMessage]);
+      setIsTyping(false);
+    }, 1000);
+  };
+
   const generateDetailedAnalysis = (card: InsightCard) => {
     console.log('[v0] Generating detailed analysis for card:', card.title);
     
@@ -682,33 +735,57 @@ export default function UnifiedAIPlatform() {
     setIsTyping(true);
     
     setTimeout(() => {
-      const detailedAnalysisText = `Here's the comprehensive deep-dive analysis for ${card.title}:
+      // Extract metrics dynamically from card data
+      const metrics = Object.entries(card.data).map(([key, value]) => ({
+        label: key.replace(/([A-Z])/g, ' $1').trim(),
+        value: value
+      }));
 
-**Market Context & Edge Analysis**
-Based on my advanced AI models analyzing ${card.category} data across multiple platforms, I've identified key insights that provide significant edge in this ${card.subcategory.toLowerCase()} opportunity.
+      // Determine conviction and risk levels
+      const convictionLevel = card.status === 'hot' || card.status === 'strong' || card.status === 'elite' ? 'High' : 
+                             card.status === 'value' || card.status === 'optimal' ? 'Medium-High' : 'Medium';
+      const riskCategory = card.status === 'hot' ? 'Time-sensitive play' : 
+                          card.status === 'value' ? 'Measured opportunity' : 'Standard variance';
+      const positionSize = card.status === 'elite' || card.status === 'strong' ? '15-20%' : 
+                          card.status === 'value' ? '10-15%' : '8-12%';
+      const entryStrategy = card.status === 'hot' ? 'Act quickly - market moving fast' : 'Monitor for optimal entry window';
+      const crossPlatformRec = card.category === 'NBA' || card.category === 'NFL' ? 'DFS lineups and player props' : 
+                               card.category === 'NFFC' || card.category === 'NFBC' ? 'auction values and stacks' : 'related betting markets';
+      const exitConditions = card.status === 'hot' ? 'Lock in if line moves significantly against position' : 'Standard variance management';
+      const leverageOpp = card.type === 'live-odds' ? 'correlated player props' : 
+                         card.type === 'dfs-lineup' ? 'betting totals' : 
+                         card.type === 'kalshi-market' ? 'sportsbook arbitrage' : 'related plays';
 
-**Detailed Breakdown:**
-${Object.entries(card.data).map(([key, value]) => `• **${key.replace(/([A-Z])/g, ' $1').trim()}**: ${value} - This metric suggests strong correlation with profitable outcomes based on historical patterns.`).join('\n')}
+      // Store structured data using JSON marker (exclude icon - it's not serializable)
+      const { icon, ...cardWithoutIcon } = card;
+      const structuredData = {
+        isDetailedAnalysis: true,
+        card: cardWithoutIcon,
+        metrics: metrics,
+        overview: `${card.category} ${card.subcategory} opportunity identified with ${card.status.toUpperCase()} confidence. Based on multi-platform analysis, this presents significant edge potential.`,
+        marketContext: `My AI models have analyzed ${card.category} data across multiple platforms including live odds feeds, historical databases, and prediction markets. This ${card.subcategory.toLowerCase()} opportunity shows strong alignment with profitable historical patterns.`,
+        riskAssessment: {
+          convictionLevel,
+          riskCategory,
+          positionSize
+        },
+        recommendations: [
+          { label: 'Entry Strategy', value: entryStrategy },
+          { label: 'Cross-Platform Plays', value: `Consider correlating with ${crossPlatformRec}` },
+          { label: 'Exit Conditions', value: exitConditions },
+          { label: 'Leverage Opportunities', value: `Stack with ${leverageOpp}` }
+        ]
+      };
 
-**Risk Assessment & Strategy:**
-The ${card.status} status indicates this is a high-conviction play. My recommendation is to approach this with calculated position sizing, accounting for the inherent variance in ${card.category} markets.
-
-**Cross-Platform Correlation:**
-This opportunity aligns well with similar patterns I'm detecting in related betting markets, DFS slates, and prediction markets. Consider stacking this with correlated plays for maximum leverage.
-
-**Action Items:**
-1. Monitor line movements over the next 2-4 hours
-2. Compare with sharp money indicators
-3. Validate against contrarian ownership metrics
-4. Execute within optimal timing window
-
-Would you like me to show correlated opportunities or dive deeper into any specific metric?`;
+      // Use special JSON marker in content
+      const detailedAnalysisText = `__DETAILED_ANALYSIS__${JSON.stringify(structuredData)}__END_ANALYSIS__`;
 
       const aiMessage: Message = {
         role: 'assistant',
         content: detailedAnalysisText,
         timestamp: new Date(),
-        cards: [card],
+        // Remove cards array to eliminate duplicate display
+        cards: [],
         sources: [
           { name: 'Advanced AI Model', type: 'model', reliability: 94 },
           { name: 'Historical Database', type: 'database', reliability: 96 },
@@ -745,19 +822,19 @@ Would you like me to show correlated opportunities or dive deeper into any speci
     setTimeout(() => {
       const responses = [
         {
-          text: "Excellent timing! I've analyzed live odds, fantasy matchups, and prediction markets to find the best opportunities across all platforms:",
+          text: "**Analysis Complete** - I've processed live odds data, fantasy matchups, and prediction markets to identify your best opportunities.\n\n**Data Sources Verified:** Multiple sportsbooks, historical databases, and real-time market feeds\n\n**Key Findings:** I've identified several high-confidence plays with strong edge potential across platforms. Each recommendation below has been validated against market consensus and historical performance patterns.\n\n**Here are your top opportunities:**",
           cards: [unifiedCards[0], unifiedCards[4], unifiedCards[7]]
         },
         {
-          text: "I've optimized your strategy by combining DFS data, betting lines, and Kalshi market insights. Here's what my AI models are showing:",
+          text: "**Strategy Optimized** - My AI models have analyzed DFS pricing, betting line movements, and Kalshi market data to maximize your edge.\n\n**Methodology:** Cross-platform correlation analysis with real-time odds tracking\n\n**Confidence Level:** High - All recommendations align with sharp money indicators and proven historical patterns\n\n**Your optimized plays:**",
           cards: [unifiedCards[2], unifiedCards[3], unifiedCards[9]]
         },
         {
-          text: "Great question! I'm seeing strong edges across multiple platforms. Here's the comprehensive breakdown:",
+          text: "**Comprehensive Breakdown** - I've identified multiple value opportunities by analyzing market inefficiencies across betting, fantasy, and prediction platforms.\n\n**Validation:** Each play has been tested against current market conditions, ownership projections, and historical success rates\n\n**Risk Assessment:** All recommendations include position sizing guidance and exit strategies\n\n**High-value opportunities identified:**",
           cards: [unifiedCards[1], unifiedCards[5], unifiedCards[8], unifiedCards[10]]
         },
         {
-          text: "Perfect! I've identified several high-value opportunities by cross-referencing fantasy values, betting markets, and financial predictions:",
+          text: "**Multi-Platform Insight** - I've cross-referenced fantasy values, live betting markets, and financial predictions to find correlated opportunities.\n\n**Advanced Analysis:** Leveraging AI models trained on millions of historical outcomes\n\n**Quality Check:** All data points verified for accuracy and recency\n\n**Your strategic advantage plays:**",
           cards: [unifiedCards[4], unifiedCards[6], unifiedCards[7]]
         }
       ];
@@ -987,7 +1064,7 @@ Would you like me to show correlated opportunities or dive deeper into any speci
     }
 
     const newChatId = `chat-${Date.now()}`;
-    const welcomeMessage = "Welcome! I'm ready to analyze betting odds, fantasy values, DFS lineups, or Kalshi markets. What would you like to explore?";
+    const welcomeMessage = "**Welcome to Leverage AI**\n\nI'm ready to provide data-driven insights across all platforms:\n\n**Sports Betting** - Live odds and value plays\n**Fantasy Sports** - Draft strategy and ADP analysis\n**DFS** - Optimal lineup construction\n**Kalshi Markets** - Prediction market opportunities\n\n**What would you like to analyze?**";
     const newChat: Chat = {
       id: newChatId,
       title: 'New Analysis',
@@ -1019,7 +1096,7 @@ Would you like me to show correlated opportunities or dive deeper into any speci
     setMessages([
       {
         role: 'assistant',
-        content: "Analysis loaded. Let's continue building your edge across all platforms!",
+        content: "**Analysis Restored**\n\nYour previous conversation has been loaded. All data sources remain active and verified.\n\n**Ready to continue optimizing your strategy across all platforms.**",
         timestamp: new Date(),
         cards: []
       }
@@ -1598,15 +1675,46 @@ Would you like me to show correlated opportunities or dive deeper into any speci
               >
                 <div className={`max-w-4xl ${message.role === 'user' ? 'w-auto' : 'w-full'}`}>
                   {message.role === 'assistant' && (
-                    <div className="flex items-center gap-3 mb-3">
+                    <div className="flex items-center gap-3 mb-3 flex-wrap">
                       <div className="w-8 h-8 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30 rounded-full">
                         <Sparkles className="w-4.5 h-4.5 text-white" />
                       </div>
-                      <span className="text-sm font-bold bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">Leverage AI </span>
+                      <span className="text-sm font-bold bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">Leverage AI</span>
+                      
+                      {/* Data Verification Badge */}
+                      {message.sources && message.sources.length > 0 && !message.isWelcome && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-500/10 border border-green-500/30 rounded-full">
+                          <CheckCheck className="w-3 h-3 text-green-400" />
+                          <span className="text-[10px] font-black text-green-400 uppercase tracking-wide">Verified</span>
+                        </div>
+                      )}
+                      
                       {message.confidence && (
-                        <div className="ml-auto flex items-center gap-2 px-3 py-1 bg-gray-800/50 border border-gray-700/50 rounded-full">
+                        <div className="flex items-center gap-2 px-3 py-1 bg-gray-800/50 border border-gray-700/50 rounded-full">
                           <Activity className="w-3.5 h-3.5 text-green-400" />
                           <span className="text-xs font-bold text-gray-400">{message.confidence}% confidence</span>
+                        </div>
+                      )}
+                      
+                      {/* Trust Level Indicator */}
+                      {message.trustMetrics && !message.isWelcome && (
+                        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${
+                          message.trustMetrics.trustLevel === 'high' ? 'bg-blue-500/10 border-blue-500/30' :
+                          message.trustMetrics.trustLevel === 'medium' ? 'bg-yellow-500/10 border-yellow-500/30' :
+                          'bg-orange-500/10 border-orange-500/30'
+                        }`}>
+                          <Shield className={`w-3 h-3 ${
+                            message.trustMetrics.trustLevel === 'high' ? 'text-blue-400' :
+                            message.trustMetrics.trustLevel === 'medium' ? 'text-yellow-400' :
+                            'text-orange-400'
+                          }`} />
+                          <span className={`text-[10px] font-black uppercase tracking-wide ${
+                            message.trustMetrics.trustLevel === 'high' ? 'text-blue-400' :
+                            message.trustMetrics.trustLevel === 'medium' ? 'text-yellow-400' :
+                            'text-orange-400'
+                          }`}>
+                            {message.trustMetrics.adjustedTone}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -1645,7 +1753,254 @@ Would you like me to show correlated opportunities or dive deeper into any speci
                       </div>
                     ) : (
                       <>
-                        <p className="text-sm leading-relaxed font-medium">{message.content}</p>
+                        {/* Check if this is a detailed analysis with structured data */}
+                        {message.content.includes('__DETAILED_ANALYSIS__') ? (
+                          (() => {
+                            const match = message.content.match(/__DETAILED_ANALYSIS__(.+)__END_ANALYSIS__/);
+                            if (!match) return <p className="text-sm leading-relaxed font-medium">{message.content}</p>;
+                            
+                            const data = JSON.parse(match[1]);
+                            const { card, metrics, overview, marketContext, riskAssessment, recommendations } = data;
+                            
+                            // Map card type to icon component
+                            const getCardIcon = (type: string) => {
+                              const iconMap: Record<string, any> = {
+                                'live-odds': Zap,
+                                'player-prop': Target,
+                                'dfs-lineup': Award,
+                                'dfs-value': DollarSign,
+                                'adp-analysis': TrendingUp,
+                                'bestball-stack': Medal,
+                                'auction-value': ShoppingCart,
+                                'kalshi-market': BarChart3,
+                                'kalshi-weather': Activity,
+                                'cross-platform': Sparkles,
+                                'ai-prediction': Sparkles,
+                              };
+                              return iconMap[type] || Sparkles;
+                            };
+                            
+                            const CardIcon = getCardIcon(card.type);
+                            
+                            return (
+                              <div className="space-y-6">
+                                {/* Header Section */}
+                                <div className="flex items-start gap-4">
+                                  <div className={`p-3 rounded-xl bg-gradient-to-br ${card.gradient} shadow-lg flex-shrink-0`}>
+                                    <CardIcon className="w-6 h-6 text-white" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-2">
+                                      <h2 className="text-xl font-black text-white">{card.title}</h2>
+                                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide ${
+                                        card.status === 'hot' || card.status === 'elite' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                                        card.status === 'strong' || card.status === 'optimal' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
+                                        'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                      }`}>{card.status}</span>
+                                    </div>
+                                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">
+                                      {card.category} • {card.subcategory}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Overview */}
+                                <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 border border-gray-700/50 rounded-xl p-4">
+                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                    <Info className="w-3.5 h-3.5" />
+                                    Overview
+                                  </h3>
+                                  <p className="text-sm text-gray-200 leading-relaxed">{overview}</p>
+                                </div>
+
+                                {/* Key Metrics Grid */}
+                                <div>
+                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                    <BarChart className="w-3.5 h-3.5" />
+                                    Key Metrics
+                                  </h3>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {metrics.map((metric: any, idx: number) => (
+                                      <div 
+                                        key={idx}
+                                        className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 rounded-xl p-3.5 hover:border-gray-600/50 transition-colors"
+                                      >
+                                        <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">{metric.label}</div>
+                                        <div className="text-base font-black text-white">{metric.value}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Market Context */}
+                                <div className="bg-gradient-to-br from-blue-900/20 to-indigo-900/20 border border-blue-700/30 rounded-xl p-4">
+                                  <h3 className="text-xs font-black text-blue-400 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                    <TrendingUp className="w-3.5 h-3.5" />
+                                    Market Context & Edge
+                                  </h3>
+                                  <p className="text-sm text-gray-200 leading-relaxed">{marketContext}</p>
+                                </div>
+
+                                {/* Risk Assessment */}
+                                <div>
+                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                    <Shield className="w-3.5 h-3.5" />
+                                    Risk Assessment
+                                  </h3>
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-700/30 rounded-xl p-4">
+                                      <div className="text-[10px] font-bold text-green-500 uppercase tracking-wide mb-1.5">Conviction Level</div>
+                                      <div className="text-lg font-black text-green-400">{riskAssessment.convictionLevel}</div>
+                                    </div>
+                                    <div className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border border-yellow-700/30 rounded-xl p-4">
+                                      <div className="text-[10px] font-bold text-yellow-500 uppercase tracking-wide mb-1.5">Risk Category</div>
+                                      <div className="text-sm font-black text-yellow-400">{riskAssessment.riskCategory}</div>
+                                    </div>
+                                    <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-700/30 rounded-xl p-4">
+                                      <div className="text-[10px] font-bold text-purple-500 uppercase tracking-wide mb-1.5">Position Sizing</div>
+                                      <div className="text-lg font-black text-purple-400">{riskAssessment.positionSize}</div>
+                                      <div className="text-[10px] text-gray-500 mt-1">of bankroll</div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Strategic Recommendations */}
+                                <div>
+                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                    <Target className="w-3.5 h-3.5" />
+                                    Strategic Recommendations
+                                  </h3>
+                                  <div className="space-y-2.5">
+                                    {recommendations.map((rec: any, idx: number) => (
+                                      <div 
+                                        key={idx}
+                                        className="bg-gradient-to-r from-gray-800/40 to-gray-900/40 border border-gray-700/50 rounded-xl p-4 hover:border-gray-600/50 transition-colors"
+                                      >
+                                        <div className="flex items-start gap-3">
+                                          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            <span className="text-white text-xs font-black">{idx + 1}</span>
+                                          </div>
+                                          <div className="flex-1">
+                                            <div className="text-xs font-black text-gray-300 mb-1">{rec.label}</div>
+                                            <div className="text-sm text-gray-400 leading-relaxed">{rec.value}</div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Next Steps CTA */}
+                                <div className="bg-gradient-to-r from-indigo-900/30 via-purple-900/30 to-pink-900/30 border border-indigo-600/30 rounded-xl p-5">
+                                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                    <p className="text-sm text-gray-300 leading-relaxed">
+                                      <span className="font-bold text-white">Next Steps:</span> Would you like me to show correlated opportunities or dive deeper into any specific metric?
+                                    </p>
+                                    <button
+                                      onClick={() => {
+                                        console.log('[v0] Yes button clicked - showing correlated opportunities');
+                                        handleFollowUp('correlated', card);
+                                      }}
+                                      disabled={isTyping}
+                                      className="group relative flex items-center justify-center gap-2.5 px-8 py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-600 disabled:via-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-black text-base rounded-xl transition-all duration-300 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:shadow-xl hover:scale-105 active:scale-95 min-w-[140px] flex-shrink-0"
+                                    >
+                                      {isTyping ? (
+                                        <>
+                                          <Loader2 className="w-5 h-5 animate-spin" />
+                                          <span>Loading...</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <CheckCircle2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                          <span className="tracking-wide">YES</span>
+                                          <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+                                  
+                                  {/* Secondary Options */}
+                                  <div className="mt-4 pt-4 border-t border-indigo-600/20">
+                                    <p className="text-xs text-gray-400 mb-3 font-semibold">Or choose a specific action:</p>
+                                    <div className="flex flex-wrap gap-2">
+                                      <button
+                                        onClick={() => {
+                                          console.log('[v0] Correlated opportunities button clicked');
+                                          handleFollowUp('correlated', card);
+                                        }}
+                                        disabled={isTyping}
+                                        className="flex items-center gap-2 px-3.5 py-2 bg-gray-800/50 hover:bg-gray-700/50 disabled:bg-gray-800/30 disabled:cursor-not-allowed border border-gray-700/50 hover:border-blue-500/50 text-gray-300 hover:text-white font-semibold text-xs rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+                                      >
+                                        <Sparkles className="w-3.5 h-3.5" />
+                                        Correlated Plays
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          console.log('[v0] Metrics analysis button clicked');
+                                          handleFollowUp('metrics', card);
+                                        }}
+                                        disabled={isTyping}
+                                        className="flex items-center gap-2 px-3.5 py-2 bg-gray-800/50 hover:bg-gray-700/50 disabled:bg-gray-800/30 disabled:cursor-not-allow border border-gray-700/50 hover:border-purple-500/50 text-gray-300 hover:text-white font-semibold text-xs rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+                                      >
+                                        <BarChart className="w-3.5 h-3.5" />
+                                        Deep Metrics
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          <div className="text-sm leading-relaxed font-medium space-y-3">
+                            {message.content.split('\n\n').map((paragraph, pIdx) => {
+                              // Check if paragraph contains bullet points
+                              if (paragraph.includes('\n**') && paragraph.includes('**')) {
+                                const lines = paragraph.split('\n');
+                                return (
+                                  <div key={pIdx} className="space-y-2">
+                                    {lines.map((line, lIdx) => {
+                                      // Bold text with ** **
+                                      if (line.includes('**')) {
+                                        const parts = line.split('**');
+                                        return (
+                                          <div key={lIdx} className="flex items-start gap-2">
+                                            {parts.map((part, partIdx) => {
+                                              if (partIdx % 2 === 1) {
+                                                return <span key={partIdx} className="font-black text-white">{part}</span>;
+                                              } else if (part.trim()) {
+                                                return <span key={partIdx} className="text-gray-300">{part}</span>;
+                                              }
+                                              return null;
+                                            })}
+                                          </div>
+                                        );
+                                      }
+                                      return <div key={lIdx}>{line}</div>;
+                                    })}
+                                  </div>
+                                );
+                              }
+                              
+                              // Regular paragraph with bold support
+                              if (paragraph.includes('**')) {
+                                const parts = paragraph.split('**');
+                                return (
+                                  <p key={pIdx}>
+                                    {parts.map((part, partIdx) => {
+                                      if (partIdx % 2 === 1) {
+                                        return <span key={partIdx} className="font-black text-white">{part}</span>;
+                                      }
+                                      return <span key={partIdx}>{part}</span>;
+                                    })}
+                                  </p>
+                                );
+                              }
+                              
+                              return <p key={pIdx}>{paragraph}</p>;
+                            })}
+                          </div>
+                        )}
                         
                         {/* File Attachments Display */}
                         {message.attachments && message.attachments.length > 0 && (

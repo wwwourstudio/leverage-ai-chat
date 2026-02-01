@@ -688,32 +688,43 @@ export default function UnifiedAIPlatform() {
         value: value
       }));
 
-      // Build comprehensive structured analysis
-      const detailedAnalysisText = `## ${card.title} - Complete Analysis
+      // Determine conviction and risk levels
+      const convictionLevel = card.status === 'hot' || card.status === 'strong' || card.status === 'elite' ? 'High' : 
+                             card.status === 'value' || card.status === 'optimal' ? 'Medium-High' : 'Medium';
+      const riskCategory = card.status === 'hot' ? 'Time-sensitive play' : 
+                          card.status === 'value' ? 'Measured opportunity' : 'Standard variance';
+      const positionSize = card.status === 'elite' || card.status === 'strong' ? '15-20%' : 
+                          card.status === 'value' ? '10-15%' : '8-12%';
+      const entryStrategy = card.status === 'hot' ? 'Act quickly - market moving fast' : 'Monitor for optimal entry window';
+      const crossPlatformRec = card.category === 'NBA' || card.category === 'NFL' ? 'DFS lineups and player props' : 
+                               card.category === 'NFFC' || card.category === 'NFBC' ? 'auction values and stacks' : 'related betting markets';
+      const exitConditions = card.status === 'hot' ? 'Lock in if line moves significantly against position' : 'Standard variance management';
+      const leverageOpp = card.type === 'live-odds' ? 'correlated player props' : 
+                         card.type === 'dfs-lineup' ? 'betting totals' : 
+                         card.type === 'kalshi-market' ? 'sportsbook arbitrage' : 'related plays';
 
-### Overview
-${card.category} ${card.subcategory} opportunity identified with **${card.status.toUpperCase()}** confidence. Based on multi-platform analysis, this presents significant edge potential.
+      // Store structured data using JSON marker
+      const structuredData = {
+        isDetailedAnalysis: true,
+        card: card,
+        metrics: metrics,
+        overview: `${card.category} ${card.subcategory} opportunity identified with ${card.status.toUpperCase()} confidence. Based on multi-platform analysis, this presents significant edge potential.`,
+        marketContext: `My AI models have analyzed ${card.category} data across multiple platforms including live odds feeds, historical databases, and prediction markets. This ${card.subcategory.toLowerCase()} opportunity shows strong alignment with profitable historical patterns.`,
+        riskAssessment: {
+          convictionLevel,
+          riskCategory,
+          positionSize
+        },
+        recommendations: [
+          { label: 'Entry Strategy', value: entryStrategy },
+          { label: 'Cross-Platform Plays', value: `Consider correlating with ${crossPlatformRec}` },
+          { label: 'Exit Conditions', value: exitConditions },
+          { label: 'Leverage Opportunities', value: `Stack with ${leverageOpp}` }
+        ]
+      };
 
-### Key Metrics
-
-${metrics.map(m => `**${m.label}**: ${m.value}`).join('  \n')}
-
-### Market Context & Edge
-My AI models have analyzed ${card.category} data across multiple platforms including live odds feeds, historical databases, and prediction markets. This ${card.subcategory.toLowerCase()} opportunity shows strong alignment with profitable historical patterns.
-
-### Risk Assessment
-- **Conviction Level**: ${card.status === 'hot' || card.status === 'strong' || card.status === 'elite' ? 'High' : card.status === 'value' || card.status === 'optimal' ? 'Medium-High' : 'Medium'}
-- **Risk Category**: ${card.status === 'hot' ? 'Time-sensitive play' : card.status === 'value' ? 'Measured opportunity' : 'Standard variance'}
-- **Position Sizing**: Recommended ${card.status === 'elite' || card.status === 'strong' ? '15-20%' : card.status === 'value' ? '10-15%' : '8-12%'} of allocated bankroll
-
-### Strategic Recommendations
-1. **Entry Strategy**: ${card.status === 'hot' ? 'Act quickly - market moving fast' : 'Monitor for optimal entry window'}
-2. **Cross-Platform Plays**: Consider correlating with ${card.category === 'NBA' || card.category === 'NFL' ? 'DFS lineups and player props' : card.category === 'NFFC' || card.category === 'NFBC' ? 'auction values and stacks' : 'related betting markets'}
-3. **Exit Conditions**: ${card.status === 'hot' ? 'Lock in if line moves significantly against position' : 'Standard variance management'}
-4. **Leverage Opportunities**: Stack with ${card.type === 'live-odds' ? 'correlated player props' : card.type === 'dfs-lineup' ? 'betting totals' : card.type === 'kalshi-market' ? 'sportsbook arbitrage' : 'related plays'}
-
-### Next Steps
-Would you like me to show correlated opportunities or dive deeper into any specific metric?`;
+      // Use special JSON marker in content
+      const detailedAnalysisText = `__DETAILED_ANALYSIS__${JSON.stringify(structuredData)}__END_ANALYSIS__`;
 
       const aiMessage: Message = {
         role: 'assistant',
@@ -1657,7 +1668,136 @@ Would you like me to show correlated opportunities or dive deeper into any speci
                       </div>
                     ) : (
                       <>
-                        <p className="text-sm leading-relaxed font-medium">{message.content}</p>
+                        {/* Check if this is a detailed analysis with structured data */}
+                        {message.content.includes('__DETAILED_ANALYSIS__') ? (
+                          (() => {
+                            const match = message.content.match(/__DETAILED_ANALYSIS__(.+)__END_ANALYSIS__/);
+                            if (!match) return <p className="text-sm leading-relaxed font-medium">{message.content}</p>;
+                            
+                            const data = JSON.parse(match[1]);
+                            const { card, metrics, overview, marketContext, riskAssessment, recommendations } = data;
+                            const CardIcon = card.icon;
+                            
+                            return (
+                              <div className="space-y-6">
+                                {/* Header Section */}
+                                <div className="flex items-start gap-4">
+                                  <div className={`p-3 rounded-xl bg-gradient-to-br ${card.gradient} shadow-lg flex-shrink-0`}>
+                                    <CardIcon className="w-6 h-6 text-white" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-2">
+                                      <h2 className="text-xl font-black text-white">{card.title}</h2>
+                                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide ${
+                                        card.status === 'hot' || card.status === 'elite' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                                        card.status === 'strong' || card.status === 'optimal' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
+                                        'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                      }`}>{card.status}</span>
+                                    </div>
+                                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">
+                                      {card.category} • {card.subcategory}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Overview */}
+                                <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 border border-gray-700/50 rounded-xl p-4">
+                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                    <Info className="w-3.5 h-3.5" />
+                                    Overview
+                                  </h3>
+                                  <p className="text-sm text-gray-200 leading-relaxed">{overview}</p>
+                                </div>
+
+                                {/* Key Metrics Grid */}
+                                <div>
+                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                    <BarChart className="w-3.5 h-3.5" />
+                                    Key Metrics
+                                  </h3>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {metrics.map((metric: any, idx: number) => (
+                                      <div 
+                                        key={idx}
+                                        className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 rounded-xl p-3.5 hover:border-gray-600/50 transition-colors"
+                                      >
+                                        <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">{metric.label}</div>
+                                        <div className="text-base font-black text-white">{metric.value}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Market Context */}
+                                <div className="bg-gradient-to-br from-blue-900/20 to-indigo-900/20 border border-blue-700/30 rounded-xl p-4">
+                                  <h3 className="text-xs font-black text-blue-400 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                    <TrendingUp className="w-3.5 h-3.5" />
+                                    Market Context & Edge
+                                  </h3>
+                                  <p className="text-sm text-gray-200 leading-relaxed">{marketContext}</p>
+                                </div>
+
+                                {/* Risk Assessment */}
+                                <div>
+                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                    <Shield className="w-3.5 h-3.5" />
+                                    Risk Assessment
+                                  </h3>
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-700/30 rounded-xl p-4">
+                                      <div className="text-[10px] font-bold text-green-500 uppercase tracking-wide mb-1.5">Conviction Level</div>
+                                      <div className="text-lg font-black text-green-400">{riskAssessment.convictionLevel}</div>
+                                    </div>
+                                    <div className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border border-yellow-700/30 rounded-xl p-4">
+                                      <div className="text-[10px] font-bold text-yellow-500 uppercase tracking-wide mb-1.5">Risk Category</div>
+                                      <div className="text-sm font-black text-yellow-400">{riskAssessment.riskCategory}</div>
+                                    </div>
+                                    <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-700/30 rounded-xl p-4">
+                                      <div className="text-[10px] font-bold text-purple-500 uppercase tracking-wide mb-1.5">Position Sizing</div>
+                                      <div className="text-lg font-black text-purple-400">{riskAssessment.positionSize}</div>
+                                      <div className="text-[10px] text-gray-500 mt-1">of bankroll</div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Strategic Recommendations */}
+                                <div>
+                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                    <Target className="w-3.5 h-3.5" />
+                                    Strategic Recommendations
+                                  </h3>
+                                  <div className="space-y-2.5">
+                                    {recommendations.map((rec: any, idx: number) => (
+                                      <div 
+                                        key={idx}
+                                        className="bg-gradient-to-r from-gray-800/40 to-gray-900/40 border border-gray-700/50 rounded-xl p-4 hover:border-gray-600/50 transition-colors"
+                                      >
+                                        <div className="flex items-start gap-3">
+                                          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            <span className="text-white text-xs font-black">{idx + 1}</span>
+                                          </div>
+                                          <div className="flex-1">
+                                            <div className="text-xs font-black text-gray-300 mb-1">{rec.label}</div>
+                                            <div className="text-sm text-gray-400 leading-relaxed">{rec.value}</div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Next Steps CTA */}
+                                <div className="bg-gradient-to-r from-indigo-900/30 via-purple-900/30 to-pink-900/30 border border-indigo-600/30 rounded-xl p-4">
+                                  <p className="text-sm text-gray-300 leading-relaxed">
+                                    <span className="font-bold text-white">Next Steps:</span> Would you like me to show correlated opportunities or dive deeper into any specific metric?
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          <p className="text-sm leading-relaxed font-medium">{message.content}</p>
+                        )}
                         
                         {/* File Attachments Display */}
                         {message.attachments && message.attachments.length > 0 && (

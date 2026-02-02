@@ -11,45 +11,38 @@ export default async function HomePage() {
 
   // Redirect to login if not authenticated
   if (!user) {
-    redirect('/auth/login')
+    redirect('/login')
   }
 
-  // Get or create user record with credits
-  const { data: userData, error: userError } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  console.log('[v0] User authenticated:', user.email)
 
-  if (userError || !userData) {
-    // Create user record if doesn't exist
-    const { error: insertError } = await supabase.from('users').insert({
-      id: user.id,
-      email: user.email!,
-      display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
-      credits_balance: 50, // Initial credits for new users
-      subscription_tier: 'free',
-    })
+  // Try to get user data, but don't fail if tables don't exist
+  let userData = null
+  let chats = null
+  let userCredits = null
 
-    if (insertError) {
-      console.error('[v0] Error creating user:', insertError)
-    }
+  try {
+    const { data } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+    userData = data
+  } catch (error) {
+    console.log('[v0] Users table not found - migrations needed')
   }
 
-  // Get user's chats
-  const { data: chats } = await supabase
-    .from('chats')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(20)
-
-  // Get user credits
-  const { data: userCredits } = await supabase
-    .from('users')
-    .select('credits_balance, subscription_tier')
-    .eq('id', user.id)
-    .single()
+  try {
+    const { data } = await supabase
+      .from('chats')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(20)
+    chats = data
+  } catch (error) {
+    console.log('[v0] Chats table not found - migrations needed')
+  }
 
   return (
     <ChatInterface
@@ -57,10 +50,11 @@ export default async function HomePage() {
         id: user.id,
         email: user.email!,
         displayName: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
-        credits: userCredits?.credits_balance || 0,
-        tier: userCredits?.subscription_tier || 'free',
+        credits: userData?.credits_balance || 100,
+        tier: userData?.subscription_tier || 'free',
       }}
       initialChats={chats || []}
+      migrationsNeeded={!userData}
     />
   )
 }

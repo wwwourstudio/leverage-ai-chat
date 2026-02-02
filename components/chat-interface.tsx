@@ -50,9 +50,11 @@ interface User {
 export default function ChatInterface({
   user,
   initialChats,
+  migrationsNeeded = false,
 }: {
   user: User
   initialChats: Chat[]
+  migrationsNeeded?: boolean
 }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -314,6 +316,43 @@ export default function ChatInterface({
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {migrationsNeeded && (
+            <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20 p-6">
+              <div className="flex items-start gap-4">
+                <AlertTriangle className="h-6 w-6 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-1" />
+                <div className="flex-1 space-y-3">
+                  <h3 className="font-semibold text-yellow-900 dark:text-yellow-100">
+                    Database Setup Required
+                  </h3>
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    The database tables have not been created yet. Please run the migrations to enable full functionality.
+                  </p>
+                  <div className="space-y-2 text-sm text-yellow-900 dark:text-yellow-100">
+                    <p className="font-medium">Quick Setup (5 minutes):</p>
+                    <ol className="list-decimal list-inside space-y-1 ml-4">
+                      <li>Open your Supabase Dashboard → SQL Editor</li>
+                      <li>Copy and run each migration file from <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">/supabase/migrations/</code></li>
+                      <li>Refresh this page</li>
+                    </ol>
+                  </div>
+                  <Button 
+                    variant="default" 
+                    size="sm"
+                    asChild
+                    className="mt-2"
+                  >
+                    <a 
+                      href="https://app.supabase.com" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                    >
+                      Open Supabase Dashboard
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          )}
           {!activeChat ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
               <Shield className="h-16 w-16 text-muted-foreground mb-4" />

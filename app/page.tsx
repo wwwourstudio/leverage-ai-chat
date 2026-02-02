@@ -3,6 +3,7 @@
 import React from "react"
 
 import { useState, useRef, useEffect } from 'react';
+import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data-service';
 import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2 } from 'lucide-react';
 
 interface FileAttachment {
@@ -91,11 +92,11 @@ export default function UnifiedAIPlatform() {
   isWelcome: true,
   cards: [],
   insights: {
-  totalValue: 4697.50,
-  winRate: 66.8,
-        roi: 15.6,
-        activeContests: 12,
-        totalInvested: 3450
+  totalValue: 0,
+  winRate: 0,
+        roi: 0,
+        activeContests: 0,
+        totalInvested: 0
       }
     }
   ]);
@@ -195,12 +196,30 @@ export default function UnifiedAIPlatform() {
     return updated;
   };
 
-  // Initialize credits on mount
+  // Initialize credits and load real insights on mount
   useEffect(() => {
     const data = getCreditData();
     setCreditsRemaining(data.credits);
     const rateData = getRateLimitData();
     setChatsRemaining(CHAT_LIMIT - rateData.count);
+
+    // Load real user insights
+    console.log('[v0] Loading real user insights on mount');
+    fetchUserInsights().then(insights => {
+      console.log('[v0] Loaded insights:', insights);
+      setMessages(prev => {
+        const newMessages = [...prev];
+        if (newMessages[0]?.isWelcome) {
+          newMessages[0] = {
+            ...newMessages[0],
+            insights
+          };
+        }
+        return newMessages;
+      });
+    }).catch(err => {
+      console.error('[v0] Failed to load insights:', err);
+    });
   }, []);
 
   const [chats, setChats] = useState<Chat[]>([
@@ -704,13 +723,13 @@ export default function UnifiedAIPlatform() {
           { name: 'Live Market API', type: 'api', reliability: 97 }
         ],
         modelUsed: 'GPT-4 Turbo',
-        processingTime: 750 + Math.floor(Math.random() * 300),
+        processingTime: 950,
         trustMetrics: {
-          benfordIntegrity: 86 + Math.floor(Math.random() * 10),
-          oddsAlignment: 88 + Math.floor(Math.random() * 10),
-          marketConsensus: 84 + Math.floor(Math.random() * 12),
-          historicalAccuracy: 91 + Math.floor(Math.random() * 8),
-          finalConfidence: 87 + Math.floor(Math.random() * 8),
+          benfordIntegrity: 90,
+          oddsAlignment: 92,
+          marketConsensus: 88,
+          historicalAccuracy: 94,
+          finalConfidence: 91,
           trustLevel: 'high',
           riskLevel: 'low',
           adjustedTone: 'Strong signal',
@@ -792,147 +811,357 @@ export default function UnifiedAIPlatform() {
           { name: 'Live Market API', type: 'api', reliability: 98 }
         ],
         modelUsed: 'GPT-4 Turbo',
-        processingTime: 850 + Math.floor(Math.random() * 300),
+        processingTime: 1050,
         trustMetrics: {
-          benfordIntegrity: 85 + Math.floor(Math.random() * 10),
-          oddsAlignment: 87 + Math.floor(Math.random() * 10),
-          marketConsensus: 83 + Math.floor(Math.random() * 12),
-          historicalAccuracy: 90 + Math.floor(Math.random() * 8),
-          finalConfidence: 86 + Math.floor(Math.random() * 8),
+          benfordIntegrity: 88,
+          oddsAlignment: 90,
+          marketConsensus: 85,
+          historicalAccuracy: 92,
+          finalConfidence: 89,
           trustLevel: 'high',
-          riskLevel: 'low',
-          adjustedTone: 'Strong signal',
-          flags: []
+          riskLevel: 'medium',
+          adjustedTone: 'Moderate confidence'
         }
       };
-
+      
       setMessages(prev => [...prev, aiMessage]);
-      
-      // Generate contextual suggestions based on the detailed analysis
-      const contextualSuggestions = generateContextualSuggestions(card.title, [card]);
-      setSuggestedPrompts(contextualSuggestions);
-      
+      setSuggestedPrompts(generateContextualSuggestions(card.title, aiMessage.cards || []));
       setIsTyping(false);
     }, 1200);
   };
 
-  const simulateResponse = (userMessage: string) => {
+  const generateRealResponse = async (userMessage: string) => {
     setIsTyping(true);
+    const startTime = Date.now();
     
-    setTimeout(() => {
-      const responses = [
-        {
-          text: "**Analysis Complete** - I've processed live odds data, fantasy matchups, and prediction markets to identify your best opportunities.\n\n**Data Sources Verified:** Multiple sportsbooks, historical databases, and real-time market feeds\n\n**Key Findings:** I've identified several high-confidence plays with strong edge potential across platforms. Each recommendation below has been validated against market consensus and historical performance patterns.\n\n**Here are your top opportunities:**",
-          cards: [unifiedCards[0], unifiedCards[4], unifiedCards[7]]
-        },
-        {
-          text: "**Strategy Optimized** - My AI models have analyzed DFS pricing, betting line movements, and Kalshi market data to maximize your edge.\n\n**Methodology:** Cross-platform correlation analysis with real-time odds tracking\n\n**Confidence Level:** High - All recommendations align with sharp money indicators and proven historical patterns\n\n**Your optimized plays:**",
-          cards: [unifiedCards[2], unifiedCards[3], unifiedCards[9]]
-        },
-        {
-          text: "**Comprehensive Breakdown** - I've identified multiple value opportunities by analyzing market inefficiencies across betting, fantasy, and prediction platforms.\n\n**Validation:** Each play has been tested against current market conditions, ownership projections, and historical success rates\n\n**Risk Assessment:** All recommendations include position sizing guidance and exit strategies\n\n**High-value opportunities identified:**",
-          cards: [unifiedCards[1], unifiedCards[5], unifiedCards[8], unifiedCards[10]]
-        },
-        {
-          text: "**Multi-Platform Insight** - I've cross-referenced fantasy values, live betting markets, and financial predictions to find correlated opportunities.\n\n**Advanced Analysis:** Leveraging AI models trained on millions of historical outcomes\n\n**Quality Check:** All data points verified for accuracy and recency\n\n**Your strategic advantage plays:**",
-          cards: [unifiedCards[4], unifiedCards[6], unifiedCards[7]]
-        }
-      ];
-
-      const response = responses[Math.floor(Math.random() * responses.length)];
+    try {
+      console.log('[v0] Starting real AI analysis for:', userMessage);
       
-    const sourceTypes: Array<{ name: string; type: 'database' | 'api' | 'model' | 'cache'; reliability: number; url?: string }> = [
-      { name: 'Live Odds API', type: 'api', reliability: 98, url: 'https://api.odds.com' },
-      { name: 'Fantasy Database', type: 'database', reliability: 95 },
-      { name: 'GPT-4 Analysis', type: 'model', reliability: 92 },
-      { name: 'Historical Cache', type: 'cache', reliability: 88 },
-      { name: 'Kalshi Markets API', type: 'api', reliability: 97, url: 'https://api.kalshi.com' },
-      { name: 'DFS Optimizer Engine', type: 'model', reliability: 94 }
+      // Extract context from user message
+      const context = {
+        sport: extractSport(userMessage),
+        marketType: extractMarketType(userMessage),
+        platform: extractPlatform(userMessage),
+        previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content }))
+      };
+
+      console.log('[v0] Extracted context:', context);
+      
+      // Fetch real data from our API routes
+      const analysisPromise = fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userMessage,
+          context
+        })
+      }).then(res => res.json());
+
+      // Fetch live odds data if relevant
+      let oddsDataPromise = Promise.resolve(null);
+      if (context.sport && (userMessage.toLowerCase().includes('odds') || 
+          userMessage.toLowerCase().includes('bet') || 
+          userMessage.toLowerCase().includes('line'))) {
+        console.log('[v0] Fetching live odds for sport:', context.sport);
+        oddsDataPromise = fetch('/api/odds', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sport: context.sport,
+            marketType: context.marketType || 'h2h'
+          })
+        }).then(res => res.json()).catch(err => {
+          console.error('[v0] Odds fetch error:', err);
+          return null;
+        });
+      }
+
+      // Wait for both API calls
+      const [analysisResult, oddsData] = await Promise.all([analysisPromise, oddsDataPromise]);
+      
+      console.log('[v0] Analysis result received:', {
+        success: analysisResult.success,
+        hasText: !!analysisResult.text,
+        hasCards: !!analysisResult.cards,
+        hasTrustMetrics: !!analysisResult.trustMetrics
+      });
+      
+      if (oddsData) {
+        console.log('[v0] Odds data received:', {
+          success: oddsData.success,
+          eventsCount: oddsData.data?.length || 0
+        });
+      }
+
+      // Handle API errors with smart fallback
+      if (!analysisResult.success || analysisResult.useFallback) {
+        console.log('[v0] API returned fallback signal, generating intelligent response');
+        
+        // Generate an intelligent fallback response based on user query
+        const fallbackResponse = generateIntelligentFallback(userMessage, context);
+        const processingTime = Date.now() - startTime;
+        const fallbackCards = await selectRelevantCards(userMessage, context);
+        
+        const newMessage: Message = {
+          role: 'assistant',
+          content: fallbackResponse.content,
+          timestamp: new Date(),
+          cards: fallbackCards,
+          confidence: 75,
+          sources: [
+            { name: 'Pattern Analysis', type: 'model', reliability: 80 },
+            { name: 'Historical Data', type: 'cache', reliability: 78 }
+          ],
+          modelUsed: 'Smart Fallback',
+          processingTime,
+          trustMetrics: {
+            benfordIntegrity: 75,
+            oddsAlignment: 78,
+            marketConsensus: 75,
+            historicalAccuracy: 80,
+            finalConfidence: 77,
+            trustLevel: 'medium',
+            riskLevel: 'medium',
+            adjustedTone: 'Moderate confidence',
+            flags: [{
+              type: 'info',
+              message: analysisResult.error || 'Using cached analysis patterns',
+              severity: 'info'
+            }]
+          }
+        };
+        
+        setMessages(prev => [...prev, newMessage]);
+        setSuggestedPrompts(generateContextualSuggestions(userMessage, newMessage.cards || []));
+        setIsTyping(false);
+        return;
+      }
+
+      // Build response message with real data
+      const processingTime = Date.now() - startTime;
+      
+      // Combine AI analysis with odds data context if available
+      let enhancedContent = analysisResult.text;
+      if (oddsData?.success && oddsData.data?.length > 0) {
+        const topEvent = oddsData.data[0];
+        console.log('[v0] Enriching response with live odds from:', topEvent.sport_title);
+        enhancedContent += `\n\n**Live Market Data:** Real-time odds from ${topEvent.bookmakers?.length || 0} bookmakers analyzed for this recommendation.`;
+      }
+
+      // Get dynamic cards if not provided by analysis
+      let responseCards = analysisResult.cards;
+      if (!responseCards || responseCards.length === 0) {
+        console.log('[v0] No cards from analysis, fetching dynamic cards');
+        responseCards = await selectRelevantCards(userMessage, context);
+      }
+
+      const newMessage: Message = {
+        role: 'assistant',
+        content: enhancedContent,
+        timestamp: new Date(),
+        cards: responseCards,
+        confidence: analysisResult.confidence || 85,
+        sources: analysisResult.sources || buildSourcesList(oddsData),
+        modelUsed: analysisResult.model || 'Grok-2 + Real-Time Data',
+        processingTime,
+        trustMetrics: analysisResult.trustMetrics
+      };
+
+      setMessages(prev => [...prev, newMessage]);
+
+      // Generate contextual suggestions
+      const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);
+      setSuggestedPrompts(contextualSuggestions);
+      console.log('[v0] Generated contextual suggestions:', contextualSuggestions.length);
+
+    } catch (error) {
+      console.error('[v0] Error generating real response:', error);
+      
+      // Fallback to basic response with error indication
+      const fallbackCards = await selectRelevantCards(userMessage);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `I'm currently experiencing connectivity issues with live data sources. Here's an analysis based on available information:\n\n**Note:** Some real-time data may be limited. ${error instanceof Error ? `(${error.message})` : ''}`,
+        timestamp: new Date(),
+        cards: fallbackCards,
+        confidence: 70,
+        sources: [
+          { name: 'Cached Data', type: 'cache', reliability: 75 }
+        ],
+        modelUsed: 'Fallback Mode',
+        processingTime: Date.now() - startTime,
+        trustMetrics: {
+          benfordIntegrity: 70,
+          oddsAlignment: 70,
+          marketConsensus: 70,
+          historicalAccuracy: 70,
+          finalConfidence: 70,
+          trustLevel: 'medium',
+          riskLevel: 'medium',
+          adjustedTone: 'Limited data',
+          flags: [{
+            type: 'connectivity',
+            message: 'Using cached data due to API connectivity issues',
+            severity: 'warning'
+          }]
+        }
+      }]);
+
+      setSuggestedPrompts(generateContextualSuggestions(userMessage, fallbackCards));
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  // Helper functions for context extraction
+  const extractSport = (message: string): string | null => {
+    const msgLower = message.toLowerCase();
+    if (msgLower.includes('nba') || msgLower.includes('basketball')) return 'nba';
+    if (msgLower.includes('nfl') || msgLower.includes('football')) return 'nfl';
+    if (msgLower.includes('mlb') || msgLower.includes('baseball')) return 'mlb';
+    if (msgLower.includes('nhl') || msgLower.includes('hockey')) return 'nhl';
+    if (msgLower.includes('ncaa')) return msgLower.includes('basketball') ? 'ncaab' : 'ncaaf';
+    return null;
+  };
+
+  const extractMarketType = (message: string): string | null => {
+    const msgLower = message.toLowerCase();
+    if (msgLower.includes('spread')) return 'spreads';
+    if (msgLower.includes('total') || msgLower.includes('over') || msgLower.includes('under')) return 'totals';
+    if (msgLower.includes('moneyline') || msgLower.includes('ml')) return 'h2h';
+    if (msgLower.includes('prop')) return 'player_props';
+    return 'h2h'; // default to head-to-head
+  };
+
+  const extractPlatform = (message: string): string | null => {
+    const msgLower = message.toLowerCase();
+    if (msgLower.includes('draftkings') || msgLower.includes('dk')) return 'draftkings';
+    if (msgLower.includes('fanduel') || msgLower.includes('fd')) return 'fanduel';
+    if (msgLower.includes('kalshi')) return 'kalshi';
+    if (msgLower.includes('nfbc') || msgLower.includes('nffc')) return 'fantasy';
+    return null;
+  };
+
+  const selectRelevantCards = async (userMessage: string, context?: any): Promise<InsightCard[]> => {
+    const msgLower = userMessage.toLowerCase();
+    
+    // Extract sport and category from message
+    const sport = extractSport(userMessage);
+    let category = 'all';
+    
+    if (msgLower.includes('bet') || msgLower.includes('odds')) {
+      category = 'betting';
+    } else if (msgLower.includes('dfs') || msgLower.includes('lineup')) {
+      category = 'dfs';
+    } else if (msgLower.includes('draft') || msgLower.includes('fantasy')) {
+      category = 'fantasy';
+    } else if (msgLower.includes('kalshi') || msgLower.includes('market')) {
+      category = 'kalshi';
+    }
+    
+    console.log('[v0] Fetching dynamic cards for:', { sport, category });
+    
+    try {
+      // Fetch dynamic cards from API
+      const dynamicCards = await fetchDynamicCards({
+        sport: sport || undefined,
+        category,
+        userContext: context,
+        limit: 3
+      });
+      
+      console.log('[v0] Got dynamic cards:', dynamicCards.length);
+      
+      // Convert DynamicCard to InsightCard format
+      return dynamicCards.map(card => convertToInsightCard(card));
+    } catch (error) {
+      console.error('[v0] Error fetching dynamic cards:', error);
+      // Return empty array on error - the response will still be shown
+      return [];
+    }
+  };
+
+  const convertToInsightCard = (dynamicCard: DynamicCard): InsightCard => {
+    // Map icon string to actual icon component
+    const iconMap: Record<string, any> = {
+      'Zap': Zap,
+      'Target': Target,
+      'Award': Award,
+      'DollarSign': DollarSign,
+      'TrendingUp': TrendingUp,
+      'Medal': Medal,
+      'ShoppingCart': ShoppingCart,
+      'BarChart3': BarChart3,
+      'Activity': Activity,
+      'Sparkles': Sparkles
+    };
+    
+    return {
+      type: dynamicCard.type,
+      title: dynamicCard.title,
+      icon: iconMap[dynamicCard.icon] || Zap,
+      category: dynamicCard.category,
+      subcategory: dynamicCard.subcategory,
+      gradient: dynamicCard.gradient,
+      data: dynamicCard.data,
+      status: dynamicCard.status
+    };
+  };
+
+  const buildSourcesList = (oddsData: any): Array<{ name: string; type: 'database' | 'api' | 'model' | 'cache'; reliability: number; url?: string }> => {
+    const sources = [
+      { name: 'Grok AI Model', type: 'model' as const, reliability: 94 },
+      { name: 'Supabase Trust System', type: 'database' as const, reliability: 96 }
     ];
     
-    const randomSources = sourceTypes
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 2 + Math.floor(Math.random() * 2));
-
-    // Generate AI Trust & Integrity metrics
-    const benfordIntegrity = 75 + Math.floor(Math.random() * 23);
-    const oddsAlignment = 80 + Math.floor(Math.random() * 18);
-    const marketConsensus = 70 + Math.floor(Math.random() * 25);
-    const historicalAccuracy = 78 + Math.floor(Math.random() * 20);
-
-    const finalConfidence = Math.round(
-      benfordIntegrity * 0.20 +
-      oddsAlignment * 0.30 +
-      marketConsensus * 0.30 +
-      historicalAccuracy * 0.20
-    );
-
-    const trustLevel: 'high' | 'medium' | 'low' = 
-      finalConfidence >= 80 ? 'high' : 
-      finalConfidence >= 60 ? 'medium' : 'low';
-
-    const riskLevel: 'low' | 'medium' | 'high' = 
-      finalConfidence >= 80 ? 'low' : 
-      finalConfidence >= 60 ? 'medium' : 'high';
-
-    const flags: Array<{ type: string; message: string; severity: 'info' | 'warning' | 'error' }> = [];
+    if (oddsData?.success) {
+      sources.push({
+        name: 'The Odds API (Live)',
+        type: 'api' as const,
+        reliability: 98,
+        url: 'https://the-odds-api.com'
+      });
+    }
     
-    if (benfordIntegrity < 70) {
-      flags.push({ 
-        type: 'benford', 
-        message: 'AI numeric outputs show deviation from market odds distribution', 
-        severity: 'warning' 
-      });
+    return sources;
+  };
+
+  const generateIntelligentFallback = (userMessage: string, context: any) => {
+    const msgLower = userMessage.toLowerCase();
+    
+    // Sports betting related query
+    if (msgLower.includes('bet') || msgLower.includes('odds') || msgLower.includes('spread')) {
+      return {
+        content: `**Analysis Based on Market Patterns**\n\n${context.sport ? `For ${context.sport.toUpperCase()}` : 'Based on your query'}, here are strategic considerations:\n\n**Key Factors to Consider:**\n- Recent team performance and momentum\n- Head-to-head historical matchups\n- Injury reports and lineup changes\n- Home/away splits and venue factors\n- Weather conditions (for outdoor sports)\n\n**Recommendation Approach:**\nI recommend cross-referencing current line movements across multiple sportsbooks to identify value. Look for discrepancies of 1-2 points in spreads or 5%+ in implied probability.\n\n**Risk Management:**\nConsider unit sizing of 1-3% of bankroll for standard plays. Always compare opening lines to current lines to gauge sharp vs public money.\n\n*Note: Configure API keys for real-time odds analysis and AI-powered insights.*`
+      };
     }
-    if (oddsAlignment < 85) {
-      flags.push({ 
-        type: 'odds', 
-        message: `AI recommendation differs from live market by ${(100 - oddsAlignment) / 10}%`, 
-        severity: oddsAlignment < 70 ? 'error' : 'warning' 
-      });
+    
+    // DFS related query
+    if (msgLower.includes('dfs') || msgLower.includes('draftkings') || msgLower.includes('fanduel') || msgLower.includes('lineup')) {
+      return {
+        content: `**DFS Strategy Recommendations**\n\n**Core Lineup Building Principles:**\n\n1. **Salary Efficiency**: Target players with 5x+ point-per-dollar projection\n2. **Game Environment**: Prioritize high-total games (O/U 220+ NBA, 50+ NFL)\n3. **Ownership Leverage**: In GPPs, fade chalk plays over 30% ownership when viable\n4. **Correlation**: Stack QB + WR combos, or game stacks in high-scoring matchups\n\n**Player Selection Framework:**\n- **Core Plays**: Safe, high-floor players for cash games\n- **Value Plays**: Punt plays under 20% ownership with ceiling outcomes\n- **Tournament Leverage**: Contrarian stars in plus matchups\n\n**Bankroll Strategy:**\nAllocate 80% to cash games (H2H, 50/50s) and 20% to GPPs for balanced risk/reward.\n\n*Connect your API keys to unlock real-time pricing inefficiency detection.*`
+      };
     }
-    if (marketConsensus < 70) {
-      flags.push({ 
-        type: 'consensus', 
-        message: 'Significant divergence from market consensus detected', 
-        severity: 'warning' 
-      });
+    
+    // Fantasy draft related
+    if (msgLower.includes('draft') || msgLower.includes('fantasy') || msgLower.includes('nfbc') || msgLower.includes('nffc')) {
+      return {
+        content: `**Fantasy Draft Strategy**\n\n**Draft Approach by Format:**\n\n**Season-Long (NFBC/NFFC):**\n- Early rounds: Target consistency over ceiling (avoid injury-prone stars)\n- Mid rounds: Seek value at scarce positions (TE, elite closers)\n- Late rounds: Upside plays with path to volume\n\n**ADP Strategy:**\n- Identify 10-15 pick value gaps using ADP vs projection delta\n- Target players rising in playing time or usage trends\n- Fade hype trains without underlying metric support\n\n**Positional Scarcity:**\n1. Premium positions: Elite QB (if superflex), top-5 TE\n2. Volume-based: RBs with 3-down roles, target-dominant WRs\n3. Streaming candidates: Defense, matchup-dependent flex\n\n**In-Draft Adjustments:**\nAdapt to league tendencies - if RBs fly early, pivot to WR/TE value.\n\n*Enable live data integration for real-time ADP tracking and player news.*`
+      };
     }
-
-    const adjustedTone = trustLevel === 'high' ? 'Strong signal' : 
-                        trustLevel === 'medium' ? 'Moderate edge' : 
-                        'High uncertainty';
-
-    setMessages(prev => [...prev, {
-      role: 'assistant',
-      content: response.text,
-      timestamp: new Date(),
-      cards: response.cards,
-      confidence: 85 + Math.floor(Math.random() * 13),
-      sources: randomSources,
-      modelUsed: 'GPT-4 Turbo',
-      processingTime: 850 + Math.floor(Math.random() * 500),
-      trustMetrics: {
-        benfordIntegrity,
-        oddsAlignment,
-        marketConsensus,
-        historicalAccuracy,
-        finalConfidence,
-        trustLevel,
-        flags: flags.length > 0 ? flags : undefined,
-        riskLevel,
-        adjustedTone
-      }
-    }]);
-
-    // Generate contextual suggestions based on the conversation
-    const contextualSuggestions = generateContextualSuggestions(userMessage, response.cards);
-    setSuggestedPrompts(contextualSuggestions);
-    console.log('[v0] Generated contextual suggestions:', contextualSuggestions.length);
-
-    setIsTyping(false);
-  }, 1500);
-};
+    
+    // Kalshi/prediction markets
+    if (msgLower.includes('kalshi') || msgLower.includes('prediction market') || msgLower.includes('binary')) {
+      return {
+        content: `**Prediction Market Analysis**\n\n**Kalshi Market Strategies:**\n\n**Event-Based Markets:**\n- Economic data releases: Fed rate decisions, employment reports\n- Political outcomes: Election forecasts, policy changes\n- Weather events: Temperature thresholds, precipitation probability\n- Sports outcomes: Championship winners, playoff advancement\n\n**Arbitrage Opportunities:**\nLook for pricing inefficiencies between Kalshi and traditional sportsbooks:\n- Convert decimal odds to implied probability\n- Account for commission/fees (typically 7-10%)\n- Execute when edge exceeds 5% after costs\n\n**Risk Assessment:**\n- Binary outcomes = binary risk (all-or-nothing)\n- Diversify across uncorrelated events\n- Size positions using Kelly Criterion (edge/odds)\n\n**Market Psychology:**\nFade public bias in emotional markets (politics, weather fears). Back objective data-driven outcomes.\n\n*API integration enables automated odds comparison and alert systems.*`
+      };
+    }
+    
+    // General fallback
+    return {
+      content: `**Comprehensive Sports Intelligence Analysis**\n\n**Multi-Platform Strategy:**\n\nI can help you optimize across all major platforms:\n\n**Sports Betting:** Line shopping, value identification, bankroll management\n**DFS (DraftKings/FanDuel):** Optimal lineup construction, leverage plays, ownership projections\n**Season-Long Fantasy:** Draft strategy, waiver wire priorities, trade evaluation\n**Prediction Markets (Kalshi):** Binary outcome analysis, arbitrage detection, market timing\n\n**Analytical Framework:**\n1. Data-driven decisions backed by historical trends\n2. Cross-platform correlation analysis\n3. Risk-adjusted position sizing\n4. Market psychology and contrarian angles\n\n**Next Steps:**\n- Specify your platform or sport of interest\n- Share specific matchups or players to analyze\n- Configure API integrations for real-time data and AI insights\n\n**Ask me about:**\n"What are the best NBA DFS plays tonight?"\n"Show me NFL Week 12 betting value"\n"Analyze Kalshi weather markets for arbitrage"\n"Help me build an NFBC draft strategy"\n\n*Full functionality requires XAI_API_KEY and ODDS_API_KEY configuration.*`
+    };
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -1053,7 +1282,7 @@ export default function UnifiedAIPlatform() {
     }));
     
     setInput('');
-    simulateResponse(input);
+    generateRealResponse(input);
   };
 
   const handleNewChat = () => {
@@ -1139,13 +1368,13 @@ export default function UnifiedAIPlatform() {
       setEditingMessageIndex(null);
       setEditingContent('');
       
-      // Re-generate response after editing user message
-      if (messages[index].role === 'user') {
-        const newMessages = messages.slice(0, index + 1);
-        setMessages(newMessages);
-        simulateResponse(editingContent);
-      }
-    }
+  // Re-generate response after editing user message
+  if (messages[index].role === 'user') {
+    const newMessages = messages.slice(0, index + 1);
+    setMessages(newMessages);
+    generateRealResponse(editingContent);
+  }
+  }
   };
 
   const handleCancelEdit = () => {
@@ -1163,7 +1392,7 @@ export default function UnifiedAIPlatform() {
       const userMessage = messages[index - 1].content;
       const newMessages = messages.slice(0, index);
       setMessages(newMessages);
-      simulateResponse(userMessage);
+      generateRealResponse(userMessage);
     }
   };
 
@@ -2430,9 +2659,9 @@ export default function UnifiedAIPlatform() {
                           return chat;
                         }));
                         
-                        setInput('');
-                        simulateResponse(action.label);
-                      }, 0);
+  setInput('');
+  generateRealResponse(action.label);
+  }, 0);
                     }}
                     className={`group/prompt flex items-center gap-2.5 px-4 py-2.5 rounded-full border text-sm font-medium whitespace-nowrap transition-all duration-200 ${
                       isSuggested 

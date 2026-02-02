@@ -3,6 +3,7 @@
 import React from "react"
 
 import { useState, useRef, useEffect } from 'react';
+import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data-service';
 import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2 } from 'lucide-react';
 
 interface FileAttachment {
@@ -91,11 +92,11 @@ export default function UnifiedAIPlatform() {
   isWelcome: true,
   cards: [],
   insights: {
-  totalValue: 4697.50,
-  winRate: 66.8,
-        roi: 15.6,
-        activeContests: 12,
-        totalInvested: 3450
+  totalValue: 0,
+  winRate: 0,
+        roi: 0,
+        activeContests: 0,
+        totalInvested: 0
       }
     }
   ]);
@@ -195,12 +196,30 @@ export default function UnifiedAIPlatform() {
     return updated;
   };
 
-  // Initialize credits on mount
+  // Initialize credits and load real insights on mount
   useEffect(() => {
     const data = getCreditData();
     setCreditsRemaining(data.credits);
     const rateData = getRateLimitData();
     setChatsRemaining(CHAT_LIMIT - rateData.count);
+
+    // Load real user insights
+    console.log('[v0] Loading real user insights on mount');
+    fetchUserInsights().then(insights => {
+      console.log('[v0] Loaded insights:', insights);
+      setMessages(prev => {
+        const newMessages = [...prev];
+        if (newMessages[0]?.isWelcome) {
+          newMessages[0] = {
+            ...newMessages[0],
+            insights
+          };
+        }
+        return newMessages;
+      });
+    }).catch(err => {
+      console.error('[v0] Failed to load insights:', err);
+    });
   }, []);
 
   const [chats, setChats] = useState<Chat[]>([
@@ -704,13 +723,13 @@ export default function UnifiedAIPlatform() {
           { name: 'Live Market API', type: 'api', reliability: 97 }
         ],
         modelUsed: 'GPT-4 Turbo',
-        processingTime: 750 + Math.floor(Math.random() * 300),
+        processingTime: 950,
         trustMetrics: {
-          benfordIntegrity: 86 + Math.floor(Math.random() * 10),
-          oddsAlignment: 88 + Math.floor(Math.random() * 10),
-          marketConsensus: 84 + Math.floor(Math.random() * 12),
-          historicalAccuracy: 91 + Math.floor(Math.random() * 8),
-          finalConfidence: 87 + Math.floor(Math.random() * 8),
+          benfordIntegrity: 90,
+          oddsAlignment: 92,
+          marketConsensus: 88,
+          historicalAccuracy: 94,
+          finalConfidence: 91,
           trustLevel: 'high',
           riskLevel: 'low',
           adjustedTone: 'Strong signal',
@@ -792,121 +811,15 @@ export default function UnifiedAIPlatform() {
           { name: 'Live Market API', type: 'api', reliability: 98 }
         ],
         modelUsed: 'GPT-4 Turbo',
-        processingTime: 850 + Math.floor(Math.random() * 300),
+        processingTime: 1050,
         trustMetrics: {
-          benfordIntegrity: 85 + Math.floor(Math.random() * 10),
-          oddsAlignment: 87 + Math.floor(Math.random() * 10),
-          marketConsensus: 83 + Math.floor(Math.random() * 12),
-          historicalAccuracy: 90 + Math.floor(Math.random() * 8),
-          finalConfidence: 86 + Math.floor(Math.random() * 8),
+          benfordIntegrity: 88,
+          oddsAlignment: 90,
+          marketConsensus: 85,
+          historicalAccuracy: 92,
+          finalConfidence: 89,
           trustLevel: 'high',
-          riskLevel: 'low',
-          adjustedTone: 'Strong signal',
-          flags: []
-        }
-      };
-
-      setMessages(prev => [...prev, aiMessage]);
-      
-      // Generate contextual suggestions based on the detailed analysis
-      const contextualSuggestions = generateContextualSuggestions(card.title, [card]);
-      setSuggestedPrompts(contextualSuggestions);
-      
-      setIsTyping(false);
-    }, 1200);
-  };
-
-  const generateRealResponse = async (userMessage: string) => {
-    setIsTyping(true);
-    const startTime = Date.now();
-    
-    try {
-      console.log('[v0] Starting real AI analysis for:', userMessage);
-      
-      // Extract context from user message
-      const context = {
-        sport: extractSport(userMessage),
-        marketType: extractMarketType(userMessage),
-        platform: extractPlatform(userMessage),
-        previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content }))
-      };
-
-      console.log('[v0] Extracted context:', context);
-      
-      // Fetch real data from our API routes
-      const analysisPromise = fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userMessage,
-          context
-        })
-      }).then(res => res.json());
-
-      // Fetch live odds data if relevant
-      let oddsDataPromise = Promise.resolve(null);
-      if (context.sport && (userMessage.toLowerCase().includes('odds') || 
-          userMessage.toLowerCase().includes('bet') || 
-          userMessage.toLowerCase().includes('line'))) {
-        console.log('[v0] Fetching live odds for sport:', context.sport);
-        oddsDataPromise = fetch('/api/odds', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sport: context.sport,
-            marketType: context.marketType || 'h2h'
-          })
-        }).then(res => res.json()).catch(err => {
-          console.error('[v0] Odds fetch error:', err);
-          return null;
-        });
-      }
-
-      // Wait for both API calls
-      const [analysisResult, oddsData] = await Promise.all([analysisPromise, oddsDataPromise]);
-      
-      console.log('[v0] Analysis result received:', {
-        success: analysisResult.success,
-        hasText: !!analysisResult.text,
-        hasCards: !!analysisResult.cards,
-        hasTrustMetrics: !!analysisResult.trustMetrics
-      });
-      
-      if (oddsData) {
-        console.log('[v0] Odds data received:', {
-          success: oddsData.success,
-          eventsCount: oddsData.data?.length || 0
-        });
-      }
-
-      // Handle API errors with smart fallback
-      if (!analysisResult.success || analysisResult.useFallback) {
-        console.log('[v0] API returned fallback signal, generating intelligent response');
-        
-        // Generate an intelligent fallback response based on user query
-        const fallbackResponse = generateIntelligentFallback(userMessage, context);
-        const processingTime = Date.now() - startTime;
-        
-        const newMessage: Message = {
-          role: 'assistant',
-          content: fallbackResponse.content,
-          timestamp: new Date(),
-          cards: selectRelevantCards(userMessage),
-          confidence: 75,
-          sources: [
-            { name: 'Pattern Analysis', type: 'model', reliability: 80 },
-            { name: 'Historical Data', type: 'cache', reliability: 78 }
-          ],
-          modelUsed: 'Smart Fallback',
-          processingTime,
-          trustMetrics: {
-            benfordIntegrity: 75,
-            oddsAlignment: 78,
-            marketConsensus: 75,
-            historicalAccuracy: 80,
-            finalConfidence: 77,
-            trustLevel: 'medium',
-            riskLevel: 'medium',
+          riskLevel: 'medium',
             adjustedTone: 'Moderate confidence',
             flags: [{
               type: 'info',
@@ -933,11 +846,18 @@ export default function UnifiedAIPlatform() {
         enhancedContent += `\n\n**Live Market Data:** Real-time odds from ${topEvent.bookmakers?.length || 0} bookmakers analyzed for this recommendation.`;
       }
 
+      // Get dynamic cards if not provided by analysis
+      let responseCards = analysisResult.cards;
+      if (!responseCards || responseCards.length === 0) {
+        console.log('[v0] No cards from analysis, fetching dynamic cards');
+        responseCards = await selectRelevantCards(userMessage, context);
+      }
+
       const newMessage: Message = {
         role: 'assistant',
         content: enhancedContent,
         timestamp: new Date(),
-        cards: analysisResult.cards || selectRelevantCards(userMessage),
+        cards: responseCards,
         confidence: analysisResult.confidence || 85,
         sources: analysisResult.sources || buildSourcesList(oddsData),
         modelUsed: analysisResult.model || 'Grok-2 + Real-Time Data',
@@ -956,7 +876,7 @@ export default function UnifiedAIPlatform() {
       console.error('[v0] Error generating real response:', error);
       
       // Fallback to basic response with error indication
-      const fallbackCards = selectRelevantCards(userMessage);
+      const fallbackCards = await selectRelevantCards(userMessage);
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: `I'm currently experiencing connectivity issues with live data sources. Here's an analysis based on available information:\n\n**Note:** Some real-time data may be limited. ${error instanceof Error ? `(${error.message})` : ''}`,
@@ -1020,30 +940,70 @@ export default function UnifiedAIPlatform() {
     return null;
   };
 
-  const selectRelevantCards = (userMessage: string): InsightCard[] => {
+  const selectRelevantCards = async (userMessage: string, context?: any): Promise<InsightCard[]> => {
     const msgLower = userMessage.toLowerCase();
-    const relevant: InsightCard[] = [];
     
-    // Select cards based on message content
-    if (msgLower.includes('odds') || msgLower.includes('bet')) {
-      relevant.push(unifiedCards[0], unifiedCards[1]);
-    }
-    if (msgLower.includes('dfs') || msgLower.includes('lineup')) {
-      relevant.push(unifiedCards[2], unifiedCards[3]);
-    }
-    if (msgLower.includes('fantasy') || msgLower.includes('draft')) {
-      relevant.push(unifiedCards[4], unifiedCards[5]);
-    }
-    if (msgLower.includes('kalshi') || msgLower.includes('market')) {
-      relevant.push(unifiedCards[7], unifiedCards[8]);
-    }
+    // Extract sport and category from message
+    const sport = extractSport(userMessage);
+    let category = 'all';
     
-    // If no specific cards matched, return a diverse set
-    if (relevant.length === 0) {
-      relevant.push(unifiedCards[0], unifiedCards[4], unifiedCards[7]);
+    if (msgLower.includes('bet') || msgLower.includes('odds')) {
+      category = 'betting';
+    } else if (msgLower.includes('dfs') || msgLower.includes('lineup')) {
+      category = 'dfs';
+    } else if (msgLower.includes('draft') || msgLower.includes('fantasy')) {
+      category = 'fantasy';
+    } else if (msgLower.includes('kalshi') || msgLower.includes('market')) {
+      category = 'kalshi';
     }
     
-    return relevant.slice(0, 4); // Limit to 4 cards
+    console.log('[v0] Fetching dynamic cards for:', { sport, category });
+    
+    try {
+      // Fetch dynamic cards from API
+      const dynamicCards = await fetchDynamicCards({
+        sport: sport || undefined,
+        category,
+        userContext: context,
+        limit: 3
+      });
+      
+      console.log('[v0] Got dynamic cards:', dynamicCards.length);
+      
+      // Convert DynamicCard to InsightCard format
+      return dynamicCards.map(card => convertToInsightCard(card));
+    } catch (error) {
+      console.error('[v0] Error fetching dynamic cards:', error);
+      // Return empty array on error - the response will still be shown
+      return [];
+    }
+  };
+
+  const convertToInsightCard = (dynamicCard: DynamicCard): InsightCard => {
+    // Map icon string to actual icon component
+    const iconMap: Record<string, any> = {
+      'Zap': Zap,
+      'Target': Target,
+      'Award': Award,
+      'DollarSign': DollarSign,
+      'TrendingUp': TrendingUp,
+      'Medal': Medal,
+      'ShoppingCart': ShoppingCart,
+      'BarChart3': BarChart3,
+      'Activity': Activity,
+      'Sparkles': Sparkles
+    };
+    
+    return {
+      type: dynamicCard.type,
+      title: dynamicCard.title,
+      icon: iconMap[dynamicCard.icon] || Zap,
+      category: dynamicCard.category,
+      subcategory: dynamicCard.subcategory,
+      gradient: dynamicCard.gradient,
+      data: dynamicCard.data,
+      status: dynamicCard.status
+    };
   };
 
   const buildSourcesList = (oddsData: any): Array<{ name: string; type: 'database' | 'api' | 'model' | 'cache'; reliability: number; url?: string }> => {

@@ -301,5 +301,13 @@ function calculateOddsAlignment(aiResponse: string, oddsData: any): number {
   }
 
   // Simple alignment check - would be more sophisticated in production
-  return 85 + Math.floor(Math.random() * 12);
+  // Calculate confidence from actual trust metrics
+  const avgMetric = (
+    trustMetrics.benfordIntegrity +
+    trustMetrics.oddsAlignment +
+    trustMetrics.marketConsensus +
+    trustMetrics.historicalAccuracy
+  ) / 4;
+  
+  return Math.round(avgMetric);
 }

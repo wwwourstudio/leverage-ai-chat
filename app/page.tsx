@@ -820,20 +820,122 @@ export default function UnifiedAIPlatform() {
           finalConfidence: 89,
           trustLevel: 'high',
           riskLevel: 'medium',
-          adjustedTone: 'Moderate confidence',
-          flags: [{
-            type: 'info',
-            message: analysisResult.error || 'Using cached analysis patterns',
-            severity: 'info'
-          }]
+          adjustedTone: 'Moderate confidence'
         }
       };
       
       setMessages(prev => [...prev, aiMessage]);
-      setSuggestedPrompts(generateContextualSuggestions(userMessage, aiMessage.cards || []));
+      setSuggestedPrompts(generateContextualSuggestions(action.label, aiMessage.cards || []));
       setIsTyping(false);
-      return;
-    }
+    }, 1200);
+  };
+
+  const generateRealResponse = async (userMessage: string) => {
+    setIsTyping(true);
+    const startTime = Date.now();
+    
+    try {
+      console.log('[v0] Starting real AI analysis for:', userMessage);
+      
+      // Extract context from user message
+      const context = {
+        sport: extractSport(userMessage),
+        marketType: extractMarketType(userMessage),
+        platform: extractPlatform(userMessage),
+        previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content }))
+      };
+
+      console.log('[v0] Extracted context:', context);
+      
+      // Fetch real data from our API routes
+      const analysisPromise = fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userMessage,
+          context
+        })
+      }).then(res => res.json());
+
+      // Fetch live odds data if relevant
+      let oddsDataPromise = Promise.resolve(null);
+      if (context.sport && (userMessage.toLowerCase().includes('odds') || 
+          userMessage.toLowerCase().includes('bet') || 
+          userMessage.toLowerCase().includes('line'))) {
+        console.log('[v0] Fetching live odds for sport:', context.sport);
+        oddsDataPromise = fetch('/api/odds', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sport: context.sport,
+            marketType: context.marketType || 'h2h'
+          })
+        }).then(res => res.json()).catch(err => {
+          console.error('[v0] Odds fetch error:', err);
+          return null;
+        });
+      }
+
+      // Wait for both API calls
+      const [analysisResult, oddsData] = await Promise.all([analysisPromise, oddsDataPromise]);
+      
+      console.log('[v0] Analysis result received:', {
+        success: analysisResult.success,
+        hasText: !!analysisResult.text,
+        hasCards: !!analysisResult.cards,
+        hasTrustMetrics: !!analysisResult.trustMetrics
+      });
+      
+      if (oddsData) {
+        console.log('[v0] Odds data received:', {
+          success: oddsData.success,
+          eventsCount: oddsData.data?.length || 0
+        });
+      }
+
+      // Handle API errors with smart fallback
+      if (!analysisResult.success || analysisResult.useFallback) {
+        console.log('[v0] API returned fallback signal, generating intelligent response');
+        
+        // Generate an intelligent fallback response based on user query
+        const fallbackResponse = generateIntelligentFallback(userMessage, context);
+        const processingTime = Date.now() - startTime;
+        const fallbackCards = await selectRelevantCards(userMessage, context);
+        
+        const newMessage: Message = {
+          role: 'assistant',
+          content: fallbackResponse.content,
+          timestamp: new Date(),
+          cards: fallbackCards,
+          confidence: 75,
+          sources: [
+            { name: 'Pattern Analysis', type: 'model', reliability: 80 },
+            { name: 'Historical Data', type: 'cache', reliability: 78 }
+          ],
+          modelUsed: 'Smart Fallback',
+          processingTime,
+          trustMetrics: {
+            benfordIntegrity: 75,
+            oddsAlignment: 78,
+            marketConsensus: 75,
+            historicalAccuracy: 80,
+            finalConfidence: 77,
+            trustLevel: 'medium',
+            riskLevel: 'medium',
+            adjustedTone: 'Moderate confidence',
+            flags: [{
+              type: 'info',
+              message: analysisResult.error || 'Using cached analysis patterns',
+              severity: 'info'
+            }]
+          }
+        };
+        
+        setMessages(prev => [...prev, newMessage]);
+        setSuggestedPrompts(generateContextualSuggestions(userMessage, newMessage.cards || []));
+        setIsTyping(false);
+        return;
+      }
 
       // Build response message with real data
       const processingTime = Date.now() - startTime;

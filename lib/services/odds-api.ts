@@ -234,33 +234,177 @@ export async function getSports(): Promise<{ key: string; title: string }[]> {
 }
 
 /**
- * Find best odds across bookmakers
+ * Find best odds across bookmakers for all market types
  */
-export function findBestOdds(event: OddsEvent, market: string = 'h2h'): {
+export function findBestOdds(event: OddsEvent, marketType: string = 'h2h'): {
   team: string
   bestPrice: number
   bookmaker: string
+  point?: number
+  allOdds: { bookmaker: string; price: number; point?: number }[]
 }[] {
-  const bestOdds = new Map<string, { price: number; bookmaker: string }>()
+  const bestOdds = new Map<
+    string,
+    {
+      price: number
+      bookmaker: string
+      point?: number
+      allOdds: { bookmaker: string; price: number; point?: number }[]
+    }
+  >()
 
   event.bookmakers.forEach((bookmaker) => {
-    const targetMarket = bookmaker.markets.find((m) => m.key === market)
+    const targetMarket = bookmaker.markets.find((m) => m.key === marketType)
     if (!targetMarket) return
 
     targetMarket.outcomes.forEach((outcome) => {
-      const existing = bestOdds.get(outcome.name)
+      const key = outcome.point !== undefined ? `${outcome.name}_${outcome.point}` : outcome.name
+      const existing = bestOdds.get(key)
+
+      const oddsEntry = {
+        bookmaker: bookmaker.title,
+        price: outcome.price,
+        point: outcome.point,
+      }
+
       if (!existing || outcome.price > existing.price) {
-        bestOdds.set(outcome.name, {
+        bestOdds.set(key, {
           price: outcome.price,
           bookmaker: bookmaker.title,
+          point: outcome.point,
+          allOdds: existing ? [...existing.allOdds, oddsEntry] : [oddsEntry],
         })
+      } else {
+        existing.allOdds.push(oddsEntry)
       }
     })
   })
 
-  return Array.from(bestOdds.entries()).map(([team, { price, bookmaker }]) => ({
-    team,
-    bestPrice: price,
-    bookmaker,
+  return Array.from(bestOdds.entries()).map(([key, data]) => ({
+    team: key.includes('_') ? key.split('_')[0] : key,
+    bestPrice: data.price,
+    bookmaker: data.bookmaker,
+    point: data.point,
+    allOdds: data.allOdds.sort((a, b) => b.price - a.price),
   }))
+}
+
+/**
+ * Compare odds across all markets for an event
+ */
+export function compareAllMarkets(event: OddsEvent): {
+  h2h: ReturnType<typeof findBestOdds>
+  spreads: ReturnType<typeof findBestOdds>
+  totals: ReturnType<typeof findBestOdds>
+} {
+  return {
+    h2h: findBestOdds(event, 'h2h'),
+    spreads: findBestOdds(event, 'spreads'),
+    totals: findBestOdds(event, 'totals'),
+  }
+}
+
+/**
+ * Calculate arbitrage opportunities
+ */
+export function findArbitrageOpportunities(
+  event: OddsEvent,
+  marketType: string = 'h2h'
+): {
+  hasArbitrage: boolean
+  profit?: number
+  bets?: { team: string; bookmaker: string; price: number; stake: number }[]
+} {
+  const bestOdds = findBestOdds(event, marketType)
+  
+  if (bestOdds.length < 2) {
+    return { hasArbitrage: false }
+  }
+
+  // Convert American odds to decimal for calculation
+  const toDecimal = (american: number) => {
+    return american > 0 ? american / 100 + 1 : 100 / Math.abs(american) + 1
+  }
+
+  const decimalOdds = bestOdds.map((odd) => ({
+    ...odd,
+    decimal: toDecimal(odd.bestPrice),
+  }))
+
+  const impliedProbability = decimalOdds.reduce((sum, odd) => sum + 1 / odd.decimal, 0)
+
+  if (impliedProbability < 1) {
+    const totalStake = 100
+    const profit = totalStake * (1 / impliedProbability - 1)
+
+    const bets = decimalOdds.map((odd) => ({
+      team: odd.team,
+      bookmaker: odd.bookmaker,
+      price: odd.bestPrice,
+      stake: totalStake / (impliedProbability * odd.decimal),
+    }))
+
+    return {
+      hasArbitrage: true,
+      profit: profit,
+      bets,
+    }
+  }
+
+  return { hasArbitrage: false }
+}
+
+/**
+ * Get odds movement history (stub for future implementation)
+ */
+export async function getOddsMovement(
+  eventId: string,
+  hoursBack: number = 24
+): Promise<
+  {
+    timestamp: string
+    bookmaker: string
+    market: string
+    odds: { name: string; price: number }[]
+  }[]
+> {
+  const supabase = await createClient()
+
+  const startTime = new Date(Date.now() - hoursBack * 60 * 60 * 1000)
+
+  const { data, error } = await supabase
+    .from('odds_cache')
+    .select('*')
+    .eq('event_id', eventId)
+    .gte('created_at', startTime.toISOString())
+    .order('created_at', { ascending: true })
+
+  if (error) throw error
+
+  return (data ?? []).map((row) => ({
+    timestamp: row.created_at,
+    bookmaker: row.bookmaker,
+    market: row.market,
+    odds: (row.odds_data as any).outcomes || [],
+  }))
+}
+
+/**
+ * Clean up expired cache entries
+ */
+export async function cleanupExpiredCache(): Promise<number> {
+  const supabase = await createClient()
+
+  const { error, count } = await supabase
+    .from('odds_cache')
+    .delete()
+    .lt('expires_at', new Date().toISOString())
+
+  if (error) {
+    console.error('[v0] Error cleaning up cache:', error)
+    throw error
+  }
+
+  console.log('[v0] Cleaned up', count, 'expired cache entries')
+  return count ?? 0
 }

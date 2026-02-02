@@ -132,13 +132,99 @@ serve(async (req) => {
 // Helper functions
 
 async function fetchLiveOdds(sport: string, marketType: string) {
-  // TODO: Integrate with actual Sports Odds API
-  // For now, return mock data
-  return {
-    impliedProbability: 0.50 + (Math.random() * 0.30),
-    decimalOdds: 2.0,
-    samples: []
+  // Retrieve ODDS_API_KEY securely from environment variables
+  const oddsApiKey = Deno.env.get('ODDS_API_KEY');
+  
+  if (!oddsApiKey) {
+    console.warn('[Supabase Function] ODDS_API_KEY not configured, using fallback data');
+    return {
+      impliedProbability: 0.50 + (Math.random() * 0.30),
+      decimalOdds: 2.0,
+      samples: []
+    };
   }
+  
+  try {
+    // Map sport to The Odds API sport key
+    const sportKey = mapSportToApiKey(sport);
+    const market = marketType === 'main' ? 'h2h' : marketType;
+    
+    const apiUrl = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds?apiKey=${oddsApiKey}&regions=us&markets=${market}`;
+    
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      console.error('[Supabase Function] Odds API error:', response.status);
+      throw new Error(`Odds API returned ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Extract and calculate average implied probability from bookmakers
+    if (Array.isArray(data) && data.length > 0 && data[0].bookmakers) {
+      const event = data[0];
+      const bookmakers = event.bookmakers;
+      
+      if (bookmakers.length > 0 && bookmakers[0].markets && bookmakers[0].markets.length > 0) {
+        const outcomes = bookmakers[0].markets[0].outcomes;
+        
+        // Calculate average implied probability
+        const impliedProbs = outcomes.map((outcome: any) => {
+          const price = outcome.price;
+          // Convert to implied probability
+          if (price > 0) {
+            return 100 / (price + 100);
+          } else {
+            return Math.abs(price) / (Math.abs(price) + 100);
+          }
+        });
+        
+        const avgImpliedProb = impliedProbs.reduce((sum: number, p: number) => sum + p, 0) / impliedProbs.length;
+        const decimalOdds = outcomes[0].price > 0 
+          ? (outcomes[0].price / 100) + 1 
+          : (100 / Math.abs(outcomes[0].price)) + 1;
+        
+        return {
+          impliedProbability: avgImpliedProb,
+          decimalOdds: decimalOdds,
+          samples: outcomes
+        };
+      }
+    }
+    
+    // Fallback if no data available
+    return {
+      impliedProbability: 0.50,
+      decimalOdds: 2.0,
+      samples: []
+    };
+  } catch (error) {
+    console.error('[Supabase Function] Error fetching live odds:', error);
+    // Return fallback data on error
+    return {
+      impliedProbability: 0.50 + (Math.random() * 0.30),
+      decimalOdds: 2.0,
+      samples: []
+    };
+  }
+}
+
+function mapSportToApiKey(sport: string): string {
+  const sportMap: Record<string, string> = {
+    'nfl': 'americanfootball_nfl',
+    'nba': 'basketball_nba',
+    'mlb': 'baseball_mlb',
+    'nhl': 'icehockey_nhl',
+    'ncaaf': 'americanfootball_ncaaf',
+    'ncaab': 'basketball_ncaab',
+  };
+  
+  return sportMap[sport.toLowerCase()] || 'upcoming';
 }
 
 async function getBenfordBaseline(supabase: any, sport: string, marketType: string) {

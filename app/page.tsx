@@ -831,9 +831,9 @@ export default function UnifiedAIPlatform() {
       
       setMessages(prev => [...prev, aiMessage]);
       setSuggestedPrompts(generateContextualSuggestions(userMessage, aiMessage.cards || []));
-        setIsTyping(false);
-        return;
-      }
+      setIsTyping(false);
+      return;
+    }
 
       // Build response message with real data
       const processingTime = Date.now() - startTime;

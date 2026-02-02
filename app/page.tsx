@@ -825,7 +825,7 @@ export default function UnifiedAIPlatform() {
       };
       
       setMessages(prev => [...prev, aiMessage]);
-      setSuggestedPrompts(generateContextualSuggestions(action.label, aiMessage.cards || []));
+      setSuggestedPrompts(generateContextualSuggestions(card.title, aiMessage.cards || []));
       setIsTyping(false);
     }, 1200);
   };

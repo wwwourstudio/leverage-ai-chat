@@ -22,7 +22,7 @@ import {
   CheckCircle2,
   AlertTriangle,
 } from 'lucide-react'
-import { readStreamableValue } from 'ai/rsc'
+import { readStreamableValue } from '@ai-sdk/rsc'
 
 interface Message {
   id: string

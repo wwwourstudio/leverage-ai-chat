@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { streamText } from 'ai'
-import { createStreamableValue } from 'ai/rsc'
+import { createStreamableValue } from '@ai-sdk/rsc'
 
 export async function generateAIResponse(
   chatId: string,

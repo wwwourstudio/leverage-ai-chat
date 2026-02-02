@@ -820,17 +820,17 @@ export default function UnifiedAIPlatform() {
           finalConfidence: 89,
           trustLevel: 'high',
           riskLevel: 'medium',
-            adjustedTone: 'Moderate confidence',
-            flags: [{
-              type: 'info',
-              message: analysisResult.error || 'Using cached analysis patterns',
-              severity: 'info'
-            }]
-          }
-        };
-        
-        setMessages(prev => [...prev, newMessage]);
-        setSuggestedPrompts(generateContextualSuggestions(userMessage, newMessage.cards || []));
+          adjustedTone: 'Moderate confidence',
+          flags: [{
+            type: 'info',
+            message: analysisResult.error || 'Using cached analysis patterns',
+            severity: 'info'
+          }]
+        }
+      };
+      
+      setMessages(prev => [...prev, aiMessage]);
+      setSuggestedPrompts(generateContextualSuggestions(userMessage, aiMessage.cards || []));
         setIsTyping(false);
         return;
       }

@@ -1,8 +1,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { AlertCircle, CheckCircle2, Database, Shield, Zap } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Database, Shield, Zap, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { DatabaseStatus } from '@/components/database-status'
 
 export default function SetupPage() {
   return (
@@ -26,6 +27,18 @@ export default function SetupPage() {
 
         <Card>
           <CardHeader>
+            <CardTitle>Database Status</CardTitle>
+            <CardDescription>
+              Real-time verification of your database setup
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DatabaseStatus />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <div className="flex items-center gap-2">
               <Database className="h-6 w-6 text-primary" />
               <CardTitle>Step 1: Connect Supabase</CardTitle>
@@ -41,10 +54,23 @@ export default function SetupPage() {
               <li>Select Supabase from the integrations list</li>
               <li>Follow the prompts to connect your project</li>
               <li>
-                Run the migration file:{' '}
-                <code className="bg-muted px-2 py-1 rounded text-xs">
-                  supabase/migrations/20260201_trust_integrity_system.sql
-                </code>
+                Run the migration files in order (see{' '}
+                <Link href="/QUICK_START.md" className="text-primary hover:underline">
+                  QUICK_START.md
+                </Link>
+                )
+              </li>
+              <li>
+                <Button variant="outline" size="sm" className="mt-2" asChild>
+                  <Link
+                    href="https://app.supabase.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Open Supabase Dashboard
+                    <ExternalLink className="ml-2 h-3 w-3" />
+                  </Link>
+                </Button>
               </li>
             </ol>
 

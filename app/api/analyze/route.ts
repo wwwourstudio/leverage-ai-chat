@@ -300,14 +300,47 @@ function calculateOddsAlignment(aiResponse: string, oddsData: any): number {
     return 85; // Default if no data
   }
 
-  // Simple alignment check - would be more sophisticated in production
-  // Calculate confidence from actual trust metrics
-  const avgMetric = (
-    trustMetrics.benfordIntegrity +
-    trustMetrics.oddsAlignment +
-    trustMetrics.marketConsensus +
-    trustMetrics.historicalAccuracy
-  ) / 4;
-  
-  return Math.round(avgMetric);
+  // Compare AI-mentioned probabilities against market-implied probabilities
+  const aiProbs = probMatches.map(m => parseInt(m.replace('%', '')));
+
+  // Extract implied probabilities from odds data
+  const marketProbs: number[] = [];
+  for (const event of oddsData.events) {
+    if (event.bookmakers) {
+      for (const bookmaker of event.bookmakers) {
+        for (const market of bookmaker.markets || []) {
+          for (const outcome of market.outcomes || []) {
+            if (outcome.price) {
+              // Convert American odds to implied probability
+              const price = outcome.price;
+              const impliedProb = price > 0
+                ? 100 / (price + 100) * 100
+                : Math.abs(price) / (Math.abs(price) + 100) * 100;
+              marketProbs.push(Math.round(impliedProb));
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (marketProbs.length === 0) {
+    return 85;
+  }
+
+  // Calculate alignment: how close are AI probabilities to market probabilities
+  let totalDeviation = 0;
+  let comparisons = 0;
+  for (const aiProb of aiProbs) {
+    // Find the closest market probability
+    const closestMarket = marketProbs.reduce((closest, mp) =>
+      Math.abs(mp - aiProb) < Math.abs(closest - aiProb) ? mp : closest
+    , marketProbs[0]);
+    totalDeviation += Math.abs(aiProb - closestMarket);
+    comparisons++;
+  }
+
+  const avgDeviation = comparisons > 0 ? totalDeviation / comparisons : 0;
+  // Convert deviation to alignment score (0 deviation = 100, 50+ deviation = 50)
+  return Math.max(50, Math.min(100, Math.round(100 - avgDeviation)));
 }

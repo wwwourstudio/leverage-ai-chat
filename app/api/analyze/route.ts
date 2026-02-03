@@ -85,7 +85,7 @@ Format responses with clear structure using markdown.`;
         'Authorization': `Bearer ${grokApiKey}`,
       },
       body: JSON.stringify({
-        model: 'grok-beta',
+        model: 'grok-3',
         messages: [
           {
             role: 'system',
@@ -126,7 +126,7 @@ Format responses with clear structure using markdown.`;
         const supabase = createClient(supabaseUrl, supabaseAnonKey);
         
         await supabase.from('ai_response_trust').insert({
-          model_id: 'grok-beta',
+          model_id: 'grok-3',
           sport: context?.sport || 'general',
           market_type: context?.marketType || 'analysis',
           benford_score: trustMetrics.benfordIntegrity,
@@ -150,7 +150,7 @@ Format responses with clear structure using markdown.`;
       text: aiResponse,
       response: aiResponse, // Keep for backwards compatibility
       trustMetrics,
-      model: 'grok-beta',
+      model: 'grok-3',
       confidence: trustMetrics.finalConfidence,
       sources: [
         { name: 'Grok AI', type: 'model', reliability: 94 },
@@ -199,7 +199,7 @@ async function calculateTrustMetrics(
       const { data } = await supabase
         .from('ai_response_trust')
         .select('final_confidence')
-        .eq('model_id', 'grok-beta')
+        .eq('model_id', 'grok-3')
         .order('created_at', { ascending: false })
         .limit(20);
       

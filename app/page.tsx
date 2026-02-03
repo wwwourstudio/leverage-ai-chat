@@ -855,7 +855,19 @@ export default function UnifiedAIPlatform() {
           userMessage,
           context
         })
-      }).then(res => res.json());
+      }).then(async (res) => {
+        if (!res.ok) {
+          console.error('[v0] Analyze API returned', res.status);
+          return { success: false, useFallback: true, error: `API returned ${res.status}` };
+        }
+        const text = await res.text();
+        try {
+          return JSON.parse(text);
+        } catch {
+          console.error('[v0] Analyze API returned non-JSON:', text.substring(0, 100));
+          return { success: false, useFallback: true, error: 'Invalid response from API' };
+        }
+      });
 
       // Fetch live odds data if relevant
       let oddsDataPromise = Promise.resolve(null);

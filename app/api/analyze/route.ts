@@ -78,28 +78,45 @@ Format responses with clear structure using markdown.`;
     }
 
     // Call Grok API using xAI's API (compatible with OpenAI SDK format)
-    const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${grokApiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'grok-3',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: userPrompt,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 2000,
-      }),
-    });
+    // Use AbortController to stay within Vercel Edge's ~25s timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+
+    let grokResponse: Response;
+    try {
+      grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${grokApiKey}`,
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: 'grok-3',
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt,
+            },
+            {
+              role: 'user',
+              content: userPrompt,
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: 1500,
+        }),
+      });
+    } catch (fetchError: any) {
+      clearTimeout(timeout);
+      console.error('[API] Grok API fetch failed:', fetchError.name, fetchError.message);
+      return NextResponse.json({
+        success: false,
+        error: fetchError.name === 'AbortError' ? 'AI request timed out' : 'AI service unavailable',
+        useFallback: true,
+      });
+    }
+    clearTimeout(timeout);
 
     if (!grokResponse.ok) {
       const errorData = await grokResponse.text();

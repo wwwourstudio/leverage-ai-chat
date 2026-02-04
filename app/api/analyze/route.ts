@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!grokApiKey) {
-      console.error('[API] Grok API key not configured - using fallback mode');
+      console.log('[API] Grok API key not configured - using fallback mode');
       // Return fallback response instead of error
       return NextResponse.json({
         success: false,
@@ -174,12 +174,13 @@ Format responses with clear structure using markdown.`;
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error('[API] Error in analyze route:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log('[API] Error in analyze route:', errorMessage);
     return NextResponse.json({
       success: false,
       error: 'Internal server error',
       useFallback: true,
-      details: error.message
+      details: errorMessage
     });
   }
 }

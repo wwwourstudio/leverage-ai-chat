@@ -115,7 +115,7 @@ Get AI-powered sports analysis
 \`\`\`
 
 **Response:**
-\`\`\`json
+```json
 {
   "response": "Based on my analysis...",
   "trustMetrics": {
@@ -124,10 +124,10 @@ Get AI-powered sports analysis
     "riskLevel": "low",
     ...
   },
-  "model": "grok-beta",
+  "model": "grok-3",
   "processingTime": 1250
 }
-\`\`\`
+```
 
 ## Client-Side Usage
 

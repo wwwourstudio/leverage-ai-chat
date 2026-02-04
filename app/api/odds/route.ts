@@ -56,11 +56,11 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[API] Odds API error:', response.status, errorText);
+      console.log('[API] Odds API error:', response.status, errorText.substring(0, 200));
       return NextResponse.json(
         { 
           error: 'Failed to fetch odds data',
-          details: response.status === 401 ? 'Invalid API key' : errorText 
+          details: response.status === 401 ? 'Invalid API key' : errorText.substring(0, 100) 
         },
         { status: response.status }
       );
@@ -117,9 +117,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(transformedData);
   } catch (error: any) {
-    console.error('[API] Error in odds route:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log('[API] Error in odds route:', errorMessage);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error', details: errorMessage },
       { status: 500 }
     );
   }
@@ -164,9 +165,10 @@ export async function GET(req: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error('[API] Error in GET odds route:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log('[API] Error in GET odds route:', errorMessage);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error', details: errorMessage },
       { status: 500 }
     );
   }

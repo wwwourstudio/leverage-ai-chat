@@ -37,7 +37,8 @@ export async function POST(req: NextRequest) {
           console.log('[API] Fetched live odds:', liveOddsData?.length || 0, 'events');
         }
       } catch (error) {
-        console.error('[API] Error fetching odds for cards:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.log('[API] Error fetching odds for cards:', errorMessage);
       }
     }
 
@@ -58,10 +59,11 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('[API] Error in cards route:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log('[API] Error in cards route:', errorMessage);
     return NextResponse.json({
       success: false,
-      error: error.message,
+      error: errorMessage,
       cards: [] // Return empty array on error
     });
   }

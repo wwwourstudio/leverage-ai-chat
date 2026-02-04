@@ -54,7 +54,8 @@ export async function GET(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('[API] Error in insights route:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log('[API] Error in insights route:', errorMessage);
     return NextResponse.json({
       success: true,
       insights: getDefaultInsights(),

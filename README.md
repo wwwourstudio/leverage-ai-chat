@@ -50,6 +50,7 @@ curl https://your-domain.vercel.app/api/health | jq
 
 ## Documentation
 
+- **[API_FIX_SUMMARY.md](./API_FIX_SUMMARY.md)** - Latest fixes: Grok model update & error handling
 - **[ENV_CONFIGURATION.md](./ENV_CONFIGURATION.md)** - Complete environment setup guide
 - **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** - Common issues and solutions
 - **[FIXES_APPLIED.md](./FIXES_APPLIED.md)** - Recent bug fixes and improvements

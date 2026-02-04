@@ -81,7 +81,8 @@ Each welcome message explicitly mentions the analysis type and provides context-
 
 ## Documentation
 
-- **[SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md)** - 🆕 Sports validation and 404 error prevention
+- **[SUPABASE_VALIDATION_SYSTEM.md](./SUPABASE_VALIDATION_SYSTEM.md)** - Database validation and JSON error prevention
+- **[SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md)** - Sports validation and 404 error prevention
 - **[AI_MODEL_DOCUMENTATION.md](./AI_MODEL_DOCUMENTATION.md)** - Complete Grok-3 AI model information
 - **[API_FIX_SUMMARY.md](./API_FIX_SUMMARY.md)** - Latest fixes: Grok model update & error handling
 - **[ENV_CONFIGURATION.md](./ENV_CONFIGURATION.md)** - Complete environment setup guide
@@ -93,7 +94,8 @@ Each welcome message explicitly mentions the analysis type and provides context-
 ## Common Issues
 
 Having trouble? Check **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** for solutions to common problems including:
-- JSON parsing errors
+- **Supabase query errors** - See **[SUPABASE_VALIDATION_SYSTEM.md](./SUPABASE_VALIDATION_SYSTEM.md)**
+- **JSON parsing errors** - Database validation handles this automatically
 - API configuration issues
 - Database connection problems
 - Environment variable setup

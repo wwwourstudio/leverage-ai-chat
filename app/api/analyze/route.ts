@@ -15,6 +15,11 @@ import {
   ATTACHMENT_TYPES,
   type AttachmentType
 } from '@/lib/constants';
+import {
+  checkTableExists,
+  safeQuery,
+  APP_TABLES
+} from '@/lib/supabase-validator';
 
 // Grok AI integration for sports analysis
 // Using xAI's Grok model through the AI SDK
@@ -139,23 +144,37 @@ export async function POST(req: NextRequest) {
       try {
         const supabase = createClient(supabaseUrl, supabaseAnonKey);
         
-        await supabase.from(EXTERNAL_APIS.SUPABASE.TABLES.AI_RESPONSE_TRUST).insert({
-          model_id: AI_CONFIG.MODEL_NAME,
-          sport: context?.sport || 'general',
-          market_type: context?.marketType || 'analysis',
-          benford_score: trustMetrics.benfordIntegrity,
-          odds_alignment_score: trustMetrics.oddsAlignment,
-          consensus_score: trustMetrics.marketConsensus,
-          historical_accuracy_score: trustMetrics.historicalAccuracy,
-          final_confidence: trustMetrics.finalConfidence,
-          flags: trustMetrics.flags || [],
-          created_at: new Date().toISOString(),
-        });
+        // Check if table exists before inserting
+        const tableExists = await checkTableExists(supabase, APP_TABLES.AI_RESPONSE_TRUST);
+        
+        if (tableExists) {
+          const { error: insertError } = await supabase
+            .from(APP_TABLES.AI_RESPONSE_TRUST)
+            .insert({
+              response_id: `resp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              model_id: AI_CONFIG.MODEL_NAME,
+              sport: context?.sport || 'general',
+              market_type: context?.marketType || 'analysis',
+              benford_score: trustMetrics.benfordIntegrity,
+              odds_alignment_score: trustMetrics.oddsAlignment,
+              consensus_score: trustMetrics.marketConsensus,
+              historical_accuracy_score: trustMetrics.historicalAccuracy,
+              final_confidence: trustMetrics.finalConfidence,
+              flags: trustMetrics.flags || [],
+              created_at: new Date().toISOString(),
+            });
 
-        console.log(`${LOG_PREFIXES.API} Trust metrics stored in Supabase`);
+          if (insertError) {
+            console.log(`${LOG_PREFIXES.API} Failed to insert trust metrics:`, insertError.message);
+          } else {
+            console.log(`${LOG_PREFIXES.API} Trust metrics stored in Supabase`);
+          }
+        } else {
+          console.log(`${LOG_PREFIXES.API} Trust metrics table does not exist, skipping storage`);
+        }
       } catch (dbError) {
         const dbErrorMessage = dbError instanceof Error ? dbError.message : String(dbError);
-        console.log(`${LOG_PREFIXES.API} Failed to store trust metrics (table may not exist):`, dbErrorMessage);
+        console.log(`${LOG_PREFIXES.API} Exception storing trust metrics:`, dbErrorMessage);
         // Continue anyway - this is non-critical
       }
     }
@@ -210,22 +229,37 @@ async function calculateTrustMetrics(
   // Market consensus (would need external data source)
   const marketConsensus = 85;
 
-  // Historical accuracy (would query from Supabase if available)
+  // Historical accuracy (query from Supabase if available)
   let historicalAccuracy = 85;
   if (supabaseUrl && supabaseAnonKey) {
     try {
       const supabase = createClient(supabaseUrl, supabaseAnonKey);
-      const { data, error } = await supabase
-        .from(EXTERNAL_APIS.SUPABASE.TABLES.AI_RESPONSE_TRUST)
-        .select('final_confidence')
-        .eq('model_id', AI_CONFIG.MODEL_NAME)
-        .order('created_at', { ascending: false })
-        .limit(20);
       
-      if (!error && data && data.length > 0) {
-        historicalAccuracy = Math.round(
-          data.reduce((sum, row) => sum + row.final_confidence, 0) / data.length
+      const queryResult = await safeQuery(
+        supabase,
+        APP_TABLES.AI_RESPONSE_TRUST,
+        (builder) => builder
+          .select('final_confidence')
+          .eq('model_id', AI_CONFIG.MODEL_NAME)
+          .order('created_at', { ascending: false })
+          .limit(20),
+        {
+          defaultValue: [],
+          logErrors: false // Don't log - this is expected to fail sometimes
+        }
+      );
+      
+      if (queryResult.success && queryResult.data.length > 0) {
+        const validData = queryResult.data.filter(
+          (row: any) => typeof row.final_confidence === 'number'
         );
+        
+        if (validData.length > 0) {
+          historicalAccuracy = Math.round(
+            validData.reduce((sum, row) => sum + row.final_confidence, 0) / validData.length
+          );
+          console.log(`${LOG_PREFIXES.API} Historical accuracy calculated from ${validData.length} records: ${historicalAccuracy}%`);
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

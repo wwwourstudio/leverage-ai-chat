@@ -7,12 +7,18 @@ import {
   EXTERNAL_APIS,
   SUCCESS_MESSAGES,
 } from '@/lib/constants';
+import {
+  safeQuery,
+  validateDataSchema,
+  APP_TABLES,
+  SCHEMA_DEFINITIONS
+} from '@/lib/supabase-validator';
 
 export const runtime = 'edge';
 
 /**
  * User Insights API
- * Fetches real user statistics from Supabase
+ * Fetches real user statistics from Supabase with validation
  */
 export async function GET(req: NextRequest) {
   try {
@@ -24,7 +30,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         success: true,
         insights: getDefaultInsights(),
-        dataSource: DATA_SOURCES.DEFAULT
+        dataSource: DATA_SOURCES.DEFAULT,
+        message: 'Supabase not configured'
       });
     }
 
@@ -33,30 +40,55 @@ export async function GET(req: NextRequest) {
     // In a real app, you'd fetch this from authenticated user's data
     // For now, aggregate platform-wide statistics
     
-    // Try to fetch AI predictions from trust system
-    const { data: predictions, error } = await supabase
-      .from(EXTERNAL_APIS.SUPABASE.TABLES.AI_PREDICTIONS)
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(100);
+    // Safely fetch AI predictions from trust system with validation
+    const queryResult = await safeQuery(
+      supabase,
+      APP_TABLES.AI_PREDICTIONS,
+      (builder) => builder
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100),
+      {
+        defaultValue: [],
+        logErrors: true
+      }
+    );
 
-    if (error) {
-      console.log(`${LOG_PREFIXES.API} Supabase query error (table may not exist yet):`, error.message || error);
+    if (!queryResult.success || queryResult.source !== 'database') {
+      console.log(`${LOG_PREFIXES.API} Using default insights: ${queryResult.error || 'No database data'}`);
       return NextResponse.json({
         success: true,
         insights: getDefaultInsights(),
-        dataSource: DATA_SOURCES.DEFAULT
+        dataSource: queryResult.source,
+        message: queryResult.error || 'Table not yet created'
       });
     }
 
-    // Calculate real metrics from predictions
-    const insights = calculateInsightsFromPredictions(predictions || []);
+    // Validate data schema
+    const predictions = queryResult.data;
+    const schemaValidation = validateDataSchema(
+      predictions,
+      ['id', 'model', 'created_at'],
+      APP_TABLES.AI_PREDICTIONS
+    );
+
+    if (schemaValidation.invalidCount > 0) {
+      console.log(`${LOG_PREFIXES.API} Found ${schemaValidation.invalidCount} invalid records, using ${schemaValidation.validRecords.length} valid records`);
+    }
+
+    // Calculate real metrics from validated predictions
+    const insights = calculateInsightsFromPredictions(schemaValidation.validRecords);
 
     return NextResponse.json({
       success: true,
       insights,
-      dataSource: 'supabase',
-      sampleSize: predictions?.length || 0,
+      dataSource: DATA_SOURCES.LIVE,
+      sampleSize: schemaValidation.validRecords.length,
+      validation: {
+        total: predictions.length,
+        valid: schemaValidation.validRecords.length,
+        invalid: schemaValidation.invalidCount
+      },
       timestamp: new Date().toISOString()
     });
 

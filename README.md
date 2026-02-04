@@ -81,6 +81,7 @@ Each welcome message explicitly mentions the analysis type and provides context-
 
 ## Documentation
 
+- **[SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md)** - 🆕 Sports validation and 404 error prevention
 - **[AI_MODEL_DOCUMENTATION.md](./AI_MODEL_DOCUMENTATION.md)** - Complete Grok-3 AI model information
 - **[API_FIX_SUMMARY.md](./API_FIX_SUMMARY.md)** - Latest fixes: Grok model update & error handling
 - **[ENV_CONFIGURATION.md](./ENV_CONFIGURATION.md)** - Complete environment setup guide
@@ -96,3 +97,4 @@ Having trouble? Check **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** for solutio
 - API configuration issues
 - Database connection problems
 - Environment variable setup
+- **404 "Unknown sport" errors** - See **[SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md)**

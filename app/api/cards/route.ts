@@ -10,6 +10,7 @@ import {
   type CardType,
   type CardStatus
 } from '@/lib/constants';
+import { validateSportKey, getSportInfo } from '@/lib/sports-validator';
 
 export const runtime = 'edge';
 
@@ -37,15 +38,31 @@ export async function POST(req: NextRequest) {
     
     // Fetch real odds data if available
     let liveOddsData = null;
+    let validationResult = null;
+    
     if (oddsApiKey && sport) {
       try {
-        const sportKey = mapSportToApiKey(sport);
+        // Validate and normalize the sport key
+        validationResult = validateSportKey(sport);
+        
+        if (!validationResult.isValid) {
+          console.log(`${LOG_PREFIXES.API} Invalid sport key:`, validationResult.error, validationResult.suggestion);
+        }
+        
+        const sportKey = validationResult.normalizedKey;
+        const sportInfo = getSportInfo(sportKey);
+        
+        console.log(`${LOG_PREFIXES.API} Fetching odds for ${sportInfo.name} (${sportInfo.apiKey})`);
+        
         const oddsUrl = `${EXTERNAL_APIS.ODDS_API.BASE_URL}/sports/${sportKey}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}&markets=${EXTERNAL_APIS.ODDS_API.DEFAULT_MARKETS}&oddsFormat=${EXTERNAL_APIS.ODDS_API.ODDS_FORMAT}`;
         
         const oddsResponse = await fetch(oddsUrl);
         if (oddsResponse.ok) {
           liveOddsData = await oddsResponse.json();
-          console.log(`${LOG_PREFIXES.API} Fetched live odds:`, liveOddsData?.length || 0, 'events');
+          console.log(`${LOG_PREFIXES.API} Fetched live odds:`, liveOddsData?.length || 0, 'events for', sportInfo.name);
+        } else {
+          const errorText = await oddsResponse.text();
+          console.log(`${LOG_PREFIXES.API} Odds API returned ${oddsResponse.status}:`, errorText.substring(0, 100));
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -66,6 +83,7 @@ export async function POST(req: NextRequest) {
       success: true,
       cards,
       dataSource: oddsApiKey ? DATA_SOURCES.LIVE : DATA_SOURCES.SIMULATED,
+      sportValidation: validationResult,
       timestamp: new Date().toISOString()
     });
 
@@ -80,9 +98,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function mapSportToApiKey(sport: string): string {
-  return SPORTS_MAP[sport?.toLowerCase() as keyof typeof SPORTS_MAP] || 'upcoming';
-}
+// Sport validation is now handled by sports-validator.ts
 
 async function generateDynamicCards(params: {
   category?: string;

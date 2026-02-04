@@ -7,6 +7,7 @@ import {
   HTTP_STATUS,
   MARKET_TYPES,
 } from '@/lib/constants';
+import { validateSportKey, getSportInfo, isValidSport } from '@/lib/sports-validator';
 
 // Sports Odds API integration
 // Documentation: https://the-odds-api.com/
@@ -40,19 +41,29 @@ export async function POST(req: NextRequest) {
 
     const oddsApiKey = getOddsApiKey();
 
+    // Validate and normalize the sport key
+    const sportValidation = validateSportKey(sport);
+    const normalizedSport = sportValidation.normalizedKey;
+    const sportInfo = getSportInfo(normalizedSport);
+    
+    // Log validation results
+    if (!sportValidation.isValid) {
+      console.log(`${LOG_PREFIXES.API} Sport validation:`, sportValidation.error, sportValidation.suggestion);
+    }
+    
+    console.log(`${LOG_PREFIXES.API} Fetching odds for ${sportInfo.name} (${sportInfo.apiKey}), market: ${marketType || MARKET_TYPES.H2H}`);
+
     // Build API URL based on request parameters
     const baseUrl = `${EXTERNAL_APIS.ODDS_API.BASE_URL}/sports`;
     
     // If eventId is provided, fetch specific event odds
     let apiUrl: string;
     if (eventId) {
-      apiUrl = `${baseUrl}/${sport}/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}&markets=${marketType || MARKET_TYPES.H2H}`;
+      apiUrl = `${baseUrl}/${normalizedSport}/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}&markets=${marketType || MARKET_TYPES.H2H}`;
     } else {
       // Fetch odds for all upcoming events
-      apiUrl = `${baseUrl}/${sport}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}&markets=${marketType || MARKET_TYPES.H2H}`;
+      apiUrl = `${baseUrl}/${normalizedSport}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}&markets=${marketType || MARKET_TYPES.H2H}`;
     }
-
-    console.log(`${LOG_PREFIXES.API} Fetching odds for sport: ${sport}, market: ${marketType}`);
 
     const response = await fetch(apiUrl, {
       method: 'GET',
@@ -77,7 +88,9 @@ export async function POST(req: NextRequest) {
 
     // Transform the data into a consistent format
     const transformedData = {
-      sport,
+      sport: normalizedSport,
+      sportInfo,
+      sportValidation,
       marketType: marketType || MARKET_TYPES.H2H,
       events: Array.isArray(data) ? data : [data],
       timestamp: new Date().toISOString(),
@@ -153,13 +166,22 @@ export async function GET(req: NextRequest) {
 
     const oddsApiKey = getOddsApiKey();
 
-    const apiUrl = `${EXTERNAL_APIS.ODDS_API.BASE_URL}/sports/${sport}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}`;
+    // Validate and normalize sport
+    const sportValidation = validateSportKey(sport);
+    const normalizedSport = sportValidation.normalizedKey;
+    const sportInfo = getSportInfo(normalizedSport);
+
+    const apiUrl = `${EXTERNAL_APIS.ODDS_API.BASE_URL}/sports/${normalizedSport}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}`;
 
     const response = await fetch(apiUrl);
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: 'Failed to fetch odds' },
+        { 
+          error: 'Failed to fetch odds',
+          sportValidation,
+          details: `API returned ${response.status} for ${sportInfo.name}`
+        },
         { status: response.status }
       );
     }
@@ -167,7 +189,9 @@ export async function GET(req: NextRequest) {
     const data = await response.json();
 
     return NextResponse.json({
-      sport,
+      sport: normalizedSport,
+      sportInfo,
+      sportValidation,
       events: data,
       timestamp: new Date().toISOString(),
     });

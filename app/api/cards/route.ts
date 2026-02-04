@@ -1,4 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  SPORTS_MAP,
+  EXTERNAL_APIS,
+  ENV_KEYS,
+  LOG_PREFIXES,
+  DATA_SOURCES,
+  CARD_TYPES,
+  CARD_STATUS,
+  type CardType,
+  type CardStatus
+} from '@/lib/constants';
 
 export const runtime = 'edge';
 
@@ -18,27 +29,27 @@ interface CardRequest {
  */
 export async function POST(req: NextRequest) {
   try {
-    console.log('[API] Dynamic cards generation started');
+    console.log(`${LOG_PREFIXES.API} Dynamic cards generation started`);
     const body: CardRequest = await req.json();
     const { sport, category, userContext, limit = 3 } = body;
 
-    const oddsApiKey = process.env.ODDS_API_KEY;
+    const oddsApiKey = process.env[ENV_KEYS.ODDS_API_KEY];
     
     // Fetch real odds data if available
     let liveOddsData = null;
     if (oddsApiKey && sport) {
       try {
         const sportKey = mapSportToApiKey(sport);
-        const oddsUrl = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds?apiKey=${oddsApiKey}&regions=us&markets=h2h,spreads,totals&oddsFormat=american`;
+        const oddsUrl = `${EXTERNAL_APIS.ODDS_API.BASE_URL}/sports/${sportKey}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}&markets=${EXTERNAL_APIS.ODDS_API.DEFAULT_MARKETS}&oddsFormat=${EXTERNAL_APIS.ODDS_API.ODDS_FORMAT}`;
         
         const oddsResponse = await fetch(oddsUrl);
         if (oddsResponse.ok) {
           liveOddsData = await oddsResponse.json();
-          console.log('[API] Fetched live odds:', liveOddsData?.length || 0, 'events');
+          console.log(`${LOG_PREFIXES.API} Fetched live odds:`, liveOddsData?.length || 0, 'events');
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.log('[API] Error fetching odds for cards:', errorMessage);
+        console.log(`${LOG_PREFIXES.API} Error fetching odds for cards:`, errorMessage);
       }
     }
 
@@ -54,13 +65,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       cards,
-      dataSource: oddsApiKey ? 'live' : 'simulated',
+      dataSource: oddsApiKey ? DATA_SOURCES.LIVE : DATA_SOURCES.SIMULATED,
       timestamp: new Date().toISOString()
     });
 
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.log('[API] Error in cards route:', errorMessage);
+    console.log(`${LOG_PREFIXES.API} Error in cards route:`, errorMessage);
     return NextResponse.json({
       success: false,
       error: errorMessage,
@@ -70,15 +81,7 @@ export async function POST(req: NextRequest) {
 }
 
 function mapSportToApiKey(sport: string): string {
-  const sportMap: Record<string, string> = {
-    'nba': 'basketball_nba',
-    'nfl': 'americanfootball_nfl',
-    'mlb': 'baseball_mlb',
-    'nhl': 'icehockey_nhl',
-    'ncaab': 'basketball_ncaab',
-    'ncaaf': 'americanfootball_ncaaf',
-  };
-  return sportMap[sport?.toLowerCase()] || 'upcoming';
+  return SPORTS_MAP[sport?.toLowerCase() as keyof typeof SPORTS_MAP] || 'upcoming';
 }
 
 async function generateDynamicCards(params: {
@@ -116,7 +119,7 @@ async function generateDynamicCards(params: {
         const edge = marketEfficiency > 0 ? `+${marketEfficiency.toFixed(1)}%` : `${marketEfficiency.toFixed(1)}%`;
         
         cards.push({
-          type: 'live-odds',
+          type: CARD_TYPES.LIVE_ODDS,
           title: 'Live Odds Analysis',
           icon: 'Zap',
           category: sport?.toUpperCase() || 'BETTING',
@@ -131,7 +134,7 @@ async function generateDynamicCards(params: {
             confidence: Math.round(impliedProb * 100),
             gameTime: event.commence_time
           },
-          status: marketEfficiency > 2 ? 'hot' : 'value',
+          status: marketEfficiency > 2 ? CARD_STATUS.HOT : CARD_STATUS.VALUE,
           realData: true
         });
       }
@@ -143,7 +146,7 @@ async function generateDynamicCards(params: {
         );
         
         cards.push({
-          type: 'moneyline-value',
+          type: CARD_TYPES.MONEYLINE_VALUE,
           title: 'Moneyline Opportunity',
           icon: 'Target',
           category: sport?.toUpperCase() || 'BETTING',
@@ -156,7 +159,7 @@ async function generateDynamicCards(params: {
             book: bookmaker.title,
             recommendation: favoriteOutcome.price < -200 ? 'Strong favorite' : 'Competitive matchup'
           },
-          status: 'value',
+          status: CARD_STATUS.VALUE,
           realData: true
         });
       }
@@ -218,7 +221,7 @@ function generateContextualCards(category?: string, sport?: string, count: numbe
   // DFS contextual card
   if (category === 'dfs' || !category) {
     cards.push({
-      type: 'dfs-strategy',
+      type: CARD_TYPES.DFS_STRATEGY,
       title: 'DFS Strategy Insight',
       icon: 'Award',
       category: sport?.toUpperCase() || 'DFS',
@@ -230,7 +233,7 @@ function generateContextualCards(category?: string, sport?: string, count: numbe
         strategy: 'Leverage ownership discrepancies',
         recommendation: 'Stack correlated plays in GPPs'
       },
-      status: 'optimal',
+      status: CARD_STATUS.OPTIMAL,
       realData: false
     });
   }
@@ -238,7 +241,7 @@ function generateContextualCards(category?: string, sport?: string, count: numbe
   // Fantasy contextual card
   if (category === 'fantasy' || !category) {
     cards.push({
-      type: 'fantasy-insight',
+      type: CARD_TYPES.FANTASY_INSIGHT,
       title: 'Draft Strategy',
       icon: 'TrendingUp',
       category: 'FANTASY',
@@ -250,7 +253,7 @@ function generateContextualCards(category?: string, sport?: string, count: numbe
         timing: 'Mid-rounds offer best value',
         recommendation: 'Monitor news for injury replacements'
       },
-      status: 'target',
+      status: CARD_STATUS.TARGET,
       realData: false
     });
   }
@@ -258,7 +261,7 @@ function generateContextualCards(category?: string, sport?: string, count: numbe
   // Kalshi contextual card
   if (category === 'kalshi' || !category) {
     cards.push({
-      type: 'kalshi-insight',
+      type: CARD_TYPES.KALSHI_INSIGHT,
       title: 'Prediction Market Analysis',
       icon: 'BarChart3',
       category: 'KALSHI',
@@ -270,7 +273,7 @@ function generateContextualCards(category?: string, sport?: string, count: numbe
         edge: 'Arbitrage opportunities available',
         recommendation: 'Monitor for pricing discrepancies'
       },
-      status: 'opportunity',
+      status: CARD_STATUS.OPPORTUNITY,
       realData: false
     });
   }

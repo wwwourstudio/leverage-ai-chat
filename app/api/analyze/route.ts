@@ -1,10 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import {
+  AI_CONFIG,
+  SYSTEM_PROMPT,
+  DEFAULT_TRUST_METRICS,
+  DEFAULT_SOURCES,
+  DEFAULT_RELIABILITY,
+  EXTERNAL_APIS,
+  ENV_KEYS,
+  ERROR_MESSAGES,
+  LOG_PREFIXES,
+  HTTP_STATUS,
+  TRUST_METRIC_TYPES,
+  ATTACHMENT_TYPES,
+  type AttachmentType
+} from '@/lib/constants';
 
 // Grok AI integration for sports analysis
 // Using xAI's Grok model through the AI SDK
 
 export const runtime = 'edge';
+
+type AttachmentType = typeof ATTACHMENT_TYPES[keyof typeof ATTACHMENT_TYPES];
 
 interface AnalysisRequest {
   query: string;
@@ -14,7 +31,7 @@ interface AnalysisRequest {
     oddsData?: any;
   };
   attachments?: Array<{
-    type: 'image' | 'csv';
+    type: AttachmentType;
     data: any;
   }>;
 }
@@ -27,41 +44,25 @@ export async function POST(req: NextRequest) {
     const attachments = body.attachments;
 
     // Get environment variables securely
-    const grokApiKey = process.env.XAI_API_KEY || process.env.GROK_API_KEY;
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const grokApiKey = process.env[ENV_KEYS.XAI_API_KEY] || process.env[ENV_KEYS.GROK_API_KEY];
+    const supabaseUrl = process.env[ENV_KEYS.SUPABASE_URL];
+    const supabaseAnonKey = process.env[ENV_KEYS.SUPABASE_ANON_KEY];
 
     if (!grokApiKey) {
-      console.log('[API] Grok API key not configured - using fallback mode');
+      console.log(`${LOG_PREFIXES.API} Grok API key not configured - using fallback mode`);
       // Return fallback response instead of error
       return NextResponse.json({
         success: false,
-        error: 'AI service not configured',
+        error: ERROR_MESSAGES.AI_NOT_CONFIGURED,
         useFallback: true,
-        message: 'Please configure XAI_API_KEY in environment variables for full functionality'
+        message: `Please configure ${ENV_KEYS.XAI_API_KEY} in environment variables for full functionality`
       });
     }
 
-    console.log('[API] Processing analysis request:', query.substring(0, 50));
+    console.log(`${LOG_PREFIXES.API} Processing analysis request:`, query.substring(0, 50));
 
     // Build the prompt with context
-    let systemPrompt = `You are Leverage AI, an expert sports betting, fantasy sports, and prediction market analyst.
-You provide data-driven insights backed by statistical analysis, market trends, and historical patterns.
-
-Your expertise spans:
-- Sports Betting (NFL, NBA, MLB) - odds analysis, line movements, value detection
-- Fantasy Sports (NFBC, NFFC, NFBKC) - draft strategy, ADP analysis, player valuations
-- DFS (DraftKings, FanDuel) - optimal lineup construction, leverage plays, ownership projections
-- Kalshi Markets - financial prediction markets, weather markets, arbitrage opportunities
-
-Always provide:
-1. Clear, confident recommendations with reasoning
-2. Specific numbers and probabilities where applicable
-3. Risk assessment and position sizing guidance
-4. Cross-platform correlation insights when relevant
-
-Format responses with clear structure using markdown.`;
-
+    const systemPrompt = SYSTEM_PROMPT;
     let userPrompt = query;
 
     // Add context from odds data if available
@@ -78,14 +79,14 @@ Format responses with clear structure using markdown.`;
     }
 
     // Call Grok API using xAI's API (compatible with OpenAI SDK format)
-    const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+    const grokResponse = await fetch(AI_CONFIG.API_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${grokApiKey}`,
       },
       body: JSON.stringify({
-        model: 'grok-3',
+        model: AI_CONFIG.MODEL_NAME,
         messages: [
           {
             role: 'system',
@@ -96,8 +97,8 @@ Format responses with clear structure using markdown.`;
             content: userPrompt,
           },
         ],
-        temperature: 0.7,
-        max_tokens: 2000,
+        temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
+        max_tokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
       }),
     });
 
@@ -116,10 +117,10 @@ Format responses with clear structure using markdown.`;
         errorMessage = errorText.substring(0, 100);
       }
       
-      console.log('[API] Grok API error:', grokResponse.status, errorMessage);
+      console.log(`${LOG_PREFIXES.API} Grok API error:`, grokResponse.status, errorMessage);
       return NextResponse.json({
         success: false,
-        error: grokResponse.status === 401 ? 'Invalid API key' : errorMessage,
+        error: grokResponse.status === HTTP_STATUS.UNAUTHORIZED ? ERROR_MESSAGES.INVALID_API_KEY : errorMessage,
         useFallback: true,
         details: errorDetails
       });
@@ -138,8 +139,8 @@ Format responses with clear structure using markdown.`;
       try {
         const supabase = createClient(supabaseUrl, supabaseAnonKey);
         
-        await supabase.from('ai_response_trust').insert({
-          model_id: 'grok-3',
+        await supabase.from(EXTERNAL_APIS.SUPABASE.TABLES.AI_RESPONSE_TRUST).insert({
+          model_id: AI_CONFIG.MODEL_NAME,
           sport: context?.sport || 'general',
           market_type: context?.marketType || 'analysis',
           benford_score: trustMetrics.benfordIntegrity,
@@ -151,10 +152,10 @@ Format responses with clear structure using markdown.`;
           created_at: new Date().toISOString(),
         });
 
-        console.log('[API] Trust metrics stored in Supabase');
+        console.log(`${LOG_PREFIXES.API} Trust metrics stored in Supabase`);
       } catch (dbError) {
         const dbErrorMessage = dbError instanceof Error ? dbError.message : String(dbError);
-        console.log('[API] Failed to store trust metrics (table may not exist):', dbErrorMessage);
+        console.log(`${LOG_PREFIXES.API} Failed to store trust metrics (table may not exist):`, dbErrorMessage);
         // Continue anyway - this is non-critical
       }
     }
@@ -164,21 +165,24 @@ Format responses with clear structure using markdown.`;
       text: aiResponse,
       response: aiResponse, // Keep for backwards compatibility
       trustMetrics,
-      model: 'grok-3',
+      model: AI_CONFIG.MODEL_NAME,
       confidence: trustMetrics.finalConfidence,
       sources: [
-        { name: 'Grok AI', type: 'model', reliability: 94 },
-        { name: 'Live Market Data', type: 'api', reliability: context?.oddsData ? 96 : 85 }
+        DEFAULT_SOURCES.GROK_AI,
+        {
+          ...DEFAULT_SOURCES.LIVE_MARKET,
+          reliability: context?.oddsData ? DEFAULT_RELIABILITY.API_LIVE : DEFAULT_RELIABILITY.API_FALLBACK
+        }
       ],
       processingTime: grokData.usage?.total_tokens ? Math.round(grokData.usage.total_tokens * 0.5) : 1200,
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.log('[API] Error in analyze route:', errorMessage);
+    console.log(`${LOG_PREFIXES.API} Error in analyze route:`, errorMessage);
     return NextResponse.json({
       success: false,
-      error: 'Internal server error',
+      error: ERROR_MESSAGES.INTERNAL_ERROR,
       useFallback: true,
       details: errorMessage
     });
@@ -212,9 +216,9 @@ async function calculateTrustMetrics(
     try {
       const supabase = createClient(supabaseUrl, supabaseAnonKey);
       const { data, error } = await supabase
-        .from('ai_response_trust')
+        .from(EXTERNAL_APIS.SUPABASE.TABLES.AI_RESPONSE_TRUST)
         .select('final_confidence')
-        .eq('model_id', 'grok-3')
+        .eq('model_id', AI_CONFIG.MODEL_NAME)
         .order('created_at', { ascending: false })
         .limit(20);
       
@@ -225,7 +229,7 @@ async function calculateTrustMetrics(
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.log('[API] Could not fetch historical accuracy:', errorMessage);
+      console.log(`${LOG_PREFIXES.API} Could not fetch historical accuracy:`, errorMessage);
     }
   }
 

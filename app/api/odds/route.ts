@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getOddsApiKey, isOddsApiConfigured } from '@/lib/env';
 
 // Sports Odds API integration
 // Documentation: https://the-odds-api.com/
@@ -15,16 +16,22 @@ export async function POST(req: NextRequest) {
   try {
     const { sport, marketType, eventId }: OddsRequest = await req.json();
 
-    // Retrieve API key securely from environment variables
-    const oddsApiKey = process.env.ODDS_API_KEY;
-
-    if (!oddsApiKey) {
-      console.error('[API] ODDS_API_KEY is not configured');
+    // Check if Odds API is configured
+    if (!isOddsApiConfigured()) {
+      console.log('[API] ODDS_API_KEY is not configured');
       return NextResponse.json(
-        { error: 'Sports Odds API is not configured. Please add ODDS_API_KEY to environment variables.' },
-        { status: 500 }
+        { 
+          error: 'Sports Odds API is not configured', 
+          message: 'Please add ODDS_API_KEY to environment variables.',
+          documentation: 'See ENV_CONFIGURATION.md for setup instructions',
+          events: [],
+          timestamp: new Date().toISOString()
+        },
+        { status: 503 }
       );
     }
+
+    const oddsApiKey = getOddsApiKey();
 
     // Build API URL based on request parameters
     const baseUrl = 'https://api.the-odds-api.com/v4/sports';
@@ -124,14 +131,19 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const sport = searchParams.get('sport') || 'upcoming';
 
-    const oddsApiKey = process.env.ODDS_API_KEY;
-
-    if (!oddsApiKey) {
+    if (!isOddsApiConfigured()) {
       return NextResponse.json(
-        { error: 'ODDS_API_KEY not configured' },
-        { status: 500 }
+        { 
+          error: 'ODDS_API_KEY not configured',
+          message: 'See ENV_CONFIGURATION.md for setup',
+          events: [],
+          timestamp: new Date().toISOString()
+        },
+        { status: 503 }
       );
     }
+
+    const oddsApiKey = getOddsApiKey();
 
     const apiUrl = `https://api.the-odds-api.com/v4/sports/${sport}/odds?apiKey=${oddsApiKey}&regions=us`;
 

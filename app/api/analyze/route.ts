@@ -85,7 +85,7 @@ Format responses with clear structure using markdown.`;
         'Authorization': `Bearer ${grokApiKey}`,
       },
       body: JSON.stringify({
-        model: 'grok-beta',
+        model: 'grok-3',
         messages: [
           {
             role: 'system',
@@ -102,13 +102,26 @@ Format responses with clear structure using markdown.`;
     });
 
     if (!grokResponse.ok) {
-      const errorData = await grokResponse.text();
-      console.error('[API] Grok API error:', grokResponse.status, errorData);
+      const errorText = await grokResponse.text();
+      let errorMessage = 'AI service unavailable';
+      let errorDetails = errorText;
+      
+      // Try to parse error as JSON for better error messages
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.error || errorJson.message || errorMessage;
+        errorDetails = errorJson;
+      } catch {
+        // If not JSON, use the raw text
+        errorMessage = errorText.substring(0, 100);
+      }
+      
+      console.log('[API] Grok API error:', grokResponse.status, errorMessage);
       return NextResponse.json({
         success: false,
-        error: grokResponse.status === 401 ? 'Invalid API key' : 'AI service unavailable',
+        error: grokResponse.status === 401 ? 'Invalid API key' : errorMessage,
         useFallback: true,
-        details: errorData
+        details: errorDetails
       });
     }
 
@@ -126,7 +139,7 @@ Format responses with clear structure using markdown.`;
         const supabase = createClient(supabaseUrl, supabaseAnonKey);
         
         await supabase.from('ai_response_trust').insert({
-          model_id: 'grok-beta',
+          model_id: 'grok-3',
           sport: context?.sport || 'general',
           market_type: context?.marketType || 'analysis',
           benford_score: trustMetrics.benfordIntegrity,
@@ -140,7 +153,8 @@ Format responses with clear structure using markdown.`;
 
         console.log('[API] Trust metrics stored in Supabase');
       } catch (dbError) {
-        console.error('[API] Failed to store trust metrics:', dbError);
+        const dbErrorMessage = dbError instanceof Error ? dbError.message : String(dbError);
+        console.log('[API] Failed to store trust metrics (table may not exist):', dbErrorMessage);
         // Continue anyway - this is non-critical
       }
     }
@@ -150,7 +164,7 @@ Format responses with clear structure using markdown.`;
       text: aiResponse,
       response: aiResponse, // Keep for backwards compatibility
       trustMetrics,
-      model: 'grok-beta',
+      model: 'grok-3',
       confidence: trustMetrics.finalConfidence,
       sources: [
         { name: 'Grok AI', type: 'model', reliability: 94 },
@@ -196,20 +210,21 @@ async function calculateTrustMetrics(
   if (supabaseUrl && supabaseAnonKey) {
     try {
       const supabase = createClient(supabaseUrl, supabaseAnonKey);
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('ai_response_trust')
         .select('final_confidence')
-        .eq('model_id', 'grok-beta')
+        .eq('model_id', 'grok-3')
         .order('created_at', { ascending: false })
         .limit(20);
       
-      if (data && data.length > 0) {
+      if (!error && data && data.length > 0) {
         historicalAccuracy = Math.round(
           data.reduce((sum, row) => sum + row.final_confidence, 0) / data.length
         );
       }
     } catch (error) {
-      console.error('[API] Error fetching historical accuracy:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.log('[API] Could not fetch historical accuracy:', errorMessage);
     }
   }
 

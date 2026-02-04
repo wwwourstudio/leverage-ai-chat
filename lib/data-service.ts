@@ -65,13 +65,20 @@ export async function fetchDynamicCards(params: {
       throw new Error(`Cards API returned ${response.status}`);
     }
 
+    // Validate JSON response
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error('Cards API returned non-JSON response');
+    }
+
     const result = await response.json();
-    const cards = result.cards || [];
+    const cards = Array.isArray(result.cards) ? result.cards : [];
 
     cache.set(cacheKey, { data: cards, timestamp: Date.now() });
     return cards;
   } catch (error) {
-    console.error('[DataService] Error fetching cards:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.log('[DataService] Error fetching cards:', errorMessage);
     return [];
   }
 }
@@ -98,13 +105,33 @@ export async function fetchUserInsights(): Promise<UserInsights> {
       throw new Error(`Insights API returned ${response.status}`);
     }
 
+    // Validate response is JSON before parsing
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error('Insights API returned non-JSON response');
+    }
+
     const result = await response.json();
-    const insights = result.insights;
+    
+    if (!result || typeof result !== 'object') {
+      throw new Error('Invalid response format from insights API');
+    }
+
+    const insights = result.insights || {
+      totalValue: 0,
+      winRate: 0,
+      roi: 0,
+      activeContests: 0,
+      totalInvested: 0,
+      dataSource: 'default',
+      message: 'No insights available'
+    };
 
     cache.set(cacheKey, { data: insights, timestamp: Date.now() });
     return insights;
   } catch (error) {
-    console.error('[DataService] Error fetching insights:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.log('[DataService] Error fetching insights:', errorMessage);
     return {
       totalValue: 0,
       winRate: 0,
@@ -141,12 +168,24 @@ export async function fetchLiveOdds(sport: string, marketType: string = 'h2h') {
       throw new Error(`Odds API returned ${response.status}`);
     }
 
+    // Validate JSON response
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error('Odds API returned non-JSON response');
+    }
+
     const result = await response.json();
     cache.set(cacheKey, { data: result, timestamp: Date.now() });
     return result;
   } catch (error) {
-    console.error('[DataService] Error fetching odds:', error);
-    return { success: false, error: error.message };
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.log('[DataService] Error fetching odds:', errorMessage);
+    return { 
+      success: false, 
+      error: errorMessage,
+      events: [],
+      timestamp: new Date().toISOString()
+    };
   }
 }
 

@@ -28,3 +28,38 @@ Continue building your app on:
 2. Deploy your chats from the v0 interface
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
+
+## Configuration
+
+### Quick Start
+
+See **[ENV_CONFIGURATION.md](./ENV_CONFIGURATION.md)** for complete environment variable setup.
+
+Required environment variables:
+- `XAI_API_KEY` - Grok AI API key (get from [console.x.ai](https://console.x.ai/))
+- `ODDS_API_KEY` - Sports odds API key (get from [the-odds-api.com](https://the-odds-api.com/))
+- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous key
+
+### Health Check
+
+Test your configuration:
+```bash
+curl https://your-domain.vercel.app/api/health | jq
+```
+
+## Documentation
+
+- **[ENV_CONFIGURATION.md](./ENV_CONFIGURATION.md)** - Complete environment setup guide
+- **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** - Common issues and solutions
+- **[FIXES_APPLIED.md](./FIXES_APPLIED.md)** - Recent bug fixes and improvements
+- **[INTEGRATION_SETUP.md](./INTEGRATION_SETUP.md)** - Integration setup instructions
+- **[REAL_DATA_INTEGRATION.md](./REAL_DATA_INTEGRATION.md)** - Real-time data integration guide
+
+## Common Issues
+
+Having trouble? Check **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** for solutions to common problems including:
+- JSON parsing errors
+- API configuration issues
+- Database connection problems
+- Environment variable setup

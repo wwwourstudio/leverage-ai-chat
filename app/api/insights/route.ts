@@ -64,11 +64,11 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Validate data schema
+    // Validate data schema (using fields from migration: id, sport, event_id, prediction_type, prediction_data, created_at)
     const predictions = queryResult.data;
     const schemaValidation = validateDataSchema(
       predictions,
-      ['id', 'model', 'created_at'],
+      ['id', 'sport', 'created_at'],
       APP_TABLES.AI_PREDICTIONS
     );
 

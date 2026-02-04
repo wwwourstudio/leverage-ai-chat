@@ -16,7 +16,26 @@ CREATE TABLE IF NOT EXISTS odds_benford_baselines (
 
 CREATE INDEX idx_benford_sport_market ON odds_benford_baselines(sport, market_type);
 
--- 2. AI Response Trust Table
+-- 2. AI Predictions Table
+-- Stores AI predictions and analysis
+CREATE TABLE IF NOT EXISTS ai_predictions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id TEXT,
+  sport TEXT NOT NULL,
+  event_id TEXT NOT NULL,
+  prediction_type TEXT NOT NULL,
+  prediction_data JSONB NOT NULL,
+  confidence NUMERIC(5,2),
+  outcome TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_predictions_user ON ai_predictions(user_id);
+CREATE INDEX idx_predictions_sport ON ai_predictions(sport);
+CREATE INDEX idx_predictions_created ON ai_predictions(created_at DESC);
+
+-- 3. AI Response Trust Table
 -- Stores trust metrics for each AI response
 CREATE TABLE IF NOT EXISTS ai_response_trust (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -38,7 +57,7 @@ CREATE INDEX idx_trust_model ON ai_response_trust(model_id);
 CREATE INDEX idx_trust_sport_market ON ai_response_trust(sport, market_type);
 CREATE INDEX idx_trust_created ON ai_response_trust(created_at DESC);
 
--- 3. AI Audit Log Table (append-only)
+-- 4. AI Audit Log Table (append-only)
 -- Comprehensive audit trail for all AI responses
 CREATE TABLE IF NOT EXISTS ai_audit_log (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -56,7 +75,7 @@ CREATE INDEX idx_audit_response ON ai_audit_log(response_id);
 CREATE INDEX idx_audit_model ON ai_audit_log(model_id);
 CREATE INDEX idx_audit_created ON ai_audit_log(created_at DESC);
 
--- 4. Model Trust Scores View
+-- 5. Model Trust Scores View
 -- Aggregated rolling trust metrics per model
 CREATE OR REPLACE VIEW model_trust_scores AS
 SELECT 
@@ -76,7 +95,7 @@ FROM ai_response_trust
 WHERE created_at >= NOW() - INTERVAL '30 days'
 GROUP BY model_id, sport, market_type;
 
--- 5. Sport-Specific Validation Thresholds Table
+-- 6. Sport-Specific Validation Thresholds Table
 -- Configurable thresholds per sport and market type
 CREATE TABLE IF NOT EXISTS validation_thresholds (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -107,7 +126,7 @@ INSERT INTO validation_thresholds (sport, market_type) VALUES
 ('economic', 'events')
 ON CONFLICT (sport, market_type) DO NOTHING;
 
--- 6. Live Odds Cache Table
+-- 7. Live Odds Cache Table
 -- Cache live odds from external APIs for faster validation
 CREATE TABLE IF NOT EXISTS live_odds_cache (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -125,7 +144,7 @@ CREATE TABLE IF NOT EXISTS live_odds_cache (
 CREATE INDEX idx_odds_cache_expiry ON live_odds_cache(expires_at);
 CREATE INDEX idx_odds_cache_sport_market ON live_odds_cache(sport, market_type);
 
--- 7. Functions for automatic baseline updates
+-- 8. Functions for automatic baseline updates
 CREATE OR REPLACE FUNCTION update_benford_baseline()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -146,14 +165,19 @@ AFTER INSERT ON live_odds_cache
 FOR EACH ROW
 EXECUTE FUNCTION update_benford_baseline();
 
--- 8. RLS Policies (if needed for multi-tenant)
+-- 9. RLS Policies (if needed for multi-tenant)
+ALTER TABLE ai_predictions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_response_trust ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_audit_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE odds_benford_baselines ENABLE ROW LEVEL SECURITY;
 ALTER TABLE validation_thresholds ENABLE ROW LEVEL SECURITY;
 ALTER TABLE live_odds_cache ENABLE ROW LEVEL SECURITY;
 
--- Allow read access for authenticated users
+-- Allow read access for all users (including anonymous)
+CREATE POLICY "Allow read access to predictions"
+  ON ai_predictions FOR SELECT
+  USING (true);
+
 CREATE POLICY "Allow read access to trust metrics"
   ON ai_response_trust FOR SELECT
   USING (true);
@@ -174,7 +198,7 @@ CREATE POLICY "Allow read access to odds cache"
   ON live_odds_cache FOR SELECT
   USING (true);
 
--- 9. Cleanup function for expired cache
+-- 10. Cleanup function for expired cache
 CREATE OR REPLACE FUNCTION cleanup_expired_odds()
 RETURNS void AS $$
 BEGIN
@@ -184,6 +208,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Comments for documentation
+COMMENT ON TABLE ai_predictions IS 'AI predictions and analysis for sports events';
 COMMENT ON TABLE odds_benford_baselines IS 'Stores sport-specific digit distributions from real market odds for Benford integrity validation';
 COMMENT ON TABLE ai_response_trust IS 'Trust and integrity metrics for each AI response';
 COMMENT ON TABLE ai_audit_log IS 'Append-only audit trail of all AI responses and trust calculations';

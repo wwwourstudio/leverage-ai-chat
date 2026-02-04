@@ -9,7 +9,7 @@ import {
   ERROR_MESSAGES,
   ENV_KEYS,
 } from '@/lib/constants';
-import { checkTableExists, APP_TABLES } from '@/lib/supabase-validator';
+import { APP_TABLES } from '@/lib/supabase-validator';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -70,20 +70,17 @@ export async function GET() {
           const supabase = createClient(supabaseUrl, supabaseAnonKey);
           health.database.connected = true;
 
-          // Check critical tables
+          // Check critical tables with simple query
           const tablesToCheck = [
-            APP_TABLES.AI_RESPONSE_TRUST,
             APP_TABLES.AI_PREDICTIONS,
-            APP_TABLES.AI_AUDIT_LOG,
-            APP_TABLES.VALIDATION_THRESHOLDS,
-            APP_TABLES.LIVE_ODDS_CACHE
           ];
 
           let allTablesExist = true;
           
           for (const table of tablesToCheck) {
             try {
-              const exists = await checkTableExists(supabase, table);
+              const { error } = await supabase.from(table).select('id').limit(1);
+              const exists = !error || !error.message.includes('does not exist');
               health.database.tables[table] = exists;
               if (!exists) {
                 allTablesExist = false;

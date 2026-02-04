@@ -111,28 +111,10 @@ export async function fetchUserInsights(): Promise<UserInsights> {
     });
 
     if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unable to read error response');
-      console.log(`${LOG_PREFIXES.DATA_SERVICE} API error ${response.status}:`, errorText);
-      throw new Error(`Insights API returned ${response.status}: ${errorText}`);
-    }
-
-    // Validate response is JSON before parsing
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      throw new Error('Insights API returned non-JSON response');
+      throw new Error(`API returned ${response.status}`);
     }
 
     const result = await response.json();
-    
-    if (!result || typeof result !== 'object') {
-      throw new Error('Invalid response format from insights API');
-    }
-
-    // Log troubleshooting info if available
-    if (result.troubleshooting) {
-      console.log(`${LOG_PREFIXES.DATA_SERVICE} Troubleshooting info:`, result.troubleshooting);
-    }
-
     const insights = result.insights || {
       totalValue: 0,
       winRate: 0,
@@ -140,33 +122,13 @@ export async function fetchUserInsights(): Promise<UserInsights> {
       activeContests: 0,
       totalInvested: 0,
       dataSource: DATA_SOURCES.DEFAULT,
-      message: result.message || 'No insights available',
-      troubleshooting: result.troubleshooting
+      message: 'No insights available'
     };
 
     cache.set(cacheKey, { data: insights, timestamp: Date.now() });
     return insights;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Error fetching insights:`, errorMessage);
-    
-    // Provide detailed error messaging
-    let userFriendlyMessage = ERROR_MESSAGES.SERVICE_UNAVAILABLE;
-    
-    if (errorMessage.includes('fetch failed') || errorMessage.includes('NetworkError')) {
-      userFriendlyMessage = 'Network error: Cannot connect to API. Check your internet connection and try again.';
-      console.log(`${LOG_PREFIXES.DATA_SERVICE} TROUBLESHOOTING: This is typically caused by:`);
-      console.log('  1. Database tables not created (run migration in Supabase)');
-      console.log('  2. Missing or incorrect environment variables');
-      console.log('  3. Supabase project is paused or unavailable');
-      console.log('  4. Row Level Security blocking anonymous access');
-      console.log(`${LOG_PREFIXES.DATA_SERVICE} Visit /api/health to diagnose the issue`);
-    } else if (errorMessage.includes('500')) {
-      userFriendlyMessage = 'Server error: The API encountered an error. Check server logs for details.';
-    } else if (errorMessage.includes('404')) {
-      userFriendlyMessage = 'API endpoint not found. This may indicate a routing issue.';
-    }
-    
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Error:`, error);
     return {
       totalValue: 0,
       winRate: 0,
@@ -174,7 +136,7 @@ export async function fetchUserInsights(): Promise<UserInsights> {
       activeContests: 0,
       totalInvested: 0,
       dataSource: DATA_SOURCES.ERROR,
-      message: userFriendlyMessage
+      message: ERROR_MESSAGES.SERVICE_UNAVAILABLE
     };
   }
 }

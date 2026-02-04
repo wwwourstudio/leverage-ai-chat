@@ -55,60 +55,12 @@ export async function GET(req: NextRequest) {
     );
 
     if (!queryResult.success || queryResult.source !== 'database') {
-      const errorDetails = queryResult.error || 'No database data';
-      console.log(`${LOG_PREFIXES.API} Using default insights: ${errorDetails}`);
-      
-      // Provide actionable error messages
-      let userMessage = 'Using default data';
-      let troubleshooting = null;
-      
-      if (errorDetails.includes('does not exist')) {
-        userMessage = 'Database tables not configured';
-        troubleshooting = {
-          issue: 'The ai_predictions table does not exist in your Supabase database',
-          solution: 'Run the database migration in Supabase SQL Editor',
-          steps: [
-            'Open Supabase Dashboard → SQL Editor',
-            'Copy content from supabase/migrations/20260201_trust_integrity_system.sql',
-            'Execute the SQL script',
-            'Refresh this page'
-          ],
-          documentationLink: '/SETUP_GUIDE.md#database-setup'
-        };
-      } else if (errorDetails.includes('permission') || errorDetails.includes('RLS')) {
-        userMessage = 'Database permission error';
-        troubleshooting = {
-          issue: 'Row Level Security (RLS) policies may be blocking access',
-          solution: 'Disable RLS or add appropriate policies for anon access',
-          steps: [
-            'Open Supabase Dashboard → Authentication → Policies',
-            'Check ai_predictions table policies',
-            'Add SELECT policy for anon role or disable RLS temporarily',
-            'Refresh this page'
-          ],
-          documentationLink: '/DEPLOYMENT_TROUBLESHOOTING.md#permission-errors'
-        };
-      } else if (errorDetails.includes('connection') || errorDetails.includes('fetch failed')) {
-        userMessage = 'Database connection error';
-        troubleshooting = {
-          issue: 'Cannot connect to Supabase database',
-          solution: 'Check environment variables and network connectivity',
-          steps: [
-            'Verify NEXT_PUBLIC_SUPABASE_URL in environment variables',
-            'Verify NEXT_PUBLIC_SUPABASE_ANON_KEY in environment variables',
-            'Check Supabase project status at app.supabase.com',
-            'Test connection with /api/health endpoint'
-          ],
-          documentationLink: '/DEPLOYMENT_TROUBLESHOOTING.md#connection-errors'
-        };
-      }
-      
+      console.log(`${LOG_PREFIXES.API} Using default insights:`, queryResult.error);
       return NextResponse.json({
         success: true,
         insights: getDefaultInsights(),
         dataSource: queryResult.source,
-        message: userMessage,
-        troubleshooting
+        message: 'Using demo data'
       });
     }
 

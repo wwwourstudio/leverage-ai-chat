@@ -1596,8 +1596,122 @@ export default function UnifiedAIPlatform() {
   // The file would be too long to include here but the pattern is clear
   
   return (
-    <div className="flex h-screen bg-black text-white overflow-hidden font-sans">
-      {/* The rest of the JSX matches the original exactly, just with resolved conflicts */}
+    <div className="flex h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white overflow-hidden font-sans">
+      {/* Left Sidebar */}
+      <div className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-gray-900/50 border-r border-gray-800 flex flex-col overflow-hidden`}>
+        <div className="p-4 border-b border-gray-800">
+          <h2 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+            Leverage AI
+          </h2>
+          <p className="text-xs text-gray-500 mt-1">Powered by Grok-3</p>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="space-y-2">
+            {messages.slice(0, -1).map((msg, idx) => (
+              <button
+                key={idx}
+                className="w-full text-left px-3 py-2 rounded-lg bg-gray-800/50 hover:bg-gray-700/50 transition-colors text-sm"
+              >
+                <div className="truncate">{msg.content.slice(0, 30)}...</div>
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        <div className="p-4 border-t border-gray-800">
+          <button className="w-full flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors text-sm font-medium">
+            <Plus className="w-4 h-4" />
+            New Chat
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-gray-900/30">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2 text-sm">
+              <Zap className="w-4 h-4 text-yellow-400" />
+              <span className="text-gray-400">{creditsRemaining} credits</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <MessageSquare className="w-4 h-4 text-blue-400" />
+              <span className="text-gray-400">{chatsRemaining} chats left</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-6 space-y-6">
+          {messages.map((message, index) => (
+            <div key={index} className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-3xl ${message.role === 'user' ? 'bg-blue-600' : 'bg-gray-800'} rounded-2xl p-4`}>
+                <div className="prose prose-invert max-w-none">
+                  {message.content}
+                </div>
+                
+                {message.insights && (
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="bg-gray-900/50 rounded-xl p-3">
+                      <div className="text-xs text-gray-400">Win Rate</div>
+                      <div className="text-xl font-bold text-green-400">{message.insights.winRate}%</div>
+                    </div>
+                    <div className="bg-gray-900/50 rounded-xl p-3">
+                      <div className="text-xs text-gray-400">ROI</div>
+                      <div className="text-xl font-bold text-blue-400">{message.insights.roi}%</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+          {isProcessing && (
+            <div className="flex gap-4">
+              <div className="bg-gray-800 rounded-2xl p-4">
+                <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Input */}
+        <div className="p-6 border-t border-gray-800 bg-gray-900/30">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex gap-3">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                placeholder="Ask about sports betting, fantasy, DFS, or Kalshi markets..."
+                className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                rows={3}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!input.trim() || isProcessing}
+                className="px-6 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-xl transition-colors flex items-center gap-2"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

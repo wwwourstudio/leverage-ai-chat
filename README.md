@@ -81,7 +81,8 @@ Each welcome message explicitly mentions the analysis type and provides context-
 
 ## Documentation
 
-- **[SUPABASE_VALIDATION_SYSTEM.md](./SUPABASE_VALIDATION_SYSTEM.md)** - Database validation and JSON error prevention
+- **[JSON_ERROR_HANDLING.md](./JSON_ERROR_HANDLING.md)** - JSON parsing error prevention and safe data validation
+- **[SUPABASE_VALIDATION_SYSTEM.md](./SUPABASE_VALIDATION_SYSTEM.md)** - Database validation and error handling
 - **[SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md)** - Sports validation and 404 error prevention
 - **[AI_MODEL_DOCUMENTATION.md](./AI_MODEL_DOCUMENTATION.md)** - Complete Grok-3 AI model information
 - **[API_FIX_SUMMARY.md](./API_FIX_SUMMARY.md)** - Latest fixes: Grok model update & error handling

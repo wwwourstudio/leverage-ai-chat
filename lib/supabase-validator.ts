@@ -1,6 +1,7 @@
 /**
  * Supabase Validator Utility
  * Validates table existence and data integrity before queries
+ * Handles malformed JSON responses and parsing errors safely
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -9,6 +10,55 @@ import { LOG_PREFIXES, EXTERNAL_APIS } from '@/lib/constants';
 // Cache for table existence checks (valid for 5 minutes)
 const tableExistenceCache = new Map<string, { exists: boolean; timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Safely parse JSON with validation
+ */
+export function safeJsonParse<T = any>(jsonString: string): { success: boolean; data: T | null; error: string | null } {
+  if (!jsonString || typeof jsonString !== 'string') {
+    return {
+      success: false,
+      data: null,
+      error: 'Invalid input: not a string'
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(jsonString);
+    return {
+      success: true,
+      data: parsed as T,
+      error: null
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'JSON parse error';
+    return {
+      success: false,
+      data: null,
+      error: `Failed to parse JSON: ${errorMessage}. Input: ${jsonString.substring(0, 100)}...`
+    };
+  }
+}
+
+/**
+ * Validate if a value is valid JSON
+ */
+export function isValidJson(value: any): boolean {
+  if (typeof value === 'object' && value !== null) {
+    return true; // Already an object
+  }
+  
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  try {
+    JSON.parse(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Check if a table exists in Supabase
@@ -47,6 +97,32 @@ export async function checkTableExists(
 }
 
 /**
+ * Safely extract error message from various error types
+ */
+function safeExtractErrorMessage(error: any): string {
+  if (!error) return 'Unknown error';
+  
+  // Handle string errors
+  if (typeof error === 'string') return error;
+  
+  // Handle Error objects
+  if (error instanceof Error) return error.message;
+  
+  // Handle Supabase error objects
+  if (error.message) return String(error.message);
+  if (error.error) return String(error.error);
+  if (error.details) return String(error.details);
+  if (error.hint) return String(error.hint);
+  
+  // Try to stringify, but catch any errors
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
+/**
  * Validate and sanitize query response
  */
 export function validateQueryResponse<T = any>(
@@ -61,10 +137,11 @@ export function validateQueryResponse<T = any>(
 } {
   // Check for errors
   if (error) {
-    const errorMessage = error.message || String(error);
+    const errorMessage = safeExtractErrorMessage(error);
     
     // Check if it's a "table doesn't exist" error
-    if (errorMessage.includes('does not exist')) {
+    if (errorMessage.includes('does not exist') || 
+        errorMessage.includes('relation') && errorMessage.includes('does not exist')) {
       return {
         isValid: false,
         data: null,
@@ -74,11 +151,25 @@ export function validateQueryResponse<T = any>(
     }
     
     // Check if it's a permission error
-    if (errorMessage.includes('permission denied') || errorMessage.includes('RLS')) {
+    if (errorMessage.includes('permission denied') || 
+        errorMessage.includes('RLS') ||
+        errorMessage.includes('policy')) {
       return {
         isValid: false,
         data: null,
         error: `Permission denied for table '${tableName}'. Check Row Level Security policies.`,
+        isEmpty: true
+      };
+    }
+    
+    // Check for connection errors
+    if (errorMessage.includes('connection') || 
+        errorMessage.includes('network') ||
+        errorMessage.includes('timeout')) {
+      return {
+        isValid: false,
+        data: null,
+        error: `Database connection error: ${errorMessage}`,
         isEmpty: true
       };
     }
@@ -104,6 +195,18 @@ export function validateQueryResponse<T = any>(
   // Ensure data is an array
   if (!Array.isArray(data)) {
     console.log(`${LOG_PREFIXES.DATABASE} Invalid data format from '${tableName}': expected array, got ${typeof data}`);
+    
+    // Try to coerce single objects into arrays
+    if (data && typeof data === 'object') {
+      console.log(`${LOG_PREFIXES.DATABASE} Converting single object to array for '${tableName}'`);
+      return {
+        isValid: true,
+        data: [data] as T[],
+        error: null,
+        isEmpty: false
+      };
+    }
+    
     return {
       isValid: false,
       data: null,
@@ -112,11 +215,18 @@ export function validateQueryResponse<T = any>(
     };
   }
 
+  // Sanitize the array data - remove null/undefined entries
+  const sanitizedData = data.filter(item => item !== null && item !== undefined);
+  
+  if (sanitizedData.length < data.length) {
+    console.log(`${LOG_PREFIXES.DATABASE} Removed ${data.length - sanitizedData.length} null/undefined entries from '${tableName}'`);
+  }
+
   return {
     isValid: true,
-    data: data as T[],
+    data: sanitizedData as T[],
     error: null,
-    isEmpty: data.length === 0
+    isEmpty: sanitizedData.length === 0
   };
 }
 
@@ -170,7 +280,9 @@ export async function safeQuery<T = any>(
 
     if (!validation.isValid) {
       if (logErrors) {
-        console.log(`${LOG_PREFIXES.DATABASE} Query validation failed for '${tableName}':`, validation.error);
+        // Safely log the error without risk of JSON parsing issues
+        const safeError = validation.error || 'Unknown validation error';
+        console.log(`${LOG_PREFIXES.DATABASE} Query validation failed for '${tableName}': ${safeError}`);
       }
       return {
         success: false,
@@ -187,9 +299,10 @@ export async function safeQuery<T = any>(
       source: 'database'
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    // Safely extract error message
+    const errorMessage = safeExtractErrorMessage(error);
     if (logErrors) {
-      console.log(`${LOG_PREFIXES.DATABASE} Exception during query to '${tableName}':`, errorMessage);
+      console.log(`${LOG_PREFIXES.DATABASE} Exception during query to '${tableName}': ${errorMessage}`);
     }
     return {
       success: false,

@@ -84,10 +84,22 @@ interface InsightCard {
 }
 
 export default function UnifiedAIPlatform() {
+  // Helper function to generate dynamic welcome messages based on category
+  const getWelcomeMessage = (category: string) => {
+    const messages = {
+      all: "Welcome to **Leverage AI** - Your All-In-One Sports & Financial Intelligence Platform.\n\nI'm your AI companion powered by **Grok-3**, ready to provide data-driven insights across all platforms:\n\n**Sports Betting** - Real-time odds analysis, value detection, and sharp money tracking\n**Fantasy Sports (NFC)** - NFBC/NFFC/NFBKC draft strategy, ADP analysis, and auction optimization\n**DFS** - Optimal lineup construction, leverage plays, and ownership projections\n**Kalshi Markets** - Financial event prediction, weather markets, and arbitrage opportunities\n\nEvery recommendation is backed by Grok-3 AI analyzing multiple data sources to provide you with verified, high-confidence insights.\n\n**What would you like to analyze?**",
+      betting: "Welcome to **Sports Betting Analysis** powered by **Grok-3** AI.\n\nI'm ready to help you find betting edges with:\n\n✓ **Live Odds Monitoring** - Real-time line movements across all major sportsbooks\n✓ **Value Detection** - Identify positive expected value opportunities\n✓ **Sharp Money Tracking** - Follow where the smart money is moving\n✓ **Player Props Analysis** - Statistical edges on player performance markets\n✓ **Line Shopping** - Find the best prices across books\n\nPowered by Grok-3's advanced pattern recognition and real-time market data integration.\n\n**What betting opportunities should we analyze today?**",
+      fantasy: "Welcome to **Fantasy Sports (NFC) Strategy** powered by **Grok-3** AI.\n\nI'm your expert draft companion for:\n\n✓ **Draft Strategy** - Optimal draft approach based on league settings\n✓ **ADP Analysis** - Identify value picks and avoid landmines\n✓ **Auction Optimization** - Target prices and nomination strategy\n✓ **Best Ball Construction** - Portfolio theory and correlation plays\n✓ **NFBC/NFFC/NFBKC** - Platform-specific strategies\n\nGrok-3 AI analyzes thousands of draft scenarios to give you winning edges.\n\n**What's your draft strategy question?**",
+      dfs: "Welcome to **DFS Lineup Optimization** powered by **Grok-3** AI.\n\nI'm your DFS edge-finder for:\n\n✓ **Optimal Lineups** - Mathematically optimized for max projected points\n✓ **Leverage Plays** - Low-ownership, high-upside tournament picks\n✓ **Ownership Projections** - Find contrarian angles and game theory edges\n✓ **Stacking Strategy** - Correlation-based lineup construction\n✓ **Value Detection** - Identify mispriced players with high point-per-dollar ratios\n\nGrok-3 processes thousands of lineup combinations to find your winning edge.\n\n**Which slate are you building for today?**",
+      kalshi: "Welcome to **Kalshi Prediction Markets** powered by **Grok-3** AI.\n\nI'm your prediction market analyst for:\n\n✓ **Market Analysis** - Identify mispriced event probabilities\n✓ **Arbitrage Detection** - Cross-market opportunities between Kalshi and sportsbooks\n✓ **Weather Markets** - Meteorological data analysis for temperature/precipitation markets\n✓ **Political Prediction** - Election and political event probability modeling\n✓ **Economic Events** - Financial indicator prediction markets\n\nGrok-3 AI compares market prices against statistical models to find edges.\n\n**Which prediction markets should we explore?**"
+    };
+    return messages[category as keyof typeof messages] || messages.all;
+  };
+
   const [messages, setMessages] = useState<Message[]>([
   {
   role: 'assistant',
-  content: "Welcome to **Leverage AI** - Your All-In-One Sports & Financial Intelligence Platform.\n\nI'm your AI companion for:\n\n**Sports Betting** - Real-time odds analysis, value detection, and sharp money tracking\n**Fantasy (NFC)** - NFBC/NFFC/NFBKC draft strategy, ADP analysis, and auction optimization\n**DFS** - Optimal lineup construction, leverage plays, and ownership projections\n**Kalshi Markets** - Financial event prediction, weather markets, and arbitrage opportunities\n\nEvery recommendation is backed by advanced AI models analyzing multiple data sources to provide you with verified, high-confidence insights.\n\n**How can I help you gain an edge today?**",
+  content: getWelcomeMessage('all'),
   timestamp: new Date(),
   isWelcome: true,
   cards: [],
@@ -718,11 +730,11 @@ export default function UnifiedAIPlatform() {
         timestamp: new Date(),
         cards: responseCards,
         sources: [
-          { name: 'Advanced AI Model', type: 'model', reliability: 93 },
+          { name: 'Grok-3 AI', type: 'model', reliability: 94 },
           { name: 'Historical Database', type: 'database', reliability: 95 },
           { name: 'Live Market API', type: 'api', reliability: 97 }
         ],
-        modelUsed: 'GPT-4 Turbo',
+        modelUsed: 'Grok-3',
         processingTime: 950,
         trustMetrics: {
           benfordIntegrity: 90,
@@ -806,11 +818,11 @@ export default function UnifiedAIPlatform() {
         // Remove cards array to eliminate duplicate display
         cards: [],
         sources: [
-          { name: 'Advanced AI Model', type: 'model', reliability: 94 },
+          { name: 'Grok-3 AI', type: 'model', reliability: 94 },
           { name: 'Historical Database', type: 'database', reliability: 96 },
           { name: 'Live Market API', type: 'api', reliability: 98 }
         ],
-        modelUsed: 'GPT-4 Turbo',
+        modelUsed: 'Grok-3',
         processingTime: 1050,
         trustMetrics: {
           benfordIntegrity: 88,
@@ -962,7 +974,7 @@ export default function UnifiedAIPlatform() {
         cards: responseCards,
         confidence: analysisResult.confidence || 85,
         sources: analysisResult.sources || buildSourcesList(oddsData),
-        modelUsed: analysisResult.model || 'Grok-2 + Real-Time Data',
+        modelUsed: analysisResult.model || 'Grok-3',
         processingTime,
         trustMetrics: analysisResult.trustMetrics
       };
@@ -1293,10 +1305,21 @@ export default function UnifiedAIPlatform() {
     }
 
     const newChatId = `chat-${Date.now()}`;
-    const welcomeMessage = "**Welcome to Leverage AI**\n\nI'm ready to provide data-driven insights across all platforms:\n\n**Sports Betting** - Live odds and value plays\n**Fantasy Sports** - Draft strategy and ADP analysis\n**DFS** - Optimal lineup construction\n**Kalshi Markets** - Prediction market opportunities\n\n**What would you like to analyze?**";
+    // Generate dynamic welcome message based on selected category
+    const welcomeMessage = getWelcomeMessage(selectedCategory);
+    
+    // Category-specific titles
+    const categoryTitles = {
+      all: 'New Analysis',
+      betting: 'New Sports Betting Analysis',
+      fantasy: 'New Fantasy (NFC) Analysis',
+      dfs: 'New DFS Lineup Analysis',
+      kalshi: 'New Kalshi Market Analysis'
+    };
+    
     const newChat: Chat = {
       id: newChatId,
-      title: 'New Analysis',
+      title: categoryTitles[selectedCategory as keyof typeof categoryTitles] || 'New Analysis',
       preview: welcomeMessage.slice(0, 50) + '...',
       timestamp: new Date(),
       starred: false,
@@ -1310,14 +1333,16 @@ export default function UnifiedAIPlatform() {
         role: 'assistant',
         content: welcomeMessage,
         timestamp: new Date(),
-        cards: []
+        cards: [],
+        modelUsed: 'Grok-3',
+        isWelcome: true
       }
     ]);
 
     // Update rate limit count
     const updated = updateRateLimitCount();
     setChatsRemaining(CHAT_LIMIT - updated.count);
-    console.log('[v0] New chat created. Chats remaining:', CHAT_LIMIT - updated.count);
+    console.log('[v0] New', selectedCategory, 'analysis chat created. Chats remaining:', CHAT_LIMIT - updated.count);
   };
 
   const handleSelectChat = (chatId: string) => {

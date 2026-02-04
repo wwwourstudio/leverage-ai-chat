@@ -29,6 +29,18 @@ Continue building your app on:
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
 
+## 🚀 Quick Start
+
+**New to Leverage AI?** Check out the **[QUICK_START_GUIDE.md](./QUICK_START_GUIDE.md)** for a 3-step setup and feature overview.
+
+## AI Model
+
+This application is powered by **Grok-3**, xAI's latest AI model optimized for sports betting, fantasy sports, DFS, and prediction market analysis. 
+
+✅ **Not GPT-4** - We use Grok-3 for superior sports intelligence and real-time data processing.
+
+See **[AI_MODEL_DOCUMENTATION.md](./AI_MODEL_DOCUMENTATION.md)** for complete details about the AI model.
+
 ## Configuration
 
 ### Quick Start
@@ -36,7 +48,7 @@ Continue building your app on:
 See **[ENV_CONFIGURATION.md](./ENV_CONFIGURATION.md)** for complete environment variable setup.
 
 Required environment variables:
-- `XAI_API_KEY` - Grok AI API key (get from [console.x.ai](https://console.x.ai/))
+- `XAI_API_KEY` - Grok-3 AI API key (get from [console.x.ai](https://console.x.ai/))
 - `ODDS_API_KEY` - Sports odds API key (get from [the-odds-api.com](https://the-odds-api.com/))
 - `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous key
@@ -48,8 +60,28 @@ Test your configuration:
 curl https://your-domain.vercel.app/api/health | jq
 ```
 
+## Features
+
+### Dynamic Welcome Messages
+When clicking "New Analysis" in the sidebar, you'll receive a personalized welcome message based on your selected analysis type:
+
+- **Sports Betting** - Tailored guidance for odds analysis and value detection
+- **Fantasy Sports (NFC)** - Specialized advice for NFBC/NFFC/NFBKC draft strategy  
+- **DFS** - Focused assistance for optimal lineup construction
+- **Kalshi Markets** - Expert help with prediction market opportunities
+- **All Platforms** - Comprehensive overview of all analysis types
+
+Each welcome message explicitly mentions the analysis type and provides context-specific guidance powered by Grok-3 AI.
+
+### Real-Time Analysis
+- Live odds monitoring across major sportsbooks
+- Dynamic lineup optimization for DFS
+- ADP tracking for fantasy drafts
+- Prediction market probability modeling
+
 ## Documentation
 
+- **[AI_MODEL_DOCUMENTATION.md](./AI_MODEL_DOCUMENTATION.md)** - Complete Grok-3 AI model information
 - **[API_FIX_SUMMARY.md](./API_FIX_SUMMARY.md)** - Latest fixes: Grok model update & error handling
 - **[ENV_CONFIGURATION.md](./ENV_CONFIGURATION.md)** - Complete environment setup guide
 - **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** - Common issues and solutions

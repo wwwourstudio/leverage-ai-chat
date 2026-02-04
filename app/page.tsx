@@ -215,23 +215,27 @@ export default function UnifiedAIPlatform() {
     const rateData = getRateLimitData();
     setChatsRemaining(CHAT_LIMIT - rateData.count);
 
-    // Load real user insights
+    // Load real user insights with error handling
     console.log('[v0] Loading real user insights on mount');
-    fetchUserInsights().then(insights => {
-      console.log('[v0] Loaded insights:', insights);
-      setMessages(prev => {
-        const newMessages = [...prev];
-        if (newMessages[0]?.isWelcome) {
-          newMessages[0] = {
-            ...newMessages[0],
-            insights
-          };
-        }
-        return newMessages;
+    fetchUserInsights()
+      .then(insights => {
+        console.log('[v0] Loaded insights:', insights);
+        setMessages(prev => {
+          const newMessages = [...prev];
+          if (newMessages[0]?.isWelcome) {
+            newMessages[0] = {
+              ...newMessages[0],
+              insights
+            };
+          }
+          return newMessages;
+        });
+      })
+      .catch(err => {
+        console.error('[v0] Failed to load insights:', err);
+        // Don't crash the app - just log the error and continue with defaults
+        // The welcome message already has default insights
       });
-    }).catch(err => {
-      console.error('[v0] Failed to load insights:', err);
-    });
   }, []);
 
   const [chats, setChats] = useState<Chat[]>([

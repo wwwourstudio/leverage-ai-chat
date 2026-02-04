@@ -9,7 +9,7 @@ This document details the comprehensive refactoring of the chat application to e
 ### 1. **Removed Hardcoded Data**
 
 #### Before (Hardcoded):
-\`\`\`typescript
+
 // Static cards array
 const unifiedCards: InsightCard[] = [
   {
@@ -32,10 +32,7 @@ insights: {
   winRate: 66.8,        // Hardcoded
   roi: 15.6             // Hardcoded
 }
-\`\`\`
 
-#### After (Dynamic):
-\`\`\`typescript
 // Dynamic card fetching
 const dynamicCards = await fetchDynamicCards({
   sport: 'nba',
@@ -48,7 +45,7 @@ const trustMetrics = calculateTrustMetrics(oddsData, aiResponse);
 
 // Real insights from Supabase
 const insights = await fetchUserInsights();
-\`\`\`
+
 
 ---
 
@@ -65,17 +62,14 @@ const insights = await fetchUserInsights();
 - Falls back to contextual recommendations when live data unavailable
 
 **Request:**
-\`\`\`json
+
 {
   "sport": "nba",
   "category": "betting",
   "userContext": { "previousQueries": ["..."] },
   "limit": 3
 }
-\`\`\`
 
-**Response:**
-\`\`\`json
 {
   "success": true,
   "cards": [
@@ -95,7 +89,7 @@ const insights = await fetchUserInsights();
   "dataSource": "live",
   "timestamp": "2026-02-02T..."
 }
-\`\`\`
+
 
 ---
 
@@ -110,7 +104,7 @@ const insights = await fetchUserInsights();
 - Returns default values for new users
 
 **Response:**
-\`\`\`json
+
 {
   "success": true,
   "insights": {
@@ -123,7 +117,7 @@ const insights = await fetchUserInsights();
   },
   "sampleSize": 100
 }
-\`\`\`
+
 
 ---
 
@@ -132,7 +126,7 @@ const insights = await fetchUserInsights();
 **Changes:**
 - Removed `Math.random()` from confidence calculation
 - Calculates confidence from actual trust metrics:
-  \`\`\`typescript
+
   const avgMetric = (
     benfordIntegrity +
     oddsAlignment +
@@ -140,7 +134,7 @@ const insights = await fetchUserInsights();
     historicalAccuracy
   ) / 4;
   return Math.round(avgMetric);
-  \`\`\`
+
 
 ---
 
@@ -168,14 +162,7 @@ Centralized service for all external data fetching:
 ### 1. **Dynamic Card Selection**
 
 **Before:**
-\`\`\`typescript
-const selectRelevantCards = (message: string): InsightCard[] => {
-  return unifiedCards.slice(0, 3); // Static array
-};
-\`\`\`
 
-**After:**
-\`\`\`typescript
 const selectRelevantCards = async (message: string): Promise<InsightCard[]> => {
   const sport = extractSport(message);
   const category = extractCategory(message);
@@ -188,13 +175,13 @@ const selectRelevantCards = async (message: string): Promise<InsightCard[]> => {
   
   return dynamicCards.map(convertToInsightCard);
 };
-\`\`\`
+
 
 ### 2. **Real Insights Loading**
 
 Added `useEffect` to load real user insights on mount:
 
-\`\`\`typescript
+
 useEffect(() => {
   fetchUserInsights().then(insights => {
     setMessages(prev => {
@@ -206,7 +193,7 @@ useEffect(() => {
     });
   });
 }, []);
-\`\`\`
+
 
 ### 3. **Removed Math.random() Calls**
 
@@ -221,7 +208,7 @@ All random number generation has been removed:
 
 ## Data Flow Architecture
 
-\`\`\`
+
 User Query
     ↓
 generateRealResponse()
@@ -241,7 +228,7 @@ generateRealResponse()
     Combine All Data
             ↓
     Display to User
-\`\`\`
+
 
 ---
 
@@ -285,7 +272,7 @@ generateRealResponse()
 
 ## Environment Variables Required
 
-\`\`\`env
+
 # Required for full functionality
 ODDS_API_KEY=your_odds_api_key_here
 XAI_API_KEY=your_grok_api_key_here
@@ -293,7 +280,7 @@ XAI_API_KEY=your_grok_api_key_here
 # Automatically configured by v0
 NEXT_PUBLIC_SUPABASE_URL=https://...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-\`\`\`
+
 
 ---
 
@@ -317,21 +304,7 @@ The system handles missing API keys elegantly:
 ## Testing the Integration
 
 ### 1. Check Health Status
-\`\`\`bash
-curl http://localhost:3000/api/health
-\`\`\`
 
-### 2. Test Cards Generation
-\`\`\`bash
-curl -X POST http://localhost:3000/api/cards \
-  -H "Content-Type: application/json" \
-  -d '{"sport":"nba","category":"betting","limit":3}'
-\`\`\`
-
-### 3. Test Insights
-\`\`\`bash
-curl http://localhost:3000/api/insights
-\`\`\`
 
 ### 4. Test Full Chat Flow
 Type in chat: "Show me NBA betting opportunities"
@@ -349,13 +322,13 @@ Type in chat: "Show me NBA betting opportunities"
 - Automatic cache invalidation
 
 ### 2. **Parallel Requests**
-\`\`\`typescript
+
 // Fetch odds and AI analysis simultaneously
 const [analysisResult, oddsData] = await Promise.all([
   analysisPromise,
   oddsDataPromise
 ]);
-\`\`\`
+
 
 ### 3. **Request Deduplication**
 - Multiple calls with same params return cached data
@@ -367,28 +340,17 @@ const [analysisResult, oddsData] = await Promise.all([
 
 ### Console Logs
 All data operations log with `[v0]` prefix:
-\`\`\`
+
 [v0] Loading real user insights on mount
 [v0] Fetched live odds: 8 events
 [v0] Got dynamic cards: 3
 [v0] Loaded insights: {...}
-\`\`\`
 
-### Data Source Indicators
-Every response includes:
-\`\`\`json
-{
-  "dataSource": "live" | "supabase" | "cache" | "default" | "fallback"
-}
-\`\`\`
-
-### Cache Statistics
-\`\`\`typescript
 import { getCacheStats } from '@/lib/data-service';
 
 console.log(getCacheStats());
 // { size: 5, keys: [...], oldestEntry: 1738521600000 }
-\`\`\`
+
 
 ---
 

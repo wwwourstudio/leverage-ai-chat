@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOddsApiKey, isOddsApiConfigured } from '@/lib/env';
+import {
+  EXTERNAL_APIS,
+  LOG_PREFIXES,
+  ERROR_MESSAGES,
+  HTTP_STATUS,
+  MARKET_TYPES,
+} from '@/lib/constants';
 
 // Sports Odds API integration
 // Documentation: https://the-odds-api.com/
@@ -18,34 +25,34 @@ export async function POST(req: NextRequest) {
 
     // Check if Odds API is configured
     if (!isOddsApiConfigured()) {
-      console.log('[API] ODDS_API_KEY is not configured');
+      console.log(`${LOG_PREFIXES.API} ODDS_API_KEY is not configured`);
       return NextResponse.json(
         { 
-          error: 'Sports Odds API is not configured', 
+          error: ERROR_MESSAGES.ODDS_NOT_CONFIGURED, 
           message: 'Please add ODDS_API_KEY to environment variables.',
           documentation: 'See ENV_CONFIGURATION.md for setup instructions',
           events: [],
           timestamp: new Date().toISOString()
         },
-        { status: 503 }
+        { status: HTTP_STATUS.SERVICE_UNAVAILABLE }
       );
     }
 
     const oddsApiKey = getOddsApiKey();
 
     // Build API URL based on request parameters
-    const baseUrl = 'https://api.the-odds-api.com/v4/sports';
+    const baseUrl = `${EXTERNAL_APIS.ODDS_API.BASE_URL}/sports`;
     
     // If eventId is provided, fetch specific event odds
     let apiUrl: string;
     if (eventId) {
-      apiUrl = `${baseUrl}/${sport}/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=us&markets=${marketType || 'h2h'}`;
+      apiUrl = `${baseUrl}/${sport}/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}&markets=${marketType || MARKET_TYPES.H2H}`;
     } else {
       // Fetch odds for all upcoming events
-      apiUrl = `${baseUrl}/${sport}/odds?apiKey=${oddsApiKey}&regions=us&markets=${marketType || 'h2h'}`;
+      apiUrl = `${baseUrl}/${sport}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}&markets=${marketType || MARKET_TYPES.H2H}`;
     }
 
-    console.log(`[API] Fetching odds for sport: ${sport}, market: ${marketType}`);
+    console.log(`${LOG_PREFIXES.API} Fetching odds for sport: ${sport}, market: ${marketType}`);
 
     const response = await fetch(apiUrl, {
       method: 'GET',
@@ -56,11 +63,11 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.log('[API] Odds API error:', response.status, errorText.substring(0, 200));
+      console.log(`${LOG_PREFIXES.API} Odds API error:`, response.status, errorText.substring(0, 200));
       return NextResponse.json(
         { 
           error: 'Failed to fetch odds data',
-          details: response.status === 401 ? 'Invalid API key' : errorText.substring(0, 100) 
+          details: response.status === HTTP_STATUS.UNAUTHORIZED ? ERROR_MESSAGES.INVALID_API_KEY : errorText.substring(0, 100) 
         },
         { status: response.status }
       );
@@ -71,7 +78,7 @@ export async function POST(req: NextRequest) {
     // Transform the data into a consistent format
     const transformedData = {
       sport,
-      marketType: marketType || 'h2h',
+      marketType: marketType || MARKET_TYPES.H2H,
       events: Array.isArray(data) ? data : [data],
       timestamp: new Date().toISOString(),
       remainingRequests: response.headers.get('x-requests-remaining'),
@@ -118,10 +125,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(transformedData);
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.log('[API] Error in odds route:', errorMessage);
+    console.log(`${LOG_PREFIXES.API} Error in odds route:`, errorMessage);
     return NextResponse.json(
-      { error: 'Internal server error', details: errorMessage },
-      { status: 500 }
+      { error: ERROR_MESSAGES.INTERNAL_ERROR, details: errorMessage },
+      { status: HTTP_STATUS.INTERNAL_ERROR }
     );
   }
 }
@@ -135,18 +142,18 @@ export async function GET(req: NextRequest) {
     if (!isOddsApiConfigured()) {
       return NextResponse.json(
         { 
-          error: 'ODDS_API_KEY not configured',
+          error: ERROR_MESSAGES.ODDS_NOT_CONFIGURED,
           message: 'See ENV_CONFIGURATION.md for setup',
           events: [],
           timestamp: new Date().toISOString()
         },
-        { status: 503 }
+        { status: HTTP_STATUS.SERVICE_UNAVAILABLE }
       );
     }
 
     const oddsApiKey = getOddsApiKey();
 
-    const apiUrl = `https://api.the-odds-api.com/v4/sports/${sport}/odds?apiKey=${oddsApiKey}&regions=us`;
+    const apiUrl = `${EXTERNAL_APIS.ODDS_API.BASE_URL}/sports/${sport}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}`;
 
     const response = await fetch(apiUrl);
 
@@ -166,10 +173,10 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.log('[API] Error in GET odds route:', errorMessage);
+    console.log(`${LOG_PREFIXES.API} Error in GET odds route:`, errorMessage);
     return NextResponse.json(
-      { error: 'Internal server error', details: errorMessage },
-      { status: 500 }
+      { error: ERROR_MESSAGES.INTERNAL_ERROR, details: errorMessage },
+      { status: HTTP_STATUS.INTERNAL_ERROR }
     );
   }
 }

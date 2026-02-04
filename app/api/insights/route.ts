@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import {
+  ENV_KEYS,
+  LOG_PREFIXES,
+  DATA_SOURCES,
+  EXTERNAL_APIS,
+  SUCCESS_MESSAGES,
+} from '@/lib/constants';
 
 export const runtime = 'edge';
 
@@ -9,15 +16,15 @@ export const runtime = 'edge';
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const supabaseUrl = process.env[ENV_KEYS.SUPABASE_URL];
+    const supabaseAnonKey = process.env[ENV_KEYS.SUPABASE_ANON_KEY];
 
     if (!supabaseUrl || !supabaseAnonKey) {
-      console.log('[API] Supabase not configured, returning default insights');
+      console.log(`${LOG_PREFIXES.API} Supabase not configured, returning default insights`);
       return NextResponse.json({
         success: true,
         insights: getDefaultInsights(),
-        dataSource: 'default'
+        dataSource: DATA_SOURCES.DEFAULT
       });
     }
 
@@ -28,17 +35,17 @@ export async function GET(req: NextRequest) {
     
     // Try to fetch AI predictions from trust system
     const { data: predictions, error } = await supabase
-      .from('ai_predictions')
+      .from(EXTERNAL_APIS.SUPABASE.TABLES.AI_PREDICTIONS)
       .select('*')
       .order('created_at', { ascending: false })
       .limit(100);
 
     if (error) {
-      console.log('[API] Supabase query error (table may not exist yet):', error.message || error);
+      console.log(`${LOG_PREFIXES.API} Supabase query error (table may not exist yet):`, error.message || error);
       return NextResponse.json({
         success: true,
         insights: getDefaultInsights(),
-        dataSource: 'default'
+        dataSource: DATA_SOURCES.DEFAULT
       });
     }
 
@@ -55,11 +62,11 @@ export async function GET(req: NextRequest) {
 
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.log('[API] Error in insights route:', errorMessage);
+    console.log(`${LOG_PREFIXES.API} Error in insights route:`, errorMessage);
     return NextResponse.json({
       success: true,
       insights: getDefaultInsights(),
-      dataSource: 'fallback'
+      dataSource: DATA_SOURCES.FALLBACK
     });
   }
 }
@@ -126,7 +133,7 @@ function getDefaultInsights() {
     activeContests: 0,
     totalInvested: 0,
     avgConfidence: 0,
-    dataSource: 'default',
+    dataSource: DATA_SOURCES.DEFAULT,
     message: 'Start making predictions to see your insights'
   };
 }

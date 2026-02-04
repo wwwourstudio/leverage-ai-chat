@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getServiceStatus, formatServiceStatus } from '@/lib/config-status';
+import {
+  HEALTH_STATUS,
+  AI_CONFIG,
+  LOG_PREFIXES,
+  HTTP_STATUS,
+  ERROR_MESSAGES,
+} from '@/lib/constants';
 
 /**
  * Health Check API Route
@@ -11,7 +18,7 @@ export async function GET() {
     const serviceStatus = getServiceStatus();
     
     const health = {
-      status: serviceStatus.overall.ready ? 'healthy' : 'degraded',
+      status: serviceStatus.overall.ready ? HEALTH_STATUS.HEALTHY : HEALTH_STATUS.DEGRADED,
       timestamp: new Date().toISOString(),
       ready: serviceStatus.overall.ready,
       integrations: {
@@ -23,7 +30,7 @@ export async function GET() {
         grokAI: {
           configured: serviceStatus.grok.configured,
           missing: serviceStatus.grok.missing,
-          model: 'grok-3',
+          model: AI_CONFIG.MODEL_NAME,
         },
         supabase: {
           configured: serviceStatus.supabase.configured,
@@ -50,15 +57,15 @@ export async function GET() {
     
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.log('[Health] Error checking service status:', errorMessage);
+    console.log(`${LOG_PREFIXES.HEALTH} Error checking service status:`, errorMessage);
     
     return NextResponse.json(
       {
-        status: 'unhealthy',
+        status: HEALTH_STATUS.UNHEALTHY,
         error: errorMessage,
         timestamp: new Date().toISOString()
       },
-      { status: 500 }
+      { status: HTTP_STATUS.INTERNAL_ERROR }
     );
   }
 }

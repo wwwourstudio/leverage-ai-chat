@@ -9,14 +9,11 @@ The AI chat functionality has been upgraded to fetch and utilize **real-world da
 ## Architecture
 
 ### Data Flow
-
-```
 User Query → Context Extraction → Parallel API Calls → Data Synthesis → AI Analysis → Response
      ↓              ↓                      ↓                  ↓              ↓           ↓
   Frontend    Extract Sport,       [Grok AI API]      Combine Data    Trust Metrics  Display
               Market Type,         [Odds API]         Processing      Validation     Cards
               Platform            [Supabase DB]
-```
 
 ### Key Components
 
@@ -63,7 +60,7 @@ User Query → Context Extraction → Parallel API Calls → Data Synthesis → 
 - Soccer, MMA, Tennis, Golf
 
 **Usage Example:**
-```typescript
+
 const oddsData = await fetch('/api/odds', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
@@ -72,7 +69,7 @@ const oddsData = await fetch('/api/odds', {
     marketType: 'h2h'
   })
 });
-```
+
 
 ### 2. Grok AI (xAI)
 **Purpose:** Advanced sports analysis and predictions
@@ -87,7 +84,7 @@ const oddsData = await fetch('/api/odds', {
 **Model:** Grok-2 (production) with real-time data access
 
 **Usage Example:**
-```typescript
+
 const analysis = await fetch('/api/analyze', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
@@ -100,7 +97,7 @@ const analysis = await fetch('/api/analyze', {
     }
   })
 });
-```
+
 
 ### 3. Supabase Database
 **Purpose:** Data persistence and trust verification
@@ -118,7 +115,7 @@ const analysis = await fetch('/api/analyze', {
 The system intelligently extracts context from user messages to fetch the most relevant data:
 
 ### Sport Detection
-```typescript
+
 User: "Lakers game tonight"
 → Detected: NBA
 
@@ -127,10 +124,7 @@ User: "Chiefs vs Bills spread"
 
 User: "Aaron Judge home run prop"
 → Detected: MLB
-```
 
-### Market Type Detection
-```typescript
 User: "spread bet"
 → Market: spreads
 
@@ -142,10 +136,7 @@ User: "moneyline pick"
 
 User: "player prop"
 → Market: player_props
-```
 
-### Platform Detection
-```typescript
 User: "DraftKings lineup"
 → Platform: draftkings
 
@@ -154,7 +145,7 @@ User: "Kalshi market"
 
 User: "NFBC draft"
 → Platform: fantasy
-```
+
 
 ---
 
@@ -163,27 +154,19 @@ User: "NFBC draft"
 ### Step-by-Step Flow
 
 1. **User submits query**
-   ```typescript
-   "Should I bet on the Lakers -4.5 against Warriors tonight?"
-   ```
 
-2. **Context extraction**
-   ```javascript
    {
      sport: 'nba',
      marketType: 'spreads',
      platform: null,
      previousMessages: [...]
    }
-   ```
 
-3. **Parallel API calls**
-   ```typescript
    Promise.all([
      fetch('/api/analyze', { ... }),  // Grok AI analysis
      fetch('/api/odds', { ... })      // Live odds data
    ])
-   ```
+
 
 4. **Data synthesis**
    - Combine Grok's analysis with real odds
@@ -192,7 +175,7 @@ User: "NFBC draft"
    - Generate confidence scores
 
 5. **Response construction**
-   ```javascript
+
    {
      content: "AI-generated analysis with real data",
      cards: [relevantInsightCards],
@@ -209,7 +192,7 @@ User: "NFBC draft"
        trustLevel: 'high'
      }
    }
-   ```
+
 
 6. **Display to user**
    - Formatted markdown content
@@ -253,11 +236,7 @@ Every AI response includes comprehensive trust metrics:
 
 ### Visual Indicators
 
-```
-🟢 High Trust - Strong Signal
-🟡 Medium Trust - Moderate Edge  
-🟠 Low Trust - High Uncertainty
-```
+
 
 ---
 
@@ -274,7 +253,7 @@ The system gracefully handles API failures and data unavailability:
 
 ### Error Types Handled
 
-```typescript
+
 // API timeout
 → Use cached data + warning badge
 
@@ -289,14 +268,14 @@ The system gracefully handles API failures and data unavailability:
 
 // Invalid sport/market
 → Return general analysis
-```
+
 
 ---
 
 ## Performance Optimizations
 
 ### 1. Parallel API Calls
-```typescript
+
 // ✅ Good - Parallel execution
 const [analysis, odds] = await Promise.all([
   fetch('/api/analyze'),
@@ -306,7 +285,7 @@ const [analysis, odds] = await Promise.all([
 // ❌ Bad - Sequential execution
 const analysis = await fetch('/api/analyze');
 const odds = await fetch('/api/odds');
-```
+
 
 ### 2. Intelligent Caching
 - Odds data cached for 60 seconds
@@ -314,12 +293,12 @@ const odds = await fetch('/api/odds');
 - Uses SWR (stale-while-revalidate) pattern
 
 ### 3. Conditional Data Fetching
-```typescript
+
 // Only fetch odds if query is betting-related
 if (userMessage.includes('bet') || userMessage.includes('odds')) {
   await fetch('/api/odds');
 }
-```
+
 
 ### 4. Request Deduplication
 - Prevents duplicate API calls for identical queries
@@ -331,30 +310,24 @@ if (userMessage.includes('bet') || userMessage.includes('odds')) {
 ## Security Best Practices
 
 ### 1. Server-Side API Key Management
-```typescript
+
 // ✅ Secure - Keys on server
 const apiKey = process.env.ODDS_API_KEY;
 
 // ❌ Insecure - Keys exposed to client
 const apiKey = 'sk-xxx'; // NEVER DO THIS
-```
 
-### 2. Input Validation
-```typescript
 // Validate user inputs before API calls
 if (!sport || !allowedSports.includes(sport)) {
   return { error: 'Invalid sport' };
 }
-```
 
-### 3. Rate Limiting
-```typescript
 // Implement rate limiting per user
 const rateLimit = new RateLimiter({
   max: 100,
   window: '1h'
 });
-```
+
 
 ### 4. Secure Data Storage
 - Supabase Row Level Security (RLS) enabled
@@ -368,38 +341,17 @@ const rateLimit = new RateLimiter({
 ### Manual Testing Checklist
 
 1. **Betting Query**
-   ```
-   User: "Should I bet Lakers -4.5?"
-   Expected: Live odds + Grok analysis + trust metrics
-   ```
 
-2. **DFS Query**
-   ```
-   User: "Build me a DraftKings NFL lineup"
-   Expected: Optimal lineup + pricing + projections
-   ```
-
-3. **Fantasy Query**
-   ```
-   User: "Best draft strategy for NFBC?"
-   Expected: ADP analysis + value targets + stacking advice
-   ```
-
-4. **Error Handling**
-   ```
-   Scenario: Disconnect internet
-   Expected: Graceful fallback with cached data warning
-   ```
 
 ### Debugging Tools
 
 **Console Logs:**
-```javascript
+
 console.log('[v0] Starting real AI analysis for:', userMessage);
 console.log('[v0] Extracted context:', context);
 console.log('[v0] Analysis result received:', result);
 console.log('[v0] Odds data received:', oddsData);
-```
+
 
 **Network Tab:**
 - Check API response times
@@ -434,7 +386,7 @@ console.log('[v0] Odds data received:', oddsData);
 
 ### Logging Strategy
 
-```typescript
+
 // Log all AI responses for quality analysis
 await supabase.from('ai_responses').insert({
   user_id: userId,
@@ -450,7 +402,7 @@ console.error('[v0] Error:', {
   message: error.message,
   stack: error.stack
 });
-```
+
 
 ---
 

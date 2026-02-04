@@ -4,6 +4,15 @@
  * Eliminates all hardcoded data with real-time fetches
  */
 
+import {
+  CACHE_CONFIG,
+  API_ENDPOINTS,
+  LOG_PREFIXES,
+  DATA_SOURCES,
+  HTTP_STATUS,
+  ERROR_MESSAGES,
+} from '@/lib/constants';
+
 export interface DynamicCard {
   type: string;
   title: string;
@@ -27,11 +36,11 @@ export interface UserInsights {
   message?: string;
 }
 
-// Cache configuration
+// Cache configuration (using centralized constants)
 const CACHE_DURATION = {
-  CARDS: 30 * 1000, // 30 seconds for cards (more frequent for live odds)
-  INSIGHTS: 5 * 60 * 1000, // 5 minutes for insights
-  ODDS: 60 * 1000, // 1 minute for odds data
+  CARDS: CACHE_CONFIG.CARDS_TTL,
+  INSIGHTS: CACHE_CONFIG.INSIGHTS_TTL,
+  ODDS: CACHE_CONFIG.ODDS_TTL,
 };
 
 const cache = new Map<string, { data: any; timestamp: number }>();
@@ -49,13 +58,13 @@ export async function fetchDynamicCards(params: {
   const cached = cache.get(cacheKey);
 
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION.CARDS) {
-    console.log('[DataService] Returning cached cards');
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Returning cached cards`);
     return cached.data;
   }
 
   try {
-    console.log('[DataService] Fetching fresh cards from API');
-    const response = await fetch('/api/cards', {
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Fetching fresh cards from API`);
+    const response = await fetch(API_ENDPOINTS.CARDS, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params)
@@ -65,13 +74,20 @@ export async function fetchDynamicCards(params: {
       throw new Error(`Cards API returned ${response.status}`);
     }
 
+    // Validate JSON response
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error('Cards API returned non-JSON response');
+    }
+
     const result = await response.json();
-    const cards = result.cards || [];
+    const cards = Array.isArray(result.cards) ? result.cards : [];
 
     cache.set(cacheKey, { data: cards, timestamp: Date.now() });
     return cards;
   } catch (error) {
-    console.error('[DataService] Error fetching cards:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Error fetching cards:`, errorMessage);
     return [];
   }
 }
@@ -84,13 +100,13 @@ export async function fetchUserInsights(): Promise<UserInsights> {
   const cached = cache.get(cacheKey);
 
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION.INSIGHTS) {
-    console.log('[DataService] Returning cached insights');
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Returning cached insights`);
     return cached.data;
   }
 
   try {
-    console.log('[DataService] Fetching fresh insights from API');
-    const response = await fetch('/api/insights', {
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Fetching fresh insights from API`);
+    const response = await fetch(API_ENDPOINTS.INSIGHTS, {
       method: 'GET',
     });
 
@@ -98,21 +114,41 @@ export async function fetchUserInsights(): Promise<UserInsights> {
       throw new Error(`Insights API returned ${response.status}`);
     }
 
+    // Validate response is JSON before parsing
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error('Insights API returned non-JSON response');
+    }
+
     const result = await response.json();
-    const insights = result.insights;
+    
+    if (!result || typeof result !== 'object') {
+      throw new Error('Invalid response format from insights API');
+    }
+
+    const insights = result.insights || {
+      totalValue: 0,
+      winRate: 0,
+      roi: 0,
+      activeContests: 0,
+      totalInvested: 0,
+      dataSource: DATA_SOURCES.DEFAULT,
+      message: 'No insights available'
+    };
 
     cache.set(cacheKey, { data: insights, timestamp: Date.now() });
     return insights;
   } catch (error) {
-    console.error('[DataService] Error fetching insights:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Error fetching insights:`, errorMessage);
     return {
       totalValue: 0,
       winRate: 0,
       roi: 0,
       activeContests: 0,
       totalInvested: 0,
-      dataSource: 'error',
-      message: 'Unable to load insights'
+      dataSource: DATA_SOURCES.ERROR,
+      message: ERROR_MESSAGES.SERVICE_UNAVAILABLE
     };
   }
 }
@@ -125,13 +161,13 @@ export async function fetchLiveOdds(sport: string, marketType: string = 'h2h') {
   const cached = cache.get(cacheKey);
 
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION.ODDS) {
-    console.log('[DataService] Returning cached odds');
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Returning cached odds`);
     return cached.data;
   }
 
   try {
-    console.log('[DataService] Fetching fresh odds from API');
-    const response = await fetch('/api/odds', {
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Fetching fresh odds from API`);
+    const response = await fetch(API_ENDPOINTS.ODDS, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sport, marketType })
@@ -141,12 +177,24 @@ export async function fetchLiveOdds(sport: string, marketType: string = 'h2h') {
       throw new Error(`Odds API returned ${response.status}`);
     }
 
+    // Validate JSON response
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error('Odds API returned non-JSON response');
+    }
+
     const result = await response.json();
     cache.set(cacheKey, { data: result, timestamp: Date.now() });
     return result;
   } catch (error) {
-    console.error('[DataService] Error fetching odds:', error);
-    return { success: false, error: error.message };
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Error fetching odds:`, errorMessage);
+    return { 
+      success: false, 
+      error: errorMessage,
+      events: [],
+      timestamp: new Date().toISOString()
+    };
   }
 }
 

@@ -1946,7 +1946,7 @@ export default function UnifiedAIPlatform() {
           </div>
         </div>
 
-        {/* Messages Container */}
+        {/* Messages Container - Dynamic Data-Driven Interface */}
         <div className="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar">
           <div className="max-w-5xl mx-auto space-y-6">
             {messages.map((message, index) => (

@@ -1676,7 +1676,7 @@ export default function UnifiedAIPlatform() {
               </div>
             </div>
           ))}
-          {isProcessing && (
+          {isTyping && (
             <div className="flex gap-4">
               <div className="bg-gray-800 rounded-2xl p-4">
                 <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
@@ -1705,7 +1705,7 @@ export default function UnifiedAIPlatform() {
               />
               <button
                 onClick={handleSendMessage}
-                disabled={!input.trim() || isProcessing}
+                disabled={!input.trim() || isTyping}
                 className="px-6 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-xl transition-colors flex items-center gap-2"
               >
                 <Send className="w-5 h-5" />

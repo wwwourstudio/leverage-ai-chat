@@ -88,40 +88,43 @@ Each welcome message explicitly mentions the analysis type and provides context-
 - ADP tracking for fantasy drafts
 - Prediction market probability modeling
 
-## Documentation
+## 📚 Documentation
 
-**[📚 Complete Documentation Index](./DOCUMENTATION_INDEX.md)** - Full guide to all documentation
+**[→ COMPLETE_DOCUMENTATION.md](./COMPLETE_DOCUMENTATION.md)** - **Single consolidated documentation file**
 
-### Core Documentation
+All project documentation has been merged into one comprehensive guide covering:
 
-**Getting Started:**
-- **[QUICK_START_GUIDE.md](./QUICK_START_GUIDE.md)** - 3-step setup guide
-- **[ENV_CONFIGURATION.md](./ENV_CONFIGURATION.md)** - Environment variables
-- **[INTEGRATION_SETUP.md](./INTEGRATION_SETUP.md)** - External services setup
+- ✅ Quick Start (3-step setup)
+- ✅ Environment Configuration  
+- ✅ Integration Setup (Supabase, Grok, The Odds API)
+- ✅ Core Features (Real-time odds, AI analysis, dynamic config)
+- ✅ System Architecture & Validation
+- ✅ Troubleshooting & Common Issues
+- ✅ API Reference
+- ✅ Development Guide
+- ✅ Migration & Updates
 
-**Key Features:**
-- **[REALTIME_ODDS_INTEGRATION.md](./REALTIME_ODDS_INTEGRATION.md)** - Live sports odds (100% live data)
-- **[DYNAMIC_CONFIGURATION_SYSTEM.md](./DYNAMIC_CONFIGURATION_SYSTEM.md)** - Database-driven config
-- **[AI_MODEL_DOCUMENTATION.md](./AI_MODEL_DOCUMENTATION.md)** - Grok-3 AI integration
+### Quick Links
 
-**System Validation:**
-- **[SUPABASE_VALIDATION_SYSTEM.md](./SUPABASE_VALIDATION_SYSTEM.md)** - Database error prevention
-- **[SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md)** - Sports API validation
-- **[JSON_VALIDATION_IMPROVEMENTS.md](./JSON_VALIDATION_IMPROVEMENTS.md)** - Safe JSON parsing
-
-**Support:**
-- **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** - Common issues and solutions
+| Section | Jump To |
+|---------|---------|
+| New Users | [Quick Start](./COMPLETE_DOCUMENTATION.md#quick-start) |
+| Configuration | [Environment Setup](./COMPLETE_DOCUMENTATION.md#environment-configuration) |
+| Features | [Core Features](./COMPLETE_DOCUMENTATION.md#core-features) |
+| Issues | [Troubleshooting](./COMPLETE_DOCUMENTATION.md#troubleshooting) |
+| API Docs | [API Reference](./COMPLETE_DOCUMENTATION.md#api-reference) |
+| Development | [Dev Guide](./COMPLETE_DOCUMENTATION.md#development-guide) |
 
 ## Common Issues
 
-Having trouble? Check **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** for detailed solutions.
+Having trouble? See the **[Troubleshooting Section](./COMPLETE_DOCUMENTATION.md#troubleshooting)** in the complete documentation.
 
-Quick fixes for common problems:
+Quick fixes:
 
-| Issue | Solution | Documentation |
-|-------|----------|---------------|
-| JSON parsing errors | Automatically handled with safe parsing | [JSON_VALIDATION_IMPROVEMENTS.md](./JSON_VALIDATION_IMPROVEMENTS.md) |
-| Supabase query errors | Validation with graceful fallbacks | [SUPABASE_VALIDATION_SYSTEM.md](./SUPABASE_VALIDATION_SYSTEM.md) |
-| 404 "Unknown sport" | Sport code validation and correction | [SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md) |
-| API not configured | Check environment variables | [ENV_CONFIGURATION.md](./ENV_CONFIGURATION.md) |
-| Missing database tables | Run migration scripts | [DYNAMIC_CONFIGURATION_SYSTEM.md](./DYNAMIC_CONFIGURATION_SYSTEM.md) |
+| Issue | Solution |
+|-------|----------|
+| JSON parsing errors | Automatically handled with safe parsing |
+| Supabase query errors | Validation with graceful fallbacks |
+| 404 "Unknown sport" | Sport code auto-correction |
+| API not configured | Check environment variables at `/api/health` |
+| Missing database tables | Run migration scripts in `/supabase/migrations/` |

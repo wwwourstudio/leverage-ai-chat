@@ -39,6 +39,11 @@ export const EXTERNAL_APIS = {
       USER_INSIGHTS: 'user_insights',
     },
   },
+  WEATHER: {
+    BASE_URL: 'https://api.open-meteo.com/v1',
+    FORECAST_ENDPOINT: '/forecast',
+    DEFAULT_PARAMS: 'temperature_2m,precipitation,windspeed_10m,weathercode',
+  },
 } as const;
 
 // Sports Mapping
@@ -75,6 +80,9 @@ export const CARD_TYPES = {
   KALSHI_INSIGHT: 'kalshi-insight',
   KALSHI_MARKET: 'kalshi-market',
   KALSHI_WEATHER: 'kalshi-weather',
+  WEATHER_IMPACT: 'weather-impact',
+  WEATHER_GAME: 'weather-game',
+  WEATHER_FORECAST: 'weather-forecast',
 } as const;
 
 // Card Status Values
@@ -87,6 +95,9 @@ export const CARD_STATUS = {
   SLEEPER: 'sleeper',
   OPPORTUNITY: 'opportunity',
   EDGE: 'edge',
+  ALERT: 'alert',
+  FAVORABLE: 'favorable',
+  NEUTRAL: 'neutral',
 } as const;
 
 // Source Types

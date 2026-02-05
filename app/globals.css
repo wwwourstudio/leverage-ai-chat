@@ -37,6 +37,13 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  
+  /* Category-specific accents for data cards */
+  --betting-accent: oklch(0.7 0.2 40);
+  --dfs-accent: oklch(0.65 0.25 300);
+  --fantasy-accent: oklch(0.7 0.22 150);
+  --kalshi-accent: oklch(0.7 0.18 200);
+  --weather-accent: oklch(0.68 0.15 240);
 }
 
 .dark {
@@ -72,6 +79,13 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+  
+  /* Enhanced category-specific accents for dark mode */
+  --betting-accent: oklch(0.72 0.22 35);
+  --dfs-accent: oklch(0.68 0.27 290);
+  --fantasy-accent: oklch(0.72 0.24 145);
+  --kalshi-accent: oklch(0.72 0.2 195);
+  --weather-accent: oklch(0.7 0.17 235);
 }
 
 @theme inline {

@@ -64,6 +64,7 @@ export const CARD_TYPES = {
   LIVE_ODDS: 'live-odds',
   PLAYER_PROP: 'player-prop',
   MONEYLINE_VALUE: 'moneyline-value',
+  TOTALS_VALUE: 'totals-value',
   DFS_STRATEGY: 'dfs-strategy',
   DFS_LINEUP: 'dfs-lineup',
   DFS_VALUE: 'dfs-value',

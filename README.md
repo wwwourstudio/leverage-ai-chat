@@ -10,6 +10,15 @@
 This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
 Any changes you make to your deployed app will be automatically pushed to this repository from [v0.app](https://v0.app).
 
+## Key Features
+
+✅ **Real-Time Sports Odds** - Live data from The Odds API with multi-bookmaker comparison  
+✅ **AI-Powered Analysis** - Grok-3 integration for intelligent betting insights  
+✅ **Market Efficiency Detection** - Automatic identification of value opportunities  
+✅ **Dynamic Configuration** - All settings stored in Supabase, no code changes needed  
+✅ **Smart Validation** - Comprehensive error handling with graceful fallbacks  
+✅ **100% Live Data** - Zero hardcoded values, everything fetched dynamically
+
 ## Deployment
 
 Your project is live at:
@@ -81,7 +90,8 @@ Each welcome message explicitly mentions the analysis type and provides context-
 
 ## Documentation
 
-- **[DYNAMIC_CONFIGURATION_SYSTEM.md](./DYNAMIC_CONFIGURATION_SYSTEM.md)** - 🆕 Dynamic config from Supabase (no more hardcoded values)
+- **[REALTIME_ODDS_INTEGRATION.md](./REALTIME_ODDS_INTEGRATION.md)** - 🔥 **NEW** Real-time odds from The Odds API (100% live data)
+- **[DYNAMIC_CONFIGURATION_SYSTEM.md](./DYNAMIC_CONFIGURATION_SYSTEM.md)** - Dynamic config from Supabase (no more hardcoded values)
 - **[JSON_VALIDATION_IMPROVEMENTS.md](./JSON_VALIDATION_IMPROVEMENTS.md)** - JSON parsing error fixes and safe response handling
 - **[SUPABASE_VALIDATION_SYSTEM.md](./SUPABASE_VALIDATION_SYSTEM.md)** - Database validation and error prevention
 - **[SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md)** - Sports validation and 404 error prevention

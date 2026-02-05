@@ -19,6 +19,7 @@ import {
   type OddsEvent,
   type TransformedOdds
 } from '@/lib/odds-transformer';
+import { enrichCardsWithWeather } from '@/lib/weather-service';
 
 export const runtime = 'edge';
 
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
       limit
     });
     
-    const cards = await generateDynamicCards({
+    let cards = await generateDynamicCards({
       category,
       sport,
       oddsData: liveOddsData,
@@ -109,6 +110,20 @@ export async function POST(req: NextRequest) {
     });
 
     console.log(`${LOG_PREFIXES.API} ✓ Generated ${cards.length} cards`);
+    
+    // Enrich cards with weather data for NFL/MLB games
+    if (cards.length > 0 && (sport?.includes('nfl') || sport?.includes('mlb'))) {
+      console.log(`${LOG_PREFIXES.API} → Enriching cards with weather data...`);
+      try {
+        const enrichedCards = await enrichCardsWithWeather(cards);
+        if (enrichedCards.length > cards.length) {
+          console.log(`${LOG_PREFIXES.API} ✓ Added ${enrichedCards.length - cards.length} weather cards`);
+          cards = enrichedCards;
+        }
+      } catch (error) {
+        console.error(`${LOG_PREFIXES.API} Weather enrichment failed:`, error);
+      }
+    }
     
     if (cards.length === 0) {
       console.log(`${LOG_PREFIXES.API} ⚠ WARNING: Zero cards generated!`);

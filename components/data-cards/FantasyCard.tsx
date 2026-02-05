@@ -51,33 +51,35 @@ export function FantasyCard({
       isLoading={isLoading}
       error={error}
     >
-      <div className="space-y-4">
+      <div className="space-y-3.5">
         {/* Focus section */}
         {focus && (
-          <div className="pb-3 border-b border-gray-700/40">
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Focus</div>
+          <div className="pb-3.5 border-b border-gray-700/30">
+            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2.5 opacity-90">Focus</div>
             <div className="text-sm font-medium text-gray-200 leading-relaxed">{focus}</div>
           </div>
         )}
         
         {/* Target sections */}
         {targetPlayers && (
-          <div className="pb-2">
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Target players</div>
-            <div className="text-sm font-medium text-white">{targetPlayers}</div>
+          <div className="pb-2.5">
+            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 opacity-90">Target players</div>
+            <div className="text-[13px] font-semibold text-white leading-snug">{targetPlayers}</div>
           </div>
         )}
         
         {targetPosition && (
-          <div className="pb-2">
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Target position</div>
-            <div className="text-sm font-medium text-white">{targetPosition}</div>
+          <div className="pb-2.5">
+            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 opacity-90">Target position</div>
+            <div className="text-[13px] font-semibold text-white leading-snug">{targetPosition}</div>
           </div>
         )}
         
         {/* Remaining data */}
         {Object.keys(remainingData).length > 0 && (
-          <DataGrid data={remainingData} empty="" />
+          <div className="pt-2">
+            <DataGrid data={remainingData} empty="" />
+          </div>
         )}
       </div>
     </BaseCard>

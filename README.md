@@ -90,25 +90,38 @@ Each welcome message explicitly mentions the analysis type and provides context-
 
 ## Documentation
 
-- **[REALTIME_ODDS_INTEGRATION.md](./REALTIME_ODDS_INTEGRATION.md)** - 🔥 **NEW** Real-time odds from The Odds API (100% live data)
-- **[DYNAMIC_CONFIGURATION_SYSTEM.md](./DYNAMIC_CONFIGURATION_SYSTEM.md)** - Dynamic config from Supabase (no more hardcoded values)
-- **[JSON_VALIDATION_IMPROVEMENTS.md](./JSON_VALIDATION_IMPROVEMENTS.md)** - JSON parsing error fixes and safe response handling
-- **[SUPABASE_VALIDATION_SYSTEM.md](./SUPABASE_VALIDATION_SYSTEM.md)** - Database validation and error prevention
-- **[SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md)** - Sports validation and 404 error prevention
-- **[AI_MODEL_DOCUMENTATION.md](./AI_MODEL_DOCUMENTATION.md)** - Complete Grok-3 AI model information
-- **[API_FIX_SUMMARY.md](./API_FIX_SUMMARY.md)** - Latest fixes: Grok model update & error handling
-- **[ENV_CONFIGURATION.md](./ENV_CONFIGURATION.md)** - Complete environment setup guide
+**[📚 Complete Documentation Index](./DOCUMENTATION_INDEX.md)** - Full guide to all documentation
+
+### Core Documentation
+
+**Getting Started:**
+- **[QUICK_START_GUIDE.md](./QUICK_START_GUIDE.md)** - 3-step setup guide
+- **[ENV_CONFIGURATION.md](./ENV_CONFIGURATION.md)** - Environment variables
+- **[INTEGRATION_SETUP.md](./INTEGRATION_SETUP.md)** - External services setup
+
+**Key Features:**
+- **[REALTIME_ODDS_INTEGRATION.md](./REALTIME_ODDS_INTEGRATION.md)** - Live sports odds (100% live data)
+- **[DYNAMIC_CONFIGURATION_SYSTEM.md](./DYNAMIC_CONFIGURATION_SYSTEM.md)** - Database-driven config
+- **[AI_MODEL_DOCUMENTATION.md](./AI_MODEL_DOCUMENTATION.md)** - Grok-3 AI integration
+
+**System Validation:**
+- **[SUPABASE_VALIDATION_SYSTEM.md](./SUPABASE_VALIDATION_SYSTEM.md)** - Database error prevention
+- **[SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md)** - Sports API validation
+- **[JSON_VALIDATION_IMPROVEMENTS.md](./JSON_VALIDATION_IMPROVEMENTS.md)** - Safe JSON parsing
+
+**Support:**
 - **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** - Common issues and solutions
-- **[FIXES_APPLIED.md](./FIXES_APPLIED.md)** - Recent bug fixes and improvements
-- **[INTEGRATION_SETUP.md](./INTEGRATION_SETUP.md)** - Integration setup instructions
-- **[REAL_DATA_INTEGRATION.md](./REAL_DATA_INTEGRATION.md)** - Real-time data integration guide
 
 ## Common Issues
 
-Having trouble? Check **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** for solutions to common problems including:
-- **JSON parsing errors** - See **[JSON_VALIDATION_IMPROVEMENTS.md](./JSON_VALIDATION_IMPROVEMENTS.md)** - Now automatically handled
-- **Supabase query errors** - See **[SUPABASE_VALIDATION_SYSTEM.md](./SUPABASE_VALIDATION_SYSTEM.md)**
-- **404 "Unknown sport" errors** - See **[SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md)**
-- API configuration issues
-- Database connection problems
-- Environment variable setup
+Having trouble? Check **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** for detailed solutions.
+
+Quick fixes for common problems:
+
+| Issue | Solution | Documentation |
+|-------|----------|---------------|
+| JSON parsing errors | Automatically handled with safe parsing | [JSON_VALIDATION_IMPROVEMENTS.md](./JSON_VALIDATION_IMPROVEMENTS.md) |
+| Supabase query errors | Validation with graceful fallbacks | [SUPABASE_VALIDATION_SYSTEM.md](./SUPABASE_VALIDATION_SYSTEM.md) |
+| 404 "Unknown sport" | Sport code validation and correction | [SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md) |
+| API not configured | Check environment variables | [ENV_CONFIGURATION.md](./ENV_CONFIGURATION.md) |
+| Missing database tables | Run migration scripts | [DYNAMIC_CONFIGURATION_SYSTEM.md](./DYNAMIC_CONFIGURATION_SYSTEM.md) |

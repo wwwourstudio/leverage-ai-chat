@@ -977,14 +977,27 @@ export default function UnifiedAIPlatform() {
         responseCards = await selectRelevantCards(userMessage, context);
       }
 
-      const newMessage: Message = {
-        role: 'assistant',
-        content: enhancedContent,
-        timestamp: new Date(),
-        cards: responseCards,
-        confidence: analysisResult.confidence || 85,
-        sources: analysisResult.sources || buildSourcesList(oddsData),
-        modelUsed: analysisResult.model || 'Grok-3',
+        // Validate and sanitize cards before adding to message
+        const validatedCards = Array.isArray(responseCards) 
+          ? responseCards.filter(card => {
+              if (!card || typeof card !== 'object' || !card.title || !card.type) {
+                console.warn('[v0] Filtering out invalid card:', card);
+                return false;
+              }
+              return true;
+            })
+          : [];
+        
+        console.log('[v0] Adding message with', validatedCards.length, 'validated cards');
+        
+        const newMessage: Message = {
+          role: 'assistant',
+          content: enhancedContent,
+          timestamp: new Date(),
+          cards: validatedCards,
+          confidence: analysisResult.confidence || 85,
+          sources: analysisResult.sources || buildSourcesList(oddsData),
+          modelUsed: analysisResult.model || 'Grok-3',
         processingTime,
         trustMetrics: analysisResult.trustMetrics
       };
@@ -1121,6 +1134,19 @@ export default function UnifiedAIPlatform() {
   };
 
   const convertToInsightCard = (dynamicCard: DynamicCard): InsightCard => {
+    console.log('[v0] Converting dynamic card:', dynamicCard.type, dynamicCard.title);
+    
+    // Validate required fields
+    if (!dynamicCard || typeof dynamicCard !== 'object') {
+      console.error('[v0] Invalid card: not an object', dynamicCard);
+      throw new Error('Invalid card data: must be an object');
+    }
+    
+    if (!dynamicCard.type || !dynamicCard.title) {
+      console.error('[v0] Invalid card: missing required fields', dynamicCard);
+      throw new Error('Invalid card data: missing type or title');
+    }
+    
     // Map icon string to actual icon component
     const iconMap: Record<string, any> = {
       'Zap': Zap,
@@ -1135,16 +1161,20 @@ export default function UnifiedAIPlatform() {
       'Sparkles': Sparkles
     };
     
-    return {
-      type: dynamicCard.type,
-      title: dynamicCard.title,
+    // Ensure all required fields have valid values
+    const validatedCard: InsightCard = {
+      type: String(dynamicCard.type || 'unknown'),
+      title: String(dynamicCard.title || 'Untitled Card'),
       icon: iconMap[dynamicCard.icon] || Zap,
-      category: dynamicCard.category,
-      subcategory: dynamicCard.subcategory,
-      gradient: dynamicCard.gradient,
-      data: dynamicCard.data,
-      status: dynamicCard.status
+      category: String(dynamicCard.category || 'General'),
+      subcategory: String(dynamicCard.subcategory || 'Info'),
+      gradient: String(dynamicCard.gradient || 'from-blue-500 to-purple-500'),
+      data: dynamicCard.data && typeof dynamicCard.data === 'object' ? dynamicCard.data : {},
+      status: String(dynamicCard.status || 'active')
     };
+    
+    console.log('[v0] Validated card:', validatedCard.type, validatedCard.title);
+    return validatedCard;
   };
 
   const buildSourcesList = (oddsData: any): Array<{ name: string; type: 'database' | 'api' | 'model' | 'cache'; reliability: number; url?: string }> => {
@@ -1514,43 +1544,62 @@ export default function UnifiedAIPlatform() {
   };
 
   const renderInsightCard = (card: InsightCard, index: number) => {
-    const Icon = card.icon;
-    const badge = getStatusBadge(card.status);
+    // Validate card data before rendering
+    if (!card || typeof card !== 'object') {
+      console.error('[v0] Invalid card at index', index, card);
+      return null;
+    }
+    
+    // Ensure required fields exist with fallbacks
+    const safeCard = {
+      icon: card.icon || Zap,
+      status: card.status || 'active',
+      gradient: card.gradient || 'from-blue-500 to-purple-500',
+      category: card.category || 'General',
+      subcategory: card.subcategory || 'Info',
+      title: card.title || 'Untitled Card',
+      data: card.data && typeof card.data === 'object' ? card.data : {}
+    };
+    
+    const Icon = safeCard.icon;
+    const badge = getStatusBadge(safeCard.status);
     const BadgeIcon = badge.icon;
-
+    
+    console.log('[v0] Rendering card:', safeCard.title, 'with', Object.keys(safeCard.data).length, 'data fields');
+    
     return (
-      <div 
-        key={index} 
+      <div
+        key={index}
         className="group relative bg-gradient-to-br from-gray-900 via-gray-850 to-gray-900 rounded-2xl p-5 border border-gray-700/50 hover:border-gray-600 transition-all duration-500 shadow-xl hover:shadow-2xl hover:scale-[1.02] overflow-hidden"
       >
-        <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-500`}></div>
+        <div className={`absolute inset-0 bg-gradient-to-br ${safeCard.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-500`}></div>
         
         <div className="relative flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl bg-gradient-to-br ${card.gradient} shadow-lg`}>
+            <div className={`p-2.5 rounded-xl bg-gradient-to-br ${safeCard.gradient} shadow-lg`}>
               <Icon className="w-5 h-5 text-white" />
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{card.category} • {card.subcategory}</span>
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{safeCard.category} • {safeCard.subcategory}</span>
                 <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${badge.bg} ${badge.border}`}>
                   <BadgeIcon className={`w-3 h-3 ${badge.text}`} />
                   <span className={`text-xs font-bold ${badge.text}`}>{badge.label}</span>
                 </div>
               </div>
-              <h3 className="text-sm font-bold text-white">{card.title}</h3>
+              <h3 className="text-sm font-bold text-white">{safeCard.title}</h3>
             </div>
           </div>
         </div>
-
+        
         <div className="relative space-y-2.5">
-          {Object.entries(card.data).map(([key, value], i) => (
+          {Object.entries(safeCard.data).map(([key, value], i) => (
             <div key={i} className="flex items-start justify-between group/item">
               <span className="text-xs font-medium text-gray-400 capitalize flex-shrink-0 mr-3">
                 {key.replace(/([A-Z])/g, ' $1').trim()}:
               </span>
               <span className="text-sm font-bold text-white group-hover/item:text-blue-400 transition-colors text-right">
-                {value}
+                {String(value || 'N/A')}
               </span>
             </div>
           ))}

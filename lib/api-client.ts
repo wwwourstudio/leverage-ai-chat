@@ -100,6 +100,10 @@ export async function getAIAnalysis(
   }>
 ): Promise<AnalysisResponse> {
   try {
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 28000); // 28 second client timeout
+    
     const response = await fetch('/api/analyze', {
       method: 'POST',
       headers: {
@@ -110,7 +114,8 @@ export async function getAIAnalysis(
         context,
         attachments,
       }),
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId));
 
     if (!response.ok) {
       const error = await response.json();
@@ -119,6 +124,12 @@ export async function getAIAnalysis(
 
     return await response.json();
   } catch (error: any) {
+    // Handle timeout errors
+    if (error.name === 'AbortError') {
+      console.error('[API Client] Request timeout getting AI analysis');
+      throw new Error('Analysis request timed out. Please try again with a simpler query.');
+    }
+    
     console.error('[API Client] Error getting AI analysis:', error);
     throw error;
   }

@@ -66,14 +66,18 @@ export function WeatherCard({
       isLoading={isLoading}
       error={error}
     >
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {data.location && <DataRow label="Location" value={data.location} highlight />}
         {data.temperature && <DataRow label="Temperature" value={data.temperature} />}
         {data.condition && <DataRow label="Condition" value={data.condition} />}
         {data.wind && <DataRow label="Wind" value={data.wind} />}
         {data.humidity && <DataRow label="Humidity" value={data.humidity} />}
         {data.precipitation && <DataRow label="Precipitation" value={data.precipitation} />}
-        {data.gameImpact && <DataRow label="Game Impact" value={data.gameImpact} highlight />}
+        {data.gameImpact && (
+          <div className="pt-2 mt-2 border-t border-gray-700/40">
+            <DataRow label="Game Impact" value={data.gameImpact} highlight />
+          </div>
+        )}
       </div>
     </BaseCard>
   );

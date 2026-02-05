@@ -67,7 +67,7 @@ export function BettingCard({
       isLoading={isLoading}
       error={error}
     >
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {data.matchup && <DataRow label="Matchup" value={data.matchup} highlight />}
         {data.team && <DataRow label="Team" value={data.team} highlight />}
         {data.bestLine && <DataRow label="Best Line" value={data.bestLine} />}

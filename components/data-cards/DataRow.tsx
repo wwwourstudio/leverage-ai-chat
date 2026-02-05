@@ -30,13 +30,13 @@ export function DataRow({ label, value, highlight, trend }: DataRowProps) {
   }
 
   return (
-    <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors group/item">
+    <div className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-all duration-200 group/item">
       <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex-shrink-0 mr-4">
         {formattedLabel}
       </span>
-      <span className={`text-sm font-bold text-right flex items-center gap-1 ${
+      <span className={`text-sm font-bold text-right flex items-center gap-1.5 ${
         highlight || isMetric ? 'text-white' : 'text-gray-300'
-      } group-hover/item:text-blue-400 transition-colors`}>
+      } group-hover/item:text-blue-300 transition-colors`}>
         {trendIcon}
         {String(value || 'N/A')}
       </span>

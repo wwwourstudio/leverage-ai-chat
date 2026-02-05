@@ -64,7 +64,7 @@ export function BaseCard({
   const StatusIcon = status?.icon;
 
   return (
-    <div className={`group relative bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/60 hover:border-gray-500/80 transition-all duration-500 shadow-2xl hover:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] hover:scale-[1.02] overflow-hidden ${className}`}>
+    <div className={`group relative bg-gradient-to-br from-gray-900/98 via-gray-850/98 to-gray-900/98 backdrop-blur-xl rounded-2xl p-5 border border-gray-700/50 hover:border-gray-500/70 transition-all duration-300 shadow-xl hover:shadow-2xl hover:shadow-gray-950/50 overflow-hidden ${className}`}>
       {/* Animated gradient overlay */}
       <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-700`} />
       
@@ -95,7 +95,7 @@ export function BaseCard({
       </div>
       
       {/* Content area */}
-      <div className="relative">
+      <div className="relative mt-1">
         {children}
       </div>
 

@@ -36,9 +36,12 @@ export function FantasyCard({
 }: FantasyCardProps) {
   const statusBadge = statusMap[status] || statusMap.value;
 
+  // Extract focus and other structured data
+  const { focus, targetPlayers, targetPosition, ...remainingData } = data as any;
+
   return (
     <BaseCard
-      icon={TrendingUp}
+      icon={Trophy}
       title={title}
       category={category}
       subcategory={subcategory}
@@ -48,7 +51,35 @@ export function FantasyCard({
       isLoading={isLoading}
       error={error}
     >
-      <DataGrid data={data} empty="No fantasy insights available" />
+      <div className="space-y-4">
+        {/* Focus section */}
+        {focus && (
+          <div className="pb-3 border-b border-gray-700/40">
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Focus</div>
+            <div className="text-sm font-medium text-gray-200 leading-relaxed">{focus}</div>
+          </div>
+        )}
+        
+        {/* Target sections */}
+        {targetPlayers && (
+          <div className="pb-2">
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Target players</div>
+            <div className="text-sm font-medium text-white">{targetPlayers}</div>
+          </div>
+        )}
+        
+        {targetPosition && (
+          <div className="pb-2">
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Target position</div>
+            <div className="text-sm font-medium text-white">{targetPosition}</div>
+          </div>
+        )}
+        
+        {/* Remaining data */}
+        {Object.keys(remainingData).length > 0 && (
+          <DataGrid data={remainingData} empty="" />
+        )}
+      </div>
     </BaseCard>
   );
 }

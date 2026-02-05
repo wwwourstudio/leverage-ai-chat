@@ -46,6 +46,33 @@ const CACHE_DURATION = {
 const cache = new Map<string, { data: any; timestamp: number }>();
 
 /**
+ * Safely parse JSON with error handling
+ */
+async function safeJsonParse(response: Response): Promise<any> {
+  try {
+    // First, get the text
+    const text = await response.text();
+    
+    // Check if it's empty
+    if (!text || text.trim().length === 0) {
+      throw new Error('Empty response body');
+    }
+    
+    // Try to parse as JSON
+    try {
+      return JSON.parse(text);
+    } catch (parseError) {
+      // Log the first 200 characters of the response for debugging
+      console.log(`${LOG_PREFIXES.DATA_SERVICE} JSON parse error. Response starts with:`, text.substring(0, 200));
+      throw new Error(`Invalid JSON: ${parseError instanceof Error ? parseError.message : 'Parse failed'}`);
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`Response parsing failed: ${errorMessage}`);
+  }
+}
+
+/**
  * Fetch dynamic cards based on context
  */
 export async function fetchDynamicCards(params: {
@@ -54,40 +81,78 @@ export async function fetchDynamicCards(params: {
   userContext?: any;
   limit?: number;
 }): Promise<DynamicCard[]> {
+  console.log(`${LOG_PREFIXES.DATA_SERVICE} ========================================`);
+  console.log(`${LOG_PREFIXES.DATA_SERVICE} FETCHING DYNAMIC CARDS`);
+  console.log(`${LOG_PREFIXES.DATA_SERVICE} Parameters:`, JSON.stringify(params, null, 2));
+  
   const cacheKey = `cards:${JSON.stringify(params)}`;
   const cached = cache.get(cacheKey);
 
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION.CARDS) {
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Returning cached cards`);
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} ✓ Returning ${cached.data.length} cached cards`);
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Cache age: ${Math.round((Date.now() - cached.timestamp) / 1000)}s`);
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} ========================================`);
     return cached.data;
   }
 
+  console.log(`${LOG_PREFIXES.DATA_SERVICE} Cache miss or expired - fetching fresh data`);
+  console.log(`${LOG_PREFIXES.DATA_SERVICE} API Endpoint: ${API_ENDPOINTS.CARDS}`);
+
   try {
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Fetching fresh cards from API`);
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} → Making POST request...`);
+    const requestBody = JSON.stringify(params);
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Request body: ${requestBody}`);
+    
     const response = await fetch(API_ENDPOINTS.CARDS, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params)
+      body: requestBody
     });
 
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} ← Response status: ${response.status} ${response.statusText}`);
+
     if (!response.ok) {
-      throw new Error(`Cards API returned ${response.status}`);
+      const errorText = await response.text();
+      console.log(`${LOG_PREFIXES.DATA_SERVICE} ✗ API Error Response:`, errorText.substring(0, 500));
+      throw new Error(`Cards API returned ${response.status}: ${errorText.substring(0, 100)}`);
     }
 
     // Validate JSON response
     const contentType = response.headers.get('content-type');
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Response Content-Type: ${contentType}`);
+    
     if (!contentType || !contentType.includes('application/json')) {
       throw new Error('Cards API returned non-JSON response');
     }
 
-    const result = await response.json();
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} → Parsing JSON response...`);
+    const result = await safeJsonParse(response);
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} ✓ JSON parsed successfully`);
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Result structure:`, Object.keys(result));
+    
     const cards = Array.isArray(result.cards) ? result.cards : [];
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} ✓ Extracted ${cards.length} cards from response`);
+    
+    if (cards.length > 0) {
+      console.log(`${LOG_PREFIXES.DATA_SERVICE} Card types:`, cards.map((c: DynamicCard) => c.type));
+      console.log(`${LOG_PREFIXES.DATA_SERVICE} Card categories:`, cards.map((c: DynamicCard) => c.category));
+      console.log(`${LOG_PREFIXES.DATA_SERVICE} Sample card:`, JSON.stringify(cards[0], null, 2));
+    } else {
+      console.log(`${LOG_PREFIXES.DATA_SERVICE} ⚠ WARNING: Zero cards returned!`);
+      console.log(`${LOG_PREFIXES.DATA_SERVICE} Full API response:`, JSON.stringify(result, null, 2));
+    }
 
     cache.set(cacheKey, { data: cards, timestamp: Date.now() });
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} ✓ Cached ${cards.length} cards`);
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} ========================================`);
     return cards;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Error fetching cards:`, errorMessage);
+    const errorStack = error instanceof Error ? error.stack : 'No stack trace';
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} ✗ FETCH ERROR:`, errorMessage);
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Error stack:`, errorStack);
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Returning empty array as fallback`);
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} ========================================`);
     return [];
   }
 }
@@ -120,7 +185,7 @@ export async function fetchUserInsights(): Promise<UserInsights> {
       throw new Error('Insights API returned non-JSON response');
     }
 
-    const result = await response.json();
+    const result = await safeJsonParse(response);
     
     if (!result || typeof result !== 'object') {
       throw new Error('Invalid response format from insights API');
@@ -183,7 +248,7 @@ export async function fetchLiveOdds(sport: string, marketType: string = 'h2h') {
       throw new Error('Odds API returned non-JSON response');
     }
 
-    const result = await response.json();
+    const result = await safeJsonParse(response);
     cache.set(cacheKey, { data: result, timestamp: Date.now() });
     return result;
   } catch (error) {

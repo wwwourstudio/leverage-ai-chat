@@ -64,6 +64,7 @@ export const CARD_TYPES = {
   LIVE_ODDS: 'live-odds',
   PLAYER_PROP: 'player-prop',
   MONEYLINE_VALUE: 'moneyline-value',
+  TOTALS_VALUE: 'totals-value',
   DFS_STRATEGY: 'dfs-strategy',
   DFS_LINEUP: 'dfs-lineup',
   DFS_VALUE: 'dfs-value',
@@ -217,6 +218,7 @@ export const LOG_PREFIXES = {
   HEALTH: '[Health]',
   DATA_SERVICE: '[DataService]',
   CONFIG: '[Config]',
+  DATABASE: '[Database]',
 } as const;
 
 // System Prompt Template

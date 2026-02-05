@@ -10,6 +10,15 @@
 This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
 Any changes you make to your deployed app will be automatically pushed to this repository from [v0.app](https://v0.app).
 
+## Key Features
+
+✅ **Real-Time Sports Odds** - Live data from The Odds API with multi-bookmaker comparison  
+✅ **AI-Powered Analysis** - Grok-3 integration for intelligent betting insights  
+✅ **Market Efficiency Detection** - Automatic identification of value opportunities  
+✅ **Dynamic Configuration** - All settings stored in Supabase, no code changes needed  
+✅ **Smart Validation** - Comprehensive error handling with graceful fallbacks  
+✅ **100% Live Data** - Zero hardcoded values, everything fetched dynamically
+
 ## Deployment
 
 Your project is live at:
@@ -79,25 +88,43 @@ Each welcome message explicitly mentions the analysis type and provides context-
 - ADP tracking for fantasy drafts
 - Prediction market probability modeling
 
-## Documentation
+## 📚 Documentation
 
-- **[JSON_ERROR_HANDLING.md](./JSON_ERROR_HANDLING.md)** - JSON parsing error prevention and safe data validation
-- **[SUPABASE_VALIDATION_SYSTEM.md](./SUPABASE_VALIDATION_SYSTEM.md)** - Database validation and error handling
-- **[SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md)** - Sports validation and 404 error prevention
-- **[AI_MODEL_DOCUMENTATION.md](./AI_MODEL_DOCUMENTATION.md)** - Complete Grok-3 AI model information
-- **[API_FIX_SUMMARY.md](./API_FIX_SUMMARY.md)** - Latest fixes: Grok model update & error handling
-- **[ENV_CONFIGURATION.md](./ENV_CONFIGURATION.md)** - Complete environment setup guide
-- **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** - Common issues and solutions
-- **[FIXES_APPLIED.md](./FIXES_APPLIED.md)** - Recent bug fixes and improvements
-- **[INTEGRATION_SETUP.md](./INTEGRATION_SETUP.md)** - Integration setup instructions
-- **[REAL_DATA_INTEGRATION.md](./REAL_DATA_INTEGRATION.md)** - Real-time data integration guide
+**[→ COMPLETE_DOCUMENTATION.md](./COMPLETE_DOCUMENTATION.md)** - **Single consolidated documentation file**
+
+All project documentation has been merged into one comprehensive guide covering:
+
+- ✅ Quick Start (3-step setup)
+- ✅ Environment Configuration  
+- ✅ Integration Setup (Supabase, Grok, The Odds API)
+- ✅ Core Features (Real-time odds, AI analysis, dynamic config)
+- ✅ System Architecture & Validation
+- ✅ Troubleshooting & Common Issues
+- ✅ API Reference
+- ✅ Development Guide
+- ✅ Migration & Updates
+
+### Quick Links
+
+| Section | Jump To |
+|---------|---------|
+| New Users | [Quick Start](./COMPLETE_DOCUMENTATION.md#quick-start) |
+| Configuration | [Environment Setup](./COMPLETE_DOCUMENTATION.md#environment-configuration) |
+| Features | [Core Features](./COMPLETE_DOCUMENTATION.md#core-features) |
+| Issues | [Troubleshooting](./COMPLETE_DOCUMENTATION.md#troubleshooting) |
+| API Docs | [API Reference](./COMPLETE_DOCUMENTATION.md#api-reference) |
+| Development | [Dev Guide](./COMPLETE_DOCUMENTATION.md#development-guide) |
 
 ## Common Issues
 
-Having trouble? Check **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** for solutions to common problems including:
-- **Supabase query errors** - See **[SUPABASE_VALIDATION_SYSTEM.md](./SUPABASE_VALIDATION_SYSTEM.md)**
-- **JSON parsing errors** - Database validation handles this automatically
-- API configuration issues
-- Database connection problems
-- Environment variable setup
-- **404 "Unknown sport" errors** - See **[SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md)**
+Having trouble? See the **[Troubleshooting Section](./COMPLETE_DOCUMENTATION.md#troubleshooting)** in the complete documentation.
+
+Quick fixes:
+
+| Issue | Solution |
+|-------|----------|
+| JSON parsing errors | Automatically handled with safe parsing |
+| Supabase query errors | Validation with graceful fallbacks |
+| 404 "Unknown sport" | Sport code auto-correction |
+| API not configured | Check environment variables at `/api/health` |
+| Missing database tables | Run migration scripts in `/supabase/migrations/` |

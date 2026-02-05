@@ -13,6 +13,7 @@ import {
   APP_TABLES,
   SCHEMA_DEFINITIONS
 } from '@/lib/supabase-validator';
+import { getConfigs, getUserProfile } from '@/lib/dynamic-config';
 
 export const runtime = 'edge';
 
@@ -55,12 +56,13 @@ export async function GET(req: NextRequest) {
     );
 
     if (!queryResult.success || queryResult.source !== 'database') {
-      console.log(`${LOG_PREFIXES.API} Using default insights: ${queryResult.error || 'No database data'}`);
+      const errorMsg = queryResult.error || 'No database data';
+      console.log(`${LOG_PREFIXES.API} Using default insights -`, errorMsg);
       return NextResponse.json({
         success: true,
         insights: getDefaultInsights(),
         dataSource: queryResult.source,
-        message: queryResult.error || 'Table not yet created'
+        message: typeof errorMsg === 'string' ? errorMsg : 'Table not yet created'
       });
     }
 
@@ -77,7 +79,9 @@ export async function GET(req: NextRequest) {
     }
 
     // Calculate real metrics from validated predictions
-    const insights = calculateInsightsFromPredictions(schemaValidation.validRecords);
+    // Extract userId from request if available (from auth headers, etc.)
+    const userId = req.headers.get('x-user-id') || undefined;
+    const insights = await calculateInsightsFromPredictions(schemaValidation.validRecords, userId);
 
     return NextResponse.json({
       success: true,
@@ -93,19 +97,56 @@ export async function GET(req: NextRequest) {
     });
 
   } catch (error: any) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    // Safely extract error message to avoid JSON serialization issues
+    let errorMessage = 'Unknown error occurred';
+    try {
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error && typeof error === 'object') {
+        // Extract only serializable properties
+        errorMessage = error.message || error.error || error.toString();
+      }
+    } catch (extractError) {
+      errorMessage = 'Failed to extract error details';
+    }
+    
     console.log(`${LOG_PREFIXES.API} Error in insights route:`, errorMessage);
+    
+    // Return a safe, fully serializable response
     return NextResponse.json({
       success: true,
       insights: getDefaultInsights(),
-      dataSource: DATA_SOURCES.FALLBACK
+      dataSource: DATA_SOURCES.FALLBACK,
+      error: errorMessage,
+      timestamp: new Date().toISOString()
     });
   }
 }
 
-function calculateInsightsFromPredictions(predictions: any[]) {
+async function calculateInsightsFromPredictions(predictions: any[], userId?: string) {
   if (predictions.length === 0) {
     return getDefaultInsights();
+  }
+
+  // Fetch dynamic configuration values
+  const configs = await getConfigs([
+    { key: 'default_invested_amount', defaultValue: 2500, category: 'insights' },
+    { key: 'high_confidence_threshold', defaultValue: 80, category: 'insights' },
+    { key: 'roi_scale_factor', defaultValue: 20, category: 'insights' },
+    { key: 'default_confidence', defaultValue: 75, category: 'insights' },
+    { key: 'default_win_rate', defaultValue: 65, category: 'insights' },
+  ]);
+
+  // Try to get user profile for actual investment data
+  let totalInvested = configs.default_invested_amount;
+  if (userId) {
+    const userProfile = await getUserProfile(userId);
+    if (userProfile && userProfile.total_invested) {
+      totalInvested = userProfile.total_invested;
+      console.log(`${LOG_PREFIXES.API} Using user's actual investment: $${totalInvested}`);
+    }
   }
 
   // Calculate metrics from real prediction data
@@ -119,7 +160,7 @@ function calculateInsightsFromPredictions(predictions: any[]) {
     const metrics = pred.trust_metrics;
     if (metrics.finalConfidence) {
       totalFinalConfidence += metrics.finalConfidence;
-      if (metrics.finalConfidence >= 80) {
+      if (metrics.finalConfidence >= configs.high_confidence_threshold) {
         highConfidencePredictions++;
       }
     }
@@ -130,27 +171,29 @@ function calculateInsightsFromPredictions(predictions: any[]) {
 
   const avgConfidence = validPredictions.length > 0 
     ? totalConfidence / validPredictions.length 
-    : 75;
+    : configs.default_confidence;
 
   const avgFinalConfidence = validPredictions.length > 0
     ? totalFinalConfidence / validPredictions.length
-    : 75;
+    : configs.default_confidence;
 
   // Calculate ROI simulation based on confidence levels
   // Higher confidence predictions would yield better ROI in theory
-  const simulatedROI = ((avgFinalConfidence - 50) / 50) * 20; // Scale to realistic ROI
+  const simulatedROI = ((avgFinalConfidence - 50) / 50) * configs.roi_scale_factor;
 
   // Win rate correlates with high-confidence predictions
   const winRate = validPredictions.length > 0
     ? (highConfidencePredictions / validPredictions.length) * 100
-    : 65;
+    : configs.default_win_rate;
+
+  const totalValue = totalInvested + (simulatedROI * totalInvested / 100);
 
   return {
-    totalValue: parseFloat((2500 + (simulatedROI * 100)).toFixed(2)),
+    totalValue: parseFloat(totalValue.toFixed(2)),
     winRate: parseFloat(winRate.toFixed(1)),
     roi: parseFloat(simulatedROI.toFixed(1)),
     activeContests: predictions.length,
-    totalInvested: 2500,
+    totalInvested: totalInvested,
     avgConfidence: parseFloat(avgConfidence.toFixed(1)),
     dataSource: 'calculated',
     lastUpdated: new Date().toISOString()

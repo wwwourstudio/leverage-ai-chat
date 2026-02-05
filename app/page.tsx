@@ -6,7 +6,7 @@ import { useState, useRef, useEffect } from 'react';
 import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data-service';
 import { API_ENDPOINTS } from '@/lib/constants';
 import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2 } from 'lucide-react';
-import { DynamicCardRenderer, CardList } from '@/components/data-cards';
+import { DynamicCardRenderer, CardList, EmptyState } from '@/components/data-cards';
 
 interface FileAttachment {
   id: string;
@@ -2555,12 +2555,7 @@ export default function UnifiedAIPlatform() {
                           </div>
                         </>
                       ) : !message.isWelcome && (
-                        <div className="ml-11 p-4 rounded-xl border border-gray-700/50 bg-gray-800/30">
-                          <div className="flex items-center gap-3 text-sm text-gray-500">
-                            <Info className="w-4 h-4" />
-                            <span>No live data cards available for this query. Try asking about specific sports, markets, or events.</span>
-                          </div>
-                        </div>
+                        <EmptyState />
                       )}
                     </div>
                   )}

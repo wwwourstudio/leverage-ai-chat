@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
       limit
     });
     
-    const cards = await generateDynamicCards({
+    let cards = await generateDynamicCards({
       category,
       sport,
       oddsData: liveOddsData,

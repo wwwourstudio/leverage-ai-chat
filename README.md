@@ -81,6 +81,7 @@ Each welcome message explicitly mentions the analysis type and provides context-
 
 ## Documentation
 
+- **[DYNAMIC_CONFIGURATION_SYSTEM.md](./DYNAMIC_CONFIGURATION_SYSTEM.md)** - 🆕 Dynamic config from Supabase (no more hardcoded values)
 - **[JSON_VALIDATION_IMPROVEMENTS.md](./JSON_VALIDATION_IMPROVEMENTS.md)** - JSON parsing error fixes and safe response handling
 - **[SUPABASE_VALIDATION_SYSTEM.md](./SUPABASE_VALIDATION_SYSTEM.md)** - Database validation and error prevention
 - **[SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md)** - Sports validation and 404 error prevention

@@ -217,6 +217,7 @@ export const LOG_PREFIXES = {
   HEALTH: '[Health]',
   DATA_SERVICE: '[DataService]',
   CONFIG: '[Config]',
+  DATABASE: '[Database]',
 } as const;
 
 // System Prompt Template

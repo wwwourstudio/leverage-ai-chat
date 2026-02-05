@@ -4,6 +4,7 @@ import React from "react"
 
 import { useState, useRef, useEffect } from 'react';
 import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data-service';
+import { API_ENDPOINTS } from '@/lib/constants';
 import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2 } from 'lucide-react';
 
 interface FileAttachment {
@@ -513,7 +514,11 @@ export default function UnifiedAIPlatform() {
     const msgLower = userMessage.toLowerCase();
     const suggestions: Array<{ label: string; icon: any; category: string }> = [];
     
-    console.log('[v0] Generating dynamic suggestions based on response cards:', responseCards.length);
+    console.log('[v0] ==========================================');
+    console.log('[v0] GENERATING CONTEXTUAL SUGGESTIONS');
+    console.log('[v0] User message:', userMessage);
+    console.log('[v0] Response cards received:', responseCards.length);
+    console.log('[v0] Card details:', responseCards.map(c => ({ type: c.type, category: c.category })));
     
     // Analyze the AI's response cards to understand what was provided
     const cardTypes = responseCards.map(card => card.type);
@@ -524,6 +529,8 @@ export default function UnifiedAIPlatform() {
     const hasKalshi = cardTypes.includes('kalshi-market') || cardTypes.includes('kalshi-weather');
     const hasCrossPlatform = cardTypes.includes('cross-platform');
     const hasPlayerProps = cardTypes.includes('player-prop');
+    
+    console.log('[v0] Detected card types:', { hasLiveOdds, hasDFSLineup, hasFantasy, hasKalshi, hasCrossPlatform, hasPlayerProps });
     
     // Analyze user message context for deeper understanding
     const isBetting = msgLower.includes('bet') || msgLower.includes('odds') || msgLower.includes('line');
@@ -695,7 +702,10 @@ export default function UnifiedAIPlatform() {
       index === self.findIndex((s) => s.label === suggestion.label)
     );
     
-    console.log('[v0] Final contextual suggestions count:', uniqueSuggestions.length);
+    console.log('[v0] Generated', suggestions.length, 'total suggestions');
+    console.log('[v0] Filtered to', uniqueSuggestions.length, 'unique suggestions');
+    console.log('[v0] Suggestion labels:', uniqueSuggestions.map(s => s.label));
+    console.log('[v0] ==========================================');
     
     // Return 5-7 unique suggestions for optimal UX
     return uniqueSuggestions.slice(0, 7);
@@ -1075,6 +1085,8 @@ export default function UnifiedAIPlatform() {
     
     try {
       // Fetch dynamic cards from API
+      console.log('[v0] Requesting dynamic cards with params:', { sport, category, context, limit: 3 });
+      
       const dynamicCards = await fetchDynamicCards({
         sport: sport || undefined,
         category,
@@ -1082,12 +1094,27 @@ export default function UnifiedAIPlatform() {
         limit: 3
       });
       
-      console.log('[v0] Got dynamic cards:', dynamicCards.length);
+      console.log('[v0] Received dynamic cards response:', dynamicCards.length, 'cards');
+      
+      if (dynamicCards.length === 0) {
+        console.log('[v0] WARNING: Zero dynamic cards returned from API. Check:');
+        console.log('[v0] - Sport extracted:', sport);
+        console.log('[v0] - Category detected:', category);
+        console.log('[v0] - API endpoint configured:', API_ENDPOINTS?.CARDS || 'undefined');
+        console.log('[v0] - Context provided:', context);
+      }
       
       // Convert DynamicCard to InsightCard format
-      return dynamicCards.map(card => convertToInsightCard(card));
+      const convertedCards = dynamicCards.map(card => {
+        console.log('[v0] Converting card:', card.type, card.title);
+        return convertToInsightCard(card);
+      });
+      
+      console.log('[v0] Returning', convertedCards.length, 'converted insight cards');
+      return convertedCards;
     } catch (error) {
       console.error('[v0] Error fetching dynamic cards:', error);
+      console.error('[v0] Error details:', error instanceof Error ? error.message : String(error));
       // Return empty array on error - the response will still be shown
       return [];
     }

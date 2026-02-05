@@ -48,39 +48,77 @@ export async function checkTableExists(
 
 /**
  * Safely extract error message from any error type
+ * Ensures the result is always a valid string that can be safely logged or serialized
  */
 function extractErrorMessage(error: any): string {
   if (!error) return 'Unknown error';
   
-  // Handle Error objects
-  if (error instanceof Error) {
-    return error.message;
-  }
-  
-  // Handle Supabase error objects
-  if (error && typeof error === 'object') {
-    if (error.message && typeof error.message === 'string') {
-      return error.message;
-    }
-    if (error.error && typeof error.error === 'string') {
-      return error.error;
-    }
-    if (error.details && typeof error.details === 'string') {
-      return error.details;
-    }
-    // Try to stringify the object safely
-    try {
-      return JSON.stringify(error);
-    } catch {
-      return '[Complex error object]';
-    }
-  }
-  
-  // Fallback to string conversion
   try {
+    // Handle Error objects
+    if (error instanceof Error) {
+      // Return just the message, avoid serializing the entire Error object
+      return error.message || 'Error with no message';
+    }
+    
+    // Handle Supabase error objects
+    if (error && typeof error === 'object') {
+      // Check for standard error properties in order of preference
+      if (error.message && typeof error.message === 'string') {
+        return error.message;
+      }
+      if (error.error && typeof error.error === 'string') {
+        return error.error;
+      }
+      if (error.details && typeof error.details === 'string') {
+        return error.details;
+      }
+      if (error.hint && typeof error.hint === 'string') {
+        return `${error.message || 'Database error'}: ${error.hint}`;
+      }
+      
+      // For Supabase PostgrestError, extract relevant info
+      if (error.code) {
+        return `Database error (${error.code}): ${error.message || 'No details'}`;
+      }
+      
+      // Try to stringify the object safely, limiting circular references
+      try {
+        // Use a simple stringification that avoids circular references
+        const keys = Object.keys(error);
+        if (keys.length === 0) {
+          return '[Empty error object]';
+        }
+        
+        const simpleError: Record<string, any> = {};
+        for (const key of keys) {
+          const value = error[key];
+          // Only include primitive values to avoid circular references
+          if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+            simpleError[key] = value;
+          }
+        }
+        
+        return JSON.stringify(simpleError);
+      } catch {
+        return '[Complex error object - unable to serialize]';
+      }
+    }
+    
+    // Handle primitive types
+    if (typeof error === 'string') {
+      return error;
+    }
+    
+    if (typeof error === 'number' || typeof error === 'boolean') {
+      return String(error);
+    }
+    
+    // Fallback to string conversion
     return String(error);
-  } catch {
-    return 'Unable to parse error';
+  } catch (conversionError) {
+    // If all else fails, return a safe default
+    console.error('Critical error in extractErrorMessage:', conversionError);
+    return 'Unable to extract error message safely';
   }
 }
 
@@ -270,6 +308,46 @@ export async function safeQuery<T = any>(
 }
 
 /**
+ * Sanitize a single record to ensure it's safe for JSON serialization
+ */
+function sanitizeRecord(record: any): any {
+  if (!record || typeof record !== 'object') {
+    return record;
+  }
+
+  try {
+    // Create a clean object with only serializable properties
+    const sanitized: Record<string, any> = {};
+    
+    for (const key in record) {
+      if (record.hasOwnProperty(key)) {
+        const value = record[key];
+        
+        // Handle different value types
+        if (value === null || value === undefined) {
+          sanitized[key] = value;
+        } else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+          sanitized[key] = value;
+        } else if (value instanceof Date) {
+          sanitized[key] = value.toISOString();
+        } else if (Array.isArray(value)) {
+          sanitized[key] = value.map(item => sanitizeRecord(item));
+        } else if (typeof value === 'object') {
+          // Recursively sanitize nested objects
+          sanitized[key] = sanitizeRecord(value);
+        }
+        // Skip functions, symbols, and other non-serializable types
+      }
+    }
+    
+    return sanitized;
+  } catch (error) {
+    console.log(`${LOG_PREFIXES.DATABASE} Error sanitizing record:`, extractErrorMessage(error));
+    return null;
+  }
+}
+
+/**
  * Validate data schema matches expected structure
  */
 export function validateDataSchema<T extends Record<string, any>>(
@@ -301,9 +379,16 @@ export function validateDataSchema<T extends Record<string, any>>(
       continue;
     }
 
+    // Sanitize the record first to ensure it's serializable
+    const sanitized = sanitizeRecord(record);
+    if (!sanitized) {
+      invalidCount++;
+      continue;
+    }
+
     // Check if all required fields are present
     const hasAllFields = requiredFields.every(field => {
-      const hasField = field in record;
+      const hasField = field in sanitized;
       if (!hasField) {
         missingFieldsSet.add(String(field));
       }
@@ -311,7 +396,7 @@ export function validateDataSchema<T extends Record<string, any>>(
     });
 
     if (hasAllFields) {
-      validRecords.push(record as T);
+      validRecords.push(sanitized as T);
     } else {
       invalidCount++;
     }

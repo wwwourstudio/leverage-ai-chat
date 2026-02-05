@@ -96,12 +96,30 @@ export async function GET(req: NextRequest) {
     });
 
   } catch (error: any) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    // Safely extract error message to avoid JSON serialization issues
+    let errorMessage = 'Unknown error occurred';
+    try {
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error && typeof error === 'object') {
+        // Extract only serializable properties
+        errorMessage = error.message || error.error || error.toString();
+      }
+    } catch (extractError) {
+      errorMessage = 'Failed to extract error details';
+    }
+    
     console.log(`${LOG_PREFIXES.API} Error in insights route:`, errorMessage);
+    
+    // Return a safe, fully serializable response
     return NextResponse.json({
       success: true,
       insights: getDefaultInsights(),
-      dataSource: DATA_SOURCES.FALLBACK
+      dataSource: DATA_SOURCES.FALLBACK,
+      error: errorMessage,
+      timestamp: new Date().toISOString()
     });
   }
 }

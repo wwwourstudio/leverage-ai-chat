@@ -514,6 +514,28 @@ export default function UnifiedAIPlatform() {
     scrollToBottom();
   }, [messages, isTyping]);
 
+  // Loading skeleton for cards
+  const CardLoadingSkeleton = () => (
+    <div className="group relative bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/60 overflow-hidden animate-pulse">
+      <div className="flex items-start gap-4 mb-5">
+        <div className="w-12 h-12 rounded-xl bg-gray-700/50"></div>
+        <div className="flex-1 space-y-2">
+          <div className="h-3 w-24 bg-gray-700/50 rounded"></div>
+          <div className="h-4 w-48 bg-gray-700/50 rounded"></div>
+          <div className="h-6 w-20 bg-gray-700/50 rounded-full"></div>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-800/30">
+            <div className="h-3 w-24 bg-gray-700/50 rounded"></div>
+            <div className="h-3 w-32 bg-gray-700/50 rounded"></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   const handleStarChat = (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setChats(chats.map(chat =>
@@ -1557,7 +1579,6 @@ export default function UnifiedAIPlatform() {
   const renderInsightCard = (card: InsightCard, index: number) => {
     // Validate card data before rendering
     if (!card || typeof card !== 'object') {
-      console.error('[v0] Invalid card at index', index, card);
       return null;
     }
     
@@ -1569,51 +1590,83 @@ export default function UnifiedAIPlatform() {
       category: card.category || 'General',
       subcategory: card.subcategory || 'Info',
       title: card.title || 'Untitled Card',
-      data: card.data && typeof card.data === 'object' ? card.data : {}
+      data: card.data && typeof card.data === 'object' ? card.data : {},
+      type: card.type || 'default'
     };
     
     const Icon = safeCard.icon;
     const badge = getStatusBadge(safeCard.status);
     const BadgeIcon = badge.icon;
+    const dataEntries = Object.entries(safeCard.data);
     
-    console.log('[v0] Rendering card:', safeCard.title, 'with', Object.keys(safeCard.data).length, 'data fields');
-    
+    // Enhanced visual design with glassmorphism and better data presentation
     return (
       <div
-        key={index}
-        className="group relative bg-gradient-to-br from-gray-900 via-gray-850 to-gray-900 rounded-2xl p-5 border border-gray-700/50 hover:border-gray-600 transition-all duration-500 shadow-xl hover:shadow-2xl hover:scale-[1.02] overflow-hidden"
+        key={`card-${index}-${safeCard.type}`}
+        className="group relative bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/60 hover:border-gray-500/80 transition-all duration-500 shadow-2xl hover:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] hover:scale-[1.02] overflow-hidden"
       >
-        <div className={`absolute inset-0 bg-gradient-to-br ${safeCard.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-500`}></div>
+        {/* Animated gradient overlay */}
+        <div className={`absolute inset-0 bg-gradient-to-br ${safeCard.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-700`}></div>
         
-        <div className="relative flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl bg-gradient-to-br ${safeCard.gradient} shadow-lg`}>
-              <Icon className="w-5 h-5 text-white" />
+        {/* Accent line on left */}
+        <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${safeCard.gradient} opacity-60 group-hover:opacity-100 transition-opacity`}></div>
+        
+        {/* Header section with icon and title */}
+        <div className="relative flex items-start justify-between mb-5">
+          <div className="flex items-start gap-4 flex-1">
+            <div className={`p-3 rounded-xl bg-gradient-to-br ${safeCard.gradient} shadow-lg ring-4 ring-gray-800/50 group-hover:ring-gray-700/50 transition-all`}>
+              <Icon className="w-6 h-6 text-white" />
             </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{safeCard.category} • {safeCard.subcategory}</span>
-                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${badge.bg} ${badge.border}`}>
-                  <BadgeIcon className={`w-3 h-3 ${badge.text}`} />
-                  <span className={`text-xs font-bold ${badge.text}`}>{badge.label}</span>
-                </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{safeCard.category}</span>
+                <span className="text-gray-600">•</span>
+                <span className="text-xs font-medium text-gray-500">{safeCard.subcategory}</span>
               </div>
-              <h3 className="text-sm font-bold text-white">{safeCard.title}</h3>
+              <h3 className="text-base font-bold text-white leading-tight mb-1">{safeCard.title}</h3>
+              <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${badge.bg} ${badge.border}`}>
+                <BadgeIcon className={`w-3.5 h-3.5 ${badge.text}`} />
+                <span className={`text-xs font-bold ${badge.text} uppercase tracking-wide`}>{badge.label}</span>
+              </div>
             </div>
           </div>
         </div>
         
-        <div className="relative space-y-2.5">
-          {Object.entries(safeCard.data).map(([key, value], i) => (
-            <div key={i} className="flex items-start justify-between group/item">
-              <span className="text-xs font-medium text-gray-400 capitalize flex-shrink-0 mr-3">
-                {key.replace(/([A-Z])/g, ' $1').trim()}:
-              </span>
-              <span className="text-sm font-bold text-white group-hover/item:text-blue-400 transition-colors text-right">
-                {String(value || 'N/A')}
-              </span>
+        {/* Data grid with improved spacing and hierarchy */}
+        <div className="relative space-y-3">
+          {dataEntries.length > 0 ? (
+            dataEntries.map(([key, value], i) => {
+              // Format the key to be more readable
+              const formattedKey = key
+                .replace(/([A-Z])/g, ' $1')
+                .replace(/^./, str => str.toUpperCase())
+                .trim();
+              
+              // Detect if value contains important metrics
+              const isMetric = typeof value === 'string' && (
+                value.includes('%') || 
+                value.includes('$') || 
+                value.includes('pts') ||
+                value.includes('↑') ||
+                value.includes('↓')
+              );
+              
+              return (
+                <div key={i} className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors group/item">
+                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex-shrink-0 mr-4">
+                    {formattedKey}
+                  </span>
+                  <span className={`text-sm font-bold text-right ${isMetric ? 'text-white' : 'text-gray-300'} group-hover/item:text-blue-400 transition-colors`}>
+                    {String(value || 'N/A')}
+                  </span>
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-center py-4 text-gray-500 text-sm">
+              No data available
             </div>
-          ))}
+          )}
         </div>
 
         <div className="relative mt-4 pt-4 border-t border-gray-700/50">
@@ -2478,9 +2531,29 @@ export default function UnifiedAIPlatform() {
                     </div>
                   )}
 
-                  {message.cards && message.cards.length > 0 && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-5">
-                      {message.cards.map((card, cardIndex) => renderInsightCard(card, cardIndex))}
+                  {/* Dynamic Cards Section with Enhanced UX */}
+                  {message.role === 'assistant' && (
+                    <div className="mt-5">
+                      {message.cards && message.cards.length > 0 ? (
+                        <>
+                          <div className="flex items-center gap-2 mb-4 ml-11">
+                            <Sparkles className="w-4 h-4 text-blue-400" />
+                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                              Live Data Insights ({message.cards.length})
+                            </h4>
+                          </div>
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {message.cards.map((card, cardIndex) => renderInsightCard(card, cardIndex))}
+                          </div>
+                        </>
+                      ) : !message.isWelcome && (
+                        <div className="ml-11 p-4 rounded-xl border border-gray-700/50 bg-gray-800/30">
+                          <div className="flex items-center gap-3 text-sm text-gray-500">
+                            <Info className="w-4 h-4" />
+                            <span>No live data cards available for this query. Try asking about specific sports, markets, or events.</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 

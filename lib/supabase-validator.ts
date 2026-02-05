@@ -81,26 +81,27 @@ function extractErrorMessage(error: any): string {
         return `Database error (${error.code}): ${error.message || 'No details'}`;
       }
       
-      // Try to stringify the object safely, limiting circular references
+      // Try to create a readable error message from the object properties
       try {
-        // Use a simple stringification that avoids circular references
         const keys = Object.keys(error);
         if (keys.length === 0) {
-          return '[Empty error object]';
+          return 'Empty error object';
         }
         
-        const simpleError: Record<string, any> = {};
+        // Build a human-readable error message instead of JSON
+        const parts: string[] = [];
         for (const key of keys) {
           const value = error[key];
           // Only include primitive values to avoid circular references
           if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-            simpleError[key] = value;
+            parts.push(`${key}: ${value}`);
           }
         }
         
-        return JSON.stringify(simpleError);
+        // Return a plain string, NOT JSON
+        return parts.length > 0 ? parts.join(', ') : 'Error object with no serializable properties';
       } catch {
-        return '[Complex error object - unable to serialize]';
+        return 'Complex error object - unable to serialize';
       }
     }
     
@@ -137,10 +138,14 @@ export function validateQueryResponse<T = any>(
 } {
   // Check for errors
   if (error) {
+    // Extract error message safely - ALWAYS returns a plain string, never JSON
     const errorMessage = extractErrorMessage(error);
     
+    // Log for debugging (safe string, never JSON)
+    console.log(`${LOG_PREFIXES.DATABASE} Query validation failed for '${tableName}':`, errorMessage);
+    
     // Check if it's a "table doesn't exist" error
-    if (errorMessage.includes('does not exist') || errorMessage.includes('relation') && errorMessage.includes('does not exist')) {
+    if (errorMessage.includes('does not exist') || (errorMessage.includes('relation') && errorMessage.includes('does not exist'))) {
       return {
         isValid: false,
         data: null,

@@ -211,28 +211,39 @@ export default function UnifiedAIPlatform() {
 
   // Initialize credits and load real insights on mount
   useEffect(() => {
-    const data = getCreditData();
-    setCreditsRemaining(data.credits);
-    const rateData = getRateLimitData();
-    setChatsRemaining(CHAT_LIMIT - rateData.count);
-
-    // Load real user insights
-    console.log('[v0] Loading real user insights on mount');
-    fetchUserInsights().then(insights => {
-      console.log('[v0] Loaded insights:', insights);
-      setMessages(prev => {
-        const newMessages = [...prev];
-        if (newMessages[0]?.isWelcome) {
-          newMessages[0] = {
-            ...newMessages[0],
-            insights
-          };
-        }
-        return newMessages;
-      });
-    }).catch(err => {
-      console.error('[v0] Failed to load insights:', err);
+  const data = getCreditData();
+  setCreditsRemaining(data.credits);
+  const rateData = getRateLimitData();
+  setChatsRemaining(CHAT_LIMIT - rateData.count);
+  
+  // Load real user insights AND dynamic cards
+  console.log('[v0] Loading real user insights and dynamic cards on mount');
+  
+  Promise.all([
+    fetchUserInsights(),
+    fetchDynamicCards({ limit: 3 })
+  ]).then(([insights, dynamicCards]) => {
+    console.log('[v0] Loaded insights:', insights);
+    console.log('[v0] Loaded dynamic cards:', dynamicCards.length);
+    
+    // Convert dynamic cards to insight cards
+    const convertedCards = dynamicCards.map(convertToInsightCard).filter(Boolean);
+    console.log('[v0] Converted cards for welcome message:', convertedCards.length);
+    
+    setMessages(prev => {
+      const newMessages = [...prev];
+      if (newMessages[0]?.isWelcome) {
+        newMessages[0] = {
+          ...newMessages[0],
+          insights,
+          cards: convertedCards
+        };
+      }
+      return newMessages;
     });
+  }).catch(err => {
+    console.error('[v0] Error loading initial data:', err);
+  });
   }, []);
 
   const [chats, setChats] = useState<Chat[]>([
@@ -502,6 +513,28 @@ export default function UnifiedAIPlatform() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
+
+  // Loading skeleton for cards
+  const CardLoadingSkeleton = () => (
+    <div className="group relative bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/60 overflow-hidden animate-pulse">
+      <div className="flex items-start gap-4 mb-5">
+        <div className="w-12 h-12 rounded-xl bg-gray-700/50"></div>
+        <div className="flex-1 space-y-2">
+          <div className="h-3 w-24 bg-gray-700/50 rounded"></div>
+          <div className="h-4 w-48 bg-gray-700/50 rounded"></div>
+          <div className="h-6 w-20 bg-gray-700/50 rounded-full"></div>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-800/30">
+            <div className="h-3 w-24 bg-gray-700/50 rounded"></div>
+            <div className="h-3 w-32 bg-gray-700/50 rounded"></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   const handleStarChat = (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -977,14 +1010,27 @@ export default function UnifiedAIPlatform() {
         responseCards = await selectRelevantCards(userMessage, context);
       }
 
-      const newMessage: Message = {
-        role: 'assistant',
-        content: enhancedContent,
-        timestamp: new Date(),
-        cards: responseCards,
-        confidence: analysisResult.confidence || 85,
-        sources: analysisResult.sources || buildSourcesList(oddsData),
-        modelUsed: analysisResult.model || 'Grok-3',
+        // Validate and sanitize cards before adding to message
+        const validatedCards = Array.isArray(responseCards) 
+          ? responseCards.filter(card => {
+              if (!card || typeof card !== 'object' || !card.title || !card.type) {
+                console.warn('[v0] Filtering out invalid card:', card);
+                return false;
+              }
+              return true;
+            })
+          : [];
+        
+        console.log('[v0] Adding message with', validatedCards.length, 'validated cards');
+        
+        const newMessage: Message = {
+          role: 'assistant',
+          content: enhancedContent,
+          timestamp: new Date(),
+          cards: validatedCards,
+          confidence: analysisResult.confidence || 85,
+          sources: analysisResult.sources || buildSourcesList(oddsData),
+          modelUsed: analysisResult.model || 'Grok-3',
         processingTime,
         trustMetrics: analysisResult.trustMetrics
       };
@@ -1121,6 +1167,19 @@ export default function UnifiedAIPlatform() {
   };
 
   const convertToInsightCard = (dynamicCard: DynamicCard): InsightCard => {
+    console.log('[v0] Converting dynamic card:', dynamicCard.type, dynamicCard.title);
+    
+    // Validate required fields
+    if (!dynamicCard || typeof dynamicCard !== 'object') {
+      console.error('[v0] Invalid card: not an object', dynamicCard);
+      throw new Error('Invalid card data: must be an object');
+    }
+    
+    if (!dynamicCard.type || !dynamicCard.title) {
+      console.error('[v0] Invalid card: missing required fields', dynamicCard);
+      throw new Error('Invalid card data: missing type or title');
+    }
+    
     // Map icon string to actual icon component
     const iconMap: Record<string, any> = {
       'Zap': Zap,
@@ -1135,16 +1194,20 @@ export default function UnifiedAIPlatform() {
       'Sparkles': Sparkles
     };
     
-    return {
-      type: dynamicCard.type,
-      title: dynamicCard.title,
+    // Ensure all required fields have valid values
+    const validatedCard: InsightCard = {
+      type: String(dynamicCard.type || 'unknown'),
+      title: String(dynamicCard.title || 'Untitled Card'),
       icon: iconMap[dynamicCard.icon] || Zap,
-      category: dynamicCard.category,
-      subcategory: dynamicCard.subcategory,
-      gradient: dynamicCard.gradient,
-      data: dynamicCard.data,
-      status: dynamicCard.status
+      category: String(dynamicCard.category || 'General'),
+      subcategory: String(dynamicCard.subcategory || 'Info'),
+      gradient: String(dynamicCard.gradient || 'from-blue-500 to-purple-500'),
+      data: dynamicCard.data && typeof dynamicCard.data === 'object' ? dynamicCard.data : {},
+      status: String(dynamicCard.status || 'active')
     };
+    
+    console.log('[v0] Validated card:', validatedCard.type, validatedCard.title);
+    return validatedCard;
   };
 
   const buildSourcesList = (oddsData: any): Array<{ name: string; type: 'database' | 'api' | 'model' | 'cache'; reliability: number; url?: string }> => {
@@ -1514,46 +1577,96 @@ export default function UnifiedAIPlatform() {
   };
 
   const renderInsightCard = (card: InsightCard, index: number) => {
-    const Icon = card.icon;
-    const badge = getStatusBadge(card.status);
+    // Validate card data before rendering
+    if (!card || typeof card !== 'object') {
+      return null;
+    }
+    
+    // Ensure required fields exist with fallbacks
+    const safeCard = {
+      icon: card.icon || Zap,
+      status: card.status || 'active',
+      gradient: card.gradient || 'from-blue-500 to-purple-500',
+      category: card.category || 'General',
+      subcategory: card.subcategory || 'Info',
+      title: card.title || 'Untitled Card',
+      data: card.data && typeof card.data === 'object' ? card.data : {},
+      type: card.type || 'default'
+    };
+    
+    const Icon = safeCard.icon;
+    const badge = getStatusBadge(safeCard.status);
     const BadgeIcon = badge.icon;
-
+    const dataEntries = Object.entries(safeCard.data);
+    
+    // Enhanced visual design with glassmorphism and better data presentation
     return (
-      <div 
-        key={index} 
-        className="group relative bg-gradient-to-br from-gray-900 via-gray-850 to-gray-900 rounded-2xl p-5 border border-gray-700/50 hover:border-gray-600 transition-all duration-500 shadow-xl hover:shadow-2xl hover:scale-[1.02] overflow-hidden"
+      <div
+        key={`card-${index}-${safeCard.type}`}
+        className="group relative bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/60 hover:border-gray-500/80 transition-all duration-500 shadow-2xl hover:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] hover:scale-[1.02] overflow-hidden"
       >
-        <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-500`}></div>
+        {/* Animated gradient overlay */}
+        <div className={`absolute inset-0 bg-gradient-to-br ${safeCard.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-700`}></div>
         
-        <div className="relative flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl bg-gradient-to-br ${card.gradient} shadow-lg`}>
-              <Icon className="w-5 h-5 text-white" />
+        {/* Accent line on left */}
+        <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${safeCard.gradient} opacity-60 group-hover:opacity-100 transition-opacity`}></div>
+        
+        {/* Header section with icon and title */}
+        <div className="relative flex items-start justify-between mb-5">
+          <div className="flex items-start gap-4 flex-1">
+            <div className={`p-3 rounded-xl bg-gradient-to-br ${safeCard.gradient} shadow-lg ring-4 ring-gray-800/50 group-hover:ring-gray-700/50 transition-all`}>
+              <Icon className="w-6 h-6 text-white" />
             </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{card.category} • {card.subcategory}</span>
-                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${badge.bg} ${badge.border}`}>
-                  <BadgeIcon className={`w-3 h-3 ${badge.text}`} />
-                  <span className={`text-xs font-bold ${badge.text}`}>{badge.label}</span>
-                </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{safeCard.category}</span>
+                <span className="text-gray-600">•</span>
+                <span className="text-xs font-medium text-gray-500">{safeCard.subcategory}</span>
               </div>
-              <h3 className="text-sm font-bold text-white">{card.title}</h3>
+              <h3 className="text-base font-bold text-white leading-tight mb-1">{safeCard.title}</h3>
+              <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${badge.bg} ${badge.border}`}>
+                <BadgeIcon className={`w-3.5 h-3.5 ${badge.text}`} />
+                <span className={`text-xs font-bold ${badge.text} uppercase tracking-wide`}>{badge.label}</span>
+              </div>
             </div>
           </div>
         </div>
-
-        <div className="relative space-y-2.5">
-          {Object.entries(card.data).map(([key, value], i) => (
-            <div key={i} className="flex items-start justify-between group/item">
-              <span className="text-xs font-medium text-gray-400 capitalize flex-shrink-0 mr-3">
-                {key.replace(/([A-Z])/g, ' $1').trim()}:
-              </span>
-              <span className="text-sm font-bold text-white group-hover/item:text-blue-400 transition-colors text-right">
-                {value}
-              </span>
+        
+        {/* Data grid with improved spacing and hierarchy */}
+        <div className="relative space-y-3">
+          {dataEntries.length > 0 ? (
+            dataEntries.map(([key, value], i) => {
+              // Format the key to be more readable
+              const formattedKey = key
+                .replace(/([A-Z])/g, ' $1')
+                .replace(/^./, str => str.toUpperCase())
+                .trim();
+              
+              // Detect if value contains important metrics
+              const isMetric = typeof value === 'string' && (
+                value.includes('%') || 
+                value.includes('$') || 
+                value.includes('pts') ||
+                value.includes('↑') ||
+                value.includes('↓')
+              );
+              
+              return (
+                <div key={i} className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors group/item">
+                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex-shrink-0 mr-4">
+                    {formattedKey}
+                  </span>
+                  <span className={`text-sm font-bold text-right ${isMetric ? 'text-white' : 'text-gray-300'} group-hover/item:text-blue-400 transition-colors`}>
+                    {String(value || 'N/A')}
+                  </span>
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-center py-4 text-gray-500 text-sm">
+              No data available
             </div>
-          ))}
+          )}
         </div>
 
         <div className="relative mt-4 pt-4 border-t border-gray-700/50">
@@ -1947,13 +2060,36 @@ export default function UnifiedAIPlatform() {
         </div>
 
         {/* Messages Container - Dynamic Data-Driven Interface */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar">
+        <div 
+          className="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar scroll-smooth"
+          style={{ 
+            scrollBehavior: 'smooth',
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
           <div className="max-w-5xl mx-auto space-y-6">
-            {messages.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}
-              >
+            {messages.length === 0 ? (
+              <div className="flex items-center justify-center h-full min-h-[400px]">
+                <div className="text-center space-y-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-blue-500/30">
+                    <Sparkles className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-300">No messages yet</h3>
+                  <p className="text-sm text-gray-500">Start a conversation to get AI-powered insights</p>
+                </div>
+              </div>
+            ) : (
+              messages.map((message, index) => {
+                // Group messages: Check if this message is from same sender as previous
+                const prevMessage = index > 0 ? messages[index - 1] : null;
+                const isGrouped = prevMessage && prevMessage.role === message.role;
+                const showTimestamp = !isGrouped || index === messages.length - 1;
+                
+                return (
+                  <div
+                    key={`message-${index}-${message.timestamp.getTime()}`}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn ${isGrouped ? 'mt-2' : 'mt-6'}`}
+                  >
                 <div className={`max-w-4xl ${message.role === 'user' ? 'w-auto' : 'w-full'}`}>
                   {message.role === 'assistant' && (
                     <div className="flex items-center gap-3 mb-3 flex-wrap">
@@ -2395,9 +2531,29 @@ export default function UnifiedAIPlatform() {
                     </div>
                   )}
 
-                  {message.cards && message.cards.length > 0 && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-5">
-                      {message.cards.map((card, cardIndex) => renderInsightCard(card, cardIndex))}
+                  {/* Dynamic Cards Section with Enhanced UX */}
+                  {message.role === 'assistant' && (
+                    <div className="mt-5">
+                      {message.cards && message.cards.length > 0 ? (
+                        <>
+                          <div className="flex items-center gap-2 mb-4 ml-11">
+                            <Sparkles className="w-4 h-4 text-blue-400" />
+                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                              Live Data Insights ({message.cards.length})
+                            </h4>
+                          </div>
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {message.cards.map((card, cardIndex) => renderInsightCard(card, cardIndex))}
+                          </div>
+                        </>
+                      ) : !message.isWelcome && (
+                        <div className="ml-11 p-4 rounded-xl border border-gray-700/50 bg-gray-800/30">
+                          <div className="flex items-center gap-3 text-sm text-gray-500">
+                            <Info className="w-4 h-4" />
+                            <span>No live data cards available for this query. Try asking about specific sports, markets, or events.</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -2617,7 +2773,9 @@ export default function UnifiedAIPlatform() {
                   )}
                 </div>
               </div>
-            ))}
+            );
+          })
+        )}
 
             {isTyping && (
               <div className="flex justify-start animate-fadeIn">

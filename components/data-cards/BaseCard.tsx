@@ -1,29 +1,196 @@
 'use client';
 
-import { ReactNode } from 'react';
-import { LucideIcon, AlertCircle, Loader2 } from 'lucide-react';
+import { ReactNode, memo } from 'react';
+import { LucideIcon, AlertCircle, Loader2, ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+// Type definitions for better type safety and clarity
+interface StatusBadge {
+  icon: LucideIcon;
+  label: string;
+  bg: string;
+  border: string;
+  text: string;
+}
 
 interface BaseCardProps {
+  /** Icon component to display in the header */
   icon: LucideIcon;
+  /** Main title of the card */
   title: string;
+  /** Primary category label (e.g., "DFS", "BETTING") */
   category: string;
+  /** Secondary category label (e.g., "Lineup Building") */
   subcategory: string;
+  /** Tailwind gradient classes for theming */
   gradient: string;
-  status?: {
-    icon: LucideIcon;
-    label: string;
-    bg: string;
-    border: string;
-    text: string;
-  };
+  /** Optional status badge configuration */
+  status?: StatusBadge;
+  /** Card content */
   children: ReactNode;
+  /** Optional callback for analysis action */
   onAnalyze?: () => void;
+  /** Loading state */
   isLoading?: boolean;
+  /** Error message to display */
   error?: string;
+  /** Additional CSS classes */
   className?: string;
 }
 
-export function BaseCard({
+/**
+ * ErrorState - Displays error information in a styled container
+ */
+function ErrorState({ error, className }: { error: string; className?: string }) {
+  return (
+    <div
+      className={cn(
+        'relative rounded-2xl p-6 backdrop-blur-xl border',
+        'bg-gradient-to-br from-red-950/40 to-red-900/30',
+        'border-red-800/50 shadow-lg',
+        className
+      )}
+      role="alert"
+      aria-live="polite"
+    >
+      <div className="flex items-center gap-3 text-red-300">
+        <AlertCircle className="w-6 h-6 flex-shrink-0" aria-hidden="true" />
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-bold text-red-200">Error Loading Card</h3>
+          <p className="text-xs text-red-400 mt-1 break-words">{error}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * LoadingState - Displays loading spinner and message
+ */
+function LoadingState({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        'relative rounded-2xl p-6 backdrop-blur-xl border',
+        'bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95',
+        'border-gray-700/60 shadow-lg',
+        className
+      )}
+      role="status"
+      aria-live="polite"
+    >
+      <div className="flex items-center justify-center gap-3 text-gray-500">
+        <Loader2 className="w-6 h-6 animate-spin" aria-hidden="true" />
+        <span className="text-sm font-medium">Loading data...</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * CardHeader - Renders the icon, category, title, and status badge
+ */
+function CardHeader({
+  Icon,
+  category,
+  subcategory,
+  title,
+  gradient,
+  status,
+}: Pick<BaseCardProps, 'icon' | 'category' | 'subcategory' | 'title' | 'gradient' | 'status'>) {
+  const StatusIcon = status?.icon;
+
+  return (
+    <div className="relative flex items-start justify-between mb-5">
+      <div className="flex items-start gap-4 flex-1 min-w-0">
+        {/* Icon container with gradient background */}
+        <div
+          className={cn(
+            'p-3 rounded-xl shadow-lg ring-4 flex-shrink-0 transition-all',
+            'bg-gradient-to-br',
+            gradient,
+            'ring-gray-800/50 group-hover:ring-gray-700/50'
+          )}
+          aria-hidden="true"
+        >
+          <Icon className="w-6 h-6 text-white" />
+        </div>
+
+        {/* Text content */}
+        <div className="flex-1 min-w-0 space-y-2">
+          {/* Category labels */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest truncate">
+              {category}
+            </span>
+            <span className="text-gray-600 flex-shrink-0" aria-hidden="true">
+              •
+            </span>
+            <span className="text-xs font-medium text-gray-500 truncate">{subcategory}</span>
+          </div>
+
+          {/* Title */}
+          <h3 className="text-base font-bold text-white leading-tight text-balance">{title}</h3>
+
+          {/* Status badge */}
+          {status && StatusIcon && (
+            <div
+              className={cn(
+                'inline-flex items-center gap-1.5 px-2.5 py-1',
+                'rounded-full border',
+                status.bg,
+                status.border
+              )}
+              role="status"
+            >
+              <StatusIcon className={cn('w-3.5 h-3.5', status.text)} aria-hidden="true" />
+              <span className={cn('text-xs font-bold uppercase tracking-wide', status.text)}>
+                {status.label}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * AnalyzeButton - Action button for detailed analysis
+ */
+function AnalyzeButton({ onClick }: { onClick: () => void }) {
+  return (
+    <div className="relative mt-4 pt-4 border-t border-gray-700/50">
+      <button
+        onClick={onClick}
+        className={cn(
+          'w-full flex items-center justify-center gap-2',
+          'text-xs font-bold text-gray-400 hover:text-white',
+          'transition-colors duration-200',
+          'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2 focus:ring-offset-gray-900',
+          'rounded-lg py-2'
+        )}
+        aria-label="View full analysis"
+      >
+        <span>View Full Analysis</span>
+        <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover/btn:translate-x-1" />
+      </button>
+    </div>
+  );
+}
+
+/**
+ * BaseCard - Reusable card component for displaying data insights
+ * 
+ * Features:
+ * - Loading and error states
+ * - Animated hover effects
+ * - Category-specific theming via gradients
+ * - Status badges
+ * - Optional action button
+ * - Fully accessible with ARIA attributes
+ */
+export const BaseCard = memo(function BaseCard({
   icon: Icon,
   title,
   category,
@@ -32,87 +199,75 @@ export function BaseCard({
   status,
   children,
   onAnalyze,
-  isLoading,
+  isLoading = false,
   error,
-  className = ''
+  className,
 }: BaseCardProps) {
+  // Early returns for loading and error states
   if (error) {
-    return (
-      <div className={`relative bg-gradient-to-br from-red-950/40 to-red-900/30 backdrop-blur-xl rounded-2xl p-6 border border-red-800/50 ${className}`}>
-        <div className="flex items-center gap-3 text-red-300">
-          <AlertCircle className="w-6 h-6 flex-shrink-0" />
-          <div>
-            <h3 className="text-sm font-bold text-red-200">Error Loading Card</h3>
-            <p className="text-xs text-red-400 mt-1">{error}</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <ErrorState error={error} className={className} />;
   }
 
   if (isLoading) {
+    return <LoadingState className={className} />;
+  }
+
+  // Validate required data
+  if (!title || !category || !subcategory) {
     return (
-      <div className={`relative bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/60 ${className}`}>
-        <div className="flex items-center justify-center gap-3 text-gray-500">
-          <Loader2 className="w-6 h-6 animate-spin" />
-          <span className="text-sm font-medium">Loading data...</span>
-        </div>
-      </div>
+      <ErrorState
+        error="Missing required card data (title, category, or subcategory)"
+        className={className}
+      />
     );
   }
 
-  const StatusIcon = status?.icon;
-
   return (
-    <div className={`group relative bg-gradient-to-br from-gray-900/98 via-gray-850/98 to-gray-900/98 backdrop-blur-xl rounded-2xl p-5 border border-gray-700/50 hover:border-gray-500/70 transition-all duration-300 shadow-xl hover:shadow-2xl hover:shadow-gray-950/50 overflow-hidden ${className}`}>
-      {/* Animated gradient overlay */}
-      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-700`} />
-      
-      {/* Accent line on left */}
-      <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${gradient} opacity-60 group-hover:opacity-100 transition-opacity`} />
-      
-      {/* Header section with icon and title */}
-      <div className="relative flex items-start justify-between mb-5">
-        <div className="flex items-start gap-4 flex-1">
-          <div className={`p-3 rounded-xl bg-gradient-to-br ${gradient} shadow-lg ring-4 ring-gray-800/50 group-hover:ring-gray-700/50 transition-all flex-shrink-0`}>
-            <Icon className="w-6 h-6 text-white" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest truncate">{category}</span>
-              <span className="text-gray-600 flex-shrink-0">•</span>
-              <span className="text-xs font-medium text-gray-500 truncate">{subcategory}</span>
-            </div>
-            <h3 className="text-base font-bold text-white leading-tight mb-1 text-balance">{title}</h3>
-            {status && StatusIcon && (
-              <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${status.bg} ${status.border}`}>
-                <StatusIcon className={`w-3.5 h-3.5 ${status.text}`} />
-                <span className={`text-xs font-bold ${status.text} uppercase tracking-wide`}>{status.label}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-      
-      {/* Content area */}
-      <div className="relative mt-1">
-        {children}
-      </div>
-
-      {/* Action button */}
-      {onAnalyze && (
-        <div className="relative mt-4 pt-4 border-t border-gray-700/50">
-          <button 
-            onClick={onAnalyze}
-            className="w-full flex items-center justify-center gap-2 text-xs font-bold text-gray-400 hover:text-white transition-colors group/btn"
-          >
-            <span>View Full Analysis</span>
-            <svg className="w-3.5 h-3.5 group-hover/btn:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
+    <article
+      className={cn(
+        'group relative rounded-2xl p-5 backdrop-blur-xl border shadow-xl overflow-hidden',
+        'bg-gradient-to-br from-gray-900/98 via-gray-850/98 to-gray-900/98',
+        'border-gray-700/50 hover:border-gray-500/70',
+        'transition-all duration-300',
+        'hover:shadow-2xl hover:shadow-gray-950/50',
+        className
       )}
-    </div>
+    >
+      {/* Animated gradient overlay on hover */}
+      <div
+        className={cn(
+          'absolute inset-0 bg-gradient-to-br opacity-0 transition-opacity duration-700',
+          'group-hover:opacity-10',
+          gradient
+        )}
+        aria-hidden="true"
+      />
+
+      {/* Accent line on left edge */}
+      <div
+        className={cn(
+          'absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b transition-opacity',
+          'opacity-60 group-hover:opacity-100',
+          gradient
+        )}
+        aria-hidden="true"
+      />
+
+      {/* Card Header */}
+      <CardHeader
+        Icon={Icon}
+        category={category}
+        subcategory={subcategory}
+        title={title}
+        gradient={gradient}
+        status={status}
+      />
+
+      {/* Card Content */}
+      <div className="relative mt-1">{children}</div>
+
+      {/* Optional Action Button */}
+      {onAnalyze && <AnalyzeButton onClick={onAnalyze} />}
+    </article>
   );
-}
+});

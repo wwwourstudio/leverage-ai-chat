@@ -81,8 +81,8 @@ Each welcome message explicitly mentions the analysis type and provides context-
 
 ## Documentation
 
-- **[JSON_ERROR_HANDLING.md](./JSON_ERROR_HANDLING.md)** - JSON parsing error prevention and safe data validation
-- **[SUPABASE_VALIDATION_SYSTEM.md](./SUPABASE_VALIDATION_SYSTEM.md)** - Database validation and error handling
+- **[JSON_VALIDATION_IMPROVEMENTS.md](./JSON_VALIDATION_IMPROVEMENTS.md)** - JSON parsing error fixes and safe response handling
+- **[SUPABASE_VALIDATION_SYSTEM.md](./SUPABASE_VALIDATION_SYSTEM.md)** - Database validation and error prevention
 - **[SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md)** - Sports validation and 404 error prevention
 - **[AI_MODEL_DOCUMENTATION.md](./AI_MODEL_DOCUMENTATION.md)** - Complete Grok-3 AI model information
 - **[API_FIX_SUMMARY.md](./API_FIX_SUMMARY.md)** - Latest fixes: Grok model update & error handling
@@ -95,9 +95,9 @@ Each welcome message explicitly mentions the analysis type and provides context-
 ## Common Issues
 
 Having trouble? Check **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** for solutions to common problems including:
+- **JSON parsing errors** - See **[JSON_VALIDATION_IMPROVEMENTS.md](./JSON_VALIDATION_IMPROVEMENTS.md)** - Now automatically handled
 - **Supabase query errors** - See **[SUPABASE_VALIDATION_SYSTEM.md](./SUPABASE_VALIDATION_SYSTEM.md)**
-- **JSON parsing errors** - Database validation handles this automatically
+- **404 "Unknown sport" errors** - See **[SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md)**
 - API configuration issues
 - Database connection problems
 - Environment variable setup
-- **404 "Unknown sport" errors** - See **[SPORTS_VALIDATION_SYSTEM.md](./SPORTS_VALIDATION_SYSTEM.md)**

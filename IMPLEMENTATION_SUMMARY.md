@@ -89,7 +89,7 @@ A complete transformation from **simulated responses** to **real-world data inte
 
 ### Before (Simulated)
 
-
+\`\`\`typescript
 // Hard-coded responses
 const simulateResponse = (userMessage: string) => {
   setIsTyping(true);
@@ -112,7 +112,7 @@ const simulateResponse = (userMessage: string) => {
     }]);
   }, 1500); // Fake delay
 };
-
+\`\`\`
 
 **Problems:**
 - ❌ No real data sources
@@ -124,7 +124,7 @@ const simulateResponse = (userMessage: string) => {
 
 ### After (Real Data)
 
-
+\`\`\`typescript
 // Real API integration
 const generateRealResponse = async (userMessage: string) => {
   setIsTyping(true);
@@ -166,7 +166,7 @@ const generateRealResponse = async (userMessage: string) => {
     handleFallback(error);
   }
 };
-
+\`\`\`
 
 **Benefits:**
 - ✅ Real-time data from external APIs
@@ -221,7 +221,7 @@ const generateRealResponse = async (userMessage: string) => {
 - Real-time subscriptions for live updates
 
 ### 4. Why Parallel API Calls?
-
+\`\`\`typescript
 // Sequential (slow)
 const analysis = await fetchAnalysis(); // 800ms
 const odds = await fetchOdds();         // 400ms
@@ -233,7 +233,7 @@ const [analysis, odds] = await Promise.all([
   fetchOdds()      // 400ms
 ]);
 // Total: 800ms (50% faster!)
-
+\`\`\`
 
 ### 5. Why Intelligent Caching?
 - Reduces API costs (The Odds API charges per request)
@@ -245,7 +245,7 @@ const [analysis, odds] = await Promise.all([
 
 ## Data Flow Architecture
 
-
+\`\`\`
 ┌─────────────┐
 │   User      │ "Should I bet Lakers -4.5?"
 └──────┬──────┘
@@ -283,6 +283,7 @@ const [analysis, odds] = await Promise.all([
           │  ✓ Trust 87%  │
           │  ✓ 3 sources  │
           └───────────────┘
+\`\`\`
 
 ---
 
@@ -291,26 +292,37 @@ const [analysis, odds] = await Promise.all([
 ### API Key Management
 
 **Before:**
+\`\`\`typescript
+// ❌ NEVER DO THIS
+const apiKey = 'sk-xxx'; // Exposed to client!
+fetch(`https://api.example.com?key=${apiKey}`);
+\`\`\`
 
+**After:**
+\`\`\`typescript
 // ✅ Server-side only
 // In /app/api/odds/route.ts
 const apiKey = process.env.ODDS_API_KEY; // Never sent to client
 
 // Client calls server route
 fetch('/api/odds', { ... }); // No key needed
-
+\`\`\`
 
 ### Environment Variables
 
 All sensitive credentials are managed via environment variables:
 
-
+\`\`\`bash
 # .env (server-side only, not committed to git)
 ODDS_API_KEY=your_key_here
 XAI_API_KEY=your_key_here
 NEXT_PUBLIC_SUPABASE_URL=your_url_here
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_key_here
+\`\`\`
 
+### Input Validation
+
+\`\`\`typescript
 // Validate all user inputs before API calls
 if (!sport || !validSports.includes(sport)) {
   return NextResponse.json(
@@ -318,7 +330,11 @@ if (!sport || !validSports.includes(sport)) {
     { status: 400 }
   );
 }
+\`\`\`
 
+### Rate Limiting
+
+\`\`\`typescript
 // Implement per-user rate limiting
 const rateLimiter = new Ratelimit({
   redis: Redis.fromEnv(),
@@ -330,7 +346,7 @@ const { success } = await rateLimiter.limit(userId);
 if (!success) {
   return new Response('Too many requests', { status: 429 });
 }
-
+\`\`\`
 
 ---
 
@@ -373,7 +389,7 @@ if (!success) {
 
 ### Setup Steps
 
-
+\`\`\`bash
 # 1. Add environment variables in Vercel dashboard
 # Settings → Environment Variables → Add
 
@@ -386,7 +402,7 @@ npm run dev
 
 # 4. Test the integration
 # Open chat and ask: "Should I bet on the Lakers?"
-
+\`\`\`
 
 ---
 
@@ -411,7 +427,7 @@ npm run dev
 
 ### Vercel Deployment
 
-
+\`\`\`bash
 # 1. Push code to GitHub
 git add .
 git commit -m "Implement real data integration"
@@ -424,7 +440,7 @@ git push origin main
 
 # 4. Redeploy to apply variables
 # Deployments → ⋯ → Redeploy
-
+\`\`\`
 
 ### Production Checklist
 
@@ -445,12 +461,30 @@ git push origin main
 ### Key Metrics to Track
 
 1. **API Performance**
+   \`\`\`typescript
+   // Log API response times
+   console.log('[v0] API call duration:', duration);
+   \`\`\`
 
+2. **Error Rates**
+   \`\`\`typescript
    // Track API failures
    if (!response.ok) {
      trackError('odds_api_failure', response.status);
    }
+   \`\`\`
 
+3. **Cache Hit Rate**
+   \`\`\`typescript
+   // Monitor cache effectiveness
+   const hitRate = cacheHits / totalRequests;
+   \`\`\`
+
+4. **User Engagement**
+   \`\`\`typescript
+   // Track messages per session
+   const avgMessages = totalMessages / totalSessions;
+   \`\`\`
 
 ---
 

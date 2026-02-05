@@ -31,7 +31,9 @@ All sensitive API keys are managed server-side through:
 4. Add to Vercel environment variables as `ODDS_API_KEY`
 
 **Environment Variable:**
-
+\`\`\`
+ODDS_API_KEY=your_api_key_here
+\`\`\`
 
 ### 2. Grok AI API Key (xAI)
 
@@ -44,7 +46,9 @@ All sensitive API keys are managed server-side through:
 4. Add to Vercel environment variables as `XAI_API_KEY`
 
 **Environment Variable:**
-
+\`\`\`
+XAI_API_KEY=your_api_key_here
+\`\`\`
 
 ### 3. Supabase Configuration
 
@@ -74,13 +78,16 @@ The application exposes the following server-side API routes:
 Fetch sports odds data
 
 **Request:**
-
+\`\`\`json
 {
   "sport": "nfl",
   "marketType": "h2h",
   "eventId": "optional-event-id"
 }
+\`\`\`
 
+**Response:**
+\`\`\`json
 {
   "sport": "nfl",
   "marketType": "h2h",
@@ -89,14 +96,14 @@ Fetch sports odds data
   "remainingRequests": "450",
   "usedRequests": "50"
 }
-
+\`\`\`
 
 ### `/api/analyze` (POST)
 
 Get AI-powered sports analysis
 
 **Request:**
-
+\`\`\`json
 {
   "query": "Should I bet on Lakers -4.5?",
   "context": {
@@ -105,7 +112,7 @@ Get AI-powered sports analysis
     "oddsData": {...}
   }
 }
-
+\`\`\`
 
 **Response:**
 ```json
@@ -117,7 +124,7 @@ Get AI-powered sports analysis
     "riskLevel": "low",
     ...
   },
-
+  "model": "grok-3",
   "processingTime": 1250
 }
 ```
@@ -128,12 +135,16 @@ The application provides a secure API client library at `/lib/api-client.ts`:
 
 ### Fetch Odds Example
 
-
+\`\`\`typescript
 import { fetchOddsWithCache } from '@/lib/api-client';
 
 const oddsData = await fetchOddsWithCache('nfl', 'h2h');
 console.log(oddsData.events);
+\`\`\`
 
+### Get AI Analysis Example
+
+\`\`\`typescript
 import { getAIAnalysis } from '@/lib/api-client';
 
 const analysis = await getAIAnalysis(
@@ -146,6 +157,7 @@ const analysis = await getAIAnalysis(
 
 console.log(analysis.response);
 console.log(analysis.trustMetrics);
+\`\`\`
 
 ## Security Best Practices
 
@@ -168,6 +180,28 @@ console.log(analysis.trustMetrics);
 ## Testing the Integration
 
 ### 1. Verify Environment Variables
+
+\`\`\`bash
+# Check if variables are set
+echo $ODDS_API_KEY
+echo $XAI_API_KEY
+\`\`\`
+
+### 2. Test Odds API
+
+\`\`\`bash
+curl -X POST http://localhost:3000/api/odds \
+  -H "Content-Type: application/json" \
+  -d '{"sport":"nfl","marketType":"h2h"}'
+\`\`\`
+
+### 3. Test Grok AI Analysis
+
+\`\`\`bash
+curl -X POST http://localhost:3000/api/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Analyze NBA games tonight"}'
+\`\`\`
 
 ## Troubleshooting
 
@@ -201,7 +235,15 @@ console.log(analysis.trustMetrics);
 The application previously used simulated responses. The refactoring maintains backward compatibility:
 
 **Before (mock data):**
+\`\`\`typescript
+simulateResponse(userMessage);
+\`\`\`
 
+**After (real API integration):**
+\`\`\`typescript
+const analysis = await getAIAnalysis(userMessage, context);
+// Process real AI response with trust metrics
+\`\`\`
 
 ## Cost Optimization
 
@@ -222,6 +264,10 @@ The application implements intelligent caching to minimize API calls:
 ### Rate Limiting
 
 Consider implementing rate limiting at the route handler level to prevent abuse:
+
+\`\`\`typescript
+// Example: Limit to 60 requests per hour per user
+\`\`\`
 
 ## Production Checklist
 

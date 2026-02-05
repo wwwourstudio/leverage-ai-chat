@@ -46,6 +46,33 @@ const CACHE_DURATION = {
 const cache = new Map<string, { data: any; timestamp: number }>();
 
 /**
+ * Safely parse JSON with error handling
+ */
+async function safeJsonParse(response: Response): Promise<any> {
+  try {
+    // First, get the text
+    const text = await response.text();
+    
+    // Check if it's empty
+    if (!text || text.trim().length === 0) {
+      throw new Error('Empty response body');
+    }
+    
+    // Try to parse as JSON
+    try {
+      return JSON.parse(text);
+    } catch (parseError) {
+      // Log the first 200 characters of the response for debugging
+      console.log(`${LOG_PREFIXES.DATA_SERVICE} JSON parse error. Response starts with:`, text.substring(0, 200));
+      throw new Error(`Invalid JSON: ${parseError instanceof Error ? parseError.message : 'Parse failed'}`);
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`Response parsing failed: ${errorMessage}`);
+  }
+}
+
+/**
  * Fetch dynamic cards based on context
  */
 export async function fetchDynamicCards(params: {
@@ -80,7 +107,7 @@ export async function fetchDynamicCards(params: {
       throw new Error('Cards API returned non-JSON response');
     }
 
-    const result = await response.json();
+    const result = await safeJsonParse(response);
     const cards = Array.isArray(result.cards) ? result.cards : [];
 
     cache.set(cacheKey, { data: cards, timestamp: Date.now() });
@@ -120,7 +147,7 @@ export async function fetchUserInsights(): Promise<UserInsights> {
       throw new Error('Insights API returned non-JSON response');
     }
 
-    const result = await response.json();
+    const result = await safeJsonParse(response);
     
     if (!result || typeof result !== 'object') {
       throw new Error('Invalid response format from insights API');
@@ -183,7 +210,7 @@ export async function fetchLiveOdds(sport: string, marketType: string = 'h2h') {
       throw new Error('Odds API returned non-JSON response');
     }
 
-    const result = await response.json();
+    const result = await safeJsonParse(response);
     cache.set(cacheKey, { data: result, timestamp: Date.now() });
     return result;
   } catch (error) {

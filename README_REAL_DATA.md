@@ -41,23 +41,33 @@ This project has been upgraded from simulated responses to **real-world data int
 1. Go to your Vercel project
 2. Settings → Environment Variables
 3. Add:
-
+   \`\`\`
+   ODDS_API_KEY=your_odds_api_key_here
+   XAI_API_KEY=your_xai_api_key_here
+   \`\`\`
 4. Redeploy your app
 
 #### Option B: Local Development
 1. Create `.env.local` file in project root:
-
+   \`\`\`bash
+   ODDS_API_KEY=your_odds_api_key_here
+   XAI_API_KEY=your_xai_api_key_here
+   \`\`\`
+2. Restart dev server:
+   \`\`\`bash
+   npm run dev
+   \`\`\`
 
 ### 3. Test the Integration
 
 Open your app and try these queries:
 
-
+\`\`\`
 "Should I bet on the Lakers tonight?"
 "Build me a DraftKings NFL lineup"
 "Best fantasy draft strategy for this week"
 "Kalshi weather market opportunities"
-
+\`\`\`
 
 You should see:
 - ✅ Real-time data in responses
@@ -69,7 +79,7 @@ You should see:
 
 ## Architecture Overview
 
-
+\`\`\`
 User Query
     ↓
 Frontend (page.tsx)
@@ -85,25 +95,41 @@ Frontend (page.tsx)
     Combine & Return
             ↓
     Display to User
-
+\`\`\`
 
 ---
 
 ## File Structure
 
 ### API Routes (Server-Side)
-
+\`\`\`
 /app/api/
 ├── analyze/route.ts      # Grok AI integration
 ├── odds/route.ts         # The Odds API integration
 └── health/route.ts       # Health check endpoint
+\`\`\`
 
+### Utility Libraries
+\`\`\`
+/lib/
+├── api-client.ts         # Client-side API wrapper
+└── test-helpers.ts       # Testing and debugging utilities
+\`\`\`
+
+### Supabase Functions
+\`\`\`
+/supabase/functions/
+└── validate-ai-response/ # Edge function for trust validation
+\`\`\`
+
+### Documentation
+\`\`\`
 /
 ├── README_REAL_DATA.md           # This file (quick start)
 ├── INTEGRATION_SETUP.md          # Detailed setup guide
 ├── REAL_DATA_INTEGRATION.md      # Technical architecture docs
 └── IMPLEMENTATION_SUMMARY.md     # Complete implementation overview
-
+\`\`\`
 
 ---
 
@@ -137,7 +163,7 @@ Try these test queries in the chat:
 
 Run the test suite in your browser console:
 
-
+\`\`\`javascript
 // Import test helpers
 import { runAllTests } from '/lib/test-helpers';
 
@@ -148,14 +174,14 @@ const results = await runAllTests();
 import { testOddsAPI, testGrokAI } from '/lib/test-helpers';
 await testOddsAPI();
 await testGrokAI();
-
+\`\`\`
 
 ### Health Check
 
 Visit: `https://your-app.vercel.app/api/health`
 
 Should return:
-
+\`\`\`json
 {
   "status": "healthy",
   "ready": true,
@@ -165,7 +191,7 @@ Should return:
     "supabase": true
   }
 }
-
+\`\`\`
 
 ---
 
@@ -175,7 +201,7 @@ Should return:
 
 Fetch live odds from 50+ bookmakers:
 
-
+\`\`\`typescript
 const oddsData = await fetch('/api/odds', {
   method: 'POST',
   body: JSON.stringify({
@@ -183,7 +209,7 @@ const oddsData = await fetch('/api/odds', {
     marketType: 'h2h'
   })
 });
-
+\`\`\`
 
 **Supported Sports:**
 - NFL, NBA, MLB, NHL
@@ -200,7 +226,7 @@ const oddsData = await fetch('/api/odds', {
 
 Grok-2 analyzes your queries with context:
 
-
+\`\`\`typescript
 const analysis = await fetch('/api/analyze', {
   method: 'POST',
   body: JSON.stringify({
@@ -212,7 +238,7 @@ const analysis = await fetch('/api/analyze', {
     }
   })
 });
-
+\`\`\`
 
 **Context Extraction:**
 - Automatically detects sport (NBA, NFL, MLB, etc.)
@@ -238,13 +264,13 @@ Every response includes calculated trust metrics:
 
 Reduces API costs and improves performance:
 
-
+\`\`\`typescript
 // First request: API call (800ms)
 const data1 = await fetchOdds('nba');
 
 // Within 60 seconds: Cache hit (50ms)
 const data2 = await fetchOdds('nba');
-
+\`\`\`
 
 **Cache Strategy:**
 - Odds data: 60-second TTL
@@ -258,12 +284,12 @@ const data2 = await fetchOdds('nba');
 The system gracefully handles failures:
 
 ### API Failures
-
+\`\`\`
 ❌ API Error → Use cached data
 ❌ Rate limit → Exponential backoff
 ❌ Timeout → Retry with fallback
 ❌ Invalid key → User notification
-
+\`\`\`
 
 ### Fallback Response
 When live data is unavailable:
@@ -316,7 +342,7 @@ When live data is unavailable:
 
 ### Key Metrics to Track
 
-
+\`\`\`bash
 # API Performance
 - Response time: < 1000ms (target)
 - Error rate: < 1% (target)
@@ -326,13 +352,13 @@ When live data is unavailable:
 - Messages per user: ~10-15
 - AI confidence: 80-90% avg
 - Trust level distribution: 70% high, 25% medium, 5% low
-
+\`\`\`
 
 ### Debug Logging
 
 Enable detailed logging:
 
-
+\`\`\`javascript
 // In browser console
 localStorage.setItem('debug', 'v0:*');
 
@@ -340,7 +366,7 @@ localStorage.setItem('debug', 'v0:*');
 [v0] Starting real AI analysis for: ...
 [v0] Extracted context: ...
 [v0] Analysis result received: ...
-
+\`\`\`
 
 ---
 
@@ -417,7 +443,7 @@ localStorage.setItem('debug', 'v0:*');
 
 ### Vercel (Recommended)
 
-
+\`\`\`bash
 # 1. Push to GitHub
 git add .
 git commit -m "Real data integration"
@@ -430,7 +456,7 @@ git push origin main
 
 # 4. Redeploy
 # Deployments → ⋯ → Redeploy
-
+\`\`\`
 
 ### Environment Variables Checklist
 
@@ -501,14 +527,30 @@ You now have a **production-ready sports intelligence platform** with:
 ## Quick Reference
 
 ### Test Queries
-
+\`\`\`javascript
 const queries = {
   betting: "Should I bet Lakers -4.5?",
   dfs: "Build me a DraftKings lineup",
   fantasy: "Best draft strategy for NFBC",
   kalshi: "Kalshi weather market analysis"
 };
+\`\`\`
 
+### API Endpoints
+\`\`\`bash
+POST /api/analyze  # AI analysis
+POST /api/odds     # Live odds
+GET  /api/health   # Health check
+\`\`\`
+
+### Environment Variables
+\`\`\`bash
+ODDS_API_KEY=your_key
+XAI_API_KEY=your_key
+\`\`\`
+
+### Debug Commands
+\`\`\`javascript
 // Test integrations
 import { runAllTests } from '/lib/test-helpers';
 await runAllTests();
@@ -518,7 +560,7 @@ localStorage.setItem('debug', 'v0:*');
 
 // Check health
 fetch('/api/health').then(r => r.json());
-
+\`\`\`
 
 ---
 

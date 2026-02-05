@@ -1690,7 +1690,6 @@ export default function UnifiedAIPlatform() {
           <div className="max-w-4xl mx-auto">
             <div className="flex gap-3">
               <textarea
-                ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {

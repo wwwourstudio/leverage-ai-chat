@@ -275,9 +275,11 @@ export async function safeQuery<T = any>(
 
     if (!validation.isValid) {
       if (logErrors) {
-        // Log the error message safely - avoid potential JSON parsing issues
+        // Log the error message safely - ensure it's a plain string to avoid JSON parsing issues
         const safeError = validation.error || 'Unknown validation error';
-        console.log(`${LOG_PREFIXES.DATABASE} Query validation failed for '${tableName}':`, safeError);
+        // Use separate arguments to avoid console trying to parse the error as JSON
+        console.log(`${LOG_PREFIXES.DATABASE} Query validation failed for '${tableName}'`);
+        console.log(`${LOG_PREFIXES.DATABASE} Error details:`, safeError);
       }
       return {
         success: false,
@@ -294,9 +296,10 @@ export async function safeQuery<T = any>(
       source: 'database'
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = extractErrorMessage(error);
     if (logErrors) {
-      console.log(`${LOG_PREFIXES.DATABASE} Exception during query to '${tableName}':`, errorMessage);
+      console.log(`${LOG_PREFIXES.DATABASE} Exception during query to '${tableName}'`);
+      console.log(`${LOG_PREFIXES.DATABASE} Exception details:`, errorMessage);
     }
     return {
       success: false,

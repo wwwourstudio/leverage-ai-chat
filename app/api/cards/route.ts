@@ -38,11 +38,22 @@ interface CardRequest {
  */
 export async function POST(req: NextRequest) {
   try {
-    console.log(`${LOG_PREFIXES.API} Dynamic cards generation started`);
+    console.log(`${LOG_PREFIXES.API} ========================================`);
+    console.log(`${LOG_PREFIXES.API} CARDS API: POST REQUEST RECEIVED`);
+    console.log(`${LOG_PREFIXES.API} Timestamp:`, new Date().toISOString());
+    
     const body: CardRequest = await req.json();
+    console.log(`${LOG_PREFIXES.API} Request body parsed:`, JSON.stringify(body, null, 2));
+    
     const { sport, category, userContext, limit = 3 } = body;
+    console.log(`${LOG_PREFIXES.API} Extracted parameters:`);
+    console.log(`${LOG_PREFIXES.API} - Sport: ${sport || 'not specified'}`);
+    console.log(`${LOG_PREFIXES.API} - Category: ${category || 'not specified'}`);
+    console.log(`${LOG_PREFIXES.API} - Limit: ${limit}`);
+    console.log(`${LOG_PREFIXES.API} - User context:`, userContext ? 'provided' : 'not provided');
 
     const oddsApiKey = process.env[ENV_KEYS.ODDS_API_KEY];
+    console.log(`${LOG_PREFIXES.API} Odds API Key configured:`, oddsApiKey ? 'YES' : 'NO');
     
     // Fetch real odds data if available
     let liveOddsData = null;
@@ -79,6 +90,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate cards based on category and available data
+    console.log(`${LOG_PREFIXES.API} → Calling generateDynamicCards...`);
+    console.log(`${LOG_PREFIXES.API} Generation parameters:`, {
+      category,
+      sport,
+      hasOddsData: !!liveOddsData,
+      oddsEventsCount: liveOddsData?.length || 0,
+      hasUserContext: !!userContext,
+      limit
+    });
+    
     const cards = await generateDynamicCards({
       category,
       sport,
@@ -87,13 +108,34 @@ export async function POST(req: NextRequest) {
       limit
     });
 
-    return NextResponse.json({
+    console.log(`${LOG_PREFIXES.API} ✓ Generated ${cards.length} cards`);
+    
+    if (cards.length === 0) {
+      console.log(`${LOG_PREFIXES.API} ⚠ WARNING: Zero cards generated!`);
+      console.log(`${LOG_PREFIXES.API} Possible causes:`);
+      console.log(`${LOG_PREFIXES.API} 1. No odds data available (had ${liveOddsData?.length || 0} events)`);
+      console.log(`${LOG_PREFIXES.API} 2. Sport not recognized: ${sport}`);
+      console.log(`${LOG_PREFIXES.API} 3. Category filtering too strict: ${category}`);
+      console.log(`${LOG_PREFIXES.API} 4. generateDynamicCards logic issue`);
+    } else {
+      console.log(`${LOG_PREFIXES.API} Card summary:`);
+      cards.forEach((card, idx) => {
+        console.log(`${LOG_PREFIXES.API}   ${idx + 1}. ${card.type} - ${card.title} [${card.category}]`);
+      });
+    }
+
+    const response = {
       success: true,
       cards,
       dataSource: oddsApiKey ? DATA_SOURCES.LIVE : DATA_SOURCES.SIMULATED,
       sportValidation: validationResult,
       timestamp: new Date().toISOString()
-    });
+    };
+    
+    console.log(`${LOG_PREFIXES.API} ← Sending response with ${cards.length} cards`);
+    console.log(`${LOG_PREFIXES.API} ========================================`);
+    
+    return NextResponse.json(response);
 
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -115,26 +157,51 @@ async function generateDynamicCards(params: {
   userContext?: any;
   limit: number;
 }) {
+  console.log(`${LOG_PREFIXES.API} ----------------------------------------`);
+  console.log(`${LOG_PREFIXES.API} generateDynamicCards() called`);
+  console.log(`${LOG_PREFIXES.API} Input parameters:`, {
+    category,
+    sport,
+    hasOddsData: !!oddsData,
+    oddsDataIsArray: Array.isArray(oddsData),
+    oddsDataLength: oddsData?.length || 0,
+    limit
+  });
+  
   const { category, sport, oddsData, limit } = params;
   const cards: any[] = [];
 
   // Generate betting cards from live odds using transformer
   if (oddsData && Array.isArray(oddsData) && oddsData.length > 0) {
+    console.log(`${LOG_PREFIXES.API} ✓ Odds data validation passed`);
     console.log(`${LOG_PREFIXES.API} Processing ${oddsData.length} live odds events`);
     
     // Transform and enhance the odds data
-    const filteredEvents = filterEventsByTimeRange(oddsData, 48); // Next 48 hours
+    console.log(`${LOG_PREFIXES.API} → Step 1: Filtering events by time range (48 hours)...`);
+    const filteredEvents = filterEventsByTimeRange(oddsData, 48);
+    console.log(`${LOG_PREFIXES.API}   Filtered to ${filteredEvents.length} upcoming events`);
+    
+    console.log(`${LOG_PREFIXES.API} → Step 2: Transforming odds events...`);
     const transformedOdds = transformOddsEvents(filteredEvents);
+    console.log(`${LOG_PREFIXES.API}   Transformed ${transformedOdds.length} events`);
+    
+    console.log(`${LOG_PREFIXES.API} → Step 3: Sorting by value...`);
     const sortedByValue = sortEventsByValue(transformedOdds);
+    console.log(`${LOG_PREFIXES.API}   Sorted ${sortedByValue.length} events by market value`);
     
     // Take top events by value
     const topEvents = sortedByValue.slice(0, limit * 2); // Get more to filter
+    console.log(`${LOG_PREFIXES.API} → Step 4: Selected top ${topEvents.length} events for card generation`)
+    
+    console.log(`${LOG_PREFIXES.API} → Step 5: Generating cards from top events...`);
     
     for (const transformed of topEvents) {
       const event = transformed.event;
+      console.log(`${LOG_PREFIXES.API}   Processing: ${event.home_team} vs ${event.away_team}`);
       
       // Generate spread card if available
       if (transformed.bestSpread && cards.length < limit) {
+        console.log(`${LOG_PREFIXES.API}     ✓ Adding spread card`)
         const spread = transformed.bestSpread;
         const edge = spread.edge;
         const confidence = Math.round((1 - spread.impliedProbability) * 100);
@@ -234,19 +301,29 @@ async function generateDynamicCards(params: {
         });
       }
 
-      if (cards.length >= limit) break;
+      if (cards.length >= limit) {
+        console.log(`${LOG_PREFIXES.API}   ✓ Reached limit of ${limit} cards, stopping`);
+        break;
+      }
     }
     
-    console.log(`${LOG_PREFIXES.API} Generated ${cards.length} cards from live odds data`);
+    console.log(`${LOG_PREFIXES.API} ✓ Generated ${cards.length} cards from live odds data`);
+  } else {
+    console.log(`${LOG_PREFIXES.API} ⚠ No odds data available for card generation`);
+    console.log(`${LOG_PREFIXES.API} Reasons: oddsData=${!!oddsData}, isArray=${Array.isArray(oddsData)}, length=${oddsData?.length || 0}`);
   }
 
   // If no live data or need more cards, generate contextual recommendations
   if (cards.length < limit) {
     const contextualCount = limit - cards.length;
-    console.log(`${LOG_PREFIXES.API} Adding ${contextualCount} contextual cards`);
-    cards.push(...generateContextualCards(category, sport, contextualCount));
+    console.log(`${LOG_PREFIXES.API} → Step 6: Need ${contextualCount} more cards, generating contextual cards...`);
+    const contextualCards = generateContextualCards(category, sport, contextualCount);
+    console.log(`${LOG_PREFIXES.API}   Generated ${contextualCards.length} contextual cards`);
+    cards.push(...contextualCards);
   }
 
+  console.log(`${LOG_PREFIXES.API} ✓ Final result: ${cards.length} total cards`);
+  console.log(`${LOG_PREFIXES.API} ----------------------------------------`);
   return cards.slice(0, limit);
 }
 

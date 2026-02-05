@@ -1696,7 +1696,7 @@ export default function UnifiedAIPlatform() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    handleSendMessage();
+                    handleSubmit(e as any);
                   }
                 }}
                 placeholder="Ask about sports betting, fantasy, DFS, or Kalshi markets..."
@@ -1704,7 +1704,7 @@ export default function UnifiedAIPlatform() {
                 rows={3}
               />
               <button
-                onClick={handleSendMessage}
+                onClick={(e) => handleSubmit(e as any)}
                 disabled={!input.trim() || isTyping}
                 className="px-6 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-xl transition-colors flex items-center gap-2"
               >

@@ -1996,13 +1996,36 @@ export default function UnifiedAIPlatform() {
         </div>
 
         {/* Messages Container - Dynamic Data-Driven Interface */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar">
+        <div 
+          className="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar scroll-smooth"
+          style={{ 
+            scrollBehavior: 'smooth',
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
           <div className="max-w-5xl mx-auto space-y-6">
-            {messages.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}
-              >
+            {messages.length === 0 ? (
+              <div className="flex items-center justify-center h-full min-h-[400px]">
+                <div className="text-center space-y-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-blue-500/30">
+                    <Sparkles className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-300">No messages yet</h3>
+                  <p className="text-sm text-gray-500">Start a conversation to get AI-powered insights</p>
+                </div>
+              </div>
+            ) : (
+              messages.map((message, index) => {
+                // Group messages: Check if this message is from same sender as previous
+                const prevMessage = index > 0 ? messages[index - 1] : null;
+                const isGrouped = prevMessage && prevMessage.role === message.role;
+                const showTimestamp = !isGrouped || index === messages.length - 1;
+                
+                return (
+                  <div
+                    key={`message-${index}-${message.timestamp.getTime()}`}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn ${isGrouped ? 'mt-2' : 'mt-6'}`}
+                  >
                 <div className={`max-w-4xl ${message.role === 'user' ? 'w-auto' : 'w-full'}`}>
                   {message.role === 'assistant' && (
                     <div className="flex items-center gap-3 mb-3 flex-wrap">
@@ -2666,7 +2689,9 @@ export default function UnifiedAIPlatform() {
                   )}
                 </div>
               </div>
-            ))}
+            );
+          })
+        )}
 
             {isTyping && (
               <div className="flex justify-start animate-fadeIn">

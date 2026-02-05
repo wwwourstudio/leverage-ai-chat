@@ -56,12 +56,13 @@ export async function GET(req: NextRequest) {
     );
 
     if (!queryResult.success || queryResult.source !== 'database') {
-      console.log(`${LOG_PREFIXES.API} Using default insights: ${queryResult.error || 'No database data'}`);
+      const errorMsg = queryResult.error || 'No database data';
+      console.log(`${LOG_PREFIXES.API} Using default insights -`, errorMsg);
       return NextResponse.json({
         success: true,
         insights: getDefaultInsights(),
         dataSource: queryResult.source,
-        message: queryResult.error || 'Table not yet created'
+        message: typeof errorMsg === 'string' ? errorMsg : 'Table not yet created'
       });
     }
 

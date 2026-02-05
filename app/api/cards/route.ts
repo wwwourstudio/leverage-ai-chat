@@ -157,6 +157,10 @@ async function generateDynamicCards(params: {
   userContext?: any;
   limit: number;
 }) {
+  // Destructure parameters FIRST before using them
+  const { category, sport, oddsData, limit } = params;
+  const cards: any[] = [];
+  
   console.log(`${LOG_PREFIXES.API} ----------------------------------------`);
   console.log(`${LOG_PREFIXES.API} generateDynamicCards() called`);
   console.log(`${LOG_PREFIXES.API} Input parameters:`, {
@@ -167,9 +171,6 @@ async function generateDynamicCards(params: {
     oddsDataLength: oddsData?.length || 0,
     limit
   });
-  
-  const { category, sport, oddsData, limit } = params;
-  const cards: any[] = [];
 
   // Generate betting cards from live odds using transformer
   if (oddsData && Array.isArray(oddsData) && oddsData.length > 0) {

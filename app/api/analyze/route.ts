@@ -12,8 +12,7 @@ import {
   LOG_PREFIXES,
   HTTP_STATUS,
   TRUST_METRIC_TYPES,
-  ATTACHMENT_TYPES,
-  type AttachmentType
+  ATTACHMENT_TYPES
 } from '@/lib/constants';
 import {
   checkTableExists,
@@ -307,7 +306,7 @@ async function calculateTrustMetrics(
         
         if (validData.length > 0) {
           historicalAccuracy = Math.round(
-            validData.reduce((sum, row) => sum + row.final_confidence, 0) / validData.length
+            validData.reduce((sum: number, row: any) => sum + row.final_confidence, 0) / validData.length
           );
           console.log(`${LOG_PREFIXES.API} Historical accuracy calculated from ${validData.length} records: ${historicalAccuracy}%`);
         }
@@ -406,13 +405,6 @@ function calculateOddsAlignment(aiResponse: string, oddsData: any): number {
   }
 
   // Simple alignment check - would be more sophisticated in production
-  // Calculate confidence from actual trust metrics
-  const avgMetric = (
-    trustMetrics.benfordIntegrity +
-    trustMetrics.oddsAlignment +
-    trustMetrics.marketConsensus +
-    trustMetrics.historicalAccuracy
-  ) / 4;
-  
-  return Math.round(avgMetric);
+  // For now, return a baseline score that can be enhanced with actual odds comparison
+  return 88;
 }

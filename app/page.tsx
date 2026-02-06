@@ -2534,24 +2534,16 @@ export default function UnifiedAIPlatform() {
                   {message.role === 'assistant' && (
                     <div className="mt-5">
                       {message.cards && message.cards.length > 0 ? (
-                        <>
-                          <div className="flex items-center gap-2 mb-4 ml-11">
-                            <Sparkles className="w-4 h-4 text-blue-400" />
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                              Live Data Insights ({Math.max(0, message.cards.length - 3)})
-                            </h4>
-                          </div>
-                          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                            {message.cards.slice(3).map((card, cardIndex) => (
-                              <DynamicCardRenderer
-                                key={`${card.type}-${cardIndex}`}
-                                card={card}
-                                index={cardIndex}
-                                onAnalyze={() => generateDetailedAnalysis(card)}
-                              />
-                            ))}
-                          </div>
-                        </>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                          {message.cards.slice(3).map((card, cardIndex) => (
+                            <DynamicCardRenderer
+                              key={`${card.type}-${cardIndex}`}
+                              card={card}
+                              index={cardIndex}
+                              onAnalyze={() => generateDetailedAnalysis(card)}
+                            />
+                          ))}
+                        </div>
                       ) : !message.isWelcome && (
                         <EmptyState />
                       )}

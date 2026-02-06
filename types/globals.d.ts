@@ -4,8 +4,48 @@
 // Ensure JSX types are available globally
 declare global {
   namespace JSX {
+    interface Element extends React.ReactElement<any, any> { }
+    interface ElementClass extends React.Component<any> {
+      render(): React.ReactNode;
+    }
+    interface ElementAttributesProperty { props: {}; }
+    interface ElementChildrenAttribute { children: {}; }
+    
+    type LibraryManagedAttributes<C, P> = P;
+    
+    interface IntrinsicAttributes extends React.Attributes { }
+    interface IntrinsicClassAttributes<T> extends React.ClassAttributes<T> { }
+    
     interface IntrinsicElements {
       [elemName: string]: any;
+      div: any;
+      span: any;
+      button: any;
+      input: any;
+      form: any;
+      a: any;
+      p: any;
+      h1: any;
+      h2: any;
+      h3: any;
+      h4: any;
+      h5: any;
+      h6: any;
+      img: any;
+      svg: any;
+      path: any;
+      textarea: any;
+      select: any;
+      option: any;
+      label: any;
+      ul: any;
+      li: any;
+      section: any;
+      article: any;
+      header: any;
+      footer: any;
+      nav: any;
+      main: any;
     }
   }
 }

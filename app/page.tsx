@@ -2540,11 +2540,11 @@ export default function UnifiedAIPlatform() {
                           <div className="flex items-center gap-2 mb-4 ml-11">
                             <Sparkles className="w-4 h-4 text-blue-400" />
                             <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                              Live Data Insights ({message.cards.length})
+                              Live Data Insights ({Math.max(0, message.cards.length - 3)})
                             </h4>
                           </div>
                           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                            {message.cards.map((card, cardIndex) => (
+                            {message.cards.slice(3).map((card, cardIndex) => (
                               <DynamicCardRenderer
                                 key={`${card.type}-${cardIndex}`}
                                 card={card}

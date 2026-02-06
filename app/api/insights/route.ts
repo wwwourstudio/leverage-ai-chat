@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
     // For now, aggregate platform-wide statistics
     
     // Safely fetch AI predictions from trust system with validation
+    console.log(`[v0] Attempting to query ${APP_TABLES.AI_PREDICTIONS} table...`);
     const queryResult = await safeQuery(
       supabase,
       APP_TABLES.AI_PREDICTIONS,

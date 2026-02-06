@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 /**
  * Configuration Status Checker
  * Verifies that required environment variables are properly configured

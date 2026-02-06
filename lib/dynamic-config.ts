@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 /**
  * Dynamic Configuration System
  * Fetches configuration values from Supabase instead of hardcoding
@@ -72,7 +74,7 @@ export async function getConfig(
         .eq('category', category)
         .single(),
       {
-        defaultValue: null,
+        defaultValue: undefined,
         logErrors: false
       }
     );
@@ -165,7 +167,7 @@ export async function getUserProfile(
         .eq('user_id', userId)
         .single(),
       {
-        defaultValue: null,
+        defaultValue: undefined,
         logErrors: false
       }
     );

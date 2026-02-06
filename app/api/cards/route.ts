@@ -60,10 +60,14 @@ export async function POST(req: NextRequest) {
     let liveOddsData = null;
     let validationResult = null;
     
-    if (oddsApiKey && sport) {
+    // Use NBA as default sport if no sport specified
+    const sportToFetch = sport || 'nba';
+    console.log(`${LOG_PREFIXES.API} Sport to fetch: ${sportToFetch}${!sport ? ' (default)' : ''}`);
+    
+    if (oddsApiKey) {
       try {
         // Validate and normalize the sport key
-        validationResult = validateSportKey(sport);
+        validationResult = validateSportKey(sportToFetch);
         
         if (!validationResult.isValid) {
           console.log(`${LOG_PREFIXES.API} Invalid sport key:`, validationResult.error, validationResult.suggestion);
@@ -338,7 +342,7 @@ async function generateDynamicCards(params: {
     cards.push(...contextualCards);
   }
 
-  console.log(`${LOG_PREFIXES.API} ✓ Final result: ${cards.length} total cards`);
+  console.log(`${LOG_PREFIXES.API} �� Final result: ${cards.length} total cards`);
   console.log(`${LOG_PREFIXES.API} ----------------------------------------`);
   return cards.slice(0, limit);
 }

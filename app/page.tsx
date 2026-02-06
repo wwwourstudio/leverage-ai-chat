@@ -2535,7 +2535,7 @@ export default function UnifiedAIPlatform() {
                     <div className="mt-5">
                       {message.cards && message.cards.length > 0 ? (
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                          {message.cards.slice(3).map((card, cardIndex) => (
+                          {message.cards.map((card, cardIndex) => (
                             <DynamicCardRenderer
                               key={`${card.type}-${cardIndex}`}
                               card={card}

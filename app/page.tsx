@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data-service';
 import { API_ENDPOINTS } from '@/lib/constants';
 import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2 } from 'lucide-react';
@@ -537,9 +537,9 @@ export default function UnifiedAIPlatform() {
 
   const handleStarChat = (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setChats(chats.map(chat =>
-      chat.id === chatId ? { ...chat, starred: !chat.starred } : chat
-    ));
+      setChats(chats.map((chat: Chat) =>
+        chat.id === id ? { ...chat, starred: !chat.starred } : chat
+      ));
   };
 
   const generateContextualSuggestions = (userMessage: string, responseCards: InsightCard[]) => {
@@ -1210,7 +1210,7 @@ export default function UnifiedAIPlatform() {
   };
 
   const buildSourcesList = (oddsData: any): Array<{ name: string; type: 'database' | 'api' | 'model' | 'cache'; reliability: number; url?: string }> => {
-    const sources = [
+    const sources: Array<{ name: string; type: 'database' | 'api' | 'model' | 'cache'; reliability: number; url?: string }> = [
       { name: 'Grok AI Model', type: 'model' as const, reliability: 94 },
       { name: 'Supabase Trust System', type: 'database' as const, reliability: 96 }
     ];
@@ -1353,7 +1353,7 @@ export default function UnifiedAIPlatform() {
     setUploadedFiles([]);
     
     // Update chat preview and title based on first user message
-    setChats((prevChats: Chat[]) => prevChats.map(chat => {
+    setChats((prevChats: Chat[]) => prevChats.map((chat: Chat) => {
       if (chat.id === activeChat) {
         const updatedChat = { ...chat };
         // Update preview with user's message
@@ -1448,9 +1448,9 @@ export default function UnifiedAIPlatform() {
 
   const handleDeleteChat = (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setChats(chats.filter(chat => chat.id !== chatId));
+    setChats(chats.filter((chat: Chat) => chat.id !== chatId));
     if (activeChat === chatId && chats.length > 1) {
-      const remainingChats = chats.filter(chat => chat.id !== chatId);
+      const remainingChats = chats.filter((chat: Chat) => chat.id !== chatId);
       setActiveChat(remainingChats[0].id);
     }
   };
@@ -1683,7 +1683,7 @@ export default function UnifiedAIPlatform() {
 
   const filteredChats = selectedCategory === 'all'
   ? chats
-  : chats.filter(chat => chat.category === selectedCategory);
+      : chats.filter((chat: Chat) => chat.category === selectedCategory);
   
   // Platform-specific AI-powered prompt suggestions
   const platformPrompts: Record<string, Array<{ label: string; icon: any; category: string }>> = {
@@ -1774,7 +1774,7 @@ export default function UnifiedAIPlatform() {
 
         <div className="flex-1 overflow-y-auto p-2.5 space-y-3 custom-scrollbar">
           {/* Starred Chats Section */}
-          {filteredChats.filter(chat => chat.starred).length > 0 && (
+                  {filteredChats.filter((chat: Chat) => chat.starred).length > 0 && (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between px-2.5 py-1.5">
                 <div className="flex items-center gap-2">
@@ -1879,7 +1879,7 @@ export default function UnifiedAIPlatform() {
                 {selectedCategory === 'all' ? 'All Chats' : categories.find(c => c.id === selectedCategory)?.name || 'Chats'}
               </span>
               <span className="text-[10px] font-bold text-gray-600">
-                {filteredChats.filter(chat => !chat.starred).length}
+                  {filteredChats.filter((chat: Chat) => !chat.starred).length}
               </span>
             </div>
             {filteredChats.filter(chat => !chat.starred).map((chat) => (
@@ -2856,7 +2856,7 @@ export default function UnifiedAIPlatform() {
                         setMessages((prev: Message[]) => [...prev, userMessage]);
                         
                         // Update chat metadata
-                        setChats((prevChats: Chat[]) => prevChats.map(chat => {
+                        setChats((prevChats: Chat[]) => prevChats.map((chat: Chat) => {
                           if (chat.id === activeChat) {
                             const updatedChat = { ...chat };
                             updatedChat.preview = action.label.slice(0, 50) + (action.label.length > 50 ? '...' : '');

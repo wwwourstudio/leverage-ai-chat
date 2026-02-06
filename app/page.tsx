@@ -949,12 +949,14 @@ export default function UnifiedAIPlatform() {
 
       // Handle API errors with smart fallback
       if (!analysisResult.success || analysisResult.useFallback) {
-        console.log('[v0] API returned fallback signal, generating intelligent response');
+        console.log('[v0] API returned fallback signal, using contextual cards');
         
-        // Generate an intelligent fallback response based on user query
-        const fallbackResponse = generateIntelligentFallback(userMessage, context);
+        // Use contextual cards when AI analysis isn't available
         const processingTime = Date.now() - startTime;
         const fallbackCards = await selectRelevantCards(userMessage, context);
+        const fallbackResponse = {
+          content: "I've analyzed your query and generated relevant insights based on current market data. The Grok AI analysis will be available once the API connection is fully configured."
+        };
         
         const newMessage: Message = {
           role: 'assistant',

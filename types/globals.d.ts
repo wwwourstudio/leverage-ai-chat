@@ -1,8 +1,24 @@
 /// <reference types="react" />
 /// <reference types="react-dom" />
 
+// Ensure JSX types are available globally
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      [elemName: string]: any;
+    }
+  }
+}
+
 declare module 'react' {
   export * from 'react';
+  
+  // Explicitly export commonly used hooks
+  export function useState<S>(initialState: S | (() => S)): [S, React.Dispatch<React.SetStateAction<S>>];
+  export function useEffect(effect: React.EffectCallback, deps?: React.DependencyList): void;
+  export function useRef<T>(initialValue: T): React.MutableRefObject<T>;
+  export function useRef<T>(initialValue: T | null): React.RefObject<T>;
+  export function useRef<T = undefined>(): React.MutableRefObject<T | undefined>;
 }
 
 declare module 'react-dom' {

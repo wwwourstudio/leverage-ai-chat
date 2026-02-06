@@ -91,7 +91,7 @@ function LoadingState({ className }: { className?: string }) {
  * CardHeader - Renders the icon, category, title, and status badge
  */
 function CardHeader({
-  Icon,
+  icon: Icon,
   category,
   subcategory,
   title,
@@ -255,7 +255,7 @@ export const BaseCard = memo(function BaseCard({
 
       {/* Card Header */}
       <CardHeader
-        Icon={Icon}
+        icon={Icon}
         category={category}
         subcategory={subcategory}
         title={title}

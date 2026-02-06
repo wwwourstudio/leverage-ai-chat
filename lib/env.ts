@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 /**
  * Environment Variable Utilities
  * Safely access and validate environment variables

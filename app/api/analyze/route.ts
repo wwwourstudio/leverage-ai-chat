@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
-import { xai } from '@ai-sdk/xai';
 import { createClient } from '@supabase/supabase-js';
 import {
   AI_CONFIG,
@@ -50,20 +49,8 @@ export async function POST(req: NextRequest) {
     const attachments = body.attachments;
 
     // Get environment variables securely
-    const grokApiKey = process.env[ENV_KEYS.XAI_API_KEY] || process.env[ENV_KEYS.GROK_API_KEY];
     const supabaseUrl = process.env[ENV_KEYS.SUPABASE_URL];
     const supabaseAnonKey = process.env[ENV_KEYS.SUPABASE_ANON_KEY];
-
-    if (!grokApiKey) {
-      console.log(`${LOG_PREFIXES.API} Grok API key not configured - using fallback mode`);
-      // Return fallback response instead of error
-      return NextResponse.json({
-        success: false,
-        error: ERROR_MESSAGES.AI_NOT_CONFIGURED,
-        useFallback: true,
-        message: `Please configure ${ENV_KEYS.XAI_API_KEY} in environment variables for full functionality`
-      });
-    }
 
     console.log(`${LOG_PREFIXES.API} Processing analysis request:`, query.substring(0, 50));
 
@@ -84,15 +71,13 @@ export async function POST(req: NextRequest) {
       userPrompt += `\nMarket Type: ${context.marketType}`;
     }
 
-    // Call Grok API using AI SDK with proper integration
-    console.log(`[v0] Calling Grok via AI SDK with model: grok-beta`);
+    // Call Grok via Vercel AI Gateway (uses Grok integration automatically)
+    console.log(`[v0] Calling Grok via AI Gateway with model: xai/grok-beta`);
     
     let aiResponse: string;
     try {
       const result = await generateText({
-        model: xai('grok-beta', {
-          apiKey: grokApiKey,
-        }),
+        model: 'xai/grok-beta', // AI Gateway handles authentication via Grok integration
         system: systemPrompt,
         prompt: userPrompt,
         temperature: AI_CONFIG.DEFAULT_TEMPERATURE,

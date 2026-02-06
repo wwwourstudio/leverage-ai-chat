@@ -1,6 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { Deno } from 'https://deno.land/std@0.168.0/io/mod.ts' // Declaring Deno variable
 
 interface TrustMetrics {
   benfordIntegrity: number
@@ -27,7 +26,7 @@ interface ValidationRequest {
   aiProbability?: number
 }
 
-serve(async (req) => {
+serve(async (req: Request): Promise<Response> => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -122,8 +121,9 @@ serve(async (req) => {
       { headers: { 'Content-Type': 'application/json' } }
     )
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: errorMessage }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
   }
@@ -299,7 +299,7 @@ async function getHistoricalAccuracy(supabase: any, modelId: string, sport: stri
   
   if (!data || data.length === 0) return 85 // Default for new models
   
-  const avgConfidence = data.reduce((sum, row) => sum + row.final_confidence, 0) / data.length
+  const avgConfidence = data.reduce((sum: number, row: any) => sum + row.final_confidence, 0) / data.length
   return Math.round(avgConfidence)
 }
 
@@ -384,8 +384,8 @@ function calculateDigitDistribution(numbers: number[]): number[] {
   }
   
   // Normalize to percentages
-  const total = distribution.reduce((sum, count) => sum + count, 0)
-  return distribution.map(count => total > 0 ? count / total : 0)
+  const total = distribution.reduce((sum: number, count: number) => sum + count, 0)
+  return distribution.map((count: number) => total > 0 ? count / total : 0)
 }
 
 function calculateDistributionDeviation(dist1: number[], dist2: number[]): number {

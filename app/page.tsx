@@ -229,7 +229,7 @@ export default function UnifiedAIPlatform() {
     const convertedCards = dynamicCards.map(convertToInsightCard).filter(Boolean);
     console.log('[v0] Converted cards for welcome message:', convertedCards.length);
     
-    setMessages(prev => {
+      setMessages((prev: Message[]) => {
       const newMessages = [...prev];
       if (newMessages[0]?.isWelcome) {
         newMessages[0] = {
@@ -791,7 +791,7 @@ export default function UnifiedAIPlatform() {
         }
       };
 
-      setMessages(prev => [...prev, aiMessage]);
+      setMessages((prev: Message[]) => [...prev, aiMessage]);
       setIsTyping(false);
     }, 1000);
   };
@@ -878,7 +878,7 @@ export default function UnifiedAIPlatform() {
         }
       };
       
-      setMessages(prev => [...prev, aiMessage]);
+      setMessages((prev: Message[]) => [...prev, aiMessage]);
       setSuggestedPrompts(generateContextualSuggestions(card.title, aiMessage.cards || []));
       setIsTyping(false);
     }, 1200);
@@ -985,7 +985,7 @@ export default function UnifiedAIPlatform() {
           }
         };
         
-        setMessages(prev => [...prev, newMessage]);
+        setMessages((prev: Message[]) => [...prev, newMessage]);
         setSuggestedPrompts(generateContextualSuggestions(userMessage, newMessage.cards || []));
         setIsTyping(false);
         return;
@@ -1034,7 +1034,7 @@ export default function UnifiedAIPlatform() {
         trustMetrics: analysisResult.trustMetrics
       };
 
-      setMessages(prev => [...prev, newMessage]);
+      setMessages((prev: Message[]) => [...prev, newMessage]);
 
       // Generate contextual suggestions
       const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);
@@ -1046,7 +1046,7 @@ export default function UnifiedAIPlatform() {
       
       // Fallback to basic response with error indication
       const fallbackCards = await selectRelevantCards(userMessage);
-      setMessages(prev => [...prev, {
+      setMessages((prev: Message[]) => [...prev, {
         role: 'assistant',
         content: `I'm currently experiencing connectivity issues with live data sources. Here's an analysis based on available information:\n\n**Note:** Some real-time data may be limited. ${error instanceof Error ? `(${error.message})` : ''}`,
         timestamp: new Date(),
@@ -1301,7 +1301,7 @@ export default function UnifiedAIPlatform() {
       newAttachments.push(attachment);
     }
 
-    setUploadedFiles(prev => [...prev, ...newAttachments]);
+    setUploadedFiles((prev: FileAttachment[]) => [...prev, ...newAttachments]);
     console.log('[v0] Files uploaded:', newAttachments.length);
     
     // Reset file input
@@ -1323,7 +1323,7 @@ export default function UnifiedAIPlatform() {
   };
 
   const removeAttachment = (id: string) => {
-    setUploadedFiles(prev => {
+    setUploadedFiles((prev: FileAttachment[]) => {
       const file = prev.find(f => f.id === id);
       if (file) {
         URL.revokeObjectURL(file.url);
@@ -1349,11 +1349,11 @@ export default function UnifiedAIPlatform() {
       attachments: uploadedFiles.length > 0 ? [...uploadedFiles] : undefined
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev: Message[]) => [...prev, userMessage]);
     setUploadedFiles([]);
     
     // Update chat preview and title based on first user message
-    setChats(prevChats => prevChats.map(chat => {
+    setChats((prevChats: Chat[]) => prevChats.map(chat => {
       if (chat.id === activeChat) {
         const updatedChat = { ...chat };
         // Update preview with user's message
@@ -1465,7 +1465,7 @@ export default function UnifiedAIPlatform() {
 
   const handleSaveEdit = (index: number) => {
     if (editingContent.trim()) {
-      setMessages(prev => prev.map((msg, i) => {
+      setMessages((prev: Message[]) => prev.map((msg, i) => {
         if (i === index) {
           return {
             ...msg,
@@ -2853,10 +2853,10 @@ export default function UnifiedAIPlatform() {
                           content: action.label,
                           timestamp: new Date()
                         };
-                        setMessages(prev => [...prev, userMessage]);
+                        setMessages((prev: Message[]) => [...prev, userMessage]);
                         
                         // Update chat metadata
-                        setChats(prevChats => prevChats.map(chat => {
+                        setChats((prevChats: Chat[]) => prevChats.map(chat => {
                           if (chat.id === activeChat) {
                             const updatedChat = { ...chat };
                             updatedChat.preview = action.label.slice(0, 50) + (action.label.length > 50 ? '...' : '');

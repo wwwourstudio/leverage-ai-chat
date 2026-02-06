@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { generateText } from 'ai';
+import { xai } from '@ai-sdk/xai';
 import { createClient } from '@supabase/supabase-js';
 import {
   AI_CONFIG,
@@ -82,60 +84,42 @@ export async function POST(req: NextRequest) {
       userPrompt += `\nMarket Type: ${context.marketType}`;
     }
 
-    // Call Grok API with timeout using xAI's API (compatible with OpenAI SDK format)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+    // Call Grok API using AI SDK with proper integration
+    console.log(`[v0] Calling Grok via AI SDK with model: grok-beta`);
     
-    const grokResponse = await fetch(AI_CONFIG.API_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${grokApiKey}`,
-      },
-      body: JSON.stringify({
-        model: AI_CONFIG.MODEL_NAME,
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: userPrompt,
-          },
-        ],
+    let aiResponse: string;
+    try {
+      const result = await generateText({
+        model: xai('grok-beta', {
+          apiKey: grokApiKey,
+        }),
+        system: systemPrompt,
+        prompt: userPrompt,
         temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-        max_tokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
-      }),
-      signal: controller.signal,
-    }).finally(() => clearTimeout(timeoutId));
-
-    if (!grokResponse.ok) {
-      const errorText = await grokResponse.text();
-      let errorMessage = 'AI service unavailable';
-      let errorDetails = errorText;
+        maxTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
+      });
       
-      // Try to parse error as JSON for better error messages
-      try {
-        const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.error || errorJson.message || errorMessage;
-        errorDetails = errorJson;
-      } catch {
-        // If not JSON, use the raw text
-        errorMessage = errorText.substring(0, 100);
+      aiResponse = result.text;
+      console.log(`[v0] Grok response received, length: ${aiResponse.length}`);
+      
+      if (!aiResponse || aiResponse.trim().length === 0) {
+        console.log(`${LOG_PREFIXES.API} Grok returned empty response`);
+        return NextResponse.json({
+          success: false,
+          error: 'AI service returned empty response',
+          useFallback: true
+        });
       }
-      
-      console.log(`${LOG_PREFIXES.API} Grok API error:`, grokResponse.status, errorMessage);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.log(`${LOG_PREFIXES.API} Grok API error:`, errorMessage);
       return NextResponse.json({
         success: false,
-        error: grokResponse.status === HTTP_STATUS.UNAUTHORIZED ? ERROR_MESSAGES.INVALID_API_KEY : errorMessage,
+        error: errorMessage.includes('401') || errorMessage.includes('unauthorized') ? ERROR_MESSAGES.INVALID_API_KEY : 'AI service error',
         useFallback: true,
-        details: errorDetails
+        details: errorMessage
       });
     }
-
-    const grokData = await grokResponse.json();
-    const aiResponse = grokData.choices[0]?.message?.content || 'No response generated';
 
     console.log('[API] Grok response generated:', aiResponse.substring(0, 100));
 

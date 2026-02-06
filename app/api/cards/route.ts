@@ -65,33 +65,47 @@ export async function POST(req: NextRequest) {
     console.log(`${LOG_PREFIXES.API} Sport to fetch: ${sportToFetch}${!sport ? ' (default)' : ''}`);
     
     if (oddsApiKey) {
+      console.log(`[v0] Starting odds fetch for sport: ${sportToFetch}`);
       try {
         // Validate and normalize the sport key
+        console.log(`[v0] Validating sport key...`);
         validationResult = validateSportKey(sportToFetch);
+        console.log(`[v0] Validation result:`, validationResult);
         
         if (!validationResult.isValid) {
           console.log(`${LOG_PREFIXES.API} Invalid sport key:`, validationResult.error, validationResult.suggestion);
         }
         
         const sportKey = validationResult.normalizedKey;
+        console.log(`[v0] Normalized sport key: ${sportKey}`);
+        
         const sportInfo = getSportInfo(sportKey);
+        console.log(`[v0] Sport info:`, sportInfo);
         
         console.log(`${LOG_PREFIXES.API} Fetching odds for ${sportInfo.name} (${sportInfo.apiKey})`);
         
         const oddsUrl = `${EXTERNAL_APIS.ODDS_API.BASE_URL}/sports/${sportKey}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}&markets=${EXTERNAL_APIS.ODDS_API.DEFAULT_MARKETS}&oddsFormat=${EXTERNAL_APIS.ODDS_API.ODDS_FORMAT}`;
+        console.log(`[v0] Odds URL (masked):`, oddsUrl.replace(oddsApiKey, 'XXXXX'));
         
+        console.log(`[v0] Making fetch request to odds API...`);
         const oddsResponse = await fetch(oddsUrl);
+        console.log(`[v0] Odds API response status:`, oddsResponse.status);
+        
         if (oddsResponse.ok) {
           liveOddsData = await oddsResponse.json();
           console.log(`${LOG_PREFIXES.API} Fetched live odds:`, liveOddsData?.length || 0, 'events for', sportInfo.name);
         } else {
           const errorText = await oddsResponse.text();
-          console.log(`${LOG_PREFIXES.API} Odds API returned ${oddsResponse.status}:`, errorText.substring(0, 100));
+          console.log(`${LOG_PREFIXES.API} Odds API returned ${oddsResponse.status}:`, errorText.substring(0, 200));
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : '';
         console.log(`${LOG_PREFIXES.API} Error fetching odds for cards:`, errorMessage);
+        console.log(`[v0] Error stack:`, errorStack);
       }
+    } else {
+      console.log(`[v0] No odds API key found - skipping odds fetch`);
     }
 
     // Generate cards based on category and available data

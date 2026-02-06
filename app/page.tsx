@@ -2500,34 +2500,18 @@ export default function UnifiedAIPlatform() {
                   {/* Dynamic Cards Section with Enhanced UX */}
                   {message.role === 'assistant' && (
                     <div className="mt-5">
-                      {(() => {
-                        console.log('[v0] Rendering cards section for message:', { 
-                          hasCards: !!message.cards, 
-                          cardsLength: message.cards?.length || 0,
-                          isWelcome: message.isWelcome 
-                        });
-                        
-                        if (message.cards && message.cards.length > 0) {
-                          return (
-                            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                              {message.cards.map((card, cardIndex) => {
-                                console.log('[v0] Rendering card:', card.type, card.title);
-                                return (
-                                  <DynamicCardRenderer
-                                    key={`${card.type}-${cardIndex}`}
-                                    card={card}
-                                    index={cardIndex}
-                                    onAnalyze={() => generateDetailedAnalysis(card)}
-                                  />
-                                );
-                              })}
-                            </div>
-                          );
-                        } else if (!message.isWelcome) {
-                          return <EmptyState />;
-                        }
-                        return null;
-                      })()}
+                      {message.cards && message.cards.length > 0 && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                          {message.cards.map((card, cardIndex) => (
+                            <DynamicCardRenderer
+                              key={`${card.type}-${cardIndex}`}
+                              card={card}
+                              index={cardIndex}
+                              onAnalyze={() => generateDetailedAnalysis(card)}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 

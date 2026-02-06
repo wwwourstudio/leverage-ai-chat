@@ -12,6 +12,14 @@ import {
 } from '@/lib/constants';
 import { validateSportKey, getSportInfo } from '@/lib/sports-validator';
 import {
+  fetchLiveOdds,
+  fetchHistoricalOdds,
+  fetchOutrights,
+  getActiveSports,
+  ODDS_MARKETS,
+  BETTING_REGIONS
+} from '@/lib/odds-api-client';
+import {
   transformOddsEvents,
   filterEventsByTimeRange,
   sortEventsByValue,
@@ -84,19 +92,28 @@ export async function POST(req: NextRequest) {
         
         console.log(`${LOG_PREFIXES.API} Fetching odds for ${sportInfo.name} (${sportInfo.apiKey})`);
         
-        const oddsUrl = `${EXTERNAL_APIS.ODDS_API.BASE_URL}/sports/${sportKey}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}&markets=${EXTERNAL_APIS.ODDS_API.DEFAULT_MARKETS}&oddsFormat=${EXTERNAL_APIS.ODDS_API.ODDS_FORMAT}`;
-        console.log(`[v0] Odds URL (masked):`, oddsUrl.replace(oddsApiKey, 'XXXXX'));
+        // Use the comprehensive odds API client with multi-sport support
+        console.log(`[v0] Fetching live odds using multi-sport client...`);
+        liveOddsData = await fetchLiveOdds(sportKey, {
+          markets: [ODDS_MARKETS.H2H, ODDS_MARKETS.SPREADS, ODDS_MARKETS.TOTALS],
+          regions: [BETTING_REGIONS.US],
+          apiKey: oddsApiKey
+        });
+        console.log(`${LOG_PREFIXES.API} Fetched live odds:`, liveOddsData?.length || 0, 'events for', sportInfo.name);
         
-        console.log(`[v0] Making fetch request to odds API...`);
-        const oddsResponse = await fetch(oddsUrl);
-        console.log(`[v0] Odds API response status:`, oddsResponse.status);
-        
-        if (oddsResponse.ok) {
-          liveOddsData = await oddsResponse.json();
-          console.log(`${LOG_PREFIXES.API} Fetched live odds:`, liveOddsData?.length || 0, 'events for', sportInfo.name);
-        } else {
-          const errorText = await oddsResponse.text();
-          console.log(`${LOG_PREFIXES.API} Odds API returned ${oddsResponse.status}:`, errorText.substring(0, 200));
+        // Also fetch outrights/futures if available for this sport
+        if (sportInfo.hasOutrights) {
+          console.log(`[v0] Fetching outrights for ${sportInfo.name}...`);
+          try {
+            const outrights = await fetchOutrights(sportKey, { apiKey: oddsApiKey });
+            console.log(`${LOG_PREFIXES.API} Fetched outrights:`, outrights?.length || 0, 'markets');
+            // Store outrights separately for futures analysis
+            if (outrights && outrights.length > 0) {
+              (liveOddsData as any).outrights = outrights;
+            }
+          } catch (error) {
+            console.log(`${LOG_PREFIXES.API} Outrights not available for ${sportInfo.name}`);
+          }
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);

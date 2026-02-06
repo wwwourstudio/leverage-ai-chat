@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
+import { xai } from '@ai-sdk/xai';
 import { createClient } from '@supabase/supabase-js';
 import {
   AI_CONFIG,
@@ -71,13 +72,13 @@ export async function POST(req: NextRequest) {
       userPrompt += `\nMarket Type: ${context.marketType}`;
     }
 
-    // Call Grok via Vercel AI Gateway (uses Grok integration automatically)
-    console.log(`[v0] Calling Grok via AI Gateway with model: xai/grok-beta`);
+    // Call Grok using xAI provider with integration credentials
+    console.log(`[v0] Calling Grok via xAI provider`);
     
     let aiResponse: string;
     try {
       const result = await generateText({
-        model: 'xai/grok-beta', // AI Gateway handles authentication via Grok integration
+        model: xai('grok-beta'), // Uses Grok Leverage integration credentials
         system: systemPrompt,
         prompt: userPrompt,
         temperature: AI_CONFIG.DEFAULT_TEMPERATURE,

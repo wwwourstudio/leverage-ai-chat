@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
           reliability: context?.oddsData ? DEFAULT_RELIABILITY.API_LIVE : DEFAULT_RELIABILITY.API_FALLBACK
         }
       ],
-      processingTime: grokData.usage?.total_tokens ? Math.round(grokData.usage.total_tokens * 0.5) : 1200,
+      processingTime: Math.round(aiResponse.length * 2), // Estimate based on response length
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {

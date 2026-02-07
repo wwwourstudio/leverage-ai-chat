@@ -127,12 +127,14 @@ export async function getConfigs(
     const result: Record<string, any> = {};
     
     keys.forEach(({ key, defaultValue }) => {
-      const config = queryResult.data?.find((c: AppConfig) => c.key === key);
-      result[key] = config ? config.value : defaultValue;
+      const configData = Array.isArray(queryResult.data) 
+        ? queryResult.data.find((c: AppConfig) => c.key === key)
+        : undefined;
+      result[key] = configData ? configData.value : defaultValue;
       
       // Cache it
-      if (config) {
-        configCache.set(key, { value: config.value, timestamp: Date.now() });
+      if (configData) {
+        configCache.set(key, { value: configData.value, timestamp: Date.now() });
       }
     });
 
@@ -205,7 +207,7 @@ export async function getWelcomeMessages(): Promise<Record<string, string>> {
       }
     );
 
-    if (queryResult.success && queryResult.data) {
+    if (queryResult.success && Array.isArray(queryResult.data)) {
       const messages: Record<string, string> = {};
       queryResult.data.forEach((config: AppConfig) => {
         messages[config.key] = config.value;

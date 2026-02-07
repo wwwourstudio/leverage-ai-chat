@@ -1,19 +1,6 @@
 // Global type declarations for external packages
-
-// Ensure Next.js server types are available
-declare module 'next/server' {
-  export { NextRequest, NextResponse } from 'next/dist/server/web/spec-extension/request';
-}
-
-// Ensure Supabase types are available
-declare module '@supabase/supabase-js' {
-  export function createClient(
-    supabaseUrl: string,
-    supabaseKey: string,
-    options?: any
-  ): any;
-  export type SupabaseClient = any;
-}
+// These packages have proper type definitions that TypeScript should auto-discover
+// Only add explicit declarations if types are genuinely missing from node_modules
 
 // Ensure next-themes types are available
 declare module 'next-themes' {

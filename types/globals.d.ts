@@ -50,30 +50,8 @@ declare global {
   }
 }
 
-declare module 'react' {
-  export * from 'react';
-  
-  // Explicitly export commonly used hooks
-  export function useState<S>(initialState: S | (() => S)): [S, React.Dispatch<React.SetStateAction<S>>];
-  export function useEffect(effect: React.EffectCallback, deps?: React.DependencyList): void;
-  export function useRef<T>(initialValue: T): React.MutableRefObject<T>;
-  export function useRef<T>(initialValue: T | null): React.RefObject<T>;
-  export function useRef<T = undefined>(): React.MutableRefObject<T | undefined>;
-  
-  // Event types namespace
-  export namespace React {
-    export type MouseEvent<T = Element, E = NativeMouseEvent> = any;
-    export type ChangeEvent<T = Element> = any;
-    export type FormEvent<T = Element> = any;
-    export type KeyboardEvent<T = Element> = any;
-    export type FocusEvent<T = Element> = any;
-    export type TouchEvent<T = Element> = any;
-    export type PointerEvent<T = Element> = any;
-    export type WheelEvent<T = Element> = any;
-    export type AnimationEvent<T = Element> = any;
-    export type TransitionEvent<T = Element> = any;
-  }
-}
+// React types are already properly defined by @types/react
+// No need to redeclare - TypeScript will use the official types
 
 declare module 'react-dom' {
   export * from 'react-dom';

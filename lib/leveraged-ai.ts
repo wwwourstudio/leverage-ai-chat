@@ -6,6 +6,7 @@
 
 import { SupabaseClient, createClient } from '@supabase/supabase-js';
 import { generateText } from 'ai';
+import { xai } from '@ai-sdk/xai';
 import { ENV_KEYS, LOG_PREFIXES, AI_CONFIG } from '@/lib/constants';
 import { safeQuery, validateDataSchema, APP_TABLES } from '@/lib/supabase-validator';
 
@@ -236,9 +237,9 @@ ${options.summarize ? 'Provide a concise summary of the data trends and importan
 Be concise and focus on actionable insights.
       `.trim();
 
-      // Use AI Gateway with Grok
+      // Use xAI provider with proper typing
       const result = await generateText({
-        model: 'xai/grok-beta',
+        model: xai('grok-beta'),
         prompt,
         temperature: 0.7,
         maxOutputTokens: 500,
@@ -274,7 +275,7 @@ Be concise and focus on actionable insights.
           try {
             const prompt = enrichmentPrompt(record);
             const result = await generateText({
-              model: 'xai/grok-beta',
+              model: xai('grok-beta'),
               prompt,
               temperature: 0.7,
               maxOutputTokens: 200,
@@ -315,7 +316,7 @@ Be concise and focus on actionable insights.
     const records = Array.isArray(data) ? data : [data];
 
     // Optional: AI validation before insertion
-    if (this.xaiModel && validationContext) {
+    if (this.aiEnabled && validationContext) {
       const validation = await this.validateDataWithAI(records, validationContext);
       if (!validation.isValid) {
         return {
@@ -371,7 +372,7 @@ Respond with "VALID" if okay, or "INVALID: [reason]" if there are issues.
       `.trim();
 
       const result = await generateText({
-        model: 'xai/grok-beta',
+        model: xai('grok-beta'),
         prompt,
         temperature: 0.3,
         maxOutputTokens: 100,

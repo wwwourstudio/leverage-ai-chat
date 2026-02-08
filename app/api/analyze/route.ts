@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
+import { xai } from '@ai-sdk/xai';
 import {
   AI_CONFIG,
   SYSTEM_PROMPT,
@@ -77,14 +78,14 @@ export async function POST(req: NextRequest) {
     try {
       console.log('[v0] Calling generateText with xAI Grok...');
       
-      // AI Gateway automatically uses configured XAI_API_KEY
+      // Using xAI provider with proper typing
       // Supported models: grok-beta, grok-vision-beta, grok-2-latest
       const result = await generateText({
-        model: 'xai/grok-beta', // Using AI Gateway model string format
+        model: xai('grok-beta'),
         system: systemPrompt,
         prompt: userPrompt,
         temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-        maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS, // AI SDK 6 uses maxOutputTokens
+        maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
       });
       
       aiResponse = result.text;

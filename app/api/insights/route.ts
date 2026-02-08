@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import {
   ENV_KEYS,
   LOG_PREFIXES,
@@ -8,12 +7,12 @@ import {
   SUCCESS_MESSAGES,
 } from '@/lib/constants';
 import {
-  safeQuery,
   validateDataSchema,
   APP_TABLES,
   SCHEMA_DEFINITIONS
 } from '@/lib/supabase-validator';
 import { getConfigs, getUserProfile } from '@/lib/dynamic-config';
+import { queryWithAI } from '@/lib/leveraged-ai';
 
 export const runtime = 'edge';
 
@@ -23,52 +22,35 @@ export const runtime = 'edge';
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabaseUrl = process.env[ENV_KEYS.SUPABASE_URL];
-    const supabaseAnonKey = process.env[ENV_KEYS.SUPABASE_ANON_KEY];
+    // Extract userId from request headers if available
+    const userId = req.headers.get('x-user-id') || undefined;
 
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.log(`${LOG_PREFIXES.API} Supabase not configured, returning default insights`);
-      return NextResponse.json({
-        success: true,
-        insights: getDefaultInsights(),
-        dataSource: DATA_SOURCES.DEFAULT,
-        message: 'Supabase not configured'
-      });
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-    // In a real app, you'd fetch this from authenticated user's data
-    // For now, aggregate platform-wide statistics
+    // Use LeveragedAI for AI-enhanced database query
+    console.log(`${LOG_PREFIXES.API} Fetching insights using LeveragedAI...`);
     
-    // Safely fetch AI response trust metrics from database with validation and timeout
-    console.log(`[v0] Attempting to query ${APP_TABLES.AI_RESPONSE_TRUST} table...`);
-    const queryResult = await Promise.race([
-      safeQuery(
-        supabase,
-        APP_TABLES.AI_RESPONSE_TRUST,
-        (builder) => builder
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(100),
-        {
-          defaultValue: [],
-          logErrors: true
-        }
-      ),
-      new Promise<any>((resolve) => 
-        setTimeout(() => resolve({ success: false, data: [], error: 'Query timeout', source: 'error' }), 1500)
-      )
-    ]);
+    const queryResult = await queryWithAI<any>(
+      APP_TABLES.AI_RESPONSE_TRUST,
+      (builder) => builder
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100),
+      {
+        enableAIProcessing: true,
+        aiContext: 'Analyzing betting prediction performance metrics to generate user insights',
+        summarize: true,
+        timeout: 2000
+      }
+    );
 
-    if (!queryResult.success || queryResult.source !== 'database') {
-      const errorMsg = queryResult.error || 'No database data';
+    if (!queryResult.success || queryResult.data.length === 0) {
+      const errorMsg = queryResult.error || 'No database data available';
       console.log(`${LOG_PREFIXES.API} Using default insights -`, errorMsg);
       return NextResponse.json({
         success: true,
         insights: getDefaultInsights(),
-        dataSource: queryResult.source,
-        message: typeof errorMsg === 'string' ? errorMsg : 'Table not yet created'
+        dataSource: DATA_SOURCES.DEFAULT,
+        message: typeof errorMsg === 'string' ? errorMsg : 'Table not yet created',
+        aiSummary: queryResult.aiSummary
       });
     }
 
@@ -85,8 +67,6 @@ export async function GET(req: NextRequest) {
     }
 
     // Calculate real metrics from validated predictions
-    // Extract userId from request if available (from auth headers, etc.)
-    const userId = req.headers.get('x-user-id') || undefined;
     const insights = await calculateInsightsFromPredictions(schemaValidation.validRecords, userId);
 
     return NextResponse.json({
@@ -99,6 +79,9 @@ export async function GET(req: NextRequest) {
         valid: schemaValidation.validRecords.length,
         invalid: schemaValidation.invalidCount
       },
+      aiSummary: queryResult.aiSummary,
+      aiInsights: queryResult.aiInsights,
+      processingTime: queryResult.processingTime,
       timestamp: new Date().toISOString()
     });
 

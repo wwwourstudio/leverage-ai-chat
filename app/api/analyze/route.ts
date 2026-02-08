@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
 import { createXai } from '@ai-sdk/xai';
-import { createClient } from '@supabase/supabase-js';
 import {
   AI_CONFIG,
   SYSTEM_PROMPT,
@@ -17,10 +16,9 @@ import {
   ATTACHMENT_TYPES
 } from '@/lib/constants';
 import {
-  checkTableExists,
-  safeQuery,
   APP_TABLES
 } from '@/lib/supabase-validator';
+import { getLeveragedAI } from '@/lib/leveraged-ai';
 
 // Grok AI integration for sports analysis
 // Using xAI's Grok model through the AI SDK
@@ -175,15 +173,12 @@ export async function POST(req: NextRequest) {
       }, 1500)) // Faster fallback: 1.5 seconds
     ]) as any;
 
-    // Store analysis in Supabase asynchronously (completely non-blocking)
-    if (supabaseUrl && supabaseAnonKey) {
-      // Fire and forget - don't block response
-      Promise.resolve().then(() => {
-        storeAnalysisMetrics(supabaseUrl, supabaseAnonKey, trustMetrics, context).catch(err => {
-          console.log(`${LOG_PREFIXES.API} Background metrics storage failed:`, err.message);
-        });
+    // Store analysis in Supabase using LeveragedAI (non-blocking, AI-validated)
+    Promise.resolve().then(() => {
+      storeAnalysisMetricsWithAI(trustMetrics, context).catch(err => {
+        console.log(`${LOG_PREFIXES.API} Background metrics storage failed:`, err.message);
       });
-    }
+    });
 
     return NextResponse.json({
       success: true,
@@ -226,43 +221,47 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Non-blocking helper to store analysis metrics in Supabase
-async function storeAnalysisMetrics(
-  supabaseUrl: string,
-  supabaseAnonKey: string,
+// Non-blocking helper to store analysis metrics using LeveragedAI
+async function storeAnalysisMetricsWithAI(
   trustMetrics: any,
   context: any
 ) {
   try {
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const leveragedAI = getLeveragedAI();
     
-    // Check if table exists before inserting
-    const tableExists = await checkTableExists(supabase, APP_TABLES.AI_RESPONSE_TRUST);
-    
-    if (tableExists) {
-      const { error: insertError } = await supabase
-        .from(APP_TABLES.AI_RESPONSE_TRUST)
-        .insert({
-          response_id: `resp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          model_id: AI_CONFIG.MODEL_NAME,
-          sport: context?.sport || 'general',
-          market_type: context?.marketType || 'analysis',
-          benford_score: trustMetrics.benfordIntegrity,
-          odds_alignment_score: trustMetrics.oddsAlignment,
-          consensus_score: trustMetrics.marketConsensus,
-          historical_accuracy_score: trustMetrics.historicalAccuracy,
-          final_confidence: trustMetrics.finalConfidence,
-          flags: trustMetrics.flags || [],
-          created_at: new Date().toISOString(),
-        });
+    if (!leveragedAI.isReady()) {
+      console.log(`${LOG_PREFIXES.API} LeveragedAI not ready, skipping metrics storage`);
+      return;
+    }
 
-      if (insertError) {
-        console.log(`${LOG_PREFIXES.API} Failed to insert trust metrics:`, insertError.message);
-      } else {
-        console.log(`${LOG_PREFIXES.API} Trust metrics stored in Supabase`);
+    const metricsData = {
+      response_id: `resp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      model_id: AI_CONFIG.MODEL_NAME,
+      sport: context?.sport || 'general',
+      market_type: context?.marketType || 'analysis',
+      benford_score: trustMetrics.benfordIntegrity,
+      odds_alignment_score: trustMetrics.oddsAlignment,
+      consensus_score: trustMetrics.marketConsensus,
+      historical_accuracy_score: trustMetrics.historicalAccuracy,
+      final_confidence: trustMetrics.finalConfidence,
+      flags: trustMetrics.flags || [],
+      created_at: new Date().toISOString(),
+    };
+
+    // Use LeveragedAI for AI-validated insertion
+    const result = await leveragedAI.insertWithAIValidation(
+      APP_TABLES.AI_RESPONSE_TRUST,
+      metricsData,
+      'Trust metrics for sports betting AI analysis'
+    );
+
+    if (result.success) {
+      console.log(`${LOG_PREFIXES.API} ✓ Trust metrics stored via LeveragedAI`);
+      if (result.aiValidation) {
+        console.log(`${LOG_PREFIXES.API} AI validation:`, result.aiValidation);
       }
     } else {
-      console.log(`${LOG_PREFIXES.API} Trust metrics table does not exist, skipping storage`);
+      console.log(`${LOG_PREFIXES.API} Failed to store metrics:`, result.error);
     }
   } catch (dbError) {
     const dbErrorMessage = dbError instanceof Error ? dbError.message : String(dbError);
@@ -291,35 +290,24 @@ async function calculateTrustMetrics(
   // Market consensus (would need external data source)
   const marketConsensus = 85;
 
-  // Historical accuracy (query from Supabase with timeout)
+  // Historical accuracy using LeveragedAI with AI-enhanced insights
   let historicalAccuracy = 85;
-  if (supabaseUrl && supabaseAnonKey) {
-    try {
-      const supabase = createClient(supabaseUrl, supabaseAnonKey);
-      
-      // Add aggressive timeout to Supabase query
-      const queryPromise = safeQuery(
-        supabase,
+  try {
+    const leveragedAI = getLeveragedAI();
+    
+    if (leveragedAI.isReady()) {
+      const queryResult = await leveragedAI.queryWithAI(
         APP_TABLES.AI_RESPONSE_TRUST,
-        (builder) => builder
+        (builder: any) => builder
           .select('final_confidence')
           .eq('model_id', AI_CONFIG.MODEL_NAME)
           .order('created_at', { ascending: false })
-          .limit(10), // Reduced from 20 to 10 for faster query
+          .limit(10),
         {
-          defaultValue: [],
-          logErrors: false
+          enableAIProcessing: false,
+          timeout: 1000
         }
       );
-      
-      // Aggressive timeout: 1 second max for historical data
-      const queryResult = await Promise.race([
-        queryPromise,
-        new Promise((resolve) => setTimeout(() => {
-          console.log('[v0] Historical accuracy query timeout');
-          resolve({ success: false, data: [] });
-        }, 1000))
-      ]) as any;
       
       if (queryResult.success && queryResult.data.length > 0) {
         const validData = queryResult.data.filter(
@@ -330,13 +318,13 @@ async function calculateTrustMetrics(
           historicalAccuracy = Math.round(
             validData.reduce((sum: number, row: any) => sum + row.final_confidence, 0) / validData.length
           );
-          console.log(`${LOG_PREFIXES.API} Historical accuracy calculated from ${validData.length} records: ${historicalAccuracy}%`);
+          console.log(`${LOG_PREFIXES.API} Historical accuracy from LeveragedAI: ${historicalAccuracy}% (${validData.length} records)`);
         }
       }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.log(`${LOG_PREFIXES.API} Could not fetch historical accuracy:`, errorMessage);
     }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log(`${LOG_PREFIXES.API} Could not fetch historical accuracy:`, errorMessage);
   }
 
   const finalConfidence = Math.round(

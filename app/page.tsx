@@ -271,8 +271,62 @@ export default function UnifiedAIPlatform() {
   });
   }, []);
 
-  // Empty initial state - no demo chats shown to visitors
-  const [chats, setChats] = useState<Chat[]>([]);
+  const [chats, setChats] = useState<Chat[]>([
+    {
+      id: 'chat-1',
+      title: 'NBA Lakers Betting Analysis',
+      preview: 'Sharp money on Lakers -4.5, 73% win probability...',
+      timestamp: new Date(Date.now() - 1000 * 60 * 5),
+      starred: true,
+      category: 'betting',
+      tags: ['live', 'nba', 'high-value']
+    },
+    {
+      id: 'chat-2',
+      title: 'NFBC Main Event Draft Strategy',
+      preview: 'Zero RB approach with elite WR stacking...',
+      timestamp: new Date(Date.now() - 1000 * 60 * 30),
+      starred: true,
+      category: 'fantasy',
+      tags: ['baseball', 'draft', 'strategy']
+    },
+    {
+      id: 'chat-3',
+      title: 'DFS NFL Week 8 Showdown Lineup',
+      preview: 'Optimal $49,800 salary lineup, 315.2 projected...',
+      timestamp: new Date(Date.now() - 1000 * 60 * 60),
+      starred: false,
+      category: 'dfs',
+      tags: ['nfl', 'optimizer', 'draftkings']
+    },
+    {
+      id: 'chat-4',
+      title: 'Kalshi Election Market Analysis',
+      preview: 'Presidential market showing 58% probability...',
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
+      starred: true,
+      category: 'kalshi',
+      tags: ['politics', 'prediction-market']
+    },
+    {
+      id: 'chat-5',
+      title: 'Best Ball Portfolio Optimization',
+      preview: 'Diversify with 40% Mahomes exposure across...',
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 12),
+      starred: false,
+      category: 'fantasy',
+      tags: ['football', 'bestball', 'nffc']
+    },
+    {
+      id: 'chat-6',
+      title: 'MLB Ohtani Props + Kalshi Weather',
+      preview: 'Over 1.5 total bases +120, 68% hit rate with...',
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
+      starred: true,
+      category: 'betting',
+      tags: ['mlb', 'props', 'cross-platform']
+    }
+  ]);
 
   const categories = [
     { id: 'all', name: 'All', icon: Layers, color: 'text-blue-400', desc: 'Everything' },
@@ -1710,46 +1764,115 @@ export default function UnifiedAIPlatform() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-2.5 space-y-3 custom-scrollbar">
-          {/* Current Active Chat */}
-          <div className="space-y-3">
-            <div className="px-2.5 py-1.5 flex items-center justify-between">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                All Chats
-              </span>
-              <span className="text-[10px] font-bold text-gray-600">
-                {chats.length}
-              </span>
-            </div>
-            
-            {chats.length > 0 && (
-              <div className="bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10 border border-blue-500/30 shadow-lg shadow-blue-500/10 rounded-lg p-3 cursor-pointer transition-all duration-300">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <MessageSquare className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-                      <h3 className="text-xs font-bold text-white truncate flex-1">
-                        {chats[chats.length - 1].title}
-                      </h3>
+          {/* Starred Chats Section */}
+                  {filteredChats.filter((chat: Chat) => chat.starred).length > 0 && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between px-2.5 py-1.5">
+                <div className="flex items-center gap-2">
+                  <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    Starred
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold text-gray-600">
+                  {filteredChats.filter(chat => chat.starred).length}
+                </span>
+              </div>
+              {filteredChats.filter(chat => chat.starred).map((chat) => (
+                <div
+                  key={chat.id}
+                  onClick={() => handleSelectChat(chat.id)}
+                  className={`group relative rounded-lg p-3 cursor-pointer transition-all duration-300 ${
+                    activeChat === chat.id
+                      ? 'bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10 border border-blue-500/30 shadow-lg shadow-blue-500/10'
+                      : 'bg-gray-900/30 hover:bg-gray-800/50 border border-transparent hover:border-gray-700/50'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5 group/title">
+                        <MessageSquare className={`w-3.5 h-3.5 ${activeChat === chat.id ? 'text-blue-400' : 'text-gray-500'} flex-shrink-0`} />
+                        {editingChatId === chat.id ? (
+                          <div className="flex-1 flex items-center gap-1">
+                            <input
+                              type="text"
+                              value={editingChatTitle}
+                              onChange={(e) => setEditingChatTitle(e.target.value)}
+                              onKeyDown={(e) => handleKeyDownChatTitle(e, chat.id)}
+                              onBlur={() => handleSaveChatTitle(chat.id)}
+                              className="flex-1 bg-gray-800/80 border border-blue-500/50 rounded-md px-2 py-1 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                              autoFocus
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSaveChatTitle(chat.id);
+                              }}
+                              className="p-1 hover:bg-gray-700/50 rounded transition-all"
+                              title="Save title"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5 text-green-400" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                            <h3 className="text-xs font-bold text-white truncate flex-1">
+                              {chat.title}
+                            </h3>
+                            <button
+                              onClick={(e) => handleEditChatTitle(chat.id, chat.title, e)}
+                              className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-gray-700/50 rounded transition-all flex-shrink-0"
+                              title="Edit title"
+                            >
+                              <Edit3 className="w-3 h-3 text-gray-500 hover:text-blue-400" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-gray-400 truncate mb-2 leading-tight">{chat.preview}</p>
+                      
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {chat.tags.slice(0, 2).map((tag, i) => (
+                            <span key={i} className="px-1.5 py-0.5 bg-gray-800/50 border border-gray-700/50 rounded text-[10px] font-semibold text-gray-500">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                        <span className="text-[10px] font-medium text-gray-600">{formatTimestamp(chat.timestamp)}</span>
+                      </div>
                     </div>
-                    <p className="text-[11px] text-gray-400 line-clamp-2 leading-relaxed mb-2">
-                      {chats[chats.length - 1].messages[0]?.content?.substring(0, 100) || 'No messages yet'}...
-                    </p>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="px-2 py-0.5 rounded-md bg-gray-800/60 text-[10px] font-semibold text-gray-400 border border-gray-700/50">
-                        {chats[chats.length - 1].category}
-                      </span>
-                      <span className="text-[10px] text-gray-600 font-medium">
-                        Just now
-                      </span>
+                    <div className="flex flex-col gap-1">
+                      <button
+                        onClick={(e) => handleStarChat(chat.id, e)}
+                        className="p-1 rounded-md hover:bg-gray-700/50 transition-all opacity-100"
+                      >
+                        <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteChat(chat.id, e)}
+                        className="p-1 rounded-md hover:bg-gray-700/50 opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
+                      </button>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
 
-          {/* Hidden chat list - keeping functionality but hiding UI */}
-          <div className="hidden">
+          {/* All Chats Section */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between px-2.5 py-1.5">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                {selectedCategory === 'all' ? 'All Chats' : categories.find(c => c.id === selectedCategory)?.name || 'Chats'}
+              </span>
+              <span className="text-[10px] font-bold text-gray-600">
+                  {filteredChats.filter((chat: Chat) => !chat.starred).length}
+              </span>
+            </div>
             {filteredChats.filter(chat => !chat.starred).map((chat) => (
             <div
               key={chat.id}
@@ -1943,71 +2066,6 @@ export default function UnifiedAIPlatform() {
                   </div>
                   <h3 className="text-lg font-bold text-gray-300">No messages yet</h3>
                   <p className="text-sm text-gray-500">Start a conversation to get AI-powered insights</p>
-                </div>
-              </div>
-            ) : messages.length === 1 && messages[0]?.isWelcome ? (
-              // Hero Section for First-Time Visitors
-              <div className="flex flex-col items-center justify-center min-h-[calc(100vh-300px)] py-12 px-4">
-                <div className="max-w-4xl w-full space-y-8">
-                  {/* Hero Header */}
-                  <div className="text-center space-y-4">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-full mb-4">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-xs font-bold text-blue-400 uppercase tracking-wide">All Systems Operational</span>
-                    </div>
-                    <h1 className="text-5xl md:text-6xl font-black bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent leading-tight">
-                      Leverage AI
-                    </h1>
-                    <p className="text-xl md:text-2xl font-bold text-gray-300 max-w-2xl mx-auto">
-                      Your All-In-One Sports Intelligence Platform
-                    </p>
-                    <p className="text-sm text-gray-500 max-w-xl mx-auto">
-                      Real-time odds analysis, fantasy insights, DFS optimization, and Kalshi market predictions powered by Grok AI
-                    </p>
-                  </div>
-
-                  {/* Product Screenshot */}
-                  <div className="relative group">
-                    <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl blur-xl opacity-25 group-hover:opacity-40 transition-opacity"></div>
-                    <div className="relative rounded-2xl overflow-hidden border border-gray-800/50 bg-gray-900/50 shadow-2xl">
-                      <img 
-                        src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%202026-02-07%20at%207.32.13%E2%80%AFPM-3ynZR23mfg3WlUvSdSqGibuYLaqG6b.png"
-                        alt="Leverage AI - Sports Intelligence Platform"
-                        className="w-full h-auto"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Feature Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-xl p-4 text-center">
-                      <TrendingUp className="w-8 h-8 text-orange-400 mx-auto mb-2" />
-                      <div className="text-sm font-bold text-white">Sports Betting</div>
-                      <div className="text-xs text-gray-500 mt-1">Live odds & value</div>
-                    </div>
-                    <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl p-4 text-center">
-                      <Trophy className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                      <div className="text-sm font-bold text-white">Fantasy (NFC)</div>
-                      <div className="text-xs text-gray-500 mt-1">Draft strategy</div>
-                    </div>
-                    <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-4 text-center">
-                      <Award className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-                      <div className="text-sm font-bold text-white">DFS Optimizer</div>
-                      <div className="text-xs text-gray-500 mt-1">Optimal lineups</div>
-                    </div>
-                    <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 rounded-xl p-4 text-center">
-                      <BarChart3 className="w-8 h-8 text-cyan-400 mx-auto mb-2" />
-                      <div className="text-sm font-bold text-white">Kalshi Markets</div>
-                      <div className="text-xs text-gray-500 mt-1">Event predictions</div>
-                    </div>
-                  </div>
-
-                  {/* CTA */}
-                  <div className="text-center">
-                    <p className="text-sm font-bold text-gray-400 mb-4">
-                      Try an example query below to see Leverage AI in action
-                    </p>
-                  </div>
                 </div>
               </div>
             ) : (

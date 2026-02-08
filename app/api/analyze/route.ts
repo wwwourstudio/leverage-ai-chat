@@ -187,14 +187,10 @@ export async function POST(req: NextRequest) {
       }, { status: 408 });
     }
     
-    // Log detailed error for debugging
     console.log(`${LOG_PREFIXES.API} Error in analyze route:`, errorMessage);
-    console.log(`${LOG_PREFIXES.API} Error stack:`, error.stack);
-    
-    // Return user-friendly error message
     return NextResponse.json({
       success: false,
-      error: 'AI analysis temporarily unavailable. Using cached insights.',
+      error: ERROR_MESSAGES.INTERNAL_ERROR,
       useFallback: true,
       details: errorMessage
     }, { status: 500 });

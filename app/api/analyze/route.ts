@@ -89,13 +89,13 @@ export async function POST(req: NextRequest) {
     
     let aiResponse: string;
     try {
-      console.log('[v0] Initializing Grok with model grok-beta');
+      console.log('[v0] Initializing Grok with model grok-4');
       const xai = createXai({
         apiKey: xaiApiKey,
       });
       
       const result = await generateText({
-        model: xai('grok-beta'),
+        model: xai('grok-4'),
         system: systemPrompt,
         prompt: userPrompt,
         temperature: AI_CONFIG.DEFAULT_TEMPERATURE,

@@ -15,6 +15,32 @@ interface FileAttachment {
   data?: any; // For CSV parsed data
 }
 
+interface APIResponse<T = any> {
+  success: boolean;
+  error?: string;
+  data?: T;
+  text?: string;
+  cards?: InsightCard[];
+  confidence?: number;
+  sources?: Array<{
+    name: string;
+    type: 'database' | 'api' | 'model' | 'cache';
+    reliability: number;
+    url?: string;
+  }>;
+  model?: string;
+  trustMetrics?: TrustMetrics;
+}
+
+interface OddsEvent {
+  sport_title: string;
+  bookmakers?: Array<{
+    key: string;
+    title: string;
+    markets: any[];
+  }>;
+}
+
 interface TrustMetrics {
   benfordIntegrity: number;
   oddsAlignment: number;
@@ -909,10 +935,10 @@ export default function UnifiedAIPlatform() {
           userMessage,
           context
         })
-      }).then(res => res.json());
+      }).then(res => res.json() as Promise<APIResponse>);
 
       // Fetch live odds data if relevant
-      let oddsDataPromise = Promise.resolve(null);
+      let oddsDataPromise: Promise<APIResponse<OddsEvent[]> | null> = Promise.resolve(null);
       if (context.sport && (userMessage.toLowerCase().includes('odds') || 
           userMessage.toLowerCase().includes('bet') || 
           userMessage.toLowerCase().includes('line'))) {
@@ -924,7 +950,7 @@ export default function UnifiedAIPlatform() {
             sport: context.sport,
             marketType: context.marketType || 'h2h'
           })
-        }).then(res => res.json()).catch(err => {
+        }).then(res => res.json() as Promise<APIResponse<OddsEvent[]>>).catch(err => {
           console.error('[v0] Odds fetch error:', err);
           return null;
         });

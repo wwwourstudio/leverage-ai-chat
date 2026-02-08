@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
-import { xai } from '@ai-sdk/xai';
+import { createXai } from '@ai-sdk/xai';
 import { createClient } from '@supabase/supabase-js';
 import {
   AI_CONFIG,
@@ -87,12 +87,15 @@ export async function POST(req: NextRequest) {
       });
     }
     
+    // Create xAI provider instance with custom API key
+    const xaiProvider = createXai({
+      apiKey: xaiApiKey,
+    });
+    
     let aiResponse: string;
     try {
       const result = await generateText({
-        model: xai('grok-4', {
-          apiKey: xaiApiKey,
-        }),
+        model: xaiProvider('grok-4'),
         system: systemPrompt,
         prompt: userPrompt,
         temperature: AI_CONFIG.DEFAULT_TEMPERATURE,

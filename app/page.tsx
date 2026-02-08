@@ -1710,115 +1710,29 @@ export default function UnifiedAIPlatform() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-2.5 space-y-3 custom-scrollbar">
-          {/* Starred Chats Section */}
-                  {filteredChats.filter((chat: Chat) => chat.starred).length > 0 && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between px-2.5 py-1.5">
-                <div className="flex items-center gap-2">
-                  <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                    Starred
-                  </span>
-                </div>
-                <span className="text-[10px] font-bold text-gray-600">
-                  {filteredChats.filter(chat => chat.starred).length}
-                </span>
-              </div>
-              {filteredChats.filter(chat => chat.starred).map((chat) => (
-                <div
-                  key={chat.id}
-                  onClick={() => handleSelectChat(chat.id)}
-                  className={`group relative rounded-lg p-3 cursor-pointer transition-all duration-300 ${
-                    activeChat === chat.id
-                      ? 'bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10 border border-blue-500/30 shadow-lg shadow-blue-500/10'
-                      : 'bg-gray-900/30 hover:bg-gray-800/50 border border-transparent hover:border-gray-700/50'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5 group/title">
-                        <MessageSquare className={`w-3.5 h-3.5 ${activeChat === chat.id ? 'text-blue-400' : 'text-gray-500'} flex-shrink-0`} />
-                        {editingChatId === chat.id ? (
-                          <div className="flex-1 flex items-center gap-1">
-                            <input
-                              type="text"
-                              value={editingChatTitle}
-                              onChange={(e) => setEditingChatTitle(e.target.value)}
-                              onKeyDown={(e) => handleKeyDownChatTitle(e, chat.id)}
-                              onBlur={() => handleSaveChatTitle(chat.id)}
-                              className="flex-1 bg-gray-800/80 border border-blue-500/50 rounded-md px-2 py-1 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                              autoFocus
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSaveChatTitle(chat.id);
-                              }}
-                              className="p-1 hover:bg-gray-700/50 rounded transition-all"
-                              title="Save title"
-                            >
-                              <CheckCircle className="w-3.5 h-3.5 text-green-400" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex-1 flex items-center gap-1.5 min-w-0">
-                            <h3 className="text-xs font-bold text-white truncate flex-1">
-                              {chat.title}
-                            </h3>
-                            <button
-                              onClick={(e) => handleEditChatTitle(chat.id, chat.title, e)}
-                              className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-gray-700/50 rounded transition-all flex-shrink-0"
-                              title="Edit title"
-                            >
-                              <Edit3 className="w-3 h-3 text-gray-500 hover:text-blue-400" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-gray-400 truncate mb-2 leading-tight">{chat.preview}</p>
-                      
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {chat.tags.slice(0, 2).map((tag, i) => (
-                            <span key={i} className="px-1.5 py-0.5 bg-gray-800/50 border border-gray-700/50 rounded text-[10px] font-semibold text-gray-500">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                        <span className="text-[10px] font-medium text-gray-600">{formatTimestamp(chat.timestamp)}</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <button
-                        onClick={(e) => handleStarChat(chat.id, e)}
-                        className="p-1 rounded-md hover:bg-gray-700/50 transition-all opacity-100"
-                      >
-                        <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
-                      </button>
-                      <button
-                        onClick={(e) => handleDeleteChat(chat.id, e)}
-                        className="p-1 rounded-md hover:bg-gray-700/50 opacity-0 group-hover:opacity-100 transition-all"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* All Chats Section */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between px-2.5 py-1.5">
+          {/* App Preview Screenshot */}
+          <div className="space-y-3">
+            <div className="px-2.5 py-1.5">
               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                {selectedCategory === 'all' ? 'All Chats' : categories.find(c => c.id === selectedCategory)?.name || 'Chats'}
-              </span>
-              <span className="text-[10px] font-bold text-gray-600">
-                  {filteredChats.filter((chat: Chat) => !chat.starred).length}
+                App Preview
               </span>
             </div>
+            <div className="rounded-xl overflow-hidden border border-gray-800/50 shadow-2xl">
+              <img 
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%202026-02-07%20at%207.32.13%E2%80%AFPM-3ynZR23mfg3WlUvSdSqGibuYLaqG6b.png"
+                alt="Leverage AI Analysis Interface"
+                className="w-full h-auto object-cover"
+              />
+            </div>
+            <div className="px-3 py-2 bg-gray-900/30 rounded-lg border border-gray-800/50">
+              <p className="text-[11px] text-gray-400 leading-relaxed">
+                Real-time betting insights powered by Grok AI. Get live odds analysis, trust metrics, and verified predictions across NBA, NFL, and more.
+              </p>
+            </div>
+          </div>
+
+          {/* Hidden chat list - keeping functionality but hiding UI */}
+          <div className="hidden">
             {filteredChats.filter(chat => !chat.starred).map((chat) => (
             <div
               key={chat.id}

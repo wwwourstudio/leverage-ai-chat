@@ -45,13 +45,29 @@ export class LeveragedAI {
    * Initialize Supabase and XAI connections
    */
   private initialize(): void {
-    // Initialize Supabase
-    const supabaseUrl = process.env[ENV_KEYS.SUPABASE_URL];
-    const supabaseKey = process.env[ENV_KEYS.SUPABASE_ANON_KEY];
+    // Initialize Supabase - try multiple env var names for compatibility
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+    
+    console.log(`${LOG_PREFIXES.DATABASE} LeveragedAI init - URL: ${supabaseUrl ? 'SET' : 'MISSING'}, Key: ${supabaseKey ? 'SET' : 'MISSING'}`);
     
     if (supabaseUrl && supabaseKey) {
-      this.supabase = createClient(supabaseUrl, supabaseKey);
-      console.log(`${LOG_PREFIXES.DATABASE} LeveragedAI: Supabase client initialized`);
+      try {
+        this.supabase = createClient(supabaseUrl, supabaseKey, {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+          },
+          global: {
+            fetch: fetch.bind(globalThis)
+          }
+        });
+        console.log(`${LOG_PREFIXES.DATABASE} LeveragedAI: Supabase client initialized successfully`);
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.error(`${LOG_PREFIXES.DATABASE} LeveragedAI: Failed to create Supabase client:`, errorMsg);
+        this.supabase = null;
+      }
     } else {
       console.log(`${LOG_PREFIXES.DATABASE} LeveragedAI: Supabase not configured`);
     }

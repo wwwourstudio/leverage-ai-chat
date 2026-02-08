@@ -236,39 +236,26 @@ export default function UnifiedAIPlatform() {
 
   // Initialize credits and load real insights on mount
   useEffect(() => {
-  const data = getCreditData();
-  setCreditsRemaining(data.credits);
-  const rateData = getRateLimitData();
-  setChatsRemaining(CHAT_LIMIT - rateData.count);
-  
-  // Load real user insights AND dynamic cards
-  console.log('[v0] Loading real user insights and dynamic cards on mount');
-  
-  Promise.all([
-    fetchUserInsights(),
-    fetchDynamicCards({ limit: 3 })
-  ]).then(([insights, dynamicCards]) => {
-    console.log('[v0] Loaded insights:', insights);
-    console.log('[v0] Loaded dynamic cards:', dynamicCards.length);
-    
-    // Convert dynamic cards to insight cards
-    const convertedCards = dynamicCards.map(convertToInsightCard).filter(Boolean);
-    console.log('[v0] Converted cards for welcome message:', convertedCards.length);
-    
-      setMessages((prev: Message[]) => {
-      const newMessages = [...prev];
-      if (newMessages[0]?.isWelcome) {
-        newMessages[0] = {
-          ...newMessages[0],
-          insights,
-          cards: convertedCards
-        };
-      }
-      return newMessages;
-    });
-  }).catch(err => {
-    console.error('[v0] Error loading initial data:', err);
-  });
+    // Load insights on mount (cards removed from initial welcome)
+    fetch('/api/insights')
+      .then(r => r.json())
+      .then(insights => {
+        console.log('[v0] Loaded insights:', insights);
+        
+        setMessages((prev: Message[]) => {
+          const newMessages = [...prev];
+          if (newMessages[0]?.isWelcome) {
+            newMessages[0] = {
+              ...newMessages[0],
+              insights
+            };
+          }
+          return newMessages;
+        });
+      })
+      .catch(err => {
+        console.error('[v0] Error loading initial data:', err);
+      });
   }, []);
 
   const [chats, setChats] = useState<Chat[]>([

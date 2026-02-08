@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
-import { createXai } from '@ai-sdk/xai';
+import { xai } from '@ai-sdk/xai';
 import {
   AI_CONFIG,
   SYSTEM_PROMPT,
@@ -21,9 +21,9 @@ import {
 import { getLeveragedAI } from '@/lib/leveraged-ai';
 
 // Grok AI integration for sports analysis
-// Using xAI's Grok model through the AI SDK
+// Using xAI through Vercel AI Gateway (AI SDK 6)
 
-export const runtime = 'edge';
+// Note: NOT using 'edge' runtime as AI SDK 6 doesn't require it
 
 type AttachmentType = typeof ATTACHMENT_TYPES[keyof typeof ATTACHMENT_TYPES];
 
@@ -70,39 +70,22 @@ export async function POST(req: NextRequest) {
       userPrompt += `\nMarket Type: ${context.marketType}`;
     }
 
-    // Call Grok using xAI provider with integration credentials
-    console.log(`[v0] Calling Grok via xAI provider`);
-    
-    // Get XAI API key from environment
-    const xaiApiKey = process.env.XAI_API_KEY;
-    
-    if (!xaiApiKey) {
-      console.log(`${LOG_PREFIXES.API} XAI_API_KEY not configured`);
-      return NextResponse.json({
-        success: false,
-        error: 'Grok AI integration not configured. Please add XAI_API_KEY to environment variables.',
-        useFallback: true
-      });
-    }
+    // Call Grok using AI Gateway (AI SDK 6)
+    // No provider imports needed - AI Gateway handles routing
+    console.log(`[v0] Calling Grok via AI Gateway`);
     
     let aiResponse: string;
     try {
-      console.log('[v0] Initializing Grok with model: grok-4');
-      console.log('[v0] API Key present:', !!xaiApiKey);
-      console.log('[v0] API Key prefix:', xaiApiKey?.substring(0, 10) + '...');
+      console.log('[v0] Calling generateText with xAI Grok...');
       
-      const xai = createXai({
-        apiKey: xaiApiKey,
-        baseURL: 'https://api.x.ai/v1',
-      });
-      
-      console.log('[v0] Calling generateText with Grok 4...');
+      // Using xAI provider with proper typing
+      // Supported models: grok-beta, grok-vision-beta, grok-2-latest
       const result = await generateText({
-        model: xai('grok-4'),
+        model: xai('grok-beta') as any, // Type assertion for AI SDK compatibility
         system: systemPrompt,
         prompt: userPrompt,
         temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-        maxTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
+        maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
       });
       
       aiResponse = result.text;
@@ -125,17 +108,14 @@ export async function POST(req: NextRequest) {
         name: errorName,
         message: errorMessage,
         stack: errorStack?.split('\n')[0],
-        hasApiKey: !!xaiApiKey,
-        apiKeyLength: xaiApiKey?.length,
-        apiKeyStart: xaiApiKey?.substring(0, 7)
       });
       
       // More specific error handling
       let userError = 'AI service error. Please try again.';
       if (errorMessage.includes('401') || errorMessage.includes('unauthorized') || errorMessage.includes('API key')) {
-        userError = 'Invalid XAI API key. Please verify your XAI_API_KEY in environment variables.';
+        userError = 'Grok AI not configured. Please add XAI_API_KEY in the Vars section.';
       } else if (errorMessage.includes('404') || errorMessage.includes('model')) {
-        userError = 'Grok 4 model not accessible. Trying alternative: Check if your API key has access to Grok 4.';
+        userError = 'Grok model not accessible. Check if your API key has access to Grok.';
       } else if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
         userError = 'Rate limit exceeded. Please try again in a moment.';
       } else if (errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED')) {

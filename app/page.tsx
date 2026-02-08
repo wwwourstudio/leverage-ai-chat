@@ -30,6 +30,9 @@ interface APIResponse<T = any> {
   }>;
   model?: string;
   trustMetrics?: TrustMetrics;
+  useFallback?: boolean; // Flag to indicate fallback mode was used
+  details?: string; // Additional error or diagnostic details
+  errorType?: string; // Type of error that occurred
 }
 
 interface OddsEvent {
@@ -909,7 +912,7 @@ export default function UnifiedAIPlatform() {
         sport: extractSport(userMessage),
         marketType: extractMarketType(userMessage),
         platform: extractPlatform(userMessage),
-        previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content }))
+        previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }))
       };
 
       console.log('[v0] Extracted context:', context);
@@ -1012,7 +1015,7 @@ export default function UnifiedAIPlatform() {
       
       // Combine AI analysis with odds data context if available
       let enhancedContent = analysisResult.text;
-      if (oddsData?.success && oddsData.data?.length > 0) {
+      if (oddsData?.success && oddsData.data && oddsData.data.length > 0) {
         const topEvent = oddsData.data[0];
         console.log('[v0] Enriching response with live odds from:', topEvent.sport_title);
         enhancedContent += `\n\n**Live Market Data:** Real-time odds from ${topEvent.bookmakers?.length || 0} bookmakers analyzed for this recommendation.`;
@@ -1225,13 +1228,13 @@ export default function UnifiedAIPlatform() {
     return validatedCard;
   };
 
-  const buildSourcesList = (oddsData: any): Array<{ name: string; type: 'database' | 'api' | 'model' | 'cache'; reliability: number; url?: string }> => {
+  const buildSourcesList = (oddsData: APIResponse<OddsEvent[]> | null): Array<{ name: string; type: 'database' | 'api' | 'model' | 'cache'; reliability: number; url?: string }> => {
     const sources: Array<{ name: string; type: 'database' | 'api' | 'model' | 'cache'; reliability: number; url?: string }> = [
       { name: 'Grok AI Model', type: 'model' as const, reliability: 94 },
       { name: 'Supabase Trust System', type: 'database' as const, reliability: 96 }
     ];
     
-    if (oddsData?.success) {
+    if (oddsData?.success && oddsData.data) {
       sources.push({
         name: 'The Odds API (Live)',
         type: 'api' as const,

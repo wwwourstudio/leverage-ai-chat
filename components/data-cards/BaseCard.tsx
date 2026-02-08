@@ -27,7 +27,7 @@ interface BaseCardProps {
   /** Optional status badge configuration */
   status?: StatusBadge;
   /** Card content */
-  children: ReactNode;
+  children?: ReactNode;
   /** Optional callback for analysis action */
   onAnalyze?: () => void;
   /** Loading state */

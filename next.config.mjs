@@ -6,7 +6,24 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
- 
+  // Allow iframe embedding for v0 preview
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'ALLOWALL',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: "frame-ancestors 'self' https://*.v0.dev https://v0.dev",
+          },
+        ],
+      },
+    ];
+  },
 }
 
 export default nextConfig

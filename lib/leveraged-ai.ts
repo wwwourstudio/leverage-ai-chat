@@ -6,7 +6,7 @@
 
 import { SupabaseClient, createClient } from '@supabase/supabase-js';
 import { generateText } from 'ai';
-import { createXai } from '@ai-sdk/xai';
+import { xai } from '@ai-sdk/xai';
 import { ENV_KEYS, LOG_PREFIXES, AI_CONFIG } from '@/lib/constants';
 import { safeQuery, validateDataSchema, APP_TABLES } from '@/lib/supabase-validator';
 
@@ -34,20 +34,31 @@ interface AIEnhancedResult<T> {
  */
 export class LeveragedAI {
   private supabase: SupabaseClient | null = null;
-  private xaiModel: ReturnType<typeof createXai> | null = null;
+  private aiEnabled: boolean = false;
   private isInitialized: boolean = false;
+  private initPromise: Promise<void> | null = null;
 
   constructor() {
-    this.initialize();
+    this.initPromise = this.initialize();
   }
 
   /**
-   * Initialize Supabase and XAI connections
+   * Ensure initialization is complete before operations
    */
-  private initialize(): void {
-    // Initialize Supabase - try multiple env var names for compatibility
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  private async ensureInitialized(): Promise<void> {
+    if (this.initPromise) {
+      await this.initPromise;
+      this.initPromise = null;
+    }
+  }
+
+  /**
+   * Initialize Supabase and check AI availability
+   */
+  private async initialize(): Promise<void> {
+    // Initialize Supabase using proper server client
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     
     console.log(`${LOG_PREFIXES.DATABASE} LeveragedAI init - URL: ${supabaseUrl ? 'SET' : 'MISSING'}, Key: ${supabaseKey ? 'SET' : 'MISSING'}`);
     
@@ -72,19 +83,16 @@ export class LeveragedAI {
       console.log(`${LOG_PREFIXES.DATABASE} LeveragedAI: Supabase not configured`);
     }
 
-    // Initialize XAI/Grok
+    // Check if AI is available (AI Gateway handles auth automatically)
     const xaiApiKey = process.env.XAI_API_KEY;
     if (xaiApiKey) {
-      this.xaiModel = createXai({
-        apiKey: xaiApiKey,
-        baseURL: 'https://api.x.ai/v1',
-      });
-      console.log(`${LOG_PREFIXES.DATABASE} LeveragedAI: Grok AI initialized`);
+      this.aiEnabled = true;
+      console.log(`${LOG_PREFIXES.DATABASE} LeveragedAI: Grok AI available via AI Gateway`);
     } else {
       console.log(`${LOG_PREFIXES.DATABASE} LeveragedAI: Grok AI not configured`);
     }
 
-    this.isInitialized = !!(this.supabase && this.xaiModel);
+    this.isInitialized = !!(this.supabase && this.aiEnabled);
   }
 
   /**
@@ -110,6 +118,9 @@ export class LeveragedAI {
       summarize = false,
       timeout = 5000
     } = options;
+
+    // Ensure initialization is complete
+    await this.ensureInitialized();
 
     // Ensure database is available
     if (!this.supabase) {
@@ -154,7 +165,7 @@ export class LeveragedAI {
       const data = queryResult.data;
 
       // If AI processing is not enabled or AI is not available, return data as-is
-      if (!enableAIProcessing || !this.xaiModel || !data || data.length === 0) {
+      if (!enableAIProcessing || !this.aiEnabled || !data || data.length === 0) {
         return {
           success: true,
           data,
@@ -206,7 +217,7 @@ export class LeveragedAI {
     summary?: string;
     enrichedData?: any[];
   }> {
-    if (!this.xaiModel) {
+    if (!this.aiEnabled) {
       return {};
     }
 
@@ -226,11 +237,12 @@ ${options.summarize ? 'Provide a concise summary of the data trends and importan
 Be concise and focus on actionable insights.
       `.trim();
 
+      // Use xAI provider with proper typing
       const result = await generateText({
-        model: this.xaiModel('grok-4'),
+        model: xai('grok-beta') as any,
         prompt,
         temperature: 0.7,
-        maxTokens: 500,
+        maxOutputTokens: 500,
       });
 
       return {
@@ -251,21 +263,23 @@ Be concise and focus on actionable insights.
     enrichmentPrompt: (record: T) => string,
     enrichmentField: string = 'aiEnrichment'
   ): Promise<T[]> {
-    if (!this.xaiModel || !records || records.length === 0) {
+    await this.ensureInitialized();
+
+    if (!this.aiEnabled || !records || records.length === 0) {
       return records;
     }
 
     try {
       const enrichedRecords = await Promise.all(
         records.map(async (record) => {
-          try {
-            const prompt = enrichmentPrompt(record);
-            const result = await generateText({
-              model: this.xaiModel!('grok-4'),
-              prompt,
-              temperature: 0.7,
-              maxTokens: 200,
-            });
+  try {
+    const prompt = enrichmentPrompt(record);
+    const result = await generateText({
+      model: xai('grok-beta') as any,
+      prompt,
+      temperature: 0.7,
+      maxOutputTokens: 200,
+    });
 
             return {
               ...record,
@@ -293,6 +307,8 @@ Be concise and focus on actionable insights.
     data: T | T[],
     validationContext?: string
   ): Promise<{ success: boolean; data?: T[]; error?: string; aiValidation?: string }> {
+    await this.ensureInitialized();
+
     if (!this.supabase) {
       return { success: false, error: 'Database not initialized' };
     }
@@ -300,7 +316,7 @@ Be concise and focus on actionable insights.
     const records = Array.isArray(data) ? data : [data];
 
     // Optional: AI validation before insertion
-    if (this.xaiModel && validationContext) {
+    if (this.aiEnabled && validationContext) {
       const validation = await this.validateDataWithAI(records, validationContext);
       if (!validation.isValid) {
         return {
@@ -335,7 +351,7 @@ Be concise and focus on actionable insights.
     data: any[],
     context: string
   ): Promise<{ isValid: boolean; reason?: string }> {
-    if (!this.xaiModel) {
+    if (!this.aiEnabled) {
       return { isValid: true };
     }
 
@@ -353,14 +369,14 @@ Check for:
 4. Potential errors
 
 Respond with "VALID" if okay, or "INVALID: [reason]" if there are issues.
-      `.trim();
-
-      const result = await generateText({
-        model: this.xaiModel('grok-4'),
-        prompt,
-        temperature: 0.3,
-        maxTokens: 100,
-      });
+  `.trim();
+  
+  const result = await generateText({
+    model: xai('grok-beta') as any,
+    prompt,
+    temperature: 0.3,
+    maxOutputTokens: 100,
+  });
 
       const response = result.text.trim();
       if (response.startsWith('INVALID')) {

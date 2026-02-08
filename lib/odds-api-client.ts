@@ -190,8 +190,46 @@ export function getSportInfo(sportKey: string): SportInfo {
   return sportInfo;
 }
 
+// Request cache to prevent duplicate calls
+const requestCache = new Map<string, { data: any; timestamp: number; promise?: Promise<any> }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const IN_FLIGHT_TTL = 30 * 1000; // 30 seconds for in-flight requests
+
 /**
- * Fetch live odds for a sport
+ * Exponential backoff retry logic
+ */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  initialDelay: number = 1000
+): Promise<T> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+      const status = (error as any).status;
+      
+      // Don't retry on 4xx errors (except 429 rate limit)
+      if (status && status >= 400 && status < 500 && status !== 429) {
+        throw error;
+      }
+      
+      if (attempt < maxRetries - 1) {
+        const delay = initialDelay * Math.pow(2, attempt);
+        console.log(`${LOG_PREFIXES.API} Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError || new Error('Max retries exceeded');
+}
+
+/**
+ * Fetch live odds for a sport with caching and retry logic
  */
 export async function fetchLiveOdds(
   sportKey: string,
@@ -200,31 +238,90 @@ export async function fetchLiveOdds(
     regions?: string[];
     oddsFormat?: string;
     apiKey: string;
+    skipCache?: boolean;
   }
 ): Promise<any> {
   const {
     markets = [ODDS_MARKETS.H2H, ODDS_MARKETS.SPREADS, ODDS_MARKETS.TOTALS],
     regions = [BETTING_REGIONS.US],
     oddsFormat = ODDS_FORMATS.AMERICAN,
-    apiKey
+    apiKey,
+    skipCache = false
   } = options;
 
   const baseUrl = EXTERNAL_APIS.ODDS_API.BASE_URL;
   const marketsParam = markets.join(',');
   const regionsParam = regions.join(',');
-
   const url = `${baseUrl}/sports/${sportKey}/odds?apiKey=${apiKey}&regions=${regionsParam}&markets=${marketsParam}&oddsFormat=${oddsFormat}`;
+  
+  const cacheKey = `odds:${sportKey}:${marketsParam}:${regionsParam}`;
+  
+  // Check cache
+  if (!skipCache) {
+    const cached = requestCache.get(cacheKey);
+    if (cached) {
+      const age = Date.now() - cached.timestamp;
+      
+      // Return cached data if still fresh
+      if (age < CACHE_TTL) {
+        console.log(`${LOG_PREFIXES.API} Cache hit for ${sportKey} (age: ${Math.round(age / 1000)}s)`);
+        return cached.data;
+      }
+      
+      // If there's an in-flight request, wait for it
+      if (cached.promise && age < IN_FLIGHT_TTL) {
+        console.log(`${LOG_PREFIXES.API} Waiting for in-flight request for ${sportKey}`);
+        try {
+          return await cached.promise;
+        } catch (error) {
+          // If in-flight request failed, continue to make new request
+          console.log(`${LOG_PREFIXES.API} In-flight request failed, making new request`);
+        }
+      }
+    }
+  }
   
   console.log(`${LOG_PREFIXES.API} Fetching live odds:`, { sportKey, markets, regions });
 
-  const response = await fetch(url);
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Odds API error (${response.status}): ${errorText}`);
+  // Create the fetch promise
+  const fetchPromise = retryWithBackoff(async () => {
+    const response = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+      },
+      // Add timeout
+      signal: AbortSignal.timeout(10000) // 10 second timeout
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      const error: any = new Error(`Odds API error (${response.status}): ${errorText}`);
+      error.status = response.status;
+      throw error;
+    }
+
+    const data = await response.json();
+    
+    // Cache successful response
+    requestCache.set(cacheKey, { 
+      data, 
+      timestamp: Date.now(),
+      promise: undefined
+    });
+    
+    return data;
+  }, 3, 1000);
+
+  // Store in-flight promise
+  if (!skipCache) {
+    requestCache.set(cacheKey, {
+      data: null,
+      timestamp: Date.now(),
+      promise: fetchPromise
+    });
   }
 
-  return response.json();
+  return fetchPromise;
 }
 
 /**
@@ -339,4 +436,41 @@ export function getSportsByCategory(category: string): SportInfo[] {
   return Object.values(SPORT_INFO).filter(
     sport => sport.active && sport.category.toLowerCase() === category.toLowerCase()
   );
+}
+
+/**
+ * Clear request cache
+ */
+export function clearOddsCache(sportKey?: string): void {
+  if (sportKey) {
+    // Clear cache for specific sport
+    for (const key of requestCache.keys()) {
+      if (key.startsWith(`odds:${sportKey}:`)) {
+        requestCache.delete(key);
+      }
+    }
+    console.log(`${LOG_PREFIXES.API} Cleared cache for ${sportKey}`);
+  } else {
+    // Clear all cache
+    requestCache.clear();
+    console.log(`${LOG_PREFIXES.API} Cleared all odds cache`);
+  }
+}
+
+/**
+ * Get cache statistics
+ */
+export function getOddsCacheStats(): {
+  size: number;
+  keys: string[];
+  oldestEntry: number;
+} {
+  const entries = Array.from(requestCache.values());
+  return {
+    size: requestCache.size,
+    keys: Array.from(requestCache.keys()),
+    oldestEntry: entries.length > 0
+      ? Math.min(...entries.map(e => e.timestamp))
+      : Date.now()
+  };
 }

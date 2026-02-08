@@ -210,6 +210,7 @@ interface WeatherCard {
   status: string;
   data: {
     location: string;
+    matchup?: string; // Optional matchup field for game context
     temperature: string;
     condition: string;
     wind: string;

@@ -239,7 +239,7 @@ Be concise and focus on actionable insights.
 
       // Use xAI provider with proper typing
       const result = await generateText({
-        model: xai('grok-beta'),
+        model: xai('grok-beta') as any,
         prompt,
         temperature: 0.7,
         maxOutputTokens: 500,
@@ -272,14 +272,14 @@ Be concise and focus on actionable insights.
     try {
       const enrichedRecords = await Promise.all(
         records.map(async (record) => {
-          try {
-            const prompt = enrichmentPrompt(record);
-            const result = await generateText({
-              model: xai('grok-beta'),
-              prompt,
-              temperature: 0.7,
-              maxOutputTokens: 200,
-            });
+  try {
+    const prompt = enrichmentPrompt(record);
+    const result = await generateText({
+      model: xai('grok-beta') as any,
+      prompt,
+      temperature: 0.7,
+      maxOutputTokens: 200,
+    });
 
             return {
               ...record,
@@ -369,14 +369,14 @@ Check for:
 4. Potential errors
 
 Respond with "VALID" if okay, or "INVALID: [reason]" if there are issues.
-      `.trim();
-
-      const result = await generateText({
-        model: xai('grok-beta'),
-        prompt,
-        temperature: 0.3,
-        maxOutputTokens: 100,
-      });
+  `.trim();
+  
+  const result = await generateText({
+    model: xai('grok-beta') as any,
+    prompt,
+    temperature: 0.3,
+    maxOutputTokens: 100,
+  });
 
       const response = result.text.trim();
       if (response.startsWith('INVALID')) {

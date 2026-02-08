@@ -912,7 +912,7 @@ export default function UnifiedAIPlatform() {
         sport: extractSport(userMessage),
         marketType: extractMarketType(userMessage),
         platform: extractPlatform(userMessage),
-        previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content }))
+        previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }))
       };
 
       console.log('[v0] Extracted context:', context);

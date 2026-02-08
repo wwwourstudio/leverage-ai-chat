@@ -1,8 +1,5 @@
 {
   "css.customData": [
     ".vscode/tailwind.json"
-  ],
-  "files.readonlyInclude": {
-    "**/*": true
-  }
+  ]
 }

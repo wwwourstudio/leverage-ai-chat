@@ -75,10 +75,24 @@ export async function POST(req: NextRequest) {
     // Call Grok using xAI provider with integration credentials
     console.log(`[v0] Calling Grok via xAI provider`);
     
+    // Get XAI API key from environment
+    const xaiApiKey = process.env.XAI_API_KEY;
+    
+    if (!xaiApiKey) {
+      console.log(`${LOG_PREFIXES.API} XAI_API_KEY not configured`);
+      return NextResponse.json({
+        success: false,
+        error: 'Grok AI integration not configured. Please add XAI_API_KEY to environment variables.',
+        useFallback: true
+      });
+    }
+    
     let aiResponse: string;
     try {
       const result = await generateText({
-        model: xai('grok-beta'), // Uses Grok Leverage integration credentials
+        model: xai('grok-beta', {
+          apiKey: xaiApiKey,
+        }),
         system: systemPrompt,
         prompt: userPrompt,
         temperature: AI_CONFIG.DEFAULT_TEMPERATURE,

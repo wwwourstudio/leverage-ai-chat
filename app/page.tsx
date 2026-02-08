@@ -271,62 +271,8 @@ export default function UnifiedAIPlatform() {
   });
   }, []);
 
-  const [chats, setChats] = useState<Chat[]>([
-    {
-      id: 'chat-1',
-      title: 'NBA Lakers Betting Analysis',
-      preview: 'Sharp money on Lakers -4.5, 73% win probability...',
-      timestamp: new Date(Date.now() - 1000 * 60 * 5),
-      starred: true,
-      category: 'betting',
-      tags: ['live', 'nba', 'high-value']
-    },
-    {
-      id: 'chat-2',
-      title: 'NFBC Main Event Draft Strategy',
-      preview: 'Zero RB approach with elite WR stacking...',
-      timestamp: new Date(Date.now() - 1000 * 60 * 30),
-      starred: true,
-      category: 'fantasy',
-      tags: ['baseball', 'draft', 'strategy']
-    },
-    {
-      id: 'chat-3',
-      title: 'DFS NFL Week 8 Showdown Lineup',
-      preview: 'Optimal $49,800 salary lineup, 315.2 projected...',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60),
-      starred: false,
-      category: 'dfs',
-      tags: ['nfl', 'optimizer', 'draftkings']
-    },
-    {
-      id: 'chat-4',
-      title: 'Kalshi Election Market Analysis',
-      preview: 'Presidential market showing 58% probability...',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-      starred: true,
-      category: 'kalshi',
-      tags: ['politics', 'prediction-market']
-    },
-    {
-      id: 'chat-5',
-      title: 'Best Ball Portfolio Optimization',
-      preview: 'Diversify with 40% Mahomes exposure across...',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 12),
-      starred: false,
-      category: 'fantasy',
-      tags: ['football', 'bestball', 'nffc']
-    },
-    {
-      id: 'chat-6',
-      title: 'MLB Ohtani Props + Kalshi Weather',
-      preview: 'Over 1.5 total bases +120, 68% hit rate with...',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
-      starred: true,
-      category: 'betting',
-      tags: ['mlb', 'props', 'cross-platform']
-    }
-  ]);
+  // Empty initial state - no demo chats shown to visitors
+  const [chats, setChats] = useState<Chat[]>([]);
 
   const categories = [
     { id: 'all', name: 'All', icon: Layers, color: 'text-blue-400', desc: 'Everything' },
@@ -2066,6 +2012,71 @@ export default function UnifiedAIPlatform() {
                   </div>
                   <h3 className="text-lg font-bold text-gray-300">No messages yet</h3>
                   <p className="text-sm text-gray-500">Start a conversation to get AI-powered insights</p>
+                </div>
+              </div>
+            ) : messages.length === 1 && messages[0]?.isWelcome ? (
+              // Hero Section for First-Time Visitors
+              <div className="flex flex-col items-center justify-center min-h-[calc(100vh-300px)] py-12 px-4">
+                <div className="max-w-4xl w-full space-y-8">
+                  {/* Hero Header */}
+                  <div className="text-center space-y-4">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-full mb-4">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs font-bold text-blue-400 uppercase tracking-wide">All Systems Operational</span>
+                    </div>
+                    <h1 className="text-5xl md:text-6xl font-black bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent leading-tight">
+                      Leverage AI
+                    </h1>
+                    <p className="text-xl md:text-2xl font-bold text-gray-300 max-w-2xl mx-auto">
+                      Your All-In-One Sports Intelligence Platform
+                    </p>
+                    <p className="text-sm text-gray-500 max-w-xl mx-auto">
+                      Real-time odds analysis, fantasy insights, DFS optimization, and Kalshi market predictions powered by Grok AI
+                    </p>
+                  </div>
+
+                  {/* Product Screenshot */}
+                  <div className="relative group">
+                    <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl blur-xl opacity-25 group-hover:opacity-40 transition-opacity"></div>
+                    <div className="relative rounded-2xl overflow-hidden border border-gray-800/50 bg-gray-900/50 shadow-2xl">
+                      <img 
+                        src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%202026-02-07%20at%207.32.13%E2%80%AFPM-3ynZR23mfg3WlUvSdSqGibuYLaqG6b.png"
+                        alt="Leverage AI - Sports Intelligence Platform"
+                        className="w-full h-auto"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Feature Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-xl p-4 text-center">
+                      <TrendingUp className="w-8 h-8 text-orange-400 mx-auto mb-2" />
+                      <div className="text-sm font-bold text-white">Sports Betting</div>
+                      <div className="text-xs text-gray-500 mt-1">Live odds & value</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl p-4 text-center">
+                      <Trophy className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                      <div className="text-sm font-bold text-white">Fantasy (NFC)</div>
+                      <div className="text-xs text-gray-500 mt-1">Draft strategy</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-4 text-center">
+                      <Award className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+                      <div className="text-sm font-bold text-white">DFS Optimizer</div>
+                      <div className="text-xs text-gray-500 mt-1">Optimal lineups</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 rounded-xl p-4 text-center">
+                      <BarChart3 className="w-8 h-8 text-cyan-400 mx-auto mb-2" />
+                      <div className="text-sm font-bold text-white">Kalshi Markets</div>
+                      <div className="text-xs text-gray-500 mt-1">Event predictions</div>
+                    </div>
+                  </div>
+
+                  {/* CTA */}
+                  <div className="text-center">
+                    <p className="text-sm font-bold text-gray-400 mb-4">
+                      Try an example query below to see Leverage AI in action
+                    </p>
+                  </div>
                 </div>
               </div>
             ) : (

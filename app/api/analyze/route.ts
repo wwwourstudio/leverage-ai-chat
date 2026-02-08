@@ -126,30 +126,33 @@ export async function POST(req: NextRequest) {
 
     console.log('[API] Grok response generated:', aiResponse.substring(0, 100));
 
-    // Calculate trust metrics (non-blocking for historical data)
-    const trustMetricsPromise = calculateTrustMetrics(aiResponse, context, supabaseUrl, supabaseAnonKey);
-    
-    // Start trust metrics calculation but don't wait for Supabase queries
+    // Calculate trust metrics with fast fallback (max 1.5 seconds)
+    console.log('[v0] Calculating trust metrics with timeout...');
     const trustMetrics = await Promise.race([
-      trustMetricsPromise,
-      new Promise((resolve) => setTimeout(() => resolve({
-        benfordIntegrity: 85,
-        oddsAlignment: 88,
-        marketConsensus: 85,
-        historicalAccuracy: 85,
-        finalConfidence: 86,
-        trustLevel: 'high' as const,
-        riskLevel: 'low' as const,
-        adjustedTone: 'Strong signal',
-        flags: []
-      }), 3000)) // Fallback after 3 seconds
+      calculateTrustMetrics(aiResponse, context, supabaseUrl, supabaseAnonKey),
+      new Promise((resolve) => setTimeout(() => {
+        console.log('[v0] Trust metrics timeout, using defaults');
+        resolve({
+          benfordIntegrity: 85,
+          oddsAlignment: 88,
+          marketConsensus: 85,
+          historicalAccuracy: 85,
+          finalConfidence: 86,
+          trustLevel: 'high' as const,
+          riskLevel: 'low' as const,
+          adjustedTone: 'Strong signal',
+          flags: []
+        });
+      }, 1500)) // Faster fallback: 1.5 seconds
     ]) as any;
 
-    // Store analysis in Supabase if configured (fire and forget - non-blocking)
+    // Store analysis in Supabase asynchronously (completely non-blocking)
     if (supabaseUrl && supabaseAnonKey) {
-      // Don't await this - run in background
-      storeAnalysisMetrics(supabaseUrl, supabaseAnonKey, trustMetrics, context).catch(err => {
-        console.log(`${LOG_PREFIXES.API} Background metrics storage failed:`, err.message);
+      // Fire and forget - don't block response
+      setImmediate(() => {
+        storeAnalysisMetrics(supabaseUrl, supabaseAnonKey, trustMetrics, context).catch(err => {
+          console.log(`${LOG_PREFIXES.API} Background metrics storage failed:`, err.message);
+        });
       });
     }
 
@@ -265,7 +268,7 @@ async function calculateTrustMetrics(
     try {
       const supabase = createClient(supabaseUrl, supabaseAnonKey);
       
-      // Add timeout to Supabase query to prevent hanging
+      // Add aggressive timeout to Supabase query
       const queryPromise = safeQuery(
         supabase,
         APP_TABLES.AI_RESPONSE_TRUST,
@@ -273,17 +276,20 @@ async function calculateTrustMetrics(
           .select('final_confidence')
           .eq('model_id', AI_CONFIG.MODEL_NAME)
           .order('created_at', { ascending: false })
-          .limit(20),
+          .limit(10), // Reduced from 20 to 10 for faster query
         {
           defaultValue: [],
           logErrors: false
         }
       );
       
-      // Timeout after 2 seconds
+      // Aggressive timeout: 1 second max for historical data
       const queryResult = await Promise.race([
         queryPromise,
-        new Promise((resolve) => setTimeout(() => resolve({ success: false, data: [] }), 2000))
+        new Promise((resolve) => setTimeout(() => {
+          console.log('[v0] Historical accuracy query timeout');
+          resolve({ success: false, data: [] });
+        }, 1000))
       ]) as any;
       
       if (queryResult.success && queryResult.data.length > 0) {

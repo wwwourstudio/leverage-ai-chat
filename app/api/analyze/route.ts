@@ -89,11 +89,16 @@ export async function POST(req: NextRequest) {
     
     let aiResponse: string;
     try {
-      console.log('[v0] Initializing Grok with model grok-4');
+      console.log('[v0] Initializing Grok with model: grok-4');
+      console.log('[v0] API Key present:', !!xaiApiKey);
+      console.log('[v0] API Key prefix:', xaiApiKey?.substring(0, 10) + '...');
+      
       const xai = createXai({
         apiKey: xaiApiKey,
+        baseURL: 'https://api.x.ai/v1',
       });
       
+      console.log('[v0] Calling generateText with Grok 4...');
       const result = await generateText({
         model: xai('grok-4'),
         system: systemPrompt,
@@ -103,7 +108,7 @@ export async function POST(req: NextRequest) {
       });
       
       aiResponse = result.text;
-      console.log(`[v0] Grok response received successfully, length: ${aiResponse.length}`);
+      console.log(`[v0] ✅ Grok response received successfully, length: ${aiResponse.length}`);
       
       if (!aiResponse || aiResponse.trim().length === 0) {
         console.log(`${LOG_PREFIXES.API} Grok returned empty response`);
@@ -116,22 +121,35 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : '';
-      console.error('[v0] Grok API detailed error:', {
+      const errorName = error instanceof Error ? error.name : 'Unknown';
+      
+      console.error('[v0] ❌ Grok API ERROR:', {
+        name: errorName,
         message: errorMessage,
-        stack: errorStack,
+        stack: errorStack?.split('\n')[0],
         hasApiKey: !!xaiApiKey,
-        apiKeyLength: xaiApiKey?.length
+        apiKeyLength: xaiApiKey?.length,
+        apiKeyStart: xaiApiKey?.substring(0, 7)
       });
+      
+      // More specific error handling
+      let userError = 'AI service error. Please try again.';
+      if (errorMessage.includes('401') || errorMessage.includes('unauthorized') || errorMessage.includes('API key')) {
+        userError = 'Invalid XAI API key. Please verify your XAI_API_KEY in environment variables.';
+      } else if (errorMessage.includes('404') || errorMessage.includes('model')) {
+        userError = 'Grok 4 model not accessible. Trying alternative: Check if your API key has access to Grok 4.';
+      } else if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
+        userError = 'Rate limit exceeded. Please try again in a moment.';
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED')) {
+        userError = 'Connection timeout. Please check your network and try again.';
+      }
       
       return NextResponse.json({
         success: false,
-        error: errorMessage.includes('401') || errorMessage.includes('unauthorized') 
-          ? 'Invalid API key. Please check your XAI_API_KEY configuration.' 
-          : errorMessage.includes('404') || errorMessage.includes('model')
-          ? 'Model not found. Please check Grok model availability.'
-          : 'AI service error. Please try again.',
+        error: userError,
         useFallback: true,
-        details: errorMessage
+        details: errorMessage,
+        errorType: errorName
       });
     }
 

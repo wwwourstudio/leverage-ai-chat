@@ -41,20 +41,25 @@ export async function GET(req: NextRequest) {
     // In a real app, you'd fetch this from authenticated user's data
     // For now, aggregate platform-wide statistics
     
-    // Safely fetch AI response trust metrics from database with validation
+    // Safely fetch AI response trust metrics from database with validation and timeout
     console.log(`[v0] Attempting to query ${APP_TABLES.AI_RESPONSE_TRUST} table...`);
-    const queryResult = await safeQuery(
-      supabase,
-      APP_TABLES.AI_RESPONSE_TRUST,
-      (builder) => builder
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100),
-      {
-        defaultValue: [],
-        logErrors: true
-      }
-    );
+    const queryResult = await Promise.race([
+      safeQuery(
+        supabase,
+        APP_TABLES.AI_RESPONSE_TRUST,
+        (builder) => builder
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(100),
+        {
+          defaultValue: [],
+          logErrors: true
+        }
+      ),
+      new Promise<any>((resolve) => 
+        setTimeout(() => resolve({ success: false, data: [], error: 'Query timeout', source: 'error' }), 1500)
+      )
+    ]);
 
     if (!queryResult.success || queryResult.source !== 'database') {
       const errorMsg = queryResult.error || 'No database data';

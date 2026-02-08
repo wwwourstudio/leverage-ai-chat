@@ -1015,7 +1015,7 @@ export default function UnifiedAIPlatform() {
       
       // Combine AI analysis with odds data context if available
       let enhancedContent = analysisResult.text;
-      if (oddsData?.success && oddsData.data?.length > 0) {
+      if (oddsData?.success && oddsData.data && oddsData.data.length > 0) {
         const topEvent = oddsData.data[0];
         console.log('[v0] Enriching response with live odds from:', topEvent.sport_title);
         enhancedContent += `\n\n**Live Market Data:** Real-time odds from ${topEvent.bookmakers?.length || 0} bookmakers analyzed for this recommendation.`;

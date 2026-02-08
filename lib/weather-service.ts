@@ -207,18 +207,17 @@ interface WeatherCard {
   category: string;
   subcategory: string;
   gradient: string;
+  status: string;
   data: {
     location: string;
-    matchup: string;
     temperature: string;
     condition: string;
     wind: string;
+    humidity: string;
     precipitation: string;
     gameImpact: string;
-    gameTime: string;
   };
-  status: string;
-  realData: boolean;
+  [key: string]: any; // Index signature for Card compatibility
 }
 
 /**
@@ -230,7 +229,7 @@ export async function generateWeatherCard(
   gameTime: Date
 ): Promise<WeatherCard | null> {
   // Try to find stadium location
-  let location = STADIUM_LOCATIONS[homeTeam];
+  let location: GameLocation | null = STADIUM_LOCATIONS[homeTeam] || null;
   
   // Fallback to city-based lookup if no exact stadium match
   if (!location) {

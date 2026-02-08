@@ -41,11 +41,11 @@ export async function GET(req: NextRequest) {
     // In a real app, you'd fetch this from authenticated user's data
     // For now, aggregate platform-wide statistics
     
-    // Safely fetch AI predictions from trust system with validation
-    console.log(`[v0] Attempting to query ${APP_TABLES.AI_PREDICTIONS} table...`);
+    // Safely fetch AI response trust metrics from database with validation
+    console.log(`[v0] Attempting to query ${APP_TABLES.AI_RESPONSE_TRUST} table...`);
     const queryResult = await safeQuery(
       supabase,
-      APP_TABLES.AI_PREDICTIONS,
+      APP_TABLES.AI_RESPONSE_TRUST,
       (builder) => builder
         .select('*')
         .order('created_at', { ascending: false })
@@ -71,8 +71,8 @@ export async function GET(req: NextRequest) {
     const predictions = queryResult.data;
     const schemaValidation = validateDataSchema(
       predictions,
-      ['id', 'model', 'created_at'],
-      APP_TABLES.AI_PREDICTIONS
+      ['id', 'model_id', 'created_at', 'final_confidence'],
+      APP_TABLES.AI_RESPONSE_TRUST
     );
 
     if (schemaValidation.invalidCount > 0) {
@@ -150,29 +150,19 @@ async function calculateInsightsFromPredictions(predictions: any[], userId?: str
     }
   }
 
-  // Calculate metrics from real prediction data
-  const validPredictions = predictions.filter(p => p.trust_metrics);
+  // Calculate metrics from real prediction data (ai_response_trust table)
+  const validPredictions = predictions.filter(p => p.final_confidence !== null && p.final_confidence !== undefined);
   
-  let totalConfidence = 0;
-  let highConfidencePredictions = 0;
   let totalFinalConfidence = 0;
+  let highConfidencePredictions = 0;
 
   validPredictions.forEach(pred => {
-    const metrics = pred.trust_metrics;
-    if (metrics.finalConfidence) {
-      totalFinalConfidence += metrics.finalConfidence;
-      if (metrics.finalConfidence >= configs.high_confidence_threshold) {
-        highConfidencePredictions++;
-      }
-    }
-    if (pred.confidence) {
-      totalConfidence += pred.confidence;
+    const finalConf = pred.final_confidence;
+    totalFinalConfidence += finalConf;
+    if (finalConf >= configs.high_confidence_threshold) {
+      highConfidencePredictions++;
     }
   });
-
-  const avgConfidence = validPredictions.length > 0 
-    ? totalConfidence / validPredictions.length 
-    : configs.default_confidence;
 
   const avgFinalConfidence = validPredictions.length > 0
     ? totalFinalConfidence / validPredictions.length
@@ -195,7 +185,7 @@ async function calculateInsightsFromPredictions(predictions: any[], userId?: str
     roi: parseFloat(simulatedROI.toFixed(1)),
     activeContests: predictions.length,
     totalInvested: totalInvested,
-    avgConfidence: parseFloat(avgConfidence.toFixed(1)),
+    avgConfidence: parseFloat(avgFinalConfidence.toFixed(1)),
     dataSource: 'calculated',
     lastUpdated: new Date().toISOString()
   };

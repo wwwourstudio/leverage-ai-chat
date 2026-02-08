@@ -1710,25 +1710,42 @@ export default function UnifiedAIPlatform() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-2.5 space-y-3 custom-scrollbar">
-          {/* App Preview Screenshot */}
+          {/* Current Active Chat */}
           <div className="space-y-3">
-            <div className="px-2.5 py-1.5">
+            <div className="px-2.5 py-1.5 flex items-center justify-between">
               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                App Preview
+                All Chats
+              </span>
+              <span className="text-[10px] font-bold text-gray-600">
+                {chats.length}
               </span>
             </div>
-            <div className="rounded-xl overflow-hidden border border-gray-800/50 shadow-2xl">
-              <img 
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%202026-02-07%20at%207.32.13%E2%80%AFPM-3ynZR23mfg3WlUvSdSqGibuYLaqG6b.png"
-                alt="Leverage AI Analysis Interface"
-                className="w-full h-auto object-cover"
-              />
-            </div>
-            <div className="px-3 py-2 bg-gray-900/30 rounded-lg border border-gray-800/50">
-              <p className="text-[11px] text-gray-400 leading-relaxed">
-                Real-time betting insights powered by Grok AI. Get live odds analysis, trust metrics, and verified predictions across NBA, NFL, and more.
-              </p>
-            </div>
+            
+            {chats.length > 0 && (
+              <div className="bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10 border border-blue-500/30 shadow-lg shadow-blue-500/10 rounded-lg p-3 cursor-pointer transition-all duration-300">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <MessageSquare className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                      <h3 className="text-xs font-bold text-white truncate flex-1">
+                        {chats[chats.length - 1].title}
+                      </h3>
+                    </div>
+                    <p className="text-[11px] text-gray-400 line-clamp-2 leading-relaxed mb-2">
+                      {chats[chats.length - 1].messages[0]?.content.substring(0, 100)}...
+                    </p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2 py-0.5 rounded-md bg-gray-800/60 text-[10px] font-semibold text-gray-400 border border-gray-700/50">
+                        {chats[chats.length - 1].category}
+                      </span>
+                      <span className="text-[10px] text-gray-600 font-medium">
+                        Just now
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Hidden chat list - keeping functionality but hiding UI */}

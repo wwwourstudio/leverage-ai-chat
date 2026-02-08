@@ -180,13 +180,14 @@ export function validateSportKey(sport: string): {
  * Get sport information
  */
 export function getSportInfo(sportKey: string): SportInfo {
-  return SPORT_INFO[sportKey] || {
+  const sportInfo: SportInfo = SPORT_INFO[sportKey] || {
     key: sportKey,
     name: sportKey.toUpperCase(),
     category: 'Unknown',
     active: false,
     hasOutrights: false
   };
+  return sportInfo;
 }
 
 /**

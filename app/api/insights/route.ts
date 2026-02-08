@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import {
   ENV_KEYS,
   LOG_PREFIXES,
@@ -8,12 +7,12 @@ import {
   SUCCESS_MESSAGES,
 } from '@/lib/constants';
 import {
-  safeQuery,
   validateDataSchema,
   APP_TABLES,
   SCHEMA_DEFINITIONS
 } from '@/lib/supabase-validator';
 import { getConfigs, getUserProfile } from '@/lib/dynamic-config';
+import { queryWithAI } from '@/lib/leveraged-ai';
 
 export const runtime = 'edge';
 
@@ -23,47 +22,47 @@ export const runtime = 'edge';
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabaseUrl = process.env[ENV_KEYS.SUPABASE_URL];
-    const supabaseAnonKey = process.env[ENV_KEYS.SUPABASE_ANON_KEY];
+    // Extract userId from request headers if available
+    const userId = req.headers.get('x-user-id') || undefined;
 
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.log(`${LOG_PREFIXES.API} Supabase not configured, returning default insights`);
-      return NextResponse.json({
-        success: true,
-        insights: getDefaultInsights(),
-        dataSource: DATA_SOURCES.DEFAULT,
-        message: 'Supabase not configured'
-      });
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-    // In a real app, you'd fetch this from authenticated user's data
-    // For now, aggregate platform-wide statistics
+    // Use LeveragedAI for AI-enhanced database query
+    console.log(`${LOG_PREFIXES.API} Fetching insights using LeveragedAI...`);
     
-    // Safely fetch AI predictions from trust system with validation
-    console.log(`[v0] Attempting to query ${APP_TABLES.AI_PREDICTIONS} table...`);
-    const queryResult = await safeQuery(
-      supabase,
-      APP_TABLES.AI_PREDICTIONS,
+    const queryResult = await queryWithAI<any>(
+      APP_TABLES.AI_RESPONSE_TRUST,
       (builder) => builder
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100),
       {
-        defaultValue: [],
-        logErrors: true
+        enableAIProcessing: true,
+        aiContext: 'Analyzing betting prediction performance metrics to generate user insights',
+        summarize: true,
+        timeout: 2000
       }
     );
 
-    if (!queryResult.success || queryResult.source !== 'database') {
-      const errorMsg = queryResult.error || 'No database data';
+    if (!queryResult.success || queryResult.data.length === 0) {
+      const errorMsg = queryResult.error || 'No database data available';
+      const isTableMissing = typeof errorMsg === 'string' && (
+        errorMsg.includes('Could not find the table') || 
+        errorMsg.includes('relation') && errorMsg.includes('does not exist')
+      );
+      
       console.log(`${LOG_PREFIXES.API} Using default insights -`, errorMsg);
+      
       return NextResponse.json({
         success: true,
         insights: getDefaultInsights(),
-        dataSource: queryResult.source,
-        message: typeof errorMsg === 'string' ? errorMsg : 'Table not yet created'
+        dataSource: DATA_SOURCES.DEFAULT,
+        message: isTableMissing 
+          ? 'Database tables not created yet. See SUPABASE_SETUP.md in project root for setup instructions.' 
+          : queryResult.data.length === 0
+          ? 'No predictions yet. Start chatting to generate insights!'
+          : typeof errorMsg === 'string' ? errorMsg : 'Unable to fetch data',
+        aiSummary: queryResult.aiSummary,
+        setupRequired: isTableMissing,
+        setupGuideUrl: isTableMissing ? '/SUPABASE_SETUP.md' : undefined
       });
     }
 
@@ -71,8 +70,8 @@ export async function GET(req: NextRequest) {
     const predictions = queryResult.data;
     const schemaValidation = validateDataSchema(
       predictions,
-      ['id', 'model', 'created_at'],
-      APP_TABLES.AI_PREDICTIONS
+      ['id', 'model_id', 'created_at', 'final_confidence'],
+      APP_TABLES.AI_RESPONSE_TRUST
     );
 
     if (schemaValidation.invalidCount > 0) {
@@ -80,8 +79,6 @@ export async function GET(req: NextRequest) {
     }
 
     // Calculate real metrics from validated predictions
-    // Extract userId from request if available (from auth headers, etc.)
-    const userId = req.headers.get('x-user-id') || undefined;
     const insights = await calculateInsightsFromPredictions(schemaValidation.validRecords, userId);
 
     return NextResponse.json({
@@ -94,6 +91,9 @@ export async function GET(req: NextRequest) {
         valid: schemaValidation.validRecords.length,
         invalid: schemaValidation.invalidCount
       },
+      aiSummary: queryResult.aiSummary,
+      aiInsights: queryResult.aiInsights,
+      processingTime: queryResult.processingTime,
       timestamp: new Date().toISOString()
     });
 
@@ -150,29 +150,19 @@ async function calculateInsightsFromPredictions(predictions: any[], userId?: str
     }
   }
 
-  // Calculate metrics from real prediction data
-  const validPredictions = predictions.filter(p => p.trust_metrics);
+  // Calculate metrics from real prediction data (ai_response_trust table)
+  const validPredictions = predictions.filter(p => p.final_confidence !== null && p.final_confidence !== undefined);
   
-  let totalConfidence = 0;
-  let highConfidencePredictions = 0;
   let totalFinalConfidence = 0;
+  let highConfidencePredictions = 0;
 
   validPredictions.forEach(pred => {
-    const metrics = pred.trust_metrics;
-    if (metrics.finalConfidence) {
-      totalFinalConfidence += metrics.finalConfidence;
-      if (metrics.finalConfidence >= configs.high_confidence_threshold) {
-        highConfidencePredictions++;
-      }
-    }
-    if (pred.confidence) {
-      totalConfidence += pred.confidence;
+    const finalConf = pred.final_confidence;
+    totalFinalConfidence += finalConf;
+    if (finalConf >= configs.high_confidence_threshold) {
+      highConfidencePredictions++;
     }
   });
-
-  const avgConfidence = validPredictions.length > 0 
-    ? totalConfidence / validPredictions.length 
-    : configs.default_confidence;
 
   const avgFinalConfidence = validPredictions.length > 0
     ? totalFinalConfidence / validPredictions.length
@@ -195,7 +185,7 @@ async function calculateInsightsFromPredictions(predictions: any[], userId?: str
     roi: parseFloat(simulatedROI.toFixed(1)),
     activeContests: predictions.length,
     totalInvested: totalInvested,
-    avgConfidence: parseFloat(avgConfidence.toFixed(1)),
+    avgConfidence: parseFloat(avgFinalConfidence.toFixed(1)),
     dataSource: 'calculated',
     lastUpdated: new Date().toISOString()
   };

@@ -15,6 +15,32 @@ interface FileAttachment {
   data?: any; // For CSV parsed data
 }
 
+interface APIResponse<T = any> {
+  success: boolean;
+  error?: string;
+  data?: T;
+  text?: string;
+  cards?: InsightCard[];
+  confidence?: number;
+  sources?: Array<{
+    name: string;
+    type: 'database' | 'api' | 'model' | 'cache';
+    reliability: number;
+    url?: string;
+  }>;
+  model?: string;
+  trustMetrics?: TrustMetrics;
+}
+
+interface OddsEvent {
+  sport_title: string;
+  bookmakers?: Array<{
+    key: string;
+    title: string;
+    markets: any[];
+  }>;
+}
+
 interface TrustMetrics {
   benfordIntegrity: number;
   oddsAlignment: number;
@@ -210,39 +236,26 @@ export default function UnifiedAIPlatform() {
 
   // Initialize credits and load real insights on mount
   useEffect(() => {
-  const data = getCreditData();
-  setCreditsRemaining(data.credits);
-  const rateData = getRateLimitData();
-  setChatsRemaining(CHAT_LIMIT - rateData.count);
-  
-  // Load real user insights AND dynamic cards
-  console.log('[v0] Loading real user insights and dynamic cards on mount');
-  
-  Promise.all([
-    fetchUserInsights(),
-    fetchDynamicCards({ limit: 3 })
-  ]).then(([insights, dynamicCards]) => {
-    console.log('[v0] Loaded insights:', insights);
-    console.log('[v0] Loaded dynamic cards:', dynamicCards.length);
-    
-    // Convert dynamic cards to insight cards
-    const convertedCards = dynamicCards.map(convertToInsightCard).filter(Boolean);
-    console.log('[v0] Converted cards for welcome message:', convertedCards.length);
-    
-      setMessages((prev: Message[]) => {
-      const newMessages = [...prev];
-      if (newMessages[0]?.isWelcome) {
-        newMessages[0] = {
-          ...newMessages[0],
-          insights,
-          cards: convertedCards
-        };
-      }
-      return newMessages;
-    });
-  }).catch(err => {
-    console.error('[v0] Error loading initial data:', err);
-  });
+    // Load insights on mount (cards removed from initial welcome)
+    fetch('/api/insights')
+      .then(r => r.json())
+      .then(insights => {
+        console.log('[v0] Loaded insights:', insights);
+        
+        setMessages((prev: Message[]) => {
+          const newMessages = [...prev];
+          if (newMessages[0]?.isWelcome) {
+            newMessages[0] = {
+              ...newMessages[0],
+              insights
+            };
+          }
+          return newMessages;
+        });
+      })
+      .catch(err => {
+        console.error('[v0] Error loading initial data:', err);
+      });
   }, []);
 
   const [chats, setChats] = useState<Chat[]>([
@@ -909,10 +922,10 @@ export default function UnifiedAIPlatform() {
           userMessage,
           context
         })
-      }).then(res => res.json());
+      }).then(res => res.json() as Promise<APIResponse>);
 
       // Fetch live odds data if relevant
-      let oddsDataPromise = Promise.resolve(null);
+      let oddsDataPromise: Promise<APIResponse<OddsEvent[]> | null> = Promise.resolve(null);
       if (context.sport && (userMessage.toLowerCase().includes('odds') || 
           userMessage.toLowerCase().includes('bet') || 
           userMessage.toLowerCase().includes('line'))) {
@@ -924,7 +937,7 @@ export default function UnifiedAIPlatform() {
             sport: context.sport,
             marketType: context.marketType || 'h2h'
           })
-        }).then(res => res.json()).catch(err => {
+        }).then(res => res.json() as Promise<APIResponse<OddsEvent[]>>).catch(err => {
           console.error('[v0] Odds fetch error:', err);
           return null;
         });
@@ -937,7 +950,10 @@ export default function UnifiedAIPlatform() {
         success: analysisResult.success,
         hasText: !!analysisResult.text,
         hasCards: !!analysisResult.cards,
-        hasTrustMetrics: !!analysisResult.trustMetrics
+        hasTrustMetrics: !!analysisResult.trustMetrics,
+        error: analysisResult.error,
+        useFallback: analysisResult.useFallback,
+        details: analysisResult.details
       });
       
       if (oddsData) {
@@ -948,41 +964,39 @@ export default function UnifiedAIPlatform() {
       }
 
       // Handle API errors with smart fallback
-      if (!analysisResult.success || analysisResult.useFallback) {
-        console.log('[v0] API returned fallback signal, using contextual cards');
+      if (!analysisResult.success) {
+        console.log('[v0] API call failed, using contextual cards');
         
-        // Use contextual cards when AI analysis isn't available
+        // Only use fallback for actual errors, not when useFallback flag is set
         const processingTime = Date.now() - startTime;
         const fallbackCards = await selectRelevantCards(userMessage, context);
-        const fallbackResponse = {
-          content: "I've analyzed your query and generated relevant insights based on current market data. The Grok AI analysis will be available once the API connection is fully configured."
-        };
+        const errorMessage = analysisResult.error || 'API temporarily unavailable';
         
         const newMessage: Message = {
           role: 'assistant',
-          content: fallbackResponse.content,
+          content: `I'm experiencing connectivity issues with the AI service. Here's an analysis based on available data:\n\n**Status:** ${errorMessage}\n\nI can still provide you with relevant betting insights and live odds analysis based on cached patterns and real-time market data.`,
           timestamp: new Date(),
           cards: fallbackCards,
-          confidence: 75,
+          confidence: 70,
           sources: [
-            { name: 'Pattern Analysis', type: 'model', reliability: 80 },
+            { name: 'Pattern Analysis', type: 'cache', reliability: 75 },
             { name: 'Historical Data', type: 'cache', reliability: 78 }
           ],
-          modelUsed: 'Smart Fallback',
+          modelUsed: 'Fallback Mode',
           processingTime,
           trustMetrics: {
-            benfordIntegrity: 75,
-            oddsAlignment: 78,
+            benfordIntegrity: 70,
+            oddsAlignment: 75,
             marketConsensus: 75,
-            historicalAccuracy: 80,
-            finalConfidence: 77,
+            historicalAccuracy: 78,
+            finalConfidence: 74,
             trustLevel: 'medium',
             riskLevel: 'medium',
             adjustedTone: 'Moderate confidence',
             flags: [{
-              type: 'info',
-              message: analysisResult.error || 'Using cached analysis patterns',
-              severity: 'info'
+              type: 'warning',
+              message: errorMessage,
+              severity: 'warning'
             }]
           }
         };
@@ -1542,7 +1556,7 @@ export default function UnifiedAIPlatform() {
     return badges[status] || badges.value;
   };
 
-  const renderInsightCard = (card: InsightCard, index: number) => {
+  const _renderInsightCard = (card: InsightCard, index: number) => {
     // Validate card data before rendering
     if (!card || typeof card !== 'object') {
       return null;
@@ -1653,7 +1667,7 @@ export default function UnifiedAIPlatform() {
       : chats.filter((chat: Chat) => chat.category === selectedCategory);
   
   // Platform-specific AI-powered prompt suggestions
-  const platformPrompts: Record<string, Array<{ label: string; icon: any; category: string }>> = {
+  const platformPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }>> = {
     all: [
       { label: 'Cross-platform arbitrage opportunities', icon: Sparkles, category: 'all' },
       { label: 'Today\'s best value plays across all platforms', icon: TrendingUp, category: 'all' },
@@ -2049,7 +2063,7 @@ export default function UnifiedAIPlatform() {
                 // Group messages: Check if this message is from same sender as previous
                 const prevMessage = index > 0 ? messages[index - 1] : null;
                 const isGrouped = prevMessage && prevMessage.role === message.role;
-                const showTimestamp = !isGrouped || index === messages.length - 1;
+                const _showTimestamp = !isGrouped || index === messages.length - 1;
                 
                 return (
                   <div
@@ -2147,7 +2161,7 @@ export default function UnifiedAIPlatform() {
                             
                             // Map card type to icon component
                             const getCardIcon = (type: string) => {
-                              const iconMap: Record<string, any> = {
+                              const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
                                 'live-odds': Zap,
                                 'player-prop': Target,
                                 'dfs-lineup': Award,
@@ -2203,7 +2217,7 @@ export default function UnifiedAIPlatform() {
                                     Key Metrics
                                   </h3>
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {metrics.map((metric: any, idx: number) => (
+                                    {metrics.map((metric: { label: string; value: string }, idx: number) => (
                                       <div 
                                         key={idx}
                                         className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 rounded-xl p-3.5 hover:border-gray-600/50 transition-colors"
@@ -2254,7 +2268,7 @@ export default function UnifiedAIPlatform() {
                                     Strategic Recommendations
                                   </h3>
                                   <div className="space-y-2.5">
-                                    {recommendations.map((rec: any, idx: number) => (
+                                    {recommendations.map((rec: { label: string; value: string }, idx: number) => (
                                       <div 
                                         key={idx}
                                         className="bg-gradient-to-r from-gray-800/40 to-gray-900/40 border border-gray-700/50 rounded-xl p-4 hover:border-gray-600/50 transition-colors"
@@ -2902,7 +2916,7 @@ export default function UnifiedAIPlatform() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      handleSubmit(e as any);
+                      handleSubmit(e as React.FormEvent<HTMLInputElement>);
                     }
                   }}
                   placeholder="Ask about betting odds, fantasy strategy, DFS lineups, or Kalshi markets..."

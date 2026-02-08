@@ -44,13 +44,25 @@ export async function GET(req: NextRequest) {
 
     if (!queryResult.success || queryResult.data.length === 0) {
       const errorMsg = queryResult.error || 'No database data available';
+      const isTableMissing = typeof errorMsg === 'string' && (
+        errorMsg.includes('Could not find the table') || 
+        errorMsg.includes('relation') && errorMsg.includes('does not exist')
+      );
+      
       console.log(`${LOG_PREFIXES.API} Using default insights -`, errorMsg);
+      
       return NextResponse.json({
         success: true,
         insights: getDefaultInsights(),
         dataSource: DATA_SOURCES.DEFAULT,
-        message: typeof errorMsg === 'string' ? errorMsg : 'Table not yet created',
-        aiSummary: queryResult.aiSummary
+        message: isTableMissing 
+          ? 'Database tables not created yet. See SUPABASE_SETUP.md in project root for setup instructions.' 
+          : queryResult.data.length === 0
+          ? 'No predictions yet. Start chatting to generate insights!'
+          : typeof errorMsg === 'string' ? errorMsg : 'Unable to fetch data',
+        aiSummary: queryResult.aiSummary,
+        setupRequired: isTableMissing,
+        setupGuideUrl: isTableMissing ? '/SUPABASE_SETUP.md' : undefined
       });
     }
 

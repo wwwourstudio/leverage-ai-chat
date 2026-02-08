@@ -65,61 +65,58 @@ export async function POST(req: NextRequest) {
     console.log(`${LOG_PREFIXES.API} Odds API Key configured:`, oddsApiKey ? 'YES' : 'NO');
     
     // Fetch real odds data if available
-    let liveOddsData = null;
+    let liveOddsData: any[] = [];
     let validationResult = null;
     
-    // Use NBA as default sport if no sport specified
-    const sportToFetch = sport || 'nba';
-    console.log(`${LOG_PREFIXES.API} Sport to fetch: ${sportToFetch}${!sport ? ' (default)' : ''}`);
+    // If no specific sport requested, fetch from multiple sports for variety
+    const sportsToFetch = sport ? [sport] : ['nfl', 'nba', 'mlb', 'nhl'];
+    console.log(`${LOG_PREFIXES.API} Sports to fetch: ${sportsToFetch.join(', ')}${!sport ? ' (showing all active sports)' : ''}`);
     
     if (oddsApiKey) {
-      console.log(`[v0] Starting odds fetch for sport: ${sportToFetch}`);
-      try {
-        // Validate and normalize the sport key
-        console.log(`[v0] Validating sport key...`);
-        validationResult = validateSportKey(sportToFetch);
-        console.log(`[v0] Validation result:`, validationResult);
-        
-        if (!validationResult.isValid) {
-          console.log(`${LOG_PREFIXES.API} Invalid sport key:`, validationResult.error, validationResult.suggestion);
-        }
-        
-        const sportKey = validationResult.normalizedKey;
-        console.log(`[v0] Normalized sport key: ${sportKey}`);
-        
-        const sportInfo = getSportInfo(sportKey);
-        console.log(`[v0] Sport info:`, sportInfo);
-        
-        console.log(`${LOG_PREFIXES.API} Fetching odds for ${sportInfo.name} (${sportInfo.apiKey})`);
-        
-        // Use the comprehensive odds API client with multi-sport support
-        console.log(`[v0] Fetching live odds using multi-sport client...`);
-        liveOddsData = await fetchLiveOdds(sportKey, {
-          markets: [ODDS_MARKETS.H2H, ODDS_MARKETS.SPREADS, ODDS_MARKETS.TOTALS],
-          regions: [BETTING_REGIONS.US],
-          apiKey: oddsApiKey
-        });
-        console.log(`${LOG_PREFIXES.API} Fetched live odds:`, liveOddsData?.length || 0, 'events for', sportInfo.name);
-        
-        // Also fetch outrights/futures if available for this sport
-        if (sportInfo.hasOutrights) {
-          console.log(`[v0] Fetching outrights for ${sportInfo.name}...`);
-          try {
-            const outrights = await fetchOutrights(sportKey, { apiKey: oddsApiKey });
-            console.log(`${LOG_PREFIXES.API} Fetched outrights:`, outrights?.length || 0, 'markets');
-            // Store outrights separately for futures analysis
-            if (outrights && outrights.length > 0) {
-              (liveOddsData as any).outrights = outrights;
-            }
-          } catch (error) {
-            console.log(`${LOG_PREFIXES.API} Outrights not available for ${sportInfo.name}`);
+      console.log(`[v0] Starting odds fetch for ${sportsToFetch.length} sport(s)`);
+      
+      // Fetch odds from all specified sports in parallel
+      const fetchPromises = sportsToFetch.map(async (sportKey) => {
+        try {
+          console.log(`[v0] Fetching odds for: ${sportKey}`);
+          const validation = validateSportKey(sportKey);
+          
+          if (!validation.isValid) {
+            console.log(`${LOG_PREFIXES.API} Skipping invalid sport: ${sportKey}`);
+            return [];
           }
+          
+          const normalizedKey = validation.normalizedKey;
+          const sportInfo = getSportInfo(normalizedKey);
+          
+          console.log(`[v0] Fetching ${sportInfo.name} odds...`);
+          const oddsData = await fetchLiveOdds(normalizedKey, {
+            markets: [ODDS_MARKETS.H2H, ODDS_MARKETS.SPREADS, ODDS_MARKETS.TOTALS],
+            regions: [BETTING_REGIONS.US],
+            apiKey: oddsApiKey
+          });
+          
+          console.log(`${LOG_PREFIXES.API} ✓ Fetched ${oddsData?.length || 0} ${sportInfo.name} events`);
+          return Array.isArray(oddsData) ? oddsData : [];
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.log(`${LOG_PREFIXES.API} ✗ Error fetching ${sportKey}:`, errorMessage);
+          return [];
+        }
+      });
+      
+      try {
+        const results = await Promise.all(fetchPromises);
+        liveOddsData = results.flat(); // Combine all sports into one array
+        console.log(`${LOG_PREFIXES.API} ✓ Combined total: ${liveOddsData.length} events from ${sportsToFetch.length} sports`);
+        
+        // Store validation result from first sport for response
+        if (sport) {
+          validationResult = validateSportKey(sport);
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        const errorStack = error instanceof Error ? error.stack : '';
-        console.log(`${LOG_PREFIXES.API} Error fetching odds for cards:`, errorMessage);
-        console.log(`[v0] Error stack:`, errorStack);
+        console.log(`${LOG_PREFIXES.API} Error in multi-sport fetch:`, errorMessage);
       }
     } else {
       console.log(`[v0] No odds API key found - skipping odds fetch`);

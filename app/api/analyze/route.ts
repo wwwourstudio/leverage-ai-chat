@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
     // Store analysis in Supabase asynchronously (completely non-blocking)
     if (supabaseUrl && supabaseAnonKey) {
       // Fire and forget - don't block response
-      setImmediate(() => {
+      Promise.resolve().then(() => {
         storeAnalysisMetrics(supabaseUrl, supabaseAnonKey, trustMetrics, context).catch(err => {
           console.log(`${LOG_PREFIXES.API} Background metrics storage failed:`, err.message);
         });

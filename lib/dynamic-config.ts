@@ -71,16 +71,16 @@ export async function getConfig(
       (builder) => builder
         .select('*')
         .eq('key', key)
-        .eq('category', category)
-        .single(),
+        .eq('category', category),
       {
-        defaultValue: undefined,
+        defaultValue: [],
         logErrors: false
       }
     );
 
-    if (queryResult.success && queryResult.data) {
-      const value = queryResult.data.value;
+    if (queryResult.success && Array.isArray(queryResult.data) && queryResult.data.length > 0) {
+      const config = queryResult.data[0];
+      const value = config.value;
       configCache.set(key, { value, timestamp: Date.now() });
       console.log(`${LOG_PREFIXES.CONFIG} Loaded config ${key}:`, value);
       return value;
@@ -166,16 +166,15 @@ export async function getUserProfile(
       'user_profiles',
       (builder) => builder
         .select('*')
-        .eq('user_id', userId)
-        .single(),
+        .eq('user_id', userId),
       {
-        defaultValue: undefined,
+        defaultValue: [],
         logErrors: false
       }
     );
 
-    if (queryResult.success && queryResult.data) {
-      return queryResult.data;
+    if (queryResult.success && Array.isArray(queryResult.data) && queryResult.data.length > 0) {
+      return queryResult.data[0];
     }
 
     return null;

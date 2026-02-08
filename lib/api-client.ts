@@ -4,7 +4,7 @@
 // Line 78
 try {
     // some code
-} catch (error: unknown) {
+} catch (_error: unknown) {
     // error handling
 }
 
@@ -13,6 +13,6 @@ try {
 // Line 126
 try {
     // some other code
-} catch (error: unknown) {
+} catch (_error: unknown) {
     // error handling
 }

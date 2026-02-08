@@ -1566,7 +1566,7 @@ export default function UnifiedAIPlatform() {
     return badges[status] || badges.value;
   };
 
-  const renderInsightCard = (card: InsightCard, index: number) => {
+  const _renderInsightCard = (card: InsightCard, index: number) => {
     // Validate card data before rendering
     if (!card || typeof card !== 'object') {
       return null;
@@ -1677,7 +1677,7 @@ export default function UnifiedAIPlatform() {
       : chats.filter((chat: Chat) => chat.category === selectedCategory);
   
   // Platform-specific AI-powered prompt suggestions
-  const platformPrompts: Record<string, Array<{ label: string; icon: any; category: string }>> = {
+  const platformPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }>> = {
     all: [
       { label: 'Cross-platform arbitrage opportunities', icon: Sparkles, category: 'all' },
       { label: 'Today\'s best value plays across all platforms', icon: TrendingUp, category: 'all' },
@@ -2073,7 +2073,7 @@ export default function UnifiedAIPlatform() {
                 // Group messages: Check if this message is from same sender as previous
                 const prevMessage = index > 0 ? messages[index - 1] : null;
                 const isGrouped = prevMessage && prevMessage.role === message.role;
-                const showTimestamp = !isGrouped || index === messages.length - 1;
+                const _showTimestamp = !isGrouped || index === messages.length - 1;
                 
                 return (
                   <div
@@ -2171,7 +2171,7 @@ export default function UnifiedAIPlatform() {
                             
                             // Map card type to icon component
                             const getCardIcon = (type: string) => {
-                              const iconMap: Record<string, any> = {
+                              const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
                                 'live-odds': Zap,
                                 'player-prop': Target,
                                 'dfs-lineup': Award,
@@ -2227,7 +2227,7 @@ export default function UnifiedAIPlatform() {
                                     Key Metrics
                                   </h3>
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {metrics.map((metric: any, idx: number) => (
+                                    {metrics.map((metric: { label: string; value: string }, idx: number) => (
                                       <div 
                                         key={idx}
                                         className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 rounded-xl p-3.5 hover:border-gray-600/50 transition-colors"
@@ -2278,7 +2278,7 @@ export default function UnifiedAIPlatform() {
                                     Strategic Recommendations
                                   </h3>
                                   <div className="space-y-2.5">
-                                    {recommendations.map((rec: any, idx: number) => (
+                                    {recommendations.map((rec: { label: string; value: string }, idx: number) => (
                                       <div 
                                         key={idx}
                                         className="bg-gradient-to-r from-gray-800/40 to-gray-900/40 border border-gray-700/50 rounded-xl p-4 hover:border-gray-600/50 transition-colors"
@@ -2926,7 +2926,7 @@ export default function UnifiedAIPlatform() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      handleSubmit(e as any);
+                      handleSubmit(e as React.FormEvent<HTMLInputElement>);
                     }
                   }}
                   placeholder="Ask about betting odds, fantasy strategy, DFS lineups, or Kalshi markets..."

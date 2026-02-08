@@ -127,6 +127,27 @@ export async function fetchWeatherForLocation(
   }
 }
 
+interface WeatherCard {
+  type: string;
+  title: string;
+  icon: string;
+  category: string;
+  subcategory: string;
+  gradient: string;
+  data: {
+    location: string;
+    matchup: string;
+    temperature: string;
+    condition: string;
+    wind: string;
+    precipitation: string;
+    gameImpact: string;
+    gameTime: string;
+  };
+  status: string;
+  realData: boolean;
+}
+
 /**
  * Generate weather card for a game
  */
@@ -134,7 +155,7 @@ export async function generateWeatherCard(
   homeTeam: string,
   awayTeam: string,
   gameTime: Date
-): Promise<any | null> {
+): Promise<WeatherCard | null> {
   // Try to find stadium location
   const location = STADIUM_LOCATIONS[homeTeam];
   if (!location) {
@@ -180,10 +201,21 @@ export async function generateWeatherCard(
   };
 }
 
+interface CardData {
+  matchup?: string;
+  gameTime?: string | Date;
+  [key: string]: unknown;
+}
+
+interface Card {
+  data?: CardData;
+  [key: string]: unknown;
+}
+
 /**
  * Enhance odds cards with weather data
  */
-export async function enrichCardsWithWeather(cards: any[]): Promise<any[]> {
+export async function enrichCardsWithWeather(cards: Card[]): Promise<Card[]> {
   const enrichedCards = [...cards];
   
   for (const card of enrichedCards) {

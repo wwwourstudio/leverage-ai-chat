@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     let aiResponse: string;
     try {
       const result = await generateText({
-        model: xai('grok-beta', {
+        model: xai('grok-4', {
           apiKey: xaiApiKey,
         }),
         system: systemPrompt,

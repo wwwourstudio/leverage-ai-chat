@@ -963,7 +963,10 @@ export default function UnifiedAIPlatform() {
         success: analysisResult.success,
         hasText: !!analysisResult.text,
         hasCards: !!analysisResult.cards,
-        hasTrustMetrics: !!analysisResult.trustMetrics
+        hasTrustMetrics: !!analysisResult.trustMetrics,
+        error: analysisResult.error,
+        useFallback: analysisResult.useFallback,
+        details: analysisResult.details
       });
       
       if (oddsData) {

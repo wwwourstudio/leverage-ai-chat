@@ -89,10 +89,13 @@ export async function POST(req: NextRequest) {
     
     let aiResponse: string;
     try {
+      console.log('[v0] Initializing Grok with model grok-beta');
+      const xai = createXai({
+        apiKey: xaiApiKey,
+      });
+      
       const result = await generateText({
-        model: createXai({
-          apiKey: xaiApiKey,
-        })('grok-4'),
+        model: xai('grok-beta'),
         system: systemPrompt,
         prompt: userPrompt,
         temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
@@ -100,7 +103,7 @@ export async function POST(req: NextRequest) {
       });
       
       aiResponse = result.text;
-      console.log(`[v0] Grok response received, length: ${aiResponse.length}`);
+      console.log(`[v0] Grok response received successfully, length: ${aiResponse.length}`);
       
       if (!aiResponse || aiResponse.trim().length === 0) {
         console.log(`${LOG_PREFIXES.API} Grok returned empty response`);
@@ -112,10 +115,21 @@ export async function POST(req: NextRequest) {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.log(`${LOG_PREFIXES.API} Grok API error:`, errorMessage);
+      const errorStack = error instanceof Error ? error.stack : '';
+      console.error('[v0] Grok API detailed error:', {
+        message: errorMessage,
+        stack: errorStack,
+        hasApiKey: !!xaiApiKey,
+        apiKeyLength: xaiApiKey?.length
+      });
+      
       return NextResponse.json({
         success: false,
-        error: errorMessage.includes('401') || errorMessage.includes('unauthorized') ? ERROR_MESSAGES.INVALID_API_KEY : 'AI service error',
+        error: errorMessage.includes('401') || errorMessage.includes('unauthorized') 
+          ? 'Invalid API key. Please check your XAI_API_KEY configuration.' 
+          : errorMessage.includes('404') || errorMessage.includes('model')
+          ? 'Model not found. Please check Grok model availability.'
+          : 'AI service error. Please try again.',
         useFallback: true,
         details: errorMessage
       });

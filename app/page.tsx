@@ -1732,7 +1732,7 @@ export default function UnifiedAIPlatform() {
                       </h3>
                     </div>
                     <p className="text-[11px] text-gray-400 line-clamp-2 leading-relaxed mb-2">
-                      {chats[chats.length - 1].messages[0]?.content.substring(0, 100)}...
+                      {chats[chats.length - 1].messages[0]?.content?.substring(0, 100) || 'No messages yet'}...
                     </p>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="px-2 py-0.5 rounded-md bg-gray-800/60 text-[10px] font-semibold text-gray-400 border border-gray-700/50">

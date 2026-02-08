@@ -948,41 +948,39 @@ export default function UnifiedAIPlatform() {
       }
 
       // Handle API errors with smart fallback
-      if (!analysisResult.success || analysisResult.useFallback) {
-        console.log('[v0] API returned fallback signal, using contextual cards');
+      if (!analysisResult.success) {
+        console.log('[v0] API call failed, using contextual cards');
         
-        // Use contextual cards when AI analysis isn't available
+        // Only use fallback for actual errors, not when useFallback flag is set
         const processingTime = Date.now() - startTime;
         const fallbackCards = await selectRelevantCards(userMessage, context);
-        const fallbackResponse = {
-          content: "I've analyzed your query and generated relevant insights based on current market data. The Grok AI analysis will be available once the API connection is fully configured."
-        };
+        const errorMessage = analysisResult.error || 'API temporarily unavailable';
         
         const newMessage: Message = {
           role: 'assistant',
-          content: fallbackResponse.content,
+          content: `I'm experiencing connectivity issues with the AI service. Here's an analysis based on available data:\n\n**Status:** ${errorMessage}\n\nI can still provide you with relevant betting insights and live odds analysis based on cached patterns and real-time market data.`,
           timestamp: new Date(),
           cards: fallbackCards,
-          confidence: 75,
+          confidence: 70,
           sources: [
-            { name: 'Pattern Analysis', type: 'model', reliability: 80 },
+            { name: 'Pattern Analysis', type: 'cache', reliability: 75 },
             { name: 'Historical Data', type: 'cache', reliability: 78 }
           ],
-          modelUsed: 'Smart Fallback',
+          modelUsed: 'Fallback Mode',
           processingTime,
           trustMetrics: {
-            benfordIntegrity: 75,
-            oddsAlignment: 78,
+            benfordIntegrity: 70,
+            oddsAlignment: 75,
             marketConsensus: 75,
-            historicalAccuracy: 80,
-            finalConfidence: 77,
+            historicalAccuracy: 78,
+            finalConfidence: 74,
             trustLevel: 'medium',
             riskLevel: 'medium',
             adjustedTone: 'Moderate confidence',
             flags: [{
-              type: 'info',
-              message: analysisResult.error || 'Using cached analysis patterns',
-              severity: 'info'
+              type: 'warning',
+              message: errorMessage,
+              severity: 'warning'
             }]
           }
         };

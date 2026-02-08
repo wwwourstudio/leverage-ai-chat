@@ -30,6 +30,9 @@ interface APIResponse<T = any> {
   }>;
   model?: string;
   trustMetrics?: TrustMetrics;
+  useFallback?: boolean; // Flag to indicate fallback mode was used
+  details?: string; // Additional error or diagnostic details
+  errorType?: string; // Type of error that occurred
 }
 
 interface OddsEvent {
@@ -1225,13 +1228,13 @@ export default function UnifiedAIPlatform() {
     return validatedCard;
   };
 
-  const buildSourcesList = (oddsData: any): Array<{ name: string; type: 'database' | 'api' | 'model' | 'cache'; reliability: number; url?: string }> => {
+  const buildSourcesList = (oddsData: APIResponse<OddsEvent[]> | null): Array<{ name: string; type: 'database' | 'api' | 'model' | 'cache'; reliability: number; url?: string }> => {
     const sources: Array<{ name: string; type: 'database' | 'api' | 'model' | 'cache'; reliability: number; url?: string }> = [
       { name: 'Grok AI Model', type: 'model' as const, reliability: 94 },
       { name: 'Supabase Trust System', type: 'database' as const, reliability: 96 }
     ];
     
-    if (oddsData?.success) {
+    if (oddsData?.success && oddsData.data) {
       sources.push({
         name: 'The Odds API (Live)',
         type: 'api' as const,

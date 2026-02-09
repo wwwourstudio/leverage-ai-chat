@@ -203,7 +203,6 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     
-    // Handle timeout errors specifically
     if (error.name === 'AbortError') {
       console.log(`${LOG_PREFIXES.API} Request timeout in analyze route`);
       return NextResponse.json({
@@ -262,7 +261,7 @@ async function storeAnalysisMetricsWithAI(
     );
 
     if (result.success) {
-      console.log(`${LOG_PREFIXES.API} ✓ Trust metrics stored via LeveragedAI`);
+      console.log(`${LOG_PREFIXES.API} ��� Trust metrics stored via LeveragedAI`);
       if (result.aiValidation) {
         console.log(`${LOG_PREFIXES.API} AI validation:`, result.aiValidation);
       }

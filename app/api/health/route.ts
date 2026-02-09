@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServiceStatus, formatServiceStatus } from '@/lib/config-status';
+import { getServiceStatus, formatServiceStatus } from '@/lib/config';
 import {
   HEALTH_STATUS,
   AI_CONFIG,

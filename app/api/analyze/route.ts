@@ -114,23 +114,20 @@ export async function POST(req: NextRequest) {
     console.log(`[v0] Calling Grok via AI Gateway`);
     
     let aiResponse: string;
-    let attempt = 0;
-    const maxRetries = 2;
     
-    while (attempt <= maxRetries) {
-      try {
-        console.log(`[v0] Calling generateText with xAI Grok via AI Gateway... (attempt ${attempt + 1}/${maxRetries + 1})`);
-        
-        // Using Vercel AI Gateway with xAI grok-4-fast model
-        // AI Gateway handles routing and authentication automatically
-        const result = await generateText({
-          model: 'xai/grok-4-fast',
-          system: systemPrompt,
-          prompt: userPrompt,
-          temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-          maxTokens: 300, // Limit to short responses
-        });
-        
+    try {
+      console.log(`[v0] Calling generateText with xAI Grok via AI Gateway`);
+      
+      // Using Vercel AI Gateway with xAI grok-4-fast model
+      // AI Gateway handles routing and authentication automatically
+      const result = await generateText({
+        model: 'xai/grok-4-fast',
+        system: systemPrompt,
+        prompt: userPrompt,
+        temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
+        maxTokens: 300, // Limit to short responses
+      });
+      
       aiResponse = result.text;
       console.log(`${LOG_PREFIXES.API} ✓ AI response: ${aiResponse.length} chars`);
       
@@ -147,54 +144,13 @@ export async function POST(req: NextRequest) {
       // Concise fallback response
       aiResponse = `I encountered an issue analyzing that query. Here's what I suggest:\n\n• Review current odds from The Odds API\n• Check recent line movements for value\n• Consider weather impacts for outdoor sports\n\nTry asking about a specific game or player for detailed analysis.`;
     }
-        
-        // Out of retries or non-gateway error
-        throw error;
-      }
-    }
     
-    if (!aiResponse || aiResponse!.trim().length === 0) {
+    if (!aiResponse || aiResponse.trim().length === 0) {
       console.log(`${LOG_PREFIXES.API} Grok returned empty response`);
       return NextResponse.json({
         success: false,
         error: 'AI service returned empty response',
         useFallback: true
-      });
-    }
-    
-    // Success path continues here
-    try {
-      // Process the successful response (this is outside the retry loop)
-      const placeholder = aiResponse; // Just to satisfy the compiler
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : '';
-      const errorName = error instanceof Error ? error.name : 'Unknown';
-      
-      console.error('[v0] ❌ Grok API ERROR:', {
-        name: errorName,
-        message: errorMessage,
-        stack: errorStack?.split('\n')[0],
-      });
-      
-      // More specific error handling
-      let userError = 'AI service error. Please try again.';
-      if (errorMessage.includes('401') || errorMessage.includes('unauthorized') || errorMessage.includes('API key')) {
-        userError = 'Grok AI not configured. Please add XAI_API_KEY in the Vars section.';
-      } else if (errorMessage.includes('404') || errorMessage.includes('model')) {
-        userError = 'Grok model not accessible. Check if your API key has access to Grok.';
-      } else if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
-        userError = 'Rate limit exceeded. Please try again in a moment.';
-      } else if (errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED')) {
-        userError = 'Connection timeout. Please check your network and try again.';
-      }
-      
-      return NextResponse.json({
-        success: false,
-        error: userError,
-        useFallback: true,
-        details: errorMessage,
-        errorType: errorName
       });
     }
 

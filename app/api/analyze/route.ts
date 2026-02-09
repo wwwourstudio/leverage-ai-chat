@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
-import { xai } from '@ai-sdk/xai';
 import { randomUUID } from 'crypto';
 import {
   AI_CONFIG,

@@ -6,7 +6,6 @@
 
 import { SupabaseClient, createClient } from '@supabase/supabase-js';
 import { generateText } from 'ai';
-import { xai } from '@ai-sdk/xai';
 import { ENV_KEYS, LOG_PREFIXES, AI_CONFIG } from '@/lib/constants';
 import { safeQuery, validateDataSchema, APP_TABLES } from '@/lib/supabase-validator';
 

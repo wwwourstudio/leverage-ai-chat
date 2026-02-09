@@ -239,7 +239,7 @@ Be concise and focus on actionable insights.
 
       // Use xAI provider with proper typing and explicit API key
       const result = await generateText({
-        model: xai('grok-3', {
+        model: xai('grok-beta', {
           apiKey: process.env.XAI_API_KEY,
         }) as any,
         prompt,
@@ -277,7 +277,7 @@ Be concise and focus on actionable insights.
   try {
     const prompt = enrichmentPrompt(record);
     const result = await generateText({
-      model: xai('grok-3', {
+      model: xai('grok-beta', {
         apiKey: process.env.XAI_API_KEY,
       }) as any,
       prompt,
@@ -376,7 +376,7 @@ Respond with "VALID" if okay, or "INVALID: [reason]" if there are issues.
   `.trim();
   
   const result = await generateText({
-    model: xai('grok-3', {
+    model: xai('grok-beta', {
       apiKey: process.env.XAI_API_KEY,
     }) as any,
     prompt,

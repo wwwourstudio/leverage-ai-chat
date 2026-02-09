@@ -5,14 +5,14 @@
 
 // AI Model Configuration
 export const AI_CONFIG = {
-  MODEL_NAME: 'grok-3',
-  MODEL_DISPLAY_NAME: 'Grok-3',
+  MODEL_NAME: 'grok-beta',
+  MODEL_DISPLAY_NAME: 'Grok Beta',
   PROVIDER: 'xAI',
   API_ENDPOINT: 'https://api.x.ai/v1/chat/completions',
   DEFAULT_TEMPERATURE: 0.7,
   DEFAULT_MAX_TOKENS: 2000,
   DEFAULT_PROCESSING_TIME: 950,
-  FALLBACK_MODEL: 'Grok-3',
+  FALLBACK_MODEL: 'Grok Beta',
 } as const;
 
 // API Endpoints
@@ -253,7 +253,7 @@ Format responses with clear structure using markdown.` as const;
 // Default Source Configurations
 export const DEFAULT_SOURCES = {
   GROK_AI: {
-    name: 'Grok-3 AI',
+    name: 'Grok Beta AI',
     type: SOURCE_TYPES.MODEL,
     reliability: DEFAULT_RELIABILITY.MODEL,
   },

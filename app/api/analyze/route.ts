@@ -79,9 +79,11 @@ export async function POST(req: NextRequest) {
       console.log('[v0] Calling generateText with xAI Grok...');
       
       // Using xAI provider with proper typing
-      // Supported models: grok-beta, grok-vision-beta, grok-2-latest
+      // Using grok-4 with explicit API key configuration
       const result = await generateText({
-        model: xai('grok-beta') as any, // Type assertion for AI SDK compatibility
+        model: xai('grok-4', {
+          apiKey: process.env.XAI_API_KEY,
+        }) as any, // Type assertion for AI SDK compatibility
         system: systemPrompt,
         prompt: userPrompt,
         temperature: AI_CONFIG.DEFAULT_TEMPERATURE,

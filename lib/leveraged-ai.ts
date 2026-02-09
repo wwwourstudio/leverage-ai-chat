@@ -237,9 +237,11 @@ ${options.summarize ? 'Provide a concise summary of the data trends and importan
 Be concise and focus on actionable insights.
       `.trim();
 
-      // Use xAI provider with proper typing
+      // Use xAI provider with proper typing and explicit API key
       const result = await generateText({
-        model: xai('grok-beta') as any,
+        model: xai('grok-4', {
+          apiKey: process.env.XAI_API_KEY,
+        }) as any,
         prompt,
         temperature: 0.7,
         maxOutputTokens: 500,
@@ -275,7 +277,9 @@ Be concise and focus on actionable insights.
   try {
     const prompt = enrichmentPrompt(record);
     const result = await generateText({
-      model: xai('grok-beta') as any,
+      model: xai('grok-4', {
+        apiKey: process.env.XAI_API_KEY,
+      }) as any,
       prompt,
       temperature: 0.7,
       maxOutputTokens: 200,
@@ -372,7 +376,9 @@ Respond with "VALID" if okay, or "INVALID: [reason]" if there are issues.
   `.trim();
   
   const result = await generateText({
-    model: xai('grok-beta') as any,
+    model: xai('grok-4', {
+      apiKey: process.env.XAI_API_KEY,
+    }) as any,
     prompt,
     temperature: 0.3,
     maxOutputTokens: 100,

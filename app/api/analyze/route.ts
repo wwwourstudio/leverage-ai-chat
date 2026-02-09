@@ -186,7 +186,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       text: aiResponse,
-      response: aiResponse, // Keep for backwards compatibility
+      response: aiResponse,
       trustMetrics,
       model: AI_CONFIG.MODEL_NAME,
       confidence: trustMetrics.finalConfidence,
@@ -197,10 +197,9 @@ export async function POST(req: NextRequest) {
           reliability: context?.oddsData ? DEFAULT_RELIABILITY.API_LIVE : DEFAULT_RELIABILITY.API_FALLBACK
         }
       ],
-      processingTime: Math.round(aiResponse.length * 2), // Estimate based on response length
+      processingTime: Math.round(aiResponse.length * 2),
       timestamp: new Date().toISOString(),
     });
-    
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     

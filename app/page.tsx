@@ -2170,12 +2170,23 @@ export default function UnifiedAIPlatform() {
                   >
                     {editingMessageIndex === index ? (
                       <div className="space-y-3">
-                        <textarea
-                          value={editingContent}
-                          onChange={(e) => setEditingContent(e.target.value)}
-                          className="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 min-h-[80px] resize-y"
-                          autoFocus
-                        />
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  adjustTextareaHeight();
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder={selectedCategory === 'all' ? "Ask about sports betting, fantasy, DFS, or prediction markets..." : 
+                             selectedCategory === 'betting' ? "e.g. 'Best value plays for tonight's games'" :
+                             selectedCategory === 'fantasy' ? "e.g. 'NFBC draft strategy for pick 3'" :
+                             selectedCategory === 'dfs' ? "e.g. 'Optimal GPP stack for tonight'" :
+                             "e.g. 'Weather-correlated Kalshi markets'"}
+                className="flex-1 bg-transparent text-white placeholder-gray-400 focus:outline-none text-[13px] leading-relaxed resize-none min-h-[44px] max-h-[200px] pr-2"
+                rows={1}
+                disabled={isTyping}
+              />
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleSaveEdit(index)}

@@ -80,8 +80,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Build the prompt with context
-    const systemPrompt = SYSTEM_PROMPT + contextEnhancement;
+    // Build the prompt with context and CRITICAL current date information
+    const currentDate = new Date();
+    const dateStr = currentDate.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.toLocaleDateString('en-US', { month: 'long' });
+    
+    const dateWarning = `\n\n🚨 CRITICAL INSTRUCTIONS - READ CAREFULLY:\n- TODAY'S DATE: ${dateStr}\n- CURRENT YEAR: ${currentYear}\n- CURRENT MONTH: ${currentMonth}\n\nYou MUST provide information relevant to the ${currentYear} season ONLY. DO NOT reference data from 2023, 2024, or 2025. All player stats, odds, games, and analysis must be for the CURRENT ${currentYear} season. If you don't have current ${currentYear} data, say "I need to fetch current ${currentYear} data" instead of providing outdated information.`;
+    
+    const systemPrompt = SYSTEM_PROMPT + contextEnhancement + dateWarning;
     let userPrompt = query;
 
     // Add context from odds data if available

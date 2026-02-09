@@ -35,10 +35,77 @@ interface CardRequest {
   sport?: string;
   category?: string;
   userContext?: {
+    sport?: string | null;
+    marketType?: string;
+    platform?: string;
+    previousMessages?: Array<{
+      role: string;
+      content: string;
+    }>;
     previousQueries?: string[];
     preferences?: string[];
   };
   limit?: number;
+}
+
+/**
+ * Analyzes user context from previous messages to determine actual sport intent
+ */
+function analyzeContextForSport(userContext?: CardRequest['userContext']): string | null {
+  if (!userContext) return null;
+  
+  console.log(`${LOG_PREFIXES.API} [Context Analyzer] Analyzing user context for sport detection`);
+  
+  // First check if sport is directly provided in context
+  if (userContext.sport) {
+    console.log(`${LOG_PREFIXES.API} [Context Analyzer] ✓ Sport from context.sport: ${userContext.sport}`);
+    return userContext.sport;
+  }
+  
+  // Analyze previous messages to extract sport intent
+  if (userContext.previousMessages && userContext.previousMessages.length > 0) {
+    console.log(`${LOG_PREFIXES.API} [Context Analyzer] Analyzing ${userContext.previousMessages.length} previous messages`);
+    
+    // Combine all message content
+    const combinedText = userContext.previousMessages
+      .map(msg => msg.content)
+      .join(' ')
+      .toLowerCase();
+    
+    console.log(`${LOG_PREFIXES.API} [Context Analyzer] Combined text sample: ${combinedText.substring(0, 150)}...`);
+    
+    // Enhanced sport detection including fantasy baseball keywords
+    if (combinedText.includes('nfbc') || combinedText.includes('nffc') || 
+        combinedText.includes('nfbkc') || combinedText.includes('tgfbi') ||
+        combinedText.includes('baseball') || combinedText.includes('mlb')) {
+      console.log(`${LOG_PREFIXES.API} [Context Analyzer] ✓ Detected MLB from fantasy baseball keywords`);
+      return 'mlb';
+    }
+    
+    if (combinedText.includes('nba') || combinedText.includes('basketball')) {
+      console.log(`${LOG_PREFIXES.API} [Context Analyzer] ✓ Detected NBA`);
+      return 'nba';
+    }
+    
+    if (combinedText.includes('nfl') || combinedText.includes('football')) {
+      console.log(`${LOG_PREFIXES.API} [Context Analyzer] ✓ Detected NFL`);
+      return 'nfl';
+    }
+    
+    if (combinedText.includes('nhl') || combinedText.includes('hockey')) {
+      console.log(`${LOG_PREFIXES.API} [Context Analyzer] ✓ Detected NHL`);
+      return 'nhl';
+    }
+  }
+  
+  // Check platform to infer sport (e.g., fantasy platform might indicate baseball)
+  if (userContext.platform === 'fantasy') {
+    console.log(`${LOG_PREFIXES.API} [Context Analyzer] Platform is 'fantasy' - defaulting to MLB for fantasy baseball`);
+    return 'mlb';
+  }
+  
+  console.log(`${LOG_PREFIXES.API} [Context Analyzer] ✗ No sport detected from context`);
+  return null;
 }
 
 /**
@@ -56,10 +123,17 @@ export async function POST(req: NextRequest) {
     
     const { sport, category, userContext, limit = 3 } = body;
     console.log(`${LOG_PREFIXES.API} Extracted parameters:`);
-    console.log(`${LOG_PREFIXES.API} - Sport: ${sport || 'not specified'}`);
+    console.log(`${LOG_PREFIXES.API} - Sport (direct): ${sport || 'not specified'}`);
     console.log(`${LOG_PREFIXES.API} - Category: ${category || 'not specified'}`);
     console.log(`${LOG_PREFIXES.API} - Limit: ${limit}`);
     console.log(`${LOG_PREFIXES.API} - User context:`, userContext ? 'provided' : 'not provided');
+    
+    // Analyze context to determine actual sport intent
+    const contextualSport = analyzeContextForSport(userContext);
+    const finalSport = sport || contextualSport;
+    
+    console.log(`${LOG_PREFIXES.API} - Sport (from context): ${contextualSport || 'none'}`);
+    console.log(`${LOG_PREFIXES.API} - Sport (final): ${finalSport || 'none - will show variety'}`);
 
     const oddsApiKey = process.env[ENV_KEYS.ODDS_API_KEY];
     console.log(`${LOG_PREFIXES.API} Odds API Key configured:`, oddsApiKey ? 'YES' : 'NO');
@@ -69,8 +143,8 @@ export async function POST(req: NextRequest) {
     let validationResult = null;
     
     // If no specific sport requested, fetch from multiple sports for variety
-    const sportsToFetch = sport ? [sport] : ['nfl', 'nba', 'mlb', 'nhl'];
-    console.log(`${LOG_PREFIXES.API} Sports to fetch: ${sportsToFetch.join(', ')}${!sport ? ' (showing all active sports)' : ''}`);
+    const sportsToFetch = finalSport ? [finalSport] : ['nfl', 'nba', 'mlb', 'nhl'];
+    console.log(`${LOG_PREFIXES.API} Sports to fetch: ${sportsToFetch.join(', ')}${!finalSport ? ' (showing all active sports)' : ''}`);
     
     if (oddsApiKey) {
       console.log(`[v0] Starting odds fetch for ${sportsToFetch.length} sport(s)`);
@@ -135,7 +209,7 @@ export async function POST(req: NextRequest) {
     
     let cards = await generateDynamicCards({
       category,
-      sport,
+      sport: finalSport || undefined,
       oddsData: liveOddsData,
       userContext,
       limit
@@ -400,16 +474,37 @@ function generateContextualCards(category?: string, sport?: string, count: numbe
     });
   }
 
-  // Fantasy contextual card
+  // Fantasy contextual card - sport-specific
   if (category === 'fantasy' || !category) {
+    const isBaseball = sport === 'mlb';
+    const isBasketball = sport === 'nba';
+    const isFootball = sport === 'nfl';
+    
     cards.push({
       type: CARD_TYPES.FANTASY_INSIGHT,
-      title: 'Draft Strategy',
+      title: isBaseball ? 'NFBC Draft Strategy' : isBasketball ? 'Fantasy Basketball Strategy' : isFootball ? 'Fantasy Football Strategy' : 'Draft Strategy',
       icon: 'TrendingUp',
-      category: 'FANTASY',
-      subcategory: 'Value Targets',
-      gradient: 'from-green-600 to-teal-600',
-      data: {
+      category: isBaseball ? 'MLB' : isBasketball ? 'NBA' : isFootball ? 'NFL' : 'FANTASY',
+      subcategory: isBaseball ? 'NFBC/NFFC Draft' : 'Value Targets',
+      gradient: isBaseball ? 'from-emerald-500 to-green-700' : isBasketball ? 'from-orange-500 to-red-600' : 'from-green-600 to-teal-600',
+      data: isBaseball ? {
+        focus: 'Pick position strategy for NFBC Main Event',
+        approach: 'Early: Elite starting pitchers or 5-category hitters',
+        timing: 'Mid-rounds: Target multi-position eligibility',
+        recommendation: 'Draft catchers early - scarcity position in 2026',
+        ageAnalysis: 'Young breakout candidates: Adley Rutschman, Bobby Witt Jr',
+        contextNote: 'NFBC 2026 season - current ADP trends'
+      } : isBasketball ? {
+        focus: 'Draft position optimization for points leagues',
+        approach: 'Target high-usage players on improving teams',
+        timing: 'Late rounds offer streaming-friendly players',
+        recommendation: 'Monitor preseason injury reports closely'
+      } : isFootball ? {
+        focus: 'Running back vs wide receiver strategy',
+        approach: 'Target pass-catching backs in PPR formats',
+        timing: 'Quarterback value peaks in mid-rounds',
+        recommendation: 'Handcuff your RB1 with late-round insurance'
+      } : {
         focus: 'ADP inefficiencies in current market',
         approach: 'Target players with usage trajectory',
         timing: 'Mid-rounds offer best value',

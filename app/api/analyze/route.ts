@@ -55,8 +55,34 @@ export async function POST(req: NextRequest) {
 
     console.log(`${LOG_PREFIXES.API} Processing analysis request:`, query.substring(0, 50));
 
+    // Analyze context to enhance prompt specificity
+    let contextEnhancement = '';
+    if (context) {
+      console.log('[v0] Analyzing context for prompt enhancement');
+      const queryLower = query.toLowerCase();
+      
+      // Detect fantasy baseball keywords
+      if (queryLower.includes('nfbc') || queryLower.includes('nffc') || 
+          queryLower.includes('nfbkc') || queryLower.includes('fantasy baseball')) {
+        contextEnhancement = '\n\nCONTEXT: The user is asking about fantasy baseball draft strategy (NFBC/NFFC). Provide baseball-specific advice focusing on 2026 season projections, draft position strategy, player values, and category contributions (HR, R, RBI, SB, AVG for hitters; W, K, ERA, WHIP, SV for pitchers). Reference specific players and current ADP trends when possible.';
+        console.log('[v0] Enhanced prompt for fantasy baseball context');
+      } else if (queryLower.includes('dfs') || queryLower.includes('draftkings') || queryLower.includes('fanduel')) {
+        contextEnhancement = '\n\nCONTEXT: The user is asking about daily fantasy sports (DFS). Focus on optimal lineup construction, value plays, ownership projections, and game theory for tournaments vs cash games.';
+        console.log('[v0] Enhanced prompt for DFS context');
+      } else if (queryLower.includes('kalshi')) {
+        contextEnhancement = '\n\nCONTEXT: The user is asking about Kalshi prediction markets. Focus on event probabilities, arbitrage opportunities, and market efficiency analysis.';
+        console.log('[v0] Enhanced prompt for Kalshi context');
+      }
+      
+      // Add sport-specific context if detected
+      if (context.sport) {
+        contextEnhancement += `\n\nSPORT FOCUS: ${context.sport.toUpperCase()}`;
+        console.log(`[v0] Added sport focus: ${context.sport}`);
+      }
+    }
+
     // Build the prompt with context
-    const systemPrompt = SYSTEM_PROMPT;
+    const systemPrompt = SYSTEM_PROMPT + contextEnhancement;
     let userPrompt = query;
 
     // Add context from odds data if available

@@ -1102,11 +1102,43 @@ export default function UnifiedAIPlatform() {
   // Helper functions for context extraction
   const extractSport = (message: string): string | null => {
     const msgLower = message.toLowerCase();
-    if (msgLower.includes('nba') || msgLower.includes('basketball')) return 'nba';
-    if (msgLower.includes('nfl') || msgLower.includes('football')) return 'nfl';
-    if (msgLower.includes('mlb') || msgLower.includes('baseball')) return 'mlb';
-    if (msgLower.includes('nhl') || msgLower.includes('hockey')) return 'nhl';
-    if (msgLower.includes('ncaa')) return msgLower.includes('basketball') ? 'ncaab' : 'ncaaf';
+    
+    console.log('[v0] Extracting sport from:', message);
+    
+    // Basketball
+    if (msgLower.includes('nba') || msgLower.includes('basketball')) {
+      console.log('[v0] Detected sport: NBA');
+      return 'nba';
+    }
+    
+    // Football
+    if (msgLower.includes('nfl') || msgLower.includes('football')) {
+      console.log('[v0] Detected sport: NFL');
+      return 'nfl';
+    }
+    
+    // Baseball - enhanced detection for fantasy baseball
+    if (msgLower.includes('mlb') || msgLower.includes('baseball') || 
+        msgLower.includes('nfbc') || msgLower.includes('nffc') || 
+        msgLower.includes('nfbkc') || msgLower.includes('tgfbi')) {
+      console.log('[v0] Detected sport: MLB (baseball/fantasy baseball)');
+      return 'mlb';
+    }
+    
+    // Hockey
+    if (msgLower.includes('nhl') || msgLower.includes('hockey')) {
+      console.log('[v0] Detected sport: NHL');
+      return 'nhl';
+    }
+    
+    // NCAA
+    if (msgLower.includes('ncaa')) {
+      const sport = msgLower.includes('basketball') ? 'ncaab' : 'ncaaf';
+      console.log('[v0] Detected sport:', sport);
+      return sport;
+    }
+    
+    console.log('[v0] No specific sport detected');
     return null;
   };
 

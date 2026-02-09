@@ -5,14 +5,14 @@
 
 // AI Model Configuration
 export const AI_CONFIG = {
-  MODEL_NAME: 'grok-beta',
-  MODEL_DISPLAY_NAME: 'Grok Beta',
+  MODEL_NAME: 'grok-4-fast',
+  MODEL_DISPLAY_NAME: 'Grok 4 Fast',
   PROVIDER: 'xAI',
   API_ENDPOINT: 'https://api.x.ai/v1/chat/completions',
   DEFAULT_TEMPERATURE: 0.7,
   DEFAULT_MAX_TOKENS: 2000,
   DEFAULT_PROCESSING_TIME: 950,
-  FALLBACK_MODEL: 'Grok Beta',
+  FALLBACK_MODEL: 'Grok 4 Fast',
 } as const;
 
 // API Endpoints

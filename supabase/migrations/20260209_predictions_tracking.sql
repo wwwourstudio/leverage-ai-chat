@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS public.predictions (
   stake_amount NUMERIC(10,2),
   
   -- AI metadata
-  ai_model TEXT DEFAULT 'grok-beta',
+  ai_model TEXT DEFAULT 'grok-4-fast',
   ai_response_id TEXT,
   trust_metrics JSONB,
   

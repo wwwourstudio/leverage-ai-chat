@@ -201,6 +201,7 @@ export async function POST(req: NextRequest) {
       processingTime: Math.round(aiResponse.length * 2),
       timestamp: new Date().toISOString(),
     });
+    
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     

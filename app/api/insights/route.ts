@@ -81,9 +81,13 @@ export async function GET(req: NextRequest) {
     // Calculate real metrics from validated predictions
     const insights = await calculateInsightsFromPredictions(schemaValidation.validRecords, userId);
 
+    // Calculate trust metrics from the data
+    const trustMetrics = calculateTrustMetrics(schemaValidation.validRecords);
+
     return NextResponse.json({
       success: true,
       insights,
+      trustMetrics,
       dataSource: DATA_SOURCES.LIVE,
       sampleSize: schemaValidation.validRecords.length,
       validation: {
@@ -188,6 +192,41 @@ async function calculateInsightsFromPredictions(predictions: any[], userId?: str
     avgConfidence: parseFloat(avgFinalConfidence.toFixed(1)),
     dataSource: 'calculated',
     lastUpdated: new Date().toISOString()
+  };
+}
+
+function calculateTrustMetrics(records: any[]) {
+  if (records.length === 0) {
+    return {
+      benfordIntegrity: 0,
+      oddsAlignment: 0,
+      marketConsensus: 0,
+      historicalAccuracy: 0,
+      finalConfidence: 0,
+      trustLevel: 'low' as const,
+      flags: [],
+      riskLevel: 'high' as const
+    };
+  }
+
+  const avgBenford = records.reduce((sum, r) => sum + (r.benford_integrity || 0), 0) / records.length;
+  const avgOdds = records.reduce((sum, r) => sum + (r.odds_alignment || 0), 0) / records.length;
+  const avgConsensus = records.reduce((sum, r) => sum + (r.market_consensus || 0), 0) / records.length;
+  const avgAccuracy = records.reduce((sum, r) => sum + (r.historical_accuracy || 0), 0) / records.length;
+  const avgConfidence = records.reduce((sum, r) => sum + (r.final_confidence || 0), 0) / records.length;
+
+  const trustLevel = avgConfidence >= 80 ? 'high' : avgConfidence >= 60 ? 'medium' : 'low';
+  const riskLevel = avgConfidence >= 80 ? 'low' : avgConfidence >= 60 ? 'medium' : 'high';
+
+  return {
+    benfordIntegrity: parseFloat(avgBenford.toFixed(2)),
+    oddsAlignment: parseFloat(avgOdds.toFixed(2)),
+    marketConsensus: parseFloat(avgConsensus.toFixed(2)),
+    historicalAccuracy: parseFloat(avgAccuracy.toFixed(2)),
+    finalConfidence: parseFloat(avgConfidence.toFixed(2)),
+    trustLevel,
+    flags: [],
+    riskLevel
   };
 }
 

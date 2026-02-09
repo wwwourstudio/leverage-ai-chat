@@ -7,6 +7,7 @@ import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, Mes
 import { DynamicCardRenderer, CardList, EmptyState } from '@/components/data-cards';
 import { DatabaseStatusBanner } from '@/components/database-status-banner';
 import { TrustMetricsDisplay, TrustMetricsBadge } from '@/components/trust-metrics-display';
+import { InsightsDashboard } from '@/components/insights-dashboard';
 
 interface FileAttachment {
   id: string;
@@ -2472,31 +2473,8 @@ export default function UnifiedAIPlatform() {
                   </div>
 
                   {message.role === 'assistant' && message.insights && (
-                    <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {message.insights.totalValue !== undefined && (
-                        <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl p-3">
-                          <div className="text-xs font-bold text-gray-400 mb-1">Total Value</div>
-                          <div className="text-lg font-black text-green-400">${message.insights.totalValue.toFixed(2)}</div>
-                        </div>
-                      )}
-                      {message.insights.winRate !== undefined && (
-                        <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/20 rounded-xl p-3">
-                          <div className="text-xs font-bold text-gray-400 mb-1">Win Rate</div>
-                          <div className="text-lg font-black text-blue-400">{message.insights.winRate}%</div>
-                        </div>
-                      )}
-                      {message.insights.roi !== undefined && (
-                        <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-3">
-                          <div className="text-xs font-bold text-gray-400 mb-1">ROI</div>
-                          <div className="text-lg font-black text-purple-400">+{message.insights.roi}%</div>
-                        </div>
-                      )}
-                      {message.insights.activeContests !== undefined && (
-                        <div className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-xl p-3">
-                          <div className="text-xs font-bold text-gray-400 mb-1">Active</div>
-                          <div className="text-lg font-black text-orange-400">{message.insights.activeContests}</div>
-                        </div>
-                      )}
+                    <div className="mt-4">
+                      <InsightsDashboard userId={user?.email} />
                     </div>
                   )}
 

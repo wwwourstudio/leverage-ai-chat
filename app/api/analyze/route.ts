@@ -131,24 +131,22 @@ export async function POST(req: NextRequest) {
           maxTokens: 300, // Limit to short responses
         });
         
-        aiResponse = result.text;
-        console.log(`[v0] ✅ Grok response received successfully, length: ${aiResponse.length}`);
-        break; // Success, exit retry loop
+      aiResponse = result.text;
+      console.log(`${LOG_PREFIXES.API} ✓ AI response: ${aiResponse.length} chars`);
       
-      } catch (error) {
-        attempt++;
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const errorName = error instanceof Error ? error.name : 'Unknown';
-        
-        console.log(`[v0] ❌ Grok API ERROR (attempt ${attempt}/${maxRetries + 1}): ${errorName} - ${errorMessage}`);
-        
-        // If it's a gateway error and we have retries left, wait and try again
-        if ((errorName === 'GatewayInternalServerError' || errorMessage.includes('Bad Gateway') || errorMessage.includes('Gateway')) && attempt <= maxRetries) {
-          const waitTime = attempt * 1000; // 1s, 2s
-          console.log(`[v0] Retrying after ${waitTime}ms...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-          continue;
-        }
+      // Trim response if it's too long despite token limit
+      if (aiResponse.length > 800) {
+        const sentences = aiResponse.split(/[.!?]\s+/);
+        aiResponse = sentences.slice(0, 4).join('. ') + '.';
+        console.log(`${LOG_PREFIXES.API} Response trimmed to ${aiResponse.length} chars`);
+      }
+      
+    } catch (error) {
+      console.error(`${LOG_PREFIXES.API} ❌ AI Error:`, error);
+      
+      // Concise fallback response
+      aiResponse = `I encountered an issue analyzing that query. Here's what I suggest:\n\n• Review current odds from The Odds API\n• Check recent line movements for value\n• Consider weather impacts for outdoor sports\n\nTry asking about a specific game or player for detailed analysis.`;
+    }
         
         // Out of retries or non-gateway error
         throw error;

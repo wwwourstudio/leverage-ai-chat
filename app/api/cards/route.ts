@@ -263,17 +263,26 @@ export async function POST(req: NextRequest) {
       dataSources.push('Statistical Models & Historical Data');
     }
     
+    // Ensure we always have at least 3 cards
+    if (cards.length < 3) {
+      console.log(`${LOG_PREFIXES.API} ⚠ Only ${cards.length} cards, padding to minimum of 3`);
+      const needed = 3 - cards.length;
+      const fillerCards = generateContextualCards(category, finalSport, needed);
+      cards.push(...fillerCards);
+      console.log(`${LOG_PREFIXES.API} ✓ Added ${fillerCards.length} contextual cards`);
+    }
+    
     const response = {
       success: true,
-      cards,
+      cards: cards.slice(0, limit),
       dataSources,
       dataSource: oddsApiKey ? DATA_SOURCES.LIVE : DATA_SOURCES.SIMULATED,
       sportValidation: validationResult,
       timestamp: new Date().toISOString()
     };
     
-    console.log(`${LOG_PREFIXES.API} ← Sending response with ${cards.length} cards`);
-    console.log(`${LOG_PREFIXES.API} Data sources: ${dataSources.join(', ')}`);
+    console.log(`${LOG_PREFIXES.API} ← Sending ${response.cards.length} cards`);
+    console.log(`${LOG_PREFIXES.API} Sources: ${dataSources.join(', ')}`);
     console.log(`${LOG_PREFIXES.API} ========================================`);
     
     return NextResponse.json(response);

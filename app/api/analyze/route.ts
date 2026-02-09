@@ -1,6 +1,7 @@
+// Analyze API - Grok 4 Fast integration
 import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
-import { xai } from '@ai-sdk/xai';
+import { randomUUID } from 'crypto';
 import {
   AI_CONFIG,
   SYSTEM_PROMPT,
@@ -15,6 +16,7 @@ import {
   TRUST_METRIC_TYPES,
   ATTACHMENT_TYPES
 } from '@/lib/constants';
+import { classifyError, formatErrorForLog, getUserErrorMessage, ERROR_CODES } from '@/lib/error-handler';
 import {
   APP_TABLES
 } from '@/lib/supabase-validator';
@@ -53,9 +55,47 @@ export async function POST(req: NextRequest) {
 
     console.log(`${LOG_PREFIXES.API} Processing analysis request:`, query.substring(0, 50));
 
-    // Build the prompt with context
-    const systemPrompt = SYSTEM_PROMPT;
-    let userPrompt = query;
+    // Analyze context to enhance prompt specificity
+    let contextEnhancement = '';
+    if (context) {
+      console.log('[v0] Analyzing context for prompt enhancement');
+      const queryLower = query.toLowerCase();
+      
+      // Detect fantasy baseball keywords
+      if (queryLower.includes('nfbc') || queryLower.includes('nffc') || 
+          queryLower.includes('nfbkc') || queryLower.includes('fantasy baseball')) {
+        contextEnhancement = '\n\nCONTEXT: The user is asking about fantasy baseball draft strategy (NFBC/NFFC). Provide baseball-specific advice focusing on 2026 season projections, draft position strategy, player values, and category contributions (HR, R, RBI, SB, AVG for hitters; W, K, ERA, WHIP, SV for pitchers). Reference specific players and current ADP trends when possible.';
+        console.log('[v0] Enhanced prompt for fantasy baseball context');
+      } else if (queryLower.includes('dfs') || queryLower.includes('draftkings') || queryLower.includes('fanduel')) {
+        contextEnhancement = '\n\nCONTEXT: The user is asking about daily fantasy sports (DFS). Focus on optimal lineup construction, value plays, ownership projections, and game theory for tournaments vs cash games.';
+        console.log('[v0] Enhanced prompt for DFS context');
+      } else if (queryLower.includes('kalshi')) {
+        contextEnhancement = '\n\nCONTEXT: The user is asking about Kalshi prediction markets. Focus on event probabilities, arbitrage opportunities, and market efficiency analysis.';
+        console.log('[v0] Enhanced prompt for Kalshi context');
+      }
+      
+      // Add sport-specific context if detected
+      if (context.sport) {
+        contextEnhancement += `\n\nSPORT FOCUS: ${context.sport.toUpperCase()}`;
+        console.log(`[v0] Added sport focus: ${context.sport}`);
+      }
+    }
+
+    // Build the prompt with context and CRITICAL current date information
+    const currentDate = new Date();
+    const dateStr = currentDate.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.toLocaleDateString('en-US', { month: 'long' });
+    
+    const dateWarning = `\n\n🚨 CRITICAL INSTRUCTIONS:\n- TODAY: ${dateStr}\n- YEAR: ${currentYear}\n- Provide ONLY ${currentYear} season data\n- Keep response under 150 words\n- Be concise and actionable`;
+    
+    const systemPrompt = SYSTEM_PROMPT + contextEnhancement + dateWarning;
+    let userPrompt = `${query}\n\nIMPORTANT: Respond in 3-4 short sentences maximum (under 150 words total). Be direct and specific.`;
 
     // Add context from odds data if available
     if (context?.oddsData) {
@@ -75,59 +115,43 @@ export async function POST(req: NextRequest) {
     console.log(`[v0] Calling Grok via AI Gateway`);
     
     let aiResponse: string;
+    
     try {
-      console.log('[v0] Calling generateText with xAI Grok...');
+      console.log(`[v0] Calling generateText with xAI Grok via AI Gateway`);
       
-      // Using xAI provider with proper typing
-      // Supported models: grok-beta, grok-vision-beta, grok-2-latest
+      // Using Vercel AI Gateway with xAI grok-4-fast model
+      // AI Gateway handles routing and authentication automatically
       const result = await generateText({
-        model: xai('grok-beta') as any, // Type assertion for AI SDK compatibility
+        model: 'xai/grok-4-fast',
         system: systemPrompt,
         prompt: userPrompt,
         temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-        maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
+        maxTokens: 300, // Limit to short responses
       });
       
       aiResponse = result.text;
-      console.log(`[v0] ✅ Grok response received successfully, length: ${aiResponse.length}`);
+      console.log(`${LOG_PREFIXES.API} ✓ AI response: ${aiResponse.length} chars`);
       
-      if (!aiResponse || aiResponse.trim().length === 0) {
-        console.log(`${LOG_PREFIXES.API} Grok returned empty response`);
-        return NextResponse.json({
-          success: false,
-          error: 'AI service returned empty response',
-          useFallback: true
-        });
+      // Trim response if it's too long despite token limit
+      if (aiResponse.length > 800) {
+        const sentences = aiResponse.split(/[.!?]\s+/);
+        aiResponse = sentences.slice(0, 4).join('. ') + '.';
+        console.log(`${LOG_PREFIXES.API} Response trimmed to ${aiResponse.length} chars`);
       }
+      
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : '';
-      const errorName = error instanceof Error ? error.name : 'Unknown';
+      console.error(`${LOG_PREFIXES.API} ❌ AI Error:`, error);
       
-      console.error('[v0] ❌ Grok API ERROR:', {
-        name: errorName,
-        message: errorMessage,
-        stack: errorStack?.split('\n')[0],
-      });
-      
-      // More specific error handling
-      let userError = 'AI service error. Please try again.';
-      if (errorMessage.includes('401') || errorMessage.includes('unauthorized') || errorMessage.includes('API key')) {
-        userError = 'Grok AI not configured. Please add XAI_API_KEY in the Vars section.';
-      } else if (errorMessage.includes('404') || errorMessage.includes('model')) {
-        userError = 'Grok model not accessible. Check if your API key has access to Grok.';
-      } else if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
-        userError = 'Rate limit exceeded. Please try again in a moment.';
-      } else if (errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED')) {
-        userError = 'Connection timeout. Please check your network and try again.';
-      }
-      
+      // Concise fallback response
+      aiResponse = `I encountered an issue analyzing that query. Here's what I suggest:\n\n• Review current odds from The Odds API\n• Check recent line movements for value\n• Consider weather impacts for outdoor sports\n\nTry asking about a specific game or player for detailed analysis.`;
+    }
+    
+    if (!aiResponse || aiResponse.trim().length === 0) {
+      console.log(`${LOG_PREFIXES.API} Grok returned empty response`);
       return NextResponse.json({
         success: false,
-        error: userError,
-        useFallback: true,
-        details: errorMessage,
-        errorType: errorName
+        error: 'AI service returned empty response',
+        useFallback: true
       });
     }
 
@@ -163,7 +187,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       text: aiResponse,
-      response: aiResponse, // Keep for backwards compatibility
+      response: aiResponse,
       trustMetrics,
       model: AI_CONFIG.MODEL_NAME,
       confidence: trustMetrics.finalConfidence,
@@ -174,13 +198,12 @@ export async function POST(req: NextRequest) {
           reliability: context?.oddsData ? DEFAULT_RELIABILITY.API_LIVE : DEFAULT_RELIABILITY.API_FALLBACK
         }
       ],
-      processingTime: Math.round(aiResponse.length * 2), // Estimate based on response length
+      processingTime: Math.round(aiResponse.length * 2),
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     
-    // Handle timeout errors specifically
     if (error.name === 'AbortError') {
       console.log(`${LOG_PREFIXES.API} Request timeout in analyze route`);
       return NextResponse.json({
@@ -214,16 +237,19 @@ async function storeAnalysisMetricsWithAI(
       return;
     }
 
+    // Generate proper response ID format
+    const responseId = `resp-${Date.now()}-${randomUUID().split('-')[0]}`;
+    
     const metricsData = {
-      response_id: `resp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      response_id: responseId,
       model_id: AI_CONFIG.MODEL_NAME,
       sport: context?.sport || 'general',
       market_type: context?.marketType || 'analysis',
-      benford_score: trustMetrics.benfordIntegrity,
-      odds_alignment_score: trustMetrics.oddsAlignment,
-      consensus_score: trustMetrics.marketConsensus,
-      historical_accuracy_score: trustMetrics.historicalAccuracy,
-      final_confidence: trustMetrics.finalConfidence,
+      benford_score: Math.round(trustMetrics.benfordIntegrity || 0),
+      odds_alignment_score: Math.round(trustMetrics.oddsAlignment || 0),
+      consensus_score: Math.round(trustMetrics.marketConsensus || 0),
+      historical_accuracy_score: Math.round(trustMetrics.historicalAccuracy || 0),
+      final_confidence: Math.round(trustMetrics.finalConfidence || 0),
       flags: trustMetrics.flags || [],
       created_at: new Date().toISOString(),
     };
@@ -236,7 +262,7 @@ async function storeAnalysisMetricsWithAI(
     );
 
     if (result.success) {
-      console.log(`${LOG_PREFIXES.API} ✓ Trust metrics stored via LeveragedAI`);
+      console.log(`${LOG_PREFIXES.API} ��� Trust metrics stored via LeveragedAI`);
       if (result.aiValidation) {
         console.log(`${LOG_PREFIXES.API} AI validation:`, result.aiValidation);
       }

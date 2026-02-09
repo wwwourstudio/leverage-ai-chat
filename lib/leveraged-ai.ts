@@ -6,7 +6,6 @@
 
 import { SupabaseClient, createClient } from '@supabase/supabase-js';
 import { generateText } from 'ai';
-import { xai } from '@ai-sdk/xai';
 import { ENV_KEYS, LOG_PREFIXES, AI_CONFIG } from '@/lib/constants';
 import { safeQuery, validateDataSchema, APP_TABLES } from '@/lib/supabase-validator';
 
@@ -237,12 +236,12 @@ ${options.summarize ? 'Provide a concise summary of the data trends and importan
 Be concise and focus on actionable insights.
       `.trim();
 
-      // Use xAI provider with proper typing
+      // Use Vercel AI Gateway for Grok 4
       const result = await generateText({
-        model: xai('grok-beta') as any,
+        model: 'xai/grok-4-fast',
         prompt,
         temperature: 0.7,
-        maxOutputTokens: 500,
+        maxTokens: 500,
       });
 
       return {
@@ -275,10 +274,10 @@ Be concise and focus on actionable insights.
   try {
     const prompt = enrichmentPrompt(record);
     const result = await generateText({
-      model: xai('grok-beta') as any,
+      model: 'xai/grok-4-fast',
       prompt,
       temperature: 0.7,
-      maxOutputTokens: 200,
+      maxTokens: 200,
     });
 
             return {
@@ -372,10 +371,10 @@ Respond with "VALID" if okay, or "INVALID: [reason]" if there are issues.
   `.trim();
   
   const result = await generateText({
-    model: xai('grok-beta') as any,
+    model: 'xai/grok-4-fast',
     prompt,
     temperature: 0.3,
-    maxOutputTokens: 100,
+    maxTokens: 100,
   });
 
       const response = result.text.trim();

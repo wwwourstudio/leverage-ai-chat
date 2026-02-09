@@ -277,7 +277,7 @@ export class GrokAnalysisPipeline {
           'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          model: 'grok-3',
+          model: 'grok-2-latest',
           messages: [
             {
               role: 'system',

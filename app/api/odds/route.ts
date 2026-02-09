@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOddsApiKey, isOddsApiConfigured } from '@/lib/env';
+import { getOddsApiKey, isOddsApiConfigured } from '@/lib/config';
 import {
   EXTERNAL_APIS,
   LOG_PREFIXES,

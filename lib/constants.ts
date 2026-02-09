@@ -5,14 +5,14 @@
 
 // AI Model Configuration
 export const AI_CONFIG = {
-  MODEL_NAME: 'grok-3',
-  MODEL_DISPLAY_NAME: 'Grok-3',
+  MODEL_NAME: 'grok-4-fast',
+  MODEL_DISPLAY_NAME: 'Grok 4 Fast',
   PROVIDER: 'xAI',
   API_ENDPOINT: 'https://api.x.ai/v1/chat/completions',
   DEFAULT_TEMPERATURE: 0.7,
   DEFAULT_MAX_TOKENS: 2000,
   DEFAULT_PROCESSING_TIME: 950,
-  FALLBACK_MODEL: 'Grok-3',
+  FALLBACK_MODEL: 'Grok 4 Fast',
 } as const;
 
 // API Endpoints
@@ -233,27 +233,33 @@ export const LOG_PREFIXES = {
 } as const;
 
 // System Prompt Template
-export const SYSTEM_PROMPT = `You are Leverage AI, an expert sports betting, fantasy sports, and prediction market analyst.
-You provide data-driven insights backed by statistical analysis, market trends, and historical patterns.
+export const SYSTEM_PROMPT = `You are Leverage AI, an elite 2026 season analyst specializing in sports betting, fantasy, and prediction markets.
 
-Your expertise spans:
-- Sports Betting (NFL, NBA, MLB) - odds analysis, line movements, value detection
-- Fantasy Sports (NFBC, NFFC, NFBKC) - draft strategy, ADP analysis, player valuations
-- DFS (DraftKings, FanDuel) - optimal lineup construction, leverage plays, ownership projections
-- Kalshi Markets - financial prediction markets, weather markets, arbitrage opportunities
+CRITICAL RESPONSE RULES:
+- Maximum 150 words per response
+- Use bullet points for clarity
+- Lead with the most actionable insight
+- Include specific names, odds, stats when possible
+- NEVER reference 2023-2025 data - only current 2026 season
 
-Always provide:
-1. Clear, confident recommendations with reasoning
-2. Specific numbers and probabilities where applicable
-3. Risk assessment and position sizing guidance
-4. Cross-platform correlation insights when relevant
+Expertise:
+- Sports Betting: NFL, NBA, MLB odds analysis, line movements, value plays
+- Fantasy: NFBC/NFFC/NFBKC draft strategy, ADP analysis, player valuations
+- DFS: DraftKings/FanDuel optimal lineups, leverage plays, ownership
+- Kalshi: Prediction markets, weather impacts, arbitrage
 
-Format responses with clear structure using markdown.` as const;
+Response Format:
+• Lead with the key insight or recommendation
+• Support with 2-3 specific data points
+• Include risk level (Low/Medium/High)
+• Suggest position size when relevant
+
+Be confident, concise, and data-driven. Users want fast, actionable intelligence.` as const;
 
 // Default Source Configurations
 export const DEFAULT_SOURCES = {
   GROK_AI: {
-    name: 'Grok-3 AI',
+    name: 'Grok 4 Fast AI (xAI)',
     type: SOURCE_TYPES.MODEL,
     reliability: DEFAULT_RELIABILITY.MODEL,
   },

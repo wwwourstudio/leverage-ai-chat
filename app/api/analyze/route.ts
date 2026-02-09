@@ -76,18 +76,16 @@ export async function POST(req: NextRequest) {
     
     let aiResponse: string;
     try {
-      console.log('[v0] Calling generateText with xAI Grok...');
+      console.log('[v0] Calling generateText with xAI Grok via AI Gateway...');
       
-      // Using xAI provider with proper typing
-      // Using grok-beta with explicit API key configuration
+      // Using Vercel AI Gateway with xAI grok-3 model
+      // AI Gateway handles routing and authentication automatically
       const result = await generateText({
-        model: xai('grok-beta', {
-          apiKey: process.env.XAI_API_KEY,
-        }) as any, // Type assertion for AI SDK compatibility
+        model: 'xai/grok-3',
         system: systemPrompt,
         prompt: userPrompt,
         temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-        maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
+        maxTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
       });
       
       aiResponse = result.text;

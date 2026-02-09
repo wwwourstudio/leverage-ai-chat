@@ -5,6 +5,8 @@ import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/da
 import { API_ENDPOINTS } from '@/lib/constants';
 import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2 } from 'lucide-react';
 import { DynamicCardRenderer, CardList, EmptyState } from '@/components/data-cards';
+import { DatabaseStatusBanner } from '@/components/database-status-banner';
+import { TrustMetricsDisplay, TrustMetricsBadge } from '@/components/trust-metrics-display';
 
 interface FileAttachment {
   id: string;
@@ -2011,6 +2013,8 @@ export default function UnifiedAIPlatform() {
           }}
         >
           <div className="max-w-5xl mx-auto space-y-6">
+            {/* Database Status Banner */}
+            <DatabaseStatusBanner />
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-full min-h-[400px]">
                 <div className="text-center space-y-4">
@@ -2234,6 +2238,17 @@ export default function UnifiedAIPlatform() {
                                     </div>
                                   </div>
                                 </div>
+
+                                {/* Trust Metrics Display */}
+                                {message.trustMetrics && (
+                                  <div className="bg-gradient-to-br from-slate-900/60 to-slate-800/60 border border-slate-700/50 rounded-xl p-5">
+                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-wide mb-4 flex items-center gap-2">
+                                      <Shield className="w-3.5 h-3.5" />
+                                      AI Trust & Validation Metrics
+                                    </h3>
+                                    <TrustMetricsDisplay metrics={message.trustMetrics} showDetails={true} />
+                                  </div>
+                                )}
 
                                 {/* Strategic Recommendations */}
                                 <div>

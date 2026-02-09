@@ -259,7 +259,7 @@ Be confident, concise, and data-driven. Users want fast, actionable intelligence
 // Default Source Configurations
 export const DEFAULT_SOURCES = {
   GROK_AI: {
-    name: 'Grok Beta AI',
+    name: 'Grok 4 Fast AI (xAI)',
     type: SOURCE_TYPES.MODEL,
     reliability: DEFAULT_RELIABILITY.MODEL,
   },

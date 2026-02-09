@@ -200,6 +200,7 @@ export async function POST(req: NextRequest) {
       processingTime: Math.round(aiResponse.length * 2), // Estimate based on response length
       timestamp: new Date().toISOString(),
     });
+    
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     

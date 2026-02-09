@@ -812,44 +812,11 @@ export default function UnifiedAIPlatform() {
     }, 1000);
   };
 
+  // Generate detailed analysis for a card by querying AI
   const generateDetailedAnalysis = (card: InsightCard) => {
     console.log('[v0] Generating detailed analysis for card:', card);
     const analysisPrompt = `Provide a comprehensive analysis for ${card.title} in ${card.category}. Include: 1) Specific data points supporting this opportunity, 2) Risk assessment and potential downsides, 3) Recommended position sizing, 4) Historical performance of similar scenarios.`;
     handleSend(analysisPrompt);
-  };
-
-      // Use special JSON marker in content
-      const detailedAnalysisText = `__DETAILED_ANALYSIS__${JSON.stringify(structuredData)}__END_ANALYSIS__`;
-
-      const aiMessage: Message = {
-        role: 'assistant',
-        content: detailedAnalysisText,
-        timestamp: new Date(),
-        // Remove cards array to eliminate duplicate display
-        cards: [],
-        sources: [
-          { name: 'Grok AI', type: 'model', reliability: 94 },
-          { name: 'Historical Database', type: 'database', reliability: 96 },
-          { name: 'Live Market API', type: 'api', reliability: 98 }
-        ],
-        modelUsed: 'Grok AI',
-        processingTime: 1050,
-        trustMetrics: {
-          benfordIntegrity: 88,
-          oddsAlignment: 90,
-          marketConsensus: 85,
-          historicalAccuracy: 92,
-          finalConfidence: 89,
-          trustLevel: 'high',
-          riskLevel: 'medium',
-          adjustedTone: 'Moderate confidence'
-        }
-      };
-      
-      setMessages((prev: Message[]) => [...prev, aiMessage]);
-      setSuggestedPrompts(generateContextualSuggestions(card.title, aiMessage.cards || []));
-      setIsTyping(false);
-    }, 1200);
   };
 
   const generateRealResponse = async (userMessage: string) => {

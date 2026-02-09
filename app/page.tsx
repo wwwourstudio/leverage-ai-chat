@@ -1647,38 +1647,47 @@ export default function UnifiedAIPlatform() {
           </div>
         </div>
         
-        {/* Data grid with improved spacing and hierarchy */}
-        <div className="relative space-y-3">
+        {/* Enhanced data grid with better visual hierarchy */}
+        <div className="relative space-y-2">
           {dataEntries.length > 0 ? (
             dataEntries.map(([key, value], i) => {
-              // Format the key to be more readable
               const formattedKey = key
                 .replace(/([A-Z])/g, ' $1')
                 .replace(/^./, str => str.toUpperCase())
                 .trim();
               
-              // Detect if value contains important metrics
-              const isMetric = typeof value === 'string' && (
-                value.includes('%') || 
-                value.includes('$') || 
-                value.includes('pts') ||
-                value.includes('↑') ||
-                value.includes('↓')
-              );
+              // Enhanced metric detection
+              const valueStr = String(value);
+              const isPercentage = valueStr.includes('%');
+              const isDollar = valueStr.includes('$');
+              const isUpTrend = valueStr.includes('↑') || valueStr.toLowerCase().includes('up');
+              const isDownTrend = valueStr.includes('↓') || valueStr.toLowerCase().includes('down');
+              const isHighValue = valueStr.includes('elite') || valueStr.includes('optimal');
+              
+              // Assign colors based on context
+              let valueColor = 'text-gray-300';
+              if (isUpTrend) valueColor = 'text-green-400';
+              else if (isDownTrend) valueColor = 'text-red-400';
+              else if (isHighValue) valueColor = 'text-purple-400';
+              else if (isDollar || isPercentage) valueColor = 'text-blue-400';
               
               return (
-                <div key={i} className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors group/item">
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex-shrink-0 mr-4">
-                    {formattedKey}
-                  </span>
-                  <span className={`text-sm font-bold text-right ${isMetric ? 'text-white' : 'text-gray-300'} group-hover/item:text-blue-400 transition-colors`}>
-                    {String(value || 'N/A')}
-                  </span>
+                <div key={i} className="group/item relative">
+                  <div className="flex items-center justify-between py-2.5 px-3.5 rounded-lg bg-gradient-to-r from-gray-800/40 to-gray-800/20 hover:from-gray-800/60 hover:to-gray-800/40 transition-all duration-200 border border-gray-700/30 hover:border-gray-600/50">
+                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest flex-shrink-0 mr-4">
+                      {formattedKey}
+                    </span>
+                    <span className={`text-sm font-extrabold text-right ${valueColor} group-hover/item:scale-105 transition-transform flex items-center gap-1.5`}>
+                      {isUpTrend && <TrendingUp className="w-3.5 h-3.5" />}
+                      {isDownTrend && <TrendingDown className="w-3.5 h-3.5" />}
+                      {valueStr || 'N/A'}
+                    </span>
+                  </div>
                 </div>
               );
             })
           ) : (
-            <div className="text-center py-4 text-gray-500 text-sm">
+            <div className="text-center py-6 text-gray-500 text-sm font-medium">
               No data available
             </div>
           )}
@@ -2784,22 +2793,30 @@ export default function UnifiedAIPlatform() {
           })
         )}
 
-            {isTyping && (
-              <div className="flex justify-start animate-fadeIn">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-                    <Sparkles className="w-4.5 h-4.5 text-white" />
-                  </div>
-                  <div className="bg-gradient-to-br from-gray-900/80 via-gray-850/80 to-gray-900/80 border border-gray-700/50 backdrop-blur-sm rounded-2xl px-5 py-4">
-                    <div className="flex gap-2">
-                      <div className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                      <div className="w-2.5 h-2.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                      <div className="w-2.5 h-2.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                    </div>
-                  </div>
+      {isTyping && (
+        <div className="flex gap-3 animate-fade-in">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-500/50 animate-pulse">
+            <Sparkles className="w-4 h-4 text-white" />
+          </div>
+          <div className="flex-1 space-y-3">
+            <div className="bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl px-5 py-4 border border-gray-700/60 shadow-2xl">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                 </div>
+                <span className="text-sm font-semibold text-transparent bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text">Analyzing with Grok 4...</span>
               </div>
-            )}
+              <div className="space-y-2">
+                <div className="h-2 bg-gray-800/60 rounded-full animate-pulse w-full"></div>
+                <div className="h-2 bg-gray-800/60 rounded-full animate-pulse w-5/6"></div>
+                <div className="h-2 bg-gray-800/60 rounded-full animate-pulse w-4/6"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
             
             <div ref={messagesEndRef} />
           </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
 import { xai } from '@ai-sdk/xai';
+import { randomUUID } from 'crypto';
 import {
   AI_CONFIG,
   SYSTEM_PROMPT,
@@ -15,6 +16,7 @@ import {
   TRUST_METRIC_TYPES,
   ATTACHMENT_TYPES
 } from '@/lib/constants';
+import { classifyError, formatErrorForLog, getUserErrorMessage, ERROR_CODES } from '@/lib/error-handler';
 import {
   APP_TABLES
 } from '@/lib/supabase-validator';
@@ -214,16 +216,19 @@ async function storeAnalysisMetricsWithAI(
       return;
     }
 
+    // Generate proper response ID format
+    const responseId = `resp-${Date.now()}-${randomUUID().split('-')[0]}`;
+    
     const metricsData = {
-      response_id: `resp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      response_id: responseId,
       model_id: AI_CONFIG.MODEL_NAME,
       sport: context?.sport || 'general',
       market_type: context?.marketType || 'analysis',
-      benford_score: trustMetrics.benfordIntegrity,
-      odds_alignment_score: trustMetrics.oddsAlignment,
-      consensus_score: trustMetrics.marketConsensus,
-      historical_accuracy_score: trustMetrics.historicalAccuracy,
-      final_confidence: trustMetrics.finalConfidence,
+      benford_score: Math.round(trustMetrics.benfordIntegrity || 0),
+      odds_alignment_score: Math.round(trustMetrics.oddsAlignment || 0),
+      consensus_score: Math.round(trustMetrics.marketConsensus || 0),
+      historical_accuracy_score: Math.round(trustMetrics.historicalAccuracy || 0),
+      final_confidence: Math.round(trustMetrics.finalConfidence || 0),
       flags: trustMetrics.flags || [],
       created_at: new Date().toISOString(),
     };

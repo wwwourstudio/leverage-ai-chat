@@ -103,30 +103,60 @@ export async function POST(req: NextRequest) {
     console.log(`[v0] Calling Grok via AI Gateway`);
     
     let aiResponse: string;
-    try {
-      console.log('[v0] Calling generateText with xAI Grok via AI Gateway...');
-      
-      // Using Vercel AI Gateway with xAI grok-3 model
-      // AI Gateway handles routing and authentication automatically
-      const result = await generateText({
-        model: 'xai/grok-3',
-        system: systemPrompt,
-        prompt: userPrompt,
-        temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-        maxTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
-      });
-      
-      aiResponse = result.text;
-      console.log(`[v0] ✅ Grok response received successfully, length: ${aiResponse.length}`);
-      
-      if (!aiResponse || aiResponse.trim().length === 0) {
-        console.log(`${LOG_PREFIXES.API} Grok returned empty response`);
-        return NextResponse.json({
-          success: false,
-          error: 'AI service returned empty response',
-          useFallback: true
+    let attempt = 0;
+    const maxRetries = 2;
+    
+    while (attempt <= maxRetries) {
+      try {
+        console.log(`[v0] Calling generateText with xAI Grok via AI Gateway... (attempt ${attempt + 1}/${maxRetries + 1})`);
+        
+        // Using Vercel AI Gateway with xAI grok-3 model
+        // AI Gateway handles routing and authentication automatically
+        const result = await generateText({
+          model: 'xai/grok-3',
+          system: systemPrompt,
+          prompt: userPrompt,
+          temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
+          maxTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
         });
+        
+        aiResponse = result.text;
+        console.log(`[v0] ✅ Grok response received successfully, length: ${aiResponse.length}`);
+        break; // Success, exit retry loop
+      
+      } catch (error) {
+        attempt++;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorName = error instanceof Error ? error.name : 'Unknown';
+        
+        console.log(`[v0] ❌ Grok API ERROR (attempt ${attempt}/${maxRetries + 1}): ${errorName} - ${errorMessage}`);
+        
+        // If it's a gateway error and we have retries left, wait and try again
+        if ((errorName === 'GatewayInternalServerError' || errorMessage.includes('Bad Gateway') || errorMessage.includes('Gateway')) && attempt <= maxRetries) {
+          const waitTime = attempt * 1000; // 1s, 2s
+          console.log(`[v0] Retrying after ${waitTime}ms...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+        
+        // Out of retries or non-gateway error
+        throw error;
       }
+    }
+    
+    if (!aiResponse || aiResponse!.trim().length === 0) {
+      console.log(`${LOG_PREFIXES.API} Grok returned empty response`);
+      return NextResponse.json({
+        success: false,
+        error: 'AI service returned empty response',
+        useFallback: true
+      });
+    }
+    
+    // Success path continues here
+    try {
+      // Process the successful response (this is outside the retry loop)
+      const placeholder = aiResponse; // Just to satisfy the compiler
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : '';

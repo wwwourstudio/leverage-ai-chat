@@ -1,5 +1,5 @@
 'use client';
-
+// Leverage AI Platform - v2.0
 import React, { useState, useRef, useEffect } from 'react';
 import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data-service';
 import { API_ENDPOINTS } from '@/lib/constants';

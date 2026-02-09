@@ -245,15 +245,30 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Track actual data sources for transparency
+    const dataSources: string[] = [];
+    if (liveOddsData.length > 0) {
+      dataSources.push('The Odds API (live sportsbook data)');
+    }
+    if (finalSport === 'nfl' || finalSport === 'mlb') {
+      dataSources.push('Weather API (game conditions)');
+    }
+    if (dataSources.length === 0) {
+      dataSources.push('Grok 4 Fast AI');
+      dataSources.push('Statistical Models');
+    }
+    
     const response = {
       success: true,
       cards,
+      dataSources,
       dataSource: oddsApiKey ? DATA_SOURCES.LIVE : DATA_SOURCES.SIMULATED,
       sportValidation: validationResult,
       timestamp: new Date().toISOString()
     };
     
     console.log(`${LOG_PREFIXES.API} ← Sending response with ${cards.length} cards`);
+    console.log(`${LOG_PREFIXES.API} Data sources: ${dataSources.join(', ')}`);
     console.log(`${LOG_PREFIXES.API} ========================================`);
     
     return NextResponse.json(response);

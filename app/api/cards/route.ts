@@ -263,14 +263,13 @@ export async function POST(req: NextRequest) {
       dataSources.push('Statistical Models & Historical Data');
     }
     
-    // Ensure we always have at least 3 cards
-    if (cards.length < 3) {
-      console.log(`${LOG_PREFIXES.API} ⚠ Only ${cards.length} cards, padding to minimum of 3`);
-      const needed = 3 - cards.length;
-      const fillerCards = generateContextualCards(category, finalSport, needed);
-      cards.push(...fillerCards);
-      console.log(`${LOG_PREFIXES.API} ✓ Added ${fillerCards.length} contextual cards`);
+    // Ensure we always have exactly 3 cards
+    while (cards.length < 3) {
+      console.log(`${LOG_PREFIXES.API} ⚠ Only ${cards.length} cards, generating more`);
+      const additionalCards = generateContextualCards(category, finalSport, 3 - cards.length);
+      cards.push(...additionalCards);
     }
+    console.log(`${LOG_PREFIXES.API} ✓ Final card count: ${cards.length}`);
     
     const response = {
       success: true,

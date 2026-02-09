@@ -813,58 +813,10 @@ export default function UnifiedAIPlatform() {
   };
 
   const generateDetailedAnalysis = (card: InsightCard) => {
-    console.log('[v0] Generating detailed analysis for card:', card.title);
-    
-    // Check if user has credits
-    if (!consumeCredit()) {
-      console.log('[v0] No credits remaining, showing purchase modal');
-      return;
-    }
-
-    setIsTyping(true);
-    
-    setTimeout(() => {
-      // Extract metrics dynamically from card data
-      const metrics = Object.entries(card.data).map(([key, value]) => ({
-        label: key.replace(/([A-Z])/g, ' $1').trim(),
-        value: value
-      }));
-
-      // Determine conviction and risk levels
-      const convictionLevel = card.status === 'hot' || card.status === 'strong' || card.status === 'elite' ? 'High' : 
-                             card.status === 'value' || card.status === 'optimal' ? 'Medium-High' : 'Medium';
-      const riskCategory = card.status === 'hot' ? 'Time-sensitive play' : 
-                          card.status === 'value' ? 'Measured opportunity' : 'Standard variance';
-      const positionSize = card.status === 'elite' || card.status === 'strong' ? '15-20%' : 
-                          card.status === 'value' ? '10-15%' : '8-12%';
-      const entryStrategy = card.status === 'hot' ? 'Act quickly - market moving fast' : 'Monitor for optimal entry window';
-      const crossPlatformRec = card.category === 'NBA' || card.category === 'NFL' ? 'DFS lineups and player props' : 
-                               card.category === 'NFFC' || card.category === 'NFBC' ? 'auction values and stacks' : 'related betting markets';
-      const exitConditions = card.status === 'hot' ? 'Lock in if line moves significantly against position' : 'Standard variance management';
-      const leverageOpp = card.type === 'live-odds' ? 'correlated player props' : 
-                         card.type === 'dfs-lineup' ? 'betting totals' : 
-                         card.type === 'kalshi-market' ? 'sportsbook arbitrage' : 'related plays';
-
-      // Store structured data using JSON marker (exclude icon - it's not serializable)
-      const { icon, ...cardWithoutIcon } = card;
-      const structuredData = {
-        isDetailedAnalysis: true,
-        card: cardWithoutIcon,
-        metrics: metrics,
-        overview: `${card.category} ${card.subcategory} opportunity identified with ${card.status.toUpperCase()} confidence. Based on multi-platform analysis, this presents significant edge potential.`,
-        marketContext: `My AI models have analyzed ${card.category} data across multiple platforms including live odds feeds, historical databases, and prediction markets. This ${card.subcategory.toLowerCase()} opportunity shows strong alignment with profitable historical patterns.`,
-        riskAssessment: {
-          convictionLevel,
-          riskCategory,
-          positionSize
-        },
-        recommendations: [
-          { label: 'Entry Strategy', value: entryStrategy },
-          { label: 'Cross-Platform Plays', value: `Consider correlating with ${crossPlatformRec}` },
-          { label: 'Exit Conditions', value: exitConditions },
-          { label: 'Leverage Opportunities', value: `Stack with ${leverageOpp}` }
-        ]
-      };
+    console.log('[v0] Generating detailed analysis for card:', card);
+    const analysisPrompt = `Provide a comprehensive analysis for ${card.title} in ${card.category}. Include: 1) Specific data points supporting this opportunity, 2) Risk assessment and potential downsides, 3) Recommended position sizing, 4) Historical performance of similar scenarios.`;
+    handleSend(analysisPrompt);
+  };
 
       // Use special JSON marker in content
       const detailedAnalysisText = `__DETAILED_ANALYSIS__${JSON.stringify(structuredData)}__END_ANALYSIS__`;

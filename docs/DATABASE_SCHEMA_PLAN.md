@@ -3,6 +3,42 @@
 ## Overview
 This document outlines the complete database structure for the LeverageAI sports betting and financial intelligence platform. The schema is designed for PostgreSQL/Supabase with Row Level Security (RLS), scalability, and data integrity.
 
+---
+
+## Quick Setup Instructions
+
+Your Supabase connection is active, but the database schema needs to be created. Follow these steps:
+
+### Option 1: Supabase SQL Editor (Recommended - 2 minutes)
+
+1. Open your Supabase project dashboard
+2. Click on **SQL Editor** in the left sidebar
+3. Click **New Query**
+4. Copy the contents of `/scripts/setup-database.sql`
+5. Paste into the SQL Editor
+6. Click **Run** (or press Cmd/Ctrl + Enter)
+7. Wait for "Success. No rows returned" message
+8. Refresh your application - data should now flow
+
+### Option 2: Supabase CLI (Advanced)
+
+```bash
+cd /vercel/share/v0-project
+supabase db push --file scripts/setup-database.sql
+```
+
+### What Gets Created
+
+The migration creates:
+- 7 core tables (ai_response_trust, ai_audit_log, odds_benford_baselines, validation_thresholds, live_odds_cache, app_config, user_profiles)
+- 23 indexes for query optimization
+- 3 views for aggregated metrics
+- 4 functions for automation
+- Row Level Security policies
+- Seed data for configuration
+
+---
+
 ## Design Principles
 
 ### 1. **Data Normalization**

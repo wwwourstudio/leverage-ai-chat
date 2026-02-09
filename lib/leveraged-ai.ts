@@ -237,9 +237,9 @@ ${options.summarize ? 'Provide a concise summary of the data trends and importan
 Be concise and focus on actionable insights.
       `.trim();
 
-      // Use Vercel AI Gateway for Grok
+      // Use Vercel AI Gateway for Grok 4
       const result = await generateText({
-        model: 'xai/grok-3',
+        model: 'xai/grok-4-fast',
         prompt,
         temperature: 0.7,
         maxTokens: 500,
@@ -275,7 +275,7 @@ Be concise and focus on actionable insights.
   try {
     const prompt = enrichmentPrompt(record);
     const result = await generateText({
-      model: 'xai/grok-3',
+      model: 'xai/grok-4-fast',
       prompt,
       temperature: 0.7,
       maxTokens: 200,
@@ -372,7 +372,7 @@ Respond with "VALID" if okay, or "INVALID: [reason]" if there are issues.
   `.trim();
   
   const result = await generateText({
-    model: 'xai/grok-3',
+    model: 'xai/grok-4-fast',
     prompt,
     temperature: 0.3,
     maxTokens: 100,

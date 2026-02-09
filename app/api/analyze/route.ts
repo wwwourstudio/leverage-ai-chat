@@ -110,10 +110,10 @@ export async function POST(req: NextRequest) {
       try {
         console.log(`[v0] Calling generateText with xAI Grok via AI Gateway... (attempt ${attempt + 1}/${maxRetries + 1})`);
         
-        // Using Vercel AI Gateway with xAI grok-3 model
+        // Using Vercel AI Gateway with xAI grok-4-fast model
         // AI Gateway handles routing and authentication automatically
         const result = await generateText({
-          model: 'xai/grok-3',
+          model: 'xai/grok-4-fast',
           system: systemPrompt,
           prompt: userPrompt,
           temperature: AI_CONFIG.DEFAULT_TEMPERATURE,

@@ -926,11 +926,11 @@ export default function UnifiedAIPlatform() {
               severity: 'warning'
             }]
           }
-        };
-        
-        setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
-        
-        // Generate contextual suggestions
+    };
+  
+    setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
+  
+    // Generate contextual suggestions
         const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);
         setSuggestedPrompts(contextualSuggestions);
   console.log('[v0] Generated contextual suggestions:', contextualSuggestions.length);

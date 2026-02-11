@@ -74,32 +74,34 @@ export async function POST(req: Request) {
     // Step 4: Execute migration
     addStep('Executing migration SQL', 'running');
     
-    // Split SQL into individual statements and execute
-    const statements = migrationSQL
-      .split(';')
-      .map(s => s.trim())
-      .filter(s => s.length > 0 && !s.startsWith('--'));
+    // Execute the full SQL script using Supabase's direct SQL execution
+    // We need to use the REST API directly since the client doesn't support raw SQL
+    const { error: sqlError } = await supabase.rpc('exec', { 
+      query: migrationSQL 
+    }).single();
 
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const statement of statements) {
-      try {
-        const { error } = await supabase.rpc('exec_sql', { sql: statement });
-        if (error) {
-          // Try direct execution as fallback
-          console.log('[v0] [Migration] Attempting direct SQL execution...');
-          errorCount++;
-        } else {
-          successCount++;
-        }
-      } catch (err) {
-        errorCount++;
-        console.error('[v0] [Migration] Statement error:', err);
-      }
+    // If exec RPC doesn't exist, we need to inform user to run SQL manually
+    if (sqlError && sqlError.message?.includes('function')) {
+      addStep('Executing migration SQL', 'error', 'Direct SQL execution not available via API');
+      diagnostics.status = 'manual_required';
+      diagnostics.error = 'Please run the migration SQL manually in Supabase SQL Editor. The SQL is available at /scripts/setup-database.sql';
+      
+      // Provide instructions
+      diagnostics.steps.push({
+        step: 'Manual Migration Required',
+        status: 'info',
+        message: 'Go to Supabase Dashboard → SQL Editor → Run the contents of scripts/setup-database.sql'
+      });
+      
+      return NextResponse.json(diagnostics, { status: 200 });
+    } else if (sqlError) {
+      addStep('Executing migration SQL', 'error', sqlError.message);
+      diagnostics.status = 'failed';
+      diagnostics.error = sqlError.message;
+      return NextResponse.json(diagnostics, { status: 500 });
     }
 
-    addStep('Executing migration SQL', 'success', `${successCount} statements executed, ${errorCount} errors`);
+    addStep('Executing migration SQL', 'success', 'All SQL statements executed');
 
     // Step 5: Verify tables created
     addStep('Verifying tables', 'running');

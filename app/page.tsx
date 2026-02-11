@@ -8,6 +8,7 @@ import { DynamicCardRenderer, CardList, EmptyState } from '@/components/data-car
 import { DatabaseStatusBanner } from '@/components/database-status-banner';
 import { TrustMetricsDisplay, TrustMetricsBadge } from '@/components/trust-metrics-display';
 import { InsightsDashboard } from '@/components/insights-dashboard';
+import { AIProgressIndicator } from '@/components/ai-progress-indicator';
 
 interface FileAttachment {
   id: string;
@@ -2708,19 +2709,7 @@ export default function UnifiedAIPlatform() {
           </div>
           <div className="flex-1 space-y-3">
             <div className="bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl px-5 py-4 border border-gray-700/60 shadow-2xl">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                </div>
-                  <span className="text-sm font-semibold text-transparent bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text">Grok 4 neurons firing...</span>
-              </div>
-              <div className="space-y-2">
-                <div className="h-2 bg-gray-800/60 rounded-full animate-pulse w-full"></div>
-                <div className="h-2 bg-gray-800/60 rounded-full animate-pulse w-5/6"></div>
-                <div className="h-2 bg-gray-800/60 rounded-full animate-pulse w-4/6"></div>
-              </div>
+              <AIProgressIndicator />
             </div>
           </div>
         </div>

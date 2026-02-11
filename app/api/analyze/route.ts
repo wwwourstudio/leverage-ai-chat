@@ -43,11 +43,16 @@ interface AnalysisRequest {
 }
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+  const MAX_PROCESSING_TIME = 25000; // 25 seconds max
+  
   try {
     const body = await req.json();
     const query = body.query || body.userMessage; // Support both field names
     const context = body.context;
     const attachments = body.attachments;
+    
+    console.log(`[v0] [${Date.now() - startTime}ms] Request received`);
 
     // Get environment variables securely
     const supabaseUrl = process.env[ENV_KEYS.SUPABASE_URL];
@@ -117,20 +122,27 @@ export async function POST(req: NextRequest) {
     let aiResponse: string;
     
     try {
-      console.log(`[v0] Calling generateText with xAI Grok via AI Gateway`);
+      console.log(`[v0] [${Date.now() - startTime}ms] Calling generateText with xAI Grok via AI Gateway`);
       
-      // Using Vercel AI Gateway with xAI grok-4-fast model
-      // AI Gateway handles routing and authentication automatically
-      const result = await generateText({
+      // Race against timeout
+      const grokPromise = generateText({
         model: 'xai/grok-4-fast',
         system: systemPrompt,
         prompt: userPrompt,
         temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-        maxTokens: 300, // Limit to short responses
+        maxTokens: 300,
+        maxRetries: 2,
       });
       
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Grok request timeout')), MAX_PROCESSING_TIME - 2000)
+      );
+      
+      const result = await Promise.race([grokPromise, timeoutPromise]) as Awaited<typeof grokPromise>;
+      
       aiResponse = result.text;
-      console.log(`${LOG_PREFIXES.API} ✓ AI response: ${aiResponse.length} chars`);
+      const elapsed = Date.now() - startTime;
+      console.log(`${LOG_PREFIXES.API} ✓ AI response: ${aiResponse.length} chars (${elapsed}ms)`);
       
       // Trim response if it's too long despite token limit
       if (aiResponse.length > 800) {

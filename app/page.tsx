@@ -823,7 +823,7 @@ export default function UnifiedAIPlatform() {
     setInput(analysisPrompt);
     generateRealResponse(analysisPrompt);
   };
-
+  
   const generateRealResponse = async (userMessage: string) => {
     setIsTyping(true);
     const startTime = Date.now();

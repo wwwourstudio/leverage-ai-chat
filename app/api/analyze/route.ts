@@ -69,20 +69,16 @@ export async function POST(req: NextRequest) {
       // Detect fantasy baseball keywords
       if (queryLower.includes('nfbc') || queryLower.includes('nffc') || 
           queryLower.includes('nfbkc') || queryLower.includes('fantasy baseball')) {
-        contextEnhancement = '\n\nCONTEXT: The user is asking about fantasy baseball draft strategy (NFBC/NFFC). Provide baseball-specific advice focusing on 2026 season projections, draft position strategy, player values, and category contributions (HR, R, RBI, SB, AVG for hitters; W, K, ERA, WHIP, SV for pitchers). Reference specific players and current ADP trends when possible.';
-        console.log('[v0] Enhanced prompt for fantasy baseball context');
+        contextEnhancement = '\nContext: Fantasy baseball (NFBC/NFFC). Focus on 2026 projections and draft strategy.';
       } else if (queryLower.includes('dfs') || queryLower.includes('draftkings') || queryLower.includes('fanduel')) {
-        contextEnhancement = '\n\nCONTEXT: The user is asking about daily fantasy sports (DFS). Focus on optimal lineup construction, value plays, ownership projections, and game theory for tournaments vs cash games.';
-        console.log('[v0] Enhanced prompt for DFS context');
+        contextEnhancement = '\nContext: DFS. Focus on optimal lineups and value plays.';
       } else if (queryLower.includes('kalshi')) {
-        contextEnhancement = '\n\nCONTEXT: The user is asking about Kalshi prediction markets. Focus on event probabilities, arbitrage opportunities, and market efficiency analysis.';
-        console.log('[v0] Enhanced prompt for Kalshi context');
+        contextEnhancement = '\nContext: Kalshi prediction markets.';
       }
       
       // Add sport-specific context if detected
       if (context.sport) {
-        contextEnhancement += `\n\nSPORT FOCUS: ${context.sport.toUpperCase()}`;
-        console.log(`[v0] Added sport focus: ${context.sport}`);
+        contextEnhancement += `\nSport: ${context.sport}`;
       }
     }
 
@@ -129,9 +125,9 @@ export async function POST(req: NextRequest) {
         model: 'xai/grok-4-fast',
         system: systemPrompt,
         prompt: userPrompt,
-        temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-        maxTokens: 300,
-        maxRetries: 2,
+        temperature: 0.5,
+        maxTokens: 150,
+        maxRetries: 1,
       });
       
       const timeoutPromise = new Promise((_, reject) => 

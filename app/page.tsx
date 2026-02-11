@@ -976,7 +976,6 @@ export default function UnifiedAIPlatform() {
       const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);
       setSuggestedPrompts(contextualSuggestions);
       console.log('[v0] Generated contextual suggestions:', contextualSuggestions.length);
-      
     } catch (error) {
       console.error('[v0] Error generating real response:', error);
       

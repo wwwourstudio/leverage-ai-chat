@@ -929,13 +929,13 @@ export default function UnifiedAIPlatform() {
         };
         
         setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
-  
-  // Generate contextual suggestions
-  const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);
-      setSuggestedPrompts(contextualSuggestions);
-      console.log('[v0] Generated contextual suggestions:', contextualSuggestions.length);
+        
+        // Generate contextual suggestions
+        const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);
+        setSuggestedPrompts(contextualSuggestions);
+        console.log('[v0] Generated contextual suggestions:', contextualSuggestions.length);
 
-    } catch (error) {
+      } catch (error) {
       console.error('[v0] Error generating real response:', error);
       
       // Fallback to basic response with error indication

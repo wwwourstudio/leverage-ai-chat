@@ -976,40 +976,6 @@ export default function UnifiedAIPlatform() {
       const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);
       setSuggestedPrompts(contextualSuggestions);
       console.log('[v0] Generated contextual suggestions:', contextualSuggestions.length);
-        
-        return; // Exit early since we handled the error case
-      }
-      
-      // Success path - process the analysis result
-      const processingTime = Date.now() - startTime;
-      const newMessage: Message = {
-        role: 'assistant',
-        content: analysisResult.text || 'Analysis complete.',
-        timestamp: new Date(),
-        cards: analysisResult.cards || [],
-        confidence: analysisResult.confidence || 85,
-        sources: analysisResult.sources || [],
-        modelUsed: analysisResult.modelUsed || 'Grok',
-        processingTime,
-        trustMetrics: analysisResult.trustMetrics || {
-          benfordIntegrity: 85,
-          oddsAlignment: 85,
-          marketConsensus: 85,
-          historicalAccuracy: 85,
-          finalConfidence: 85,
-          trustLevel: 'high',
-          riskLevel: 'low',
-          adjustedTone: 'Confident',
-          flags: []
-        }
-      };
-      
-      setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
-        
-      // Generate contextual suggestions
-      const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);
-      setSuggestedPrompts(contextualSuggestions);
-      console.log('[v0] Generated contextual suggestions:', contextualSuggestions.length);
       
     } catch (error) {
       console.error('[v0] Error generating real response:', error);

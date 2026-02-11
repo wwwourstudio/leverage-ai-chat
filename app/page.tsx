@@ -9,6 +9,9 @@ import { DatabaseStatusBanner } from '@/components/database-status-banner';
 import { TrustMetricsDisplay, TrustMetricsBadge } from '@/components/trust-metrics-display';
 import { InsightsDashboard } from '@/components/insights-dashboard';
 import { AIProgressIndicator } from '@/components/ai-progress-indicator';
+import { ErrorBoundary } from '@/components/error-boundary';
+import { DataFallback } from '@/components/data-fallback';
+import { ChatMessage } from '@/components/chat-message';
 
 interface FileAttachment {
   id: string;

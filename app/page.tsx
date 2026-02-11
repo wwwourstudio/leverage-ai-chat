@@ -925,10 +925,10 @@ export default function UnifiedAIPlatform() {
               message: errorMessage,
               severity: 'warning'
             }]
-  }
-  };
-  
-  setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
+          }
+        };
+        
+        setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
   
   // Generate contextual suggestions
   const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);

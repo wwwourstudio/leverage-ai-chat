@@ -2240,17 +2240,6 @@ export default function UnifiedAIPlatform() {
                                   </div>
                                 </div>
 
-                                {/* Trust Metrics Display */}
-                                {message.trustMetrics && (
-                                  <div className="bg-gradient-to-br from-slate-900/60 to-slate-800/60 border border-slate-700/50 rounded-xl p-5">
-                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-wide mb-4 flex items-center gap-2">
-                                      <Shield className="w-3.5 h-3.5" />
-                                      AI Trust & Validation Metrics
-                                    </h3>
-                                    <TrustMetricsDisplay metrics={message.trustMetrics} showDetails={true} />
-                                  </div>
-                                )}
-
                                 {/* Strategic Recommendations */}
                                 <div>
                                   <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
@@ -2472,11 +2461,7 @@ export default function UnifiedAIPlatform() {
                     )}
                   </div>
 
-                  {message.role === 'assistant' && message.insights && (
-                    <div className="mt-4">
-                      <InsightsDashboard userId={user?.email} />
-                    </div>
-                  )}
+
 
                   {/* Dynamic Cards Section with Enhanced UX */}
                   {message.role === 'assistant' && (

@@ -21,6 +21,7 @@ import {
   APP_TABLES
 } from '@/lib/supabase-validator';
 import { getLeveragedAI } from '@/lib/leveraged-ai';
+import { fetchPlayerProjections, formatProjectionSummary } from '@/lib/player-projections';
 
 // Grok AI integration for sports analysis
 // Using xAI through Vercel AI Gateway (AI SDK 6)
@@ -60,6 +61,50 @@ export async function POST(req: NextRequest) {
 
     console.log(`${LOG_PREFIXES.API} Processing analysis request:`, query.substring(0, 50));
 
+    // STEP 1: Detect if this is a player projection query
+    const queryLower = query.toLowerCase();
+    const isPlayerQuery = queryLower.includes('projection') || 
+                         queryLower.includes('prop bet') || 
+                         queryLower.includes('over/under') ||
+                         queryLower.includes('hr') || 
+                         queryLower.includes('rbi') ||
+                         queryLower.includes('stolen bases') ||
+                         queryLower.includes('batting average');
+    
+    // Extract player name if this is a player query
+    let playerProjections = null;
+    let playerName = '';
+    
+    if (isPlayerQuery) {
+      console.log('[v0] Detected player projection query');
+      
+      // Try to extract player name from query
+      // Common patterns: "Zach Cole", "Cole, Zach", "Cole's projections"
+      const namePatterns = [
+        /([A-Z][a-z]+ [A-Z][a-z]+)/g, // First Last
+        /([A-Z][a-z]+, [A-Z][a-z]+)/g, // Last, First
+      ];
+      
+      for (const pattern of namePatterns) {
+        const matches = query.match(pattern);
+        if (matches && matches.length > 0) {
+          playerName = matches[0].replace(/,\s*/, ' '); // Normalize "Last, First" to "First Last"
+          break;
+        }
+      }
+      
+      // Fetch real player projections if we found a name
+      if (playerName) {
+        console.log(`[v0] Fetching real projections for: ${playerName}`);
+        try {
+          playerProjections = await fetchPlayerProjections(playerName, context?.sport || 'baseball_mlb');
+          console.log(`[v0] Player projections result:`, playerProjections.success ? 'Success' : 'Failed');
+        } catch (err) {
+          console.log('[v0] Error fetching player projections:', err);
+        }
+      }
+    }
+
     // Analyze context to enhance prompt specificity
     let contextEnhancement = '';
     if (context) {
@@ -97,6 +142,17 @@ export async function POST(req: NextRequest) {
     
     const systemPrompt = SYSTEM_PROMPT + contextEnhancement + dateWarning;
     let userPrompt = `${query}\n\nIMPORTANT: Respond in 3-4 short sentences maximum (under 150 words total). Be direct and specific.`;
+
+    // Add REAL player projection data if available
+    if (playerProjections?.success && playerProjections.projections && playerProjections.projections.length > 0) {
+      const projectionSummary = formatProjectionSummary(playerProjections);
+      userPrompt += `\n\n📊 REAL MARKET DATA (The Odds API):\n${projectionSummary}\n\nIMPORTANT: Use ONLY this verified data. Do not fabricate additional statistics. If asked about stats not provided above, clearly state "Data not available."`;
+      console.log('[v0] Added real player projection data to prompt');
+    } else if (playerProjections && !playerProjections.success) {
+      // Player was searched but no data found
+      userPrompt += `\n\n⚠️ IMPORTANT: No active market data found for ${playerName}. The player may not be in today's games, may be on a different team, or the name spelling may differ. Acknowledge this limitation in your response and DO NOT fabricate statistics.`;
+      console.log('[v0] No player projections found, instructed AI not to fabricate');
+    }
 
     // Add context from odds data if available
     if (context?.oddsData) {
@@ -192,6 +248,27 @@ export async function POST(req: NextRequest) {
       });
     });
 
+    // Build sources array with real data indicator
+    const sources = [DEFAULT_SOURCES.GROK_AI];
+    
+    if (playerProjections?.success) {
+      sources.push({
+        name: 'The Odds API (Player Props)',
+        type: 'api' as const,
+        reliability: 95, // High reliability for direct API data
+      });
+    } else if (context?.oddsData) {
+      sources.push({
+        ...DEFAULT_SOURCES.LIVE_MARKET,
+        reliability: DEFAULT_RELIABILITY.API_LIVE
+      });
+    } else {
+      sources.push({
+        ...DEFAULT_SOURCES.LIVE_MARKET,
+        reliability: DEFAULT_RELIABILITY.API_FALLBACK
+      });
+    }
+
     return NextResponse.json({
       success: true,
       text: aiResponse,
@@ -199,13 +276,12 @@ export async function POST(req: NextRequest) {
       trustMetrics,
       model: AI_CONFIG.MODEL_NAME,
       confidence: trustMetrics.finalConfidence,
-      sources: [
-        DEFAULT_SOURCES.GROK_AI,
-        {
-          ...DEFAULT_SOURCES.LIVE_MARKET,
-          reliability: context?.oddsData ? DEFAULT_RELIABILITY.API_LIVE : DEFAULT_RELIABILITY.API_FALLBACK
-        }
-      ],
+      sources,
+      playerData: playerProjections?.success ? {
+        player: playerProjections.player,
+        projectionsCount: playerProjections.projections?.length || 0,
+        source: 'The Odds API'
+      } : undefined,
       processingTime: Math.round(aiResponse.length * 2),
       timestamp: new Date().toISOString(),
     });

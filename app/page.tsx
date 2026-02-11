@@ -923,7 +923,7 @@ export default function UnifiedAIPlatform() {
   }
   };
   
-> setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
+  setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
   setSuggestedPrompts(generateContextualSuggestions(userMessage, newMessage.cards || []));
   setIsTyping(false);
   return;
@@ -972,7 +972,7 @@ export default function UnifiedAIPlatform() {
   trustMetrics: analysisResult.trustMetrics
   };
   
-> setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
+  setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
   
   // Generate contextual suggestions
   const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);

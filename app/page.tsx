@@ -3068,7 +3068,7 @@ export default function UnifiedAIPlatform() {
                   <input
                     id="login-password"
                     type="password"
-                    placeholder="••••••••"
+                    placeholder="•••••��••"
                     className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
                 </div>
@@ -3286,40 +3286,6 @@ export default function UnifiedAIPlatform() {
           }
         `}
       </style>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
     </div>
   );
 }

@@ -2714,7 +2714,7 @@ export default function UnifiedAIPlatform() {
                   <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                   <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                 </div>
-                <span className="text-sm font-semibold text-transparent bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text">Analyzing with Grok 4...</span>
+                  <span className="text-sm font-semibold text-transparent bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text">Grok 4 neurons firing...</span>
               </div>
               <div className="space-y-2">
                 <div className="h-2 bg-gray-800/60 rounded-full animate-pulse w-full"></div>

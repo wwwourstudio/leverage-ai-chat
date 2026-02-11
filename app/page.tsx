@@ -555,9 +555,9 @@ export default function UnifiedAIPlatform() {
 
   const handleStarChat = (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-      setChats(chats.map((chat: Chat) =>
-        chat.id === id ? { ...chat, starred: !chat.starred } : chat
-      ));
+    setChats(chats.map((chat: Chat) =>
+      chat.id === chatId ? { ...chat, starred: !chat.starred } : chat
+    ));
   };
 
   const generateContextualSuggestions = (userMessage: string, responseCards: InsightCard[]) => {

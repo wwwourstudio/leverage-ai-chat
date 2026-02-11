@@ -1,8 +1,12 @@
 'use client';
-// Leverage AI Platform - v2.0
-import React, { useState, useRef, useEffect } from 'react';
+
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data-service';
 import { API_ENDPOINTS } from '@/lib/constants';
+
+// Lazy load heavy components
+const ChatSidebar = lazy(() => import('@/components/chat-sidebar').then(mod => ({ default: mod.ChatSidebar })));
+const ChatInput = lazy(() => import('@/components/chat-input').then(mod => ({ default: mod.ChatInput })));
 import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2 } from 'lucide-react';
 import { DynamicCardRenderer, CardList, EmptyState } from '@/components/data-cards';
 import { DatabaseStatusBanner } from '@/components/database-status-banner';

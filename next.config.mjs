@@ -6,6 +6,11 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  experimental: {
+    // Optimize memory usage
+    workerThreads: false,
+    cpus: 1,
+  },
   // Allow iframe embedding for v0 preview
   async headers() {
     return [

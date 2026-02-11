@@ -929,55 +929,6 @@ export default function UnifiedAIPlatform() {
   };
   
   setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
-  setSuggestedPrompts(generateContextualSuggestions(userMessage, newMessage.cards || []));
-  setIsTyping(false);
-  return;
-      }
-
-      // Build response message with real data
-      const processingTime = Date.now() - startTime;
-      
-      // Combine AI analysis with odds data context if available
-      let enhancedContent = analysisResult.text;
-      if (oddsData?.success && oddsData.data && oddsData.data.length > 0) {
-        const topEvent = oddsData.data[0];
-        console.log('[v0] Enriching response with live odds from:', topEvent.sport_title);
-        enhancedContent += `\n\n**Live Market Data:** Real-time odds from ${topEvent.bookmakers?.length || 0} bookmakers analyzed for this recommendation.`;
-      }
-
-      // Get dynamic cards if not provided by analysis
-      let responseCards = analysisResult.cards;
-      if (!responseCards || responseCards.length === 0) {
-        console.log('[v0] No cards from analysis, fetching dynamic cards');
-        responseCards = await selectRelevantCards(userMessage, context);
-      }
-
-        // Validate and sanitize cards before adding to message
-        const validatedCards = Array.isArray(responseCards) 
-          ? responseCards.filter(card => {
-              if (!card || typeof card !== 'object' || !card.title || !card.type) {
-                console.warn('[v0] Filtering out invalid card:', card);
-                return false;
-              }
-              return true;
-            })
-          : [];
-        
-        console.log('[v0] Adding message with', validatedCards.length, 'validated cards');
-        
-        const newMessage: Message = {
-          role: 'assistant',
-          content: enhancedContent,
-          timestamp: new Date(),
-          cards: validatedCards,
-          confidence: analysisResult.confidence || 85,
-          sources: analysisResult.sources || buildSourcesList(oddsData),
-          modelUsed: analysisResult.model || 'Grok AI',
-        processingTime,
-  trustMetrics: analysisResult.trustMetrics
-  };
-  
-  setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
   
   // Generate contextual suggestions
   const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);

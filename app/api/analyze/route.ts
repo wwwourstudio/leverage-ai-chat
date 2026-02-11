@@ -21,7 +21,12 @@ import {
   APP_TABLES
 } from '@/lib/supabase-validator';
 import { getLeveragedAI } from '@/lib/leveraged-ai';
-import { fetchPlayerProjections, formatProjectionSummary } from '@/lib/player-projections';
+import { 
+  fetchPlayerProjections, 
+  formatProjectionSummary,
+  extractPlayerName,
+  isPlayerProjectionQuery
+} from '@/lib/player-projections';
 
 // Grok AI integration for sports analysis
 // Using xAI through Vercel AI Gateway (AI SDK 6)
@@ -43,6 +48,35 @@ interface AnalysisRequest {
   }>;
 }
 
+/**
+ * Builds context enhancement string based on query keywords
+ */
+function buildContextEnhancement(
+  query: string, 
+  context?: AnalysisRequest['context']
+): string {
+  const queryLower = query.toLowerCase();
+  const parts: string[] = [];
+  
+  // Detect platform-specific keywords
+  if (queryLower.includes('nfbc') || queryLower.includes('nffc') || 
+      queryLower.includes('nfbkc') || queryLower.includes('fantasy baseball')) {
+    parts.push('Context: Fantasy baseball (NFBC/NFFC). Focus on 2026 projections and draft strategy.');
+  } else if (queryLower.includes('dfs') || queryLower.includes('draftkings') || 
+             queryLower.includes('fanduel')) {
+    parts.push('Context: DFS. Focus on optimal lineups and value plays.');
+  } else if (queryLower.includes('kalshi')) {
+    parts.push('Context: Kalshi prediction markets.');
+  }
+  
+  // Add sport-specific context
+  if (context?.sport) {
+    parts.push(`Sport: ${context.sport}`);
+  }
+  
+  return parts.length > 0 ? '\n' + parts.join('\n') : '';
+}
+
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
   const MAX_PROCESSING_TIME = 25000; // 25 seconds max
@@ -61,71 +95,30 @@ export async function POST(req: NextRequest) {
 
     console.log(`${LOG_PREFIXES.API} Processing analysis request:`, query.substring(0, 50));
 
-    // STEP 1: Detect if this is a player projection query
-    const queryLower = query.toLowerCase();
-    const isPlayerQuery = queryLower.includes('projection') || 
-                         queryLower.includes('prop bet') || 
-                         queryLower.includes('over/under') ||
-                         queryLower.includes('hr') || 
-                         queryLower.includes('rbi') ||
-                         queryLower.includes('stolen bases') ||
-                         queryLower.includes('batting average');
-    
-    // Extract player name if this is a player query
+    // Detect if this is a player projection query and fetch real data
     let playerProjections = null;
-    let playerName = '';
     
-    if (isPlayerQuery) {
-      console.log('[v0] Detected player projection query');
+    if (isPlayerProjectionQuery(query)) {
+      const playerName = extractPlayerName(query);
       
-      // Try to extract player name from query
-      // Common patterns: "Zach Cole", "Cole, Zach", "Cole's projections"
-      const namePatterns = [
-        /([A-Z][a-z]+ [A-Z][a-z]+)/g, // First Last
-        /([A-Z][a-z]+, [A-Z][a-z]+)/g, // Last, First
-      ];
-      
-      for (const pattern of namePatterns) {
-        const matches = query.match(pattern);
-        if (matches && matches.length > 0) {
-          playerName = matches[0].replace(/,\s*/, ' '); // Normalize "Last, First" to "First Last"
-          break;
-        }
-      }
-      
-      // Fetch real player projections if we found a name
       if (playerName) {
-        console.log(`[v0] Fetching real projections for: ${playerName}`);
+        console.log(`${LOG_PREFIXES.API} Fetching player projections for: ${playerName}`);
         try {
-          playerProjections = await fetchPlayerProjections(playerName, context?.sport || 'baseball_mlb');
-          console.log(`[v0] Player projections result:`, playerProjections.success ? 'Success' : 'Failed');
+          playerProjections = await fetchPlayerProjections(
+            playerName, 
+            context?.sport || 'baseball_mlb'
+          );
+          console.log(
+            `${LOG_PREFIXES.API} Player projections: ${playerProjections.success ? 'Found' : 'Not found'}`
+          );
         } catch (err) {
-          console.log('[v0] Error fetching player projections:', err);
+          console.error(`${LOG_PREFIXES.API} Player projection error:`, err);
         }
       }
     }
 
-    // Analyze context to enhance prompt specificity
-    let contextEnhancement = '';
-    if (context) {
-      console.log('[v0] Analyzing context for prompt enhancement');
-      const queryLower = query.toLowerCase();
-      
-      // Detect fantasy baseball keywords
-      if (queryLower.includes('nfbc') || queryLower.includes('nffc') || 
-          queryLower.includes('nfbkc') || queryLower.includes('fantasy baseball')) {
-        contextEnhancement = '\nContext: Fantasy baseball (NFBC/NFFC). Focus on 2026 projections and draft strategy.';
-      } else if (queryLower.includes('dfs') || queryLower.includes('draftkings') || queryLower.includes('fanduel')) {
-        contextEnhancement = '\nContext: DFS. Focus on optimal lineups and value plays.';
-      } else if (queryLower.includes('kalshi')) {
-        contextEnhancement = '\nContext: Kalshi prediction markets.';
-      }
-      
-      // Add sport-specific context if detected
-      if (context.sport) {
-        contextEnhancement += `\nSport: ${context.sport}`;
-      }
-    }
+    // Build context enhancement string based on query keywords
+    const contextEnhancement = buildContextEnhancement(query, context);
 
     // Build the prompt with context and CRITICAL current date information
     const currentDate = new Date();

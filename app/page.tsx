@@ -972,7 +972,7 @@ export default function UnifiedAIPlatform() {
     } finally {
       setIsTyping(false);
     }
-  }
+  };
 
   // Helper functions for context extraction
   const extractSport = (message: string): string | null => {

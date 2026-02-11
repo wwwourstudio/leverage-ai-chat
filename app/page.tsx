@@ -820,7 +820,8 @@ export default function UnifiedAIPlatform() {
   const generateDetailedAnalysis = (card: InsightCard) => {
     console.log('[v0] Generating detailed analysis for card:', card);
     const analysisPrompt = `Provide a comprehensive analysis for ${card.title} in ${card.category}. Include: 1) Specific data points supporting this opportunity, 2) Risk assessment and potential downsides, 3) Recommended position sizing, 4) Historical performance of similar scenarios.`;
-    handleSend(analysisPrompt);
+    setInput(analysisPrompt);
+    generateRealResponse(analysisPrompt);
   };
 
   const generateRealResponse = async (userMessage: string) => {

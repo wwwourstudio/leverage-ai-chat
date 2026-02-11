@@ -127,4 +127,4 @@ Quick fixes:
 | Supabase query errors | Validation with graceful fallbacks |
 | 404 "Unknown sport" | Sport code auto-correction |
 | API not configured | Check environment variables at `/api/health` |
-| Missing database tables | Run migration scripts in `/supabase/migrations/` |
+| Missing database tables | See [Database Schema Plan](./docs/DATABASE_SCHEMA_PLAN.md) for setup instructions |

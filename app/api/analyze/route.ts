@@ -21,6 +21,12 @@ import {
   APP_TABLES
 } from '@/lib/supabase-validator';
 import { getLeveragedAI } from '@/lib/leveraged-ai';
+import { 
+  fetchPlayerProjections, 
+  formatProjectionSummary,
+  extractPlayerName,
+  isPlayerProjectionQuery
+} from '@/lib/player-projections';
 
 // Grok AI integration for sports analysis
 // Using xAI through Vercel AI Gateway (AI SDK 6)
@@ -42,12 +48,46 @@ interface AnalysisRequest {
   }>;
 }
 
+/**
+ * Builds context enhancement string based on query keywords
+ */
+function buildContextEnhancement(
+  query: string, 
+  context?: AnalysisRequest['context']
+): string {
+  const queryLower = query.toLowerCase();
+  const parts: string[] = [];
+  
+  // Detect platform-specific keywords
+  if (queryLower.includes('nfbc') || queryLower.includes('nffc') || 
+      queryLower.includes('nfbkc') || queryLower.includes('fantasy baseball')) {
+    parts.push('Context: Fantasy baseball (NFBC/NFFC). Focus on 2026 projections and draft strategy.');
+  } else if (queryLower.includes('dfs') || queryLower.includes('draftkings') || 
+             queryLower.includes('fanduel')) {
+    parts.push('Context: DFS. Focus on optimal lineups and value plays.');
+  } else if (queryLower.includes('kalshi')) {
+    parts.push('Context: Kalshi prediction markets.');
+  }
+  
+  // Add sport-specific context
+  if (context?.sport) {
+    parts.push(`Sport: ${context.sport}`);
+  }
+  
+  return parts.length > 0 ? '\n' + parts.join('\n') : '';
+}
+
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+  const MAX_PROCESSING_TIME = 25000; // 25 seconds max
+  
   try {
     const body = await req.json();
     const query = body.query || body.userMessage; // Support both field names
     const context = body.context;
     const attachments = body.attachments;
+    
+    console.log(`[v0] [${Date.now() - startTime}ms] Request received`);
 
     // Get environment variables securely
     const supabaseUrl = process.env[ENV_KEYS.SUPABASE_URL];
@@ -55,31 +95,30 @@ export async function POST(req: NextRequest) {
 
     console.log(`${LOG_PREFIXES.API} Processing analysis request:`, query.substring(0, 50));
 
-    // Analyze context to enhance prompt specificity
-    let contextEnhancement = '';
-    if (context) {
-      console.log('[v0] Analyzing context for prompt enhancement');
-      const queryLower = query.toLowerCase();
+    // Detect if this is a player projection query and fetch real data
+    let playerProjections = null;
+    
+    if (isPlayerProjectionQuery(query)) {
+      const playerName = extractPlayerName(query);
       
-      // Detect fantasy baseball keywords
-      if (queryLower.includes('nfbc') || queryLower.includes('nffc') || 
-          queryLower.includes('nfbkc') || queryLower.includes('fantasy baseball')) {
-        contextEnhancement = '\n\nCONTEXT: The user is asking about fantasy baseball draft strategy (NFBC/NFFC). Provide baseball-specific advice focusing on 2026 season projections, draft position strategy, player values, and category contributions (HR, R, RBI, SB, AVG for hitters; W, K, ERA, WHIP, SV for pitchers). Reference specific players and current ADP trends when possible.';
-        console.log('[v0] Enhanced prompt for fantasy baseball context');
-      } else if (queryLower.includes('dfs') || queryLower.includes('draftkings') || queryLower.includes('fanduel')) {
-        contextEnhancement = '\n\nCONTEXT: The user is asking about daily fantasy sports (DFS). Focus on optimal lineup construction, value plays, ownership projections, and game theory for tournaments vs cash games.';
-        console.log('[v0] Enhanced prompt for DFS context');
-      } else if (queryLower.includes('kalshi')) {
-        contextEnhancement = '\n\nCONTEXT: The user is asking about Kalshi prediction markets. Focus on event probabilities, arbitrage opportunities, and market efficiency analysis.';
-        console.log('[v0] Enhanced prompt for Kalshi context');
-      }
-      
-      // Add sport-specific context if detected
-      if (context.sport) {
-        contextEnhancement += `\n\nSPORT FOCUS: ${context.sport.toUpperCase()}`;
-        console.log(`[v0] Added sport focus: ${context.sport}`);
+      if (playerName) {
+        console.log(`${LOG_PREFIXES.API} Fetching player projections for: ${playerName}`);
+        try {
+          playerProjections = await fetchPlayerProjections(
+            playerName, 
+            context?.sport || 'baseball_mlb'
+          );
+          console.log(
+            `${LOG_PREFIXES.API} Player projections: ${playerProjections.success ? 'Found' : 'Not found'}`
+          );
+        } catch (err) {
+          console.error(`${LOG_PREFIXES.API} Player projection error:`, err);
+        }
       }
     }
+
+    // Build context enhancement string based on query keywords
+    const contextEnhancement = buildContextEnhancement(query, context);
 
     // Build the prompt with context and CRITICAL current date information
     const currentDate = new Date();
@@ -96,6 +135,17 @@ export async function POST(req: NextRequest) {
     
     const systemPrompt = SYSTEM_PROMPT + contextEnhancement + dateWarning;
     let userPrompt = `${query}\n\nIMPORTANT: Respond in 3-4 short sentences maximum (under 150 words total). Be direct and specific.`;
+
+    // Add REAL player projection data if available
+    if (playerProjections?.success && playerProjections.projections && playerProjections.projections.length > 0) {
+      const projectionSummary = formatProjectionSummary(playerProjections);
+      userPrompt += `\n\n📊 REAL MARKET DATA (The Odds API):\n${projectionSummary}\n\nIMPORTANT: Use ONLY this verified data. Do not fabricate additional statistics. If asked about stats not provided above, clearly state "Data not available."`;
+      console.log('[v0] Added real player projection data to prompt');
+    } else if (playerProjections && !playerProjections.success) {
+      // Player was searched but no data found
+      userPrompt += `\n\n⚠️ IMPORTANT: No active market data found for ${playerName}. The player may not be in today's games, may be on a different team, or the name spelling may differ. Acknowledge this limitation in your response and DO NOT fabricate statistics.`;
+      console.log('[v0] No player projections found, instructed AI not to fabricate');
+    }
 
     // Add context from odds data if available
     if (context?.oddsData) {
@@ -117,20 +167,27 @@ export async function POST(req: NextRequest) {
     let aiResponse: string;
     
     try {
-      console.log(`[v0] Calling generateText with xAI Grok via AI Gateway`);
+      console.log(`[v0] [${Date.now() - startTime}ms] Calling generateText with xAI Grok via AI Gateway`);
       
-      // Using Vercel AI Gateway with xAI grok-4-fast model
-      // AI Gateway handles routing and authentication automatically
-      const result = await generateText({
+      // Race against timeout
+      const grokPromise = generateText({
         model: 'xai/grok-4-fast',
         system: systemPrompt,
         prompt: userPrompt,
-        temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-        maxTokens: 300, // Limit to short responses
+        temperature: 0.5,
+        maxTokens: 150,
+        maxRetries: 1,
       });
       
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Grok request timeout')), MAX_PROCESSING_TIME - 2000)
+      );
+      
+      const result = await Promise.race([grokPromise, timeoutPromise]) as Awaited<typeof grokPromise>;
+      
       aiResponse = result.text;
-      console.log(`${LOG_PREFIXES.API} ✓ AI response: ${aiResponse.length} chars`);
+      const elapsed = Date.now() - startTime;
+      console.log(`${LOG_PREFIXES.API} ✓ AI response: ${aiResponse.length} chars (${elapsed}ms)`);
       
       // Trim response if it's too long despite token limit
       if (aiResponse.length > 800) {
@@ -184,6 +241,27 @@ export async function POST(req: NextRequest) {
       });
     });
 
+    // Build sources array with real data indicator
+    const sources = [DEFAULT_SOURCES.GROK_AI];
+    
+    if (playerProjections?.success) {
+      sources.push({
+        name: 'The Odds API (Player Props)',
+        type: 'api' as const,
+        reliability: 95, // High reliability for direct API data
+      });
+    } else if (context?.oddsData) {
+      sources.push({
+        ...DEFAULT_SOURCES.LIVE_MARKET,
+        reliability: DEFAULT_RELIABILITY.API_LIVE
+      });
+    } else {
+      sources.push({
+        ...DEFAULT_SOURCES.LIVE_MARKET,
+        reliability: DEFAULT_RELIABILITY.API_FALLBACK
+      });
+    }
+
     return NextResponse.json({
       success: true,
       text: aiResponse,
@@ -191,13 +269,12 @@ export async function POST(req: NextRequest) {
       trustMetrics,
       model: AI_CONFIG.MODEL_NAME,
       confidence: trustMetrics.finalConfidence,
-      sources: [
-        DEFAULT_SOURCES.GROK_AI,
-        {
-          ...DEFAULT_SOURCES.LIVE_MARKET,
-          reliability: context?.oddsData ? DEFAULT_RELIABILITY.API_LIVE : DEFAULT_RELIABILITY.API_FALLBACK
-        }
-      ],
+      sources,
+      playerData: playerProjections?.success ? {
+        player: playerProjections.player,
+        projectionsCount: playerProjections.projections?.length || 0,
+        source: 'The Odds API'
+      } : undefined,
       processingTime: Math.round(aiResponse.length * 2),
       timestamp: new Date().toISOString(),
     });

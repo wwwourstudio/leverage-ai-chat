@@ -50,24 +50,51 @@ const cache = new Map<string, { data: any; timestamp: number }>();
  */
 async function safeJsonParse(response: Response): Promise<any> {
   try {
+    // Clone the response so we can read it multiple times if needed
+    const clonedResponse = response.clone();
+    
     // First, get the text
     const text = await response.text();
     
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Response length: ${text.length} bytes`);
+    
     // Check if it's empty
     if (!text || text.trim().length === 0) {
+      console.error(`${LOG_PREFIXES.DATA_SERVICE} Empty response body received`);
       throw new Error('Empty response body');
+    }
+    
+    // Check for common non-JSON responses
+    if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
+      console.error(`${LOG_PREFIXES.DATA_SERVICE} Received HTML instead of JSON`);
+      throw new Error('Server returned HTML instead of JSON (possible error page)');
     }
     
     // Try to parse as JSON
     try {
-      return JSON.parse(text);
+      const parsed = JSON.parse(text);
+      console.log(`${LOG_PREFIXES.DATA_SERVICE} Successfully parsed JSON`);
+      return parsed;
     } catch (parseError) {
-      // Log the first 200 characters of the response for debugging
-      console.log(`${LOG_PREFIXES.DATA_SERVICE} JSON parse error. Response starts with:`, text.substring(0, 200));
-      throw new Error(`Invalid JSON: ${parseError instanceof Error ? parseError.message : 'Parse failed'}`);
+      // Log the first 500 characters for better debugging
+      const preview = text.length > 500 ? text.substring(0, 500) + '...' : text;
+      console.error(`${LOG_PREFIXES.DATA_SERVICE} JSON parse failed`);
+      console.error(`${LOG_PREFIXES.DATA_SERVICE} Response preview:`, preview);
+      console.error(`${LOG_PREFIXES.DATA_SERVICE} Parse error:`, parseError instanceof Error ? parseError.message : 'Unknown');
+      
+      // Try to extract any useful info from malformed JSON
+      if (text.includes('"error"')) {
+        const errorMatch = text.match(/"error":\s*"([^"]*)"/);
+        if (errorMatch) {
+          throw new Error(`Server error: ${errorMatch[1]}`);
+        }
+      }
+      
+      throw new Error(`Invalid JSON response: ${parseError instanceof Error ? parseError.message : 'Parse failed'}`);
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`${LOG_PREFIXES.DATA_SERVICE} Response parsing failed:`, errorMessage);
     throw new Error(`Response parsing failed: ${errorMessage}`);
   }
 }

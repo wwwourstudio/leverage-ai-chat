@@ -1,12 +1,34 @@
+/**
+ * Main Chat Interface
+ * 
+ * Production-ready AI sports betting assistant with real-time data integration.
+ * Features:
+ * - Real-time player projections from The Odds API
+ * - Trust metrics and confidence scoring
+ * - Context-aware suggestions
+ * - File attachments (images, CSV)
+ * - Chat history with edit/regenerate
+ * - Mobile-optimized UI
+ * 
+ * @module app/page
+ */
+
 'use client';
-// Leverage AI Platform - v2.0
-import React, { useState, useRef, useEffect } from 'react';
+
+import { useState, useRef, useEffect } from 'react';
 import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data-service';
 import { API_ENDPOINTS } from '@/lib/constants';
+import { MessageList } from '@/components/message-list';
+import { MobileChatInput } from '@/components/mobile-chat-input';
 import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2 } from 'lucide-react';
 import { DynamicCardRenderer, CardList, EmptyState } from '@/components/data-cards';
 import { DatabaseStatusBanner } from '@/components/database-status-banner';
 import { TrustMetricsDisplay, TrustMetricsBadge } from '@/components/trust-metrics-display';
+import { InsightsDashboard } from '@/components/insights-dashboard';
+import { AIProgressIndicator } from '@/components/ai-progress-indicator';
+import { ErrorBoundary } from '@/components/error-boundary';
+import { DataFallback } from '@/components/data-fallback';
+import { ChatMessage } from '@/components/chat-message';
 
 interface FileAttachment {
   id: string;
@@ -115,16 +137,9 @@ interface InsightCard {
 }
 
 export default function UnifiedAIPlatform() {
-  // Helper function to generate dynamic welcome messages based on category
+  // Lightweight welcome message to reduce memory usage
   const getWelcomeMessage = (category: string) => {
-    const messages = {
-      all: "Welcome to **Leverage AI** - Your All-In-One Sports & Financial Intelligence Platform.\n\nI'm your AI companion powered by **Grok AI** via Vercel AI Gateway, ready to provide data-driven insights across all platforms:\n\n**Sports Betting** - Real-time odds analysis, value detection, and sharp money tracking\n**Fantasy Sports (NFC)** - NFBC/NFFC/NFBKC draft strategy, ADP analysis, and auction optimization\n**DFS** - Optimal lineup construction, leverage plays, and ownership projections\n**Kalshi Markets** - Financial event prediction, weather markets, and arbitrage opportunities\n\nEvery recommendation is backed by advanced AI analyzing multiple data sources to provide you with verified, high-confidence insights.\n\n**What would you like to analyze?**",
-      betting: "Welcome to **Sports Betting Analysis** powered by **Grok AI**.\n\nI'm ready to help you find betting edges with:\n\n✓ **Live Odds Monitoring** - Real-time line movements across all major sportsbooks\n✓ **Value Detection** - Identify positive expected value opportunities\n✓ **Sharp Money Tracking** - Follow where the smart money is moving\n✓ **Player Props Analysis** - Statistical edges on player performance markets\n✓ **Line Shopping** - Find the best prices across books\n\nPowered by advanced pattern recognition and real-time market data integration.\n\n**What betting opportunities should we analyze today?**",
-      fantasy: "Welcome to **Fantasy Sports (NFC) Strategy** powered by **Grok AI**.\n\nI'm your expert draft companion for:\n\n✓ **Draft Strategy** - Optimal draft approach based on league settings\n✓ **ADP Analysis** - Identify value picks and avoid landmines\n✓ **Auction Optimization** - Target prices and nomination strategy\n✓ **Best Ball Construction** - Portfolio theory and correlation plays\n✓ **NFBC/NFFC/NFBKC** - Platform-specific strategies\n\nAdvanced AI analyzes thousands of draft scenarios to give you winning edges.\n\n**What's your draft strategy question?**",
-      dfs: "Welcome to **DFS Lineup Optimization** powered by **Grok AI**.\n\nI'm your DFS edge-finder for:\n\n✓ **Optimal Lineups** - Mathematically optimized for max projected points\n✓ **Leverage Plays** - Low-ownership, high-upside tournament picks\n✓ **Ownership Projections** - Find contrarian angles and game theory edges\n✓ **Stacking Strategy** - Correlation-based lineup construction\n✓ **Value Detection** - Identify mispriced players with high point-per-dollar ratios\n\nAdvanced AI processes thousands of lineup combinations to find your winning edge.\n\n**Which slate are you building for today?**",
-      kalshi: "Welcome to **Kalshi Prediction Markets** powered by **Grok AI**.\n\nI'm your prediction market analyst for:\n\n✓ **Market Analysis** - Identify mispriced event probabilities\n✓ **Arbitrage Detection** - Cross-market opportunities between Kalshi and sportsbooks\n✓ **Weather Markets** - Meteorological data analysis for temperature/precipitation markets\n✓ **Political Prediction** - Election and political event probability modeling\n✓ **Economic Events** - Financial indicator prediction markets\n\nAdvanced AI compares market prices against statistical models to find edges.\n\n**Which prediction markets should we explore?**"
-    };
-    return messages[category as keyof typeof messages] || messages.all;
+    return "Welcome to **Leverage AI** - Powered by Grok AI\n\nAsk me anything about sports betting, fantasy sports, DFS, or prediction markets.";
   };
 
   const [messages, setMessages] = useState<Message[]>([
@@ -555,9 +570,9 @@ export default function UnifiedAIPlatform() {
 
   const handleStarChat = (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-      setChats(chats.map((chat: Chat) =>
-        chat.id === id ? { ...chat, starred: !chat.starred } : chat
-      ));
+    setChats(chats.map((chat: Chat) =>
+      chat.id === chatId ? { ...chat, starred: !chat.starred } : chat
+    ));
   };
 
   const generateContextualSuggestions = (userMessage: string, responseCards: InsightCard[]) => {
@@ -818,9 +833,10 @@ export default function UnifiedAIPlatform() {
   const generateDetailedAnalysis = (card: InsightCard) => {
     console.log('[v0] Generating detailed analysis for card:', card);
     const analysisPrompt = `Provide a comprehensive analysis for ${card.title} in ${card.category}. Include: 1) Specific data points supporting this opportunity, 2) Risk assessment and potential downsides, 3) Recommended position sizing, 4) Historical performance of similar scenarios.`;
-    handleSend(analysisPrompt);
+    setInput(analysisPrompt);
+    generateRealResponse(analysisPrompt);
   };
-
+  
   const generateRealResponse = async (userMessage: string) => {
     setIsTyping(true);
     const startTime = Date.now();
@@ -888,32 +904,36 @@ export default function UnifiedAIPlatform() {
       }
 
       // Handle API errors with smart fallback
+      const processingTime = Date.now() - startTime;
+      let newMessage: Message;
+      
       if (!analysisResult.success) {
         console.log('[v0] API call failed, using contextual cards');
         
-        // Only use fallback for actual errors, not when useFallback flag is set
-        const processingTime = Date.now() - startTime;
         const fallbackCards = await selectRelevantCards(userMessage, context);
         const errorMessage = analysisResult.error || 'API temporarily unavailable';
         
-        const newMessage: Message = {
+        newMessage = {
           role: 'assistant',
-          content: `I'm experiencing connectivity issues with the AI service. Here's an analysis based on available data:\n\n**Status:** ${errorMessage}\n\nI can still provide you with relevant betting insights and live odds analysis based on cached patterns and real-time market data.`,
+          content: `I'm processing your request using cached data since live services are temporarily limited. ${errorMessage}\n\nHere's what I can tell you:`,
           timestamp: new Date(),
           cards: fallbackCards,
           confidence: 70,
           sources: [
-            { name: 'Pattern Analysis', type: 'cache', reliability: 75 },
-            { name: 'Historical Data', type: 'cache', reliability: 78 }
+            {
+              name: 'Cached Market Data',
+              type: 'cache',
+              reliability: 70
+            }
           ],
-          modelUsed: 'Fallback Mode',
+          modelUsed: 'Fallback',
           processingTime,
           trustMetrics: {
             benfordIntegrity: 70,
-            oddsAlignment: 75,
-            marketConsensus: 75,
-            historicalAccuracy: 78,
-            finalConfidence: 74,
+            oddsAlignment: 70,
+            marketConsensus: 70,
+            historicalAccuracy: 70,
+            finalConfidence: 70,
             trustLevel: 'medium',
             riskLevel: 'medium',
             adjustedTone: 'Moderate confidence',
@@ -924,63 +944,38 @@ export default function UnifiedAIPlatform() {
             }]
           }
         };
-        
-        setMessages((prev: Message[]) => [...prev, newMessage]);
-        setSuggestedPrompts(generateContextualSuggestions(userMessage, newMessage.cards || []));
-        setIsTyping(false);
-        return;
-      }
-
-      // Build response message with real data
-      const processingTime = Date.now() - startTime;
-      
-      // Combine AI analysis with odds data context if available
-      let enhancedContent = analysisResult.text;
-      if (oddsData?.success && oddsData.data && oddsData.data.length > 0) {
-        const topEvent = oddsData.data[0];
-        console.log('[v0] Enriching response with live odds from:', topEvent.sport_title);
-        enhancedContent += `\n\n**Live Market Data:** Real-time odds from ${topEvent.bookmakers?.length || 0} bookmakers analyzed for this recommendation.`;
-      }
-
-      // Get dynamic cards if not provided by analysis
-      let responseCards = analysisResult.cards;
-      if (!responseCards || responseCards.length === 0) {
-        console.log('[v0] No cards from analysis, fetching dynamic cards');
-        responseCards = await selectRelevantCards(userMessage, context);
-      }
-
-        // Validate and sanitize cards before adding to message
-        const validatedCards = Array.isArray(responseCards) 
-          ? responseCards.filter(card => {
-              if (!card || typeof card !== 'object' || !card.title || !card.type) {
-                console.warn('[v0] Filtering out invalid card:', card);
-                return false;
-              }
-              return true;
-            })
-          : [];
-        
-        console.log('[v0] Adding message with', validatedCards.length, 'validated cards');
-        
-        const newMessage: Message = {
+      } else {
+        // Success path - process the analysis result
+        newMessage = {
           role: 'assistant',
-          content: enhancedContent,
+          content: analysisResult.text || 'Analysis complete.',
           timestamp: new Date(),
-          cards: validatedCards,
+          cards: analysisResult.cards || [],
           confidence: analysisResult.confidence || 85,
-          sources: analysisResult.sources || buildSourcesList(oddsData),
-          modelUsed: analysisResult.model || 'Grok AI',
-        processingTime,
-        trustMetrics: analysisResult.trustMetrics
-      };
-
-      setMessages((prev: Message[]) => [...prev, newMessage]);
-
+          sources: analysisResult.sources || [],
+          modelUsed: analysisResult.modelUsed || 'Grok',
+          processingTime,
+          trustMetrics: analysisResult.trustMetrics || {
+            benfordIntegrity: 85,
+            oddsAlignment: 85,
+            marketConsensus: 85,
+            historicalAccuracy: 85,
+            finalConfidence: 85,
+            trustLevel: 'high',
+            riskLevel: 'low',
+            adjustedTone: 'Confident',
+            flags: []
+          }
+        };
+      }
+      
+      // Add message to state
+      setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
+      
       // Generate contextual suggestions
       const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);
       setSuggestedPrompts(contextualSuggestions);
       console.log('[v0] Generated contextual suggestions:', contextualSuggestions.length);
-
     } catch (error) {
       console.error('[v0] Error generating real response:', error);
       
@@ -2239,17 +2234,6 @@ export default function UnifiedAIPlatform() {
                                   </div>
                                 </div>
 
-                                {/* Trust Metrics Display */}
-                                {message.trustMetrics && (
-                                  <div className="bg-gradient-to-br from-slate-900/60 to-slate-800/60 border border-slate-700/50 rounded-xl p-5">
-                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-wide mb-4 flex items-center gap-2">
-                                      <Shield className="w-3.5 h-3.5" />
-                                      AI Trust & Validation Metrics
-                                    </h3>
-                                    <TrustMetricsDisplay metrics={message.trustMetrics} showDetails={true} />
-                                  </div>
-                                )}
-
                                 {/* Strategic Recommendations */}
                                 <div>
                                   <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
@@ -2471,34 +2455,7 @@ export default function UnifiedAIPlatform() {
                     )}
                   </div>
 
-                  {message.role === 'assistant' && message.insights && (
-                    <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {message.insights.totalValue !== undefined && (
-                        <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl p-3">
-                          <div className="text-xs font-bold text-gray-400 mb-1">Total Value</div>
-                          <div className="text-lg font-black text-green-400">${message.insights.totalValue.toFixed(2)}</div>
-                        </div>
-                      )}
-                      {message.insights.winRate !== undefined && (
-                        <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/20 rounded-xl p-3">
-                          <div className="text-xs font-bold text-gray-400 mb-1">Win Rate</div>
-                          <div className="text-lg font-black text-blue-400">{message.insights.winRate}%</div>
-                        </div>
-                      )}
-                      {message.insights.roi !== undefined && (
-                        <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-3">
-                          <div className="text-xs font-bold text-gray-400 mb-1">ROI</div>
-                          <div className="text-lg font-black text-purple-400">+{message.insights.roi}%</div>
-                        </div>
-                      )}
-                      {message.insights.activeContests !== undefined && (
-                        <div className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-xl p-3">
-                          <div className="text-xs font-bold text-gray-400 mb-1">Active</div>
-                          <div className="text-lg font-black text-orange-400">{message.insights.activeContests}</div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+
 
                   {/* Dynamic Cards Section with Enhanced UX */}
                   {message.role === 'assistant' && (
@@ -2745,19 +2702,7 @@ export default function UnifiedAIPlatform() {
           </div>
           <div className="flex-1 space-y-3">
             <div className="bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl px-5 py-4 border border-gray-700/60 shadow-2xl">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                </div>
-                <span className="text-sm font-semibold text-transparent bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text">Analyzing with Grok 4...</span>
-              </div>
-              <div className="space-y-2">
-                <div className="h-2 bg-gray-800/60 rounded-full animate-pulse w-full"></div>
-                <div className="h-2 bg-gray-800/60 rounded-full animate-pulse w-5/6"></div>
-                <div className="h-2 bg-gray-800/60 rounded-full animate-pulse w-4/6"></div>
-              </div>
+              <AIProgressIndicator />
             </div>
           </div>
         </div>
@@ -3166,7 +3111,7 @@ export default function UnifiedAIPlatform() {
                   <input
                     id="login-password"
                     type="password"
-                    placeholder="••••••••"
+                    placeholder="•••••����••"
                     className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
                 </div>

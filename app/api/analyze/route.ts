@@ -88,12 +88,25 @@ export async function POST(req: NextRequest) {
     const attachments = body.attachments;
     
     console.log(`[v0] [${Date.now() - startTime}ms] Request received`);
+    console.log(`[v0] Query:`, query);
+
+    // Verify Grok AI is configured
+    const xaiApiKey = process.env[ENV_KEYS.XAI_API_KEY];
+    if (!xaiApiKey) {
+      console.error(`${LOG_PREFIXES.API} XAI_API_KEY not configured!`);
+      return NextResponse.json({
+        success: false,
+        error: 'Grok AI not configured. Please add XAI_API_KEY to environment variables.',
+        text: 'AI service unavailable. Please contact support to enable Grok 4 Fast.',
+        useFallback: true
+      }, { status: 503 });
+    }
 
     // Get environment variables securely
     const supabaseUrl = process.env[ENV_KEYS.SUPABASE_URL];
     const supabaseAnonKey = process.env[ENV_KEYS.SUPABASE_ANON_KEY];
 
-    console.log(`${LOG_PREFIXES.API} Processing analysis request:`, query.substring(0, 50));
+    console.log(`${LOG_PREFIXES.API} Processing analysis with Grok 4 Fast (xAI)`);
 
     // Detect if this is a player projection query and fetch real data
     let playerProjections = null;
@@ -160,22 +173,24 @@ export async function POST(req: NextRequest) {
       userPrompt += `\nMarket Type: ${context.marketType}`;
     }
 
-    // Call Grok using AI Gateway (AI SDK 6)
-    // No provider imports needed - AI Gateway handles routing
-    console.log(`[v0] Calling Grok via AI Gateway`);
+    // Call Grok 4 Fast using xAI through Vercel AI Gateway
+    console.log(`[v0] Calling Grok 4 Fast via xAI...`);
+    console.log(`[v0] Model: ${AI_CONFIG.MODEL_NAME}`);
+    console.log(`[v0] Temperature: ${AI_CONFIG.DEFAULT_TEMPERATURE}`);
+    console.log(`[v0] Max Tokens: ${AI_CONFIG.DEFAULT_MAX_TOKENS}`);
     
     let aiResponse: string;
     
     try {
-      console.log(`[v0] [${Date.now() - startTime}ms] Calling generateText with xAI Grok via AI Gateway`);
+      console.log(`[v0] [${Date.now() - startTime}ms] Sending request to Grok...`);
       
       // Race against timeout
       const grokPromise = generateText({
-        model: 'xai/grok-4-fast',
+        model: AI_CONFIG.MODEL_NAME,
         system: systemPrompt,
         prompt: userPrompt,
-        temperature: 0.5,
-        maxTokens: 150,
+        temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
+        maxTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
         maxRetries: 1,
       });
       
@@ -187,20 +202,53 @@ export async function POST(req: NextRequest) {
       
       aiResponse = result.text;
       const elapsed = Date.now() - startTime;
-      console.log(`${LOG_PREFIXES.API} ✓ AI response: ${aiResponse.length} chars (${elapsed}ms)`);
+      console.log(`${LOG_PREFIXES.API} ✓ Grok 4 Fast response received: ${aiResponse.length} chars (${elapsed}ms)`);
+      console.log(`${LOG_PREFIXES.API} Response preview:`, aiResponse.substring(0, 200));
+      
+      // Validate response quality - check for hallucination indicators
+      const hallucationIndicators = [
+        /\d{2,3}%.*win.*rate/i, // Specific win percentages without data
+        /\$\d+.*profit/i, // Dollar amounts without context
+        /\d+\.\d+.*points.*average/i, // Specific stats without source
+      ];
+      
+      let hasHallucination = false;
+      for (const pattern of hallucationIndicators) {
+        if (pattern.test(aiResponse) && !playerProjections?.success) {
+          console.warn(`${LOG_PREFIXES.API} ⚠️ Potential hallucination detected: ${pattern}`);
+          hasHallucination = true;
+        }
+      }
+      
+      if (hasHallucination && !playerProjections?.success) {
+        console.warn(`${LOG_PREFIXES.API} ⚠️ Response contained specific stats without real data`);
+        aiResponse = `⚠️ Real-time data not available for this query.\n\n• Check The Odds API for current odds\n• Visit sportsbooks for live lines\n• Request requires verified market data\n\nPlease try a different query or check back when more data is available.`;
+      }
       
       // Trim response if it's too long despite token limit
-      if (aiResponse.length > 800) {
+      if (aiResponse.length > 600) {
         const sentences = aiResponse.split(/[.!?]\s+/);
-        aiResponse = sentences.slice(0, 4).join('. ') + '.';
+        aiResponse = sentences.slice(0, 3).join('. ') + '.';
         console.log(`${LOG_PREFIXES.API} Response trimmed to ${aiResponse.length} chars`);
       }
       
     } catch (error) {
-      console.error(`${LOG_PREFIXES.API} ❌ AI Error:`, error);
+      console.error(`${LOG_PREFIXES.API} ❌ Grok 4 Fast Error:`, error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error(`${LOG_PREFIXES.API} Error details:`, errorMsg);
       
-      // Concise fallback response
-      aiResponse = `I encountered an issue analyzing that query. Here's what I suggest:\n\n• Review current odds from The Odds API\n• Check recent line movements for value\n• Consider weather impacts for outdoor sports\n\nTry asking about a specific game or player for detailed analysis.`;
+      // Check if it's an API key issue
+      if (errorMsg.includes('401') || errorMsg.includes('unauthorized') || errorMsg.includes('API key')) {
+        return NextResponse.json({
+          success: false,
+          error: 'Grok AI authentication failed. Please verify XAI_API_KEY is correct.',
+          text: 'AI service authentication error. Please check your API configuration.',
+          useFallback: true
+        }, { status: 401 });
+      }
+      
+      // Generic error fallback
+      aiResponse = `⚠️ Unable to process request. Real-time AI analysis unavailable.\n\n• Check The Odds API directly for current lines\n• Visit sportsbooks for live odds\n• Verify weather conditions for outdoor games\n\nPlease try again or contact support if this persists.`;
     }
     
     if (!aiResponse || aiResponse.trim().length === 0) {

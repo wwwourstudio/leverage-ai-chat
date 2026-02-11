@@ -44,9 +44,9 @@ Continue building your app on:
 
 ## AI Model
 
-This application is powered by **Grok-3**, xAI's latest AI model optimized for sports betting, fantasy sports, DFS, and prediction market analysis. 
+This application is powered by **Grok 4 Fast**, xAI's latest AI model optimized for sports betting, fantasy sports, DFS, and prediction market analysis. 
 
-✅ **Not GPT-4** - We use Grok-3 for superior sports intelligence and real-time data processing.
+✅ **Not GPT-4** - We use Grok 4 Fast for superior sports intelligence and real-time data processing with strict anti-hallucination controls.
 
 See **[AI_MODEL_DOCUMENTATION.md](./AI_MODEL_DOCUMENTATION.md)** for complete details about the AI model.
 
@@ -57,7 +57,7 @@ See **[AI_MODEL_DOCUMENTATION.md](./AI_MODEL_DOCUMENTATION.md)** for complete de
 See **[ENV_CONFIGURATION.md](./ENV_CONFIGURATION.md)** for complete environment variable setup.
 
 Required environment variables:
-- `XAI_API_KEY` - Grok-3 AI API key (get from [console.x.ai](https://console.x.ai/))
+- `XAI_API_KEY` - Grok 4 Fast AI API key (get from [console.x.ai](https://console.x.ai/))
 - `ODDS_API_KEY` - Sports odds API key (get from [the-odds-api.com](https://the-odds-api.com/))
 - `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous key

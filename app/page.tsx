@@ -972,8 +972,9 @@ export default function UnifiedAIPlatform() {
       const fileType = file.type;
 
       // Validate file type
-      if (!fileType.startsWith('image/') && fileType !== 'text/csv') {
-        alert(`File type not supported: ${file.name}. Please upload images (JPEG, PNG) or CSV files.`);
+      const isCsvOrTsv = fileType === 'text/csv' || fileType === 'text/tab-separated-values' || file.name.endsWith('.tsv');
+      if (!fileType.startsWith('image/') && !isCsvOrTsv) {
+        alert(`File type not supported: ${file.name}. Please upload images (JPEG, PNG), CSV, or TSV files.`);
         continue;
       }
 
@@ -983,15 +984,16 @@ export default function UnifiedAIPlatform() {
       const attachment: FileAttachment = {
         id: `${Date.now()}-${i}`,
         name: file.name,
-        type: fileType.startsWith('image/') ? 'image' : 'csv',
+        type: fileType.startsWith('image/') ? 'image' : isCsvOrTsv ? 'csv' : 'csv',
         url: fileUrl,
         size: file.size
       };
 
-      // Parse CSV if needed
-      if (fileType === 'text/csv') {
+      // Parse CSV/TSV if needed
+      if (isCsvOrTsv) {
         const text = await file.text();
-        const parsed = parseCSV(text);
+        const delimiter = file.name.endsWith('.tsv') || fileType === 'text/tab-separated-values' ? '\t' : ',';
+        const parsed = parseDelimitedFile(text, delimiter);
         attachment.data = parsed;
       }
 
@@ -1007,13 +1009,13 @@ export default function UnifiedAIPlatform() {
     }
   };
 
-  const parseCSV = (text: string) => {
+  const parseDelimitedFile = (text: string, delimiter: string = ',') => {
     const lines = text.split('\n').filter(line => line.trim());
     if (lines.length === 0) return { headers: [], rows: [] };
 
-    const headers = lines[0].split(',').map(h => h.trim());
+    const headers = lines[0].split(delimiter).map(h => h.trim());
     const rows = lines.slice(1).map(line => 
-      line.split(',').map(cell => cell.trim())
+      line.split(delimiter).map(cell => cell.trim())
     );
 
     return { headers, rows };
@@ -2610,7 +2612,7 @@ export default function UnifiedAIPlatform() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/jpg,text/csv"
+                  accept="image/jpeg,image/png,image/jpg,text/csv,.tsv,text/tab-separated-values"
                   multiple
                   onChange={handleFileUpload}
                   className="hidden"

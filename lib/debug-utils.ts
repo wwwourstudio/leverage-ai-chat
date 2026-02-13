@@ -213,7 +213,7 @@ export function createSystemSnapshot(additionalData?: any): SystemSnapshot {
     },
     cache: additionalData?.cache || { size: 0, keys: [] },
     performance: {
-      uptime: typeof process !== 'undefined' && process.uptime ? process.uptime() : 0
+      uptime: typeof process !== 'undefined' && typeof process.uptime === 'function' ? process.uptime() : 0
     }
   };
 }

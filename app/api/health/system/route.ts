@@ -14,7 +14,7 @@ export async function GET() {
   const healthCheck = {
     status: 'healthy' as 'healthy' | 'degraded' | 'down',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime ? Math.floor(process.uptime()) : undefined,
+    uptime: typeof process.uptime === 'function' ? Math.floor(process.uptime()) : undefined,
     services: {
       database: { status: 'unknown' as string, message: '', latency: 0 },
       oddsAPI: { status: 'unknown' as string, message: '', configured: false },
@@ -29,7 +29,7 @@ export async function GET() {
     metrics: {
       responseTime: 0,
       checksPerformed: 0,
-      checksPass ed: 0
+      checksPassed: 0
     }
   };
 

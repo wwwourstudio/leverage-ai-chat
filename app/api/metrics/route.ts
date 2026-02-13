@@ -24,7 +24,7 @@ export async function GET() {
     };
 
     // Calculate system uptime (if available)
-    const uptime = process.uptime ? Math.floor(process.uptime()) : null;
+    const uptime = typeof process.uptime === 'function' ? Math.floor(process.uptime()) : null;
 
     // Collect metrics
     const metrics = {

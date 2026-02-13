@@ -619,6 +619,33 @@ export default function UnifiedAIPlatform() {
 
       console.log('[v0] Extracted context:', context);
       
+      // Check if this is a betting-related query
+      const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'arbitrage', 'arb', 'h2h', 'value', 'sportsbook', 'draftkings', 'fanduel'];
+      const lowerMsg = userMessage.toLowerCase();
+      const hasBettingKeyword = bettingKeywords.some(k => lowerMsg.includes(k));
+      
+      // Fetch odds data if betting-related (default to NBA if no sport detected)
+      if (hasBettingKeyword) {
+        const sportToFetch = context.sport || 'basketball_nba';
+        console.log('[v0] Fetching odds for betting query - Sport:', sportToFetch);
+        
+        try {
+          const oddsResponse = await fetch('/api/odds', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sport: sportToFetch, marketType: 'h2h' })
+          });
+          
+          const oddsResult = await oddsResponse.json();
+          if (oddsResult?.events?.length > 0) {
+            console.log(`[v0] Fetched ${oddsResult.events.length} odds events`);
+            context.oddsData = oddsResult;
+          }
+        } catch (err) {
+          console.log('[v0] Odds fetch failed:', err);
+        }
+      }
+      
       // Fetch real data from our API routes
       const analysisResult = await fetch('/api/analyze', {
         method: 'POST',

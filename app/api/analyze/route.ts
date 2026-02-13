@@ -89,6 +89,12 @@ export async function POST(req: NextRequest) {
     
     console.log(`[v0] [${Date.now() - startTime}ms] Request received`);
     console.log(`[v0] Query:`, query);
+    console.log('[v0] Context received:', {
+      sport: context?.sport,
+      marketType: context?.marketType,
+      hasOddsData: !!context?.oddsData,
+      oddsEventsCount: context?.oddsData?.events?.length || 0
+    });
 
     // Verify Grok AI is configured
     const xaiApiKey = process.env[ENV_KEYS.XAI_API_KEY];

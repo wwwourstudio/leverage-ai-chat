@@ -55,7 +55,7 @@ export function ChatInput({
           onChange={onFileUpload}
           className="hidden"
           multiple
-          accept="image/*,.pdf,.doc,.docx,.txt,.csv"
+          accept="image/*,.pdf,.doc,.docx,.txt,.csv,.tsv,text/tab-separated-values"
         />
         <button
           type="button"

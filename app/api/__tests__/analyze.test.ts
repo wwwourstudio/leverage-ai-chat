@@ -12,11 +12,18 @@ vi.mock('ai', () => ({
   generateText: vi.fn()
 }));
 
+// Mock LeveragedAI instance
+const mockLeveragedAI = {
+  isReady: vi.fn(() => true),
+  insertWithAIValidation: vi.fn().mockResolvedValue({ success: true }),
+  queryWithAI: vi.fn().mockResolvedValue({ success: true, data: [] }),
+  enrichRecordsWithAI: vi.fn(),
+  getSupabaseClient: vi.fn(() => null)
+};
+
 vi.mock('@/lib/leveraged-ai', () => ({
-  LeveragedAI: {
-    isReady: vi.fn(() => true),
-    insertWithAIValidation: vi.fn()
-  }
+  LeveragedAI: vi.fn(() => mockLeveragedAI),
+  getLeveragedAI: vi.fn(() => mockLeveragedAI)
 }));
 
 describe('POST /api/analyze', () => {
@@ -138,7 +145,7 @@ describe('POST /api/analyze', () => {
 
   it('should store trust metrics when database is ready', async () => {
     const { generateText } = await import('ai');
-    const { LeveragedAI } = await import('@/lib/leveraged-ai');
+    const { getLeveragedAI } = await import('@/lib/leveraged-ai');
     
     vi.mocked(generateText).mockResolvedValue({
       text: 'Response',
@@ -155,6 +162,7 @@ describe('POST /api/analyze', () => {
 
     await POST(request);
 
-    expect(LeveragedAI.isReady).toHaveBeenCalled();
+    const leveragedAI = getLeveragedAI();
+    expect(leveragedAI.isReady).toHaveBeenCalled();
   });
 });

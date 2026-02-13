@@ -53,6 +53,7 @@ interface APIResponse<T = any> {
     url?: string;
   }>;
   model?: string;
+  modelUsed?: string; // Model name used for generation (for display)
   trustMetrics?: TrustMetrics;
   useFallback?: boolean; // Flag to indicate fallback mode was used
   details?: string; // Additional error or diagnostic details
@@ -278,60 +279,16 @@ export default function UnifiedAIPlatform() {
       });
   }, []);
 
+  // Start with empty chat history - user creates real chats
   const [chats, setChats] = useState<Chat[]>([
     {
       id: 'chat-1',
-      title: 'NBA Lakers Betting Analysis',
-      preview: 'Sharp money on Lakers -4.5, 73% win probability...',
-      timestamp: new Date(Date.now() - 1000 * 60 * 5),
-      starred: true,
-      category: 'betting',
-      tags: ['live', 'nba', 'high-value']
-    },
-    {
-      id: 'chat-2',
-      title: 'NFBC Main Event Draft Strategy',
-      preview: 'Zero RB approach with elite WR stacking...',
-      timestamp: new Date(Date.now() - 1000 * 60 * 30),
-      starred: true,
-      category: 'fantasy',
-      tags: ['baseball', 'draft', 'strategy']
-    },
-    {
-      id: 'chat-3',
-      title: 'DFS NFL Week 8 Showdown Lineup',
-      preview: 'Optimal $49,800 salary lineup, 315.2 projected...',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60),
+      title: 'New Chat',
+      preview: 'Start a conversation to get real-time sports betting insights...',
+      timestamp: new Date(),
       starred: false,
-      category: 'dfs',
-      tags: ['nfl', 'optimizer', 'draftkings']
-    },
-    {
-      id: 'chat-4',
-      title: 'Kalshi Election Market Analysis',
-      preview: 'Presidential market showing 58% probability...',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-      starred: true,
-      category: 'kalshi',
-      tags: ['politics', 'prediction-market']
-    },
-    {
-      id: 'chat-5',
-      title: 'Best Ball Portfolio Optimization',
-      preview: 'Diversify with 40% Mahomes exposure across...',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 12),
-      starred: false,
-      category: 'fantasy',
-      tags: ['football', 'bestball', 'nffc']
-    },
-    {
-      id: 'chat-6',
-      title: 'MLB Ohtani Props + Kalshi Weather',
-      preview: 'Over 1.5 total bases +120, 68% hit rate with...',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
-      starred: true,
-      category: 'betting',
-      tags: ['mlb', 'props', 'cross-platform']
+      category: 'all',
+      tags: []
     }
   ]);
 
@@ -343,200 +300,9 @@ export default function UnifiedAIPlatform() {
     { id: 'kalshi', name: 'Kalshi Markets', icon: BarChart3, color: 'text-cyan-400', desc: 'Financial Prediction' },
   ];
 
-  const unifiedCards: InsightCard[] = [
-    // Betting Cards
-    {
-      type: 'live-odds',
-      title: 'Live Odds Alert',
-      icon: Zap,
-      category: 'NBA',
-      subcategory: 'Live Betting',
-      gradient: 'from-orange-500 to-red-600',
-      data: {
-        matchup: 'Lakers vs Warriors',
-        bestLine: 'Lakers -4.5 (-108)',
-        book: 'FanDuel',
-        edge: '+2.3%',
-        movement: '↑ from -3.5',
-        confidence: 87
-      },
-      status: 'hot'
-    },
-    {
-      type: 'player-prop',
-      title: 'Player Prop Value',
-      icon: Target,
-      category: 'NBA',
-      subcategory: 'Props',
-      gradient: 'from-purple-500 to-pink-600',
-      data: {
-        player: 'LeBron James',
-        prop: 'Over 25.5 Points',
-        line: '+105',
-        hitRate: '68%',
-        lastGames: '4/5 over',
-        projection: '27.8 pts'
-      },
-      status: 'value'
-    },
-    // DFS Cards
-    {
-      type: 'dfs-lineup',
-      title: 'Optimal DFS Lineup',
-      icon: Award,
-      category: 'NFL',
-      subcategory: 'DraftKings',
-      gradient: 'from-green-500 to-emerald-600',
-      data: {
-        platform: 'DraftKings Showdown',
-        salary: '$49,800 / $50,000',
-        projected: '315.2 pts',
-        ownership: 'Avg 8.3% owned',
-        topPlay: 'Patrick Mahomes (CPT)',
-        leverage: 'High tournament upside'
-      },
-      status: 'optimal'
-    },
-    {
-      type: 'dfs-value',
-      title: 'DFS Value Play',
-      icon: DollarSign,
-      category: 'NFL',
-      subcategory: 'FanDuel',
-      gradient: 'from-blue-500 to-cyan-600',
-      data: {
-        player: 'Jakobi Meyers WR',
-        salary: '$5,200',
-        projection: '14.7 pts',
-        valueRatio: '2.83x',
-        ownership: '3.1% projected',
-        matchup: 'vs NYJ (28th vs WR)'
-      },
-      status: 'value'
-    },
-    // Fantasy Cards
-    {
-      type: 'adp-analysis',
-      title: 'ADP Value Target',
-      icon: TrendingUp,
-      category: 'NFFC',
-      subcategory: 'Draft Strategy',
-      gradient: 'from-green-600 to-teal-600',
-      data: {
-        player: 'Ja\'Marr Chase WR CIN',
-        currentADP: '12.3',
-        recommendation: 'Target at pick 15+',
-        value: '+2.7 rounds value',
-        reason: 'WR1 upside undervalued',
-        confidence: 89
-      },
-      status: 'target'
-    },
-    {
-      type: 'bestball-stack',
-      title: 'Best Ball Stack',
-      icon: Medal,
-      category: 'NFFC',
-      subcategory: 'Best Ball',
-      gradient: 'from-purple-500 to-indigo-600',
-      data: {
-        stack: 'Chiefs Offense',
-        players: 'Mahomes + Kelce + Rice',
-        correlation: '+0.84',
-        upside: 'Top 5% finish: 12.3%',
-        ownership: 'Combined 18.2%',
-        leverage: 'Elite tournament value'
-      },
-      status: 'elite'
-    },
-    {
-      type: 'auction-value',
-      title: 'Auction Sleeper',
-      icon: ShoppingCart,
-      category: 'NFBC',
-      subcategory: 'Auction',
-      gradient: 'from-blue-500 to-indigo-600',
-      data: {
-        player: 'Juan Soto OF NYY',
-        avgPrice: '$38',
-        targetPrice: '$35-37',
-        maxPrice: '$40',
-        reasoning: 'Yankee Stadium boost',
-        projection: '35 HR, .285 AVG, 100 RBI'
-      },
-      status: 'sleeper'
-    },
-    // Kalshi Cards
-    {
-      type: 'kalshi-market',
-      title: 'Kalshi Event Prediction',
-      icon: BarChart3,
-      category: 'Politics',
-      subcategory: 'Election Markets',
-      gradient: 'from-cyan-500 to-blue-600',
-      data: {
-        event: '2024 Presidential Election',
-        market: 'Democratic Nominee',
-        probability: '58%',
-        volume: '$2.4M traded',
-        edge: 'Sharp money moving',
-        recommendation: 'Long at 56-58'
-      },
-      status: 'opportunity'
-    },
-    {
-      type: 'kalshi-weather',
-      title: 'Weather Market Edge',
-      icon: Activity,
-      category: 'Weather',
-      subcategory: 'Temperature',
-      gradient: 'from-orange-400 to-red-500',
-      data: {
-        market: 'SF Over 75°F Tomorrow',
-        currentOdds: '42%',
-        modelPrediction: '51%',
-        edge: '+9% value',
-        volume: '$126K',
-        recommendation: 'Buy at <45%'
-      },
-      status: 'edge'
-    },
-    // Cross-Platform Insights
-    {
-      type: 'cross-platform',
-      title: 'Multi-Platform Insight',
-      icon: Sparkles,
-      category: 'NFL + Kalshi',
-      subcategory: 'Correlation Analysis',
-      gradient: 'from-violet-500 to-purple-600',
-      data: {
-        insight: 'Weather impact on totals',
-        game: 'BUF @ KC Sunday',
-        kalshiWeather: '35°F, 70% snow',
-        bettingAdjustment: 'Under 47.5 ↓ from 51',
-        dfsImpact: 'RB usage up 18%',
-        recommendation: 'Under + stack RBs in DFS'
-      },
-      status: 'synergy'
-    },
-    {
-      type: 'ai-prediction',
-      title: 'AI Model Prediction',
-      icon: Sparkles,
-      category: 'NFL',
-      subcategory: 'Model Edge',
-      gradient: 'from-blue-600 to-purple-600',
-      data: {
-        pick: 'Chiefs -7.5',
-        probability: '73.4%',
-        expectedValue: '+$12.80',
-        modelEdge: '9.2%',
-        sharpMoney: '78% on Chiefs',
-        confidence: 91
-      },
-      status: 'strong'
-    }
-  ];
+  // Demo cards removed - app now fetches ONLY real data from APIs
+  // Real data sources: The Odds API, Grok 4 Fast AI, Open-Meteo Weather API, Supabase
+  const unifiedCards: InsightCard[] = [];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -845,7 +611,7 @@ export default function UnifiedAIPlatform() {
       console.log('[v0] Starting real AI analysis for:', userMessage);
       
       // Extract context from user message
-      const context = {
+      const context: any = {
         sport: extractSport(userMessage),
         marketType: extractMarketType(userMessage),
         platform: extractPlatform(userMessage),
@@ -854,8 +620,93 @@ export default function UnifiedAIPlatform() {
 
       console.log('[v0] Extracted context:', context);
       
+      // Check if this is a betting-related query
+      // H2H = Head-to-Head markets (moneyline betting on which team wins)
+      const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'arbitrage', 'arb', 'h2h', 'value', 'sportsbook', 'draftkings', 'fanduel', 'moneyline', 'kalshi', 'prediction market', 'election', 'polymarket', 'prop', 'parlay'];
+      const lowerMsg = userMessage.toLowerCase();
+      const hasBettingKeyword = bettingKeywords.some(k => lowerMsg.includes(k));
+      
+      console.log('[v0] Betting query check:', { 
+        hasBettingKeyword, 
+        query: lowerMsg.substring(0, 50),
+        matchedKeywords: bettingKeywords.filter(k => lowerMsg.includes(k))
+      });
+      
+      // Fetch odds data if betting-related (try multiple sports to ensure we get data)
+      if (hasBettingKeyword) {
+        console.log('[v0] === ODDS FETCH STARTING ===');
+        // Import SPORT_KEYS for consistent API format
+        const { SPORT_KEYS, sportToApi } = await import('@/lib/constants');
+        const primarySport = context.sport ? sportToApi(context.sport) : SPORT_KEYS.NBA.API;
+        // Fallback sports in priority order (using standardized API format)
+        const fallbackSports = [SPORT_KEYS.NFL.API, SPORT_KEYS.NHL.API, SPORT_KEYS.MLB.API, SPORT_KEYS.EPL.API];
+        const sportsToTry = [primarySport, ...fallbackSports.filter(s => s !== primarySport)];
+        
+        console.log('[v0] Odds fetch config:', { 
+          primarySport, 
+          fallbackSports: fallbackSports.slice(0, 2),
+          totalSportsToTry: sportsToTry.length
+        });
+        
+        let foundData = false;
+        let attemptCount = 0;
+        
+        for (const sportKey of sportsToTry) {
+          if (foundData) break;
+          attemptCount++;
+          
+          console.log(`[v0] [Attempt ${attemptCount}/${sportsToTry.length}] Fetching ${sportKey}...`);
+          
+          try {
+            const oddsResponse = await fetch('/api/odds', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sport: sportKey, marketType: 'h2h' })
+            });
+            
+            console.log(`[v0] Odds API response status: ${oddsResponse.status}`);
+            
+            if (!oddsResponse.ok) {
+              const errorText = await oddsResponse.text();
+              console.error(`[v0] Odds API error (${oddsResponse.status}):`, errorText.substring(0, 100));
+              continue;
+            }
+            
+            const oddsResult = await oddsResponse.json();
+            console.log(`[v0] Odds result:`, {
+              hasEvents: !!oddsResult?.events,
+              eventCount: oddsResult?.events?.length || 0,
+              hasError: !!oddsResult?.error
+            });
+            
+            if (oddsResult?.events?.length > 0) {
+              const sportName = sportKey.replace('_', ' ').toUpperCase();
+              console.log(`[v0] ✅ SUCCESS - Found ${oddsResult.events.length} live games in ${sportName}`);
+              context.oddsData = oddsResult;
+              foundData = true;
+              break;
+            } else if (oddsResult?.error) {
+              console.log(`[v0] API returned error: ${oddsResult.error}`);
+            } else {
+              console.log(`[v0] No games available for ${sportKey}`);
+            }
+          } catch (err) {
+            console.error(`[v0] Exception fetching ${sportKey}:`, err);
+          }
+        }
+        
+        if (!foundData) {
+          console.warn('[v0] ⚠️ ODDS FETCH FAILED - No live games found across all sports');
+        } else {
+          console.log('[v0] ✓ Odds data attached to context');
+        }
+        console.log('[v0] === ODDS FETCH COMPLETE ===');
+      } else {
+        console.log('[v0] Skipping odds fetch - no betting keywords in query');
+      }
+      
       // Fetch real data from our API routes
-      const analysisPromise = fetch('/api/analyze', {
+      const analysisResult = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -863,28 +714,6 @@ export default function UnifiedAIPlatform() {
           context
         })
       }).then(res => res.json() as Promise<APIResponse>);
-
-      // Fetch live odds data if relevant
-      let oddsDataPromise: Promise<APIResponse<OddsEvent[]> | null> = Promise.resolve(null);
-      if (context.sport && (userMessage.toLowerCase().includes('odds') || 
-          userMessage.toLowerCase().includes('bet') || 
-          userMessage.toLowerCase().includes('line'))) {
-        console.log('[v0] Fetching live odds for sport:', context.sport);
-        oddsDataPromise = fetch('/api/odds', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sport: context.sport,
-            marketType: context.marketType || 'h2h'
-          })
-        }).then(res => res.json() as Promise<APIResponse<OddsEvent[]>>).catch(err => {
-          console.error('[v0] Odds fetch error:', err);
-          return null;
-        });
-      }
-
-      // Wait for both API calls
-      const [analysisResult, oddsData] = await Promise.all([analysisPromise, oddsDataPromise]);
       
       console.log('[v0] Analysis result received:', {
         success: analysisResult.success,
@@ -893,15 +722,9 @@ export default function UnifiedAIPlatform() {
         hasTrustMetrics: !!analysisResult.trustMetrics,
         error: analysisResult.error,
         useFallback: analysisResult.useFallback,
-        details: analysisResult.details
+        details: analysisResult.details,
+        hadOddsData: !!context.oddsData
       });
-      
-      if (oddsData) {
-        console.log('[v0] Odds data received:', {
-          success: oddsData.success,
-          eventsCount: oddsData.data?.length || 0
-        });
-      }
 
       // Handle API errors with smart fallback
       const processingTime = Date.now() - startTime;
@@ -1207,8 +1030,9 @@ export default function UnifiedAIPlatform() {
       const fileType = file.type;
 
       // Validate file type
-      if (!fileType.startsWith('image/') && fileType !== 'text/csv') {
-        alert(`File type not supported: ${file.name}. Please upload images (JPEG, PNG) or CSV files.`);
+      const isCsvOrTsv = fileType === 'text/csv' || fileType === 'text/tab-separated-values' || file.name.endsWith('.tsv');
+      if (!fileType.startsWith('image/') && !isCsvOrTsv) {
+        alert(`File type not supported: ${file.name}. Please upload images (JPEG, PNG), CSV, or TSV files.`);
         continue;
       }
 
@@ -1218,15 +1042,16 @@ export default function UnifiedAIPlatform() {
       const attachment: FileAttachment = {
         id: `${Date.now()}-${i}`,
         name: file.name,
-        type: fileType.startsWith('image/') ? 'image' : 'csv',
+        type: fileType.startsWith('image/') ? 'image' : isCsvOrTsv ? 'csv' : 'csv',
         url: fileUrl,
         size: file.size
       };
 
-      // Parse CSV if needed
-      if (fileType === 'text/csv') {
+      // Parse CSV/TSV if needed
+      if (isCsvOrTsv) {
         const text = await file.text();
-        const parsed = parseCSV(text);
+        const delimiter = file.name.endsWith('.tsv') || fileType === 'text/tab-separated-values' ? '\t' : ',';
+        const parsed = parseDelimitedFile(text, delimiter);
         attachment.data = parsed;
       }
 
@@ -1242,13 +1067,13 @@ export default function UnifiedAIPlatform() {
     }
   };
 
-  const parseCSV = (text: string) => {
+  const parseDelimitedFile = (text: string, delimiter: string = ',') => {
     const lines = text.split('\n').filter(line => line.trim());
     if (lines.length === 0) return { headers: [], rows: [] };
 
-    const headers = lines[0].split(',').map(h => h.trim());
+    const headers = lines[0].split(delimiter).map(h => h.trim());
     const rows = lines.slice(1).map(line => 
-      line.split(',').map(cell => cell.trim())
+      line.split(delimiter).map(cell => cell.trim())
     );
 
     return { headers, rows };
@@ -2845,7 +2670,7 @@ export default function UnifiedAIPlatform() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/jpg,text/csv"
+                  accept="image/jpeg,image/png,image/jpg,text/csv,.tsv,text/tab-separated-values"
                   multiple
                   onChange={handleFileUpload}
                   className="hidden"

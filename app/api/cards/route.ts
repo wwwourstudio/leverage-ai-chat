@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
     
     // Analyze context to determine actual sport intent
     const contextualSport = analyzeContextForSport(userContext);
-    const finalSport = sport || contextualSport;
+    const finalSport = sport || contextualSport || undefined;
     
     console.log(`${LOG_PREFIXES.API} - Sport (from context): ${contextualSport || 'none'}`);
     console.log(`${LOG_PREFIXES.API} - Sport (final): ${finalSport || 'none - will show variety'}`);
@@ -143,11 +143,12 @@ export async function POST(req: NextRequest) {
     let validationResult = null;
     
     // If no specific sport requested, fetch from multiple sports for variety
-    const sportsToFetch = finalSport ? [finalSport] : ['nfl', 'nba', 'mlb', 'nhl'];
-    console.log(`${LOG_PREFIXES.API} Sports to fetch: ${sportsToFetch.join(', ')}${!finalSport ? ' (showing all active sports)' : ''}`);
+    // Always fetch multiple sports to show variety in cards
+    const sportsToFetch = finalSport ? [finalSport] : ['basketball_nba', 'americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb'];
+    console.log(`${LOG_PREFIXES.API} Sports to fetch: ${sportsToFetch.join(', ')}${!finalSport ? ' (showing variety from all active sports)' : ''}`);
     
     if (oddsApiKey) {
-      console.log(`[v0] Starting odds fetch for ${sportsToFetch.length} sport(s)`);
+      console.log(`[v0] Starting odds fetch for ${sportsToFetch.length} sport(s) to ensure variety`);
       
       // Fetch odds from all specified sports in parallel
       const fetchPromises = sportsToFetch.map(async (sportKey) => {
@@ -209,7 +210,7 @@ export async function POST(req: NextRequest) {
     
     let cards = await generateDynamicCards({
       category,
-      sport: finalSport || undefined,
+      sport: finalSport ?? undefined,
       oddsData: liveOddsData,
       userContext,
       limit
@@ -264,9 +265,15 @@ export async function POST(req: NextRequest) {
     }
     
     // Ensure we always have exactly 3 cards
-    while (cards.length < 3) {
+    if (cards.length < 3) {
       console.log(`${LOG_PREFIXES.API} ⚠ Only ${cards.length} cards, generating more`);
-      const additionalCards = generateContextualCards(category, finalSport, 3 - cards.length);
+      const { generateContextualCards } = await import('@/lib/cards-generator');
+      const additionalCards = await generateContextualCards(
+        category, 
+        finalSport, 
+        3 - cards.length,
+        !finalSport // Use multi-sport if no specific sport
+      );
       cards.push(...additionalCards);
     }
     console.log(`${LOG_PREFIXES.API} ✓ Final card count: ${cards.length}`);
@@ -467,7 +474,8 @@ async function generateDynamicCards(params: {
   if (cards.length < limit) {
     const contextualCount = limit - cards.length;
     console.log(`${LOG_PREFIXES.API} → Step 6: Need ${contextualCount} more cards, generating contextual cards...`);
-    const contextualCards = generateContextualCards(category, sport, contextualCount);
+    const { generateContextualCards: genCards } = await import('@/lib/cards-generator');
+    const contextualCards = await genCards(category, sport, contextualCount, !sport);
     console.log(`${LOG_PREFIXES.API}   Generated ${contextualCards.length} contextual cards`);
     cards.push(...contextualCards);
   }
@@ -477,151 +485,4 @@ async function generateDynamicCards(params: {
   return cards.slice(0, limit);
 }
 
-// Helper functions moved to odds-transformer.ts for reusability
-
-function generateContextualCards(category?: string, sport?: string, count: number = 3): any[] {
-  const cards: any[] = [];
-  
-  // Enhanced betting card with rich metrics
-  if ((category === 'betting' || !category) && cards.length < count) {
-    const currentSport = sport || 'nba';
-    cards.push({
-      type: CARD_TYPES.BETTING_OPPORTUNITY,
-      title: 'Sharp Money Movement',
-      icon: 'TrendingUp',
-      category: currentSport.toUpperCase(),
-      subcategory: 'Line Value',
-      gradient: 'from-emerald-500 to-green-700',
-      data: {
-        edge: '+4.8% EV detected',
-        lineMovement: '2.5 pts toward underdog',
-        sharpMoney: '73% of money on dog',
-        bestLine: 'FanDuel +6.5 (-108)',
-        timing: 'Line opened +4, now +6.5',
-        confidence: 'High (82%)',
-        recommendedUnit: '2-3 units'
-      },
-      status: CARD_STATUS.TARGET,
-      realData: false
-    });
-  }
-  
-  // Enhanced DFS contextual card with tournament strategy
-  if ((category === 'dfs' || !category) && cards.length < count) {
-    cards.push({
-      type: CARD_TYPES.DFS_LINEUP,
-      title: 'GPP Leverage Stack',
-      icon: 'Layers',
-      category: 'DFS',
-      subcategory: 'Tournament Play',
-      gradient: 'from-purple-600 to-pink-600',
-      data: {
-        corePlay: 'QB + WR1 + Opp WR1 stack',
-        ownership: 'Proj 8-12% combined',
-        salary: '$18.2K total (3 players)',
-        ceiling: '85+ combined pts possible',
-        gameEnvironment: 'O/U 51.5 | shootout potential',
-        correlation: '+0.73 in high-scoring games',
-        leverage: '4x leverage vs chalk stacks',
-        confidence: 'Medium-High (76%)'
-      },
-      status: CARD_STATUS.TARGET,
-      realData: false
-    });
-  }
-
-  // Fantasy contextual card - sport-specific
-  if (category === 'fantasy' || !category) {
-    const isBaseball = sport === 'mlb';
-    const isBasketball = sport === 'nba';
-    const isFootball = sport === 'nfl';
-    
-    cards.push({
-      type: CARD_TYPES.FANTASY_INSIGHT,
-      title: isBaseball ? 'NFBC Draft Strategy' : isBasketball ? 'Fantasy Basketball Strategy' : isFootball ? 'Fantasy Football Strategy' : 'Draft Strategy',
-      icon: 'TrendingUp',
-      category: isBaseball ? 'MLB' : isBasketball ? 'NBA' : isFootball ? 'NFL' : 'FANTASY',
-      subcategory: isBaseball ? 'NFBC/NFFC Draft' : 'Value Targets',
-      gradient: isBaseball ? 'from-emerald-500 to-green-700' : isBasketball ? 'from-orange-500 to-red-600' : 'from-green-600 to-teal-600',
-      data: isBaseball ? {
-        focus: 'Pick position strategy for NFBC Main Event',
-        approach: 'Early: Elite starting pitchers or 5-category hitters',
-        timing: 'Mid-rounds: Target multi-position eligibility',
-        recommendation: 'Draft catchers early - scarcity position in 2026',
-        ageAnalysis: 'Young breakout candidates: Adley Rutschman, Bobby Witt Jr',
-        contextNote: 'NFBC 2026 season - current ADP trends'
-      } : isBasketball ? {
-        focus: 'Draft position optimization for points leagues',
-        approach: 'Target high-usage players on improving teams',
-        timing: 'Late rounds offer streaming-friendly players',
-        recommendation: 'Monitor preseason injury reports closely'
-      } : isFootball ? {
-        focus: 'Running back vs wide receiver strategy',
-        approach: 'Target pass-catching backs in PPR formats',
-        timing: 'Quarterback value peaks in mid-rounds',
-        recommendation: 'Handcuff your RB1 with late-round insurance'
-      } : {
-        focus: 'ADP inefficiencies in current market',
-        approach: 'Target players with usage trajectory',
-        timing: 'Mid-rounds offer best value',
-        recommendation: 'Monitor news for injury replacements'
-      },
-      status: CARD_STATUS.TARGET,
-      realData: false
-    });
-  }
-
-  // Kalshi contextual card
-  if (category === 'kalshi' || !category) {
-    cards.push({
-      type: CARD_TYPES.KALSHI_INSIGHT,
-      title: 'Prediction Market Analysis',
-      icon: 'BarChart3',
-      category: 'KALSHI',
-      subcategory: 'Market Opportunities',
-      gradient: 'from-cyan-500 to-blue-600',
-      data: {
-        focus: 'Event-based market inefficiencies',
-        approach: 'Cross-reference with betting markets',
-        edge: 'Arbitrage opportunities available',
-        recommendation: 'Monitor for pricing discrepancies'
-      },
-      status: CARD_STATUS.OPPORTUNITY,
-      realData: false
-    });
-  }
-
-  // Enhanced Kalshi card with weather correlation for outdoor events
-  if ((category === 'kalshi' || !category) && cards.length < count) {
-    const isOutdoorSport = sport === 'nfl' || sport === 'mlb' || sport === 'ncaaf';
-    
-    cards.push({
-      type: CARD_TYPES.PREDICTION_MARKET,
-      title: isOutdoorSport ? 'Weather-Correlated Market' : 'Market Mispricing',
-      icon: isOutdoorSport ? 'CloudRain' : 'TrendingUp',
-      category: 'KALSHI',
-      subcategory: isOutdoorSport ? 'Weather Impact' : 'Arbitrage',
-      gradient: isOutdoorSport ? 'from-blue-500 to-cyan-600' : 'from-orange-500 to-red-600',
-      data: isOutdoorSport ? {
-        market: 'O/U Total Points',
-        weatherImpact: 'Wind 15+ mph | Rain 60% chance',
-        marketPrice: 'Over trading at 52¢ (fair: 38¢)',
-        recommendation: 'Buy Under contracts',
-        edge: '+14¢ edge vs weather model',
-        correlation: '71% Under in these conditions',
-        confidence: 'High (84%)'
-      } : {
-        market: 'Event probability mispriced',
-        sbookImplied: 'Sportsbooks at 58%',
-        kalshiPrice: '42¢ (42% implied)',
-        edge: '+16% arbitrage opportunity',
-        action: 'Buy Yes contracts',
-        confidence: 'Medium-High (78%)'
-      },
-      status: CARD_STATUS.OPPORTUNITY,
-      realData: false
-    });
-  }
-  
-  return cards.slice(0, count);
-}
+// Helper functions moved to odds-transformer.ts and cards-generator.ts for reusability

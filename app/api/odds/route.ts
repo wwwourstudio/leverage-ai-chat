@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
     }
 
     const oddsApiKey = getOddsApiKey();
+    console.log(`[v0] ODDS_API_KEY configured: ${oddsApiKey ? `${oddsApiKey.substring(0, 8)}...` : 'MISSING'}`);
 
     // Validate and normalize the sport key
     const sportValidation = validateSportKey(sport);
@@ -65,6 +66,8 @@ export async function POST(req: NextRequest) {
       apiUrl = `${baseUrl}/${normalizedSport}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}&markets=${marketType || MARKET_TYPES.H2H}`;
     }
 
+    console.log(`[v0] Fetching from URL: ${apiUrl.replace(oddsApiKey || '', 'REDACTED')}`);
+    
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
@@ -72,9 +75,12 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    console.log(`[v0] Odds API response status: ${response.status}`);
+
     if (!response.ok) {
       const errorText = await response.text();
       console.log(`${LOG_PREFIXES.API} Odds API error:`, response.status, errorText.substring(0, 200));
+      console.log(`[v0] Full error response:`, errorText);
       return NextResponse.json(
         { 
           error: 'Failed to fetch odds data',
@@ -85,6 +91,9 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await response.json();
+
+    console.log(`[v0] Odds API returned ${Array.isArray(data) ? data.length : 1} events`);
+    console.log(`[v0] API usage - Remaining: ${response.headers.get('x-requests-remaining')}, Used: ${response.headers.get('x-requests-used')}`);
 
     // Transform the data into a consistent format
     const transformedData = {

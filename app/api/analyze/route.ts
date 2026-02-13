@@ -328,18 +328,13 @@ export async function POST(req: NextRequest) {
       });
     });
 
-    // Fetch dynamic insight cards based on the query context
-    console.log('[v0] Fetching insight cards for response...');
+    // Generate insight cards directly (no HTTP call needed)
+    console.log('[v0] Generating insight cards for response...');
     let insightCards: any[] = [];
     
     try {
-      // Use absolute URL for internal API call
-      const baseUrl = process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}` 
-        : 'http://localhost:3000';
-      const cardsUrl = `${baseUrl}/api/cards`;
-      
-      console.log('[v0] Calling cards API:', cardsUrl);
+      // Import card generation function
+      const { generateContextualCards } = await import('@/app/api/cards/route');
       
       // Determine category based on platform and query context
       let cardCategory = 'betting'; // default
@@ -351,31 +346,14 @@ export async function POST(req: NextRequest) {
         cardCategory = 'fantasy';
       }
       
-      console.log('[v0] Card category determined:', cardCategory, '(platform:', context?.platform, ')');
+      console.log('[v0] Card category:', cardCategory, '| Sport:', context?.sport || 'none');
       
-      const cardsResponse = await fetch(cardsUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sport: context?.sport,
-          category: cardCategory,
-          userContext: context,
-          limit: 3
-        })
-      });
+      // Generate cards directly without HTTP call
+      insightCards = generateContextualCards(cardCategory, context?.sport, 3);
       
-      console.log('[v0] Cards API response status:', cardsResponse.status);
-      
-      if (cardsResponse.ok) {
-        const cardsData = await cardsResponse.json();
-        insightCards = cardsData.cards || [];
-        console.log(`[v0] ✓ Fetched ${insightCards.length} insight cards`);
-      } else {
-        const errorText = await cardsResponse.text();
-        console.log('[v0] Cards API error:', cardsResponse.status, errorText.substring(0, 100));
-      }
+      console.log(`[v0] ✓ Generated ${insightCards.length} insight cards`);
     } catch (error) {
-      console.log('[v0] Failed to fetch cards:', error instanceof Error ? error.message : String(error));
+      console.log('[v0] Failed to generate cards:', error instanceof Error ? error.message : String(error));
     }
 
     // Build sources array with real data indicator

@@ -480,7 +480,7 @@ async function generateDynamicCards(params: {
 
 // Helper functions moved to odds-transformer.ts for reusability
 
-function generateContextualCards(category?: string, sport?: string, count: number = 3): any[] {
+export function generateContextualCards(category?: string, sport?: string, count: number = 3): any[] {
   const cards: any[] = [];
   
   // Educational betting guidance (only shown when no real data available)

@@ -332,8 +332,18 @@ export async function POST(req: NextRequest) {
     let insightCards: any[] = [];
     
     try {
+      console.log('[v0] Attempting to import card generation function...');
+      
       // Import card generation function
-      const { generateContextualCards } = await import('@/app/api/cards/route');
+      const cardsModule = await import('@/app/api/cards/route');
+      console.log('[v0] Cards module imported successfully');
+      console.log('[v0] Available exports:', Object.keys(cardsModule));
+      
+      const { generateContextualCards } = cardsModule;
+      
+      if (!generateContextualCards) {
+        throw new Error('generateContextualCards function not found in module exports');
+      }
       
       // Determine category based on platform and query context
       let cardCategory = 'betting'; // default
@@ -346,13 +356,16 @@ export async function POST(req: NextRequest) {
       }
       
       console.log('[v0] Card category:', cardCategory, '| Sport:', context?.sport || 'none');
+      console.log('[v0] Calling generateContextualCards...');
       
       // Generate cards directly without HTTP call
       insightCards = generateContextualCards(cardCategory, context?.sport, 3);
       
       console.log(`[v0] ✓ Generated ${insightCards.length} insight cards`);
+      console.log('[v0] Card titles:', insightCards.map(c => c.title));
     } catch (error) {
-      console.log('[v0] Failed to generate cards:', error instanceof Error ? error.message : String(error));
+      console.error('[v0] ❌ Failed to generate cards:', error);
+      console.error('[v0] Error details:', error instanceof Error ? error.stack : String(error));
     }
 
     // Build sources array with real data indicator

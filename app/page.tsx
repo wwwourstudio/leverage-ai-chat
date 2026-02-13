@@ -619,19 +619,6 @@ export default function UnifiedAIPlatform() {
 
       console.log('[v0] Extracted context:', context);
       
-      // Fetch real data from our API routes
-      const analysisPromise = fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userMessage,
-          context
-        })
-      }).then(res => res.json() as Promise<APIResponse>);
-
-      // Fetch live odds data if relevant
-      let oddsDataPromise: Promise<APIResponse<OddsEvent[]> | null> = Promise.resolve(null);
-      
       // Expanded keyword detection for betting-related queries
       const bettingKeywords = [
         'odds', 'bet', 'line', 'spread', 'moneyline', 'total', 'over', 'under',
@@ -646,25 +633,53 @@ export default function UnifiedAIPlatform() {
       // Default to NBA if no sport detected but query is clearly about betting
       const sportToFetch = context.sport || (hasBettingKeyword ? 'basketball_nba' : null);
       
+      // STEP 1: Fetch odds data FIRST if relevant (before calling analyze)
+      let oddsData: APIResponse<any> | null = null;
+      
       if (sportToFetch && hasBettingKeyword) {
         console.log('[v0] Fetching live odds for sport:', sportToFetch);
-        oddsDataPromise = fetch('/api/odds', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sport: sportToFetch,
-            marketType: context.marketType || 'h2h'
-          })
-        }).then(res => res.json() as Promise<APIResponse<OddsEvent[]>>).catch(err => {
+        try {
+          const oddsResponse = await fetch('/api/odds', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sport: sportToFetch,
+              marketType: context.marketType || 'h2h'
+            })
+          });
+          
+          oddsData = await oddsResponse.json() as APIResponse<any>;
+          
+          if (oddsData && oddsData.events && oddsData.events.length > 0) {
+            console.log(`[v0] ✓ Fetched ${oddsData.events.length} events with live odds`);
+            // Add odds to context so Grok can analyze them
+            context.oddsData = oddsData;
+          } else {
+            console.log('[v0] ⚠️ No odds events returned from API');
+          }
+        } catch (err) {
           console.error('[v0] Odds fetch error:', err);
-          return null;
-        });
+          oddsData = null;
+        }
       } else if (hasBettingKeyword && !sportToFetch) {
         console.log('[v0] Betting query detected but no sport - will suggest specifying sport');
       }
 
-      // Wait for both API calls
-      const [analysisResult, oddsData] = await Promise.all([analysisPromise, oddsDataPromise]);
+      // STEP 2: Now call analyze WITH odds data in context
+      console.log('[v0] Calling analyze API with context:', {
+        sport: context.sport,
+        hasOddsData: !!context.oddsData,
+        oddsEventsCount: context.oddsData?.events?.length || 0
+      });
+      
+      const analysisResult = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userMessage,
+          context
+        })
+      }).then(res => res.json() as Promise<APIResponse>);
       
       console.log('[v0] Analysis result received:', {
         success: analysisResult.success,
@@ -673,15 +688,9 @@ export default function UnifiedAIPlatform() {
         hasTrustMetrics: !!analysisResult.trustMetrics,
         error: analysisResult.error,
         useFallback: analysisResult.useFallback,
-        details: analysisResult.details
+        details: analysisResult.details,
+        hadOddsData: !!context.oddsData
       });
-      
-      if (oddsData) {
-        console.log('[v0] Odds data received:', {
-          success: oddsData.success,
-          eventsCount: oddsData.data?.length || 0
-        });
-      }
 
       // Handle API errors with smart fallback
       const processingTime = Date.now() - startTime;

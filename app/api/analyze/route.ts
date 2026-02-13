@@ -161,8 +161,41 @@ export async function POST(req: NextRequest) {
     }
 
     // Add context from odds data if available
-    if (context?.oddsData) {
-      userPrompt += `\n\nCurrent Market Data:\n${JSON.stringify(context.oddsData, null, 2)}`;
+    if (context?.oddsData && context.oddsData.events && context.oddsData.events.length > 0) {
+      console.log(`[v0] Processing ${context.oddsData.events.length} live odds events for analysis`);
+      
+      // Format odds data in a readable way for Grok
+      const oddsEvents = context.oddsData.events.map((event: any, idx: number) => {
+        const homeTeam = event.home_team;
+        const awayTeam = event.away_team;
+        const gameTime = event.commence_time;
+        
+        let oddsText = `Game ${idx + 1}: ${awayTeam} @ ${homeTeam} (${new Date(gameTime).toLocaleString()})`;
+        
+        if (event.bookmakers && event.bookmakers.length > 0) {
+          oddsText += '\n  Sportsbook Odds:';
+          event.bookmakers.forEach((book: any) => {
+            oddsText += `\n    ${book.title}:`;
+            if (book.markets && book.markets.length > 0) {
+              book.markets.forEach((market: any) => {
+                if (market.key === 'h2h' && market.outcomes) {
+                  market.outcomes.forEach((outcome: any) => {
+                    oddsText += ` ${outcome.name} ${outcome.price > 0 ? '+' : ''}${outcome.price}`;
+                  });
+                }
+              });
+            }
+          });
+        }
+        
+        return oddsText;
+      }).join('\n\n');
+      
+      userPrompt += `\n\n📊 LIVE ODDS DATA FROM THE ODDS API (${context.oddsData.events.length} games):\n${oddsEvents}\n\nIMPORTANT: Use this REAL data to analyze opportunities. Compare odds across sportsbooks to identify arbitrage or value. Be specific about which sportsbooks and which lines.`;
+      console.log('[v0] ✓ Formatted live odds data for Grok analysis');
+    } else if (context?.oddsData) {
+      console.log('[v0] ⚠️ Odds data present but no events found');
+      userPrompt += `\n\n⚠️ NOTE: No live games currently available in the market. This may be due to off-season, no scheduled games today, or API limitations.`;
     }
 
     // Add sport/market context

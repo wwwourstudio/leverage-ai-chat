@@ -230,7 +230,6 @@ export async function POST(req: NextRequest) {
         system: systemPrompt,
         prompt: userPrompt,
         temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-        maxTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
         maxRetries: 1,
       });
       

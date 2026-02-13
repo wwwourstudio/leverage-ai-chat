@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
     
     // Analyze context to determine actual sport intent
     const contextualSport = analyzeContextForSport(userContext);
-    const finalSport = sport || contextualSport;
+    const finalSport = sport || contextualSport || undefined;
     
     console.log(`${LOG_PREFIXES.API} - Sport (from context): ${contextualSport || 'none'}`);
     console.log(`${LOG_PREFIXES.API} - Sport (final): ${finalSport || 'none - will show variety'}`);

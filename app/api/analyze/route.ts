@@ -333,7 +333,15 @@ export async function POST(req: NextRequest) {
     let insightCards: any[] = [];
     
     try {
-      const cardsResponse = await fetch(`${req.url.replace('/api/analyze', '/api/cards')}`, {
+      // Use absolute URL for internal API call
+      const baseUrl = process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : 'http://localhost:3000';
+      const cardsUrl = `${baseUrl}/api/cards`;
+      
+      console.log('[v0] Calling cards API:', cardsUrl);
+      
+      const cardsResponse = await fetch(cardsUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -344,12 +352,15 @@ export async function POST(req: NextRequest) {
         })
       });
       
+      console.log('[v0] Cards API response status:', cardsResponse.status);
+      
       if (cardsResponse.ok) {
         const cardsData = await cardsResponse.json();
         insightCards = cardsData.cards || [];
         console.log(`[v0] ✓ Fetched ${insightCards.length} insight cards`);
       } else {
-        console.log('[v0] Cards API returned non-ok status:', cardsResponse.status);
+        const errorText = await cardsResponse.text();
+        console.log('[v0] Cards API error:', cardsResponse.status, errorText.substring(0, 100));
       }
     } catch (error) {
       console.log('[v0] Failed to fetch cards:', error instanceof Error ? error.message : String(error));

@@ -57,11 +57,23 @@ export const SPORTS_MAP = {
 } as const;
 
 // Market Types
+/**
+ * H2H (Head-to-Head) Markets: Direct moneyline betting on which team will win
+ * - Also called "moneyline" or "match winner" markets
+ * - No point spreads involved - just pick the winner
+ * - Example: Lakers -150 vs Warriors +130 (bet $150 to win $100 on Lakers, or bet $100 to win $130 on Warriors)
+ * - Used for arbitrage opportunities by comparing odds across sportsbooks (DraftKings, FanDuel, BetMGM, etc.)
+ * 
+ * Other Market Types:
+ * - Spreads: Point handicap betting (e.g., Lakers -7.5 points)
+ * - Totals: Over/Under total points scored (e.g., Over 215.5)
+ * - Player Props: Individual player performance bets (e.g., LeBron over 25.5 points)
+ */
 export const MARKET_TYPES = {
-  H2H: 'h2h',
-  SPREADS: 'spreads',
-  TOTALS: 'totals',
-  PLAYER_PROPS: 'player_props',
+  H2H: 'h2h', // Head-to-Head / Moneyline markets
+  SPREADS: 'spreads', // Point spread markets
+  TOTALS: 'totals', // Over/Under total points
+  PLAYER_PROPS: 'player_props', // Individual player props
 } as const;
 
 // Card Types

@@ -620,14 +620,21 @@ export default function UnifiedAIPlatform() {
       console.log('[v0] Extracted context:', context);
       
       // Check if this is a betting-related query
-      const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'arbitrage', 'arb', 'h2h', 'value', 'sportsbook', 'draftkings', 'fanduel'];
+      // H2H = Head-to-Head markets (moneyline betting on which team wins)
+      const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'arbitrage', 'arb', 'h2h', 'value', 'sportsbook', 'draftkings', 'fanduel', 'moneyline'];
       const lowerMsg = userMessage.toLowerCase();
       const hasBettingKeyword = bettingKeywords.some(k => lowerMsg.includes(k));
+      
+      console.log('[v0] Betting query check:', { 
+        hasBettingKeyword, 
+        query: lowerMsg.substring(0, 50),
+        matchedKeywords: bettingKeywords.filter(k => lowerMsg.includes(k))
+      });
       
       // Fetch odds data if betting-related (default to NBA if no sport detected)
       if (hasBettingKeyword) {
         const sportToFetch = context.sport || 'basketball_nba';
-        console.log('[v0] Fetching odds for betting query - Sport:', sportToFetch);
+        console.log('[v0] 🎯 Fetching odds - Sport:', sportToFetch, '| Market: h2h (Head-to-Head)');
         
         try {
           const oddsResponse = await fetch('/api/odds', {
@@ -636,14 +643,22 @@ export default function UnifiedAIPlatform() {
             body: JSON.stringify({ sport: sportToFetch, marketType: 'h2h' })
           });
           
+          console.log('[v0] Odds API status:', oddsResponse.status);
           const oddsResult = await oddsResponse.json();
+          
           if (oddsResult?.events?.length > 0) {
-            console.log(`[v0] Fetched ${oddsResult.events.length} odds events`);
+            console.log(`[v0] ✅ Fetched ${oddsResult.events.length} odds events with ${oddsResult.events[0]?.bookmakers?.length || 0} sportsbooks`);
             context.oddsData = oddsResult;
+          } else if (oddsResult?.error) {
+            console.log('[v0] ⚠️ Odds API error:', oddsResult.error);
+          } else {
+            console.log('[v0] ⚠️ No odds events returned (likely no games scheduled)');
           }
         } catch (err) {
-          console.log('[v0] Odds fetch failed:', err);
+          console.log('[v0] ❌ Odds fetch failed:', err);
         }
+      } else {
+        console.log('[v0] ℹ️  No betting keywords detected, skipping odds fetch');
       }
       
       // Fetch real data from our API routes

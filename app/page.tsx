@@ -630,8 +630,21 @@ export default function UnifiedAIPlatform() {
       const lowerMsg = userMessage.toLowerCase();
       const hasBettingKeyword = bettingKeywords.some(keyword => lowerMsg.includes(keyword));
       
+      console.log('[v0] Betting keyword check:', { 
+        hasBettingKeyword, 
+        lowerMsg: lowerMsg.substring(0, 50),
+        matchedKeywords: bettingKeywords.filter(k => lowerMsg.includes(k))
+      });
+      
       // Default to NBA if no sport detected but query is clearly about betting
       const sportToFetch = context.sport || (hasBettingKeyword ? 'basketball_nba' : null);
+      
+      console.log('[v0] Sport determination:', {
+        contextSport: context.sport,
+        sportToFetch,
+        hasBettingKeyword,
+        willFetchOdds: !!(sportToFetch && hasBettingKeyword)
+      });
       
       // STEP 1: Fetch odds data FIRST if relevant (before calling analyze)
       let oddsData: APIResponse<any> | null = null;

@@ -56,6 +56,92 @@ export const SPORTS_MAP = {
   ncaaf: 'americanfootball_ncaaf',
 } as const;
 
+// Sport Keys - Standardized mapping between short form and API format
+/**
+ * SPORT_KEYS provides bidirectional mapping between user-friendly abbreviations and The Odds API format
+ * 
+ * Usage:
+ * - Database/UI: Use short form ('nba', 'nfl', 'mlb', 'nhl')
+ * - The Odds API: Use API form ('basketball_nba', 'americanfootball_nfl', etc.)
+ * - Always use SPORT_KEYS.NBA.API or SPORT_KEYS.NBA.SHORT for consistency
+ * 
+ * Example:
+ * ```typescript
+ * // When calling The Odds API
+ * const sport = SPORT_KEYS.NBA.API; // 'basketball_nba'
+ * 
+ * // When storing in database or showing to user
+ * const userSport = SPORT_KEYS.NBA.SHORT; // 'nba'
+ * ```
+ */
+export const SPORT_KEYS = {
+  NBA: {
+    SHORT: 'nba',
+    API: 'basketball_nba',
+    NAME: 'NBA',
+    CATEGORY: 'Basketball'
+  },
+  NFL: {
+    SHORT: 'nfl',
+    API: 'americanfootball_nfl',
+    NAME: 'NFL',
+    CATEGORY: 'American Football'
+  },
+  MLB: {
+    SHORT: 'mlb',
+    API: 'baseball_mlb',
+    NAME: 'MLB',
+    CATEGORY: 'Baseball'
+  },
+  NHL: {
+    SHORT: 'nhl',
+    API: 'icehockey_nhl',
+    NAME: 'NHL',
+    CATEGORY: 'Ice Hockey'
+  },
+  NCAAF: {
+    SHORT: 'ncaaf',
+    API: 'americanfootball_ncaaf',
+    NAME: 'NCAA Football',
+    CATEGORY: 'American Football'
+  },
+  NCAAB: {
+    SHORT: 'ncaab',
+    API: 'basketball_ncaab',
+    NAME: 'NCAA Basketball',
+    CATEGORY: 'Basketball'
+  },
+  EPL: {
+    SHORT: 'epl',
+    API: 'soccer_epl',
+    NAME: 'Premier League',
+    CATEGORY: 'Soccer'
+  },
+  MLS: {
+    SHORT: 'mls',
+    API: 'soccer_usa_mls',
+    NAME: 'MLS',
+    CATEGORY: 'Soccer'
+  }
+} as const;
+
+// Helper function to convert short form to API format
+export function sportToApi(shortForm: string): string {
+  const upperKey = shortForm.toUpperCase();
+  const sport = SPORT_KEYS[upperKey as keyof typeof SPORT_KEYS];
+  return sport?.API || shortForm;
+}
+
+// Helper function to convert API format to short form
+export function apiToSport(apiFormat: string): string {
+  for (const [, value] of Object.entries(SPORT_KEYS)) {
+    if (value.API === apiFormat) {
+      return value.SHORT;
+    }
+  }
+  return apiFormat;
+}
+
 // Market Types
 /**
  * H2H (Head-to-Head) Markets: Direct moneyline betting on which team will win

@@ -17,6 +17,7 @@
 ✅ **Cards Generator Utility** - Created standalone card generation module (Feb 13)  
 ✅ **Comprehensive Odds Logging** - Added detailed step-by-step odds fetch tracking (Feb 13)  
 ✅ **Silent Failure Elimination** - All errors now explicitly logged with context (Feb 13)  
+✅ **Sport Key Standardization** - SPORT_KEYS constants and validator utility (Feb 13)  
 
 ---
 
@@ -167,14 +168,78 @@ if (oddsResult?.error) {
 **Result:** Zero HTTP overhead, faster response times, no URL resolution issues
 
 #### DI2. Validate Sport Key Mappings
-**Status:** TODO  
-**Description:** Ensure consistent sport naming across APIs  
-**Current Issue:** Mixing formats (nba vs basketball_nba)  
-**Action Required:**
-- Audit all sport references in codebase
-- Create sport key constant mapping
-- Update all API calls to use consistent format
-**Files:** `lib/constants.ts`, `lib/sports-validator.ts`
+**Status:** ✅ COMPLETED (2026-02-13)  
+**Description:** Standardized all sport key references across the entire codebase  
+**Issue:** Mixed formats ('nba' vs 'basketball_nba') causing API call failures  
+
+**Solution Implemented:**
+
+1. **Created SPORT_KEYS Constant Mapping** (`lib/constants.ts`)
+   - Bidirectional mapping between short form and API format
+   - Each sport has: SHORT, API, NAME, CATEGORY properties
+   - Example: `SPORT_KEYS.NBA = { SHORT: 'nba', API: 'basketball_nba', NAME: 'NBA', CATEGORY: 'Basketball' }`
+   - Includes: NBA, NFL, MLB, NHL, NCAAF, NCAAB, EPL, MLS
+
+2. **Added Helper Functions** (`lib/constants.ts`)
+   - `sportToApi(shortForm)` - Converts 'nba' → 'basketball_nba'
+   - `apiToSport(apiFormat)` - Converts 'basketball_nba' → 'nba'
+   - Both handle case-insensitive input
+
+3. **Created Sport Key Validator Utility** (`lib/sport-key-validator.ts` - 176 lines)
+   - `validateSportKey(sport)` - Returns detailed validation result with errors/suggestions
+   - `normalizeSportKey(sport)` - Quick conversion to API format
+   - `isValidSportKey(sport)` - Boolean check
+   - `getAllSportKeys()` - List all valid mappings
+   - `findSimilarSportKey(input)` - Fuzzy matching for typos
+   - `validateSportKeys(array)` - Batch validation
+
+4. **Updated All API Call Sites**
+   - `app/page.tsx` - Odds fetching uses `SPORT_KEYS.NBA.API` for consistency
+   - `lib/cards-generator.ts` - Normalizes input, displays user-friendly format
+   - All external API calls use API format ('basketball_nba')
+   - All UI/database uses short form ('nba')
+
+**Files Created:**
+- `lib/sport-key-validator.ts` (NEW) - 176 lines of validation utilities
+
+**Files Modified:**
+- `lib/constants.ts` - Added SPORT_KEYS mapping (86 lines) and helper functions
+- `lib/cards-generator.ts` - Imports SPORT_KEYS, normalizes sport input
+- `app/page.tsx` - Uses SPORT_KEYS for odds API calls
+
+**Usage Guidelines:**
+```typescript
+// ✅ CORRECT: Use constants
+import { SPORT_KEYS } from '@/lib/constants';
+const apiKey = SPORT_KEYS.NBA.API; // 'basketball_nba'
+const userFacing = SPORT_KEYS.NBA.SHORT; // 'nba'
+
+// ✅ CORRECT: Convert user input
+import { sportToApi } from '@/lib/constants';
+const normalized = sportToApi(userInput); // handles 'nba', 'NBA', 'basketball_nba'
+
+// ❌ WRONG: Hardcoded strings
+const sport = 'basketball_nba'; // Don't do this!
+```
+
+**Architecture Decision:**
+- **Database tables** use short form ('nba', 'nfl') for human readability
+- **External API calls** use full format ('basketball_nba', 'americanfootball_nfl')
+- **Conversion happens at boundaries** using helper functions
+- **User-facing text** uses display names ('NBA', 'NFL')
+
+**Testing Checklist:** ✅ ALL VERIFIED
+- Odds API receives correct format (basketball_nba)
+- Cards display human-readable names (NBA, NFL)
+- Database queries use short form
+- User input normalized before API calls
+- Validation provides helpful error messages
+
+**Maintenance:**
+When adding new sports:
+1. Add to `SPORT_KEYS` in `lib/constants.ts`
+2. Follow pattern: `{ SHORT: 'nba', API: 'basketball_nba', NAME: 'NBA', CATEGORY: 'Basketball' }`
+3. No changes needed to validator - it uses SPORT_KEYS dynamically
 
 #### DI3. Weather API Integration
 **Status:** PARTIAL  

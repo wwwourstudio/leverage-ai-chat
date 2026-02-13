@@ -635,9 +635,11 @@ export default function UnifiedAIPlatform() {
       // Fetch odds data if betting-related (try multiple sports to ensure we get data)
       if (hasBettingKeyword) {
         console.log('[v0] === ODDS FETCH STARTING ===');
-        const primarySport = context.sport || 'basketball_nba';
-        // Fallback sports in priority order
-        const fallbackSports = ['americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb', 'soccer_epl'];
+        // Import SPORT_KEYS for consistent API format
+        const { SPORT_KEYS, sportToApi } = await import('@/lib/constants');
+        const primarySport = context.sport ? sportToApi(context.sport) : SPORT_KEYS.NBA.API;
+        // Fallback sports in priority order (using standardized API format)
+        const fallbackSports = [SPORT_KEYS.NFL.API, SPORT_KEYS.NHL.API, SPORT_KEYS.MLB.API, SPORT_KEYS.EPL.API];
         const sportsToTry = [primarySport, ...fallbackSports.filter(s => s !== primarySport)];
         
         console.log('[v0] Odds fetch config:', { 

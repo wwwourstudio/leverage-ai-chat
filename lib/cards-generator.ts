@@ -2,9 +2,14 @@
  * Cards Generator Utility
  * Generates contextual insight cards for betting analysis
  * Separated from route file for safe importing
+ * 
+ * Sport Key Standardization:
+ * - Accepts both short form ('nba') and API format ('basketball_nba')
+ * - Normalizes to API format internally using SPORT_KEYS
+ * - Converts back to display format for user-facing text
  */
 
-import { CARD_TYPES } from '@/lib/constants';
+import { CARD_TYPES, SPORT_KEYS, sportToApi, apiToSport } from '@/lib/constants';
 
 export interface InsightCard {
   type: string;
@@ -20,7 +25,7 @@ export interface InsightCard {
 /**
  * Generate contextual cards based on category and sport
  * @param category - Type of analysis (betting, kalshi, dfs, fantasy)
- * @param sport - Sport key (basketball_nba, americanfootball_nfl, etc.)
+ * @param sport - Sport key in either short form ('nba') or API format ('basketball_nba')
  * @param count - Number of cards to generate (default: 3)
  */
 export function generateContextualCards(
@@ -30,8 +35,13 @@ export function generateContextualCards(
 ): InsightCard[] {
   const cards: InsightCard[] = [];
 
+  // Normalize sport to API format, then get display name
+  const normalizedSport = sport ? sportToApi(sport) : undefined;
+  const displaySport = normalizedSport ? apiToSport(normalizedSport).toUpperCase() : 'MULTI-SPORT';
+
   console.log('[v0] [CARDS GENERATOR] Generating cards...');
-  console.log('[v0] [CARDS GENERATOR] Category:', category, '| Sport:', sport, '| Count:', count);
+  console.log('[v0] [CARDS GENERATOR] Input:', { category, sport, normalizedSport, displaySport });
+  console.log('[v0] [CARDS GENERATOR] Category:', category, '| Display Sport:', displaySport, '| Count:', count);
 
   // Betting/Arbitrage cards (default)
   if (category === 'betting' || !category) {
@@ -99,16 +109,16 @@ export function generateContextualCards(
 
   // Add general sports odds card if we have fewer than requested
   while (cards.length < count) {
-    const sportName = sport ? sport.replace('_', ' ').toUpperCase() : 'MULTI-SPORT';
     cards.push({
       type: CARD_TYPES.LIVE_ODDS,
-      title: `📈 ${sportName} Odds Analysis`,
+      title: `📈 ${displaySport} Odds Analysis`,
       icon: 'LineChart',
-      category: sportName,
+      category: displaySport,
       subcategory: 'Live Odds',
       gradient: 'from-slate-600 to-gray-700',
       data: {
         description: 'Real-time odds and line movements',
+        sport: normalizedSport,
         note: 'Connect to The Odds API for live data'
       }
     });

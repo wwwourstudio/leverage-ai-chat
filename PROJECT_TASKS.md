@@ -20,6 +20,7 @@
 ✅ **Sport Key Standardization** - SPORT_KEYS constants and validator utility (Feb 13)  
 ✅ **Weather API Integration** - Real-time weather for outdoor games with impact analysis (Feb 13)  
 ✅ **Kalshi Prediction Markets** - Live market data with probabilities and volume (Feb 13)  
+✅ **Player Prop Hit Rate Analytics** - Historical tracking with trend detection and recommendations (Feb 13)  
 
 ---
 
@@ -428,15 +429,153 @@ To update market categories:
 2. Supported categories: 'sports', 'politics', 'weather', 'economics', 'all'
 3. API documentation: https://trading-api.readme.io/reference/getting-started
 
-#### DI5. Player Props Historical Data
-**Status:** TODO  
-**Description:** Store and analyze player prop hit rates  
-**Purpose:** "LeBron hits over 25.5 pts 68% this season"  
-**Data Needed:**
-- Past game results
-- Prop lines from bookmakers
-- Hit/miss tracking
-**Storage:** Supabase tables
+#### DI5. Player Props Historical Data & Hit Rate Analytics
+**Status:** ✅ COMPLETED (2026-02-13)  
+**Description:** Complete system for tracking and analyzing player prop outcomes with historical data  
+**Purpose:** "LeBron hits over 25.5 pts 68% this season" - Data-driven prop betting insights  
+
+**Database Schema Created:**
+
+1. **player_prop_history** - Core historical data table
+   - Stores prop lines, actual results, game dates, opponents
+   - Tracks hit/miss outcomes (over/under performance)
+   - Includes weather conditions for outdoor sports
+   - Supports MLB, NBA, NFL, NHL
+   - Auto-updates hit status via trigger when game completes
+
+2. **player_prop_hit_rate_stats** - Materialized view for fast queries
+   - Pre-computed hit rate percentages by player/stat
+   - Overall and last 30 days statistics
+   - Average lines, actual results, differentials
+   - Sample size tracking for confidence scoring
+
+3. **prop_line_movements** - Line movement tracking
+   - Tracks how lines change over time before games
+   - Multiple bookmaker support
+   - Timestamp tracking for market analysis
+
+4. **player_metadata** - Player information
+   - Team, position, jersey number
+   - Injury status tracking
+   - Career statistics in JSONB format
+   - Active status flag
+
+**Analysis Engine (`lib/prop-hit-rate-analyzer.ts` - 322 lines):**
+
+1. **Core Functions:**
+   - `analyzePlayerProp()` - Complete analysis with hit rate, trend, confidence
+   - `getPlayerHitRate()` - Fetch pre-computed statistics
+   - `getRecentPropHistory()` - Recent game-by-game results
+   - `batchAnalyze()` - Analyze multiple players simultaneously
+   - `formatHitRateAnalysis()` - Human-readable text output
+
+2. **Trend Analysis:**
+   - Splits recent games into halves to detect improving/declining patterns
+   - Threshold: 15% difference = significant trend
+   - Returns: 'improving', 'declining', 'stable', or 'insufficient_data'
+
+3. **Confidence Scoring:**
+   - High: 30+ game sample size
+   - Medium: 15-29 games
+   - Low: <15 games
+   - Used to weight recommendations
+
+4. **Smart Recommendations:**
+   - 65%+ hit rate → "Strong over trend, consider OVER bets"
+   - 35%- hit rate → "Strong under trend, consider UNDER bets"
+   - Close to 50% → "Market efficient, look elsewhere"
+   - Low activity → "Check player health/availability"
+   - Accounts for trend direction and sample size
+
+**UI Component (`components/data-cards/PropHitRateCard.tsx` - 144 lines):**
+
+1. **Visual Design:**
+   - Color-coded gradients based on hit rate (green=over, red=under, gray=neutral)
+   - Status badges: "Strong Over", "Strong Under", "Neutral", "Limited Data"
+   - Trend icons: up arrow (improving), down arrow (declining), horizontal (stable)
+
+2. **Displayed Metrics:**
+   - Hit rate percentage with sample size (e.g., "68.2% (34/50 games)")
+   - Average line vs average actual result
+   - Differential (how much player beats/misses line)
+   - Recent form (last 10 games)
+   - Trend direction with confidence level
+   - Actionable recommendation
+
+3. **Responsive Layout:**
+   - Flexbox-based design for mobile/desktop
+   - Compact metric displays with clear labels
+   - Rounded corners and soft shadows
+   - Status indicator badges for quick scanning
+
+**Database Functions & Automation:**
+
+1. **refresh_prop_hit_rate_stats()** - Refreshes materialized view
+2. **calculate_player_hit_rate()** - On-demand calculation for specific timeframes
+3. **update_prop_outcome()** - Trigger to auto-calculate hit/miss when game completes
+4. **Indexes** - Optimized for player name, sport, stat type, and date queries
+
+**Sample Data Included:**
+- Example props for Shohei Ohtani and Aaron Judge
+- Demonstrates hit/miss tracking
+- Shows proper data structure for testing
+
+**Files Created:**
+- `supabase/migrations/20260213_player_prop_hit_rates.sql` (245 lines) - Complete schema
+- `lib/prop-hit-rate-analyzer.ts` (322 lines) - Analysis engine with trend detection
+- `components/data-cards/PropHitRateCard.tsx` (144 lines) - Display component
+
+**Example Analysis Output:**
+```
+📊 LeBron James - POINTS
+
+Hit Rate: 68.0% (34/50 games)
+Avg Line: 25.5 | Avg Actual: 27.2
+Differential: +1.7
+
+Recent Form (Last 10 games): 7/10 hits
+Trend: IMPROVING | Confidence: HIGH
+Last 30 Days: 18 games, 72.2% hit rate
+
+💡 Recommendation: Strong over trend (68.0%) and improving. Consider OVER bets.
+```
+
+**Integration Points:**
+- Can be called from analyze endpoint to enrich responses
+- Accessible via API for custom queries
+- Data collection via existing player-props API route
+- Manual data entry supported for backfilling history
+
+**Data Collection Flow:**
+1. User queries player props via existing API
+2. Current lines fetched from The Odds API
+3. After game completes, actual results entered/scraped
+4. Hit/miss automatically calculated via trigger
+5. Materialized view refreshed for fast queries
+6. Analysis available immediately for next query
+
+**Future Enhancements:**
+- Automated game result scraping from ESPN/sports APIs
+- Historical data backfill scripts (import past seasons)
+- Matchup-specific analysis (vs specific teams/pitchers)
+- Venue impact analysis (home/away splits)
+- Weather correlation for outdoor sports
+- Bookmaker comparison (which books have softer lines)
+
+**Maintenance:**
+To add new sports or stat types:
+1. Add to sport CHECK constraint in player_prop_history table
+2. Update stat_type values as needed (no constraint, flexible)
+3. Refresh materialized view after adding historical data
+4. No code changes required - system is sport-agnostic
+
+**Testing Checklist:** ✅ ALL VERIFIED
+- Database tables created successfully
+- Sample data inserts working
+- Materialized view computes correctly
+- Analysis functions return proper results
+- UI component renders all metrics
+- Confidence and trend logic validated
 
 #### DI6. Cross-Platform Arbitrage Calculator
 **Status:** TODO  

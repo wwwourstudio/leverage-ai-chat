@@ -3,6 +3,9 @@
  * Extends types for better TypeScript support
  */
 
+/// <reference types="react" />
+/// <reference types="react-dom" />
+
 // Ensure @supabase/ssr types are recognized
 declare module '@supabase/ssr' {
   export * from '@supabase/ssr/dist/index';

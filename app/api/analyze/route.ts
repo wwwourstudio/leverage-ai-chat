@@ -383,10 +383,22 @@ export async function POST(req: NextRequest) {
         cardCategory = 'fantasy';
       }
       
-      console.log('[v0] Calling generateContextualCards with:', { cardCategory, sport: context?.sport });
+      // Determine if we should use multi-sport mode
+      const useMultiSport = !context?.sport || context?.sport === null;
       
-      // Generate cards
-      insightCards = generateContextualCards(cardCategory, context?.sport, 3);
+      console.log('[v0] Calling generateContextualCards with:', { 
+        cardCategory, 
+        sport: context?.sport, 
+        multiSport: useMultiSport 
+      });
+      
+      // Generate cards with multi-sport support
+      insightCards = await generateContextualCards(
+        cardCategory, 
+        context?.sport, 
+        3,
+        useMultiSport // Enable multi-sport if no specific sport detected
+      );
       
       console.log(`[v0] ✓ Cards generated: ${insightCards.length}`);
     } catch (error) {

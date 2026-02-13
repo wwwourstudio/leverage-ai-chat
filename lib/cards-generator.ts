@@ -101,17 +101,41 @@ export async function generateContextualCards(
   console.log('[v0] [CARDS GENERATOR] Input:', { category, sport, normalizedSport, displaySport, multiSport });
   console.log('[v0] [CARDS GENERATOR] Category:', category, '| Display Sport:', displaySport, '| Count:', count);
   
-  // If multiSport requested and no specific sport, generate variety from multiple sports
-  if (multiSport && !sport) {
+  // If multiSport requested, generate variety from multiple sports
+  if (multiSport) {
     console.log('[v0] [CARDS GENERATOR] Multi-sport mode - generating diverse cards');
-    const sports = [SPORT_KEYS.NBA.API, SPORT_KEYS.NFL.API, SPORT_KEYS.NHL.API];
-    const cardsPerSport = Math.ceil(count / sports.length);
     
-    for (const sportKey of sports) {
-      if (cards.length >= count) break;
-      const sportCards = await generateSportSpecificCards(sportKey, cardsPerSport, category);
+    // Prioritize sport from query if provided, otherwise use popular sports
+    const primarySport = normalizedSport || SPORT_KEYS.NBA.API;
+    const allSports = [
+      SPORT_KEYS.NBA.API, 
+      SPORT_KEYS.NFL.API, 
+      SPORT_KEYS.NHL.API,
+      SPORT_KEYS.MLB.API
+    ];
+    
+    // Reorder to put primary sport first
+    const orderedSports = [
+      primarySport,
+      ...allSports.filter(s => s !== primarySport)
+    ].slice(0, 3); // Top 3 sports
+    
+    console.log('[v0] [CARDS GENERATOR] Sport priority order:', orderedSports.map(s => apiToSport(s).toUpperCase()));
+    
+    // Generate more cards for primary sport (40% of total)
+    const primaryCount = Math.ceil(count * 0.4);
+    const secondaryCount = Math.floor((count - primaryCount) / 2);
+    const remainingCount = count - primaryCount - (secondaryCount * 2);
+    
+    const sportCounts = [primaryCount, secondaryCount + remainingCount, secondaryCount];
+    
+    for (let i = 0; i < orderedSports.length && cards.length < count; i++) {
+      const sportKey = orderedSports[i];
+      const cardsToGenerate = sportCounts[i] || 1;
+      
+      const sportCards = await generateSportSpecificCards(sportKey, cardsToGenerate, category);
       cards.push(...sportCards);
-      console.log('[v0] [CARDS GENERATOR] Added', sportCards.length, 'cards for', sportKey);
+      console.log('[v0] [CARDS GENERATOR] Added', sportCards.length, 'cards for', apiToSport(sportKey).toUpperCase());
     }
     
     return cards.slice(0, count);

@@ -4,7 +4,7 @@
  */
 
 // Benford's Law expected distribution (first digit probabilities)
-const BENFORD_EXPECTED = {
+const BENFORD_EXPECTED: Record<string, number> = {
   '1': 0.301,
   '2': 0.176,
   '3': 0.125,

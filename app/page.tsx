@@ -634,17 +634,26 @@ export default function UnifiedAIPlatform() {
       
       // Fetch odds data if betting-related (try multiple sports to ensure we get data)
       if (hasBettingKeyword) {
+        console.log('[v0] === ODDS FETCH STARTING ===');
         const primarySport = context.sport || 'basketball_nba';
         // Fallback sports in priority order
         const fallbackSports = ['americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb', 'soccer_epl'];
         const sportsToTry = [primarySport, ...fallbackSports.filter(s => s !== primarySport)];
         
-        console.log('[v0] 🎯 Fetching odds - Primary:', primarySport, '| Fallbacks:', fallbackSports.slice(0, 2).join(', '));
+        console.log('[v0] Odds fetch config:', { 
+          primarySport, 
+          fallbackSports: fallbackSports.slice(0, 2),
+          totalSportsToTry: sportsToTry.length
+        });
         
         let foundData = false;
+        let attemptCount = 0;
         
         for (const sportKey of sportsToTry) {
           if (foundData) break;
+          attemptCount++;
+          
+          console.log(`[v0] [Attempt ${attemptCount}/${sportsToTry.length}] Fetching ${sportKey}...`);
           
           try {
             const oddsResponse = await fetch('/api/odds', {
@@ -653,27 +662,45 @@ export default function UnifiedAIPlatform() {
               body: JSON.stringify({ sport: sportKey, marketType: 'h2h' })
             });
             
+            console.log(`[v0] Odds API response status: ${oddsResponse.status}`);
+            
+            if (!oddsResponse.ok) {
+              const errorText = await oddsResponse.text();
+              console.error(`[v0] Odds API error (${oddsResponse.status}):`, errorText.substring(0, 100));
+              continue;
+            }
+            
             const oddsResult = await oddsResponse.json();
+            console.log(`[v0] Odds result:`, {
+              hasEvents: !!oddsResult?.events,
+              eventCount: oddsResult?.events?.length || 0,
+              hasError: !!oddsResult?.error
+            });
             
             if (oddsResult?.events?.length > 0) {
               const sportName = sportKey.replace('_', ' ').toUpperCase();
-              console.log(`[v0] ✅ Found ${oddsResult.events.length} live games in ${sportName} with ${oddsResult.events[0]?.bookmakers?.length || 0} sportsbooks`);
+              console.log(`[v0] ✅ SUCCESS - Found ${oddsResult.events.length} live games in ${sportName}`);
               context.oddsData = oddsResult;
               foundData = true;
               break;
-            } else if (sportKey === primarySport) {
-              console.log(`[v0] No ${sportKey} games scheduled, trying fallback sports...`);
+            } else if (oddsResult?.error) {
+              console.log(`[v0] API returned error: ${oddsResult.error}`);
+            } else {
+              console.log(`[v0] No games available for ${sportKey}`);
             }
           } catch (err) {
-            console.log(`[v0] Failed to fetch ${sportKey}:`, err);
+            console.error(`[v0] Exception fetching ${sportKey}:`, err);
           }
         }
         
         if (!foundData) {
-          console.log('[v0] ⚠️ No live games found across NBA, NFL, NHL, MLB, EPL');
+          console.warn('[v0] ⚠️ ODDS FETCH FAILED - No live games found across all sports');
+        } else {
+          console.log('[v0] ✓ Odds data attached to context');
         }
+        console.log('[v0] === ODDS FETCH COMPLETE ===');
       } else {
-        console.log('[v0] ℹ️  No betting keywords detected, skipping odds fetch');
+        console.log('[v0] Skipping odds fetch - no betting keywords in query');
       }
       
       // Fetch real data from our API routes

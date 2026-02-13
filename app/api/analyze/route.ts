@@ -327,23 +327,13 @@ export async function POST(req: NextRequest) {
       });
     });
 
-    // Generate insight cards directly (no HTTP call needed)
+    // Generate insight cards using utility function
     console.log('[v0] Generating insight cards for response...');
     let insightCards: any[] = [];
     
     try {
-      console.log('[v0] Attempting to import card generation function...');
-      
-      // Import card generation function
-      const cardsModule = await import('@/app/api/cards/route');
-      console.log('[v0] Cards module imported successfully');
-      console.log('[v0] Available exports:', Object.keys(cardsModule));
-      
-      const { generateContextualCards } = cardsModule;
-      
-      if (!generateContextualCards) {
-        throw new Error('generateContextualCards function not found in module exports');
-      }
+      // Import from utility module (not route file)
+      const { generateContextualCards } = await import('@/lib/cards-generator');
       
       // Determine category based on platform and query context
       let cardCategory = 'betting'; // default
@@ -355,17 +345,26 @@ export async function POST(req: NextRequest) {
         cardCategory = 'fantasy';
       }
       
-      console.log('[v0] Card category:', cardCategory, '| Sport:', context?.sport || 'none');
-      console.log('[v0] Calling generateContextualCards...');
+      console.log('[v0] Calling generateContextualCards with:', { cardCategory, sport: context?.sport });
       
-      // Generate cards directly without HTTP call
+      // Generate cards
       insightCards = generateContextualCards(cardCategory, context?.sport, 3);
       
-      console.log(`[v0] ✓ Generated ${insightCards.length} insight cards`);
-      console.log('[v0] Card titles:', insightCards.map(c => c.title));
+      console.log(`[v0] ✓ Cards generated: ${insightCards.length}`);
     } catch (error) {
       console.error('[v0] ❌ Failed to generate cards:', error);
-      console.error('[v0] Error details:', error instanceof Error ? error.stack : String(error));
+      console.error('[v0] Stack:', error instanceof Error ? error.stack : 'No stack trace');
+      
+      // Fallback: create a single default card
+      insightCards = [{
+        type: 'INFO',
+        title: '⚠️ Cards Generation Error',
+        icon: 'AlertTriangle',
+        category: 'SYSTEM',
+        subcategory: 'Error',
+        gradient: 'from-amber-600 to-orange-700',
+        data: { message: 'Failed to generate insight cards. Check server logs.' }
+      }];
     }
 
     // Build sources array with real data indicator

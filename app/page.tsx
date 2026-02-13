@@ -53,6 +53,7 @@ interface APIResponse<T = any> {
     url?: string;
   }>;
   model?: string;
+  modelUsed?: string; // Model name used for generation (for display)
   trustMetrics?: TrustMetrics;
   useFallback?: boolean; // Flag to indicate fallback mode was used
   details?: string; // Additional error or diagnostic details

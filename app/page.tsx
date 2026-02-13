@@ -631,21 +631,36 @@ export default function UnifiedAIPlatform() {
 
       // Fetch live odds data if relevant
       let oddsDataPromise: Promise<APIResponse<OddsEvent[]> | null> = Promise.resolve(null);
-      if (context.sport && (userMessage.toLowerCase().includes('odds') || 
-          userMessage.toLowerCase().includes('bet') || 
-          userMessage.toLowerCase().includes('line'))) {
-        console.log('[v0] Fetching live odds for sport:', context.sport);
+      
+      // Expanded keyword detection for betting-related queries
+      const bettingKeywords = [
+        'odds', 'bet', 'line', 'spread', 'moneyline', 'total', 'over', 'under',
+        'arbitrage', 'arb', 'h2h', 'head to head', 'value', 'edge', 'sharp',
+        'best line', 'sportsbook', 'draftkings', 'fanduel', 'betmgm',
+        'tonight', 'today', 'game', 'match', 'matchup'
+      ];
+      
+      const lowerMsg = userMessage.toLowerCase();
+      const hasBettingKeyword = bettingKeywords.some(keyword => lowerMsg.includes(keyword));
+      
+      // Default to NBA if no sport detected but query is clearly about betting
+      const sportToFetch = context.sport || (hasBettingKeyword ? 'basketball_nba' : null);
+      
+      if (sportToFetch && hasBettingKeyword) {
+        console.log('[v0] Fetching live odds for sport:', sportToFetch);
         oddsDataPromise = fetch('/api/odds', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            sport: context.sport,
+            sport: sportToFetch,
             marketType: context.marketType || 'h2h'
           })
         }).then(res => res.json() as Promise<APIResponse<OddsEvent[]>>).catch(err => {
           console.error('[v0] Odds fetch error:', err);
           return null;
         });
+      } else if (hasBettingKeyword && !sportToFetch) {
+        console.log('[v0] Betting query detected but no sport - will suggest specifying sport');
       }
 
       // Wait for both API calls

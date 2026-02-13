@@ -621,7 +621,7 @@ export default function UnifiedAIPlatform() {
       
       // Check if this is a betting-related query
       // H2H = Head-to-Head markets (moneyline betting on which team wins)
-      const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'arbitrage', 'arb', 'h2h', 'value', 'sportsbook', 'draftkings', 'fanduel', 'moneyline'];
+      const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'arbitrage', 'arb', 'h2h', 'value', 'sportsbook', 'draftkings', 'fanduel', 'moneyline', 'kalshi', 'prediction market', 'election', 'polymarket', 'prop', 'parlay'];
       const lowerMsg = userMessage.toLowerCase();
       const hasBettingKeyword = bettingKeywords.some(k => lowerMsg.includes(k));
       

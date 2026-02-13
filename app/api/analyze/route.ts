@@ -341,12 +341,24 @@ export async function POST(req: NextRequest) {
       
       console.log('[v0] Calling cards API:', cardsUrl);
       
+      // Determine category based on platform and query context
+      let cardCategory = 'betting'; // default
+      if (context?.platform === 'kalshi') {
+        cardCategory = 'kalshi';
+      } else if (context?.platform === 'dfs') {
+        cardCategory = 'dfs';
+      } else if (context?.platform === 'fantasy') {
+        cardCategory = 'fantasy';
+      }
+      
+      console.log('[v0] Card category determined:', cardCategory, '(platform:', context?.platform, ')');
+      
       const cardsResponse = await fetch(cardsUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sport: context?.sport,
-          category: 'betting',
+          category: cardCategory,
           userContext: context,
           limit: 3
         })

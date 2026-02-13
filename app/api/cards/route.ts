@@ -143,11 +143,12 @@ export async function POST(req: NextRequest) {
     let validationResult = null;
     
     // If no specific sport requested, fetch from multiple sports for variety
-    const sportsToFetch = finalSport ? [finalSport] : ['nfl', 'nba', 'mlb', 'nhl'];
-    console.log(`${LOG_PREFIXES.API} Sports to fetch: ${sportsToFetch.join(', ')}${!finalSport ? ' (showing all active sports)' : ''}`);
+    // Always fetch multiple sports to show variety in cards
+    const sportsToFetch = finalSport ? [finalSport] : ['basketball_nba', 'americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb'];
+    console.log(`${LOG_PREFIXES.API} Sports to fetch: ${sportsToFetch.join(', ')}${!finalSport ? ' (showing variety from all active sports)' : ''}`);
     
     if (oddsApiKey) {
-      console.log(`[v0] Starting odds fetch for ${sportsToFetch.length} sport(s)`);
+      console.log(`[v0] Starting odds fetch for ${sportsToFetch.length} sport(s) to ensure variety`);
       
       // Fetch odds from all specified sports in parallel
       const fetchPromises = sportsToFetch.map(async (sportKey) => {

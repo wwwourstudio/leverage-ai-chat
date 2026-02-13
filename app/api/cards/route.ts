@@ -210,7 +210,7 @@ export async function POST(req: NextRequest) {
     
     let cards = await generateDynamicCards({
       category,
-      sport: finalSport || undefined,
+      sport: finalSport ?? undefined,
       oddsData: liveOddsData,
       userContext,
       limit
@@ -487,7 +487,7 @@ function generateContextualCards(category?: string, sport?: string, count: numbe
   if ((category === 'betting' || !category) && cards.length < count) {
     const currentSport = sport || 'NBA';
     cards.push({
-      type: CARD_TYPES.BETTING_OPPORTUNITY,
+      type: CARD_TYPES.LIVE_ODDS,
       title: '⚠️ Real-Time Data Unavailable',
       icon: 'TrendingUp',
       category: currentSport.toUpperCase(),

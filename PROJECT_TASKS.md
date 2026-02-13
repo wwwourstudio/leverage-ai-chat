@@ -19,6 +19,7 @@
 ✅ **Silent Failure Elimination** - All errors now explicitly logged with context (Feb 13)  
 ✅ **Sport Key Standardization** - SPORT_KEYS constants and validator utility (Feb 13)  
 ✅ **Weather API Integration** - Real-time weather for outdoor games with impact analysis (Feb 13)  
+✅ **Kalshi Prediction Markets** - Live market data with probabilities and volume (Feb 13)  
 
 ---
 
@@ -331,15 +332,101 @@ To add new stadiums:
 ### Medium Priority
 
 #### DI4. Kalshi Prediction Markets API
-**Status:** TODO  
-**Description:** Real Kalshi market data integration  
-**Current State:** Placeholder cards only, no live data  
-**Requirements:**
-- Kalshi API key and authentication
-- Fetch active prediction markets
-- Real-time probability updates
-- Market volume and liquidity data
-**API Docs:** https://kalshi.com/api
+**Status:** ✅ COMPLETED (2026-02-13)  
+**Description:** Real-time prediction market data from Kalshi API  
+**API:** Kalshi Trading API v2 (https://trading-api.kalshi.com)  
+
+**Solution Implemented:**
+
+1. **Kalshi API Client** (`lib/kalshi-api-client.ts` - 203 lines)
+   - Fetches active prediction markets from Kalshi API
+   - Supports category filtering (sports, politics, weather, etc.)
+   - 5-minute caching to reduce API load
+   - 8-second timeout with comprehensive error handling
+   - Returns market data: ticker, prices, volume, liquidity
+
+2. **Market Data Structure:**
+   - **Yes/No Prices**: Current market prices in cents
+   - **Probabilities**: Implied probability (price / 100)
+   - **Volume**: 24h trading volume in dollars
+   - **Open Interest**: Total money in market
+   - **Close Time**: Market expiration date
+   - **Tags**: Market categorization
+
+3. **Card Generation:**
+   - Converts raw market data to display cards
+   - Shows probability percentages
+   - Includes volume and liquidity metrics
+   - Status badges: edge (>30% confidence), opportunity (15-30%), neutral (<15%)
+   - Color-coded gradients: purple to indigo
+
+4. **Integration Points:**
+   - `lib/cards-generator.ts` - Auto-enriches cards when category is 'kalshi'
+   - `components/data-cards/KalshiCard.tsx` - Displays market data in UI
+   - Fallback to placeholder card if API fails
+
+**Market Data Displayed:**
+- Ticker symbol (e.g., ELECTION-2024-PRES)
+- Market title and subtitle
+- Yes/No prices and probabilities
+- 24-hour trading volume
+- Open interest (total liquidity)
+- Market closing time
+- Category and tags
+
+**API Details:**
+- Base URL: `https://trading-api.kalshi.com/trade-api/v2`
+- Endpoint: `/events`
+- Method: GET (public, no auth required for market data)
+- Response format: JSON with markets array
+- Rate limit: No documented limit for public endpoints
+- Cache duration: 5 minutes
+
+**Example Market Response:**
+```json
+{
+  "ticker": "NBA-LAKERS-WIN",
+  "title": "Will Lakers win NBA Championship?",
+  "yes_price": 3500,
+  "no_price": 6500,
+  "volume": 125000,
+  "open_interest": 450000,
+  "close_time": "2026-06-30T00:00:00Z"
+}
+```
+
+**Files Created:**
+- `lib/kalshi-api-client.ts` (NEW) - 203 lines of API integration
+
+**Files Modified:**
+- `lib/cards-generator.ts` - Added Kalshi enrichment for category='kalshi'
+- `components/data-cards/KalshiCard.tsx` - Existing, no changes needed
+
+**Error Handling:**
+- Timeout after 8 seconds
+- Cache errors don't break flow
+- Fallback to placeholder card on API failure
+- Detailed error logging for debugging
+
+**Testing Checklist:** ✅ ALL VERIFIED
+- Kalshi markets fetched from API
+- Market data cached for 5 minutes
+- Cards display probability and volume
+- Fallback card shown on errors
+- No silent failures
+
+**Future Enhancements:**
+- Add authentication for authenticated endpoints
+- Historical price charts
+- Market depth/order book
+- User portfolio tracking
+- Market alerts and notifications
+
+**Maintenance:**
+To update market categories:
+1. Modify `category` parameter in `fetchKalshiMarkets()`
+2. Supported categories: 'sports', 'politics', 'weather', 'economics', 'all'
+3. API documentation: https://trading-api.readme.io/reference/getting-started
 
 #### DI5. Player Props Historical Data
 **Status:** TODO  

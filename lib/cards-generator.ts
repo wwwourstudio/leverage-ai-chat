@@ -59,20 +59,31 @@ export function generateContextualCards(
     });
   }
 
-  // Kalshi/Prediction Markets
+  // Kalshi/Prediction Markets - Fetch real market data
   if (category === 'kalshi') {
-    cards.push({
-      type: 'PREDICTION_MARKET',
-      title: '📊 Kalshi Market Analysis',
-      icon: 'BarChart',
-      category: 'KALSHI',
-      subcategory: 'Prediction Markets',
-      gradient: 'from-purple-600 to-indigo-700',
-      data: {
-        description: 'Real-time prediction market probabilities',
-        markets: ['Election outcomes', 'Economic indicators', 'Sports championships']
-      }
-    });
+    console.log('[v0] [CARDS GENERATOR] Kalshi category detected, fetching live markets');
+    try {
+      const { enrichCardsWithKalshi } = await import('@/lib/kalshi-api-client');
+      const enrichedCards = await enrichCardsWithKalshi(cards, 'sports');
+      console.log('[v0] [CARDS GENERATOR] Kalshi enrichment complete:', enrichedCards.length - cards.length, 'markets added');
+      return enrichedCards;
+    } catch (error) {
+      console.error('[v0] [CARDS GENERATOR] Kalshi enrichment failed:', error);
+      // Fallback to placeholder card
+      cards.push({
+        type: 'PREDICTION_MARKET',
+        title: 'Prediction Markets',
+        icon: 'BarChart',
+        category: 'KALSHI',
+        subcategory: 'Live Markets',
+        gradient: 'from-purple-600 to-indigo-700',
+        data: {
+          description: 'Real-time prediction market probabilities',
+          note: 'Live data temporarily unavailable',
+          marketType: 'Binary Outcome'
+        }
+      });
+    }
   }
 
   // DFS cards

@@ -116,9 +116,10 @@ export async function POST(req: NextRequest) {
 
     // Detect if this is a player projection query and fetch real data
     let playerProjections = null;
+    let playerName: string | null = null;
     
     if (isPlayerProjectionQuery(query)) {
-      const playerName = extractPlayerName(query);
+      playerName = extractPlayerName(query);
       
       if (playerName) {
         console.log(`${LOG_PREFIXES.API} Fetching player projections for: ${playerName}`);
@@ -229,7 +230,7 @@ export async function POST(req: NextRequest) {
         system: systemPrompt,
         prompt: userPrompt,
         temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-        maxTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
+        maxCompletionTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
         maxRetries: 1,
       });
       
@@ -379,25 +380,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Build sources array with real data indicator
-    const sources = [DEFAULT_SOURCES.GROK_AI];
-    
-    if (playerProjections?.success) {
-      sources.push({
-        name: 'The Odds API (Player Props)',
-        type: 'api' as const,
-        reliability: 95, // High reliability for direct API data
-      });
-    } else if (context?.oddsData) {
-      sources.push({
-        ...DEFAULT_SOURCES.LIVE_MARKET,
-        reliability: DEFAULT_RELIABILITY.API_LIVE
-      });
-    } else {
-      sources.push({
-        ...DEFAULT_SOURCES.LIVE_MARKET,
-        reliability: DEFAULT_RELIABILITY.API_FALLBACK
-      });
-    }
+    const sources = [
+      DEFAULT_SOURCES.GROK_AI,
+      playerProjections?.success 
+        ? DEFAULT_SOURCES.ODDS_API
+        : context?.oddsData
+          ? DEFAULT_SOURCES.LIVE_MARKET
+          : DEFAULT_SOURCES.LIVE_MARKET
+    ];
 
     return NextResponse.json({
       success: true,

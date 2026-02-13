@@ -45,18 +45,47 @@ export function generateContextualCards(
 
   // Betting/Arbitrage cards (default)
   if (category === 'betting' || !category) {
-    cards.push({
-      type: CARD_TYPES.LIVE_ODDS,
-      title: '🎯 Cross-Platform Arbitrage',
-      icon: 'TrendingUp',
-      category: 'BETTING',
-      subcategory: 'Arbitrage',
-      gradient: 'from-emerald-600 to-teal-700',
-      data: {
-        description: 'Find guaranteed profit opportunities across sportsbooks',
-        examples: ['DraftKings +150 vs FanDuel -130', 'Profit margin: 2.3%']
+    // Try to detect real arbitrage opportunities
+    console.log('[v0] [CARDS GENERATOR] Checking for arbitrage opportunities');
+    try {
+      const { detectArbitrageFromContext } = await import('@/lib/arbitrage-detector');
+      const arbitrageCards = await detectArbitrageFromContext(normalizedSport);
+      
+      if (arbitrageCards && arbitrageCards.length > 0) {
+        console.log('[v0] [CARDS GENERATOR] Found', arbitrageCards.length, 'arbitrage opportunities');
+        cards.push(...arbitrageCards.slice(0, 2)); // Add up to 2 arbitrage cards
+      } else {
+        // Fallback placeholder card
+        cards.push({
+          type: CARD_TYPES.LIVE_ODDS,
+          title: 'Cross-Platform Arbitrage',
+          icon: 'TrendingUp',
+          category: 'BETTING',
+          subcategory: 'Arbitrage Scanner',
+          gradient: 'from-emerald-600 to-teal-700',
+          data: {
+            description: 'Scanning for guaranteed profit opportunities across sportsbooks',
+            note: 'No arbitrage opportunities currently available',
+            markets: ['Moneyline', 'Spreads', 'Totals']
+          }
+        });
       }
-    });
+    } catch (error) {
+      console.error('[v0] [CARDS GENERATOR] Arbitrage detection failed:', error);
+      // Fallback placeholder card
+      cards.push({
+        type: CARD_TYPES.LIVE_ODDS,
+        title: 'Cross-Platform Arbitrage',
+        icon: 'TrendingUp',
+        category: 'BETTING',
+        subcategory: 'Arbitrage Scanner',
+        gradient: 'from-emerald-600 to-teal-700',
+        data: {
+          description: 'Find guaranteed profit opportunities across sportsbooks',
+          note: 'Arbitrage detection temporarily unavailable'
+        }
+      });
+    }
   }
 
   // Kalshi/Prediction Markets - Fetch real market data

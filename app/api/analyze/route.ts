@@ -289,6 +289,33 @@ export async function POST(req: NextRequest) {
       });
     });
 
+    // Fetch dynamic insight cards based on the query context
+    console.log('[v0] Fetching insight cards for response...');
+    let insightCards: any[] = [];
+    
+    try {
+      const cardsResponse = await fetch(`${req.url.replace('/api/analyze', '/api/cards')}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sport: context?.sport,
+          category: 'betting',
+          userContext: context,
+          limit: 3
+        })
+      });
+      
+      if (cardsResponse.ok) {
+        const cardsData = await cardsResponse.json();
+        insightCards = cardsData.cards || [];
+        console.log(`[v0] ✓ Fetched ${insightCards.length} insight cards`);
+      } else {
+        console.log('[v0] Cards API returned non-ok status:', cardsResponse.status);
+      }
+    } catch (error) {
+      console.log('[v0] Failed to fetch cards:', error instanceof Error ? error.message : String(error));
+    }
+
     // Build sources array with real data indicator
     const sources = [DEFAULT_SOURCES.GROK_AI];
     
@@ -318,6 +345,7 @@ export async function POST(req: NextRequest) {
       model: AI_CONFIG.MODEL_NAME,
       confidence: trustMetrics.finalConfidence,
       sources,
+      cards: insightCards, // Add cards to response
       playerData: playerProjections?.success ? {
         player: playerProjections.player,
         projectionsCount: playerProjections.projections?.length || 0,

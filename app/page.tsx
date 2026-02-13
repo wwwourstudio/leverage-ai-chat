@@ -607,10 +607,19 @@ export default function UnifiedAIPlatform() {
     const startTime = Date.now();
     
     try {
+      console.log('[v0] === CODE VERSION: 2026-02-13-v2 ===');
       console.log('[v0] Starting real AI analysis for:', userMessage);
       
+      // STEP 1: CHECK FOR BETTING KEYWORDS FIRST
+      const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'moneyline', 'total', 'over', 'under', 'arbitrage', 'arb', 'h2h', 'head to head', 'value', 'edge', 'sharp', 'best line', 'sportsbook', 'draftkings', 'fanduel', 'betmgm', 'tonight', 'today', 'game', 'match', 'matchup'];
+      const lowerMsg = userMessage.toLowerCase();
+      const hasBettingKeyword = bettingKeywords.some(keyword => lowerMsg.includes(keyword));
+      const matchedKeywords = bettingKeywords.filter(k => lowerMsg.includes(k));
+      
+      console.log('[v0] Betting keywords detected:', { hasBettingKeyword, matchedKeywords, query: lowerMsg.substring(0, 60) });
+      
       // Extract context from user message
-      const context = {
+      const context: any = {
         sport: extractSport(userMessage),
         marketType: extractMarketType(userMessage),
         platform: extractPlatform(userMessage),
@@ -619,38 +628,11 @@ export default function UnifiedAIPlatform() {
 
       console.log('[v0] Extracted context:', context);
       
-      // Expanded keyword detection for betting-related queries
-      const bettingKeywords = [
-        'odds', 'bet', 'line', 'spread', 'moneyline', 'total', 'over', 'under',
-        'arbitrage', 'arb', 'h2h', 'head to head', 'value', 'edge', 'sharp',
-        'best line', 'sportsbook', 'draftkings', 'fanduel', 'betmgm',
-        'tonight', 'today', 'game', 'match', 'matchup'
-      ];
-      
-      const lowerMsg = userMessage.toLowerCase();
-      const hasBettingKeyword = bettingKeywords.some(keyword => lowerMsg.includes(keyword));
-      
-      console.log('[v0] Betting keyword check:', { 
-        hasBettingKeyword, 
-        lowerMsg: lowerMsg.substring(0, 50),
-        matchedKeywords: bettingKeywords.filter(k => lowerMsg.includes(k))
-      });
-      
-      // Default to NBA if no sport detected but query is clearly about betting
-      const sportToFetch = context.sport || (hasBettingKeyword ? 'basketball_nba' : null);
-      
-      console.log('[v0] Sport determination:', {
-        contextSport: context.sport,
-        sportToFetch,
-        hasBettingKeyword,
-        willFetchOdds: !!(sportToFetch && hasBettingKeyword)
-      });
-      
-      // STEP 1: Fetch odds data FIRST if relevant (before calling analyze)
-      let oddsData: APIResponse<any> | null = null;
-      
-      if (sportToFetch && hasBettingKeyword) {
-        console.log('[v0] Fetching live odds for sport:', sportToFetch);
+      // STEP 2: ALWAYS FETCH ODDS FOR BETTING QUERIES (default to NBA if no sport detected)
+      if (hasBettingKeyword) {
+        const sportToFetch = context.sport || 'basketball_nba';
+        console.log('[v0] 🎯 FETCHING ODDS - Sport:', sportToFetch, '| Market: h2h');
+        
         try {
           const oddsResponse = await fetch('/api/odds', {
             method: 'POST',
@@ -661,25 +643,24 @@ export default function UnifiedAIPlatform() {
             })
           });
           
-          oddsData = await oddsResponse.json() as APIResponse<any>;
+          const oddsResult = await oddsResponse.json();
+          console.log('[v0] Odds API response:', { status: oddsResponse.status, hasEvents: !!oddsResult?.events, eventCount: oddsResult?.events?.length });
           
-          if (oddsData && oddsData.events && oddsData.events.length > 0) {
-            console.log(`[v0] ✓ Fetched ${oddsData.events.length} events with live odds`);
-            // Add odds to context so Grok can analyze them
-            context.oddsData = oddsData;
+          if (oddsResult && oddsResult.events && oddsResult.events.length > 0) {
+            console.log(`[v0] ✅ SUCCESS: Fetched ${oddsResult.events.length} events with live odds`);
+            context.oddsData = oddsResult;
           } else {
-            console.log('[v0] ⚠️ No odds events returned from API');
+            console.log('[v0] ⚠️ WARNING: No odds events in response');
           }
         } catch (err) {
-          console.error('[v0] Odds fetch error:', err);
-          oddsData = null;
+          console.error('[v0] ❌ ERROR fetching odds:', err);
         }
-      } else if (hasBettingKeyword && !sportToFetch) {
-        console.log('[v0] Betting query detected but no sport - will suggest specifying sport');
+      } else {
+        console.log('[v0] ℹ️  Skipping odds fetch - no betting keywords detected');
       }
 
-      // STEP 2: Now call analyze WITH odds data in context
-      console.log('[v0] Calling analyze API with context:', {
+      // STEP 3: Call analyze WITH odds data
+      console.log('[v0] 📤 Sending to analyze API:', {
         sport: context.sport,
         hasOddsData: !!context.oddsData,
         oddsEventsCount: context.oddsData?.events?.length || 0

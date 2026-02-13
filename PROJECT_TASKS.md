@@ -1,55 +1,188 @@
-# NFC Assistant - Remaining Project Tasks
+# LEVERAGEAI - Project Tasks
 
-**Last Updated:** February 8, 2026  
-**Project Status:** Core functionality complete, optimization and enhancement phase
+**Last Updated:** February 13, 2026  
+**Project Status:** Core AI functionality complete, data integration refinement phase
+
+---
+
+## Recent Accomplishments (Feb 11-13, 2026)
+
+✅ **Database Schema** - Created comprehensive Supabase schema with 16 tables  
+✅ **File Upload** - Added TSV file support alongside CSV  
+✅ **H2H Markets** - Documented Head-to-Head (moneyline) market definitions  
+✅ **Multi-Sport Fallback** - Odds API tries NBA, NFL, NHL, MLB, EPL automatically  
+✅ **Kalshi Support** - Added prediction market keywords and card generation  
+✅ **Error Logging** - Enhanced debug logging throughout odds and cards flow  
+✅ **Grok 4 Fast** - Successfully integrated xAI Grok 4 Fast AI model  
 
 ---
 
 ## Task Categories Overview
 
-- **Frontend** - 12 tasks
-- **Backend** - 8 tasks
-- **Testing** - 10 tasks
-- **Documentation** - 5 tasks
-- **Performance** - 6 tasks
-- **Deployment** - 4 tasks
-- **Security** - 5 tasks
+- **Critical Issues** - 3 tasks (MUST FIX NOW)
+- **Data Integration** - 6 tasks
+- **Frontend** - 8 tasks
+- **Backend** - 6 tasks
+- **Testing** - 8 tasks
+- **Documentation** - 4 tasks
+- **Performance** - 4 tasks
+- **Deployment** - 3 tasks
+- **Security** - 4 tasks
 
-**Total Tasks:** 50
+**Total Tasks:** 46
 
 ---
 
-## 1. Frontend Tasks (12)
+## 0. Critical Issues (MUST FIX IMMEDIATELY)
+
+### CI1. Cards API Not Returning Data
+**Status:** BROKEN  
+**Impact:** Users see no insight cards, only AI text  
+**Error:** `Response cards received: 0` in logs  
+**Root Cause:** Cards API internal fetch failing (URL resolution issue)  
+**Files Affected:**
+- `app/api/analyze/route.ts` (lines 335-375)
+- `app/api/cards/route.ts` (card generation logic)
+**Debug Steps:**
+1. Verify cards API returns data when called directly
+2. Check baseUrl construction for internal API calls
+3. Validate card generation logic runs successfully
+4. Ensure cards are properly serialized in response
+**Acceptance Criteria:**
+- Cards API called successfully from analyze endpoint
+- 3 relevant cards returned with every AI response
+- Cards display properly in UI
+
+### CI2. Odds Data Not Fetched for Queries
+**Status:** BROKEN  
+**Impact:** No real-time sportsbook odds, arbitrage analysis impossible  
+**Error:** Betting keywords detected but no odds fetch initiated  
+**Root Cause:** Keyword detection works but fetch logic not executing  
+**Files Affected:**
+- `app/page.tsx` (lines 620-665)
+- `app/api/odds/route.ts`
+**Debug Steps:**
+1. Verify betting keywords properly detected in logs
+2. Check if fetch('/api/odds') is actually called
+3. Validate sports keys (basketball_nba vs NBA mismatch)
+4. Ensure oddsData attached to context before analyze call
+**Acceptance Criteria:**
+- Odds fetched automatically for betting queries
+- Multi-sport fallback works (NBA → NFL → NHL → MLB)
+- Live odds data passed to Grok for analysis
+- Sportsbook comparison shows in AI response
+
+### CI3. Database Tables Not Created
+**Status:** BLOCKED  
+**Impact:** User insights, history, and predictions not persisted  
+**Error:** `Database tables not created yet` in insights response  
+**Root Cause:** Migration SQL not executed in Supabase  
+**Files Needed:**
+- `QUICK_DATABASE_SETUP.sql` (exists, not run)
+- `scripts/setup-database.sql` (full schema)
+**Action Required:**
+1. User must run `QUICK_DATABASE_SETUP.sql` in Supabase SQL Editor
+2. Or run full `scripts/setup-database.sql` for complete schema
+3. Verify tables created: `ai_response_trust`, `user_profiles`, `app_config`
+**Documentation:** See `DATABASE_SETUP_GUIDE.md`
+
+---
+
+## 1. Data Integration Tasks (6)
 
 ### High Priority
 
-#### F1. Fix Grok-3 Display References
-**Status:** In Progress  
-**Description:** Update all UI references from "Grok-3" to "Grok Beta" to match actual model name  
-**Files Affected:**
-- `app/page.tsx` (11 occurrences at lines 119-123, 791, 795, 879, 883, 1051+)
-- `lib/grok-pipeline.ts` (line 280)
-- Welcome messages and AI model display text
-**Acceptance Criteria:**
-- All user-facing text shows correct model name
-- No confusion about which AI model is being used
-- Model name matches actual API implementation
+#### DI1. Fix Internal API Fetch for Cards
+**Status:** IN PROGRESS (related to CI1)  
+**Description:** Resolve baseUrl construction for internal API calls  
+**Issue:** `fetch()` to internal routes failing in serverless functions  
+**Solution:**
+- Use relative URLs for same-origin requests
+- Or construct full URL with proper host resolution
+- Test in both local dev and production
+**Files:** `app/api/analyze/route.ts`
 
-#### F2. Implement File Upload UI
+#### DI2. Validate Sport Key Mappings
 **Status:** TODO  
-**Description:** Complete the file attachment interface for images and CSV files  
-**Files Affected:**
-- `app/page.tsx` (FileAttachment interface defined but not fully integrated)
+**Description:** Ensure consistent sport naming across APIs  
+**Current Issue:** Mixing formats (nba vs basketball_nba)  
+**Action Required:**
+- Audit all sport references in codebase
+- Create sport key constant mapping
+- Update all API calls to use consistent format
+**Files:** `lib/constants.ts`, `lib/sports-validator.ts`
+
+#### DI3. Weather API Integration
+**Status:** PARTIAL  
+**Description:** Weather data for outdoor games (NFL, MLB)  
+**Current State:** Open-Meteo API configured but not called  
+**Enhancement Needed:**
+- Fetch weather for outdoor stadiums
+- Include in odds analysis context
+- Show weather impact in cards
+**Use Case:** Wind/precipitation affects totals betting
+
+### Medium Priority
+
+#### DI4. Kalshi Prediction Markets API
+**Status:** TODO  
+**Description:** Real Kalshi market data integration  
+**Current State:** Placeholder cards only, no live data  
+**Requirements:**
+- Kalshi API key and authentication
+- Fetch active prediction markets
+- Real-time probability updates
+- Market volume and liquidity data
+**API Docs:** https://kalshi.com/api
+
+#### DI5. Player Props Historical Data
+**Status:** TODO  
+**Description:** Store and analyze player prop hit rates  
+**Purpose:** "LeBron hits over 25.5 pts 68% this season"  
+**Data Needed:**
+- Past game results
+- Prop lines from bookmakers
+- Hit/miss tracking
+**Storage:** Supabase tables
+
+#### DI6. Cross-Platform Arbitrage Calculator
+**Status:** TODO  
+**Description:** Automated arbitrage opportunity detection  
+**Logic:**
+- Fetch odds from all sportsbooks simultaneously
+- Calculate implied probabilities
+- Identify guaranteed profit scenarios
+- Account for vig and hold
+**Display:** Show arbitrage cards when detected
+
+---
+
+## 2. Frontend Tasks (8)
+
+### High Priority
+
+#### F1. Card Display Variety
+**Status:** TODO  
+**Description:** Show cards from multiple sports instead of just NBA  
+**Current Issue:** All 3 cards show NBA even when other sports queried  
+**Solution:**
+- Cards API should fetch from multiple sports simultaneously
+- Distribute cards across sports (1 NBA, 1 NFL, 1 NHL)
+- Prioritize sport from user query
+**Files:** `app/api/cards/route.ts`
+
+#### F2. File Upload Preview UI
+**Status:** PARTIAL (backend done, UI incomplete)  
+**Description:** Show preview of uploaded CSV/TSV files  
+**Current State:**
+- File upload works (CSV + TSV supported)
+- No visual preview of uploaded data
 **Features Needed:**
-- Drag-and-drop interface
-- File preview thumbnails
-- CSV parsing and validation
-- File size limits and type validation
-- Remove file functionality
-**Acceptance Criteria:**
-- Users can attach images and CSV files to messages
-- Files are validated before upload
-- Preview shows file content appropriately
+- Show first 5 rows of CSV/TSV data
+- Column headers clearly labeled
+- Remove file button
+- File size/type indicator
+**Files:** `app/page.tsx`, `components/chat-input.tsx`
 
 #### F3. Enhanced Error Messages
 **Status:** TODO  
@@ -165,29 +298,23 @@
 
 ---
 
-## 2. Backend Tasks (8)
+## 3. Backend Tasks (6)
 
 ### High Priority
 
-#### B1. Implement Database Migrations
-**Status:** Planned  
-**Description:** Create and run all Supabase migrations from schema plan  
-**Files Needed:**
-- `supabase/migrations/20260208_ai_response_trust.sql`
-- `supabase/migrations/20260208_predictions.sql`
-- `supabase/migrations/20260208_user_profiles.sql`
-- `supabase/migrations/20260208_rls_policies.sql`
-**Tables to Create:**
-- `ai_response_trust` - Store AI confidence and trust metrics
-- `predictions` - Historical predictions and outcomes
-- `user_profiles` - User preferences and settings
-- `session_history` - Conversation history
-- `api_usage` - Track API calls and quotas
-**Acceptance Criteria:**
-- All tables created successfully
-- Indexes properly configured
-- RLS policies active and tested
-- Foreign key constraints validated
+#### B1. Execute Database Migrations
+**Status:** READY (user action required)  
+**Description:** User must run migration SQL in Supabase  
+**Files Ready:**
+- `QUICK_DATABASE_SETUP.sql` (3 critical tables)
+- `scripts/setup-database.sql` (full 16-table schema)
+**Action:** Open Supabase SQL Editor and run one of the above files  
+**Tables Created:**
+- `ai_response_trust` - AI confidence metrics
+- `user_profiles` - User preferences
+- `app_config` - System settings
+- Plus 13 more for full schema (conversations, predictions, odds cache, etc.)
+**Documentation:** `DATABASE_SETUP_GUIDE.md`
 
 #### B2. Implement Caching Strategy
 **Status:** Partial  
@@ -658,23 +785,31 @@
 
 ---
 
-## Task Priority Matrix
+## Task Priority Order
 
-### Critical Path (Must Complete First)
+### IMMEDIATE (This Week)
 
-1. **B1** - Implement Database Migrations
-2. **T1** - Unit Tests for Lib Functions
-3. **S1** - Implement Authentication
-4. **S2** - Row Level Security
-5. **DEP1** - Production Environment Variables
+1. **CI1** - Fix cards API internal fetch (CRITICAL)
+2. **CI2** - Debug and fix odds data fetching (CRITICAL)
+3. **CI3** - User runs database migration (BLOCKED ON USER)
+4. **DI1** - Resolve baseUrl for internal API calls
+5. **DI2** - Validate sport key consistency
 
-### High Value (Complete Next)
+### HIGH PRIORITY (Next Week)
 
-6. **F1** - Fix Grok-3 Display References
-7. **F2** - Implement File Upload UI
-8. **B2** - Implement Caching Strategy
-9. **B3** - Rate Limiting
-10. **T2** - Integration Tests for API Routes
+6. **F1** - Multi-sport card variety
+7. **DI3** - Weather API integration
+8. **DI6** - Arbitrage calculator logic
+9. **B2** - Implement Redis caching
+10. **B3** - Rate limiting implementation
+
+### MEDIUM PRIORITY (Next 2 Weeks)
+
+11. **DI4** - Real Kalshi API integration
+12. **DI5** - Player props historical data
+13. **S1** - Implement authentication
+14. **T1** - Unit tests for lib functions
+15. **F2** - File upload preview UI
 
 ### Quality Improvements (Ongoing)
 
@@ -703,25 +838,34 @@
 
 ---
 
-## Success Criteria
+## Current System Status
 
-### Minimum Viable Product (MVP)
-- ✅ Core AI analysis working
-- ✅ Real-time odds integration
-- ✅ Dynamic card system
-- ⚠️ Basic error handling (needs improvement)
-- ⚠️ Documentation (needs user guide)
-- ❌ No authentication (critical gap)
-- ❌ No testing (critical gap)
+### What's Working ✅
+- Grok 4 Fast AI integration (xAI)
+- AI analysis and text generation
+- Trust metrics calculation
+- Context extraction (sport, platform, market type)
+- Betting keyword detection
+- Multi-sport fallback logic
+- File uploads (CSV + TSV support)
+- H2H market documentation
+- Comprehensive database schema designed
 
-### Production Ready
-- 80%+ test coverage
-- Authentication implemented
-- All security headers configured
-- Monitoring and alerting active
-- User documentation complete
-- Performance benchmarks met
-- Zero critical vulnerabilities
+### What's Broken 🔴
+- **Cards API not returning data** (0 cards in response)
+- **Odds data not fetching** (betting queries get no live odds)
+- **Database not initialized** (tables don't exist, SQL not run)
+- Kalshi integration incomplete (no real market data)
+- Weather API configured but not called
+
+### Next Milestone: Fully Functional Data Flow
+**Goal:** Real-time odds and cards working end-to-end  
+**Requirements:**
+1. Fix cards API internal fetch
+2. Verify odds fetch executes for betting queries
+3. User runs database migration
+4. Test full flow: Query → Odds → Grok → Cards → UI
+**Timeline:** 1-2 days with focused debugging
 
 ### World Class
 - 95%+ test coverage

@@ -11,6 +11,62 @@
 
 import { CARD_TYPES, SPORT_KEYS, sportToApi, apiToSport } from '@/lib/constants';
 
+/**
+ * Generate sport-specific cards
+ */
+async function generateSportSpecificCards(
+  sport: string,
+  count: number,
+  category?: string
+): Promise<InsightCard[]> {
+  const cards: InsightCard[] = [];
+  const displaySport = apiToSport(sport).toUpperCase();
+  
+  // Try arbitrage detection for this sport
+  if (category === 'betting' || !category) {
+    try {
+      const { detectArbitrageFromContext } = await import('@/lib/arbitrage-detector');
+      const arbitrageCards = await detectArbitrageFromContext(sport);
+      
+      if (arbitrageCards && arbitrageCards.length > 0) {
+        cards.push(...arbitrageCards.slice(0, 1));
+      }
+    } catch (error) {
+      console.error('[v0] [CARDS GENERATOR] Arbitrage detection failed for', sport);
+    }
+  }
+  
+  // Add general odds card for this sport
+  if (cards.length < count) {
+    cards.push({
+      type: CARD_TYPES.LIVE_ODDS,
+      title: `${displaySport} Live Odds`,
+      icon: 'TrendingUp',
+      category: displaySport,
+      subcategory: 'H2H Markets',
+      gradient: getSportGradient(sport),
+      data: {
+        description: 'Real-time odds from multiple sportsbooks',
+        sport: sport,
+        markets: ['Moneyline', 'Spreads', 'Totals']
+      }
+    });
+  }
+  
+  return cards;
+}
+
+/**
+ * Get gradient colors by sport
+ */
+function getSportGradient(sport: string): string {
+  if (sport.includes('basketball')) return 'from-orange-600 to-red-700';
+  if (sport.includes('football')) return 'from-green-600 to-emerald-700';
+  if (sport.includes('hockey')) return 'from-blue-600 to-cyan-700';
+  if (sport.includes('baseball')) return 'from-indigo-600 to-purple-700';
+  return 'from-slate-600 to-gray-700';
+}
+
 export interface InsightCard {
   type: string;
   title: string;
@@ -27,12 +83,14 @@ export interface InsightCard {
  * @param category - Type of analysis (betting, kalshi, dfs, fantasy)
  * @param sport - Sport key in either short form ('nba') or API format ('basketball_nba')
  * @param count - Number of cards to generate (default: 3)
+ * @param multiSport - If true, generates cards from multiple sports (default: false)
  */
-export function generateContextualCards(
+export async function generateContextualCards(
   category?: string,
   sport?: string,
-  count: number = 3
-): InsightCard[] {
+  count: number = 3,
+  multiSport: boolean = false
+): Promise<InsightCard[]> {
   const cards: InsightCard[] = [];
 
   // Normalize sport to API format, then get display name
@@ -40,8 +98,24 @@ export function generateContextualCards(
   const displaySport = normalizedSport ? apiToSport(normalizedSport).toUpperCase() : 'MULTI-SPORT';
 
   console.log('[v0] [CARDS GENERATOR] Generating cards...');
-  console.log('[v0] [CARDS GENERATOR] Input:', { category, sport, normalizedSport, displaySport });
+  console.log('[v0] [CARDS GENERATOR] Input:', { category, sport, normalizedSport, displaySport, multiSport });
   console.log('[v0] [CARDS GENERATOR] Category:', category, '| Display Sport:', displaySport, '| Count:', count);
+  
+  // If multiSport requested and no specific sport, generate variety from multiple sports
+  if (multiSport && !sport) {
+    console.log('[v0] [CARDS GENERATOR] Multi-sport mode - generating diverse cards');
+    const sports = [SPORT_KEYS.NBA.API, SPORT_KEYS.NFL.API, SPORT_KEYS.NHL.API];
+    const cardsPerSport = Math.ceil(count / sports.length);
+    
+    for (const sportKey of sports) {
+      if (cards.length >= count) break;
+      const sportCards = await generateSportSpecificCards(sportKey, cardsPerSport, category);
+      cards.push(...sportCards);
+      console.log('[v0] [CARDS GENERATOR] Added', sportCards.length, 'cards for', sportKey);
+    }
+    
+    return cards.slice(0, count);
+  }
 
   // Betting/Arbitrage cards (default)
   if (category === 'betting' || !category) {

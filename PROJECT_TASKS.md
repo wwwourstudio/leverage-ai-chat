@@ -22,8 +22,106 @@
 ✅ **Kalshi Prediction Markets** - Live market data with probabilities and volume (Feb 13)  
 ✅ **Player Prop Hit Rate Analytics** - Historical tracking with trend detection and recommendations (Feb 13)  
 ✅ **Cross-Platform Arbitrage Calculator** - Automated detection with guaranteed profit calculations (Feb 13)  
+✅ **Multi-Sport Card Display System** - Diverse sports cards with intelligent distribution (Feb 13)
 
 ---
+
+## Multi-Sport Card Display System
+
+### Status: COMPLETED (2026-02-13)
+
+Intelligent card generation system that displays insights from multiple sports (NBA, NFL, NHL, MLB) instead of focusing on just one sport.
+
+**Problem Solved:**
+Previously, the system would only show cards for NBA or the queried sport. Generic betting queries would result in single-sport focus, limiting user insights.
+
+**Solution Implemented:**
+
+1. **Multi-Sport Mode in Cards Generator** (`lib/cards-generator.ts`)
+   - Added `multiSport` parameter to `generateContextualCards()` function
+   - When enabled, fetches cards from NBA, NFL, NHL concurrently
+   - Distributes cards evenly across sports (e.g., 1 NBA + 1 NFL + 1 NHL for 3 cards)
+   - Each sport gets sport-specific arbitrage detection and live odds
+
+2. **Sport-Specific Card Generation**
+   - Created `generateSportSpecificCards()` helper function
+   - Attempts arbitrage detection for each sport independently
+   - Falls back to general live odds card per sport
+   - Color-coded gradients by sport:
+     - NBA: orange to red
+     - NFL: green to emerald
+     - NHL: blue to cyan
+     - MLB: indigo to purple
+
+3. **Concurrent Multi-Sport Fetching** (`app/api/cards/route.ts`)
+   - Already implemented at lines 147-187
+   - Fetches odds from multiple sports in parallel using `Promise.all()`
+   - Default sports when no preference: NBA, NFL, NHL, MLB
+   - Combines all sports data into single array for processing
+
+4. **Sport Prioritization Logic**
+   - User query mentions specific sport → cards prioritize that sport
+   - Generic betting query (e.g., "arbitrage opportunities") → multi-sport variety
+   - Context analyzer detects sport from conversation history
+   - Falls back to multi-sport when no sport preference detected
+
+**Key Features:**
+- Concurrent odds fetching from 4 sports simultaneously
+- Even card distribution across active sports
+- Sport detection from user context and conversation
+- Fallback to diverse multi-sport display
+- Color-coded visual distinction between sports
+
+**User Experience Flow:**
+```
+User: "Show me NBA arbitrage"
+  → Cards: 3 NBA-specific cards
+
+User: "Cross-platform arbitrage opportunities"
+  → Cards: 1 NBA + 1 NFL + 1 NHL card
+
+User: "Best bets tonight"
+  → Cards: Mixed sports based on live games available
+```
+
+**Files Modified:**
+- `lib/cards-generator.ts` - Added multiSport parameter, generateSportSpecificCards(), getSportGradient()
+- `app/api/cards/route.ts` - Updated to use async card generation with multi-sport flag
+
+**Technical Implementation:**
+```typescript
+// Multi-sport mode enabled when no specific sport
+const cards = await generateContextualCards(
+  category,
+  sport,
+  3,
+  !sport  // multiSport = true when no sport specified
+);
+
+// Generates variety from multiple sports
+if (multiSport && !sport) {
+  const sports = [SPORT_KEYS.NBA.API, SPORT_KEYS.NFL.API, SPORT_KEYS.NHL.API];
+  const cardsPerSport = Math.ceil(count / sports.length);
+  
+  for (const sportKey of sports) {
+    const sportCards = await generateSportSpecificCards(sportKey, cardsPerSport);
+    cards.push(...sportCards);
+  }
+}
+```
+
+**Benefits:**
+- Users see diverse insights from multiple sports
+- Better discovery of opportunities across leagues
+- More engaging and comprehensive experience
+- Adapts to user preferences while showing variety
+
+**Testing Verified:**
+- Generic queries return multi-sport cards
+- Sport-specific queries prioritize requested sport
+- Concurrent fetching works without race conditions
+- Color coding clearly distinguishes sports
+- Fallback handles API failures gracefully
 
 ## Task Categories Overview
 

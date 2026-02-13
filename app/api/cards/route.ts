@@ -265,9 +265,15 @@ export async function POST(req: NextRequest) {
     }
     
     // Ensure we always have exactly 3 cards
-    while (cards.length < 3) {
+    if (cards.length < 3) {
       console.log(`${LOG_PREFIXES.API} ⚠ Only ${cards.length} cards, generating more`);
-      const additionalCards = generateContextualCards(category, finalSport, 3 - cards.length);
+      const { generateContextualCards } = await import('@/lib/cards-generator');
+      const additionalCards = await generateContextualCards(
+        category, 
+        finalSport, 
+        3 - cards.length,
+        !finalSport // Use multi-sport if no specific sport
+      );
       cards.push(...additionalCards);
     }
     console.log(`${LOG_PREFIXES.API} ✓ Final card count: ${cards.length}`);
@@ -468,7 +474,8 @@ async function generateDynamicCards(params: {
   if (cards.length < limit) {
     const contextualCount = limit - cards.length;
     console.log(`${LOG_PREFIXES.API} → Step 6: Need ${contextualCount} more cards, generating contextual cards...`);
-    const contextualCards = generateContextualCards(category, sport, contextualCount);
+    const { generateContextualCards: genCards } = await import('@/lib/cards-generator');
+    const contextualCards = await genCards(category, sport, contextualCount, !sport);
     console.log(`${LOG_PREFIXES.API}   Generated ${contextualCards.length} contextual cards`);
     cards.push(...contextualCards);
   }
@@ -478,33 +485,7 @@ async function generateDynamicCards(params: {
   return cards.slice(0, limit);
 }
 
-// Helper functions moved to odds-transformer.ts for reusability
-
-export function generateContextualCards(category?: string, sport?: string, count: number = 3): any[] {
-  const cards: any[] = [];
-  
-  // Educational betting guidance (only shown when no real data available)
-  if ((category === 'betting' || !category) && cards.length < count) {
-    const currentSport = sport || 'NBA';
-    cards.push({
-      type: CARD_TYPES.LIVE_ODDS,
-      title: '⚠️ Real-Time Data Unavailable',
-      icon: 'TrendingUp',
-      category: currentSport.toUpperCase(),
-      subcategory: 'Guidance',
-      gradient: 'from-gray-600 to-gray-800',
-      data: {
-        message: 'No live odds currently available',
-        suggestion: 'Check The Odds API for real-time lines',
-        alternative: 'Visit sportsbooks for current spreads',
-        note: 'Real data appears when games are scheduled',
-        betterOption: 'Ask about specific games or teams',
-        status: 'ODDS_API_KEY configured'
-      },
-      status: CARD_STATUS.NEUTRAL,
-      realData: false
-    });
-  }
+// Helper functions moved to odds-transformer.ts and cards-generator.ts for reusability
   
   // DFS guidance (only shown when no real data available)
   if ((category === 'dfs' || !category) && cards.length < count) {

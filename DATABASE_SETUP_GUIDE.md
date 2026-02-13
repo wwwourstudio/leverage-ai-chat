@@ -1,6 +1,31 @@
 # Database Setup Guide - LEVERAGEAI
 
-## Quick Setup (2 minutes)
+---
+
+## 🚨 URGENT: Fix Current Database Errors (30 seconds)
+
+**You're seeing these errors:**
+```
+Could not find the table 'public.ai_response_trust' in the schema cache
+column "model_id" does not exist
+```
+
+**Quick Fix - Do This RIGHT NOW:**
+
+1. Open [Supabase Dashboard](https://supabase.com/dashboard/project/_) → Select your LEVERAGEAI project
+2. Click **SQL Editor** in left sidebar → Click **New Query**
+3. Open `QUICK_DATABASE_SETUP.sql` from project root, copy everything
+4. Paste into SQL Editor → Click **Run** button
+5. Wait 5 seconds for ✅ SUCCESS message
+6. **Refresh your app** - errors are gone!
+
+This creates the 3 critical tables (`ai_response_trust`, `user_profiles`, `app_config`) needed immediately.
+
+**Then optionally** run the full schema below for all features (conversations, predictions, DFS, etc.)
+
+---
+
+## Complete Setup (2 minutes) - Recommended After Quick Fix
 
 ### Step 1: Open Supabase SQL Editor
 1. Go to your Supabase project dashboard at [supabase.com/dashboard](https://supabase.com/dashboard)

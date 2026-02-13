@@ -15,13 +15,9 @@ CREATE TABLE IF NOT EXISTS ai_response_trust (
   
   -- Trust Scores (0-100 scale) - matching app/api/analyze/route.ts insert format
   benford_score INTEGER DEFAULT 0 CHECK (benford_score >= 0 AND benford_score <= 100),
-  benford_integrity INTEGER GENERATED ALWAYS AS (benford_score) STORED, -- alias for compatibility
   odds_alignment_score INTEGER DEFAULT 0 CHECK (odds_alignment_score >= 0 AND odds_alignment_score <= 100),
-  odds_alignment INTEGER GENERATED ALWAYS AS (odds_alignment_score) STORED, -- alias for compatibility
   consensus_score INTEGER DEFAULT 0 CHECK (consensus_score >= 0 AND consensus_score <= 100),
-  market_consensus INTEGER GENERATED ALWAYS AS (consensus_score) STORED, -- alias for compatibility
   historical_accuracy_score INTEGER DEFAULT 0 CHECK (historical_accuracy_score >= 0 AND historical_accuracy_score <= 100),
-  historical_accuracy INTEGER GENERATED ALWAYS AS (historical_accuracy_score) STORED, -- alias for compatibility
   final_confidence INTEGER DEFAULT 0 CHECK (final_confidence >= 0 AND final_confidence <= 100),
   
   -- Classification
@@ -120,6 +116,35 @@ ON app_config FOR SELECT
 USING (true);
 
 GRANT SELECT ON app_config TO anon, authenticated;
+
+-- =============================================================================
+-- BACKWARD COMPATIBILITY VIEWS
+-- =============================================================================
+-- Create view with old column names for any code using the old schema
+CREATE OR REPLACE VIEW ai_response_trust_legacy AS
+SELECT 
+  id,
+  response_id,
+  model_id,
+  sport,
+  market_type,
+  benford_score,
+  benford_score as benford_integrity,  -- alias
+  odds_alignment_score,
+  odds_alignment_score as odds_alignment,  -- alias
+  consensus_score,
+  consensus_score as market_consensus,  -- alias
+  historical_accuracy_score,
+  historical_accuracy_score as historical_accuracy,  -- alias
+  final_confidence,
+  trust_level,
+  risk_level,
+  flags,
+  created_at
+FROM ai_response_trust;
+
+-- Grant access to the view
+GRANT SELECT ON ai_response_trust_legacy TO anon, authenticated;
 
 -- Insert default config values
 INSERT INTO app_config (key, value, category, description) VALUES

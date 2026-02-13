@@ -16,7 +16,6 @@ import {
   TRUST_METRIC_TYPES,
   ATTACHMENT_TYPES
 } from '@/lib/constants';
-import { classifyError, formatErrorForLog, getUserErrorMessage, ERROR_CODES } from '@/lib/error-handler';
 import {
   APP_TABLES
 } from '@/lib/supabase-validator';

@@ -295,7 +295,6 @@ Provide additional context, risk assessment, or actionable insights.
 Format as JSON with new field names and values.
           `.trim(),
           temperature: 0.7,
-          maxTokens: 200,
         });
 
         // Try to parse JSON from response
@@ -369,7 +368,6 @@ Check for:
 Respond: "VALID" or "INVALID: [specific reason]"
         `.trim(),
         temperature: 0.3,
-        maxTokens: 150,
       });
 
       const response = result.text.trim();

@@ -330,3 +330,43 @@ export function arbitrageToCard(opp: ArbitrageOpportunity): any {
     }
   };
 }
+
+/**
+ * Detect arbitrage opportunities from context (fetches live odds)
+ * This is called by the cards generator to find real arbitrage opportunities
+ */
+export async function detectArbitrageFromContext(sport?: string): Promise<any[]> {
+  try {
+    const { fetchLiveOdds } = await import('@/lib/odds-api-client');
+    const { SPORT_KEYS, sportToApi } = await import('@/lib/constants');
+    
+    const normalizedSport = sport ? sportToApi(sport) : SPORT_KEYS.NBA.API;
+    const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+    
+    if (!apiKey) {
+      console.log('[v0] [ARBITRAGE] No Odds API key found, skipping arbitrage detection');
+      return [];
+    }
+    
+    console.log('[v0] [ARBITRAGE] Fetching odds for arbitrage detection:', normalizedSport);
+    
+    const oddsData = await fetchLiveOdds(normalizedSport, {
+      markets: ['h2h'],
+      regions: ['us'],
+      oddsFormat: 'american',
+      apiKey
+    });
+    
+    if (!oddsData || oddsData.length === 0) {
+      console.log('[v0] [ARBITRAGE] No odds data available');
+      return [];
+    }
+    
+    const opportunities = detectArbitrageOpportunities(oddsData, 0.5);
+    
+    return opportunities.map(arbitrageToCard);
+  } catch (error) {
+    console.error('[v0] [ARBITRAGE] Error in context detection:', error);
+    return [];
+  }
+}

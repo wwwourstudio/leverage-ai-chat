@@ -607,16 +607,7 @@ export default function UnifiedAIPlatform() {
     const startTime = Date.now();
     
     try {
-      console.log('[v0] === CODE VERSION: 2026-02-13-v2 ===');
       console.log('[v0] Starting real AI analysis for:', userMessage);
-      
-      // STEP 1: CHECK FOR BETTING KEYWORDS FIRST
-      const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'moneyline', 'total', 'over', 'under', 'arbitrage', 'arb', 'h2h', 'head to head', 'value', 'edge', 'sharp', 'best line', 'sportsbook', 'draftkings', 'fanduel', 'betmgm', 'tonight', 'today', 'game', 'match', 'matchup'];
-      const lowerMsg = userMessage.toLowerCase();
-      const hasBettingKeyword = bettingKeywords.some(keyword => lowerMsg.includes(keyword));
-      const matchedKeywords = bettingKeywords.filter(k => lowerMsg.includes(k));
-      
-      console.log('[v0] Betting keywords detected:', { hasBettingKeyword, matchedKeywords, query: lowerMsg.substring(0, 60) });
       
       // Extract context from user message
       const context: any = {
@@ -628,48 +619,7 @@ export default function UnifiedAIPlatform() {
 
       console.log('[v0] Extracted context:', context);
       
-      // STEP 2: ALWAYS fetch odds data (Grok can decide if it's relevant)
-      const sportToFetch = context.sport || 'basketball_nba';
-      console.log('[v0] 🎯 FETCHING ODDS - Sport:', sportToFetch, '| Market: h2h | Keywords:', matchedKeywords);
-      
-      try {
-        const oddsResponse = await fetch('/api/odds', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sport: sportToFetch,
-            marketType: context.marketType || 'h2h'
-          })
-        });
-        
-        const oddsResult = await oddsResponse.json();
-        console.log('[v0] Odds API response:', { 
-          status: oddsResponse.status, 
-          success: oddsResult?.success,
-          hasEvents: !!oddsResult?.events, 
-          eventCount: oddsResult?.events?.length,
-          error: oddsResult?.error 
-        });
-        
-        if (oddsResult && oddsResult.events && oddsResult.events.length > 0) {
-          console.log(`[v0] ✅ SUCCESS: Fetched ${oddsResult.events.length} events with live odds from ${oddsResult.sport}`);
-          context.oddsData = oddsResult;
-        } else if (oddsResult?.error) {
-          console.log('[v0] ⚠️ Odds API returned error:', oddsResult.error);
-        } else {
-          console.log('[v0] ⚠️ WARNING: No odds events in response (likely no games scheduled)');
-        }
-      } catch (err) {
-        console.error('[v0] ❌ ERROR fetching odds:', err);
-      }
-
-      // STEP 3: Call analyze WITH odds data
-      console.log('[v0] 📤 Sending to analyze API:', {
-        sport: context.sport,
-        hasOddsData: !!context.oddsData,
-        oddsEventsCount: context.oddsData?.events?.length || 0
-      });
-      
+      // Fetch real data from our API routes
       const analysisResult = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

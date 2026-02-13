@@ -124,8 +124,27 @@ export function generateContextualCards(
     });
   }
 
-  console.log('[v0] [CARDS GENERATOR] ✓ Generated', cards.length, 'cards');
+  console.log('[v0] [CARDS GENERATOR] ✓ Generated', cards.length, 'cards (before weather enrichment)');
   console.log('[v0] [CARDS GENERATOR] Card titles:', cards.map(c => c.title).join(', '));
+
+  // Add weather cards for outdoor sports if betting category
+  if ((category === 'betting' || !category) && normalizedSport) {
+    const isOutdoorSport = normalizedSport === 'americanfootball_nfl' || 
+                          normalizedSport === 'baseball_mlb';
+    
+    if (isOutdoorSport) {
+      console.log('[v0] [CARDS GENERATOR] Outdoor sport detected, attempting weather enrichment');
+      try {
+        const { enrichCardsWithWeather } = await import('@/lib/weather-service');
+        const enrichedCards = await enrichCardsWithWeather(cards);
+        console.log('[v0] [CARDS GENERATOR] Weather enrichment complete:', enrichedCards.length - cards.length, 'weather cards added');
+        return enrichedCards.slice(0, count + 1); // Allow 1 extra for weather card
+      } catch (error) {
+        console.error('[v0] [CARDS GENERATOR] Weather enrichment failed:', error);
+        // Fall through to return original cards
+      }
+    }
+  }
 
   return cards.slice(0, count);
 }

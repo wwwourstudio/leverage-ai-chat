@@ -170,6 +170,41 @@ export async function POST(req: NextRequest) {
     if (context?.oddsData && context.oddsData.events && context.oddsData.events.length > 0) {
       console.log(`[v0] Processing ${context.oddsData.events.length} live odds events for analysis`);
       
+      // Fetch weather data for outdoor sports (NFL, MLB)
+      const isOutdoorSport = context?.sport === 'americanfootball_nfl' || 
+                            context?.sport === 'baseball_mlb' ||
+                            context?.sport === 'nfl' ||
+                            context?.sport === 'mlb';
+      
+      let weatherData: string | null = null;
+      
+      if (isOutdoorSport && context.oddsData.events.length > 0) {
+        console.log('[v0] Outdoor sport detected - fetching weather data');
+        try {
+          const { generateWeatherCard } = await import('@/lib/weather-service');
+          const firstGame = context.oddsData.events[0];
+          const weatherCard = await generateWeatherCard(
+            firstGame.home_team,
+            firstGame.away_team,
+            new Date(firstGame.commence_time)
+          );
+          
+          if (weatherCard) {
+            console.log('[v0] Weather data fetched successfully');
+            weatherData = `\n\n🌤️ WEATHER CONDITIONS (${weatherCard.data.location}):\n` +
+                         `Temperature: ${weatherCard.data.temperature}\n` +
+                         `Condition: ${weatherCard.data.condition}\n` +
+                         `Wind: ${weatherCard.data.wind}\n` +
+                         `Precipitation: ${weatherCard.data.precipitation}\n` +
+                         `Game Impact: ${weatherCard.data.gameImpact}`;
+          } else {
+            console.log('[v0] Weather data not available for this location');
+          }
+        } catch (error) {
+          console.error('[v0] Weather fetch error:', error instanceof Error ? error.message : String(error));
+        }
+      }
+      
       // Format odds data in a readable way for Grok
       const oddsEvents = context.oddsData.events.map((event: any, idx: number) => {
         const homeTeam = event.home_team;
@@ -196,6 +231,9 @@ export async function POST(req: NextRequest) {
         
         return oddsText;
       }).join('\n\n');
+      
+      // Add weather data to odds context if available
+      const fullOddsContext = weatherData ? `${oddsEvents}${weatherData}` : oddsEvents;
       
       userPrompt += `\n\n📊 LIVE ODDS DATA FROM THE ODDS API (${context.oddsData.events.length} games):\n${oddsEvents}\n\nIMPORTANT: Use this REAL data to analyze opportunities. Compare odds across sportsbooks to identify arbitrage or value. Be specific about which sportsbooks and which lines.`;
       console.log('[v0] ✓ Formatted live odds data for Grok analysis');

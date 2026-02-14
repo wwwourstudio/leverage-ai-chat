@@ -30,10 +30,10 @@ BEGIN
   RAISE NOTICE '1. TABLES: % tables created', table_count;
   
   -- List all tables
-  FOR table_name IN 
+  FOR table_record IN 
     SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename
   LOOP
-    RAISE NOTICE '   - %', table_name;
+    RAISE NOTICE '   - %', table_record.tablename;
   END LOOP;
   RAISE NOTICE '';
 
@@ -44,10 +44,10 @@ BEGIN
   
   RAISE NOTICE '2. VIEWS: % views created', view_count;
   
-  FOR view_name IN 
+  FOR view_record IN 
     SELECT viewname FROM pg_views WHERE schemaname = 'public' ORDER BY viewname
   LOOP
-    RAISE NOTICE '   - %', view_name;
+    RAISE NOTICE '   - %', view_record.viewname;
   END LOOP;
   RAISE NOTICE '';
 
@@ -59,13 +59,13 @@ BEGIN
   
   RAISE NOTICE '3. FUNCTIONS: % functions created', function_count;
   
-  FOR func_name IN 
+  FOR func_record IN 
     SELECT proname FROM pg_proc p
     JOIN pg_namespace n ON p.pronamespace = n.oid
     WHERE n.nspname = 'public'
     ORDER BY proname
   LOOP
-    RAISE NOTICE '   - %', func_name;
+    RAISE NOTICE '   - %', func_record.proname;
   END LOOP;
   RAISE NOTICE '';
 
@@ -95,20 +95,20 @@ BEGIN
 
   -- 7. Check RLS Status
   RAISE NOTICE '7. RLS STATUS (Row Level Security enabled):';
-  FOR table_name, rls_enabled IN 
+  FOR rls_record IN 
     SELECT 
-      c.relname,
-      c.relrowsecurity
+      c.relname AS table_name,
+      c.relrowsecurity AS rls_enabled
     FROM pg_class c
     JOIN pg_namespace n ON c.relnamespace = n.oid
     WHERE n.nspname = 'public'
       AND c.relkind = 'r'
     ORDER BY c.relname
   LOOP
-    IF rls_enabled THEN
-      RAISE NOTICE '   - %: ENABLED', table_name;
+    IF rls_record.rls_enabled THEN
+      RAISE NOTICE '   - %: ENABLED', rls_record.table_name;
     ELSE
-      RAISE NOTICE '   - %: DISABLED (Warning!)', table_name;
+      RAISE NOTICE '   - %: DISABLED (Warning!)', rls_record.table_name;
     END IF;
   END LOOP;
   RAISE NOTICE '';

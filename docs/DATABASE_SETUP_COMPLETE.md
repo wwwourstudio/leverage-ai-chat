@@ -121,7 +121,59 @@ STATUS: SUCCESS - All database objects created correctly
 
 ## Troubleshooting Guide
 
-### Issue 1: Permission Denied Error
+### Issue 1: FOR Loop Syntax Error (verify-database-setup.sql)
+
+**Error:**
+```
+ERROR: syntax error at or near "table_name"
+LINE 33: FOR table_name IN
+```
+
+**Root Cause:**
+PostgreSQL FOR loops require proper record variable naming when iterating over SELECT results. Using column names directly as loop variables causes syntax errors because PostgreSQL expects a record type variable that contains the selected columns.
+
+**Incorrect Syntax:**
+```sql
+FOR table_name IN 
+  SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+LOOP
+  RAISE NOTICE '   - %', table_name;  -- ERROR: ambiguous reference
+END LOOP;
+```
+
+**Correct Syntax:**
+```sql
+FOR table_record IN 
+  SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+LOOP
+  RAISE NOTICE '   - %', table_record.tablename;  -- Access via record.column
+END LOOP;
+```
+
+**Why This Happens:**
+- PostgreSQL creates a record variable for each iteration
+- Column values must be accessed via `record_variable.column_name`
+- Using just the column name creates ambiguity and syntax errors
+- This is particularly important for multi-column SELECT statements
+
+**Solution Applied (February 13, 2026):**
+Fixed in `scripts/verify-database-setup.sql`:
+- Changed `table_name` → `table_record.tablename` (line 33)
+- Changed `view_name` → `view_record.viewname` (line 47)
+- Changed `func_name` → `func_record.proname` (line 62)
+- Updated RLS status loop to use aliased columns (line 98)
+
+**Prevention:**
+Always use descriptive record variable names in FOR loops and access columns via dot notation:
+```sql
+FOR my_record IN SELECT col1, col2 FROM my_table LOOP
+  RAISE NOTICE '%, %', my_record.col1, my_record.col2;
+END LOOP;
+```
+
+---
+
+### Issue 2: Permission Denied Error
 
 **Error:**
 ```

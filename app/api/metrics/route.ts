@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { logger, LogCategory } from '@/lib/logger';
 import { getLeveragedAI } from '@/lib/leveraged-ai';
+import { getProcessInfo, getRuntimeEnvironment, formatProcessInfo } from '@/lib/process-utils';
 
 export const runtime = 'edge';
 
@@ -23,18 +24,26 @@ export async function GET() {
       popularQueries: []
     };
 
-    // Calculate system uptime (if available)
-    const uptime = typeof process.uptime === 'function' ? Math.floor(process.uptime()) : null;
+    // Get safe process information
+    const processInfo = getProcessInfo();
+    const runtimeEnv = getRuntimeEnvironment();
 
     // Collect metrics
     const metrics = {
       timestamp: new Date().toISOString(),
       system: {
-        uptime,
-        runtime: 'edge',
+        uptime: processInfo.uptime,
+        runtime: runtimeEnv,
         region: process.env.VERCEL_REGION || 'unknown',
         environment: process.env.VERCEL_ENV || process.env.NODE_ENV || 'development',
-        nodeVersion: process.version
+        nodeVersion: processInfo.nodeVersion || 'unavailable',
+        platform: processInfo.platform,
+        arch: processInfo.arch,
+        memory: processInfo.memoryUsage ? {
+          heapUsed: Math.round((processInfo.memoryUsage.heapUsed || 0) / 1024 / 1024),
+          heapTotal: Math.round((processInfo.memoryUsage.heapTotal || 0) / 1024 / 1024),
+          rss: Math.round((processInfo.memoryUsage.rss || 0) / 1024 / 1024)
+        } : null
       },
       cache: {
         size: cacheStats.cacheSize,

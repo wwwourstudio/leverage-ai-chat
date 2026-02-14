@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import {  getOddsApiKey, isOddsApiConfigured } from '@/lib/config';
 import { ENV_KEYS, LOG_PREFIXES } from '@/lib/constants';
+import { getUptime, getRuntimeEnvironment } from '@/lib/process-utils';
 
 export const runtime = 'edge';
 
@@ -14,7 +15,7 @@ export async function GET() {
   const healthCheck = {
     status: 'healthy' as 'healthy' | 'degraded' | 'down',
     timestamp: new Date().toISOString(),
-    uptime: typeof process.uptime === 'function' ? Math.floor(process.uptime()) : undefined,
+    uptime: getUptime() ?? undefined,
     services: {
       database: { status: 'unknown' as string, message: '', latency: 0 },
       oddsAPI: { status: 'unknown' as string, message: '', configured: false },
@@ -22,7 +23,7 @@ export async function GET() {
       weatherAPI: { status: 'unknown' as string, message: '', configured: false }
     },
     environment: {
-      runtime: 'edge',
+      runtime: getRuntimeEnvironment(),
       region: process.env.VERCEL_REGION || 'unknown',
       deployment: process.env.VERCEL_ENV || 'development'
     },

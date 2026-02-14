@@ -47,8 +47,9 @@ export function isEdgeRuntime(): boolean {
  */
 export function getNodeVersion(): string | null {
   try {
-    if (typeof process !== 'undefined' && process.version) {
-      return process.version;
+    if (typeof process !== 'undefined') {
+      const version = (process as any)?.version;
+      return typeof version === 'string' ? version : null;
     }
   } catch {
     // Silently fail in restricted environments
@@ -61,8 +62,9 @@ export function getNodeVersion(): string | null {
  */
 export function getPlatform(): string | null {
   try {
-    if (typeof process !== 'undefined' && process.platform) {
-      return process.platform;
+    if (typeof process !== 'undefined') {
+      const platform = (process as any)?.platform;
+      return typeof platform === 'string' ? platform : null;
     }
   } catch {
     // Silently fail
@@ -75,8 +77,9 @@ export function getPlatform(): string | null {
  */
 export function getArchitecture(): string | null {
   try {
-    if (typeof process !== 'undefined' && process.arch) {
-      return process.arch;
+    if (typeof process !== 'undefined') {
+      const arch = (process as any)?.arch;
+      return typeof arch === 'string' ? arch : null;
     }
   } catch {
     // Silently fail

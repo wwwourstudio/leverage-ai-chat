@@ -1,7 +1,7 @@
 # LEVERAGEAI - Project Tasks
 
 **Last Updated:** February 13, 2026  
-**Project Status:** Core AI functionality complete, data integration refinement phase
+**Project Status:** Core AI functionality complete, expanding to production-ready betting platform
 
 ---
 
@@ -1497,6 +1497,599 @@ Market Efficiency: 96.5%
 
 ### Next Milestone: Fully Functional Data Flow
 **Goal:** Real-time odds and cards working end-to-end  
+
+---
+
+## Future Enhancements (Roadmap)
+
+### Phase 1: Enhanced Weather & Stadium Analysis
+**Status:** PLANNED  
+**Timeline:** 4-6 weeks  
+**Dependencies:** Weather API (completed), Stadium database
+
+#### W1. Expand Stadium Database
+**Priority:** HIGH  
+**Current State:** 12 stadiums mapped  
+**Target:** 100+ professional sports venues  
+**Scope:**
+- NFL: All 32 stadiums with dome/open-air classification
+- MLB: All 30 ballparks with dimensions and orientation
+- NHL: Outdoor game venues
+- College Football: Top 25 programs
+**Data Points:**
+- Latitude/longitude coordinates
+- Stadium name and capacity
+- Roof type (retractable, dome, open)
+- Field orientation (for wind analysis)
+- Altitude (for baseball carry distance)
+- Historical weather patterns
+**Implementation:**
+- Extend `STADIUM_LOCATIONS` in `lib/weather-service.ts`
+- Create `scripts/import-stadium-data.ts` for bulk import
+- Add stadium validation utility
+**Files:** `lib/weather-service.ts`, `lib/stadium-data.ts`, `scripts/import-stadium-data.ts`
+
+#### W2. Hourly Game Time Forecast
+**Priority:** MEDIUM  
+**Description:** Fetch hour-by-hour weather predictions for exact game times  
+**Current:** Current conditions only  
+**Enhancement:**
+- Query forecast for specific game time (e.g., 7:00 PM kickoff)
+- Show trend analysis (getting better/worse during game)
+- Pre-game vs in-game condition changes
+**API:** Open-Meteo hourly forecast endpoint  
+**Use Case:** "How will weather change from 1st to 4th quarter?"  
+**Files:** `lib/weather-service.ts` (add `getGameTimeForecast()`)
+
+#### W3. Historical Weather Impact Database
+**Priority:** MEDIUM  
+**Description:** Track how teams perform under different weather conditions  
+**Data Schema:**
+```sql
+CREATE TABLE team_weather_performance (
+  team_name TEXT,
+  weather_condition TEXT, -- rain, snow, wind, cold, heat
+  games_played INT,
+  win_percentage DECIMAL,
+  avg_points_scored DECIMAL,
+  avg_points_allowed DECIMAL,
+  updated_at TIMESTAMPTZ
+);
+```
+**Analysis:**
+- Patriots in cold weather (65% win rate)
+- Dolphins in temperatures below 40°F (poor performance)
+- Passing teams in high wind (reduced efficiency)
+**Files:** `lib/weather-impact-analyzer.ts`, new database table
+
+#### W4. Wind Direction & Field Position Analysis
+**Priority:** LOW  
+**Description:** Analyze wind direction relative to field orientation  
+**Features:**
+- Show wind impact by quarter (which endzone has advantage)
+- Recommend field goal attempts based on wind direction
+- Passing direction analysis (with/against wind)
+**Calculation:**
+- Stadium orientation (north-south vs east-west)
+- Current wind direction (degrees)
+- Wind speed and gusts
+**Display:** "20 mph wind favoring south endzone (Q1, Q3)"  
+**Files:** `lib/wind-analysis.ts`
+
+---
+
+### Phase 2: Authentication & Portfolio Tracking
+**Status:** PLANNED  
+**Timeline:** 6-8 weeks  
+**Dependencies:** Supabase Auth, Database schema
+
+#### AUTH1. User Authentication System
+**Priority:** HIGH  
+**Description:** Implement user accounts with Supabase Auth  
+**Features:**
+- Email/password signup and login
+- OAuth providers (Google, Twitter)
+- Password reset flow
+- Email verification
+- Session management
+**Implementation:**
+- Use `@supabase/ssr` for Next.js 16 App Router
+- Auth middleware for protected routes
+- User profile creation on signup
+**Files:** `app/auth/`, `middleware.ts`, `lib/supabase/auth.ts`
+
+#### AUTH2. Authenticated Endpoints
+**Priority:** HIGH  
+**Description:** Protect sensitive endpoints with authentication  
+**Protected Routes:**
+- `/api/user/profile` - User settings and preferences
+- `/api/user/portfolio` - Betting history and tracking
+- `/api/user/alerts` - Custom notifications
+- `/api/user/favorites` - Saved bets and markets
+**Implementation:**
+- JWT validation middleware
+- Row Level Security (RLS) policies
+- User-specific data isolation
+**Files:** `app/api/user/`, RLS policies in database
+
+#### PORT1. Historical Price Charts
+**Priority:** MEDIUM  
+**Description:** Track and visualize odds movement over time  
+**Data Schema:**
+```sql
+CREATE TABLE odds_history (
+  id UUID PRIMARY KEY,
+  event_id TEXT,
+  bookmaker TEXT,
+  market_type TEXT,
+  outcome TEXT,
+  price DECIMAL,
+  timestamp TIMESTAMPTZ
+);
+```
+**Features:**
+- Line chart showing odds changes
+- Identify line movement triggers
+- Compare across bookmakers
+- Alert on significant moves
+**UI:** Recharts line charts with time series  
+**Files:** `components/OddsPriceChart.tsx`, new database table
+
+#### PORT2. Market Depth & Order Book
+**Priority:** LOW  
+**Description:** For prediction markets, show order book depth  
+**Applies To:** Kalshi, Polymarket  
+**Display:**
+- Bid/ask spread
+- Order book depth at each price level
+- Recent trade history
+- Liquidity indicators
+**Files:** `components/MarketDepthChart.tsx`, `lib/kalshi-api-client.ts`
+
+#### PORT3. User Portfolio Tracking
+**Priority:** HIGH  
+**Description:** Track user bets and calculate performance  
+**Data Schema:**
+```sql
+CREATE TABLE user_bets (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES auth.users,
+  event_id TEXT,
+  bet_type TEXT,
+  stake DECIMAL,
+  odds DECIMAL,
+  status TEXT, -- pending, won, lost, void
+  settled_at TIMESTAMPTZ
+);
+```
+**Features:**
+- Add bets manually
+- Calculate ROI and win rate
+- Track by sport, bet type, bookmaker
+- Performance charts over time
+**Files:** `app/portfolio/`, `components/PortfolioSummary.tsx`
+
+#### PORT4. Market Alerts & Notifications
+**Priority:** MEDIUM  
+**Description:** Real-time alerts for betting opportunities  
+**Alert Types:**
+- Arbitrage opportunity detected (>2% edge)
+- Line movement (>10 cents in 5 minutes)
+- New high-value props
+- Favorable weather updates
+**Delivery Methods:**
+- In-app notifications
+- Email alerts
+- Webhook for advanced users
+**Implementation:**
+- Background job checks for triggers every 60 seconds
+- Supabase Realtime for instant updates
+**Files:** `lib/alert-engine.ts`, `app/api/alerts/`, database trigger functions
+
+---
+
+### Phase 3: Historical Data & Advanced Analysis
+**Status:** PLANNED  
+**Timeline:** 8-12 weeks  
+**Dependencies:** Database, External APIs
+
+#### HIST1. Automated Game Result Scraping
+**Priority:** HIGH  
+**Description:** Scrape game results from ESPN/sports APIs  
+**Data Sources:**
+- ESPN API (unofficial but reliable)
+- The Odds API (results endpoint)
+- Official league APIs where available
+**Data Schema:**
+```sql
+CREATE TABLE game_results (
+  id UUID PRIMARY KEY,
+  sport TEXT,
+  event_id TEXT,
+  home_team TEXT,
+  away_team TEXT,
+  home_score INT,
+  away_score INT,
+  game_date TIMESTAMPTZ,
+  final_status TEXT,
+  created_at TIMESTAMPTZ
+);
+```
+**Implementation:**
+- Cron job runs daily at 2 AM
+- Scrapes previous day's completed games
+- Updates betting outcome tables
+- Calculates prop hit rates
+**Files:** `scripts/scrape-game-results.ts`, `lib/espn-scraper.ts`
+
+#### HIST2. Historical Data Backfill Scripts
+**Priority:** MEDIUM  
+**Description:** Import past seasons of game results and odds  
+**Data Range:** Last 5 seasons (2021-2026)  
+**Sources:**
+- Sports Reference (Baseball Reference, Pro Football Reference)
+- Kaggle datasets
+- The Odds API historical data (paid)
+**Scripts:**
+- `scripts/backfill-nfl-2021-2025.ts`
+- `scripts/backfill-nba-2021-2025.ts`
+- `scripts/backfill-mlb-2021-2025.ts`
+**Usage:** Run once to populate database, then keep updated with daily scraper  
+**Files:** `scripts/backfill-*.ts`, `lib/sports-reference-api.ts`
+
+#### HIST3. Matchup-Specific Analysis
+**Priority:** HIGH  
+**Description:** Analyze team performance against specific opponents  
+**Features:**
+- Head-to-head records (last 10 meetings)
+- Division rival analysis
+- Pitcher vs batter historical matchups (MLB)
+- QB vs defense matchups (NFL)
+**Queries:**
+- "How do Lakers perform vs Warriors?"
+- "LeBron James career stats vs Celtics"
+- "Patrick Mahomes vs Bills defense"
+**Data Schema:**
+```sql
+CREATE TABLE matchup_history (
+  id UUID PRIMARY KEY,
+  sport TEXT,
+  team1 TEXT,
+  team2 TEXT,
+  date TIMESTAMPTZ,
+  team1_score INT,
+  team2_score INT,
+  winner TEXT,
+  notes JSONB
+);
+```
+**Files:** `lib/matchup-analyzer.ts`, `app/api/matchups/route.ts`
+
+#### HIST4. Venue Impact Analysis (Home/Away Splits)
+**Priority:** MEDIUM  
+**Description:** Calculate performance differences at home vs away  
+**Metrics:**
+- Win percentage (home vs away)
+- Points scored differential
+- Defensive performance
+- Specific stadium effects (Coors Field altitude, Lambeau cold)
+**Data Schema:**
+```sql
+CREATE TABLE venue_splits (
+  team_name TEXT,
+  venue TEXT,
+  games_played INT,
+  win_percentage DECIMAL,
+  avg_points_scored DECIMAL,
+  avg_points_allowed DECIMAL,
+  notable_factors JSONB
+);
+```
+**Analysis Examples:**
+- Rockies hit 40% more home runs at Coors Field
+- Bills defense +15% better at home in December
+**Files:** `lib/venue-impact-analyzer.ts`
+
+#### HIST5. Weather Correlation for Outdoor Sports
+**Priority:** LOW  
+**Description:** Statistical correlation between weather and game outcomes  
+**Analysis:**
+- Over/under hit rate in rain vs dry
+- Home team advantage in extreme weather
+- Wind impact on field goal percentage
+- Temperature effect on scoring
+**ML Approach:**
+- Train model on 5 years of weather + results
+- Predict over/under likelihood based on forecast
+- Confidence intervals for predictions
+**Files:** `lib/weather-ml-model.ts`, `scripts/train-weather-model.py`
+
+#### HIST6. Bookmaker Comparison (Line Shopping)
+**Priority:** HIGH  
+**Description:** Compare odds across bookmakers to find best value  
+**Bookmakers Tracked:**
+- DraftKings, FanDuel, BetMGM, Caesars
+- Bet365, PointsBet, WynnBET
+- Offshore: Pinnacle, Bovada
+**Features:**
+- Highlight "softest" lines (best odds)
+- Show percentage edge over consensus
+- Track which books offer best value by sport
+- "Sharp" vs "recreational" book classification
+**Display:**
+```
+Lakers ML:
+  DraftKings: -145 (Worst)
+  FanDuel: -138
+  Pinnacle: -142
+  BetMGM: -135 (Best) ← 7 cent advantage
+```
+**Files:** `lib/line-shopping.ts`, `components/BookmakerComparison.tsx`
+
+---
+
+### Phase 4: Arbitrage & Trading Platform
+**Status:** PLANNED  
+**Timeline:** 10-14 weeks  
+**Dependencies:** Real-time odds, Historical data, Auth system
+
+**LEGAL WARNING:** Automated betting may violate sportsbook terms of service. This is for educational/research purposes only.
+
+#### ARB1. Spread and Totals Arbitrage Detection
+**Priority:** HIGH  
+**Description:** Detect arbitrage opportunities across spread and totals markets  
+**Current:** Moneyline arbitrage only  
+**Enhancement:**
+- Spread arbitrage (e.g., Team A +3.5 vs Team B -3)
+- Totals arbitrage (Over 45.5 vs Under 46)
+- Middle opportunities (profit on both sides if result lands in gap)
+**Algorithm:**
+```typescript
+function findSpreadArbitrage(odds: OddsData[]): Arbitrage[] {
+  for (const event of events) {
+    for (const book1 of event.bookmakers) {
+      for (const book2 of event.bookmakers) {
+        if (book1 === book2) continue;
+        
+        const spread1 = book1.spreads.home;
+        const spread2 = book2.spreads.away;
+        
+        if (isArbitrage(spread1, spread2)) {
+          return { type: 'spread', books: [book1, book2], edge: calculateEdge() };
+        }
+      }
+    }
+  }
+}
+```
+**Files:** `lib/arbitrage-detector.ts` (extend existing)
+
+#### ARB2. Mid-Game Live Betting Arbitrage
+**Priority:** MEDIUM  
+**Description:** Real-time arbitrage during live games  
+**Challenges:**
+- Odds change every 5-30 seconds
+- Must execute bets within seconds
+- Higher risk of bet rejection
+**Features:**
+- WebSocket connection to odds feeds
+- Sub-second latency requirement
+- Auto-calculate optimal stakes
+- Track execution speed
+**Implementation:**
+- WebSocket client for The Odds API live feed
+- Redis for ultra-fast odds storage
+- Alert system for opportunities >1% edge
+**Files:** `lib/live-arbitrage-monitor.ts`, WebSocket handler
+
+#### ARB3. Automated Bet Placement via Sportsbook APIs
+**Priority:** LOW (HIGH RISK)  
+**Description:** Programmatic bet placement  
+**WARNING:** Most sportsbooks prohibit automated betting. Risk of account closure.  
+**Approach:**
+- Research bookmakers with official APIs (if any)
+- Headless browser automation (Puppeteer) as fallback
+- Captcha solving (2Captcha API)
+- Session management and rotation
+**Legal Considerations:**
+- Review each sportsbook's terms of service
+- Consult legal counsel before implementation
+- Consider jurisdictional restrictions
+**Files:** `lib/sportsbook-clients/`, `lib/bet-automation.ts`
+
+**RECOMMENDATION:** Focus on arbitrage detection and manual execution, not automation.
+
+#### ARB4. Historical Arbitrage Opportunity Tracking
+**Priority:** MEDIUM  
+**Description:** Database of past arbitrage opportunities  
+**Data Schema:**
+```sql
+CREATE TABLE arbitrage_history (
+  id UUID PRIMARY KEY,
+  detected_at TIMESTAMPTZ,
+  sport TEXT,
+  event_id TEXT,
+  market_type TEXT,
+  book1 TEXT,
+  book2 TEXT,
+  edge_percentage DECIMAL,
+  duration_seconds INT, -- how long opportunity lasted
+  executed BOOLEAN,
+  profit_realized DECIMAL
+);
+```
+**Analysis:**
+- Which bookmaker pairs offer most arbitrage
+- Average opportunity duration
+- Best times of day for arbitrage
+- Which sports have most opportunities
+**Files:** `app/api/arbitrage/history/route.ts`, database table
+
+#### ARB5. Notification System for New Opportunities
+**Priority:** HIGH  
+**Description:** Real-time alerts when arbitrage is detected  
+**Delivery:**
+- Push notifications (web push API)
+- SMS via Twilio (optional, user-configured)
+- Email alerts
+- Discord/Telegram webhooks
+**Filters:**
+- Minimum edge threshold (e.g., only alert if >2%)
+- Specific sports
+- Specific bookmakers
+- Time of day preferences
+**Implementation:**
+- Background worker checks every 30 seconds
+- Supabase Realtime for instant delivery
+- Rate limiting to avoid alert fatigue
+**Files:** `lib/notification-service.ts`, `app/api/notifications/route.ts`
+
+#### ARB6. Multi-Way Arbitrage (3+ Outcomes)
+**Priority:** LOW  
+**Description:** Arbitrage across markets with 3 or more outcomes  
+**Examples:**
+- Soccer (Home/Draw/Away)
+- Golf/Tennis (multiple players)
+- Futures (multiple teams to win championship)
+**Calculation:**
+```typescript
+function isMultiWayArbitrage(outcomes: Outcome[]): boolean {
+  const sumOfReciprocals = outcomes.reduce((sum, outcome) => {
+    return sum + (1 / outcome.decimalOdds);
+  }, 0);
+  
+  return sumOfReciprocals < 1; // Arbitrage exists
+}
+```
+**Complexity:** Much rarer than 2-way arbitrage  
+**Files:** `lib/arbitrage-detector.ts` (extend with multi-way logic)
+
+---
+
+### Phase 5: Year-Round Content (Historical Reference Mode)
+**Status:** PLANNED  
+**Timeline:** 6-8 weeks  
+**Dependencies:** Historical data backfill (Phase 3)
+
+#### YR1. Import Historical Odds Data
+**Priority:** MEDIUM  
+**Description:** Populate database with past seasons' opening/closing lines  
+**Data Sources:**
+- Sports Odds History (paid API)
+- Kaggle datasets
+- The Odds API historical endpoint
+**Data Range:** Last 3-5 seasons  
+**Schema:**
+```sql
+CREATE TABLE historical_odds (
+  id UUID PRIMARY KEY,
+  sport TEXT,
+  season TEXT, -- "2024-25 NBA"
+  event_date DATE,
+  home_team TEXT,
+  away_team TEXT,
+  market_type TEXT,
+  opening_line DECIMAL,
+  closing_line DECIMAL,
+  result TEXT
+);
+```
+**Files:** `scripts/import-historical-odds.ts`, database table
+
+#### YR2. Show "Typical" Betting Patterns from Past Seasons
+**Priority:** MEDIUM  
+**Description:** When no live games, show historical trends and patterns  
+**Features:**
+- "In Week 1 of NFL, home underdogs are 58-42 ATS over last 5 years"
+- "MLB totals in April go over 52% of the time"
+- "NBA home favorites cover 54% in back-to-back games"
+**Data Source:** Aggregated from `historical_odds` and `game_results`  
+**UI:** Insight cards marked with "Historical Analysis" badge  
+**Files:** `lib/historical-patterns-analyzer.ts`, `app/api/historical-insights/route.ts`
+
+#### YR3. Label Clearly as "Historical Reference - Not Live Data"
+**Priority:** HIGH (LEGAL REQUIREMENT)  
+**Description:** Prominent disclaimers for off-season content  
+**Implementation:**
+- Orange badge on every historical card: "Historical Reference"
+- Modal on first view explaining data is from past seasons
+- Footer text: "These insights are based on historical data from 2021-2025 seasons. No live games are currently available for this sport."
+**Reason:** Prevent user confusion, avoid misrepresentation  
+**Files:** All card components, `components/HistoricalDataBadge.tsx`
+
+#### YR4. Database Backfill Scripts
+**Priority:** HIGH  
+**Description:** Automated scripts to populate historical data  
+**Scripts:**
+1. `backfill-nfl-seasons.ts` - Import NFL 2021-2025
+2. `backfill-nba-seasons.ts` - Import NBA 2021-2025
+3. `backfill-mlb-seasons.ts` - Import MLB 2021-2025
+4. `backfill-nhl-seasons.ts` - Import NHL 2021-2025
+**Execution:** One-time setup, run locally or as migration  
+**Duration:** ~2-4 hours per sport (depends on API rate limits)  
+**Storage:** Estimated 500MB-2GB per sport (5 seasons)  
+**Files:** `scripts/backfill-*.ts`
+
+---
+
+## Updated Task Statistics
+
+**Total Tasks:** 46 (existing) + 33 (new phases) = **79 tasks**
+
+**By Phase:**
+- Phase 0: Core Issues - 3 tasks (completed)
+- Phase 1: Weather & Stadiums - 4 tasks
+- Phase 2: Auth & Portfolio - 8 tasks
+- Phase 3: Historical Data - 6 tasks
+- Phase 4: Arbitrage Platform - 6 tasks
+- Phase 5: Year-Round Content - 4 tasks
+- Original Tasks - 46 tasks
+
+**Timeline Estimate:**
+- Phase 1: 4-6 weeks
+- Phase 2: 6-8 weeks
+- Phase 3: 8-12 weeks
+- Phase 4: 10-14 weeks
+- Phase 5: 6-8 weeks
+
+**Total Development Time:** 34-48 weeks (8-12 months) for complete platform
+
+**With Parallel Teams:** 20-28 weeks (5-7 months)
+
+---
+
+## Implementation Priority Recommendation
+
+Based on user value and complexity, the recommended implementation order is:
+
+### Priority 1 (Next 4 weeks):
+1. Complete existing critical issues (CI1-CI3)
+2. AUTH1 - User authentication system
+3. PORT3 - Portfolio tracking
+4. W1 - Expand stadium database
+
+### Priority 2 (Weeks 5-12):
+5. HIST1 - Automated game result scraping
+6. HIST3 - Matchup-specific analysis
+7. ARB1 - Spread/totals arbitrage
+8. PORT4 - Market alerts
+9. HIST6 - Bookmaker comparison
+
+### Priority 3 (Weeks 13-24):
+10. YR1-YR4 - Historical data and year-round content
+11. HIST2 - Historical data backfill
+12. ARB4 - Arbitrage history tracking
+13. W2-W4 - Advanced weather features
+
+### Priority 4 (Weeks 25+):
+14. ARB2 - Live betting arbitrage
+15. PORT2 - Market depth
+16. HIST5 - Weather correlation ML
+17. ARB6 - Multi-way arbitrage
+
+**Note:** ARB3 (Automated bet placement) is NOT recommended due to legal/ToS concerns.
+
+---
 **Requirements:**
 1. Fix cards API internal fetch
 2. Verify odds fetch executes for betting queries

@@ -127,60 +127,356 @@ cost = [number of markets] × [number of regions]
 
 ## Troubleshooting
 
+### Diagnostic Steps
+
+Before diving into specific errors, run these diagnostic checks:
+
+1. **Test Connection:** `http://localhost:3000/api/test-odds-connection`
+2. **Check System Health:** `http://localhost:3000/api/health/system`
+3. **View Debug Logs:** Check browser console and terminal output
+
+---
+
 ### Error: "ODDS_API_KEY not configured"
 
-**Problem:** Environment variable not set
+**Problem:** Environment variable not set or not loaded
 
-**Solution:**
-1. Create `.env.local` in project root
-2. Add: `ODDS_API_KEY=your_key_here`
-3. Restart development server
-4. Test with `/api/test-odds-connection`
+**Root Cause Analysis:**
+- `.env.local` file missing
+- API key not defined in environment variables
+- Server not restarted after adding key
+- Key contains syntax errors (quotes, spaces)
+
+**Step-by-Step Solution:**
+
+1. **Create Environment File**
+   ```bash
+   touch .env.local
+   ```
+
+2. **Add API Key** (no quotes, no spaces)
+   ```bash
+   ODDS_API_KEY=6a8cb1c4d3e2f1a0b9c8d7e6f5a4b3c2
+   ```
+
+3. **Verify File Location**
+   - Must be in project root (same directory as `package.json`)
+   - File should start with a dot: `.env.local`
+
+4. **Restart Development Server**
+   ```bash
+   # Stop server (Ctrl+C)
+   npm run dev
+   # or
+   pnpm dev
+   ```
+
+5. **Test Configuration**
+   - Visit: `http://localhost:3000/api/test-odds-connection`
+   - Should show: "API Key: Configured (6a8cb1c4...)"
+
+**Validation:**
+```bash
+# Check if file exists
+ls -la .env.local
+
+# View contents (be careful not to expose in production)
+cat .env.local
+```
+
+---
 
 ### Error: "Invalid API key" (401)
 
-**Problem:** API key is incorrect or expired
+**Problem:** API key is incorrect, expired, or malformed
 
-**Solution:**
-1. Go to [https://the-odds-api.com/account/](https://the-odds-api.com/account/)
-2. Verify your API key is active
-3. Copy the key exactly (no extra spaces)
-4. Update `.env.local`
-5. Restart server
+**Root Cause Analysis:**
+- Typo when copying API key
+- Extra spaces or invisible characters
+- API key has been regenerated on The Odds API dashboard
+- Account suspended or key revoked
+
+**Step-by-Step Solution:**
+
+1. **Login to The Odds API**
+   - Go to: [https://the-odds-api.com/account/](https://the-odds-api.com/account/)
+   - Verify you're logged in
+
+2. **Locate Your API Key**
+   - Look for "API Key" section
+   - Key format: 32 hexadecimal characters (0-9, a-f)
+
+3. **Copy Key Carefully**
+   ```bash
+   # Use "Copy" button, don't manually select
+   # Correct format: 6a8cb1c4d3e2f1a0b9c8d7e6f5a4b3c2
+   # Length: exactly 32 characters
+   ```
+
+4. **Update `.env.local`**
+   ```bash
+   # Remove old key
+   ODDS_API_KEY=6a8cb1c4d3e2f1a0b9c8d7e6f5a4b3c2
+   
+   # Common mistakes to avoid:
+   # ❌ ODDS_API_KEY="6a8cb1c4d3e2f1a0b9c8d7e6f5a4b3c2"  (no quotes)
+   # ❌ ODDS_API_KEY= 6a8cb1c4d3e2f1a0b9c8d7e6f5a4b3c2  (no space after =)
+   # ❌ ODDS_API_KEY=6a8cb1c4...                       (must be complete)
+   ```
+
+5. **Restart Server**
+   ```bash
+   # Ctrl+C to stop
+   npm run dev
+   ```
+
+6. **Test**
+   - Visit test endpoint
+   - Check for "Valid API key" message
+   - Verify quota shows correct numbers
+
+**Advanced Validation:**
+```bash
+# Test API key directly with curl
+curl "https://api.the-odds-api.com/v4/sports?apiKey=YOUR_KEY_HERE"
+
+# Should return JSON with sport list, not 401 error
+```
+
+---
 
 ### Error: "Rate limit exceeded" (429)
 
-**Problem:** You've used all your monthly requests
+**Problem:** You've exhausted your monthly request quota
+
+**Root Cause Analysis:**
+- All 500 free requests used
+- Too many markets/regions per request
+- Inefficient caching or duplicate requests
+- Development testing consuming quota
+
+**Step-by-Step Solution:**
+
+1. **Check Current Usage**
+   - Dashboard: [https://the-odds-api.com/account/](https://the-odds-api.com/account/)
+   - Look for "Requests this month" metric
+
+2. **Wait for Reset** (if quota exhausted)
+   - Free plan resets monthly
+   - Reset date shown on dashboard
+
+3. **Optimize Requests** (reduce future usage)
+
+   **A. Use Free Endpoints**
+   ```typescript
+   // Free (doesn't count against quota)
+   GET /v4/sports
+   GET /v4/sports/{sport}/events
+   
+   // Costs quota
+   GET /v4/sports/{sport}/odds
+   ```
+
+   **B. Reduce Market/Region Multiplier**
+   ```typescript
+   // Bad: 9 requests per call
+   markets: 'h2h,spreads,totals',
+   regions: 'us,uk,eu'
+   
+   // Good: 1 request per call
+   markets: 'h2h',
+   regions: 'us'
+   ```
+
+   **C. Increase Cache Duration**
+   ```typescript
+   // Current: 60 seconds
+   const CACHE_TTL = 60000;
+   
+   // Recommended: 120-300 seconds
+   const CACHE_TTL = 180000; // 3 minutes
+   ```
+
+   **D. Implement Request Deduplication**
+   - Use `lib/fetch-with-dedupe.ts`
+   - Prevents duplicate in-flight requests
+   - Already implemented in `/api/odds` endpoint
+
+4. **Monitor Quota in Application**
+   ```typescript
+   // Check response headers
+   const remaining = response.headers.get('x-requests-remaining');
+   if (parseInt(remaining) < 10) {
+     console.warn('Low quota: ', remaining);
+   }
+   ```
+
+5. **Consider Upgrading**
+   - Starter Plan: 10,000 requests/month ($10/month)
+   - Pro Plan: 100,000 requests/month ($50/month)
+   - [View pricing](https://the-odds-api.com/#pricing)
+
+**Quota Usage Calculator:**
+```
+Cost = [Markets] × [Regions] × [Request Frequency] × [Sports]
+
+Example:
+- 1 market (h2h) × 1 region (us) × 30 requests/day × 4 sports = 120 requests/day
+- Monthly: 120 × 30 = 3,600 requests (exceeds free tier)
+
+Optimized:
+- 1 market × 1 region × 10 requests/day × 2 sports = 20 requests/day
+- Monthly: 20 × 30 = 600 requests (within free tier with buffer)
+```
+
+---
+
+### Error: "No events returned" / Empty Array
+
+**Problem:** API returns empty array `[]` despite successful request
+
+**Root Cause Analysis:**
+- Sport is out of season (`active: false`)
+- No games scheduled for next 7 days
+- Bookmakers haven't listed odds yet
+- Wrong sport key used
+
+**Step-by-Step Solution:**
+
+1. **Check Sport Status**
+   ```bash
+   # Visit:
+   http://localhost:3000/api/odds/sports
+   
+   # Look for "active": true
+   ```
+
+2. **Verify Active Sports**
+   ```json
+   {
+     "key": "icehockey_nhl",
+     "active": true,  // ✅ In season
+     "title": "NHL"
+   }
+   
+   {
+     "key": "baseball_mlb",
+     "active": false, // ❌ Off season (Feb-Mar)
+     "title": "MLB"
+   }
+   ```
+
+3. **Try Alternative Sports**
+   - **Winter (Dec-Mar):** NHL, NBA, College Basketball
+   - **Spring (Apr-Jun):** MLB, NBA Playoffs
+   - **Summer (Jul-Sep):** MLB
+   - **Fall (Sep-Dec):** NFL, College Football, NHL (starts Oct)
+
+4. **Check Upcoming Events**
+   ```bash
+   # Use free events endpoint
+   curl "https://api.the-odds-api.com/v4/sports/icehockey_nhl/events?apiKey=YOUR_KEY"
+   
+   # If this returns events but /odds doesn't, odds aren't listed yet
+   ```
+
+5. **Verify Application Logic**
+   - Check logs: "Found X live games"
+   - Verify sport key matches: `icehockey_nhl` not `nhl`
+   - Check date filters aren't excluding events
+
+**Seasonal Sports Calendar:**
+```
+NFL:       Sep - Feb
+NBA:       Oct - Jun  
+NHL:       Oct - Jun
+MLB:       Apr - Oct
+Soccer:    Year-round (various leagues)
+```
+
+---
+
+### Error: Connection Timeout / Network Error
+
+**Problem:** Request exceeds timeout or fails to connect
+
+**Root Cause Analysis:**
+- Slow internet connection
+- Firewall blocking HTTPS requests
+- DNS resolution issues
+- API server temporarily down
+
+**Step-by-Step Solution:**
+
+1. **Test Direct Connection**
+   ```bash
+   # Test if you can reach the API
+   curl -I https://api.the-odds-api.com
+   
+   # Should return: HTTP/2 200
+   ```
+
+2. **Check Firewall Settings**
+   - Allow HTTPS (port 443) to `api.the-odds-api.com`
+   - Corporate networks may block external APIs
+
+3. **Try IPv6 Endpoint** (if available)
+   ```typescript
+   const BASE_URL = 'https://ipv6-api.the-odds-api.com/v4';
+   ```
+
+4. **Increase Timeout** (in `/api/odds/route.ts`)
+   ```typescript
+   const response = await fetch(apiUrl, {
+     signal: AbortSignal.timeout(15000) // Increase to 15 seconds
+   });
+   ```
+
+5. **Check API Status**
+   - Status page: [https://the-odds-api.com/](https://the-odds-api.com/)
+   - Look for "All Systems Operational"
+
+6. **Debug Network in Browser**
+   ```javascript
+   // Open DevTools → Network tab
+   // Look for failed requests to api.the-odds-api.com
+   // Check status code and timing
+   ```
+
+---
+
+### Warning: "Trust metrics timeout, using defaults"
+
+**Problem:** Trust metrics calculation taking too long
+
+**Impact:** Non-critical - System uses sensible defaults
+
+**Root Cause Analysis:**
+- Database query taking >5 seconds
+- Large dataset causing slow aggregation
+- Database not indexed properly
 
 **Solution:**
-1. Check usage at [https://the-odds-api.com/account/](https://the-odds-api.com/account/)
-2. Wait for monthly reset
-3. Optimize requests:
-   - Reduce market types
-   - Reduce regions
-   - Cache results longer
-   - Use /events endpoint (free) instead of /odds
-4. Consider upgrading plan
 
-### Error: "No events returned"
+1. **Run Performance Indexes** (one-time setup)
+   ```sql
+   -- In Supabase SQL Editor:
+   \i scripts/performance-indexes.sql
+   ```
 
-**Problem:** Sport might be out of season
+2. **Verify Indexes Created**
+   ```sql
+   SELECT * FROM pg_indexes WHERE tablename = 'ai_response_trust';
+   ```
 
-**Solution:**
-1. Check if sport is `active: true` in `/sports` endpoint
-2. Try different sports (NFL, NBA, NHL, MLB)
-3. Verify bookmakers have listed games
-4. Check `commence_time` filters
+3. **This is Expected Behavior**
+   - Trust metrics run async in background
+   - Defaults are used until calculation completes
+   - Does not affect functionality
 
-### Connection Timeout
-
-**Problem:** Request taking too long
-
-**Solution:**
-1. Check internet connection
-2. Verify firewall allows HTTPS to `api.the-odds-api.com`
-3. Try IPv6 endpoint: `https://ipv6-api.the-odds-api.com`
-4. Increase timeout in code (currently 10s)
+**Performance:**
+- Before indexes: 5-10 seconds (timeout)
+- After indexes: <100ms (instant)
 
 ---
 

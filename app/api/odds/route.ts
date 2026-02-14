@@ -20,6 +20,33 @@ interface OddsRequest {
   eventId?: string;
 }
 
+// Simple in-memory cache for odds data
+const oddsCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 60000; // 1 minute cache
+
+function getCachedOdds(key: string): any | null {
+  const cached = oddsCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    console.log(`[v0] Cache HIT for ${key}`);
+    return cached.data;
+  }
+  if (cached) {
+    oddsCache.delete(key); // Remove stale cache
+  }
+  return null;
+}
+
+function setCachedOdds(key: string, data: any): void {
+  oddsCache.set(key, { data, timestamp: Date.now() });
+  
+  // Limit cache size to prevent memory issues
+  if (oddsCache.size > 100) {
+    const oldestKey = Array.from(oddsCache.entries())
+      .sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0];
+    oddsCache.delete(oldestKey);
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { sport, marketType, eventId }: OddsRequest = await req.json();
@@ -54,6 +81,18 @@ export async function POST(req: NextRequest) {
     
     console.log(`${LOG_PREFIXES.API} Fetching odds for ${sportInfo.name} (${sportInfo.apiKey}), market: ${marketType || MARKET_TYPES.H2H}`);
 
+    // Check cache first
+    const cacheKey = `${normalizedSport}:${marketType || MARKET_TYPES.H2H}:${eventId || 'all'}`;
+    const cachedData = getCachedOdds(cacheKey);
+    
+    if (cachedData) {
+      return NextResponse.json({
+        ...cachedData,
+        cached: true,
+        timestamp: new Date().toISOString()
+      });
+    }
+
     // Build API URL based on request parameters
     const baseUrl = `${EXTERNAL_APIS.ODDS_API.BASE_URL}/sports`;
     
@@ -68,12 +107,56 @@ export async function POST(req: NextRequest) {
 
     console.log(`[v0] Fetching from URL: ${apiUrl.replace(oddsApiKey || '', 'REDACTED')}`);
     
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
+    // Retry logic with exponential backoff
+    let response: Response | null = null;
+    let lastError: Error | null = null;
+    const maxRetries = 3;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[v0] Odds API attempt ${attempt}/${maxRetries}...`);
+        
+        response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+          signal: AbortSignal.timeout(10000) // 10 second timeout
+        });
+        
+        if (response.ok) {
+          break; // Success, exit retry loop
+        }
+        
+        // Don't retry on 4xx errors (client errors)
+        if (response.status >= 400 && response.status < 500) {
+          console.log(`[v0] Client error ${response.status}, not retrying`);
+          break;
+        }
+        
+        // Retry on 5xx errors (server errors)
+        console.log(`[v0] Server error ${response.status}, will retry...`);
+        lastError = new Error(`HTTP ${response.status}`);
+        
+        if (attempt < maxRetries) {
+          const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          console.log(`[v0] Waiting ${backoffMs}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`[v0] Fetch attempt ${attempt} failed:`, lastError.message);
+        
+        if (attempt < maxRetries) {
+          const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+        }
+      }
+    }
+    
+    if (!response) {
+      throw lastError || new Error('Failed to fetch odds after retries');
+    }
 
     console.log(`[v0] Odds API response status: ${response.status}`);
 
@@ -105,6 +188,7 @@ export async function POST(req: NextRequest) {
       timestamp: new Date().toISOString(),
       remainingRequests: response.headers.get('x-requests-remaining'),
       usedRequests: response.headers.get('x-requests-used'),
+      cached: false
     };
 
     // Calculate implied probabilities from odds
@@ -143,6 +227,9 @@ export async function POST(req: NextRequest) {
       }
       return event;
     });
+
+    // Cache the transformed data
+    setCachedOdds(cacheKey, transformedData);
 
     return NextResponse.json(transformedData);
   } catch (error: any) {

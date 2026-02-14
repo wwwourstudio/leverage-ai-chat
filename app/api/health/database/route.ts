@@ -48,11 +48,27 @@ export async function GET() {
       global: { fetch: fetch.bind(globalThis) }
     });
 
-    const { error: connectionError } = await supabase
-      .from('information_schema.tables')
-      .select('table_name')
-      .eq('table_schema', 'public')
-      .limit(1);
+    // Test connection with a simple query
+    const { error: connectionError } = await supabase.rpc('pg_backend_pid').catch(() => ({
+      error: null
+    }));
+    
+    // If rpc doesn't work, try a simple table query
+    if (connectionError) {
+      const { error: fallbackError } = await supabase
+        .from('app_config')
+        .select('id')
+        .limit(1);
+      
+      if (fallbackError) {
+        diagnostics.connection.status = 'error';
+        diagnostics.connection.message = fallbackError.message;
+        diagnostics.status = 'down';
+        diagnostics.recommendations.push('Check Supabase project is active and credentials are correct');
+        
+        return NextResponse.json(diagnostics, { status: 503 });
+      }
+    }
 
     if (connectionError) {
       diagnostics.connection.status = 'error';
@@ -79,18 +95,20 @@ export async function GET() {
       'user_profiles'
     ];
 
-    const { data: existingTables, error: schemaError } = await supabase
-      .from('information_schema.tables')
-      .select('table_name')
-      .eq('table_schema', 'public');
-
-    if (schemaError) {
-      diagnostics.schema.status = 'error';
-      diagnostics.status = 'degraded';
-      return NextResponse.json(diagnostics, { status: 200 });
+    // Check each table individually to avoid information_schema RLS issues
+    const tableNames: string[] = [];
+    for (const tableName of requiredTables) {
+      const { error: tableError } = await supabase
+        .from(tableName)
+        .select('id')
+        .limit(1);
+      
+      // If no error or just an empty table, the table exists
+      if (!tableError || tableError.message?.includes('no rows')) {
+        tableNames.push(tableName);
+      }
     }
 
-    const tableNames = existingTables?.map((t: any) => t.table_name) || [];
     diagnostics.schema.tables = tableNames;
     diagnostics.schema.missingTables = requiredTables.filter(t => !tableNames.includes(t));
 

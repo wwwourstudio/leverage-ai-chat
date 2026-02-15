@@ -195,6 +195,17 @@ export async function generateContextualCards(
       const sportCards = await generateSportSpecificCards(sportKey, 1, category);
       console.log(`[v0] [MULTI-SPORT] Received ${sportCards.length} cards from ${apiToSport(sportKey).toUpperCase()}`);
       
+      // Log card details for debugging
+      sportCards.forEach((card, idx) => {
+        console.log(`[v0] [CARD INSPECTION] Card ${idx + 1}:`, {
+          title: card.title,
+          category: card.category,
+          hasMetadataRealData: card.metadata?.realData,
+          hasDataRealData: card.data?.realData,
+          willPass: !!(card.metadata?.realData || card.data?.realData)
+        });
+      });
+      
       // Only add cards with real data
       const realDataCards = sportCards.filter(c => c.metadata?.realData || c.data?.realData);
       console.log(`[v0] [MULTI-SPORT] Filtered to ${realDataCards.length} real data cards (from ${sportCards.length} total)`);

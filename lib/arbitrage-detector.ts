@@ -421,9 +421,10 @@ export async function detectArbitrageFromContext(sport?: string): Promise<any[]>
       }];
     }
     
-    const opportunities = detectArbitrageOpportunities(oddsData, 0.5);
+    const opportunities = detectArbitrageOpportunities(oddsData, 0.25); // Use 0.25% threshold
     
     console.log(`[v0] [ARBITRAGE] Found ${opportunities.length} arbitrage opportunities from ${oddsData.length} games`);
+    console.log(`[v0] [ARBITRAGE] Now creating cards from the ${oddsData.length} available games...`);
     
     // If arbitrage found, return arbitrage cards
     if (opportunities.length > 0) {

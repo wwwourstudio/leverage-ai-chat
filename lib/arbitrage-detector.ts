@@ -338,7 +338,7 @@ export function arbitrageToCard(opp: ArbitrageOpportunity): any {
 export async function detectArbitrageFromContext(sport?: string): Promise<any[]> {
   try {
     const { fetchLiveOdds } = await import('@/lib/odds-api-client');
-    const { SPORT_KEYS, sportToApi } = await import('@/lib/constants');
+    const { SPORT_KEYS, sportToApi, apiToSport } = await import('@/lib/constants');
     
     const normalizedSport = sport ? sportToApi(sport) : SPORT_KEYS.NBA.API;
     const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
@@ -364,7 +364,48 @@ export async function detectArbitrageFromContext(sport?: string): Promise<any[]>
     
     const opportunities = detectArbitrageOpportunities(oddsData, 0.5);
     
-    return opportunities.map(arbitrageToCard);
+    console.log(`[v0] [ARBITRAGE] Found ${opportunities.length} arbitrage opportunities from ${oddsData.length} games`);
+    
+    // If arbitrage found, return arbitrage cards
+    if (opportunities.length > 0) {
+      return opportunities.map(arbitrageToCard);
+    }
+    
+    // NO ARBITRAGE FOUND - Return regular live odds cards instead of empty array
+    console.log(`[v0] [ARBITRAGE] No arbitrage found, converting ${Math.min(3, oddsData.length)} games to regular odds cards`);
+    
+    return oddsData.slice(0, 3).map((game: any) => {
+      const firstBook = game.bookmakers?.[0];
+      const h2hMarket = firstBook?.markets?.find((m: any) => m.key === 'h2h');
+      const outcomes = h2hMarket?.outcomes || [];
+      
+      const homeOdds = outcomes.find((o: any) => o.name === game.home_team);
+      const awayOdds = outcomes.find((o: any) => o.name === game.away_team);
+      
+      return {
+        type: 'LIVE_ODDS',
+        title: `${game.away_team} @ ${game.home_team}`,
+        icon: 'TrendingUp',
+        category: apiToSport(game.sport_key).toUpperCase(),
+        subcategory: 'H2H Markets',
+        gradient: 'from-blue-600 to-indigo-700',
+        data: {
+          matchup: `${game.away_team} @ ${game.home_team}`,
+          gameTime: new Date(game.commence_time).toLocaleString(),
+          homeOdds: homeOdds ? (homeOdds.price > 0 ? `+${homeOdds.price}` : `${homeOdds.price}`) : 'N/A',
+          awayOdds: awayOdds ? (awayOdds.price > 0 ? `+${awayOdds.price}` : `${awayOdds.price}`) : 'N/A',
+          bookmaker: firstBook?.title || 'Multiple Books',
+          bookmakerCount: game.bookmakers?.length || 0,
+          realData: true,
+          status: 'VALUE'
+        },
+        metadata: {
+          realData: true,
+          dataSource: 'The Odds API',
+          timestamp: new Date().toISOString()
+        }
+      };
+    });
   } catch (error) {
     console.error('[v0] [ARBITRAGE] Error in context detection:', error);
     return [];

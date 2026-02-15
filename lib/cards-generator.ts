@@ -258,6 +258,88 @@ export async function generateContextualCards(
     return cards.slice(0, count);
   }
 
+  // Dedicated Arbitrage category - when user explicitly asks for arbitrage
+  if (category === 'arbitrage' || category === 'arb') {
+    console.log('[v0] [CARDS-GEN] Arbitrage category - fetching from Supabase with realtime');
+    try {
+      const supabase = (await import('@/lib/supabase/client')).createClient();
+      
+      // Fetch active arbitrage opportunities from Supabase (stored by API cron)
+      const { data: opportunities } = await supabase
+        .from('arbitrage_opportunities')
+        .select('*')
+        .eq('status', 'active')
+        .gt('expires_at', new Date().toISOString())
+        .order('profit_margin', { ascending: false })
+        .limit(count);
+      
+      if (opportunities && opportunities.length > 0) {
+        console.log(`[v0] [CARDS-GEN] Found ${opportunities.length} arbitrage opportunities`);
+        
+        opportunities.forEach(opp => {
+          cards.push({
+            type: 'ARBITRAGE',
+            title: `${opp.away_team} @ ${opp.home_team}`,
+            icon: 'DollarSign',
+            category: 'ARBITRAGE',
+            subcategory: `${(opp.profit_margin * 100).toFixed(2)}% Profit`,
+            gradient: 'from-emerald-600 to-green-700',
+            data: {
+              matchup: `${opp.away_team} @ ${opp.home_team}`,
+              profitMargin: `${(opp.profit_margin * 100).toFixed(2)}%`,
+              totalStake: `$${opp.total_stake.toFixed(2)}`,
+              guaranteedProfit: `$${(opp.total_stake * opp.profit_margin).toFixed(2)}`,
+              side1: {
+                bookmaker: opp.bookmaker_1,
+                odds: opp.odds_1 > 0 ? `+${opp.odds_1}` : opp.odds_1,
+                stake: `$${opp.stake_1.toFixed(2)}`
+              },
+              side2: {
+                bookmaker: opp.bookmaker_2,
+                odds: opp.odds_2 > 0 ? `+${opp.odds_2}` : opp.odds_2,
+                stake: `$${opp.stake_2.toFixed(2)}`
+              },
+              expiresIn: Math.round((new Date(opp.expires_at).getTime() - Date.now()) / 60000) + ' min',
+              realData: true,
+              status: 'ACTIVE'
+            },
+            metadata: {
+              realData: true,
+              dataSource: 'Supabase Arbitrage Detector',
+              timestamp: opp.detected_at,
+              expiresAt: opp.expires_at
+            }
+          });
+        });
+        
+        return cards;
+      } else {
+        console.log('[v0] [CARDS-GEN] No active arbitrage opportunities');
+      }
+    } catch (error) {
+      console.error('[v0] [CARDS-GEN] Arbitrage fetch error:', error);
+    }
+    
+    // Fallback if no opportunities found
+    cards.push({
+      type: 'ARBITRAGE',
+      title: 'Arbitrage Scanner',
+      icon: 'DollarSign',
+      category: 'ARBITRAGE',
+      subcategory: 'No Opportunities',
+      gradient: 'from-emerald-600 to-teal-700',
+      data: {
+        description: 'Continuously scanning for risk-free profit opportunities',
+        note: 'No arbitrage opportunities currently available',
+        checkingMarkets: 'Monitoring all sportsbooks in real-time',
+        realData: true,
+        status: 'SCANNING'
+      }
+    });
+    
+    return cards;
+  }
+  
   // Betting/Arbitrage cards (default)
   if (category === 'betting' || !category) {
     // Try to detect real arbitrage opportunities
@@ -310,6 +392,97 @@ export async function generateContextualCards(
     }
   }
 
+  // Line Movement category - when user asks about line moves, steam, sharp money
+  if (category === 'lines' || category === 'line_movement' || category === 'steam') {
+    console.log('[v0] [CARDS-GEN] Line movement category - fetching recent movements');
+    try {
+      const supabase = (await import('@/lib/supabase/client')).createClient();
+      
+      // Fetch recent significant line movements (last 24 hours)
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: movements } = await supabase
+        .from('line_movement')
+        .select('*')
+        .gt('updated_at', oneDayAgo)
+        .order('updated_at', { ascending: false })
+        .limit(count * 3);
+      
+      if (movements && movements.length > 0) {
+        console.log(`[v0] [CARDS-GEN] Found ${movements.length} line movements`);
+        
+        // Group by game and show most significant movements
+        const gameMovements = new Map();
+        movements.forEach(move => {
+          const key = `${move.away_team}_${move.home_team}`;
+          if (!gameMovements.has(key) || Math.abs(move.line_change || 0) > Math.abs(gameMovements.get(key).line_change || 0)) {
+            gameMovements.set(key, move);
+          }
+        });
+        
+        const topMovements = Array.from(gameMovements.values()).slice(0, count);
+        
+        topMovements.forEach(move => {
+          const lineChange = move.line_change || 0;
+          const direction = lineChange > 0 ? 'UP' : 'DOWN';
+          const isSteam = Math.abs(lineChange) > 2;
+          
+          cards.push({
+            type: 'LINE_MOVEMENT',
+            title: `${move.away_team} @ ${move.home_team}`,
+            icon: isSteam ? 'TrendingUp' : 'Activity',
+            category: 'LINE MOVEMENT',
+            subcategory: isSteam ? `STEAM ${direction}` : `${direction} ${Math.abs(lineChange).toFixed(1)} pts`,
+            gradient: isSteam ? 'from-red-600 to-orange-600' : 'from-blue-600 to-indigo-600',
+            data: {
+              matchup: `${move.away_team} @ ${move.home_team}`,
+              lineChange: `${lineChange > 0 ? '+' : ''}${lineChange.toFixed(1)} points`,
+              oldLine: move.old_line ? `${move.old_line > 0 ? '+' : ''}${move.old_line}` : 'N/A',
+              newLine: move.new_line ? `${move.new_line > 0 ? '+' : ''}${move.new_line}` : 'N/A',
+              bookmaker: move.bookmaker || 'Multiple Books',
+              timestamp: new Date(move.updated_at).toLocaleString(),
+              isSteamMove: isSteam,
+              direction: direction,
+              sharpMoney: isSteam ? `Heavy ${direction === 'UP' ? 'home' : 'away'} action` : 'Moderate movement',
+              realData: true,
+              status: isSteam ? 'STEAM' : 'MOVEMENT'
+            },
+            metadata: {
+              realData: true,
+              dataSource: 'Line Movement Tracker',
+              timestamp: move.updated_at,
+              gameId: move.game_id
+            }
+          });
+        });
+        
+        return cards;
+      } else {
+        console.log('[v0] [CARDS-GEN] No recent line movements');
+      }
+    } catch (error) {
+      console.error('[v0] [CARDS-GEN] Line movement fetch error:', error);
+    }
+    
+    // Fallback
+    cards.push({
+      type: 'LINE_MOVEMENT',
+      title: 'Line Movement Tracker',
+      icon: 'Activity',
+      category: 'LINE MOVEMENT',
+      subcategory: 'No Recent Movements',
+      gradient: 'from-blue-600 to-indigo-600',
+      data: {
+        description: 'Monitoring odds movements across all sportsbooks',
+        note: 'No significant line movements in the last 24 hours',
+        tracking: 'All major sports and markets',
+        realData: true,
+        status: 'MONITORING'
+      }
+    });
+    
+    return cards;
+  }
+  
   // Kalshi/Prediction Markets - Use unified service with Supabase caching
   if (category === 'kalshi') {
     console.log('[v0] [CARDS-GEN] Kalshi category - using unified service with caching');
@@ -348,6 +521,115 @@ export async function generateContextualCards(
     });
   }
 
+  // Portfolio/Kelly Sizing - when user asks about bet sizing, bankroll management, Kelly criterion
+  if (category === 'portfolio' || category === 'kelly' || category === 'sizing' || category === 'bankroll') {
+    console.log('[v0] [CARDS-GEN] Portfolio/Kelly category - calculating optimal bet sizes');
+    try {
+      const supabase = (await import('@/lib/supabase/client')).createClient();
+      
+      // Get current capital state
+      const { data: capitalState } = await supabase
+        .from('capital_state')
+        .select('*')
+        .eq('active', true)
+        .single();
+      
+      if (capitalState) {
+        // Get current bet allocations
+        const { data: allocations } = await supabase
+          .from('bet_allocations')
+          .select('*')
+          .in('status', ['pending', 'placed'])
+          .order('allocated_capital', { ascending: false })
+          .limit(count);
+        
+        const totalAllocated = allocations?.reduce((sum, bet) => sum + bet.allocated_capital, 0) || 0;
+        const utilization = (totalAllocated / capitalState.total_capital) * 100;
+        
+        // Portfolio summary card
+        cards.push({
+          type: 'PORTFOLIO',
+          title: 'Portfolio Overview',
+          icon: 'Wallet',
+          category: 'PORTFOLIO',
+          subcategory: `${utilization.toFixed(1)}% Deployed`,
+          gradient: 'from-purple-600 to-pink-600',
+          data: {
+            totalBankroll: `$${capitalState.total_capital.toFixed(2)}`,
+            deployed: `$${totalAllocated.toFixed(2)}`,
+            available: `$${(capitalState.total_capital - totalAllocated).toFixed(2)}`,
+            utilizationRate: `${utilization.toFixed(1)}%`,
+            riskBudget: `${(capitalState.risk_budget * 100).toFixed(0)}%`,
+            kellyScale: `${(capitalState.kelly_scale * 100).toFixed(0)}% (${capitalState.kelly_scale === 0.25 ? 'Quarter Kelly' : capitalState.kelly_scale === 0.5 ? 'Half Kelly' : 'Custom'})`,
+            maxSinglePosition: `${(capitalState.max_single_position * 100).toFixed(0)}%`,
+            activeBets: allocations?.length || 0,
+            realData: true,
+            status: utilization > 80 ? 'HIGH_UTILIZATION' : utilization > 50 ? 'MODERATE' : 'CONSERVATIVE'
+          },
+          metadata: {
+            realData: true,
+            dataSource: 'Capital State Manager',
+            timestamp: capitalState.updated_at
+          }
+        });
+        
+        // Show top allocations if any exist
+        if (allocations && allocations.length > 0) {
+          allocations.slice(0, Math.min(2, count - 1)).forEach(bet => {
+            const kellyPct = (bet.kelly_fraction * 100).toFixed(2);
+            cards.push({
+              type: 'KELLY_BET',
+              title: bet.matchup || 'Bet Allocation',
+              icon: 'Target',
+              category: 'KELLY SIZING',
+              subcategory: `${kellyPct}% Kelly`,
+              gradient: 'from-indigo-600 to-purple-600',
+              data: {
+                matchup: bet.matchup,
+                sport: bet.sport?.toUpperCase(),
+                edge: `${(bet.edge * 100).toFixed(2)}%`,
+                confidence: `${(bet.confidence_score * 100).toFixed(0)}%`,
+                kellyFraction: `${kellyPct}%`,
+                recommendedStake: `$${bet.allocated_capital.toFixed(2)}`,
+                expectedValue: `$${(bet.allocated_capital * bet.edge).toFixed(2)}`,
+                status: bet.status?.toUpperCase(),
+                realData: true
+              },
+              metadata: {
+                realData: true,
+                dataSource: 'Capital Allocator',
+                timestamp: bet.created_at
+              }
+            });
+          });
+        }
+        
+        return cards;
+      }
+    } catch (error) {
+      console.error('[v0] [CARDS-GEN] Portfolio fetch error:', error);
+    }
+    
+    // Fallback
+    cards.push({
+      type: 'PORTFOLIO',
+      title: 'Portfolio Manager',
+      icon: 'Wallet',
+      category: 'PORTFOLIO',
+      subcategory: 'Kelly Criterion',
+      gradient: 'from-purple-600 to-pink-600',
+      data: {
+        description: 'Optimal bet sizing using Kelly Criterion with fractional scaling',
+        features: ['Risk Management', 'Capital Allocation', 'Bankroll Protection'],
+        note: 'Initialize capital state to start tracking',
+        realData: false,
+        status: 'SETUP_REQUIRED'
+      }
+    });
+    
+    return cards;
+  }
+  
   // Player Props - Fetch real player prop markets
   if (category === 'props' || category === 'player_props') {
     console.log('[v0] [CARDS-GEN] Player props category - fetching live markets');

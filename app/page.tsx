@@ -694,11 +694,13 @@ export default function UnifiedAIPlatform() {
                 if (isDev) console.log('[NO GAMES FOUND]', context.sport);
                 // NO fallback - return status indicating no games
                 context.noGamesAvailable = true;
+                context.noGamesMessage = `No live ${context.sport.toUpperCase()} games scheduled at this time. Games typically appear 24-48 hours before start time.`;
               }
             }
           } catch (err) {
             if (isDev) console.error(`[v0] Exception fetching ${sportKey}:`, err);
             context.oddsError = err;
+            context.oddsErrorMessage = `Unable to fetch ${context.sport.toUpperCase()} odds. This may be a temporary API issue.`;
           }
         } else {
           // ONLY ALLOW FALLBACK IF NO SPORT DETECTED

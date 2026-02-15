@@ -30,17 +30,33 @@ async function generateSportSpecificCards(
   
   // Fetch real live odds for this sport using unified service
   if (category === 'betting' || !category) {
-    console.log(`[v0] [CARDS-GEN] Using unified odds fetcher with Supabase caching`);
+    console.log(`[v0] [CARDS-GEN] ===== FETCHING ODDS FOR ${displaySport} =====`);
+    console.log(`[v0] [CARDS-GEN] Sport key: ${sport}`);
+    console.log(`[v0] [CARDS-GEN] Category: ${category || 'default (betting)'}`);
+    console.log(`[v0] [CARDS-GEN] Requested count: ${count}, Actual count: ${actualCount}`);
+    
     try {
       const { getOddsWithCache } = await import('@/lib/unified-odds-fetcher');
       
+      // Check API key availability
+      const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+      console.log(`[v0] [CARDS-GEN] API Key present: ${!!apiKey}`);
+      
+      if (!apiKey) {
+        console.error(`[v0] [CARDS-GEN] ❌ CRITICAL: No ODDS_API_KEY found in environment!`);
+        throw new Error('ODDS_API_KEY not configured');
+      }
+      
       // Use unified service - automatically handles API + Supabase caching + storage
+      console.log(`[v0] [CARDS-GEN] Calling getOddsWithCache...`);
       const oddsData = await getOddsWithCache(sport, {
         useCache: false, // Skip cache to get fresh data with all markets
         storeResults: true // Store in Supabase for realtime sync
       });
       
-      console.log(`[v0] [CARDS-GEN] Unified service returned ${oddsData?.length || 0} games`);
+      console.log(`[v0] [CARDS-GEN] ✓ Unified service returned ${oddsData?.length || 0} games`);
+      console.log(`[v0] [CARDS-GEN] Data is array: ${Array.isArray(oddsData)}`);
+      console.log(`[v0] [CARDS-GEN] Data is null/undefined: ${oddsData == null}`);
       
       if (oddsData && oddsData.length > 0) {
         console.log(`[v0] [CARDS-GEN] SUCCESS: Found ${oddsData.length} live games for ${displaySport}`);
@@ -108,12 +124,20 @@ async function generateSportSpecificCards(
             });
         }
         
-        console.log(`[v0] [CARDS-GEN] Successfully created ${cards.length} cards with live data`);
+        console.log(`[v0] [CARDS-GEN] ✓ Successfully created ${cards.length} cards with live data`);
+        return cards; // Return immediately - we have real data
       } else {
-        console.log(`[v0] [CARDS-GEN] No live games found for ${displaySport}`);
+        console.error(`[v0] [CARDS-GEN] ❌ API returned NO GAMES for ${displaySport}`);
+        console.error(`[v0] [CARDS-GEN] This means either:`);
+        console.error(`[v0] [CARDS-GEN] 1. No games are currently live/scheduled`);
+        console.error(`[v0] [CARDS-GEN] 2. API key is invalid/expired`);
+        console.error(`[v0] [CARDS-GEN] 3. API endpoint returned error`);
+        console.error(`[v0] [CARDS-GEN] 4. Sport key "${sport}" is incorrect`);
       }
     } catch (error) {
-      console.error(`[v0] [CARDS-GEN] Unified service error for ${displaySport}:`, error);
+      console.error(`[v0] [CARDS-GEN] ❌ EXCEPTION in unified service for ${displaySport}:`);
+      console.error(error);
+      console.error(`[v0] [CARDS-GEN] Stack trace:`, (error as Error).stack);
     }
   }
   

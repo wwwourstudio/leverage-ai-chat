@@ -26,15 +26,26 @@ export async function getOddsWithCache(
   }
 
   // Fetch from API
-  console.log(`[UnifiedFetcher] Fetching fresh data from API for ${sport}`);
+  console.log(`[UnifiedFetcher] ===== FETCHING FRESH DATA =====`);
+  console.log(`[UnifiedFetcher] Sport: ${sport}`);
   const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
   
+  console.log(`[UnifiedFetcher] API Key present: ${!!apiKey}`);
+  console.log(`[UnifiedFetcher] API Key length: ${apiKey?.length || 0}`);
+  
   if (!apiKey) {
-    console.error('[UnifiedFetcher] No API key available');
+    console.error('[UnifiedFetcher] ❌ CRITICAL: No API key available!');
+    console.error('[UnifiedFetcher] Check ODDS_API_KEY or NEXT_PUBLIC_ODDS_API_KEY env vars');
     return [];
   }
 
   try {
+    console.log(`[UnifiedFetcher] Calling fetchLiveOdds with:`);
+    console.log(`[UnifiedFetcher] - sport: ${sport}`);
+    console.log(`[UnifiedFetcher] - markets: h2h, spreads, totals`);
+    console.log(`[UnifiedFetcher] - regions: us`);
+    console.log(`[UnifiedFetcher] - skipCache: ${!useCache}`);
+    
     const oddsData = await fetchLiveOdds(sport, {
       markets: ['h2h', 'spreads', 'totals'],
       regions: ['us'],
@@ -43,7 +54,9 @@ export async function getOddsWithCache(
       skipCache: !useCache
     });
 
-    console.log(`[UnifiedFetcher] Received ${oddsData.length} games from API`);
+    console.log(`[UnifiedFetcher] ✓ Received ${oddsData?.length || 0} games from API`);
+    console.log(`[UnifiedFetcher] Data type: ${typeof oddsData}`);
+    console.log(`[UnifiedFetcher] Is array: ${Array.isArray(oddsData)}`);
 
     // Store in Supabase if enabled
     if (storeResults && oddsData.length > 0) {

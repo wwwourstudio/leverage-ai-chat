@@ -304,14 +304,22 @@ export async function fetchLiveOdds(
       signal: AbortSignal.timeout(10000) // 10 second timeout
     });
     
+    console.log(`[v0] [ODDS-API] Response received:`);
+    console.log(`[v0] [ODDS-API] - Status: ${response.status} ${response.statusText}`);
+    console.log(`[v0] [ODDS-API] - Content-Type: ${response.headers.get('content-type')}`);
+    
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`[v0] [ODDS-API] ❌ API ERROR Response:`);
+      console.error(`[v0] [ODDS-API] Status: ${response.status}`);
+      console.error(`[v0] [ODDS-API] Error: ${errorText}`);
       const error: any = new Error(`Odds API error (${response.status}): ${errorText}`);
       error.status = response.status;
       throw error;
     }
 
     const data = await response.json();
+    console.log(`[v0] [ODDS-API] Successfully parsed JSON response`);
     
     console.log(`[v0] [ODDS-API] ✓ Received ${data?.length || 0} games for ${sportKey}`);
     

@@ -58,6 +58,7 @@ async function generateSportSpecificCards(
           
           // Create cards from actual live games
           const gamesToShow = Math.min(actualCount, oddsData.length);
+          console.log(`[v0] [CARDS GENERATOR] CREATING CARDS: actualCount=${actualCount}, oddsData.length=${oddsData.length}, gamesToShow=${gamesToShow}`);
           for (let i = 0; i < gamesToShow; i++) {
             const game = oddsData[i];
             const firstBook = game.bookmakers?.[0];

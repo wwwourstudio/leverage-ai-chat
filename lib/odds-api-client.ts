@@ -256,7 +256,13 @@ export async function fetchLiveOdds(
   
   const cacheKey = `odds:${sportKey}:${marketsParam}:${regionsParam}`;
   
-  // Check cache
+  // If skipCache requested, clear any existing cache entry to force fresh fetch
+  if (skipCache) {
+    console.log(`${LOG_PREFIXES.API} skipCache=true, clearing cache for ${sportKey}`);
+    requestCache.delete(cacheKey);
+  }
+  
+  // Check cache (only if not skipping)
   if (!skipCache) {
     const cached = requestCache.get(cacheKey);
     if (cached) {
@@ -264,7 +270,7 @@ export async function fetchLiveOdds(
       
       // Return cached data if still fresh
       if (age < CACHE_TTL) {
-        console.log(`${LOG_PREFIXES.API} Cache hit for ${sportKey} (age: ${Math.round(age / 1000)}s)`);
+        console.log(`${LOG_PREFIXES.API} Cache hit for ${sportKey} (age: ${Math.round(age / 1000)}s), markets: ${marketsParam}`);
         return cached.data;
       }
       

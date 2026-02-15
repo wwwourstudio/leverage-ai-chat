@@ -12,7 +12,7 @@
 import { CARD_TYPES, SPORT_KEYS, sportToApi, apiToSport } from '@/lib/constants';
 
 /**
- * Generate sport-specific cards
+ * Generate sport-specific cards with REAL odds data
  */
 async function generateSportSpecificCards(
   sport: string,
@@ -22,21 +22,73 @@ async function generateSportSpecificCards(
   const cards: InsightCard[] = [];
   const displaySport = apiToSport(sport).toUpperCase();
   
-  // Try arbitrage detection for this sport
+  console.log('[v0] [CARDS GENERATOR] Generating sport-specific cards for', displaySport);
+  
+  // Fetch real live odds for this sport
   if (category === 'betting' || !category) {
     try {
-      const { detectArbitrageFromContext } = await import('@/lib/arbitrage-detector');
-      const arbitrageCards = await detectArbitrageFromContext(sport);
+      const { fetchLiveOdds } = await import('@/lib/odds-api-client');
+      const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
       
-      if (arbitrageCards && arbitrageCards.length > 0) {
-        cards.push(...arbitrageCards.slice(0, 1));
+      if (apiKey) {
+        console.log('[v0] [CARDS GENERATOR] Fetching live odds for', displaySport);
+        const oddsData = await fetchLiveOdds(sport, {
+          markets: ['h2h'],
+          regions: ['us'],
+          oddsFormat: 'american',
+          apiKey
+        });
+        
+        if (oddsData && oddsData.length > 0) {
+          console.log('[v0] [CARDS GENERATOR] Found', oddsData.length, 'live games for', displaySport);
+          
+          // Create cards from actual live games
+          const gamesToShow = Math.min(count, oddsData.length);
+          for (let i = 0; i < gamesToShow; i++) {
+            const game = oddsData[i];
+            const bestOdds = game.bookmakers?.[0]?.markets?.[0]?.outcomes || [];
+            const homeOdds = bestOdds.find((o: any) => o.name === game.home_team);
+            const awayOdds = bestOdds.find((o: any) => o.name === game.away_team);
+            
+            cards.push({
+              type: CARD_TYPES.LIVE_ODDS,
+              title: `${game.away_team} @ ${game.home_team}`,
+              icon: 'TrendingUp',
+              category: displaySport,
+              subcategory: 'H2H Markets',
+              gradient: getSportGradient(sport),
+              data: {
+                matchup: `${game.away_team} @ ${game.home_team}`,
+                gameTime: new Date(game.commence_time).toLocaleString(),
+                homeOdds: homeOdds ? (homeOdds.price > 0 ? `+${homeOdds.price}` : `${homeOdds.price}`) : 'N/A',
+                awayOdds: awayOdds ? (awayOdds.price > 0 ? `+${awayOdds.price}` : `${awayOdds.price}`) : 'N/A',
+                bookmaker: game.bookmakers?.[0]?.title || 'Multiple Books',
+                bookmakerCount: game.bookmakers?.length || 0,
+                realData: true,
+                status: 'VALUE'
+              },
+              metadata: {
+                realData: true,
+                dataSource: 'The Odds API',
+                timestamp: new Date().toISOString()
+              }
+            });
+          }
+          
+          console.log('[v0] [CARDS GENERATOR] Created', cards.length, 'cards with real odds data');
+          return cards;
+        } else {
+          console.log('[v0] [CARDS GENERATOR] No live games found for', displaySport);
+        }
+      } else {
+        console.log('[v0] [CARDS GENERATOR] No Odds API key configured');
       }
     } catch (error) {
-      console.error('[v0] [CARDS GENERATOR] Arbitrage detection failed for', sport);
+      console.error('[v0] [CARDS GENERATOR] Failed to fetch live odds for', displaySport, error);
     }
   }
   
-  // Add general odds card for this sport
+  // Fallback: Add general odds card if no real data
   if (cards.length < count) {
     cards.push({
       type: CARD_TYPES.LIVE_ODDS,
@@ -46,9 +98,11 @@ async function generateSportSpecificCards(
       subcategory: 'H2H Markets',
       gradient: getSportGradient(sport),
       data: {
-        description: 'Real-time odds from multiple sportsbooks',
+        description: `No live ${displaySport} games currently available`,
+        note: 'Games typically appear 24-48 hours before start time',
         sport: sport,
-        markets: ['Moneyline', 'Spreads', 'Totals']
+        markets: ['Moneyline', 'Spreads', 'Totals'],
+        status: 'NO_DATA'
       }
     });
   }
@@ -101,9 +155,9 @@ export async function generateContextualCards(
   console.log('[v0] [CARDS GENERATOR] Input:', { category, sport, normalizedSport, displaySport, multiSport });
   console.log('[v0] [CARDS GENERATOR] Category:', category, '| Display Sport:', displaySport, '| Count:', count);
   
-  // If multiSport requested, generate variety from multiple sports
+  // If multiSport requested, generate variety from multiple sports with REAL data
   if (multiSport) {
-    console.log('[v0] [CARDS GENERATOR] Multi-sport mode - generating diverse cards');
+    console.log('[v0] [CARDS GENERATOR] Multi-sport mode - fetching real odds from all sports');
     
     // Prioritize sport from query if provided, otherwise use popular sports
     const primarySport = normalizedSport || SPORT_KEYS.NBA.API;
@@ -122,20 +176,43 @@ export async function generateContextualCards(
     
     console.log('[v0] [CARDS GENERATOR] Sport priority order:', orderedSports.map(s => apiToSport(s).toUpperCase()));
     
-    // Generate more cards for primary sport (40% of total)
-    const primaryCount = Math.ceil(count * 0.4);
-    const secondaryCount = Math.floor((count - primaryCount) / 2);
-    const remainingCount = count - primaryCount - (secondaryCount * 2);
-    
-    const sportCounts = [primaryCount, secondaryCount + remainingCount, secondaryCount];
-    
-    for (let i = 0; i < orderedSports.length && cards.length < count; i++) {
-      const sportKey = orderedSports[i];
-      const cardsToGenerate = sportCounts[i] || 1;
+    // Try each sport until we have enough cards with real data
+    for (const sportKey of orderedSports) {
+      if (cards.length >= count) break;
       
-      const sportCards = await generateSportSpecificCards(sportKey, cardsToGenerate, category);
-      cards.push(...sportCards);
-      console.log('[v0] [CARDS GENERATOR] Added', sportCards.length, 'cards for', apiToSport(sportKey).toUpperCase());
+      const cardsNeeded = count - cards.length;
+      const sportCards = await generateSportSpecificCards(sportKey, 1, category);
+      
+      // Only add cards with real data
+      const realDataCards = sportCards.filter(c => c.metadata?.realData || c.data?.realData);
+      if (realDataCards.length > 0) {
+        cards.push(...realDataCards.slice(0, cardsNeeded));
+        console.log('[v0] [CARDS GENERATOR] Added', realDataCards.length, 'real data cards for', apiToSport(sportKey).toUpperCase());
+      } else {
+        console.log('[v0] [CARDS GENERATOR] No real data found for', apiToSport(sportKey).toUpperCase());
+      }
+    }
+    
+    // If we still don't have enough cards, add placeholder cards
+    while (cards.length < count) {
+      const remainingSports = allSports.filter(s => !cards.some(c => c.data?.sport === s));
+      const sportToUse = remainingSports[0] || SPORT_KEYS.NBA.API;
+      const displaySport = apiToSport(sportToUse).toUpperCase();
+      
+      cards.push({
+        type: CARD_TYPES.LIVE_ODDS,
+        title: `${displaySport} Live Odds`,
+        icon: 'TrendingUp',
+        category: displaySport,
+        subcategory: 'H2H Markets',
+        gradient: getSportGradient(sportToUse),
+        data: {
+          description: `No live ${displaySport} games scheduled`,
+          note: 'Check back 24-48 hours before game time',
+          sport: sportToUse,
+          status: 'NO_DATA'
+        }
+      });
     }
     
     return cards.slice(0, count);

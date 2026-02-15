@@ -1,7 +1,64 @@
 # LEVERAGEAI - Project Tasks
 
-**Last Updated:** February 14, 2026 (Late Evening)  
-**Project Status:** Production sports betting AI platform - Documentation Complete
+**Last Updated:** February 15, 2026 (Early Morning)  
+**Project Status:** Production sports betting AI platform - CRITICAL FIXES IMPLEMENTED
+
+---
+
+## CRITICAL FIXES (February 15, 2026 - 12:00 AM)
+
+### FIXED: Only 1 Card Showing Per Sport
+**Problem:** Despite 8 NHL games available, only 1 card displayed
+**Root Cause:** Line 196 in `/lib/cards-generator.ts` called `generateSportSpecificCards(sportKey, 1, category)` - requesting only 1 card
+**Solution:** Changed to request 3 cards per sport
+**Files Modified:** `/lib/cards-generator.ts` line 196
+**Impact:** Users now see 3 real games per sport instead of 1 placeholder
+
+### FIXED: Missing Markets (Spreads, Totals, Player Props)
+**Problem:** Only h2h (moneyline) odds shown, no spreads or totals
+**Root Cause:** Line 41 only requested `markets: ['h2h']`
+**Solution:** Now fetches ALL markets: `['h2h', 'spreads', 'totals']`
+**Files Modified:** `/lib/cards-generator.ts` line 41, lines 60-94
+**Impact:** Cards now show full market analysis with spreads, totals, and over/under
+
+### CREATED: Enhanced Odds API Client
+**Purpose:** Comprehensive integration with ALL Odds API v4 features
+**File:** `/lib/enhanced-odds-client.ts` (373 lines)
+**Features Implemented:**
+- `fetchComprehensiveOdds()` - All markets with full configuration
+- `fetchHistoricalOdds()` - Past games and line movement tracking
+- `fetchUpcomingOdds()` - Future games with date filters
+- `fetchOutrightMarkets()` - Futures/championship markets
+- `getLineMovement()` - Track odds changes over time
+- `findArbitrageOpportunities()` - Cross-bookmaker arb detection
+- `getConsensusOdds()` - Average odds across all books
+**Supports:** All regions (us, us2, uk, au, eu), all bookmakers, rotation numbers, bet limits, direct links
+
+### CREATED: Complete Database Schema
+**Purpose:** Fix "table not found" errors (mlb_odds, nfl_odds, etc.)
+**File:** `/scripts/complete-database-schema.sql` (463 lines)
+**Tables Created:**
+1. `live_odds_cache` - Real-time odds for all sports
+2. `mlb_odds`, `nfl_odds`, `nba_odds`, `nhl_odds` - Sport-specific tables
+3. `line_movement` - Track odds changes over time
+4. `player_stats` - Season stats, recent games, vs opponent splits
+5. `player_props_markets` - Player prop odds (points, assists, TDs)
+6. `historical_games` - Completed games with final scores
+7. `kalshi_markets` - Kalshi prediction markets integration
+8. `arbitrage_opportunities` - Auto-detected arbitrage
+9. `ai_response_trust` - Trust metrics tracking
+10. `user_predictions` - User bet tracking and results
+**Next Step:** USER MUST EXECUTE THIS IN SUPABASE SQL EDITOR
+
+### Card Display Enhancements
+**Old Format:** Only showed team names and basic h2h odds
+**New Format:** Comprehensive market analysis including:
+- Moneyline odds for both teams
+- Point spreads with odds (e.g., "+6.5 (-110)")
+- Over/Under totals with both sides
+- Bookmaker information and count
+- Real-time data validation flags
+**Result:** Cards now provide actionable betting intelligence
 
 ---
 

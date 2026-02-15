@@ -57,31 +57,58 @@ async function generateSportSpecificCards(
           const gamesToShow = Math.min(count, oddsData.length);
           for (let i = 0; i < gamesToShow; i++) {
             const game = oddsData[i];
-            const bestOdds = game.bookmakers?.[0]?.markets?.[0]?.outcomes || [];
-            const homeOdds = bestOdds.find((o: any) => o.name === game.home_team);
-            const awayOdds = bestOdds.find((o: any) => o.name === game.away_team);
+            const firstBook = game.bookmakers?.[0];
+            
+            // Extract h2h, spreads, and totals
+            const h2hMarket = firstBook?.markets?.find((m: any) => m.key === 'h2h');
+            const spreadsMarket = firstBook?.markets?.find((m: any) => m.key === 'spreads');
+            const totalsMarket = firstBook?.markets?.find((m: any) => m.key === 'totals');
+            
+            const h2hOutcomes = h2hMarket?.outcomes || [];
+            const homeOdds = h2hOutcomes.find((o: any) => o.name === game.home_team);
+            const awayOdds = h2hOutcomes.find((o: any) => o.name === game.away_team);
+            
+            const spreadOutcomes = spreadsMarket?.outcomes || [];
+            const homeSpread = spreadOutcomes.find((o: any) => o.name === game.home_team);
+            const awaySpread = spreadOutcomes.find((o: any) => o.name === game.away_team);
+            
+            const totalOutcomes = totalsMarket?.outcomes || [];
+            const over = totalOutcomes.find((o: any) => o.name === 'Over');
+            const under = totalOutcomes.find((o: any) => o.name === 'Under');
             
             cards.push({
               type: CARD_TYPES.LIVE_ODDS,
               title: `${game.away_team} @ ${game.home_team}`,
               icon: 'TrendingUp',
               category: displaySport,
-              subcategory: 'H2H Markets',
+              subcategory: 'Full Market Analysis',
               gradient: getSportGradient(sport),
               data: {
                 matchup: `${game.away_team} @ ${game.home_team}`,
                 gameTime: new Date(game.commence_time).toLocaleString(),
+                // Moneyline
                 homeOdds: homeOdds ? (homeOdds.price > 0 ? `+${homeOdds.price}` : `${homeOdds.price}`) : 'N/A',
                 awayOdds: awayOdds ? (awayOdds.price > 0 ? `+${awayOdds.price}` : `${awayOdds.price}`) : 'N/A',
-                bookmaker: game.bookmakers?.[0]?.title || 'Multiple Books',
+                // Spreads
+                homeSpread: homeSpread ? `${homeSpread.point > 0 ? '+' : ''}${homeSpread.point} (${homeSpread.price > 0 ? '+' : ''}${homeSpread.price})` : 'N/A',
+                awaySpread: awaySpread ? `${awaySpread.point > 0 ? '+' : ''}${awaySpread.point} (${awaySpread.price > 0 ? '+' : ''}${awaySpread.price})` : 'N/A',
+                // Totals
+                overUnder: over && under ? `O/U ${over.point}: Over ${over.price > 0 ? '+' : ''}${over.price} / Under ${under.price > 0 ? '+' : ''}${under.price}` : 'N/A',
+                bookmaker: firstBook?.title || 'Multiple Books',
                 bookmakerCount: game.bookmakers?.length || 0,
                 realData: true,
-                status: 'VALUE'
+                status: 'VALUE',
+                allMarkets: {
+                  h2h: h2hMarket ? true : false,
+                  spreads: spreadsMarket ? true : false,
+                  totals: totalsMarket ? true : false
+                }
               },
               metadata: {
                 realData: true,
                 dataSource: 'The Odds API',
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                gameId: game.id
               }
             });
           }

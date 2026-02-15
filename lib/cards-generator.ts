@@ -38,7 +38,7 @@ async function generateSportSpecificCards(
       if (apiKey) {
         console.log(`[v0] [CARDS GENERATOR] Calling fetchLiveOdds for ${displaySport}...`);
         const oddsData = await fetchLiveOdds(sport, {
-          markets: ['h2h'],
+          markets: ['h2h', 'spreads', 'totals'], // Fetch ALL available markets
           regions: ['us'],
           oddsFormat: 'american',
           apiKey
@@ -192,8 +192,8 @@ export async function generateContextualCards(
       if (cards.length >= count) break;
       
       const cardsNeeded = count - cards.length;
-      console.log(`[v0] [MULTI-SPORT] Calling generateSportSpecificCards for ${apiToSport(sportKey).toUpperCase()}`);
-      const sportCards = await generateSportSpecificCards(sportKey, 1, category);
+      console.log(`[v0] [MULTI-SPORT] Requesting 3 cards from ${apiToSport(sportKey).toUpperCase()}`);
+      const sportCards = await generateSportSpecificCards(sportKey, 3, category); // Request 3 cards per sport
       console.log(`[v0] [MULTI-SPORT] Received ${sportCards.length} cards from ${apiToSport(sportKey).toUpperCase()}`);
       
       // Use ALL returned cards - they should already be properly structured

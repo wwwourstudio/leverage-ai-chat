@@ -19,7 +19,9 @@ async function generateSportSpecificCards(
   count: number,
   category?: string
 ): Promise<InsightCard[]> {
-  console.log(`[v0] [SPORT CARDS FUNCTION] === CALLED === sport=${sport} count=${count} category=${category}`);
+  // OVERRIDE: Always request at least 3 cards to show multiple games
+  const actualCount = Math.max(count, 3);
+  console.log(`[v0] [SPORT CARDS FUNCTION] === CALLED === sport=${sport} originalCount=${count} actualCount=${actualCount} category=${category}`);
   
   const cards: InsightCard[] = [];
   const displaySport = apiToSport(sport).toUpperCase();
@@ -55,7 +57,7 @@ async function generateSportSpecificCards(
           console.log(`[v0] [CARDS GENERATOR] SUCCESS: Found ${oddsData.length} live games for ${displaySport}`);
           
           // Create cards from actual live games
-          const gamesToShow = Math.min(count, oddsData.length);
+          const gamesToShow = Math.min(actualCount, oddsData.length);
           for (let i = 0; i < gamesToShow; i++) {
             const game = oddsData[i];
             const firstBook = game.bookmakers?.[0];

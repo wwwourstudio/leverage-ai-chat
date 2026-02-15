@@ -19,8 +19,7 @@ async function generateSportSpecificCards(
   count: number,
   category?: string
 ): Promise<InsightCard[]> {
-  console.log(`[v0] [CARDS GENERATOR] === SPORT SPECIFIC CARDS START ===`);
-  console.log(`[v0] [CARDS GENERATOR] Sport: ${sport}, Count: ${count}, Category: ${category}`);
+  console.log(`[v0] [NEW CARDS] ENTRY - sport=${sport} count=${count} category=${category}`);
   
   const cards: InsightCard[] = [];
   const displaySport = apiToSport(sport).toUpperCase();
@@ -192,10 +191,14 @@ export async function generateContextualCards(
       if (cards.length >= count) break;
       
       const cardsNeeded = count - cards.length;
+      console.log(`[v0] [MULTI-SPORT] Calling generateSportSpecificCards for ${apiToSport(sportKey).toUpperCase()}`);
       const sportCards = await generateSportSpecificCards(sportKey, 1, category);
+      console.log(`[v0] [MULTI-SPORT] Received ${sportCards.length} cards from ${apiToSport(sportKey).toUpperCase()}`);
       
       // Only add cards with real data
       const realDataCards = sportCards.filter(c => c.metadata?.realData || c.data?.realData);
+      console.log(`[v0] [MULTI-SPORT] Filtered to ${realDataCards.length} real data cards (from ${sportCards.length} total)`);
+      
       if (realDataCards.length > 0) {
         cards.push(...realDataCards.slice(0, cardsNeeded));
         console.log('[v0] [CARDS GENERATOR] Added', realDataCards.length, 'real data cards for', apiToSport(sportKey).toUpperCase());

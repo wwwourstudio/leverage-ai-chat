@@ -606,103 +606,161 @@ export default function UnifiedAIPlatform() {
   const generateRealResponse = async (userMessage: string) => {
     setIsTyping(true);
     const startTime = Date.now();
+    const isDev = process.env.NODE_ENV !== 'production';
     
     try {
       console.log('[v0] Starting real AI analysis for:', userMessage);
       
-      // Extract context from user message
+      // Extract context from user message with strict detection flags
+      const lowerMsg = userMessage.toLowerCase();
+      
+      // Political market keywords
+      const politicalKeywords = ['kalshi', 'election', 'politics', 'cpi', 'inflation', 'fed', 'approval rating', 'recession', 'polymarket', 'prediction market'];
+      const isPoliticalMarket = politicalKeywords.some(k => lowerMsg.includes(k));
+      
+      // Sports detection
+      const detectedSport = extractSport(userMessage);
+      
+      // Betting intent keywords
+      const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'arbitrage', 'arb', 'h2h', 'value', 'sportsbook', 'draftkings', 'fanduel', 'moneyline', 'prop', 'parlay'];
+      const hasBettingIntent = bettingKeywords.some(k => lowerMsg.includes(k));
+      
+      // Sports query detection (not political)
+      const sportsKeywords = ['nba', 'nfl', 'nhl', 'mlb', 'basketball', 'football', 'hockey', 'baseball', 'ncaa'];
+      const isSportsQuery = sportsKeywords.some(k => lowerMsg.includes(k)) && !isPoliticalMarket;
+      
+      const detectedPlatform = extractPlatform(userMessage);
+      
+      // Override isPoliticalMarket if platform is kalshi
+      const finalIsPoliticalMarket = isPoliticalMarket || detectedPlatform === 'kalshi';
+      
       const context: any = {
-        sport: extractSport(userMessage),
+        sport: detectedSport,
         marketType: extractMarketType(userMessage),
-        platform: extractPlatform(userMessage),
+        platform: detectedPlatform,
+        isSportsQuery,
+        isPoliticalMarket: finalIsPoliticalMarket,
+        hasBettingIntent,
         previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }))
       };
 
-      console.log('[v0] Extracted context:', context);
+      if (isDev) {
+        console.log('[v0] Extracted context:', context);
+        console.log('[SPORT DETECTED]', detectedSport || 'none');
+        console.log('[POLITICAL MARKET DETECTED]', finalIsPoliticalMarket);
+      }
       
-      // Check if this is a betting-related query
-      // H2H = Head-to-Head markets (moneyline betting on which team wins)
-      const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'arbitrage', 'arb', 'h2h', 'value', 'sportsbook', 'draftkings', 'fanduel', 'moneyline', 'kalshi', 'prediction market', 'election', 'polymarket', 'prop', 'parlay'];
-      const lowerMsg = userMessage.toLowerCase();
-      const hasBettingKeyword = bettingKeywords.some(k => lowerMsg.includes(k));
-      
-      console.log('[v0] Betting query check:', { 
-        hasBettingKeyword, 
-        query: lowerMsg.substring(0, 50),
-        matchedKeywords: bettingKeywords.filter(k => lowerMsg.includes(k))
-      });
-      
-      // Fetch odds data if betting-related (try multiple sports to ensure we get data)
-      if (hasBettingKeyword) {
-        console.log('[v0] === ODDS FETCH STARTING ===');
+      // HARD STOP: Political markets NEVER fetch sports odds
+      if (context.isPoliticalMarket) {
+        if (isDev) console.log('[POLITICAL MARKET DETECTED] Skipping sports odds fetch');
+        // Route directly to Kalshi analysis without attempting sports odds
+        // Note: The /api/analyze endpoint will handle Kalshi market analysis
+      } else if (context.hasBettingIntent && context.isSportsQuery) {
+        // Only fetch sports odds if this is explicitly a sports betting query
+        if (isDev) console.log('[ODDS FETCH ATTEMPT] Sports betting query detected');
+        if (isDev) console.log('[v0] === ODDS FETCH STARTING ===');
+        
         // Import SPORT_KEYS for consistent API format
         const { SPORT_KEYS, sportToApi } = await import('@/lib/constants');
-        const primarySport = context.sport ? sportToApi(context.sport) : SPORT_KEYS.NBA.API;
-        // Fallback sports in priority order (using standardized API format)
-        const fallbackSports = [SPORT_KEYS.NFL.API, SPORT_KEYS.NHL.API, SPORT_KEYS.MLB.API, SPORT_KEYS.EPL.API];
-        const sportsToTry = [primarySport, ...fallbackSports.filter(s => s !== primarySport)];
         
-        console.log('[v0] Odds fetch config:', { 
-          primarySport, 
-          fallbackSports: fallbackSports.slice(0, 2),
-          totalSportsToTry: sportsToTry.length
-        });
-        
-        let foundData = false;
-        let attemptCount = 0;
-        
-        for (const sportKey of sportsToTry) {
-          if (foundData) break;
-          attemptCount++;
+        // IF SPORT IS EXPLICITLY DETECTED: Fetch ONLY that sport, NO fallback
+        if (context.sport) {
+          const sportKey = sportToApi(context.sport);
           
-          console.log(`[v0] [Attempt ${attemptCount}/${sportsToTry.length}] Fetching ${sportKey}...`);
+          if (isDev) {
+            console.log('[v0] Fetching ONLY detected sport:', sportKey);
+            console.log('[NO FALLBACK] Explicit sport detected');
+          }
           
           try {
             const oddsResponse = await fetch('/api/odds', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sport: sportKey, marketType: 'h2h' })
+              body: JSON.stringify({ sport: sportKey, marketType: context.marketType || 'h2h' })
             });
-            
-            console.log(`[v0] Odds API response status: ${oddsResponse.status}`);
             
             if (!oddsResponse.ok) {
               const errorText = await oddsResponse.text();
-              console.error(`[v0] Odds API error (${oddsResponse.status}):`, errorText.substring(0, 100));
-              continue;
-            }
-            
-            const oddsResult = await oddsResponse.json();
-            console.log(`[v0] Odds result:`, {
-              hasEvents: !!oddsResult?.events,
-              eventCount: oddsResult?.events?.length || 0,
-              hasError: !!oddsResult?.error
-            });
-            
-            if (oddsResult?.events?.length > 0) {
-              const sportName = sportKey.replace('_', ' ').toUpperCase();
-              console.log(`[v0] ✅ SUCCESS - Found ${oddsResult.events.length} live games in ${sportName}`);
-              context.oddsData = oddsResult;
-              foundData = true;
-              break;
-            } else if (oddsResult?.error) {
-              console.log(`[v0] API returned error: ${oddsResult.error}`);
+              if (isDev) console.error(`[v0] Odds API error (${oddsResponse.status}):`, errorText.substring(0, 100));
             } else {
-              console.log(`[v0] No games available for ${sportKey}`);
+              const oddsResult = await oddsResponse.json();
+              
+              if (oddsResult?.events?.length > 0) {
+                const sportName = sportKey.replace('_', ' ').toUpperCase();
+                if (isDev) console.log(`[v0] ✅ Found ${oddsResult.events.length} live games in ${sportName}`);
+                context.oddsData = oddsResult;
+                context.oddsData.sport = sportKey;
+              } else {
+                if (isDev) console.log('[NO GAMES FOUND]', context.sport);
+                // NO fallback - return status indicating no games
+                context.noGamesAvailable = true;
+                context.noGamesMessage = `No live ${context.sport.toUpperCase()} games scheduled at this time. Games typically appear 24-48 hours before start time.`;
+              }
             }
           } catch (err) {
-            console.error(`[v0] Exception fetching ${sportKey}:`, err);
+            if (isDev) console.error(`[v0] Exception fetching ${sportKey}:`, err);
+            context.oddsError = err;
+            context.oddsErrorMessage = `Unable to fetch ${context.sport.toUpperCase()} odds. This may be a temporary API issue.`;
+          }
+        } else {
+          // ONLY ALLOW FALLBACK IF NO SPORT DETECTED
+          if (isDev) console.log('[v0] No specific sport detected - attempting fallback rotation');
+          
+          const fallbackSports = [
+            SPORT_KEYS.NBA.API,
+            SPORT_KEYS.NFL.API,
+            SPORT_KEYS.NHL.API,
+            SPORT_KEYS.MLB.API
+          ];
+          
+          let foundData = false;
+          
+          for (const sportKey of fallbackSports) {
+            if (foundData) break;
+            
+            if (isDev) console.log(`[v0] Trying fallback sport: ${sportKey}`);
+            
+            try {
+              const oddsResponse = await fetch('/api/odds', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sport: sportKey, marketType: 'h2h' })
+              });
+              
+              if (oddsResponse.ok) {
+                const oddsResult = await oddsResponse.json();
+                
+                if (oddsResult?.events?.length > 0) {
+                  const sportName = sportKey.replace('_', ' ').toUpperCase();
+                  if (isDev) console.log(`[v0] ✅ Fallback success - Found ${oddsResult.events.length} games in ${sportName}`);
+                  context.oddsData = oddsResult;
+                  context.oddsData.sport = sportKey;
+                  foundData = true;
+                  break;
+                }
+              }
+            } catch (err) {
+              if (isDev) console.error(`[v0] Exception fetching ${sportKey}:`, err);
+            }
+          }
+          
+          if (!foundData && isDev) {
+            console.warn('[v0] ⚠️ ODDS FETCH FAILED - No live games found across all sports');
           }
         }
         
-        if (!foundData) {
-          console.warn('[v0] ⚠️ ODDS FETCH FAILED - No live games found across all sports');
-        } else {
-          console.log('[v0] ✓ Odds data attached to context');
+        if (isDev) console.log('[v0] === ODDS FETCH COMPLETE ===');
+        
+        // HARD CROSS-SPORT CONTAMINATION GUARD
+        if (context.sport && context.oddsData?.sport && context.oddsData.sport !== sportToApi(context.sport)) {
+          if (isDev) console.error('[CROSS-SPORT BLOCKED] Attempted contamination prevented:', {
+            detected: context.sport,
+            fetched: context.oddsData.sport
+          });
+          // Clear contaminated data
+          delete context.oddsData;
+          context.crossSportError = true;
         }
-        console.log('[v0] === ODDS FETCH COMPLETE ===');
-      } else {
-        console.log('[v0] Skipping odds fetch - no betting keywords in query');
       }
       
       // Fetch real data from our API routes

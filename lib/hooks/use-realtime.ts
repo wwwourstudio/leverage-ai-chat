@@ -1,0 +1,90 @@
+import { useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+
+/**
+ * Real-time subscription hook for Supabase tables
+ * 
+ * @param table - Table name to subscribe to
+ * @param filter - Optional filter { column: 'sport', value: 'NBA' }
+ * @returns { data, loading, error }
+ */
+export function useRealtime<T>(
+  table: string,
+  filter?: { column: string; value: any }
+) {
+  const [data, setData] = useState<T[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const supabase = createClient();
+
+  useEffect(() => {
+    let channel: RealtimeChannel;
+
+    async function setupRealtime() {
+      try {
+        // Initial fetch
+        let query = supabase.from(table).select('*');
+        
+        if (filter) {
+          query = query.eq(filter.column, filter.value);
+        }
+        
+        const { data: initialData, error: fetchError } = await query;
+        
+        if (fetchError) throw fetchError;
+        
+        setData(initialData || []);
+        setLoading(false);
+
+        // Subscribe to real-time changes
+        channel = supabase
+          .channel(`${table}_changes`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: table,
+              filter: filter ? `${filter.column}=eq.${filter.value}` : undefined
+            },
+            (payload) => {
+              console.log(`[Realtime] ${payload.eventType} on ${table}`, payload);
+              
+              if (payload.eventType === 'INSERT') {
+                setData((prev) => [...prev, payload.new as T]);
+              } else if (payload.eventType === 'UPDATE') {
+                setData((prev) =>
+                  prev.map((item: any) =>
+                    item.id === (payload.new as any).id ? (payload.new as T) : item
+                  )
+                );
+              } else if (payload.eventType === 'DELETE') {
+                setData((prev) =>
+                  prev.filter((item: any) => item.id !== (payload.old as any).id)
+                );
+              }
+            }
+          )
+          .subscribe();
+
+        console.log(`[Realtime] Subscribed to ${table}`, filter || 'all records');
+      } catch (err) {
+        console.error(`[Realtime] Error setting up subscription for ${table}:`, err);
+        setError(err as Error);
+        setLoading(false);
+      }
+    }
+
+    setupRealtime();
+
+    return () => {
+      if (channel) {
+        console.log(`[Realtime] Unsubscribing from ${table}`);
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [table, filter?.column, filter?.value]);
+
+  return { data, loading, error };
+}

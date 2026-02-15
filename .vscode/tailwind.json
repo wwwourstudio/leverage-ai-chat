@@ -1,9 +1,0 @@
-{
-  "version": 1.1,
-  "atDirectives": [
-    {
-      "name": "@custom-variant",
-      "description": "Defines a custom variant for Tailwind CSS v4"
-    }
-  ]
-}

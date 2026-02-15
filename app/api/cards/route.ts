@@ -282,9 +282,45 @@ export async function POST(req: NextRequest) {
       dataSources.push('Statistical Models & Historical Data');
     }
     
-    // Ensure we always have exactly 3 cards
+    // Fallback to Supabase if no live odds and we need more cards
+    if (cards.length < 3 && finalSport) {
+      console.log(`${LOG_PREFIXES.API} ⚠ Only ${cards.length} cards, trying Supabase fallback`);
+      try {
+        const { fetchUpcomingGames } = await import('@/lib/supabase-data-service');
+        const dbResult = await fetchUpcomingGames(finalSport, 48);
+        
+        if (dbResult.ok && dbResult.value.data.length > 0) {
+          console.log(`${LOG_PREFIXES.API} ✓ Found ${dbResult.value.data.length} games in Supabase`);
+          dataSources.push('Supabase Database (cached odds data)');
+          
+          // Convert DB records to card format
+          const dbCards = dbResult.value.data.slice(0, 3 - cards.length).map(record => ({
+            type: CARD_TYPES.LIVE_ODDS,
+            title: `${record.home_team} vs ${record.away_team}`,
+            icon: 'Database',
+            category: record.sport.toUpperCase(),
+            subcategory: 'Cached Data',
+            gradient: 'from-blue-500 to-purple-600',
+            data: {
+              matchup: `${record.home_team} vs ${record.away_team}`,
+              gameTime: new Date(record.commence_time).toLocaleString(),
+              source: 'Database',
+              cached: true
+            },
+            status: CARD_STATUS.VALUE,
+            realData: true
+          }));
+          
+          cards.push(...dbCards);
+        }
+      } catch (error) {
+        console.error(`${LOG_PREFIXES.API} Supabase fallback failed:`, error);
+      }
+    }
+    
+    // Final fallback to contextual cards
     if (cards.length < 3) {
-      console.log(`${LOG_PREFIXES.API} ⚠ Only ${cards.length} cards, generating more`);
+      console.log(`${LOG_PREFIXES.API} ⚠ Only ${cards.length} cards, generating contextual cards`);
       const { generateContextualCards } = await import('@/lib/cards-generator');
       const additionalCards = await generateContextualCards(
         category, 

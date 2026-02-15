@@ -8,6 +8,7 @@ import {
   MARKET_TYPES,
 } from '@/lib/constants';
 import { validateSportKey, getSportInfo, isValidSport } from '@/lib/sports-validator';
+import { storeOddsData, getRecentOdds } from '@/lib/odds-persistence';
 
 // Sports Odds API integration
 // Documentation: https://the-odds-api.com/
@@ -105,7 +106,12 @@ export async function POST(req: NextRequest) {
       apiUrl = `${baseUrl}/${normalizedSport}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}&markets=${marketType || MARKET_TYPES.H2H}`;
     }
 
-    console.log(`[v0] Fetching from URL: ${apiUrl.replace(oddsApiKey || '', 'REDACTED')}`);
+    console.log(`[v0] === ODDS API REQUEST DEBUG ===`);
+    console.log(`[v0] Sport: ${normalizedSport} (${sportInfo.name})`);
+    console.log(`[v0] Market: ${marketType || MARKET_TYPES.H2H}`);
+    console.log(`[v0] URL: ${apiUrl.replace(oddsApiKey || '', 'REDACTED')}`);
+    console.log(`[v0] API Key configured: ${oddsApiKey ? 'YES' : 'NO'}`);
+    console.log(`[v0] ==============================`);
     
     // Retry logic with exponential backoff
     let response: Response | null = null;
@@ -175,8 +181,26 @@ export async function POST(req: NextRequest) {
 
     const data = await response.json();
 
-    console.log(`[v0] Odds API returned ${Array.isArray(data) ? data.length : 1} events`);
-    console.log(`[v0] API usage - Remaining: ${response.headers.get('x-requests-remaining')}, Used: ${response.headers.get('x-requests-used')}`);
+    console.log(`[v0] === ODDS API RESPONSE DEBUG ===`);
+    console.log(`[v0] HTTP Status: ${response.status}`);
+    console.log(`[v0] Events returned: ${Array.isArray(data) ? data.length : 1}`);
+    console.log(`[v0] Is Array: ${Array.isArray(data)}`);
+    console.log(`[v0] Data type: ${typeof data}`);
+    console.log(`[v0] API Remaining: ${response.headers.get('x-requests-remaining')}`);
+    console.log(`[v0] API Used: ${response.headers.get('x-requests-used')}`);
+    
+    if (Array.isArray(data) && data.length > 0) {
+      console.log(`[v0] Sample event:`, {
+        id: data[0].id,
+        home: data[0].home_team,
+        away: data[0].away_team,
+        commence: data[0].commence_time,
+        bookmakers: data[0].bookmakers?.length || 0
+      });
+    } else if (Array.isArray(data) && data.length === 0) {
+      console.log(`[v0] ⚠️  EMPTY ARRAY - No games scheduled for ${sportInfo.name}`);
+    }
+    console.log(`[v0] ===============================`);
 
     // Transform the data into a consistent format
     const transformedData = {
@@ -230,6 +254,22 @@ export async function POST(req: NextRequest) {
 
     // Cache the transformed data
     setCachedOdds(cacheKey, transformedData);
+
+    // Store in database (fire and forget - don't block response)
+    storeOddsData(normalizedSport, transformedData.events, {
+      remainingRequests: transformedData.remainingRequests || undefined,
+      usedRequests: transformedData.usedRequests || undefined,
+    })
+      .then((result) => {
+        if (result.success) {
+          console.log(`[v0] ✅ Stored ${result.stored} odds records in database`);
+        } else {
+          console.error(`[v0] ❌ Failed to store odds:`, result.errors);
+        }
+      })
+      .catch((err) => {
+        console.error(`[v0] ❌ Database storage error:`, err);
+      });
 
     return NextResponse.json(transformedData);
   } catch (error: any) {

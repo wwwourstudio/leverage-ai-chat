@@ -103,7 +103,7 @@ export function calculateArbitrageStakes(
  */
 export function detectArbitrageOpportunities(
   oddsData: any[],
-  minProfitThreshold: number = 0.5 // Minimum 0.5% profit to consider
+  minProfitThreshold: number = 0.25 // Lowered from 0.5% to 0.25% to find more opportunities
 ): ArbitrageOpportunity[] {
   const opportunities: ArbitrageOpportunity[] = [];
   
@@ -338,7 +338,7 @@ export function arbitrageToCard(opp: ArbitrageOpportunity): any {
 export async function detectArbitrageFromContext(sport?: string): Promise<any[]> {
   try {
     const { fetchLiveOdds } = await import('@/lib/odds-api-client');
-    const { SPORT_KEYS, sportToApi } = await import('@/lib/constants');
+    const { SPORT_KEYS, sportToApi, apiToSport } = await import('@/lib/constants');
     
     const normalizedSport = sport ? sportToApi(sport) : SPORT_KEYS.NBA.API;
     const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
@@ -358,13 +358,135 @@ export async function detectArbitrageFromContext(sport?: string): Promise<any[]>
     });
     
     if (!oddsData || oddsData.length === 0) {
-      console.log('[v0] [ARBITRAGE] No odds data available');
-      return [];
+      console.log('[v0] [ARBITRAGE] No live odds data available, attempting database fallback');
+      const displaySport = apiToSport(normalizedSport).toUpperCase();
+      
+      // Try to fetch cached historical data from Supabase
+      try {
+        const { fetchUpcomingGames } = await import('@/lib/supabase-data-service');
+        const dbResult = await fetchUpcomingGames(normalizedSport, 72); // Last 72 hours
+        
+        if (dbResult.ok && dbResult.value.data.length > 0) {
+          console.log(`[v0] [ARBITRAGE] Found ${dbResult.value.data.length} cached games in database`);
+          
+          // Convert DB records to card format (not arbitrage, just cached odds)
+          return dbResult.value.data.slice(0, 3).map(record => ({
+            type: 'LIVE_ODDS',
+            title: `${record.away_team} @ ${record.home_team}`,
+            icon: 'Database',
+            category: displaySport,
+            subcategory: 'Cached Data',
+            gradient: 'from-purple-600 to-indigo-700',
+            data: {
+              matchup: `${record.away_team} @ ${record.home_team}`,
+              gameTime: new Date(record.commence_time).toLocaleString(),
+              note: 'Historical data from database (no live games currently scheduled)',
+              cached: true,
+              status: 'CACHED',
+              realData: true
+            },
+            metadata: {
+              realData: true,
+              dataSource: 'Supabase Database',
+              cached: true,
+              timestamp: new Date().toISOString()
+            }
+          }));
+        }
+      } catch (dbError) {
+        console.log('[v0] [ARBITRAGE] Database fallback failed:', dbError);
+      }
+      
+      // Final fallback: informative "no games" card
+      return [{
+        type: 'LIVE_ODDS',
+        title: `${displaySport} Live Odds`,
+        icon: 'Calendar',
+        category: displaySport,
+        subcategory: 'No Games Scheduled',
+        gradient: 'from-gray-500 to-gray-700',
+        data: {
+          message: `No ${displaySport} games scheduled in the next 48 hours`,
+          note: 'The Odds API only returns games scheduled within 24-48 hours of start time',
+          suggestion: `Try checking closer to ${displaySport} game days, or ask about another sport`,
+          status: 'NO_DATA',
+          realData: false
+        },
+        metadata: {
+          realData: false,
+          dataSource: 'The Odds API',
+          reason: 'No scheduled games',
+          timestamp: new Date().toISOString()
+        }
+      }];
     }
     
-    const opportunities = detectArbitrageOpportunities(oddsData, 0.5);
+    const opportunities = detectArbitrageOpportunities(oddsData, 0.25); // Use 0.25% threshold
     
-    return opportunities.map(arbitrageToCard);
+    console.log(`[v0] [ARBITRAGE] Found ${opportunities.length} arbitrage opportunities from ${oddsData.length} games`);
+    console.log(`[v0] [ARBITRAGE] Now creating cards from the ${oddsData.length} available games...`);
+    
+    // If arbitrage found, return arbitrage cards
+    if (opportunities.length > 0) {
+      return opportunities.map(arbitrageToCard);
+    }
+    
+    // NO ARBITRAGE FOUND - Return regular live odds cards instead of empty array
+    const cardsToCreate = Math.min(3, oddsData.length);
+    console.log(`[v0] [ARBITRAGE] No arbitrage found in ${oddsData.length} games, creating ${cardsToCreate} regular odds cards`);
+    
+    const cards = oddsData.slice(0, cardsToCreate).map((game: any, index: number) => {
+      console.log(`[v0] [ARBITRAGE] Creating card ${index + 1}/${cardsToCreate} for game:`, game.id);
+      const firstBook = game.bookmakers?.[0];
+      const h2hMarket = firstBook?.markets?.find((m: any) => m.key === 'h2h');
+      const outcomes = h2hMarket?.outcomes || [];
+      
+      if (!firstBook) {
+        console.log(`[v0] [ARBITRAGE] WARNING: No bookmaker data for game ${game.id}`);
+      }
+      
+      const homeOdds = outcomes.find((o: any) => o.name === game.home_team);
+      const awayOdds = outcomes.find((o: any) => o.name === game.away_team);
+      
+      const card = {
+        type: 'LIVE_ODDS',
+        title: `${game.away_team} @ ${game.home_team}`,
+        icon: 'TrendingUp',
+        category: apiToSport(game.sport_key).toUpperCase(),
+        subcategory: 'H2H Markets',
+        gradient: 'from-blue-600 to-indigo-700',
+        data: {
+          matchup: `${game.away_team} @ ${game.home_team}`,
+          gameTime: new Date(game.commence_time).toLocaleString(),
+          homeOdds: homeOdds ? (homeOdds.price > 0 ? `+${homeOdds.price}` : `${homeOdds.price}`) : 'N/A',
+          awayOdds: awayOdds ? (awayOdds.price > 0 ? `+${awayOdds.price}` : `${awayOdds.price}`) : 'N/A',
+          bookmaker: firstBook?.title || 'Multiple Books',
+          bookmakerCount: game.bookmakers?.length || 0,
+          realData: true,
+          status: 'VALUE'
+        },
+        metadata: {
+          realData: true,
+          dataSource: 'The Odds API',
+          timestamp: new Date().toISOString()
+        }
+      };
+      
+      if (index === 0) {
+        console.log('[v0] [ARBITRAGE] Sample card created:', {
+          matchup: card.data.matchup,
+          homeOdds: card.data.homeOdds,
+          awayOdds: card.data.awayOdds,
+          bookmaker: card.data.bookmaker
+        });
+      }
+      
+      return card;
+    });
+    
+    console.log(`[v0] [ARBITRAGE] Successfully created ${cards.length} live odds cards`);
+    console.log(`[v0] [ARBITRAGE] Returning cards:`, cards.map(c => ({ title: c.title, category: c.category })));
+    return cards;
   } catch (error) {
     console.error('[v0] [ARBITRAGE] Error in context detection:', error);
     return [];

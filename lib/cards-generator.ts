@@ -28,35 +28,22 @@ async function generateSportSpecificCards(
   const displaySport = apiToSport(sport).toUpperCase();
   console.log(`[v0] [SPORT CARDS] Display sport: ${displaySport}`);
   
-  // Fetch real live odds for this sport
+  // Fetch real live odds for this sport using unified service
   if (category === 'betting' || !category) {
-    console.log(`[v0] [CARDS GENERATOR] Betting category detected, attempting to fetch real odds`);
+    console.log(`[v0] [CARDS-GEN] Using unified odds fetcher with Supabase caching`);
     try {
-      console.log(`[v0] [CARDS GENERATOR] Importing odds-api-client...`);
-      const { fetchLiveOdds } = await import('@/lib/odds-api-client');
-      const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+      const { getOddsWithCache } = await import('@/lib/unified-odds-fetcher');
       
-      console.log(`[v0] [CARDS GENERATOR] API Key available: ${!!apiKey}`);
+      // Use unified service - automatically handles API + Supabase caching + storage
+      const oddsData = await getOddsWithCache(sport, {
+        useCache: false, // Skip cache to get fresh data with all markets
+        storeResults: true // Store in Supabase for realtime sync
+      });
       
-      if (apiKey) {
-        const requestedMarkets = ['h2h', 'spreads', 'totals'];
-        console.log(`[v0] [CARDS-GEN] Fetching odds with markets:`, requestedMarkets, 'skipCache: true');
-        const oddsData = await fetchLiveOdds(sport, {
-          markets: requestedMarkets,
-          regions: ['us'],
-          oddsFormat: 'american',
-          apiKey,
-          skipCache: true
-        });
-        
-        console.log(`[v0] [CARDS GENERATOR] fetchLiveOdds returned:`, {
-          isArray: Array.isArray(oddsData),
-          length: oddsData?.length || 0,
-          hasData: !!(oddsData && oddsData.length > 0)
-        });
-        
-        if (oddsData && oddsData.length > 0) {
-          console.log(`[v0] [CARDS GENERATOR] SUCCESS: Found ${oddsData.length} live games for ${displaySport}`);
+      console.log(`[v0] [CARDS-GEN] Unified service returned ${oddsData?.length || 0} games`);
+      
+      if (oddsData && oddsData.length > 0) {
+        console.log(`[v0] [CARDS-GEN] SUCCESS: Found ${oddsData.length} live games for ${displaySport}`);
           
           // Create cards from actual live games
           const gamesToShow = Math.min(actualCount, oddsData.length);
@@ -113,23 +100,20 @@ async function generateSportSpecificCards(
               },
               metadata: {
                 realData: true,
-                dataSource: 'The Odds API',
+                dataSource: 'Unified Service (API + Supabase)',
                 timestamp: new Date().toISOString(),
-                gameId: game.id
+                gameId: game.id,
+                cached: false
               }
             });
-          }
-          
-          console.log('[v0] [CARDS GENERATOR] Created', cards.length, 'cards with real odds data');
-          return cards;
-        } else {
-          console.log('[v0] [CARDS GENERATOR] No live games found for', displaySport);
         }
+        
+        console.log(`[v0] [CARDS-GEN] Successfully created ${cards.length} cards with live data`);
       } else {
-        console.log('[v0] [CARDS GENERATOR] No Odds API key configured');
+        console.log(`[v0] [CARDS-GEN] No live games found for ${displaySport}`);
       }
     } catch (error) {
-      console.error('[v0] [CARDS GENERATOR] Failed to fetch live odds for', displaySport, error);
+      console.error(`[v0] [CARDS-GEN] Unified service error for ${displaySport}:`, error);
     }
   }
   

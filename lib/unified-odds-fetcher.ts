@@ -30,21 +30,30 @@ export async function getOddsWithCache(
   console.log(`[UnifiedFetcher] Sport: ${sport}`);
   const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
   
-  console.log(`[UnifiedFetcher] API Key present: ${!!apiKey}`);
-  console.log(`[UnifiedFetcher] API Key length: ${apiKey?.length || 0}`);
+  console.log(`[UnifiedFetcher] ====== API KEY DIAGNOSTIC ======`);
+  console.log(`[UnifiedFetcher] ODDS_API_KEY exists: ${!!process.env.ODDS_API_KEY}`);
+  console.log(`[UnifiedFetcher] NEXT_PUBLIC_ODDS_API_KEY exists: ${!!process.env.NEXT_PUBLIC_ODDS_API_KEY}`);
+  console.log(`[UnifiedFetcher] Selected API Key present: ${!!apiKey}`);
+  console.log(`[UnifiedFetcher] Selected API Key length: ${apiKey?.length || 0}`);
+  console.log(`[UnifiedFetcher] Selected API Key first 8 chars: ${apiKey?.substring(0, 8) || 'N/A'}`);
+  console.log(`[UnifiedFetcher] ================================`);
   
   if (!apiKey) {
-    console.error('[UnifiedFetcher] ❌ CRITICAL: No API key available!');
-    console.error('[UnifiedFetcher] Check ODDS_API_KEY or NEXT_PUBLIC_ODDS_API_KEY env vars');
-    return [];
+    console.error('[UnifiedFetcher] ❌❌❌ CRITICAL: NO API KEY CONFIGURED ❌❌❌');
+    console.error('[UnifiedFetcher] You must set ODDS_API_KEY or NEXT_PUBLIC_ODDS_API_KEY');
+    console.error('[UnifiedFetcher] Get your free key at: https://the-odds-api.com/');
+    throw new Error('ODDS_API_KEY not configured - cannot fetch odds data');
   }
 
   try {
-    console.log(`[UnifiedFetcher] Calling fetchLiveOdds with:`);
+    console.log(`[UnifiedFetcher] ====== CALLING THE ODDS API ======`);
     console.log(`[UnifiedFetcher] - sport: ${sport}`);
-    console.log(`[UnifiedFetcher] - markets: h2h, spreads, totals`);
-    console.log(`[UnifiedFetcher] - regions: us`);
+    console.log(`[UnifiedFetcher] - markets: ['h2h', 'spreads', 'totals']`);
+    console.log(`[UnifiedFetcher] - regions: ['us']`);
+    console.log(`[UnifiedFetcher] - oddsFormat: 'american'`);
     console.log(`[UnifiedFetcher] - skipCache: ${!useCache}`);
+    console.log(`[UnifiedFetcher] - API URL will be: https://api.the-odds-api.com/v4/sports/${sport}/odds/?markets=h2h,spreads,totals`);
+    console.log(`[UnifiedFetcher] ====================================`);
     
     const oddsData = await fetchLiveOdds(sport, {
       markets: ['h2h', 'spreads', 'totals'],
@@ -54,9 +63,27 @@ export async function getOddsWithCache(
       skipCache: !useCache
     });
 
-    console.log(`[UnifiedFetcher] ✓ Received ${oddsData?.length || 0} games from API`);
+    console.log(`[UnifiedFetcher] ====== API RESPONSE RECEIVED ======`);
+    console.log(`[UnifiedFetcher] Games returned: ${oddsData?.length || 0}`);
     console.log(`[UnifiedFetcher] Data type: ${typeof oddsData}`);
     console.log(`[UnifiedFetcher] Is array: ${Array.isArray(oddsData)}`);
+    console.log(`[UnifiedFetcher] Is null: ${oddsData === null}`);
+    console.log(`[UnifiedFetcher] Is undefined: ${oddsData === undefined}`);
+    
+    if (oddsData && oddsData.length > 0) {
+      const sample = oddsData[0];
+      console.log(`[UnifiedFetcher] Sample game: ${sample.away_team} @ ${sample.home_team}`);
+      console.log(`[UnifiedFetcher] Sample bookmakers: ${sample.bookmakers?.length || 0}`);
+      console.log(`[UnifiedFetcher] Sample start time: ${sample.commence_time}`);
+    } else {
+      console.warn(`[UnifiedFetcher] ⚠️ NO GAMES RETURNED FOR ${sport}`);
+      console.warn(`[UnifiedFetcher] This could mean:`);
+      console.warn(`[UnifiedFetcher] 1. No games scheduled/live for this sport`);
+      console.warn(`[UnifiedFetcher] 2. Sport key "${sport}" is invalid`);
+      console.warn(`[UnifiedFetcher] 3. API quota exceeded`);
+      console.warn(`[UnifiedFetcher] 4. API returned an error (check earlier logs)`);
+    }
+    console.log(`[UnifiedFetcher] ===================================`);
 
     // Store in Supabase if enabled
     if (storeResults && oddsData.length > 0) {

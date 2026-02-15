@@ -7,6 +7,28 @@
 
 ## Recent Accomplishments (Feb 11-14, 2026)
 
+### Data Integration Fixes (February 13, 2026)
+
+**DI1. Internal API Fetch Resolution:**
+- Eliminated unreliable HTTP fetch calls to same-origin routes
+- Created standalone `/lib/cards-generator.ts` utility module for direct function imports
+- Zero HTTP overhead with faster response times
+- Works reliably in both local dev and production environments
+
+**DI2. Sport Key Standardization:**
+- Created comprehensive SPORT_KEYS constant mapping in `/lib/constants.ts`
+- Bidirectional mapping between short form (nba) and API format (basketball_nba)
+- Added helper functions: `sportToApi()` and `apiToSport()`
+- Created `/lib/sport-key-validator.ts` (176 lines) with validation utilities
+- Architecture: DB uses short form, APIs use full format, conversion at boundaries
+
+**DI3. Weather API Integration:**
+- Implemented `/lib/weather-service.ts` (328 lines) with stadium location mapping
+- Integrated Open-Meteo API for real-time conditions with 15-min cache
+- Auto-detects outdoor sports (NFL, MLB) and enriches betting cards
+- Weather impact analysis: wind, precipitation, temperature effects on gameplay
+- Stadium database supports 20+ venues with fallback city-based geocoding
+
 ### Latest Debugging and Verification (February 14, 2026 - Evening)
 
 **Enhanced Logging for Live Odds Display:**

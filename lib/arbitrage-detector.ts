@@ -435,9 +435,14 @@ export async function detectArbitrageFromContext(sport?: string): Promise<any[]>
     console.log(`[v0] [ARBITRAGE] No arbitrage found in ${oddsData.length} games, creating ${cardsToCreate} regular odds cards`);
     
     const cards = oddsData.slice(0, cardsToCreate).map((game: any, index: number) => {
+      console.log(`[v0] [ARBITRAGE] Creating card ${index + 1}/${cardsToCreate} for game:`, game.id);
       const firstBook = game.bookmakers?.[0];
       const h2hMarket = firstBook?.markets?.find((m: any) => m.key === 'h2h');
       const outcomes = h2hMarket?.outcomes || [];
+      
+      if (!firstBook) {
+        console.log(`[v0] [ARBITRAGE] WARNING: No bookmaker data for game ${game.id}`);
+      }
       
       const homeOdds = outcomes.find((o: any) => o.name === game.home_team);
       const awayOdds = outcomes.find((o: any) => o.name === game.away_team);

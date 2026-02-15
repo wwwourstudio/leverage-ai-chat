@@ -19,19 +19,24 @@ async function generateSportSpecificCards(
   count: number,
   category?: string
 ): Promise<InsightCard[]> {
+  console.log(`[v0] [CARDS GENERATOR] === SPORT SPECIFIC CARDS START ===`);
+  console.log(`[v0] [CARDS GENERATOR] Sport: ${sport}, Count: ${count}, Category: ${category}`);
+  
   const cards: InsightCard[] = [];
   const displaySport = apiToSport(sport).toUpperCase();
   
-  console.log('[v0] [CARDS GENERATOR] Generating sport-specific cards for', displaySport);
-  
   // Fetch real live odds for this sport
   if (category === 'betting' || !category) {
+    console.log(`[v0] [CARDS GENERATOR] Betting category detected, attempting to fetch real odds`);
     try {
+      console.log(`[v0] [CARDS GENERATOR] Importing odds-api-client...`);
       const { fetchLiveOdds } = await import('@/lib/odds-api-client');
       const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
       
+      console.log(`[v0] [CARDS GENERATOR] API Key available: ${!!apiKey}`);
+      
       if (apiKey) {
-        console.log('[v0] [CARDS GENERATOR] Fetching live odds for', displaySport);
+        console.log(`[v0] [CARDS GENERATOR] Calling fetchLiveOdds for ${displaySport}...`);
         const oddsData = await fetchLiveOdds(sport, {
           markets: ['h2h'],
           regions: ['us'],
@@ -39,8 +44,14 @@ async function generateSportSpecificCards(
           apiKey
         });
         
+        console.log(`[v0] [CARDS GENERATOR] fetchLiveOdds returned:`, {
+          isArray: Array.isArray(oddsData),
+          length: oddsData?.length || 0,
+          hasData: !!(oddsData && oddsData.length > 0)
+        });
+        
         if (oddsData && oddsData.length > 0) {
-          console.log('[v0] [CARDS GENERATOR] Found', oddsData.length, 'live games for', displaySport);
+          console.log(`[v0] [CARDS GENERATOR] SUCCESS: Found ${oddsData.length} live games for ${displaySport}`);
           
           // Create cards from actual live games
           const gamesToShow = Math.min(count, oddsData.length);

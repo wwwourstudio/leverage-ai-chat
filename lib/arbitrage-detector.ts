@@ -359,7 +359,29 @@ export async function detectArbitrageFromContext(sport?: string): Promise<any[]>
     
     if (!oddsData || oddsData.length === 0) {
       console.log('[v0] [ARBITRAGE] No odds data available');
-      return [];
+      // Return a helpful "no games" card instead of empty array
+      const displaySport = apiToSport(normalizedSport).toUpperCase();
+      return [{
+        type: 'LIVE_ODDS',
+        title: `${displaySport} Live Odds`,
+        icon: 'Calendar',
+        category: displaySport,
+        subcategory: 'No Games Scheduled',
+        gradient: 'from-gray-500 to-gray-700',
+        data: {
+          message: `No ${displaySport} games scheduled in the next 48 hours`,
+          note: 'The Odds API only returns games scheduled within 24-48 hours of start time',
+          suggestion: `Try checking closer to ${displaySport} game days, or ask about another sport`,
+          status: 'NO_DATA',
+          realData: false
+        },
+        metadata: {
+          realData: false,
+          dataSource: 'The Odds API',
+          reason: 'No scheduled games',
+          timestamp: new Date().toISOString()
+        }
+      }];
     }
     
     const opportunities = detectArbitrageOpportunities(oddsData, 0.5);
@@ -372,9 +394,10 @@ export async function detectArbitrageFromContext(sport?: string): Promise<any[]>
     }
     
     // NO ARBITRAGE FOUND - Return regular live odds cards instead of empty array
-    console.log(`[v0] [ARBITRAGE] No arbitrage found, converting ${Math.min(3, oddsData.length)} games to regular odds cards`);
+    const cardsToCreate = Math.min(3, oddsData.length);
+    console.log(`[v0] [ARBITRAGE] No arbitrage found in ${oddsData.length} games, creating ${cardsToCreate} regular odds cards`);
     
-    return oddsData.slice(0, 3).map((game: any) => {
+    const cards = oddsData.slice(0, cardsToCreate).map((game: any, index: number) => {
       const firstBook = game.bookmakers?.[0];
       const h2hMarket = firstBook?.markets?.find((m: any) => m.key === 'h2h');
       const outcomes = h2hMarket?.outcomes || [];
@@ -382,7 +405,7 @@ export async function detectArbitrageFromContext(sport?: string): Promise<any[]>
       const homeOdds = outcomes.find((o: any) => o.name === game.home_team);
       const awayOdds = outcomes.find((o: any) => o.name === game.away_team);
       
-      return {
+      const card = {
         type: 'LIVE_ODDS',
         title: `${game.away_team} @ ${game.home_team}`,
         icon: 'TrendingUp',
@@ -405,7 +428,21 @@ export async function detectArbitrageFromContext(sport?: string): Promise<any[]>
           timestamp: new Date().toISOString()
         }
       };
+      
+      if (index === 0) {
+        console.log('[v0] [ARBITRAGE] Sample card created:', {
+          matchup: card.data.matchup,
+          homeOdds: card.data.homeOdds,
+          awayOdds: card.data.awayOdds,
+          bookmaker: card.data.bookmaker
+        });
+      }
+      
+      return card;
     });
+    
+    console.log(`[v0] [ARBITRAGE] Successfully created ${cards.length} live odds cards`);
+    return cards;
   } catch (error) {
     console.error('[v0] [ARBITRAGE] Error in context detection:', error);
     return [];

@@ -310,31 +310,84 @@ export async function generateContextualCards(
     }
   }
 
-  // Kalshi/Prediction Markets - Fetch real market data
+  // Kalshi/Prediction Markets - Use unified service with Supabase caching
   if (category === 'kalshi') {
-    console.log('[v0] [CARDS GENERATOR] Kalshi category detected, fetching live markets');
+    console.log('[v0] [CARDS-GEN] Kalshi category - using unified service with caching');
     try {
-      const { enrichCardsWithKalshi } = await import('@/lib/kalshi-api-client');
-      const enrichedCards = await enrichCardsWithKalshi(cards, 'sports');
-      console.log('[v0] [CARDS GENERATOR] Kalshi enrichment complete:', enrichedCards.length - cards.length, 'markets added');
-      return enrichedCards;
+      const { getSportsKalshiMarkets } = await import('@/lib/unified-kalshi-service');
+      const { kalshiMarketToCard } = await import('@/lib/kalshi-client');
+      
+      // Fetch markets with caching (stored in Supabase for realtime sync)
+      const markets = await getSportsKalshiMarkets(normalizedSport);
+      console.log(`[v0] [CARDS-GEN] Fetched ${markets.length} Kalshi markets from unified service`);
+      
+      if (markets.length > 0) {
+        const kalshiCards = markets.slice(0, count).map(kalshiMarketToCard);
+        cards.push(...kalshiCards);
+        console.log(`[v0] [CARDS-GEN] Added ${kalshiCards.length} Kalshi market cards`);
+        return cards;
+      }
     } catch (error) {
-      console.error('[v0] [CARDS GENERATOR] Kalshi enrichment failed:', error);
-      // Fallback to placeholder card
-      cards.push({
-        type: 'PREDICTION_MARKET',
-        title: 'Prediction Markets',
-        icon: 'BarChart',
-        category: 'KALSHI',
-        subcategory: 'Live Markets',
-        gradient: 'from-purple-600 to-indigo-700',
-        data: {
-          description: 'Real-time prediction market probabilities',
-          note: 'Live data temporarily unavailable',
-          marketType: 'Binary Outcome'
-        }
-      });
+      console.error('[v0] [CARDS-GEN] Unified Kalshi service error:', error);
     }
+    
+    // Fallback to placeholder if no markets available
+    cards.push({
+      type: 'PREDICTION_MARKET',
+      title: 'Prediction Markets',
+      icon: 'BarChart',
+      category: 'KALSHI',
+      subcategory: 'Live Markets',
+      gradient: 'from-purple-600 to-indigo-700',
+      data: {
+        description: 'Real-time prediction market probabilities',
+        note: 'Loading markets from Kalshi...',
+        marketType: 'Binary Outcome',
+        realData: false
+      }
+    });
+  }
+
+  // Player Props - Fetch real player prop markets
+  if (category === 'props' || category === 'player_props') {
+    console.log('[v0] [CARDS-GEN] Player props category - fetching live markets');
+    try {
+      const { fetchPlayerProps, playerPropToCard } = await import('@/lib/player-props-service');
+      
+      if (normalizedSport) {
+        const props = await fetchPlayerProps({ 
+          sport: normalizedSport, 
+          useCache: true, 
+          storeResults: true 
+        });
+        
+        console.log(`[v0] [CARDS-GEN] Fetched ${props.length} player props`);
+        
+        if (props.length > 0) {
+          const propCards = props.slice(0, count).map(playerPropToCard);
+          cards.push(...propCards);
+          console.log(`[v0] [CARDS-GEN] Added ${propCards.length} player prop cards`);
+          return cards;
+        }
+      }
+    } catch (error) {
+      console.error('[v0] [CARDS-GEN] Player props error:', error);
+    }
+    
+    // Fallback placeholder
+    cards.push({
+      type: 'PLAYER_PROP',
+      title: 'Player Props',
+      icon: 'User',
+      category: displaySport,
+      subcategory: 'Player Props',
+      gradient: 'from-blue-600 to-cyan-600',
+      data: {
+        description: 'Player-specific betting markets',
+        note: 'Loading prop markets...',
+        realData: false
+      }
+    });
   }
 
   // DFS cards

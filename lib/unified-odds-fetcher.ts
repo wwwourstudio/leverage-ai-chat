@@ -51,6 +51,15 @@ export async function getOddsWithCache(
         supabaseOddsService.storeOdds(sport, sport, oddsData),
         supabaseOddsService.storeSportOdds(sport.split('_')[0], oddsData)
       ]);
+      
+      // Track line movement for sharp money detection
+      try {
+        const { monitorOddsChanges } = await import('@/lib/line-movement-tracker');
+        await monitorOddsChanges(oddsData, sport);
+        console.log(`[UnifiedFetcher] Line movement tracked for ${sport}`);
+      } catch (error) {
+        console.error('[UnifiedFetcher] Line tracking error:', error);
+      }
     }
 
     return oddsData;

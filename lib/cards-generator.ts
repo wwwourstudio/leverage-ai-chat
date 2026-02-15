@@ -240,10 +240,17 @@ export async function generateContextualCards(
       const { detectArbitrageFromContext } = await import('@/lib/arbitrage-detector');
       const arbitrageCards = await detectArbitrageFromContext(normalizedSport);
       
+      console.log('[v0] [CARDS GENERATOR] Arbitrage cards returned:', {
+        isArray: Array.isArray(arbitrageCards),
+        length: arbitrageCards?.length || 0,
+        firstCard: arbitrageCards?.[0]?.title || 'none'
+      });
+      
       if (arbitrageCards && arbitrageCards.length > 0) {
-        console.log('[v0] [CARDS GENERATOR] Found', arbitrageCards.length, 'arbitrage opportunities');
-        cards.push(...arbitrageCards.slice(0, 2)); // Add up to 2 arbitrage cards
+        console.log('[v0] [CARDS GENERATOR] Adding', arbitrageCards.length, 'cards (arbitrage or live odds)');
+        cards.push(...arbitrageCards.slice(0, 3)); // Add up to 3 cards (arbitrage or live odds)
       } else {
+        console.log('[v0] [CARDS GENERATOR] No cards returned, using placeholder');
         // Fallback placeholder card
         cards.push({
           type: CARD_TYPES.LIVE_ODDS,

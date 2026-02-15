@@ -8,6 +8,7 @@ import {
   MARKET_TYPES,
 } from '@/lib/constants';
 import { validateSportKey, getSportInfo, isValidSport } from '@/lib/sports-validator';
+import { storeOddsData, getRecentOdds } from '@/lib/odds-persistence';
 
 // Sports Odds API integration
 // Documentation: https://the-odds-api.com/
@@ -230,6 +231,22 @@ export async function POST(req: NextRequest) {
 
     // Cache the transformed data
     setCachedOdds(cacheKey, transformedData);
+
+    // Store in database (fire and forget - don't block response)
+    storeOddsData(normalizedSport, transformedData.events, {
+      remainingRequests: transformedData.remainingRequests || undefined,
+      usedRequests: transformedData.usedRequests || undefined,
+    })
+      .then((result) => {
+        if (result.success) {
+          console.log(`[v0] ✅ Stored ${result.stored} odds records in database`);
+        } else {
+          console.error(`[v0] ❌ Failed to store odds:`, result.errors);
+        }
+      })
+      .catch((err) => {
+        console.error(`[v0] ❌ Database storage error:`, err);
+      });
 
     return NextResponse.json(transformedData);
   } catch (error: any) {

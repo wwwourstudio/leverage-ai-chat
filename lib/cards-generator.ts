@@ -41,7 +41,8 @@ async function generateSportSpecificCards(
           markets: ['h2h', 'spreads', 'totals'], // Fetch ALL available markets
           regions: ['us'],
           oddsFormat: 'american',
-          apiKey
+          apiKey,
+          skipCache: true // Force fresh data to get all markets
         });
         
         console.log(`[v0] [CARDS GENERATOR] fetchLiveOdds returned:`, {

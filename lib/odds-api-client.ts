@@ -287,10 +287,15 @@ export async function fetchLiveOdds(
     }
   }
   
-  console.log(`${LOG_PREFIXES.API} Fetching live odds:`, { sportKey, markets, regions });
+  console.log(`[v0] [ODDS-API] Fetching live odds for ${sportKey}`);
+  console.log(`[v0] [ODDS-API] Markets requested: ${marketsParam}`);
+  console.log(`[v0] [ODDS-API] Regions: ${regionsParam}`);
+  console.log(`[v0] [ODDS-API] Skip cache: ${skipCache}`);
+  console.log(`[v0] [ODDS-API] URL: ${url.replace(apiKey, 'REDACTED')}`);
 
   // Create the fetch promise
   const fetchPromise = retryWithBackoff(async () => {
+    console.log(`[v0] [ODDS-API] Making HTTP request to API...`);
     const response = await fetch(url, {
       headers: {
         'Accept': 'application/json',
@@ -307,6 +312,20 @@ export async function fetchLiveOdds(
     }
 
     const data = await response.json();
+    
+    console.log(`[v0] [ODDS-API] ✓ Received ${data?.length || 0} games for ${sportKey}`);
+    
+    if (data && data.length > 0) {
+      const sample = data[0];
+      console.log(`[v0] [ODDS-API] Sample: ${sample.away_team} @ ${sample.home_team}`);
+      const sampleBookies = sample.bookmakers?.length || 0;
+      console.log(`[v0] [ODDS-API] Bookmakers: ${sampleBookies}`);
+      
+      if (sample.bookmakers && sample.bookmakers[0]?.markets) {
+        const marketTypes = sample.bookmakers[0].markets.map((m: any) => m.key);
+        console.log(`[v0] [ODDS-API] Market types in response: ${marketTypes.join(', ')}`);
+      }
+    }
     
     // Cache successful response
     requestCache.set(cacheKey, { 

@@ -14,14 +14,15 @@ import { CARD_TYPES, SPORT_KEYS, sportToApi, apiToSport } from '@/lib/constants'
 /**
  * Generate sport-specific cards with REAL odds data
  */
+// FORCE REFRESH: 2026-02-15-03:00
 async function generateSportSpecificCards(
   sport: string,
   count: number,
   category?: string
 ): Promise<InsightCard[]> {
-  // OVERRIDE: Always request at least 3 cards to show multiple games
+  // FORCE MINIMUM 3 CARDS - OVERRIDE ANY COUNT PARAMETER
   const actualCount = Math.max(count, 3);
-  console.log(`[v0] [SPORT CARDS FUNCTION] === CALLED === sport=${sport} originalCount=${count} actualCount=${actualCount} category=${category}`);
+  console.log(`[v0] [CARDS-GEN] ENTRY: sport=${sport} requestedCount=${count} OVERRIDING TO actualCount=${actualCount}`);
   
   const cards: InsightCard[] = [];
   const displaySport = apiToSport(sport).toUpperCase();
@@ -38,13 +39,14 @@ async function generateSportSpecificCards(
       console.log(`[v0] [CARDS GENERATOR] API Key available: ${!!apiKey}`);
       
       if (apiKey) {
-        console.log(`[v0] [CARDS GENERATOR] Calling fetchLiveOdds for ${displaySport}...`);
+        const requestedMarkets = ['h2h', 'spreads', 'totals'];
+        console.log(`[v0] [CARDS-GEN] Fetching odds with markets:`, requestedMarkets, 'skipCache: true');
         const oddsData = await fetchLiveOdds(sport, {
-          markets: ['h2h', 'spreads', 'totals'], // Fetch ALL available markets
+          markets: requestedMarkets,
           regions: ['us'],
           oddsFormat: 'american',
           apiKey,
-          skipCache: true // Force fresh data to get all markets
+          skipCache: true
         });
         
         console.log(`[v0] [CARDS GENERATOR] fetchLiveOdds returned:`, {
@@ -58,8 +60,9 @@ async function generateSportSpecificCards(
           
           // Create cards from actual live games
           const gamesToShow = Math.min(actualCount, oddsData.length);
-          console.log(`[v0] [CARDS GENERATOR] CREATING CARDS: actualCount=${actualCount}, oddsData.length=${oddsData.length}, gamesToShow=${gamesToShow}`);
+          console.log(`[v0] [CARDS-GEN] LOOP START: Will create ${gamesToShow} cards (actualCount=${actualCount}, available=${oddsData.length})`);
           for (let i = 0; i < gamesToShow; i++) {
+            console.log(`[v0] [CARDS-GEN] Creating card ${i + 1}/${gamesToShow}`);
             const game = oddsData[i];
             const firstBook = game.bookmakers?.[0];
             

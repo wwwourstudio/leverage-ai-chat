@@ -103,7 +103,7 @@ export function calculateArbitrageStakes(
  */
 export function detectArbitrageOpportunities(
   oddsData: any[],
-  minProfitThreshold: number = 0.5 // Minimum 0.5% profit to consider
+  minProfitThreshold: number = 0.25 // Lowered from 0.5% to 0.25% to find more opportunities
 ): ArbitrageOpportunity[] {
   const opportunities: ArbitrageOpportunity[] = [];
   
@@ -358,9 +358,46 @@ export async function detectArbitrageFromContext(sport?: string): Promise<any[]>
     });
     
     if (!oddsData || oddsData.length === 0) {
-      console.log('[v0] [ARBITRAGE] No odds data available');
-      // Return a helpful "no games" card instead of empty array
+      console.log('[v0] [ARBITRAGE] No live odds data available, attempting database fallback');
       const displaySport = apiToSport(normalizedSport).toUpperCase();
+      
+      // Try to fetch cached historical data from Supabase
+      try {
+        const { fetchUpcomingGames } = await import('@/lib/supabase-data-service');
+        const dbResult = await fetchUpcomingGames(normalizedSport, 72); // Last 72 hours
+        
+        if (dbResult.ok && dbResult.value.data.length > 0) {
+          console.log(`[v0] [ARBITRAGE] Found ${dbResult.value.data.length} cached games in database`);
+          
+          // Convert DB records to card format (not arbitrage, just cached odds)
+          return dbResult.value.data.slice(0, 3).map(record => ({
+            type: 'LIVE_ODDS',
+            title: `${record.away_team} @ ${record.home_team}`,
+            icon: 'Database',
+            category: displaySport,
+            subcategory: 'Cached Data',
+            gradient: 'from-purple-600 to-indigo-700',
+            data: {
+              matchup: `${record.away_team} @ ${record.home_team}`,
+              gameTime: new Date(record.commence_time).toLocaleString(),
+              note: 'Historical data from database (no live games currently scheduled)',
+              cached: true,
+              status: 'CACHED',
+              realData: true
+            },
+            metadata: {
+              realData: true,
+              dataSource: 'Supabase Database',
+              cached: true,
+              timestamp: new Date().toISOString()
+            }
+          }));
+        }
+      } catch (dbError) {
+        console.log('[v0] [ARBITRAGE] Database fallback failed:', dbError);
+      }
+      
+      // Final fallback: informative "no games" card
       return [{
         type: 'LIVE_ODDS',
         title: `${displaySport} Live Odds`,

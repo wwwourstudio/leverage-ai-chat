@@ -88,3 +88,6 @@ export function useRealtime<T>(
 
   return { data, loading, error };
 }
+
+// Alias export for backward compatibility
+export { useRealtime as useRealtimeSubscription };

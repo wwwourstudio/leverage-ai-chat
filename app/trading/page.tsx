@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { runTradingEngine } from '@/lib/engine/runTradingEngine';
-import type { TradingEngineInputs, TradingEngineResults } from '@/lib/engine/runTradingEngine';
+import type { TradingInput, TradingEngineResult } from '@/lib/engine/runTradingEngine';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -21,13 +21,13 @@ import {
 } from 'lucide-react';
 
 export default function TradingEngineDashboard() {
-  const [results, setResults] = useState<TradingEngineResults | null>(null);
+  const [results, setResults] = useState<TradingEngineResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   // Demo inputs - replace with real API data
-  const demoInputs: TradingEngineInputs = {
-    books: [
+  const demoInputs: TradingInput = {
+    odds: [
       {
         bookmaker: 'DraftKings',
         market: 'h2h',

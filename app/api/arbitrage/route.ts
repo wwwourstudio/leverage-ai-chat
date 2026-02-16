@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { findArbitrageOpportunities } from '@/lib/arbitrage-detector';
+import { detectArbitrageOpportunities } from '@/lib/arbitrage-detector';
 import { getOddsWithCache } from '@/lib/unified-odds-fetcher';
 import { createClient } from '@/lib/supabase/server';
 
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     
     for (const { sport, odds } of allOddsResults) {
       if (odds && odds.length > 0) {
-        const opportunities = findArbitrageOpportunities(odds, sport);
+        const opportunities = detectArbitrageOpportunities(odds);
         allOpportunities.push(...opportunities);
       }
     }

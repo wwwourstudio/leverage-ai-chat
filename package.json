@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "NODE_OPTIONS='--max-old-space-size=4096' next build",
-    "dev": "NODE_OPTIONS='--max-old-space-size=4096' next dev",
+    "dev": "rm -rf .next && NODE_OPTIONS='--max-old-space-size=4096' next dev",
     "lint": "eslint .",
     "start": "next start"
   },

@@ -41,17 +41,16 @@ export function PortfolioTracker() {
   }, []);
 
   // Real-time updates for bet allocations
-  useRealtimeSubscription('bet_allocations', (payload) => {
-    console.log('[PortfolioTracker] Real-time update:', payload);
-    if (payload.eventType === 'INSERT') {
-      setPositions(prev => [payload.new as Position, ...prev]);
-    } else if (payload.eventType === 'UPDATE') {
-      setPositions(prev => 
-        prev.map(pos => pos.id === (payload.new as Position).id ? payload.new as Position : pos)
-      );
+  const { data: realtimePositions } = useRealtimeSubscription('bet_allocations');
+  
+  // Update positions when realtime data changes
+  useEffect(() => {
+    if (realtimePositions && realtimePositions.length > 0) {
+      console.log('[PortfolioTracker] Real-time update received:', realtimePositions.length, 'positions');
+      setPositions(realtimePositions as Position[]);
+      fetchPortfolio(); // Refresh stats
     }
-    fetchPortfolio(); // Refresh stats
-  });
+  }, [realtimePositions]);
 
   const fetchPortfolio = async () => {
     try {

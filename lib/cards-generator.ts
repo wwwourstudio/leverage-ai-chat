@@ -225,26 +225,38 @@ export async function generateContextualCards(
 ): Promise<InsightCard[]> {
   const cards: InsightCard[] = [];
 
+  // If no sport specified, intelligently select one with active games
+  let sportToUse = sport;
+  if (!sportToUse && !multiSport) {
+    const { getBestSportForOdds } = await import('@/lib/active-sports-detector');
+    sportToUse = getBestSportForOdds();
+    console.log(`[v0] [CARDS-GEN] No sport specified, intelligently selected: ${sportToUse}`);
+  }
+
   // Normalize sport to API format, then get display name
-  const normalizedSport = sport ? sportToApi(sport) : undefined;
+  const normalizedSport = sportToUse ? sportToApi(sportToUse) : undefined;
   const displaySport = normalizedSport ? apiToSport(normalizedSport).toUpperCase() : 'MULTI-SPORT';
 
   console.log('[v0] [CARDS GENERATOR] Generating cards...');
-  console.log('[v0] [CARDS GENERATOR] Input:', { category, sport, normalizedSport, displaySport, multiSport });
+  console.log('[v0] [CARDS GENERATOR] Input:', { category, sport: sportToUse, normalizedSport, displaySport, multiSport });
   console.log('[v0] [CARDS GENERATOR] Category:', category, '| Display Sport:', displaySport, '| Count:', count);
   
   // If multiSport requested, generate variety from multiple sports with REAL data
   if (multiSport) {
-    console.log('[v0] [CARDS GENERATOR] Multi-sport mode - fetching real odds from all sports');
+    console.log('[v0] [CARDS GENERATOR] Multi-sport mode - fetching real odds from sports with games');
     
-    // Prioritize sport from query if provided, otherwise use popular sports
-    const primarySport = normalizedSport || SPORT_KEYS.NBA.API;
-    const allSports = [
-      SPORT_KEYS.NBA.API, 
-      SPORT_KEYS.NFL.API, 
-      SPORT_KEYS.NHL.API,
-      SPORT_KEYS.MLB.API
-    ];
+    // Use intelligent sport selection to prioritize sports with active games
+    const { getSportsWithGames } = await import('@/lib/active-sports-detector');
+    const activeSports = getSportsWithGames();
+    
+    console.log('[v0] [CARDS GENERATOR] Active sports detected:', activeSports.map(s => `${s.sport} (${s.likelihood})`).join(', '));
+    
+    // Prioritize sport from query if provided, otherwise use sports with high likelihood of games
+    const primarySport = normalizedSport || activeSports[0]?.apiKey || SPORT_KEYS.NHL.API;
+    const allSports = activeSports
+      .filter(s => s.likelihood === 'high' || s.likelihood === 'medium')
+      .map(s => s.apiKey)
+      .slice(0, 4);
     
     // Reorder to put primary sport first
     const orderedSports = [

@@ -129,9 +129,46 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ALWAYS fetch live odds data for sports queries
+    let fetchedOddsData: any[] = [];
+    const queryLower = query.toLowerCase();
+    const isSportsQuery = queryLower.includes('odds') || 
+                          queryLower.includes('bet') ||
+                          queryLower.includes('prop') ||
+                          queryLower.includes('spread') ||
+                          queryLower.includes('moneyline') ||
+                          queryLower.includes('nba') ||
+                          queryLower.includes('nfl') ||
+                          queryLower.includes('mlb') ||
+                          queryLower.includes('nhl') ||
+                          queryLower.includes('game') ||
+                          queryLower.includes('player') ||
+                          queryLower.includes('tonight') ||
+                          queryLower.includes('value') ||
+                          queryLower.includes('arbitrage') ||
+                          context?.sport;
+    
+    if (isSportsQuery && (!context?.oddsData || !context?.oddsData?.events?.length)) {
+      console.log('[v0] [API] Sports query detected - fetching odds data from API');
+      try {
+        const { getOddsWithCache } = await import('@/lib/unified-odds-fetcher');
+        
+        // Determine which sport(s) to fetch
+        const sportKey = context?.sport || 
+          (queryLower.includes('nba') ? 'basketball_nba' :
+           queryLower.includes('nfl') ? 'americanfootball_nfl' :
+           queryLower.includes('mlb') ? 'baseball_mlb' :
+           queryLower.includes('nhl') ? 'icehockey_nhl' : 'basketball_nba');
+        
+        fetchedOddsData = await getOddsWithCache(sportKey, { useCache: true, storeResults: true });
+        console.log(`[v0] [API] Fetched ${fetchedOddsData.length} games for ${sportKey}`);
+      } catch (err) {
+        console.error('[v0] [API] Odds fetch error:', err);
+      }
+    }
+
     // Detect if this is a Kalshi query and fetch REAL market data
     let kalshiMarkets = null;
-    const queryLower = query.toLowerCase();
     const isKalshiQuery = queryLower.includes('kalshi') || 
                           queryLower.includes('election') || 
                           queryLower.includes('prediction market') ||
@@ -263,9 +300,41 @@ export async function POST(req: NextRequest) {
       
       userPrompt += `\n\n📊 LIVE ODDS DATA FROM THE ODDS API (${context.oddsData.events.length} games):\n${oddsEvents}\n\nIMPORTANT: Use this REAL data to analyze opportunities. Compare odds across sportsbooks to identify arbitrage or value. Be specific about which sportsbooks and which lines.`;
       console.log('[v0] ✓ Formatted live odds data for Grok analysis');
+    } else if (fetchedOddsData.length > 0) {
+      // Use the odds data we fetched directly
+      console.log(`[v0] Using directly fetched odds data: ${fetchedOddsData.length} games`);
+      
+      const oddsText = fetchedOddsData.slice(0, 10).map((game: any, idx: number) => {
+        let line = `${idx + 1}. ${game.away_team} @ ${game.home_team} (${new Date(game.commence_time).toLocaleString()})`;
+        
+        if (game.completed && game.scores) {
+          const homeScore = game.scores?.find((s: any) => s.name === game.home_team);
+          const awayScore = game.scores?.find((s: any) => s.name === game.away_team);
+          line += ` FINAL: ${game.away_team} ${awayScore?.score || '?'} - ${homeScore?.score || '?'} ${game.home_team}`;
+        } else if (game.bookmakers?.length > 0) {
+          const book = game.bookmakers[0];
+          const h2h = book.markets?.find((m: any) => m.key === 'h2h');
+          if (h2h?.outcomes) {
+            h2h.outcomes.forEach((o: any) => {
+              line += ` | ${o.name}: ${o.price > 0 ? '+' : ''}${o.price}`;
+            });
+          }
+          const spread = book.markets?.find((m: any) => m.key === 'spreads');
+          if (spread?.outcomes) {
+            line += ` | Spread:`;
+            spread.outcomes.forEach((o: any) => {
+              line += ` ${o.name} ${o.point > 0 ? '+' : ''}${o.point}`;
+            });
+          }
+        }
+        
+        return line;
+      }).join('\n');
+      
+      userPrompt += `\n\n📊 REAL GAME DATA (The Odds API - ${fetchedOddsData.length} games):\n${oddsText}\n\nUse this REAL data. Be specific with numbers and matchups.`;
     } else if (context?.oddsData) {
-      console.log('[v0] ⚠️ Odds data present but no events found');
-      userPrompt += `\n\n⚠️ NOTE: No live games currently available in the market. This may be due to off-season, no scheduled games today, or API limitations.`;
+      console.log('[v0] Odds data present but no events found');
+      userPrompt += `\n\nNo live games currently available for this sport.`;
     }
 
     // Add REAL Kalshi market data if available

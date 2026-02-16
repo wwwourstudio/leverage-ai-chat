@@ -2,6 +2,34 @@ import { fetchLiveOdds } from '@/lib/odds-api-client';
 import { supabaseOddsService } from '@/lib/supabase-odds-service';
 
 /**
+ * Fetch recent completed games with scores from The Odds API /scores endpoint
+ * This always returns data even during offseason or off-days
+ */
+async function fetchRecentScores(sport: string, apiKey: string, daysFrom: number = 3): Promise<any[]> {
+  try {
+    const url = `https://api.the-odds-api.com/v4/sports/${sport}/scores/?apiKey=${apiKey}&daysFrom=${daysFrom}`;
+    console.log(`[UnifiedFetcher] Fetching recent scores for ${sport} (last ${daysFrom} days)`);
+    
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(10000)
+    });
+    
+    if (!response.ok) {
+      console.error(`[UnifiedFetcher] Scores endpoint error: ${response.status}`);
+      return [];
+    }
+    
+    const games = await response.json();
+    console.log(`[UnifiedFetcher] Scores endpoint returned ${games?.length || 0} games`);
+    return Array.isArray(games) ? games : [];
+  } catch (error) {
+    console.error('[UnifiedFetcher] Failed to fetch scores:', error);
+    return [];
+  }
+}
+
+/**
  * Unified Odds Fetcher
  * Combines API fetching with Supabase caching and storage
  */
@@ -76,12 +104,37 @@ export async function getOddsWithCache(
       console.log(`[UnifiedFetcher] Sample bookmakers: ${sample.bookmakers?.length || 0}`);
       console.log(`[UnifiedFetcher] Sample start time: ${sample.commence_time}`);
     } else {
-      console.warn(`[UnifiedFetcher] ⚠️ NO GAMES RETURNED FOR ${sport}`);
-      console.warn(`[UnifiedFetcher] This could mean:`);
-      console.warn(`[UnifiedFetcher] 1. No games scheduled/live for this sport`);
-      console.warn(`[UnifiedFetcher] 2. Sport key "${sport}" is invalid`);
-      console.warn(`[UnifiedFetcher] 3. API quota exceeded`);
-      console.warn(`[UnifiedFetcher] 4. API returned an error (check earlier logs)`);
+      // CRITICAL FALLBACK: No upcoming games found, fetch RECENT SCORES instead
+      console.log(`[UnifiedFetcher] No upcoming games for ${sport} - fetching recent scores as fallback`);
+      
+      const recentGames = await fetchRecentScores(sport, apiKey, 7);
+      
+      if (recentGames.length > 0) {
+        console.log(`[UnifiedFetcher] Found ${recentGames.length} recent games from scores endpoint`);
+        
+        // Now fetch odds for these games if they have upcoming entries
+        // The scores endpoint returns both completed and upcoming games
+        const upcomingFromScores = recentGames.filter((g: any) => !g.completed);
+        const completedGames = recentGames.filter((g: any) => g.completed);
+        
+        console.log(`[UnifiedFetcher] ${upcomingFromScores.length} upcoming, ${completedGames.length} completed`);
+        
+        // Return whatever we have - upcoming first, then completed
+        const allGames = [...upcomingFromScores, ...completedGames];
+        
+        // Store in Supabase
+        if (storeResults && allGames.length > 0) {
+          try {
+            await supabaseOddsService.storeOdds(sport, sport, allGames);
+          } catch (e) {
+            console.error('[UnifiedFetcher] Failed to store scores:', e);
+          }
+        }
+        
+        return allGames;
+      }
+      
+      console.warn(`[UnifiedFetcher] No games found from either odds or scores endpoint for ${sport}`);
     }
     console.log(`[UnifiedFetcher] ===================================`);
 

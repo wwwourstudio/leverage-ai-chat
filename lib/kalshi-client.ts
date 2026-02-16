@@ -118,7 +118,7 @@ export async function fetchKalshiMarkets(params?: {
   }
   
   try {
-    const baseUrl = 'https://trading-api.kalshi.com/trade-api/v2';
+    const baseUrl = 'https://api.elections.kalshi.com/trade-api/v2';
     const queryParams = new URLSearchParams({
       limit: limit.toString(),
       status,
@@ -141,13 +141,19 @@ export async function fetchKalshiMarkets(params?: {
       finalCategory = categoryMap[category.toLowerCase()];
     }
     
+    // Use cursor-based pagination and category filter
     if (finalCategory) {
       queryParams.append('series_ticker', finalCategory);
     }
     
-    // Add search query if provided
+    // Add search query if provided - Kalshi uses 'title' param
     if (search) {
       queryParams.append('title', search);
+    }
+    
+    // Add event_ticker for more targeted searches
+    if (category && !finalCategory) {
+      queryParams.append('title', category);
     }
     
     const url = `${baseUrl}/markets?${queryParams}`;
@@ -188,32 +194,39 @@ export async function fetchKalshiMarkets(params?: {
     
     console.log(`[v0] [KALSHI] Raw markets count: ${data.markets.length}`);
     
-    const markets: KalshiMarket[] = data.markets.map((m: any) => ({
-      ticker: m.ticker,
-      title: m.title,
-      category: m.category,
-      subtitle: m.subtitle || '',
-      yesPrice: m.yes_bid || m.last_price || 0,
-      noPrice: m.no_bid || (100 - (m.last_price || 0)) || 0,
-      volume: m.volume || 0,
-      openInterest: m.open_interest || 0,
-      closeTime: m.close_time,
-      status: m.status,
-    }));
-    
-    console.log(`[v0] [KALSHI] ✓✓✓ Successfully fetched ${markets.length} markets`);
-    console.log('[v0] [KALSHI] Categories found:', [...new Set(markets.map(m => m.category))].slice(0, 10).join(', '));
-    console.log('[v0] [KALSHI] Sample markets:');
-    markets.slice(0, 3).forEach(m => console.log(`[v0] [KALSHI]   - ${m.title} (${m.category})`));
-    console.log('[v0] [KALSHI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
-    // Store in cache if enabled
-    if (useCache && markets.length > 0) {
-      const cacheKey = getCacheKey({ category, status, limit, search });
-      cacheMarkets(cacheKey, markets, cacheTtlMs);
+    // Log raw field names from first market for debugging
+    if (data.markets.length > 0) {
+      const sampleKeys = Object.keys(data.markets[0]);
+      console.log('[v0] [KALSHI] Raw market fields:', sampleKeys.join(', '));
     }
     
-    return markets;
+    const markets: KalshiMarket[] = data.markets.map((m: any) => ({
+      ticker: m.ticker || '',
+      title: m.title || m.event_title || m.yes_sub_title || m.subtitle || '',
+      category: m.category || m.series_ticker || m.event_ticker || '',
+      subtitle: m.subtitle || m.yes_sub_title || '',
+      yesPrice: m.yes_bid ?? m.yes_ask ?? m.last_price ?? m.floor_strike ?? 0,
+      noPrice: m.no_bid ?? m.no_ask ?? (m.last_price ? (100 - m.last_price) : 100),
+      volume: m.volume ?? m.volume_24h ?? 0,
+      openInterest: m.open_interest ?? 0,
+      closeTime: m.close_time || m.expiration_time || m.end_date || '',
+      status: m.status || 'active',
+    }));
+    
+    // Filter out markets with no meaningful data
+    const meaningfulMarkets = markets.filter(m => m.title && m.title.length > 5);
+    
+    console.log(`[v0] [KALSHI] Fetched ${markets.length} raw, ${meaningfulMarkets.length} meaningful markets`);
+    console.log('[v0] [KALSHI] Categories:', [...new Set(meaningfulMarkets.map(m => m.category))].filter(Boolean).slice(0, 10).join(', '));
+    meaningfulMarkets.slice(0, 3).forEach(m => console.log(`[v0] [KALSHI]   - ${m.title.substring(0, 80)} (${m.category})`));
+    
+    // Store in cache if enabled
+    if (useCache && meaningfulMarkets.length > 0) {
+      const cacheKey = getCacheKey({ category, status, limit, search });
+      cacheMarkets(cacheKey, meaningfulMarkets, cacheTtlMs);
+    }
+    
+    return meaningfulMarkets;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       console.error('[v0] [KALSHI] ❌ Request timeout after 10s - API may be slow or unavailable');
@@ -370,7 +383,7 @@ export async function fetchElectionMarkets(options?: {
  */
 export async function getMarketByTicker(ticker: string): Promise<KalshiMarket | null> {
   try {
-    const baseUrl = 'https://trading-api.kalshi.com/trade-api/v2';
+    const baseUrl = 'https://api.elections.kalshi.com/trade-api/v2';
     const url = `${baseUrl}/markets/${ticker}`;
     
     const response = await fetch(url, {

@@ -198,7 +198,31 @@ export async function POST(req: NextRequest) {
         bookmakers: data[0].bookmakers?.length || 0
       });
     } else if (Array.isArray(data) && data.length === 0) {
-      console.log(`[v0] ⚠️  EMPTY ARRAY - No games scheduled for ${sportInfo.name}`);
+      console.log(`[v0] EMPTY ARRAY - No upcoming games for ${sportInfo.name}, trying scores endpoint...`);
+      
+      // FALLBACK: Fetch recent scores when no upcoming games exist
+      try {
+        const scoresUrl = `${EXTERNAL_APIS.ODDS_API.BASE_URL}/sports/${normalizedSport}/scores/?apiKey=${oddsApiKey}&daysFrom=3`;
+        console.log(`[v0] Fetching recent scores: ${scoresUrl.replace(oddsApiKey || '', 'REDACTED')}`);
+        
+        const scoresResponse = await fetch(scoresUrl, {
+          headers: { 'Accept': 'application/json' },
+          signal: AbortSignal.timeout(10000)
+        });
+        
+        if (scoresResponse.ok) {
+          const scoresData = await scoresResponse.json();
+          console.log(`[v0] Scores endpoint returned ${scoresData?.length || 0} games`);
+          
+          if (Array.isArray(scoresData) && scoresData.length > 0) {
+            // Replace empty data with scores data
+            data.push(...scoresData);
+            console.log(`[v0] Added ${scoresData.length} recent/upcoming games from scores endpoint`);
+          }
+        }
+      } catch (scoresError) {
+        console.error('[v0] Scores fallback error:', scoresError);
+      }
     }
     console.log(`[v0] ===============================`);
 

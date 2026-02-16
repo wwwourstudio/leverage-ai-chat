@@ -138,9 +138,21 @@ interface InsightCard {
 }
 
 export default function UnifiedAIPlatform() {
-  // Lightweight welcome message to reduce memory usage
+  // Dynamic welcome message based on time, category, and sport season
   const getWelcomeMessage = (category: string) => {
-    return "Welcome to **Leverage AI** - Powered by Grok AI\n\nAsk me anything about sports betting, fantasy sports, DFS, or prediction markets.";
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    
+    const categoryMessages: Record<string, string> = {
+      betting: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is scanning live odds across all major sportsbooks. Ask me about tonight's lines, player props, sharp money, or arbitrage opportunities.`,
+      fantasy: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is ready for fantasy analysis. Ask about draft strategy, waiver targets, trade values, or bestball stacking for NFBC/NFFC.`,
+      dfs: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is optimizing DFS lineups. Ask about optimal builds, ownership leverage, captain picks, or correlation stacks for DraftKings and FanDuel.`,
+      kalshi: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is monitoring Kalshi prediction markets in real-time. Ask about election contracts, weather markets, economic events, or cross-market arbitrage.`,
+      all: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** - Powered by Grok AI\n\nI'm connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.`
+    };
+    
+    return categoryMessages[category] || categoryMessages.all;
   };
 
   const [messages, setMessages] = useState<Message[]>([
@@ -256,14 +268,50 @@ export default function UnifiedAIPlatform() {
     return updated;
   };
 
+  // Check Supabase auth session on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          setIsLoggedIn(true);
+          setUser({
+            name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+            email: session.user.email || ''
+          });
+        }
+        
+        // Listen for auth changes (OAuth redirect, signout, etc.)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (session?.user) {
+            setIsLoggedIn(true);
+            setUser({
+              name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+              email: session.user.email || ''
+            });
+            setShowLoginModal(false);
+            setShowSignupModal(false);
+          } else {
+            setIsLoggedIn(false);
+            setUser(null);
+          }
+        });
+        
+        return () => subscription.unsubscribe();
+      } catch (err) {
+        console.error('[v0] Auth check failed:', err);
+      }
+    })();
+  }, []);
+
   // Initialize credits and load real insights on mount
   useEffect(() => {
-    // Load insights on mount (cards removed from initial welcome)
     fetch('/api/insights')
       .then(r => r.json())
       .then(insights => {
-        console.log('[v0] Loaded insights:', insights);
-        
         setMessages((prev: Message[]) => {
           const newMessages = [...prev];
           if (newMessages[0]?.isWelcome) {
@@ -3017,17 +3065,36 @@ export default function UnifiedAIPlatform() {
                 <button
                   onClick={() => {
                     const emailInput = document.getElementById('login-email') as HTMLInputElement;
-                    const email = emailInput?.value || 'user@example.com';
-                    const name = email.split('@')[0];
+                    const email = emailInput?.value || '';
+                    const passwordInput = document.getElementById('login-password') as HTMLInputElement;
+                    const password = passwordInput?.value || '';
                     
-                    // Mock login - in production this would use Supabase
-                    setIsLoggedIn(true);
-                    setUser({
-                      name: name.charAt(0).toUpperCase() + name.slice(1),
-                      email: email
-                    });
-                    setShowLoginModal(false);
-                    console.log('[v0] User logged in:', { name, email });
+                    if (!email || !password) {
+                      alert('Please enter email and password');
+                      return;
+                    }
+                    
+                    try {
+                      const { createClient } = await import('@/lib/supabase/client');
+                      const supabase = createClient();
+                      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                      
+                      if (error) {
+                        alert(error.message);
+                        return;
+                      }
+                      
+                      if (data.user) {
+                        setIsLoggedIn(true);
+                        setUser({
+                          name: data.user.user_metadata?.full_name || email.split('@')[0],
+                          email: data.user.email || email
+                        });
+                        setShowLoginModal(false);
+                      }
+                    } catch (err: any) {
+                      alert(err.message || 'Login failed');
+                    }
                   }}
                   className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all"
                 >
@@ -3044,14 +3111,17 @@ export default function UnifiedAIPlatform() {
                 </div>
 
                 <button
-                  onClick={() => {
-                    // Mock Google login
-                    setIsLoggedIn(true);
-                    setUser({
-                      name: 'Demo User',
-                      email: 'demo@google.com'
-                    });
-                    setShowLoginModal(false);
+                  onClick={async () => {
+                    try {
+                      const { createClient } = await import('@/lib/supabase/client');
+                      const supabase = createClient();
+                      await supabase.auth.signInWithOAuth({
+                        provider: 'google',
+                        options: { redirectTo: window.location.origin }
+                      });
+                    } catch (err: any) {
+                      alert(err.message || 'Google login failed');
+                    }
                   }}
                   className="w-full py-3 border border-gray-800 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all"
                 >
@@ -3128,17 +3198,40 @@ export default function UnifiedAIPlatform() {
                   onClick={() => {
                     const nameInput = document.getElementById('signup-name') as HTMLInputElement;
                     const emailInput = document.getElementById('signup-email') as HTMLInputElement;
-                    const name = nameInput?.value || 'New User';
-                    const email = emailInput?.value || 'newuser@example.com';
+                    const passwordInput = document.getElementById('signup-password') as HTMLInputElement;
+                    const name = nameInput?.value || '';
+                    const email = emailInput?.value || '';
+                    const password = passwordInput?.value || '';
                     
-                    // Mock signup - in production this would use Supabase
-                    setIsLoggedIn(true);
-                    setUser({
-                      name: name,
-                      email: email
-                    });
-                    setShowSignupModal(false);
-                    console.log('[v0] User signed up:', { name, email });
+                    if (!email || !password) {
+                      alert('Please enter email and password');
+                      return;
+                    }
+                    
+                    try {
+                      const { createClient } = await import('@/lib/supabase/client');
+                      const supabase = createClient();
+                      const { data, error } = await supabase.auth.signUp({
+                        email,
+                        password,
+                        options: {
+                          data: { full_name: name }
+                        }
+                      });
+                      
+                      if (error) {
+                        alert(error.message);
+                        return;
+                      }
+                      
+                      if (data.user) {
+                        setIsLoggedIn(true);
+                        setUser({ name: name || email.split('@')[0], email });
+                        setShowSignupModal(false);
+                      }
+                    } catch (err: any) {
+                      alert(err.message || 'Signup failed');
+                    }
                   }}
                   className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl transition-all shadow-lg"
                 >
@@ -3155,14 +3248,17 @@ export default function UnifiedAIPlatform() {
                 </div>
 
                 <button
-                  onClick={() => {
-                    // Mock Google signup
-                    setIsLoggedIn(true);
-                    setUser({
-                      name: 'Google User',
-                      email: 'user@gmail.com'
-                    });
-                    setShowSignupModal(false);
+                  onClick={async () => {
+                    try {
+                      const { createClient } = await import('@/lib/supabase/client');
+                      const supabase = createClient();
+                      await supabase.auth.signInWithOAuth({
+                        provider: 'google',
+                        options: { redirectTo: window.location.origin }
+                      });
+                    } catch (err: any) {
+                      alert(err.message || 'Google signup failed');
+                    }
                   }}
                   className="w-full py-3 border border-gray-800 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all"
                 >

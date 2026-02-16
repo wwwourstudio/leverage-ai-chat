@@ -59,17 +59,43 @@ async function generateSportSpecificCards(
       console.log(`[v0] [CARDS-GEN] Data is null/undefined: ${oddsData == null}`);
       
       if (oddsData && oddsData.length > 0) {
-        console.log(`[v0] [CARDS-GEN] SUCCESS: Found ${oddsData.length} live games for ${displaySport}`);
+        console.log(`[v0] [CARDS-GEN] SUCCESS: Found ${oddsData.length} games for ${displaySport}`);
           
-          // Create cards from actual live games
           const gamesToShow = Math.min(actualCount, oddsData.length);
-          console.log(`[v0] [CARDS-GEN] LOOP START: Will create ${gamesToShow} cards (actualCount=${actualCount}, available=${oddsData.length})`);
           for (let i = 0; i < gamesToShow; i++) {
-            console.log(`[v0] [CARDS-GEN] Creating card ${i + 1}/${gamesToShow}`);
             const game = oddsData[i];
-            const firstBook = game.bookmakers?.[0];
+            const isCompleted = game.completed === true;
+            const hasBookmakers = game.bookmakers && game.bookmakers.length > 0;
+            const firstBook = hasBookmakers ? game.bookmakers[0] : null;
             
-            // Extract h2h, spreads, and totals
+            // For completed games with scores
+            if (isCompleted && game.scores) {
+              const homeScore = game.scores?.find((s: any) => s.name === game.home_team);
+              const awayScore = game.scores?.find((s: any) => s.name === game.away_team);
+              
+              cards.push({
+                type: CARD_TYPES.LIVE_ODDS,
+                title: `${game.away_team} @ ${game.home_team}`,
+                icon: 'CheckCircle',
+                category: displaySport,
+                subcategory: 'Final Score',
+                gradient: getSportGradient(sport),
+                data: {
+                  matchup: `${game.away_team} @ ${game.home_team}`,
+                  gameTime: new Date(game.commence_time).toLocaleString(),
+                  finalScore: `${game.away_team} ${awayScore?.score || '?'} - ${homeScore?.score || '?'} ${game.home_team}`,
+                  homeScore: homeScore?.score || '?',
+                  awayScore: awayScore?.score || '?',
+                  completed: true,
+                  realData: true,
+                  status: 'FINAL'
+                },
+                metadata: { realData: true, dataSource: 'The Odds API Scores', gameId: game.id }
+              });
+              continue;
+            }
+            
+            // For upcoming games with odds
             const h2hMarket = firstBook?.markets?.find((m: any) => m.key === 'h2h');
             const spreadsMarket = firstBook?.markets?.find((m: any) => m.key === 'spreads');
             const totalsMarket = firstBook?.markets?.find((m: any) => m.key === 'totals');
@@ -86,46 +112,34 @@ async function generateSportSpecificCards(
             const over = totalOutcomes.find((o: any) => o.name === 'Over');
             const under = totalOutcomes.find((o: any) => o.name === 'Under');
             
+            const subcategory = hasBookmakers ? 'H2H Markets' : 'Upcoming';
+            
             cards.push({
               type: CARD_TYPES.LIVE_ODDS,
               title: `${game.away_team} @ ${game.home_team}`,
               icon: 'TrendingUp',
               category: displaySport,
-              subcategory: 'Full Market Analysis',
+              subcategory,
               gradient: getSportGradient(sport),
               data: {
                 matchup: `${game.away_team} @ ${game.home_team}`,
                 gameTime: new Date(game.commence_time).toLocaleString(),
-                // Moneyline
                 homeOdds: homeOdds ? (homeOdds.price > 0 ? `+${homeOdds.price}` : `${homeOdds.price}`) : 'N/A',
                 awayOdds: awayOdds ? (awayOdds.price > 0 ? `+${awayOdds.price}` : `${awayOdds.price}`) : 'N/A',
-                // Spreads
                 homeSpread: homeSpread ? `${homeSpread.point > 0 ? '+' : ''}${homeSpread.point} (${homeSpread.price > 0 ? '+' : ''}${homeSpread.price})` : 'N/A',
                 awaySpread: awaySpread ? `${awaySpread.point > 0 ? '+' : ''}${awaySpread.point} (${awaySpread.price > 0 ? '+' : ''}${awaySpread.price})` : 'N/A',
-                // Totals
                 overUnder: over && under ? `O/U ${over.point}: Over ${over.price > 0 ? '+' : ''}${over.price} / Under ${under.price > 0 ? '+' : ''}${under.price}` : 'N/A',
-                bookmaker: firstBook?.title || 'Multiple Books',
+                bookmaker: firstBook?.title || 'N/A',
                 bookmakerCount: game.bookmakers?.length || 0,
                 realData: true,
-                status: 'VALUE',
-                allMarkets: {
-                  h2h: h2hMarket ? true : false,
-                  spreads: spreadsMarket ? true : false,
-                  totals: totalsMarket ? true : false
-                }
+                status: hasBookmakers ? 'VALUE' : 'UPCOMING'
               },
-              metadata: {
-                realData: true,
-                dataSource: 'Unified Service (API + Supabase)',
-                timestamp: new Date().toISOString(),
-                gameId: game.id,
-                cached: false
-              }
+              metadata: { realData: true, dataSource: 'The Odds API', gameId: game.id }
             });
         }
         
-        console.log(`[v0] [CARDS-GEN] ✓ Successfully created ${cards.length} cards with live data`);
-        return cards; // Return immediately - we have real data
+        console.log(`[v0] [CARDS-GEN] Created ${cards.length} cards with real data`);
+        return cards;
       } else {
         console.error(`[v0] [CARDS-GEN] ❌ API returned NO GAMES for ${displaySport}`);
         console.error(`[v0] [CARDS-GEN] This means either:`);

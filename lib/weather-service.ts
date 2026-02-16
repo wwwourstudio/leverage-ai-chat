@@ -278,6 +278,7 @@ export async function generateWeatherCard(
       temperature: `${weather.temperature}°F`,
       condition: weather.condition,
       wind: `${weather.windSpeed} mph`,
+      humidity: `${weather.humidity}%`,
       precipitation: `${weather.precipitation}mm`,
       gameImpact: impact,
       gameTime: gameTime.toLocaleString('en-US', {

@@ -61,7 +61,7 @@ export async function fetchLeagueNews(
     
     if (data && data.length > 0) {
       console.log(`[v0] [LEAGUE-NEWS] Retrieved ${data.length} news items`);
-      return data.map(row => ({
+      return data.map((row: any) => ({
         id: row.id,
         league: row.league,
         type: row.type,
@@ -115,7 +115,7 @@ export async function fetchRosterChanges(
     
     if (data && data.length > 0) {
       console.log(`[v0] [ROSTER-CHANGES] Retrieved ${data.length} roster changes`);
-      return data.map(row => ({
+      return data.map((row: any) => ({
         id: row.id,
         league: row.league,
         changeType: row.change_type,

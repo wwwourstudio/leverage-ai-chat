@@ -27,7 +27,7 @@ export async function GET(request: Request) {
         );
       }
 
-      const movements = data?.map(row => ({
+      const movements = data?.map((row: any) => ({
         timestamp: row.timestamp,
         homeOdds: row.home_odds,
         awayOdds: row.away_odds,

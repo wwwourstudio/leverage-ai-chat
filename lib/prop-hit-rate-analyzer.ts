@@ -116,7 +116,7 @@ export async function getRecentPropHistory(
       return [];
     }
     
-    return data.map(row => ({
+    return data.map((row: any) => ({
       id: row.id,
       playerName: row.player_name,
       sport: row.sport,

@@ -51,7 +51,7 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
       
       if (!error && cached && cached.length > 0) {
         console.log(`[v0] [PLAYER-PROPS] Cache hit: ${cached.length} props from Supabase`);
-        return cached.map(row => ({
+        return cached.map((row: any) => ({
           id: row.id,
           sport: row.sport,
           gameId: row.game_id,
@@ -219,7 +219,7 @@ export async function getPlayerProps(playerName: string, sport: string): Promise
     return [];
   }
   
-  return (data || []).map(row => ({
+  return (data || []).map((row: any) => ({
     id: row.id,
     sport: row.sport,
     gameId: row.game_id,

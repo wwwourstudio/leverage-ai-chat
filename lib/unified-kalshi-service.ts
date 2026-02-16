@@ -39,7 +39,7 @@ export async function getKalshiMarketsWithCache(options: KalshiServiceOptions = 
       
       if (!error && cached && cached.length > 0) {
         console.log(`[v0] [UNIFIED-KALSHI] Cache hit: ${cached.length} markets from Supabase`);
-        return cached.map(row => ({
+        return cached.map((row: any) => ({
           ticker: row.ticker,
           title: row.title,
           category: row.category,

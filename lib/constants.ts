@@ -343,7 +343,7 @@ export const SYSTEM_PROMPT = `You are Leverage AI powered by Grok 4 Fast (xAI), 
 
 CATEGORY DETECTION (Detect user intent and route to correct data cards):
 When user asks for:
-- "arbitrage", "guaranteed profit", "risk-free", "sure bet" → category: "arbitrage"
+- "arbitrage", "guaranteed profit", "risk-free", "sure bet" ��� category: "arbitrage"
 - "line movement", "steam", "sharp money", "line moves" → category: "lines"
 - "player props", "prop bets", "points over/under", "player markets" → category: "props"
 - "Kelly", "bet sizing", "bankroll", "portfolio", "how much to bet" → category: "portfolio"
@@ -398,8 +398,11 @@ export const DEFAULT_TRUST_METRICS = {
   marketConsensus: 88,
   historicalAccuracy: 94,
   finalConfidence: 91,
-  trustLevel: TRUST_LEVELS.HIGH,
-  riskLevel: RISK_LEVELS.LOW,
+  confidence: 91,
+  dataFreshness: 95,
+  modelReliability: 90,
+  trustLevel: 'high',
+  riskLevel: 'low',
   adjustedTone: 'Strong signal',
   flags: [],
 } as const;

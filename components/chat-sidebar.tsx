@@ -69,8 +69,8 @@ export function ChatSidebar({
                   <input
                     type="text"
                     value={editingChatTitle}
-                    onChange={(e) => setEditingChatTitle(e.target.value)}
-                    onKeyDown={(e) => {
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingChatTitle(e.target.value)}
+                    onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                       if (e.key === 'Enter') onSaveChatTitle(chat.id);
                       if (e.key === 'Escape') onCancelChatTitleEdit();
                     }}
@@ -86,10 +86,10 @@ export function ChatSidebar({
                 </div>
               ) : (
                 <div className="flex-1 flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <MessageSquare className="w-4 h-4 text-gray-400 shrink-0" />
                   <span className="font-semibold text-white text-sm truncate">{chat.title}</span>
-                  <button
-                    onClick={(e) => onEditChatTitle(chat.id, chat.title, e)}
+                    <button
+                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => onEditChatTitle(chat.id, chat.title, e)}
                     className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white transition-opacity"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
@@ -98,7 +98,7 @@ export function ChatSidebar({
               )}
               <div className="flex items-center gap-1 ml-2">
                 <button
-                  onClick={(e) => onStarChat(chat.id, e)}
+                  onClick={(e: React.MouseEvent<HTMLButtonElement>) => onStarChat(chat.id, e)}
                   className={`transition-colors ${chat.starred ? 'text-yellow-400' : 'text-gray-500 hover:text-yellow-400'}`}
                 >
                   <Star className="w-4 h-4" fill={chat.starred ? 'currentColor' : 'none'} />

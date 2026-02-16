@@ -67,7 +67,7 @@ async function checkDatabaseHealth() {
   for (const table of REQUIRED_TABLES) {
     try {
       // Try to query the table
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from(table)
         .select('*')
         .limit(1);

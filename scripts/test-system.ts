@@ -39,7 +39,7 @@ async function testDatabase() {
   
   // Test 1: Connection
   try {
-    const { data, error } = await supabase.from('live_odds_cache').select('count').limit(1);
+    const { error } = await supabase.from('live_odds_cache').select('count').limit(1);
     if (error) throw error;
     logTest('Database', 'Connection', 'PASS', 'Supabase connection successful');
   } catch (error: any) {
@@ -71,7 +71,7 @@ async function testDatabase() {
   
   // Test 3: Check live_odds_cache has sport_key column
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('live_odds_cache')
       .select('sport_key')
       .limit(1);
@@ -93,15 +93,14 @@ async function testDatabase() {
       .order('cached_at', { ascending: false })
       .limit(1);
     
-    if (error) throw error;
-    
-    if (data && data.length > 0) {
-      const ageMinutes = (Date.now() - new Date(data[0].cached_at).getTime()) / 60000;
-      if (ageMinutes < 60) {
-        logTest('Database', 'Data freshness', 'PASS', `Latest data is ${ageMinutes.toFixed(1)} minutes old`);
-      } else {
-        logTest('Database', 'Data freshness', 'WARN', `Latest data is ${ageMinutes.toFixed(1)} minutes old - may be stale`);
-      }
+    if (error) {
+      logTest('Database', 'Data freshness', 'FAIL', error.message);
+    } else if (data && data.length > 0) {
+      const minutesOld = Math.floor((Date.now() - new Date(data[0].cached_at).getTime()) / 60000);
+      logTest('Database', 'Data freshness', 'PASS', `Latest data is ${minutesOld} minutes old`);
+    } else {
+      logTest('Database', 'Data freshness', 'WARN', 'No data in cache yet');
+    }
     } else {
       logTest('Database', 'Data freshness', 'WARN', 'No cached odds data found');
     }

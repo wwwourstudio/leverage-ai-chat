@@ -9,6 +9,7 @@ import type { InsightCard } from './cards-generator';
 
 interface WeatherData {
   temperature: number;
+  humidity: number;
   precipitation: number;
   windSpeed: number;
   weatherCode: number;
@@ -193,6 +194,7 @@ export async function fetchWeatherForLocation(
     
     const weatherData: WeatherData = {
       temperature: Math.round(current.temperature_2m * 9/5 + 32), // Convert to Fahrenheit
+      humidity: current.relative_humidity_2m || 50, // Default to 50% if missing
       precipitation: current.precipitation || 0,
       windSpeed: Math.round(current.windspeed_10m * 0.621371), // Convert to mph
       weatherCode: current.weathercode,

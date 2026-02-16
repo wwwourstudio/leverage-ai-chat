@@ -1,21 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  SPORTS_MAP,
   EXTERNAL_APIS,
   ENV_KEYS,
   LOG_PREFIXES,
   DATA_SOURCES,
   CARD_TYPES,
-  CARD_STATUS,
-  type CardType,
-  type CardStatus
+  CARD_STATUS
 } from '@/lib/constants';
 import { validateSportKey, getSportInfo } from '@/lib/sports-validator';
 import {
   fetchLiveOdds,
-  fetchHistoricalOdds,
-  fetchOutrights,
-  getActiveSports,
   ODDS_MARKETS,
   BETTING_REGIONS
 } from '@/lib/odds-api-client';

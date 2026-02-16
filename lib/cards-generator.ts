@@ -141,21 +141,46 @@ async function generateSportSpecificCards(
     }
   }
   
-  // Fallback: Add general odds card if no real data
+  // Fallback: Add informative card if no real data
   if (cards.length < count) {
+    console.log(`[v0] [CARDS-GEN] FALLBACK: No real data for ${displaySport}, creating informative placeholder`);
+    
+    // Determine why there's no data based on sport and date
+    const now = new Date();
+    const month = now.getMonth() + 1; // 1-12
+    const isNFLOffseason = month < 9 || month === 12; // Sept-Feb season
+    const isMLBOffseason = month < 4 || month > 10; // Apr-Oct season
+    
+    let reason = 'No games scheduled today';
+    let details = 'Games typically appear 24-48 hours before start time';
+    
+    if (displaySport === 'NFL' && isNFLOffseason) {
+      reason = 'NFL Offseason';
+      details = 'NFL season runs September through February';
+    } else if (displaySport === 'MLB' && isMLBOffseason) {
+      reason = 'MLB Offseason';
+      details = 'MLB season runs April through October';
+    } else if (displaySport === 'NBA') {
+      details = 'NBA games typically scheduled afternoon/evening EST';
+    } else if (displaySport === 'NHL') {
+      details = 'NHL games typically scheduled evening EST';
+    }
+    
     cards.push({
       type: CARD_TYPES.LIVE_ODDS,
-      title: `${displaySport} Live Odds`,
-      icon: 'TrendingUp',
+      title: `${displaySport} - ${reason}`,
+      icon: 'Calendar',
       category: displaySport,
-      subcategory: 'H2H Markets',
+      subcategory: 'No Games Available',
       gradient: getSportGradient(sport),
       data: {
-        description: `No live ${displaySport} games currently available`,
-        note: 'Games typically appear 24-48 hours before start time',
+        description: reason,
+        note: details,
         sport: sport,
-        markets: ['Moneyline', 'Spreads', 'Totals'],
-        status: 'NO_DATA'
+        apiResponse: 'API returned 0 games for this sport',
+        suggestion: 'Try asking for a different sport or check back later',
+        status: 'NO_DATA',
+        realData: false
       }
     });
   }

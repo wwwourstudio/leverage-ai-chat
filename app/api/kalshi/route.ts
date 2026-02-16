@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { fetchKalshiMarkets, fetchSportsMarkets, getMarketByTicker, kalshiMarketToCard } from '@/lib/kalshi-client';
+import { fetchKalshiMarkets, fetchSportsMarkets, fetchElectionMarkets, getMarketByTicker, kalshiMarketToCard } from '@/lib/kalshi-client';
 
 export const runtime = 'edge';
 
@@ -7,9 +7,11 @@ export const runtime = 'edge';
  * GET /api/kalshi
  * Fetch Kalshi prediction markets
  * Query params:
- *  - category: Market category (NFL, NBA, MLB, NHL, etc.)
+ *  - category: Market category (NFL, NBA, MLB, NHL, election, politics, etc.)
  *  - ticker: Specific market ticker
  *  - sport: Filter by sport (converts to category)
+ *  - type: Market type ('election', 'sports', 'all')
+ *  - year: Election year (for election markets, default: 2026)
  *  - limit: Number of markets to return (default: 10)
  */
 export async function GET(request: Request) {
@@ -18,9 +20,11 @@ export async function GET(request: Request) {
     const category = searchParams.get('category');
     const ticker = searchParams.get('ticker');
     const sport = searchParams.get('sport');
+    const type = searchParams.get('type');
+    const year = parseInt(searchParams.get('year') || '2026');
     const limit = parseInt(searchParams.get('limit') || '10');
     
-    console.log('[v0] [API] [KALSHI] Request:', { category, ticker, sport, limit });
+    console.log('[v0] [API] [KALSHI] Request:', { category, ticker, sport, type, year, limit });
     
     // If ticker is provided, fetch specific market
     if (ticker) {
@@ -38,6 +42,33 @@ export async function GET(request: Request) {
         success: true,
         markets: [market],
         count: 1,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // Handle election markets specifically
+    if (type === 'election' || category === 'election' || category === 'politics') {
+      console.log('[v0] [API] [KALSHI] Fetching election markets...');
+      const markets = await fetchElectionMarkets({ year, limit });
+      
+      if (markets.length === 0) {
+        return NextResponse.json({
+          success: true,
+          markets: [],
+          count: 0,
+          category: 'election',
+          year,
+          message: `No ${year} election markets currently available. Check https://kalshi.com for live markets.`,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      return NextResponse.json({
+        success: true,
+        markets,
+        count: markets.length,
+        category: 'election',
+        year,
         timestamp: new Date().toISOString()
       });
     }
@@ -60,10 +91,13 @@ export async function GET(request: Request) {
     
     // Fetch markets based on category or all sports
     let markets;
-    if (finalCategory) {
-      markets = await fetchKalshiMarkets({ category: finalCategory, limit });
+    if (type === 'sports' || finalCategory) {
+      markets = finalCategory 
+        ? await fetchKalshiMarkets({ category: finalCategory, limit })
+        : await fetchSportsMarkets();
     } else {
-      markets = await fetchSportsMarkets();
+      // Fetch all available markets
+      markets = await fetchKalshiMarkets({ limit });
     }
     
     console.log(`[v0] [API] [KALSHI] ✓ Returning ${markets.length} markets`);

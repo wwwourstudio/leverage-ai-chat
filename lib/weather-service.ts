@@ -266,7 +266,7 @@ export async function generateWeatherCard(
   const impact = getGameImpact(weather);
   const status = getWeatherStatus(weather);
   
-  return {
+  const card: WeatherCard = {
     type: CARD_TYPES.WEATHER_GAME,
     title: 'Weather Impact Analysis',
     icon: 'Cloud',
@@ -295,6 +295,8 @@ export async function generateWeatherCard(
     status,
     realData: true
   };
+  
+  return card;
 }
 
 /**

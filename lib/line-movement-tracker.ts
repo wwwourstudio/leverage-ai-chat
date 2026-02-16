@@ -158,14 +158,14 @@ export async function detectSharpMoney(sport: string, lookbackHours: number = 24
       return [];
     }
     
-    // Get unique game IDs
-    const gameIds = [...new Set(recentGames.map((g: any) => g.game_id))];
-    
-    // Analyze each game
-    const sharpMovements: LineMovement[] = [];
-    
-    for (const gameId of gameIds) {
-      const movements = await analyzeLineMovement(gameId);
+  // Get unique game IDs
+  const gameIds = [...new Set(recentGames.map((g: any) => g.game_id))] as string[];
+  
+  // Analyze each game
+  const sharpMovements: LineMovement[] = [];
+  
+  for (const gameId of gameIds) {
+    const movements = await analyzeLineMovement(gameId);
       
       // Filter for sharp indicators
       const sharpIndicators = movements.filter(m => 

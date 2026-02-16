@@ -197,6 +197,65 @@ export async function getSportsKalshiMarkets(sport?: string): Promise<KalshiMark
 }
 
 /**
+ * Get election markets (2026 H2H contracts, presidential races)
+ */
+export async function getElectionKalshiMarkets(options?: {
+  year?: number;
+  includeH2H?: boolean;
+  limit?: number;
+}): Promise<KalshiMarket[]> {
+  const { year = 2026, includeH2H = true, limit = 20 } = options || {};
+  
+  console.log(`[v0] [UNIFIED-KALSHI] Getting election markets for ${year}`);
+  
+  // Import the election-specific function
+  const { fetchElectionMarkets } = await import('@/lib/kalshi-client');
+  
+  try {
+    const markets = await fetchElectionMarkets({ year, includeH2H, limit });
+    
+    console.log(`[v0] [UNIFIED-KALSHI] Found ${markets.length} election markets`);
+    
+    // Try to cache the results in Supabase
+    if (markets.length > 0) {
+      try {
+        const supabase = createClient();
+        const rows = markets.map(market => ({
+          ticker: market.ticker,
+          title: market.title,
+          category: 'election',
+          subtitle: market.subtitle,
+          yes_price: market.yesPrice,
+          no_price: market.noPrice,
+          volume: market.volume,
+          open_interest: market.openInterest,
+          close_time: market.closeTime,
+          status: market.status,
+          fetched_at: new Date().toISOString(),
+        }));
+        
+        const { error } = await supabase
+          .from('kalshi_markets')
+          .upsert(rows, { onConflict: 'ticker' });
+          
+        if (error) {
+          console.error('[v0] [UNIFIED-KALSHI] Failed to cache election markets:', error);
+        } else {
+          console.log(`[v0] [UNIFIED-KALSHI] Cached ${rows.length} election markets`);
+        }
+      } catch (error) {
+        console.error('[v0] [UNIFIED-KALSHI] Cache storage error:', error);
+      }
+    }
+    
+    return markets;
+  } catch (error) {
+    console.error('[v0] [UNIFIED-KALSHI] Failed to fetch election markets:', error);
+    return [];
+  }
+}
+
+/**
  * Subscribe to Kalshi market updates via Supabase Realtime
  */
 export function subscribeToKalshiMarkets(

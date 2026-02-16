@@ -23,10 +23,10 @@ export function ArbitrageDashboard() {
       setOpportunities(prev => [payload.new as ArbitrageOpportunity, ...prev]);
     } else if (payload.eventType === 'UPDATE') {
       setOpportunities(prev => 
-        prev.map(opp => opp.event === (payload.new as ArbitrageOpportunity).event ? payload.new as ArbitrageOpportunity : opp)
+        prev.map((opp: ArbitrageOpportunity) => opp.event === (payload.new as ArbitrageOpportunity).event ? payload.new as ArbitrageOpportunity : opp)
       );
     } else if (payload.eventType === 'DELETE') {
-      setOpportunities(prev => prev.filter(opp => opp.event !== (payload.old as ArbitrageOpportunity).event));
+      setOpportunities(prev => prev.filter((opp: ArbitrageOpportunity) => opp.event !== (payload.old as ArbitrageOpportunity).event));
     }
   });
 
@@ -44,7 +44,7 @@ export function ArbitrageDashboard() {
   };
 
   const filteredOpportunities = opportunities
-    .filter(opp => filter === 'all' || opp.marketType === filter)
+    .filter((opp: ArbitrageOpportunity) => filter === 'all' || opp.marketType === filter)
     .sort((a, b) => {
       if (sortBy === 'profit') {
         return b.profitPercentage - a.profitPercentage;

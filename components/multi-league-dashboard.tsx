@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { Calendar, TrendingUp, AlertCircle, Activity, DollarSign } from 'lucide-react';
 import { getSportsWithGames, getOffseasonMessage, isSportInSeason } from '@/lib/active-sports-detector';
-import type { SportAvailability } from '@/lib/active-sports-detector';
 
 interface LeagueStatus {
   sport: string;

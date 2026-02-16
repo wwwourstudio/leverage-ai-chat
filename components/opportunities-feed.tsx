@@ -95,7 +95,7 @@ export function OpportunitiesFeed() {
 
       // Add edge opportunities
       if (edgeData.opportunities) {
-        edgeData.opportunities.forEach((opp: any) => {
+        edgeData.opportunities.forEach((opp: { id: string; sport: string; event: string; home_team: string; away_team: string; game_time: string; edge: number; bookmaker: string; market_odds: number; confidence_score: number; created_at: string }) => {
           allOpps.push({
             id: opp.id,
             type: 'value_bet',
@@ -116,7 +116,7 @@ export function OpportunitiesFeed() {
 
       // Add arbitrage opportunities
       if (arbData.opportunities) {
-        arbData.opportunities.forEach((opp: any) => {
+        arbData.opportunities.forEach((opp: { event: string; sport: string; homeTeam: string; awayTeam: string; gameTime: string; profitPercentage: number; totalStake: number }) => {
           allOpps.push({
             id: opp.event + '-arb',
             type: 'arbitrage',

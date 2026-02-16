@@ -51,7 +51,7 @@ export function ArbitrageDashboard() {
       return new Date(a.gameTime).getTime() - new Date(b.gameTime).getTime();
     });
 
-  const totalProfit = filteredOpportunities.reduce((sum, opp) => sum + (opp.profitPercentage * opp.stake / 100), 0);
+  const totalProfit = filteredOpportunities.reduce((sum: number, opp: ArbitrageOpportunity) => sum + (opp.profitPercentage * opp.stake / 100), 0);
   const avgProfit = filteredOpportunities.length > 0 ? totalProfit / filteredOpportunities.length : 0;
 
   return (

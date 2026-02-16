@@ -1,8 +1,8 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env node
 
 /**
  * Test script to directly call The Odds API and debug issues
- * Run with: npx tsx scripts/test-odds-api.ts
+ * Run with: node scripts/test-odds-api.js
  */
 
 const ODDS_API_KEY = process.env.ODDS_API_KEY || '';
@@ -89,7 +89,7 @@ async function testOddsEndpoint(sportKey) {
       if (game.bookmakers && game.bookmakers[0]) {
         const bookmaker = game.bookmakers[0];
         console.log(`  Sample Bookmaker: ${bookmaker.title}`);
-        console.log(`  Markets: ${bookmaker.markets?.map((m: any) => m.key).join(', ')}`);
+        console.log(`  Markets: ${bookmaker.markets?.map(m => m.key).join(', ')}`);
         
         if (bookmaker.markets && bookmaker.markets[0]) {
           const market = bookmaker.markets[0];
@@ -110,60 +110,10 @@ async function testOddsEndpoint(sportKey) {
   }
 }
 
-async function testPlayerPropsEndpoint(sportKey) {
-  console.log(`\n🏀 TEST 3: Fetch player props for ${sportKey}`);
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  
-  try {
-    const url = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds?apiKey=${ODDS_API_KEY}&regions=us&markets=player_props&oddsFormat=american`;
-    console.log('URL:', url.replace(ODDS_API_KEY, 'REDACTED'));
-    
-    const response = await fetch(url);
-    console.log('Status:', response.status, response.statusText);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('ERROR:', errorText);
-      return null;
-    }
-    
-    const games = await response.json();
-    console.log(`\n✓ Found player props for ${games.length} games`);
-    
-    if (games.length > 0 && games[0].bookmakers && games[0].bookmakers[0]?.markets) {
-      const game = games[0];
-      const markets = game.bookmakers[0].markets;
-      console.log(`\n📊 Player Prop Markets Available:`);
-      const propTypes = [...new Set(markets.map(m => m.key))];
-      propTypes.forEach(type => {
-        const count = markets.filter(m => m.key === type).length;
-        console.log(`  ${type}: ${count} props`);
-      });
-      
-      // Show sample prop
-      if (markets[0]) {
-        const prop = markets[0];
-        console.log(`\n  Sample Prop: ${prop.key}`);
-        console.log(`    Description: ${prop.description || 'N/A'}`);
-        console.log(`    Outcomes:`);
-        prop.outcomes.forEach(outcome => {
-          console.log(`      ${outcome.name}: ${outcome.description} (${outcome.price > 0 ? '+' : ''}${outcome.price})`);
-        });
-      }
-    }
-    
-    return games;
-  } catch (error) {
-    console.error(`❌ Failed to fetch player props for ${sportKey}:`, error);
-    return null;
-  }
-}
-
 async function main() {
   console.log('🔍 ODDS API DIAGNOSTIC TEST');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('Date:', new Date().toISOString());
-  console.log('Timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
   
   // Test 1: List sports
   const sports = await testSportsEndpoint();
@@ -181,19 +131,12 @@ async function main() {
     await new Promise(resolve => setTimeout(resolve, 500));
   }
   
-  // Test 3: Try fetching player props for NBA
-  const nbaSport = sports.find(s => s.key === 'basketball_nba');
-  if (nbaSport) {
-    await testPlayerPropsEndpoint('basketball_nba');
-  }
-  
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('✓ Test completed');
   console.log('\nNEXT STEPS:');
   console.log('1. If no games found, check that sports are in-season');
   console.log('2. Verify API key has sufficient quota remaining');
   console.log('3. Check if date/time is correct (games are upcoming, not past)');
-  console.log('4. For player props, verify they are available for the sport');
 }
 
 main().catch(console.error);

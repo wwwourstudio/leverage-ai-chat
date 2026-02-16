@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import { Shield, AlertTriangle, CheckCircle2, TrendingUp, Activity, BarChart3, Info } from 'lucide-react';
 
 export interface TrustMetrics {

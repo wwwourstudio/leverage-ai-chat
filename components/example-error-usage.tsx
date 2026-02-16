@@ -10,11 +10,17 @@
 
 'use client';
 
-import React from 'react';
+// This component is an example and requires useApiRequest and EnhancedErrorDisplay
+// to be implemented. Commenting out for now to avoid build errors.
+/*
 import { useApiRequest } from '@/hooks/use-enhanced-error';
 import { EnhancedErrorDisplay } from './enhanced-error-display';
+*/
 
 export function ExampleErrorUsage() {
+  // Temporarily disabled - requires implementation of useApiRequest and EnhancedErrorDisplay
+  return null;
+  /*
   const { data, loading, error, canRetry, execute, retry } = useApiRequest();
 
   const fetchOdds = async () => {
@@ -58,6 +64,7 @@ export function ExampleErrorUsage() {
       )}
     </div>
   );
+  */
 }
 
 /**

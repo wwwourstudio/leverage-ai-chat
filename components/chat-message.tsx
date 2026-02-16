@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import { TrustMetricsDisplay } from '@/components/trust-metrics-display';
 import { Shield, Copy, Edit3, CheckCheck, X } from 'lucide-react';
 

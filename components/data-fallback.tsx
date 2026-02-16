@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import { AlertCircle, Database, RefreshCw, WifiOff } from 'lucide-react';
 
 interface DataFallbackProps {

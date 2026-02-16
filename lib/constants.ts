@@ -421,7 +421,10 @@ export const ERROR_MESSAGES = {
   INVALID_REQUEST: 'Invalid request parameters',
   INTERNAL_ERROR: 'Internal server error',
   SERVICE_UNAVAILABLE: 'Service temporarily unavailable',
-  INVALID_API_KEY: 'Invalid API key',
+  WEATHER_UNAVAILABLE: 'Weather service unavailable',
+  RATE_LIMIT_EXCEEDED: 'Rate limit exceeded. Please try again later.',
+  UNAUTHORIZED: 'Unauthorized access',
+  NOT_FOUND: 'Resource not found',
 } as const;
 
 // Success Messages

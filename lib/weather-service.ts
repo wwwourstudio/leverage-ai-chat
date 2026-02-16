@@ -5,6 +5,7 @@
  */
 
 import { EXTERNAL_APIS, CARD_TYPES, CARD_STATUS, LOG_PREFIXES } from './constants';
+import type { InsightCard } from './cards-generator';
 
 interface WeatherData {
   temperature: number;
@@ -300,21 +301,10 @@ export function getWeatherCacheStats(): {
   };
 }
 
-interface CardData {
-  matchup?: string;
-  gameTime?: string | Date;
-  [key: string]: unknown;
-}
-
-interface Card {
-  data?: CardData;
-  [key: string]: unknown;
-}
-
 /**
  * Enhance odds cards with weather data
  */
-export async function enrichCardsWithWeather(cards: Card[]): Promise<Card[]> {
+export async function enrichCardsWithWeather(cards: InsightCard[]): Promise<InsightCard[]> {
   const enrichedCards = [...cards];
   
   for (const card of enrichedCards) {

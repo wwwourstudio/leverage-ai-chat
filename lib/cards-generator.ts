@@ -337,7 +337,7 @@ export async function generateContextualCards(
       if (opportunities && opportunities.length > 0) {
         console.log(`[v0] [CARDS-GEN] Found ${opportunities.length} arbitrage opportunities`);
         
-        opportunities.forEach(opp => {
+        opportunities.forEach((opp: any) => {
           cards.push({
             type: 'ARBITRAGE',
             title: `${opp.away_team} @ ${opp.home_team}`,
@@ -473,7 +473,7 @@ export async function generateContextualCards(
         
         // Group by game and show most significant movements
         const gameMovements = new Map();
-        movements.forEach(move => {
+        movements.forEach((move: any) => {
           const key = `${move.away_team}_${move.home_team}`;
           if (!gameMovements.has(key) || Math.abs(move.line_change || 0) > Math.abs(gameMovements.get(key).line_change || 0)) {
             gameMovements.set(key, move);
@@ -604,7 +604,7 @@ export async function generateContextualCards(
           .order('allocated_capital', { ascending: false })
           .limit(count);
         
-        const totalAllocated = allocations?.reduce((sum, bet) => sum + bet.allocated_capital, 0) || 0;
+        const totalAllocated = allocations?.reduce((sum: number, bet: any) => sum + bet.allocated_capital, 0) || 0;
         const utilization = (totalAllocated / capitalState.total_capital) * 100;
         
         // Portfolio summary card
@@ -636,7 +636,7 @@ export async function generateContextualCards(
         
         // Show top allocations if any exist
         if (allocations && allocations.length > 0) {
-          allocations.slice(0, Math.min(2, count - 1)).forEach(bet => {
+          allocations.slice(0, Math.min(2, count - 1)).forEach((bet: any) => {
             const kellyPct = (bet.kelly_fraction * 100).toFixed(2);
             cards.push({
               type: 'KELLY_BET',

@@ -8,10 +8,10 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type'); // 'edge', 'arbitrage', 'sharp', or 'all'
-    const sport = searchParams.get('sport');
-    const limit = parseInt(searchParams.get('limit') || '50');
-
-    const supabase = createClient();
+  const sport = searchParams.get('sport');
+  const limit = parseInt(searchParams.get('limit') || '50');
+  
+  const supabase = await createClient();
 
     if (type === 'edge' || type === 'all' || !type) {
       // Fetch edge opportunities

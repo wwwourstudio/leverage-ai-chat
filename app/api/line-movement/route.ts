@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const gameId = searchParams.get('gameId');
 
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // If gameId provided, fetch movements for that game only
     if (gameId) {

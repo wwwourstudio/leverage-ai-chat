@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     // Store in Supabase
     if (allOpportunities.length > 0) {
       try {
-        const supabase = createClient();
+        const supabase = await createClient();
         const rows = allOpportunities.map(opp => ({
           sport: opp.sport,
           event: opp.event,

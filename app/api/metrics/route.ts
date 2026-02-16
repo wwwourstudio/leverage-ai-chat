@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { logger, LogCategory } from '@/lib/logger';
-import { getLeveragedAI } from '@/lib/leveraged-ai';
-import { getProcessInfo, getRuntimeEnvironment, formatProcessInfo } from '@/lib/process-utils';
+import { getProcessInfo, getRuntimeEnvironment } from '@/lib/process-utils';
 
 export const runtime = 'edge';
 
@@ -13,12 +12,10 @@ export async function GET() {
   const startTime = Date.now();
   
   try {
-    logger.info(LogCategory.API, 'Fetching system metrics', { endpoint: '/api/metrics' });
+    logger.info(LogCategory.API, 'Fetching system metrics');
 
-    // Get cache statistics from AI Orchestrator
-    const leveragedAI = getLeveragedAI();
-    const orchestrator = leveragedAI.getOrchestrator();
-    const cacheStats = orchestrator?.getCacheStats() || {
+    // Cache statistics placeholder - orchestrator not available
+    const cacheStats = {
       cacheSize: 0,
       totalHits: 0,
       popularQueries: []
@@ -83,16 +80,16 @@ export async function GET() {
 
     // Quick database health check (non-blocking)
     try {
-      const supabase = leveragedAI.getSupabaseClient();
-      if (supabase) {
-        const { error } = await supabase
-          .from('app_config')
-          .select('id')
-          .limit(1);
-        
-        metrics.integrations.database.status = error ? 'error' : 'healthy';
-        metrics.health.checks.database = error ? 'error' : 'healthy';
-      }
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      
+      const { error } = await supabase
+        .from('app_config')
+        .select('id')
+        .limit(1);
+      
+      metrics.integrations.database.status = error ? 'error' : 'healthy';
+      metrics.health.checks.database = error ? 'error' : 'healthy';
     } catch (dbError) {
       metrics.integrations.database.status = 'error';
       metrics.health.checks.database = 'error';

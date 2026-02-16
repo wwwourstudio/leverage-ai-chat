@@ -5,20 +5,10 @@ import { randomUUID } from 'crypto';
 import {
   AI_CONFIG,
   SYSTEM_PROMPT,
-  DEFAULT_TRUST_METRICS,
-  DEFAULT_SOURCES,
-  DEFAULT_RELIABILITY,
-  EXTERNAL_APIS,
-  ENV_KEYS,
   ERROR_MESSAGES,
   LOG_PREFIXES,
-  HTTP_STATUS,
-  TRUST_METRIC_TYPES,
   ATTACHMENT_TYPES
 } from '@/lib/constants';
-import {
-  APP_TABLES
-} from '@/lib/supabase-validator';
 import { getLeveragedAI } from '@/lib/leveraged-ai';
 import { 
   fetchPlayerProjections, 

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  EXTERNAL_APIS,
   ENV_KEYS,
   LOG_PREFIXES,
   DATA_SOURCES,

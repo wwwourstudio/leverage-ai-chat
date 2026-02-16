@@ -15,7 +15,6 @@
 
 'use client';
 
-// Force rebuild to deploy auth fixes
 import { useState, useRef, useEffect } from 'react';
 import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data-service';
 import { API_ENDPOINTS } from '@/lib/constants';

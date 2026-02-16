@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { TrendingUp, Zap, Target, Clock, Filter, RefreshCw } from 'lucide-react';
+import { Zap, Target, Clock, Filter, RefreshCw } from 'lucide-react';
 import { useRealtimeSubscription } from '@/lib/hooks/use-realtime';
 import { LineMovementChart } from './line-movement-chart';
 
@@ -33,7 +33,7 @@ export function OpportunitiesFeed() {
   }, []);
 
   // Subscribe to real-time updates for edge opportunities
-  useRealtimeSubscription('edge_opportunities', (payload) => {
+  useRealtimeSubscription('edge_opportunities', (payload: any) => {
     console.log('[OpportunitiesFeed] Edge update:', payload);
     if (payload.eventType === 'INSERT') {
       const newOpp: Opportunity = {
@@ -56,7 +56,7 @@ export function OpportunitiesFeed() {
   });
 
   // Subscribe to arbitrage opportunities
-  useRealtimeSubscription('arbitrage_opportunities', (payload) => {
+  useRealtimeSubscription('arbitrage_opportunities', (payload: any) => {
     console.log('[OpportunitiesFeed] Arbitrage update:', payload);
     if (payload.eventType === 'INSERT') {
       const newOpp: Opportunity = {

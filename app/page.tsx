@@ -182,7 +182,8 @@ export default function UnifiedAIPlatform() {
   const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
   // Credit system utilities
   const MESSAGE_LIMIT = 15;
   const CHAT_LIMIT = 10;
@@ -1360,6 +1361,20 @@ export default function UnifiedAIPlatform() {
     }
   };
 
+  const adjustTextareaHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e as any);
+    }
+  };
+
   const formatTimestamp = (date: Date) => {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
@@ -1638,7 +1653,7 @@ export default function UnifiedAIPlatform() {
                               onClick={(e) => e.stopPropagation()}
                             />
                             <button
-                              onClick={(e) => {
+                              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                                 e.stopPropagation();
                                 handleSaveChatTitle(chat.id);
                               }}
@@ -1654,7 +1669,7 @@ export default function UnifiedAIPlatform() {
                               {chat.title}
                             </h3>
                             <button
-                              onClick={(e) => handleEditChatTitle(chat.id, chat.title, e)}
+                              onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleEditChatTitle(chat.id, chat.title, e)}
                               className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-gray-700/50 rounded transition-all flex-shrink-0"
                               title="Edit title"
                             >

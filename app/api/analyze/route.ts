@@ -129,6 +129,39 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Detect if this is a Kalshi query and fetch REAL market data
+    let kalshiMarkets = null;
+    const queryLower = query.toLowerCase();
+    const isKalshiQuery = queryLower.includes('kalshi') || 
+                          queryLower.includes('election') || 
+                          queryLower.includes('prediction market') ||
+                          queryLower.includes('h2h') ||
+                          queryLower.includes('trump') ||
+                          queryLower.includes('harris');
+    
+    if (isKalshiQuery) {
+      console.log('[v0] [API] Kalshi query detected - fetching REAL market data from Kalshi API');
+      try {
+        const { fetchKalshiMarketsWithRetry } = await import('@/lib/kalshi-client');
+        
+        // Fetch ALL markets from Kalshi
+        kalshiMarkets = await fetchKalshiMarketsWithRetry({
+          status: 'open',
+          limit: 50,
+          maxRetries: 3
+        });
+        
+        console.log(`[v0] [API] Kalshi markets fetched: ${kalshiMarkets.length} markets`);
+        
+        if (kalshiMarkets.length > 0) {
+          console.log('[v0] [API] Kalshi categories:', [...new Set(kalshiMarkets.map((m: any) => m.category))].join(', '));
+        }
+      } catch (err) {
+        console.error('[v0] [API] Kalshi fetch error:', err);
+        kalshiMarkets = [];
+      }
+    }
+
     // Build context enhancement string based on query keywords
     const contextEnhancement = buildContextEnhancement(query, context);
 
@@ -233,6 +266,31 @@ export async function POST(req: NextRequest) {
     } else if (context?.oddsData) {
       console.log('[v0] ⚠️ Odds data present but no events found');
       userPrompt += `\n\n⚠️ NOTE: No live games currently available in the market. This may be due to off-season, no scheduled games today, or API limitations.`;
+    }
+
+    // Add REAL Kalshi market data if available
+    if (kalshiMarkets && kalshiMarkets.length > 0) {
+      console.log('[v0] Adding Kalshi market data to prompt');
+      
+      // Format top markets for the AI
+      const topMarkets = kalshiMarkets.slice(0, 20);
+      const kalshiData = topMarkets.map((market: any, idx: number) => {
+        return `${idx + 1}. ${market.title}\n` +
+               `   Category: ${market.category}\n` +
+               `   Yes: ${market.yesPrice}¢ | No: ${market.noPrice}¢\n` +
+               `   Volume: $${market.volume} | Open Interest: ${market.openInterest}`;
+      }).join('\n\n');
+      
+      userPrompt += `\n\n📊 REAL KALSHI PREDICTION MARKETS (Live Data):\n\n${kalshiData}\n\n` +
+                   `Total Markets Available: ${kalshiMarkets.length}\n` +
+                   `Categories: ${[...new Set(kalshiMarkets.map((m: any) => m.category))].slice(0, 10).join(', ')}\n\n` +
+                   `IMPORTANT: Use this REAL Kalshi data to analyze prediction market opportunities. ` +
+                   `Prices are in cents (¢). Calculate implied probabilities and identify mispriced markets.`;
+      
+      console.log('[v0] ✓ Added Kalshi market data to AI prompt');
+    } else if (isKalshiQuery) {
+      console.log('[v0] ⚠️ Kalshi query detected but no markets found');
+      userPrompt += `\n\n⚠️ NOTE: Attempted to fetch Kalshi markets but none are currently available. This may be due to API connectivity issues or no active markets. Check https://kalshi.com directly for live markets.`;
     }
 
     // Add sport/market context

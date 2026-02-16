@@ -423,6 +423,7 @@ export const ERROR_MESSAGES = {
   ODDS_NOT_CONFIGURED: 'Sports Odds API is not configured',
   SUPABASE_NOT_CONFIGURED: 'Supabase is not configured',
   INVALID_REQUEST: 'Invalid request parameters',
+  INVALID_API_KEY: 'Invalid or missing API key',
   INTERNAL_ERROR: 'Internal server error',
   SERVICE_UNAVAILABLE: 'Service temporarily unavailable',
   WEATHER_UNAVAILABLE: 'Weather service unavailable',

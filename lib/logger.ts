@@ -30,6 +30,8 @@ interface LogContext {
   component?: string;
   operation?: string;
   duration?: number;
+  error?: string | Error;
+  cacheSize?: number;
   metadata?: Record<string, any>;
 }
 

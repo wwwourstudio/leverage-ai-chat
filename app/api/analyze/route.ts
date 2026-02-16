@@ -453,10 +453,15 @@ export async function POST(req: NextRequest) {
       
       console.log(`[v0] ✓ Cards generated: ${insightCards.length}`);
     } catch (error) {
-      console.error('[v0] ❌ Failed to generate cards:', error);
-      console.error('[v0] Stack:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error('[v0] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('[v0] ❌ CARDS GENERATION FAILED');
+      console.error('[v0] Error:', error);
+      console.error('[v0] Error message:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('[v0] Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error('[v0] Context:', { cardCategory, sport: context?.sport, useMultiSport });
+      console.error('[v0] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
-      // Fallback: create a single default card
+      // Fallback: create a single default card with error details
       insightCards = [{
         type: 'INFO',
         title: '⚠️ Cards Generation Error',
@@ -464,7 +469,11 @@ export async function POST(req: NextRequest) {
         category: 'SYSTEM',
         subcategory: 'Error',
         gradient: 'from-amber-600 to-orange-700',
-        data: { message: 'Failed to generate insight cards. Check server logs.' }
+        data: { 
+          message: 'Failed to generate insight cards. Check server logs.',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString()
+        }
       }];
     }
 

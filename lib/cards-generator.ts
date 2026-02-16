@@ -228,11 +228,11 @@ export async function generateContextualCards(
   console.log(`[v0] [CARDS-GEN] Starting with multiSport=${multiSport}, sport=${sport}, category=${category}`);
 
   // Normalize sport to API format, then get display name
-  const normalizedSport = sportToUse ? sportToApi(sportToUse) : undefined;
+  const normalizedSport = sport ? sportToApi(sport) : undefined;
   const displaySport = normalizedSport ? apiToSport(normalizedSport).toUpperCase() : 'MULTI-SPORT';
 
   console.log('[v0] [CARDS GENERATOR] Generating cards...');
-  console.log('[v0] [CARDS GENERATOR] Input:', { category, sport: sportToUse, normalizedSport, displaySport, multiSport });
+  console.log('[v0] [CARDS GENERATOR] Input:', { category, sport, normalizedSport, displaySport, multiSport });
   console.log('[v0] [CARDS GENERATOR] Category:', category, '| Display Sport:', displaySport, '| Count:', count);
   
   // If multiSport requested, generate variety from ALL major sports with REAL data

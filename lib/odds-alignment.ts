@@ -81,11 +81,11 @@ export function validateOddsAlignment(
   const comparisons = predictions.map(p => calculateAlignment(p.aiOdds, p.marketOdds));
   
   const totalPredictions = comparisons.length;
-  const alignedPredictions = comparisons.filter(c => c.alignmentScore >= 0.75).length;
-  const outliers = comparisons.filter(c => c.isOutlier).length;
+  const alignedPredictions = comparisons.filter((c: OddsComparison) => c.alignmentScore >= 0.75).length;
+  const outliers = comparisons.filter((c: OddsComparison) => c.isOutlier).length;
   
-  const averageDeviation = comparisons.reduce((sum, c) => sum + c.deviation, 0) / totalPredictions;
-  const overallScore = comparisons.reduce((sum, c) => sum + c.alignmentScore, 0) / totalPredictions;
+  const averageDeviation = comparisons.reduce((sum: number, c: OddsComparison) => sum + c.deviation, 0) / totalPredictions;
+  const overallScore = comparisons.reduce((sum: number, c: OddsComparison) => sum + c.alignmentScore, 0) / totalPredictions;
 
   console.log('[v0] [Odds Alignment] Overall Score:', overallScore.toFixed(3), 'Aligned:', alignedPredictions + '/' + totalPredictions, 'Outliers:', outliers);
 

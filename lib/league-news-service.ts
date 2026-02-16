@@ -255,7 +255,7 @@ function getMockRosterChanges(league?: string, limit: number = 15): RosterChange
     }
   ];
   
-  const filtered = league ? allChanges.filter(c => c.league === league) : allChanges;
+  const filtered = league ? allChanges.filter((c: RosterChange) => c.league === league) : allChanges;
   return filtered.slice(0, limit);
 }
 

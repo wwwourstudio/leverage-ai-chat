@@ -781,9 +781,9 @@ export async function generateContextualCards(
       }
     });
   }
-
+  
   console.log('[v0] [CARDS GENERATOR] ✓ Generated', cards.length, 'cards (before weather enrichment)');
-  console.log('[v0] [CARDS GENERATOR] Card titles:', cards.map(c => c.title).join(', '));
+  console.log('[v0] [CARDS GENERATOR] Card titles:', cards.map((c: InsightCard) => c.title).join(', '));
 
   // Add weather cards for outdoor sports if betting category
   if ((category === 'betting' || !category) && normalizedSport) {

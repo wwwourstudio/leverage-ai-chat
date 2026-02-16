@@ -346,10 +346,10 @@ export default function UnifiedAIPlatform() {
     const suggestions: Array<{ label: string; icon: any; category: string }> = [];
     
     console.log('[v0] ==========================================');
-    console.log('[v0] GENERATING CONTEXTUAL SUGGESTIONS');
-    console.log('[v0] User message:', userMessage);
-    console.log('[v0] Response cards received:', responseCards.length);
-    console.log('[v0] Card details:', responseCards.map(c => ({ type: c.type, category: c.category })));
+      console.log('[v0] GENERATING CONTEXTUAL SUGGESTIONS');
+      console.log('[v0] User message:', userMessage);
+      console.log('[v0] Response cards received:', responseCards.length);
+      console.log('[v0] Card details:', responseCards.map((c: any) => ({ type: c.type, category: c.category })));
     
     // Analyze the AI's response cards to understand what was provided
     const cardTypes = responseCards.map(card => card.type);

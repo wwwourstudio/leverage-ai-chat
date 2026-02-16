@@ -11,10 +11,10 @@ export async function GET() {
   const diagnostics = {
     timestamp: new Date().toISOString(),
     status: 'unknown' as 'healthy' | 'degraded' | 'down' | 'setup_required',
-    connection: { status: 'unknown' as string, message: '' },
-    environment: { status: 'unknown' as string, variables: {} as Record<string, boolean> },
-    schema: { status: 'unknown' as string, tables: [] as string[], missingTables: [] as string[] },
-    sampleQuery: { status: 'unknown' as string, message: '' },
+    connection: { status: 'unknown', message: '' },
+    environment: { status: 'unknown', variables: {} as Record<string, boolean> },
+    schema: { status: 'unknown', tables: [] as string[], missingTables: [] as string[] },
+    sampleQuery: { status: 'unknown', message: '' },
     recommendations: [] as string[]
   };
 

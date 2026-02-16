@@ -17,10 +17,10 @@ export async function GET() {
     timestamp: new Date().toISOString(),
     uptime: getUptime() ?? undefined,
     services: {
-      database: { status: 'unknown' as string, message: '', latency: 0 },
-      oddsAPI: { status: 'unknown' as string, message: '', configured: false },
-      aiGateway: { status: 'unknown' as string, message: '', configured: false },
-      weatherAPI: { status: 'unknown' as string, message: '', configured: false }
+      database: { status: 'unknown', message: '', latency: 0 },
+      oddsAPI: { status: 'unknown', message: '', configured: false },
+      aiGateway: { status: 'unknown', message: '', configured: false },
+      weatherAPI: { status: 'unknown', message: '', configured: false }
     },
     environment: {
       runtime: getRuntimeEnvironment(),

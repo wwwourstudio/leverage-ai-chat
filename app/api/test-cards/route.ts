@@ -33,7 +33,7 @@ export async function GET(request: Request) {
         results[cat] = {
           success: true,
           cardsGenerated: cards.length,
-          cardTypes: cards.map(c => c.type),
+          cardTypes: cards.map((c: any) => c.type),
           sampleCard: cards[0] ? {
             type: cards[0].type,
             title: cards[0].title,

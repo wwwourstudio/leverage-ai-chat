@@ -45,7 +45,7 @@ export async function GET(request: Request) {
       step: 2,
       name: 'Cards Generation',
       cardsGenerated: cards.length,
-      cardTypes: cards.map(c => c.type),
+      cardTypes: cards.map((c: any) => c.type),
       success: cards.length > 0
     });
     
@@ -93,7 +93,7 @@ export async function GET(request: Request) {
       result: {
         aiResponse,
         cardsGenerated: cards.length,
-        cards: cards.map(c => ({
+        cards: cards.map((c: any) => ({
           type: c.type,
           title: c.title,
           category: c.category

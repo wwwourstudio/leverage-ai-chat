@@ -67,8 +67,6 @@ export function PropHitRateCard({
       category="PROP ANALYSIS"
       subcategory={getStatus()}
       gradient={getGradient()}
-      statusBadge={getStatus()}
-      statusColor={getStatusColor()}
     >
       <div className="space-y-3">
         {/* Hit Rate Summary */}

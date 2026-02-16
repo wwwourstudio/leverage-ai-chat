@@ -82,10 +82,10 @@ export function InsightsDashboard({ userId }: InsightsDashboardProps) {
     marketConsensus: historical.avgConsensus,
     historicalAccuracy: historical.avgConfidence,
     finalConfidence: historical.recentAvg,
-    trustLevel: historical.recentAvg >= 80 ? 'high' : historical.recentAvg >= 60 ? 'medium' : 'low',
-    flags: [],
-    riskLevel: historical.recentAvg >= 80 ? 'low' : historical.recentAvg >= 60 ? 'medium' : 'high'
-  } as const : null;
+    trustLevel: (historical.recentAvg >= 80 ? 'high' : historical.recentAvg >= 60 ? 'medium' : 'low') as 'high' | 'medium' | 'low',
+    flags: [] as { type: string; message: string; severity: 'error' | 'info' | 'warning' }[],
+    riskLevel: (historical.recentAvg >= 80 ? 'low' : historical.recentAvg >= 60 ? 'medium' : 'high') as 'high' | 'medium' | 'low'
+  } : null;
 
   return (
     <div className="space-y-6">
@@ -121,7 +121,7 @@ export function InsightsDashboard({ userId }: InsightsDashboardProps) {
 
       {/* Trust Metrics */}
       {trustMetrics && (
-        <div className="bg-gradient-to-br from-slate-900/60 to-slate-800/60 border border-slate-700/50 rounded-xl p-6">
+        <div className="bg-linear-to-br from-slate-900/60 to-slate-800/60 border border-slate-700/50 rounded-xl p-6">
           <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wide mb-4">
             AI Trust & Validation Metrics (30 Days)
           </h3>
@@ -131,7 +131,7 @@ export function InsightsDashboard({ userId }: InsightsDashboardProps) {
 
       {/* User Profile Summary */}
       {profile && (
-        <div className="bg-gradient-to-br from-blue-900/20 to-indigo-900/20 border border-blue-700/30 rounded-xl p-6">
+        <div className="bg-linear-to-br from-blue-900/20 to-indigo-900/20 border border-blue-700/30 rounded-xl p-6">
           <h3 className="text-sm font-bold text-blue-300 uppercase tracking-wide mb-4">
             Your Performance
           </h3>

@@ -22,11 +22,15 @@ describe('Config Module', () => {
       expect(isSupabaseConfigured()).toBe(true);
     });
 
-    it('should return false when Supabase env vars are missing', () => {
-      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-      
-      expect(isSupabaseConfigured()).toBe(false);
-    });
+  it('should return false when Supabase env vars are missing', () => {
+    const originalUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = '';
+    
+    expect(isSupabaseConfigured()).toBe(false);
+    
+    // Restore original value
+    process.env.NEXT_PUBLIC_SUPABASE_URL = originalUrl;
+  });
   });
 
   describe('isGrokConfigured', () => {
@@ -36,11 +40,15 @@ describe('Config Module', () => {
       expect(isGrokConfigured()).toBe(true);
     });
 
-    it('should return false when XAI_API_KEY is missing', () => {
-      delete process.env.XAI_API_KEY;
-      
-      expect(isGrokConfigured()).toBe(false);
-    });
+  it('should return false when XAI_API_KEY is missing', () => {
+    const originalKey = process.env.XAI_API_KEY;
+    process.env.XAI_API_KEY = '';
+    
+    expect(isGrokConfigured()).toBe(false);
+    
+    // Restore original value
+    process.env.XAI_API_KEY = originalKey;
+  });
   });
 
   describe('isOddsApiConfigured', () => {
@@ -50,11 +58,15 @@ describe('Config Module', () => {
       expect(isOddsApiConfigured()).toBe(true);
     });
 
-    it('should return false when ODDS_API_KEY is missing', () => {
-      delete process.env.ODDS_API_KEY;
-      
-      expect(isOddsApiConfigured()).toBe(false);
-    });
+  it('should return false when ODDS_API_KEY is missing', () => {
+    const originalKey = process.env.ODDS_API_KEY;
+    process.env.ODDS_API_KEY = '';
+    
+    expect(isOddsApiConfigured()).toBe(false);
+    
+    // Restore original value
+    process.env.ODDS_API_KEY = originalKey;
+  });
   });
 
   describe('getServiceStatus', () => {
@@ -82,14 +94,18 @@ describe('Config Module', () => {
       expect(status.allConfigured).toBe(true);
     });
 
-    it('should mark allConfigured as false when any service is missing', () => {
-      delete process.env.ODDS_API_KEY;
-      
-      const status = getServiceStatus();
-      
-      expect(status.allConfigured).toBe(false);
-      expect(status.oddsApi.configured).toBe(false);
-    });
+  it('should mark allConfigured as false when any service is missing', () => {
+    const originalKey = process.env.ODDS_API_KEY;
+    process.env.ODDS_API_KEY = '';
+    
+    const status = getServiceStatus();
+    
+    expect(status.allConfigured).toBe(false);
+    expect(status.oddsApi.configured).toBe(false);
+    
+    // Restore original value
+    process.env.ODDS_API_KEY = originalKey;
+  });
   });
 
   describe('formatServiceStatus', () => {

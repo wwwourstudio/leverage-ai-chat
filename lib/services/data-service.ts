@@ -62,7 +62,7 @@ export class DataService {
 
     // Store in database cache
     if (oddsData && oddsData.length > 0) {
-      const records = oddsData.map(game => ({
+      const records = oddsData.map((game: any) => ({
         sport_key: sportKey,
         game_id: game.id,
         home_team: game.home_team,
@@ -141,7 +141,7 @@ export class DataService {
   async storeEdgeOpportunities(opportunities: any[]) {
     await this.init();
 
-    const records = opportunities.map(opp => ({
+    const records = opportunities.map((opp: { market_id: string; sport: string; matchup: string; market_type: string; model_prob: number; market_prob: number; edge: number; confidence: number; expected_value: number; odds: number; bookmaker: string; created_at: string; expires_at?: string }) => ({
       market_id: opp.market_id,
       sport: opp.sport,
       matchup: opp.matchup,

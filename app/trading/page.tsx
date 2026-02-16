@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { runTradingEngine } from '@/lib/engine/runTradingEngine';
-import type { TradingEngineInputs, TradingEngineResults } from '@/lib/engine/runTradingEngine';
+import type { TradingInput, TradingEngineResult } from '@/lib/engine/runTradingEngine';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -21,36 +21,30 @@ import {
 } from 'lucide-react';
 
 export default function TradingEngineDashboard() {
-  const [results, setResults] = useState<TradingEngineResults | null>(null);
+  const [results, setResults] = useState<TradingEngineResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   // Demo inputs - replace with real API data
-  const demoInputs: TradingEngineInputs = {
-    books: [
+  const demoInputs: TradingInput = {
+    odds: [
       {
-        bookmaker: 'DraftKings',
+        book: 'DraftKings',
         market: 'h2h',
-        outcomes: [
-          { name: 'Lakers', price: -110, points: null },
-          { name: 'Warriors', price: -110, points: null }
-        ]
+        outcome: 'Lakers',
+        price: -110
       },
       {
-        bookmaker: 'FanDuel',
+        book: 'FanDuel',
         market: 'h2h',
-        outcomes: [
-          { name: 'Lakers', price: 105, points: null },
-          { name: 'Warriors', price: -125, points: null }
-        ]
+        outcome: 'Lakers',
+        price: 105
       },
       {
-        bookmaker: 'BetMGM',
+        book: 'BetMGM',
         market: 'h2h',
-        outcomes: [
-          { name: 'Lakers', price: -105, points: null },
-          { name: 'Warriors', price: -115, points: null }
-        ]
+        outcome: 'Lakers',
+        price: -105
       }
     ],
     tickets: [
@@ -63,11 +57,10 @@ export default function TradingEngineDashboard() {
       { time: new Date(), price: -110, bookmaker: 'consensus' }
     ],
     kalshiMarket: {
-      event: 'NBA-Lakers-Win',
-      currentPrice: 0.52,
-      historicalPrices: [0.48, 0.50, 0.51, 0.52, 0.52],
-      volume24h: 45000,
-      openInterest: 125000
+      yesPrice: 54,
+      noPrice: 46,
+      volume: 125000,
+      historicalPrices: [52, 53, 54, 54, 54]
     },
     modelProbability: 0.58,
     bankroll: 10000
@@ -224,7 +217,7 @@ export default function TradingEngineDashboard() {
                   <div className="bg-muted/50 rounded-xl p-4">
                     <div className="text-sm text-muted-foreground mb-1">Confidence</div>
                     <div className="text-xl font-bold text-[var(--success)]">
-                      {results.sharp.isReverseLineMovement ? 'High' : 'Medium'}
+                      {results.sharpSignal?.isReverseLineMovement ? 'High' : 'Medium'}
                     </div>
                   </div>
                 </div>

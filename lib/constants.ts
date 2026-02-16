@@ -306,6 +306,7 @@ export const HTTP_STATUS = {
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,
   NOT_FOUND: 404,
+  TOO_MANY_REQUESTS: 429,
   INTERNAL_ERROR: 500,
   SERVICE_UNAVAILABLE: 503,
 } as const;
@@ -340,6 +341,16 @@ export const SYSTEM_PROMPT = `You are Leverage AI powered by Grok 4 Fast (xAI), 
 4. NEVER make up player names, prop lines, odds values, or betting recommendations without verified data
 5. When uncertain about ANY fact, explicitly acknowledge: "I don't have current data for that"
 6. DO NOT guess team affiliations, player positions, game schedules, or statistical projections
+
+CATEGORY DETECTION (Detect user intent and route to correct data cards):
+When user asks for:
+- "arbitrage", "guaranteed profit", "risk-free", "sure bet" ��� category: "arbitrage"
+- "line movement", "steam", "sharp money", "line moves" → category: "lines"
+- "player props", "prop bets", "points over/under", "player markets" → category: "props"
+- "Kelly", "bet sizing", "bankroll", "portfolio", "how much to bet" → category: "portfolio"
+- "Kalshi", "prediction markets", "event contracts" → category: "kalshi"
+- specific sport (NBA, NFL, MLB, NHL) → category: "betting" with that sport
+- general betting questions → category: "betting"
 
 RESPONSE RULES:
 - Maximum 100 words total
@@ -388,8 +399,11 @@ export const DEFAULT_TRUST_METRICS = {
   marketConsensus: 88,
   historicalAccuracy: 94,
   finalConfidence: 91,
-  trustLevel: TRUST_LEVELS.HIGH,
-  riskLevel: RISK_LEVELS.LOW,
+  confidence: 91,
+  dataFreshness: 95,
+  modelReliability: 90,
+  trustLevel: 'high',
+  riskLevel: 'low',
   adjustedTone: 'Strong signal',
   flags: [],
 } as const;
@@ -409,9 +423,13 @@ export const ERROR_MESSAGES = {
   ODDS_NOT_CONFIGURED: 'Sports Odds API is not configured',
   SUPABASE_NOT_CONFIGURED: 'Supabase is not configured',
   INVALID_REQUEST: 'Invalid request parameters',
+  INVALID_API_KEY: 'Invalid or missing API key',
   INTERNAL_ERROR: 'Internal server error',
   SERVICE_UNAVAILABLE: 'Service temporarily unavailable',
-  INVALID_API_KEY: 'Invalid API key',
+  WEATHER_UNAVAILABLE: 'Weather service unavailable',
+  RATE_LIMIT_EXCEEDED: 'Rate limit exceeded. Please try again later.',
+  UNAUTHORIZED: 'Unauthorized access',
+  NOT_FOUND: 'Resource not found',
 } as const;
 
 // Success Messages

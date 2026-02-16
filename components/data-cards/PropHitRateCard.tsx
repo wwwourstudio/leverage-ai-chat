@@ -1,5 +1,5 @@
 import { BaseCard } from './BaseCard';
-import { TrendingUp, TrendingDown, Minus, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Activity, BarChart } from 'lucide-react';
 
 interface PropHitRateCardProps {
   playerName: string;
@@ -63,12 +63,10 @@ export function PropHitRateCard({
   return (
     <BaseCard
       title={`${playerName} - ${statType}`}
-      icon="BarChart"
+      icon={BarChart}
       category="PROP ANALYSIS"
       subcategory={getStatus()}
       gradient={getGradient()}
-      statusBadge={getStatus()}
-      statusColor={getStatusColor()}
     >
       <div className="space-y-3">
         {/* Hit Rate Summary */}

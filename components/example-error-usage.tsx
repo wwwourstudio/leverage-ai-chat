@@ -10,7 +10,10 @@
 
 'use client';
 
-import React from 'react';
+// This component is an example and requires useApiRequest and EnhancedErrorDisplay
+// to be implemented. Commented out to avoid build errors until dependencies are available.
+
+/*
 import { useApiRequest } from '@/hooks/use-enhanced-error';
 import { EnhancedErrorDisplay } from './enhanced-error-display';
 
@@ -42,7 +45,6 @@ export function ExampleErrorUsage() {
         {loading ? 'Loading...' : 'Fetch Odds'}
       </button>
 
-      {/* Display error with enhanced UI */}
       {error && (
         <EnhancedErrorDisplay 
           error={error} 
@@ -50,7 +52,6 @@ export function ExampleErrorUsage() {
         />
       )}
 
-      {/* Display data when successful */}
       {data && !error && (
         <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
           <p className="text-green-400">Success! Received {data.events?.length || 0} events</p>
@@ -58,6 +59,12 @@ export function ExampleErrorUsage() {
       )}
     </div>
   );
+}
+*/
+
+export function ExampleErrorUsage() {
+  // Temporarily disabled - requires implementation of useApiRequest and EnhancedErrorDisplay
+  return null;
 }
 
 /**

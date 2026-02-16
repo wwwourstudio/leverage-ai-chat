@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import { runTradingEngine, type TradingEngineResult } from '../lib/engine/runTradingEngine';
+import type { TradingEngineResult } from '../lib/engine/runTradingEngine';
 
 interface TradingState {
   results: TradingEngineResult | null;

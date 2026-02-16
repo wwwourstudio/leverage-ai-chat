@@ -18,6 +18,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data-service';
 import { API_ENDPOINTS } from '@/lib/constants';
+import { createClient } from '@/lib/supabase/client';
+import { AuthModals } from '@/components/AuthModals';
 import { MessageList } from '@/components/message-list';
 import { MobileChatInput } from '@/components/mobile-chat-input';
 import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2 } from 'lucide-react';
@@ -138,9 +140,21 @@ interface InsightCard {
 }
 
 export default function UnifiedAIPlatform() {
-  // Lightweight welcome message to reduce memory usage
+  // Dynamic welcome message based on time, category, and sport season
   const getWelcomeMessage = (category: string) => {
-    return "Welcome to **Leverage AI** - Powered by Grok AI\n\nAsk me anything about sports betting, fantasy sports, DFS, or prediction markets.";
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    
+    const categoryMessages: Record<string, string> = {
+      betting: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is scanning live odds across all major sportsbooks. Ask me about tonight's lines, player props, sharp money, or arbitrage opportunities.`,
+      fantasy: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is ready for fantasy analysis. Ask about draft strategy, waiver targets, trade values, or bestball stacking for NFBC/NFFC.`,
+      dfs: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is optimizing DFS lineups. Ask about optimal builds, ownership leverage, captain picks, or correlation stacks for DraftKings and FanDuel.`,
+      kalshi: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is monitoring Kalshi prediction markets in real-time. Ask about election contracts, weather markets, economic events, or cross-market arbitrage.`,
+      all: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** - Powered by Grok AI\n\nI'm connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.`
+    };
+    
+    return categoryMessages[category] || categoryMessages.all;
   };
 
   const [messages, setMessages] = useState<Message[]>([
@@ -182,7 +196,8 @@ export default function UnifiedAIPlatform() {
   const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
   // Credit system utilities
   const MESSAGE_LIMIT = 15;
   const CHAT_LIMIT = 10;
@@ -255,14 +270,49 @@ export default function UnifiedAIPlatform() {
     return updated;
   };
 
+  // Check Supabase auth session on mount
+  useEffect(() => {
+    (async () => {
+  try {
+  const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          setIsLoggedIn(true);
+          setUser({
+            name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+            email: session.user.email || ''
+          });
+        }
+        
+        // Listen for auth changes (OAuth redirect, signout, etc.)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (session?.user) {
+            setIsLoggedIn(true);
+            setUser({
+              name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+              email: session.user.email || ''
+            });
+            setShowLoginModal(false);
+            setShowSignupModal(false);
+          } else {
+            setIsLoggedIn(false);
+            setUser(null);
+          }
+        });
+        
+        return () => subscription.unsubscribe();
+      } catch (err) {
+        console.error('[v0] Auth check failed:', err);
+      }
+    })();
+  }, []);
+
   // Initialize credits and load real insights on mount
   useEffect(() => {
-    // Load insights on mount (cards removed from initial welcome)
     fetch('/api/insights')
       .then(r => r.json())
       .then(insights => {
-        console.log('[v0] Loaded insights:', insights);
-        
         setMessages((prev: Message[]) => {
           const newMessages = [...prev];
           if (newMessages[0]?.isWelcome) {
@@ -346,10 +396,10 @@ export default function UnifiedAIPlatform() {
     const suggestions: Array<{ label: string; icon: any; category: string }> = [];
     
     console.log('[v0] ==========================================');
-    console.log('[v0] GENERATING CONTEXTUAL SUGGESTIONS');
-    console.log('[v0] User message:', userMessage);
-    console.log('[v0] Response cards received:', responseCards.length);
-    console.log('[v0] Card details:', responseCards.map(c => ({ type: c.type, category: c.category })));
+      console.log('[v0] GENERATING CONTEXTUAL SUGGESTIONS');
+      console.log('[v0] User message:', userMessage);
+      console.log('[v0] Response cards received:', responseCards.length);
+      console.log('[v0] Card details:', responseCards.map((c: any) => ({ type: c.type, category: c.category })));
     
     // Analyze the AI's response cards to understand what was provided
     const cardTypes = responseCards.map(card => card.type);
@@ -755,11 +805,11 @@ export default function UnifiedAIPlatform() {
         if (context.sport && context.oddsData?.sport && context.oddsData.sport !== sportToApi(context.sport)) {
           if (isDev) console.error('[CROSS-SPORT BLOCKED] Attempted contamination prevented:', {
             detected: context.sport,
-            fetched: context.oddsData.sport
-          });
-          // Clear contaminated data
-          delete context.oddsData;
-          context.crossSportError = true;
+          fetched: context.oddsData.sport
+        });
+        // Clear contaminated data
+        context.oddsData = undefined as any;
+        context.crossSportError = true;
         }
       }
       
@@ -1360,6 +1410,20 @@ export default function UnifiedAIPlatform() {
     }
   };
 
+  const adjustTextareaHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e as any);
+    }
+  };
+
   const formatTimestamp = (date: Date) => {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
@@ -1638,7 +1702,7 @@ export default function UnifiedAIPlatform() {
                               onClick={(e) => e.stopPropagation()}
                             />
                             <button
-                              onClick={(e) => {
+                              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                                 e.stopPropagation();
                                 handleSaveChatTitle(chat.id);
                               }}
@@ -1654,7 +1718,7 @@ export default function UnifiedAIPlatform() {
                               {chat.title}
                             </h3>
                             <button
-                              onClick={(e) => handleEditChatTitle(chat.id, chat.title, e)}
+                              onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleEditChatTitle(chat.id, chat.title, e)}
                               className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-gray-700/50 rounded transition-all flex-shrink-0"
                               title="Edit title"
                             >
@@ -2961,216 +3025,17 @@ export default function UnifiedAIPlatform() {
         </div>
       )}
 
-      {/* Login Modal */}
-      {showLoginModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowLoginModal(false)}>
-          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setShowLoginModal(false)}
-              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            
-            <div className="p-8">
-              <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold text-white mb-2">Welcome Back</h2>
-                <p className="text-sm text-gray-400">Sign in to access your account</p>
-              </div>
+      {/* Auth Modals - extracted to separate component */}
+      <AuthModals
+        showLoginModal={showLoginModal}
+        showSignupModal={showSignupModal}
+        setShowLoginModal={setShowLoginModal}
+        setShowSignupModal={setShowSignupModal}
+        setIsLoggedIn={setIsLoggedIn}
+        setUser={setUser}
+      />
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-400 mb-2">Email</label>
-                  <input
-                    id="login-email"
-                    type="email"
-                    placeholder="your@email.com"
-                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                  />
-                </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-400 mb-2">Password</label>
-                  <input
-                    id="login-password"
-                    type="password"
-                    placeholder="•••••����••"
-                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                  />
-                </div>
-
-                <button
-                  onClick={() => {
-                    const emailInput = document.getElementById('login-email') as HTMLInputElement;
-                    const email = emailInput?.value || 'user@example.com';
-                    const name = email.split('@')[0];
-                    
-                    // Mock login - in production this would use Supabase
-                    setIsLoggedIn(true);
-                    setUser({
-                      name: name.charAt(0).toUpperCase() + name.slice(1),
-                      email: email
-                    });
-                    setShowLoginModal(false);
-                    console.log('[v0] User logged in:', { name, email });
-                  }}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all"
-                >
-                  Sign In
-                </button>
-
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-800"></div>
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-gray-900 text-gray-500">or</span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    // Mock Google login
-                    setIsLoggedIn(true);
-                    setUser({
-                      name: 'Demo User',
-                      email: 'demo@google.com'
-                    });
-                    setShowLoginModal(false);
-                  }}
-                  className="w-full py-3 border border-gray-800 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all"
-                >
-                  Continue with Google
-                </button>
-
-                <p className="text-center text-sm text-gray-500">
-                  Don&apos;t have an account?{' '}
-                  <button 
-                    onClick={() => {
-                      setShowLoginModal(false);
-                      setShowSignupModal(true);
-                    }}
-                    className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
-                  >
-                    Sign up
-                  </button>
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Sign Up Modal */}
-      {showSignupModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowSignupModal(false)}>
-          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setShowSignupModal(false)}
-              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            
-            <div className="p-8">
-              <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold text-white mb-2">Create Account</h2>
-                <p className="text-sm text-gray-400">Sign up to get started with Leverage AI</p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-400 mb-2">Full Name</label>
-                  <input
-                    id="signup-name"
-                    type="text"
-                    placeholder="John Doe"
-                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-400 mb-2">Email</label>
-                  <input
-                    id="signup-email"
-                    type="email"
-                    placeholder="your@email.com"
-                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-400 mb-2">Password</label>
-                  <input
-                    id="signup-password"
-                    type="password"
-                    placeholder="••••••••"
-                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                  />
-                </div>
-
-                <button
-                  onClick={() => {
-                    const nameInput = document.getElementById('signup-name') as HTMLInputElement;
-                    const emailInput = document.getElementById('signup-email') as HTMLInputElement;
-                    const name = nameInput?.value || 'New User';
-                    const email = emailInput?.value || 'newuser@example.com';
-                    
-                    // Mock signup - in production this would use Supabase
-                    setIsLoggedIn(true);
-                    setUser({
-                      name: name,
-                      email: email
-                    });
-                    setShowSignupModal(false);
-                    console.log('[v0] User signed up:', { name, email });
-                  }}
-                  className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl transition-all shadow-lg"
-                >
-                  Create Account
-                </button>
-
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-800"></div>
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-gray-900 text-gray-500">or</span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    // Mock Google signup
-                    setIsLoggedIn(true);
-                    setUser({
-                      name: 'Google User',
-                      email: 'user@gmail.com'
-                    });
-                    setShowSignupModal(false);
-                  }}
-                  className="w-full py-3 border border-gray-800 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all"
-                >
-                  Sign up with Google
-                </button>
-
-                <p className="text-center text-sm text-gray-500">
-                  Already have an account?{' '}
-                  <button 
-                    onClick={() => {
-                      setShowSignupModal(false);
-                      setShowLoginModal(true);
-                    }}
-                    className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
-                  >
-                    Log in
-                  </button>
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style>
         {`

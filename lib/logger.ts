@@ -30,6 +30,9 @@ interface LogContext {
   component?: string;
   operation?: string;
   duration?: number;
+  error?: string | Error;
+  cacheSize?: number;
+  threshold?: number;
   metadata?: Record<string, any>;
 }
 
@@ -75,16 +78,10 @@ class Logger {
 
   /**
    * Generate or retrieve request ID for tracing
+   * Note: headers() is async in Next.js 16 but we call this synchronously,
+   * so we generate a fallback ID and let headers be resolved elsewhere if needed
    */
   private getRequestId(): string {
-    try {
-      const headersList = headers();
-      const existingId = headersList.get('x-request-id') || headersList.get('x-vercel-id');
-      if (existingId) return existingId;
-    } catch {
-      // Headers not available (client-side or non-request context)
-    }
-    
     return `req_${Date.now()}_${++this.requestIdCounter}`;
   }
 

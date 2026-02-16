@@ -14,6 +14,7 @@ export async function createClient() {
   }
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
+    db: { schema: 'api' },
     cookies: {
       getAll() {
         return cookieStore.getAll()

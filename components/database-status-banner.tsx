@@ -73,8 +73,6 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
         return <AlertCircle className="w-5 h-5" />;
       case 'error':
         return <AlertCircle className="w-5 h-5" />;
-      case 'connected':
-        return <CheckCircle2 className="w-5 h-5" />;
       default:
         return <Database className="w-5 h-5" />;
     }

@@ -18,6 +18,9 @@ export interface TradingInput {
   modelProbability?: number;
   bankroll?: number;
   decimalOdds?: number;
+  // Additional demo/UI properties
+  tickets?: Array<{ side: string; count: number; handle: number }>;
+  lines?: Array<{ time: Date; price: number; bookmaker: string }>;
 }
 
 export interface TradingEngineResult {

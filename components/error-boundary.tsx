@@ -41,7 +41,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
       return (
         <div className="min-h-[400px] flex items-center justify-center p-6">
-          <div className="max-w-md w-full bg-gradient-to-br from-red-900/20 to-orange-900/20 border border-red-500/30 rounded-2xl p-8">
+          <div className="max-w-md w-full bg-linear-to-br from-red-900/20 to-orange-900/20 border border-red-500/30 rounded-2xl p-8">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center">
                 <AlertTriangle className="w-6 h-6 text-red-400" />
@@ -93,7 +93,7 @@ export function withErrorBoundary<P extends object>(
 ) {
   return function WrappedComponent(props: P) {
     return (
-      <ErrorBoundary fallback={fallback}>
+      <ErrorBoundary fallback={fallback} children={<Component {...props} />}>
         <Component {...props} />
       </ErrorBoundary>
     );

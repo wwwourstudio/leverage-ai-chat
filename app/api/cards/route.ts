@@ -1,21 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  SPORTS_MAP,
-  EXTERNAL_APIS,
   ENV_KEYS,
   LOG_PREFIXES,
   DATA_SOURCES,
   CARD_TYPES,
-  CARD_STATUS,
-  type CardType,
-  type CardStatus
+  CARD_STATUS
 } from '@/lib/constants';
 import { validateSportKey, getSportInfo } from '@/lib/sports-validator';
 import {
   fetchLiveOdds,
-  fetchHistoricalOdds,
-  fetchOutrights,
-  getActiveSports,
   ODDS_MARKETS,
   BETTING_REGIONS
 } from '@/lib/odds-api-client';
@@ -170,9 +163,9 @@ export async function POST(req: NextRequest) {
           const normalizedKey = validation.normalizedKey;
           const sportInfo = getSportInfo(normalizedKey);
           
-          console.log(`[v0] Fetching ${sportInfo.name} odds...`);
+          console.log(`[v0] Fetching ${sportInfo.name} odds with ALL markets (H2H, Spreads, Totals, Props)...`);
           const oddsData = await fetchLiveOdds(normalizedKey, {
-            markets: [ODDS_MARKETS.H2H, ODDS_MARKETS.SPREADS, ODDS_MARKETS.TOTALS],
+            markets: [ODDS_MARKETS.H2H, ODDS_MARKETS.SPREADS, ODDS_MARKETS.TOTALS, ODDS_MARKETS.PLAYER_PROPS],
             regions: [BETTING_REGIONS.US],
             apiKey: oddsApiKey
           });

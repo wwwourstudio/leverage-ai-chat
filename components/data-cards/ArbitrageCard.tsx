@@ -1,7 +1,6 @@
 'use client';
 
-import React from 'react';
-import { TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, TrendingUp } from 'lucide-react';
 
 interface ArbitrageCardProps {
   data: {

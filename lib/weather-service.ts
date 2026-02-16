@@ -5,9 +5,11 @@
  */
 
 import { EXTERNAL_APIS, CARD_TYPES, CARD_STATUS, LOG_PREFIXES } from './constants';
+import type { InsightCard } from './cards-generator';
 
 interface WeatherData {
   temperature: number;
+  humidity: number;
   precipitation: number;
   windSpeed: number;
   weatherCode: number;
@@ -19,6 +21,18 @@ interface GameLocation {
   longitude: number;
   city: string;
   stadium?: string;
+}
+
+interface WeatherCard {
+  location: string;
+  matchup?: string;
+  temperature: string;
+  condition: string;
+  wind: string;
+  humidity: string;
+  precipitation: string;
+  gameImpact: string;
+  gameTime?: string;
 }
 
 // Weather cache to avoid excessive API calls
@@ -180,6 +194,7 @@ export async function fetchWeatherForLocation(
     
     const weatherData: WeatherData = {
       temperature: Math.round(current.temperature_2m * 9/5 + 32), // Convert to Fahrenheit
+      humidity: current.relative_humidity_2m || 50, // Default to 50% if missing
       precipitation: current.precipitation || 0,
       windSpeed: Math.round(current.windspeed_10m * 0.621371), // Convert to mph
       weatherCode: current.weathercode,
@@ -217,7 +232,9 @@ interface WeatherCard {
     humidity: string;
     precipitation: string;
     gameImpact: string;
+    gameTime?: string;
   };
+  realData?: boolean; // Track if weather data is real or mocked
   [key: string]: any; // Index signature for Card compatibility
 }
 
@@ -249,7 +266,7 @@ export async function generateWeatherCard(
   const impact = getGameImpact(weather);
   const status = getWeatherStatus(weather);
   
-  return {
+  const card: WeatherCard = {
     type: CARD_TYPES.WEATHER_GAME,
     title: 'Weather Impact Analysis',
     icon: 'Cloud',
@@ -264,6 +281,7 @@ export async function generateWeatherCard(
       temperature: `${weather.temperature}°F`,
       condition: weather.condition,
       wind: `${weather.windSpeed} mph`,
+      humidity: `${weather.humidity}%`,
       precipitation: `${weather.precipitation}mm`,
       gameImpact: impact,
       gameTime: gameTime.toLocaleString('en-US', {
@@ -277,6 +295,8 @@ export async function generateWeatherCard(
     status,
     realData: true
   };
+  
+  return card;
 }
 
 /**
@@ -300,21 +320,10 @@ export function getWeatherCacheStats(): {
   };
 }
 
-interface CardData {
-  matchup?: string;
-  gameTime?: string | Date;
-  [key: string]: unknown;
-}
-
-interface Card {
-  data?: CardData;
-  [key: string]: unknown;
-}
-
 /**
  * Enhance odds cards with weather data
  */
-export async function enrichCardsWithWeather(cards: Card[]): Promise<Card[]> {
+export async function enrichCardsWithWeather(cards: InsightCard[]): Promise<InsightCard[]> {
   const enrichedCards = [...cards];
   
   for (const card of enrichedCards) {

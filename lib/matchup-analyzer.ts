@@ -52,20 +52,20 @@ export async function analyzeMatchup(
   if (error) throw error;
 
   // Calculate statistics
-  const team1Wins = games?.filter(g => g.winner === team1).length || 0;
-  const team2Wins = games?.filter(g => g.winner === team2).length || 0;
+  const team1Wins = games?.filter((g: any) => g.winner === team1).length || 0;
+  const team2Wins = games?.filter((g: any) => g.winner === team2).length || 0;
 
-  const team1Points = games?.map(g => 
+  const team1Points = games?.map((g: any) => 
     g.team1 === team1 ? g.team1_score : g.team2_score
   ) || [];
-  const team2Points = games?.map(g => 
+  const team2Points = games?.map((g: any) => 
     g.team1 === team2 ? g.team1_score : g.team2_score
   ) || [];
 
   return {
     team1,
     team2,
-    games: games?.map(g => ({
+    games: games?.map((g: any) => ({
       date: g.date,
       team1Score: g.team1_score,
       team2Score: g.team2_score,

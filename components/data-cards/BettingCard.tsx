@@ -70,10 +70,21 @@ export function BettingCard({
       <div className="space-y-2.5">
         {data.matchup && <DataRow label="Matchup" value={data.matchup} highlight />}
         {data.team && <DataRow label="Team" value={data.team} highlight />}
+        {data.finalScore && <DataRow label="Final" value={data.finalScore} highlight />}
+        {data.homeOdds && data.awayOdds && (
+          <DataRow label="Moneyline" value={`Home ${data.homeOdds} / Away ${data.awayOdds}`} />
+        )}
+        {data.homeSpread && data.homeSpread !== 'N/A' && (
+          <DataRow label="Spread" value={`${data.homeSpread}`} />
+        )}
+        {data.overUnder && data.overUnder !== 'N/A' && (
+          <DataRow label="Total" value={data.overUnder} />
+        )}
         {data.bestLine && <DataRow label="Best Line" value={data.bestLine} />}
         {data.line && <DataRow label="Line" value={data.line} />}
         {data.odds && <DataRow label="Odds" value={data.odds} />}
         {data.book && <DataRow label="Book" value={data.book} />}
+        {data.bookmaker && !data.book && <DataRow label="Book" value={data.bookmaker} />}
         {data.edge && <DataRow label="Edge" value={data.edge} trend="up" />}
         {data.impliedWin && <DataRow label="Implied Win" value={data.impliedWin} />}
         {data.impliedProb && <DataRow label="Implied Prob" value={data.impliedProb} />}

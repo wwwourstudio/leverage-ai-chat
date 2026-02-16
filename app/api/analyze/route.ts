@@ -5,20 +5,13 @@ import { randomUUID } from 'crypto';
 import {
   AI_CONFIG,
   SYSTEM_PROMPT,
-  DEFAULT_TRUST_METRICS,
-  DEFAULT_SOURCES,
-  DEFAULT_RELIABILITY,
-  EXTERNAL_APIS,
-  ENV_KEYS,
   ERROR_MESSAGES,
   LOG_PREFIXES,
-  HTTP_STATUS,
-  TRUST_METRIC_TYPES,
-  ATTACHMENT_TYPES
+  ATTACHMENT_TYPES,
+  ENV_KEYS,
+  DEFAULT_SOURCES
 } from '@/lib/constants';
-import {
-  APP_TABLES
-} from '@/lib/supabase-validator';
+import { APP_TABLES } from '@/lib/supabase-validator';
 import { getLeveragedAI } from '@/lib/leveraged-ai';
 import { 
   fetchPlayerProjections, 
@@ -136,6 +129,76 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ALWAYS fetch live odds data for sports queries
+    let fetchedOddsData: any[] = [];
+    const queryLower = query.toLowerCase();
+    const isSportsQuery = queryLower.includes('odds') || 
+                          queryLower.includes('bet') ||
+                          queryLower.includes('prop') ||
+                          queryLower.includes('spread') ||
+                          queryLower.includes('moneyline') ||
+                          queryLower.includes('nba') ||
+                          queryLower.includes('nfl') ||
+                          queryLower.includes('mlb') ||
+                          queryLower.includes('nhl') ||
+                          queryLower.includes('game') ||
+                          queryLower.includes('player') ||
+                          queryLower.includes('tonight') ||
+                          queryLower.includes('value') ||
+                          queryLower.includes('arbitrage') ||
+                          context?.sport;
+    
+    if (isSportsQuery && (!context?.oddsData || !context?.oddsData?.events?.length)) {
+      console.log('[v0] [API] Sports query detected - fetching odds data from API');
+      try {
+        const { getOddsWithCache } = await import('@/lib/unified-odds-fetcher');
+        
+        // Determine which sport(s) to fetch
+        const sportKey = context?.sport || 
+          (queryLower.includes('nba') ? 'basketball_nba' :
+           queryLower.includes('nfl') ? 'americanfootball_nfl' :
+           queryLower.includes('mlb') ? 'baseball_mlb' :
+           queryLower.includes('nhl') ? 'icehockey_nhl' : 'basketball_nba');
+        
+        fetchedOddsData = await getOddsWithCache(sportKey, { useCache: true, storeResults: true });
+        console.log(`[v0] [API] Fetched ${fetchedOddsData.length} games for ${sportKey}`);
+      } catch (err) {
+        console.error('[v0] [API] Odds fetch error:', err);
+      }
+    }
+
+    // Detect if this is a Kalshi query and fetch REAL market data
+    let kalshiMarkets = null;
+    const isKalshiQuery = queryLower.includes('kalshi') || 
+                          queryLower.includes('election') || 
+                          queryLower.includes('prediction market') ||
+                          queryLower.includes('h2h') ||
+                          queryLower.includes('trump') ||
+                          queryLower.includes('harris');
+    
+    if (isKalshiQuery) {
+      console.log('[v0] [API] Kalshi query detected - fetching REAL market data from Kalshi API');
+      try {
+        const { fetchKalshiMarketsWithRetry } = await import('@/lib/kalshi-client');
+        
+        // Fetch ALL markets from Kalshi
+        kalshiMarkets = await fetchKalshiMarketsWithRetry({
+          status: 'open',
+          limit: 50,
+          maxRetries: 3
+        });
+        
+        console.log(`[v0] [API] Kalshi markets fetched: ${kalshiMarkets.length} markets`);
+        
+        if (kalshiMarkets.length > 0) {
+          console.log('[v0] [API] Kalshi categories:', [...new Set(kalshiMarkets.map((m: any) => m.category))].join(', '));
+        }
+      } catch (err) {
+        console.error('[v0] [API] Kalshi fetch error:', err);
+        kalshiMarkets = [];
+      }
+    }
+
     // Build context enhancement string based on query keywords
     const contextEnhancement = buildContextEnhancement(query, context);
 
@@ -237,9 +300,66 @@ export async function POST(req: NextRequest) {
       
       userPrompt += `\n\n📊 LIVE ODDS DATA FROM THE ODDS API (${context.oddsData.events.length} games):\n${oddsEvents}\n\nIMPORTANT: Use this REAL data to analyze opportunities. Compare odds across sportsbooks to identify arbitrage or value. Be specific about which sportsbooks and which lines.`;
       console.log('[v0] ✓ Formatted live odds data for Grok analysis');
+    } else if (fetchedOddsData.length > 0) {
+      // Use the odds data we fetched directly
+      console.log(`[v0] Using directly fetched odds data: ${fetchedOddsData.length} games`);
+      
+      const oddsText = fetchedOddsData.slice(0, 10).map((game: any, idx: number) => {
+        let line = `${idx + 1}. ${game.away_team} @ ${game.home_team} (${new Date(game.commence_time).toLocaleString()})`;
+        
+        if (game.completed && game.scores) {
+          const homeScore = game.scores?.find((s: any) => s.name === game.home_team);
+          const awayScore = game.scores?.find((s: any) => s.name === game.away_team);
+          line += ` FINAL: ${game.away_team} ${awayScore?.score || '?'} - ${homeScore?.score || '?'} ${game.home_team}`;
+        } else if (game.bookmakers?.length > 0) {
+          const book = game.bookmakers[0];
+          const h2h = book.markets?.find((m: any) => m.key === 'h2h');
+          if (h2h?.outcomes) {
+            h2h.outcomes.forEach((o: any) => {
+              line += ` | ${o.name}: ${o.price > 0 ? '+' : ''}${o.price}`;
+            });
+          }
+          const spread = book.markets?.find((m: any) => m.key === 'spreads');
+          if (spread?.outcomes) {
+            line += ` | Spread:`;
+            spread.outcomes.forEach((o: any) => {
+              line += ` ${o.name} ${o.point > 0 ? '+' : ''}${o.point}`;
+            });
+          }
+        }
+        
+        return line;
+      }).join('\n');
+      
+      userPrompt += `\n\n📊 REAL GAME DATA (The Odds API - ${fetchedOddsData.length} games):\n${oddsText}\n\nUse this REAL data. Be specific with numbers and matchups.`;
     } else if (context?.oddsData) {
-      console.log('[v0] ⚠️ Odds data present but no events found');
-      userPrompt += `\n\n⚠️ NOTE: No live games currently available in the market. This may be due to off-season, no scheduled games today, or API limitations.`;
+      console.log('[v0] Odds data present but no events found');
+      userPrompt += `\n\nNo live games currently available for this sport.`;
+    }
+
+    // Add REAL Kalshi market data if available
+    if (kalshiMarkets && kalshiMarkets.length > 0) {
+      console.log('[v0] Adding Kalshi market data to prompt');
+      
+      // Format top markets for the AI
+      const topMarkets = kalshiMarkets.slice(0, 20);
+      const kalshiData = topMarkets.map((market: any, idx: number) => {
+        return `${idx + 1}. ${market.title}\n` +
+               `   Category: ${market.category}\n` +
+               `   Yes: ${market.yesPrice}¢ | No: ${market.noPrice}¢\n` +
+               `   Volume: $${market.volume} | Open Interest: ${market.openInterest}`;
+      }).join('\n\n');
+      
+      userPrompt += `\n\n📊 REAL KALSHI PREDICTION MARKETS (Live Data):\n\n${kalshiData}\n\n` +
+                   `Total Markets Available: ${kalshiMarkets.length}\n` +
+                   `Categories: ${[...new Set(kalshiMarkets.map((m: any) => m.category))].slice(0, 10).join(', ')}\n\n` +
+                   `IMPORTANT: Use this REAL Kalshi data to analyze prediction market opportunities. ` +
+                   `Prices are in cents (¢). Calculate implied probabilities and identify mispriced markets.`;
+      
+      console.log('[v0] ✓ Added Kalshi market data to AI prompt');
+    } else if (isKalshiQuery) {
+      console.log('[v0] ⚠️ Kalshi query detected but no markets found');
+      userPrompt += `\n\n⚠️ NOTE: Attempted to fetch Kalshi markets but none are currently available. This may be due to API connectivity issues or no active markets. Check https://kalshi.com directly for live markets.`;
     }
 
     // Add sport/market context
@@ -402,10 +522,15 @@ export async function POST(req: NextRequest) {
       
       console.log(`[v0] ✓ Cards generated: ${insightCards.length}`);
     } catch (error) {
-      console.error('[v0] ❌ Failed to generate cards:', error);
-      console.error('[v0] Stack:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error('[v0] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('[v0] ❌ CARDS GENERATION FAILED');
+      console.error('[v0] Error:', error);
+      console.error('[v0] Error message:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('[v0] Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error('[v0] Context:', { cardCategory, sport: context?.sport, useMultiSport });
+      console.error('[v0] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
-      // Fallback: create a single default card
+      // Fallback: create a single default card with error details
       insightCards = [{
         type: 'INFO',
         title: '⚠️ Cards Generation Error',
@@ -413,7 +538,11 @@ export async function POST(req: NextRequest) {
         category: 'SYSTEM',
         subcategory: 'Error',
         gradient: 'from-amber-600 to-orange-700',
-        data: { message: 'Failed to generate insight cards. Check server logs.' }
+        data: { 
+          message: 'Failed to generate insight cards. Check server logs.',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString()
+        }
       }];
     }
 

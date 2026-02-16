@@ -485,7 +485,7 @@ export async function detectArbitrageFromContext(sport?: string): Promise<any[]>
     });
     
     console.log(`[v0] [ARBITRAGE] Successfully created ${cards.length} live odds cards`);
-    console.log(`[v0] [ARBITRAGE] Returning cards:`, cards.map(c => ({ title: c.title, category: c.category })));
+    console.log(`[v0] [ARBITRAGE] Returning cards:`, cards.map((c: any) => ({ title: c.title, category: c.category })));
     return cards;
   } catch (error) {
     console.error('[v0] [ARBITRAGE] Error in context detection:', error);

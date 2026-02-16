@@ -30,30 +30,72 @@ async function generateSportSpecificCards(
   
   // Fetch real live odds for this sport using unified service
   if (category === 'betting' || !category) {
-    console.log(`[v0] [CARDS-GEN] Using unified odds fetcher with Supabase caching`);
+    console.log(`[v0] [CARDS-GEN] ===== FETCHING ODDS FOR ${displaySport} =====`);
+    console.log(`[v0] [CARDS-GEN] Sport key: ${sport}`);
+    console.log(`[v0] [CARDS-GEN] Category: ${category || 'default (betting)'}`);
+    console.log(`[v0] [CARDS-GEN] Requested count: ${count}, Actual count: ${actualCount}`);
+    
     try {
       const { getOddsWithCache } = await import('@/lib/unified-odds-fetcher');
       
+      // Check API key availability
+      const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+      console.log(`[v0] [CARDS-GEN] API Key present: ${!!apiKey}`);
+      
+      if (!apiKey) {
+        console.error(`[v0] [CARDS-GEN] ❌ CRITICAL: No ODDS_API_KEY found in environment!`);
+        throw new Error('ODDS_API_KEY not configured');
+      }
+      
       // Use unified service - automatically handles API + Supabase caching + storage
+      console.log(`[v0] [CARDS-GEN] Calling getOddsWithCache...`);
       const oddsData = await getOddsWithCache(sport, {
         useCache: false, // Skip cache to get fresh data with all markets
         storeResults: true // Store in Supabase for realtime sync
       });
       
-      console.log(`[v0] [CARDS-GEN] Unified service returned ${oddsData?.length || 0} games`);
+      console.log(`[v0] [CARDS-GEN] ✓ Unified service returned ${oddsData?.length || 0} games`);
+      console.log(`[v0] [CARDS-GEN] Data is array: ${Array.isArray(oddsData)}`);
+      console.log(`[v0] [CARDS-GEN] Data is null/undefined: ${oddsData == null}`);
       
       if (oddsData && oddsData.length > 0) {
-        console.log(`[v0] [CARDS-GEN] SUCCESS: Found ${oddsData.length} live games for ${displaySport}`);
+        console.log(`[v0] [CARDS-GEN] SUCCESS: Found ${oddsData.length} games for ${displaySport}`);
           
-          // Create cards from actual live games
           const gamesToShow = Math.min(actualCount, oddsData.length);
-          console.log(`[v0] [CARDS-GEN] LOOP START: Will create ${gamesToShow} cards (actualCount=${actualCount}, available=${oddsData.length})`);
           for (let i = 0; i < gamesToShow; i++) {
-            console.log(`[v0] [CARDS-GEN] Creating card ${i + 1}/${gamesToShow}`);
             const game = oddsData[i];
-            const firstBook = game.bookmakers?.[0];
+            const isCompleted = game.completed === true;
+            const hasBookmakers = game.bookmakers && game.bookmakers.length > 0;
+            const firstBook = hasBookmakers ? game.bookmakers[0] : null;
             
-            // Extract h2h, spreads, and totals
+            // For completed games with scores
+            if (isCompleted && game.scores) {
+              const homeScore = game.scores?.find((s: any) => s.name === game.home_team);
+              const awayScore = game.scores?.find((s: any) => s.name === game.away_team);
+              
+              cards.push({
+                type: CARD_TYPES.LIVE_ODDS,
+                title: `${game.away_team} @ ${game.home_team}`,
+                icon: 'CheckCircle',
+                category: displaySport,
+                subcategory: 'Final Score',
+                gradient: getSportGradient(sport),
+                data: {
+                  matchup: `${game.away_team} @ ${game.home_team}`,
+                  gameTime: new Date(game.commence_time).toLocaleString(),
+                  finalScore: `${game.away_team} ${awayScore?.score || '?'} - ${homeScore?.score || '?'} ${game.home_team}`,
+                  homeScore: homeScore?.score || '?',
+                  awayScore: awayScore?.score || '?',
+                  completed: true,
+                  realData: true,
+                  status: 'FINAL'
+                },
+                metadata: { realData: true, dataSource: 'The Odds API Scores', gameId: game.id }
+              });
+              continue;
+            }
+            
+            // For upcoming games with odds
             const h2hMarket = firstBook?.markets?.find((m: any) => m.key === 'h2h');
             const spreadsMarket = firstBook?.markets?.find((m: any) => m.key === 'spreads');
             const totalsMarket = firstBook?.markets?.find((m: any) => m.key === 'totals');
@@ -70,68 +112,89 @@ async function generateSportSpecificCards(
             const over = totalOutcomes.find((o: any) => o.name === 'Over');
             const under = totalOutcomes.find((o: any) => o.name === 'Under');
             
+            const subcategory = hasBookmakers ? 'H2H Markets' : 'Upcoming';
+            
             cards.push({
               type: CARD_TYPES.LIVE_ODDS,
               title: `${game.away_team} @ ${game.home_team}`,
               icon: 'TrendingUp',
               category: displaySport,
-              subcategory: 'Full Market Analysis',
+              subcategory,
               gradient: getSportGradient(sport),
               data: {
                 matchup: `${game.away_team} @ ${game.home_team}`,
                 gameTime: new Date(game.commence_time).toLocaleString(),
-                // Moneyline
                 homeOdds: homeOdds ? (homeOdds.price > 0 ? `+${homeOdds.price}` : `${homeOdds.price}`) : 'N/A',
                 awayOdds: awayOdds ? (awayOdds.price > 0 ? `+${awayOdds.price}` : `${awayOdds.price}`) : 'N/A',
-                // Spreads
                 homeSpread: homeSpread ? `${homeSpread.point > 0 ? '+' : ''}${homeSpread.point} (${homeSpread.price > 0 ? '+' : ''}${homeSpread.price})` : 'N/A',
                 awaySpread: awaySpread ? `${awaySpread.point > 0 ? '+' : ''}${awaySpread.point} (${awaySpread.price > 0 ? '+' : ''}${awaySpread.price})` : 'N/A',
-                // Totals
                 overUnder: over && under ? `O/U ${over.point}: Over ${over.price > 0 ? '+' : ''}${over.price} / Under ${under.price > 0 ? '+' : ''}${under.price}` : 'N/A',
-                bookmaker: firstBook?.title || 'Multiple Books',
+                bookmaker: firstBook?.title || 'N/A',
                 bookmakerCount: game.bookmakers?.length || 0,
                 realData: true,
-                status: 'VALUE',
-                allMarkets: {
-                  h2h: h2hMarket ? true : false,
-                  spreads: spreadsMarket ? true : false,
-                  totals: totalsMarket ? true : false
-                }
+                status: hasBookmakers ? 'VALUE' : 'UPCOMING'
               },
-              metadata: {
-                realData: true,
-                dataSource: 'Unified Service (API + Supabase)',
-                timestamp: new Date().toISOString(),
-                gameId: game.id,
-                cached: false
-              }
+              metadata: { realData: true, dataSource: 'The Odds API', gameId: game.id }
             });
         }
         
-        console.log(`[v0] [CARDS-GEN] Successfully created ${cards.length} cards with live data`);
+        console.log(`[v0] [CARDS-GEN] Created ${cards.length} cards with real data`);
+        return cards;
       } else {
-        console.log(`[v0] [CARDS-GEN] No live games found for ${displaySport}`);
+        console.error(`[v0] [CARDS-GEN] ❌ API returned NO GAMES for ${displaySport}`);
+        console.error(`[v0] [CARDS-GEN] This means either:`);
+        console.error(`[v0] [CARDS-GEN] 1. No games are currently live/scheduled`);
+        console.error(`[v0] [CARDS-GEN] 2. API key is invalid/expired`);
+        console.error(`[v0] [CARDS-GEN] 3. API endpoint returned error`);
+        console.error(`[v0] [CARDS-GEN] 4. Sport key "${sport}" is incorrect`);
       }
     } catch (error) {
-      console.error(`[v0] [CARDS-GEN] Unified service error for ${displaySport}:`, error);
+      console.error(`[v0] [CARDS-GEN] ❌ EXCEPTION in unified service for ${displaySport}:`);
+      console.error(error);
+      console.error(`[v0] [CARDS-GEN] Stack trace:`, (error as Error).stack);
     }
   }
   
-  // Fallback: Add general odds card if no real data
+  // Fallback: Add informative card if no real data
   if (cards.length < count) {
+    console.log(`[v0] [CARDS-GEN] FALLBACK: No real data for ${displaySport}, creating informative placeholder`);
+    
+    // Determine why there's no data based on sport and date
+    const now = new Date();
+    const month = now.getMonth() + 1; // 1-12
+    const isNFLOffseason = month < 9 || month === 12; // Sept-Feb season
+    const isMLBOffseason = month < 4 || month > 10; // Apr-Oct season
+    
+    let reason = 'No games scheduled today';
+    let details = 'Games typically appear 24-48 hours before start time';
+    
+    if (displaySport === 'NFL' && isNFLOffseason) {
+      reason = 'NFL Offseason';
+      details = 'NFL season runs September through February';
+    } else if (displaySport === 'MLB' && isMLBOffseason) {
+      reason = 'MLB Offseason';
+      details = 'MLB season runs April through October';
+    } else if (displaySport === 'NBA') {
+      details = 'NBA games typically scheduled afternoon/evening EST';
+    } else if (displaySport === 'NHL') {
+      details = 'NHL games typically scheduled evening EST';
+    }
+    
     cards.push({
       type: CARD_TYPES.LIVE_ODDS,
-      title: `${displaySport} Live Odds`,
-      icon: 'TrendingUp',
+      title: `${displaySport} - ${reason}`,
+      icon: 'Calendar',
       category: displaySport,
-      subcategory: 'H2H Markets',
+      subcategory: 'No Games Available',
       gradient: getSportGradient(sport),
       data: {
-        description: `No live ${displaySport} games currently available`,
-        note: 'Games typically appear 24-48 hours before start time',
+        description: reason,
+        note: details,
         sport: sport,
-        markets: ['Moneyline', 'Spreads', 'Totals'],
-        status: 'NO_DATA'
+        apiResponse: 'API returned 0 games for this sport',
+        suggestion: 'Try asking for a different sport or check back later',
+        status: 'NO_DATA',
+        realData: false
       }
     });
   }
@@ -166,15 +229,17 @@ export interface InsightCard {
  * @param category - Type of analysis (betting, kalshi, dfs, fantasy)
  * @param sport - Sport key in either short form ('nba') or API format ('basketball_nba')
  * @param count - Number of cards to generate (default: 3)
- * @param multiSport - If true, generates cards from multiple sports (default: false)
+ * @param multiSport - If true, generates cards from ALL major sports (default: true when no sport specified)
  */
 export async function generateContextualCards(
   category?: string,
   sport?: string,
   count: number = 3,
-  multiSport: boolean = false
+  multiSport: boolean = !sport // DEFAULT TO TRUE WHEN NO SPORT SPECIFIED
 ): Promise<InsightCard[]> {
   const cards: InsightCard[] = [];
+  
+  console.log(`[v0] [CARDS-GEN] Starting with multiSport=${multiSport}, sport=${sport}, category=${category}`);
 
   // Normalize sport to API format, then get display name
   const normalizedSport = sport ? sportToApi(sport) : undefined;
@@ -184,58 +249,89 @@ export async function generateContextualCards(
   console.log('[v0] [CARDS GENERATOR] Input:', { category, sport, normalizedSport, displaySport, multiSport });
   console.log('[v0] [CARDS GENERATOR] Category:', category, '| Display Sport:', displaySport, '| Count:', count);
   
-  // If multiSport requested, generate variety from multiple sports with REAL data
+  // If multiSport requested, generate variety from ALL major sports with REAL data
   if (multiSport) {
-    console.log('[v0] [CARDS GENERATOR] Multi-sport mode - fetching real odds from all sports');
+    console.log('[v0] [CARDS GENERATOR] Multi-sport mode - fetching from ALL MAJOR SPORTS (NFL, NBA, MLB, NHL)');
     
-    // Prioritize sport from query if provided, otherwise use popular sports
-    const primarySport = normalizedSport || SPORT_KEYS.NBA.API;
-    const allSports = [
-      SPORT_KEYS.NBA.API, 
-      SPORT_KEYS.NFL.API, 
-      SPORT_KEYS.NHL.API,
-      SPORT_KEYS.MLB.API
+    // FORCE query ALL major sports - don't rely on "active sports detector"
+    const allMajorSports = [
+      SPORT_KEYS.NFL.API,      // americanfootball_nfl
+      SPORT_KEYS.NBA.API,      // basketball_nba
+      SPORT_KEYS.MLB.API,      // baseball_mlb
+      SPORT_KEYS.NHL.API,      // icehockey_nhl
     ];
     
-    // Reorder to put primary sport first
-    const orderedSports = [
-      primarySport,
-      ...allSports.filter(s => s !== primarySport)
-    ].slice(0, 3); // Top 3 sports
+    // If user specified a sport, prioritize it first
+    const orderedSports = normalizedSport 
+      ? [normalizedSport, ...allMajorSports.filter(s => s !== normalizedSport)]
+      : allMajorSports;
     
-    console.log('[v0] [CARDS GENERATOR] Sport priority order:', orderedSports.map(s => apiToSport(s).toUpperCase()));
+    console.log('[v0] [CARDS GENERATOR] Will query sports in order:', orderedSports.map(s => apiToSport(s).toUpperCase()).join(', '));
     
-    // Try each sport until we have enough cards with real data
-    for (const sportKey of orderedSports) {
+    // Fetch from ALL sports in parallel for speed
+    console.log('[v0] [MULTI-SPORT] Fetching odds from all sports in PARALLEL...');
+    const allSportCards = await Promise.all(
+      orderedSports.map(async (sportKey) => {
+        console.log(`[v0] [MULTI-SPORT] Starting fetch for ${apiToSport(sportKey).toUpperCase()}`);
+        try {
+          const sportCards = await generateSportSpecificCards(sportKey, 5, category);
+          console.log(`[v0] [MULTI-SPORT] ✓ ${apiToSport(sportKey).toUpperCase()}: ${sportCards.length} cards`);
+          return { sport: sportKey, cards: sportCards };
+        } catch (error) {
+          console.error(`[v0] [MULTI-SPORT] ✗ ${apiToSport(sportKey).toUpperCase()} failed:`, error);
+          return { sport: sportKey, cards: [] };
+        }
+      })
+    );
+    
+    console.log('[v0] [MULTI-SPORT] All fetches complete');
+    
+    // Collect cards from sports that returned data
+    for (const { sport: sportKey, cards: sportCards } of allSportCards) {
       if (cards.length >= count) break;
       
-      const cardsNeeded = count - cards.length;
-      console.log(`[v0] [MULTI-SPORT] Requesting 3 cards from ${apiToSport(sportKey).toUpperCase()}`);
-      const sportCards = await generateSportSpecificCards(sportKey, 3, category); // Request 3 cards per sport
-      console.log(`[v0] [MULTI-SPORT] Received ${sportCards.length} cards from ${apiToSport(sportKey).toUpperCase()}`);
-      
-      // Use ALL returned cards - they should already be properly structured
       if (sportCards.length > 0) {
+        const cardsNeeded = count - cards.length;
         const cardsToAdd = sportCards.slice(0, cardsNeeded);
         cards.push(...cardsToAdd);
-        console.log(`[v0] [MULTI-SPORT] Added ${cardsToAdd.length} cards for ${apiToSport(sportKey).toUpperCase()}`);
+        console.log(`[v0] [MULTI-SPORT] Added ${cardsToAdd.length} ${apiToSport(sportKey).toUpperCase()} cards`);
+      }
+    }
+    
+    // Try to add player props if we still need more cards
+    if (cards.length < count) {
+      console.log('[v0] [MULTI-SPORT] Not enough game cards, trying player props...');
+      try {
+        const { fetchPlayerProps, playerPropToCard } = await import('@/lib/player-props-service');
         
-        // Log first card details for verification
-        if (cardsToAdd[0]) {
-          console.log(`[v0] [MULTI-SPORT] First card:`, {
-            title: cardsToAdd[0].title,
-            category: cardsToAdd[0].category,
-            hasData: !!cardsToAdd[0].data
-          });
+        for (const sportKey of orderedSports) {
+          if (cards.length >= count) break;
+          
+          try {
+            const props = await fetchPlayerProps({ 
+              sport: sportKey, 
+              useCache: true, 
+              storeResults: true 
+            });
+            
+            if (props.length > 0) {
+              const propsNeeded = count - cards.length;
+              const propCards = props.slice(0, propsNeeded).map(playerPropToCard);
+              cards.push(...propCards);
+              console.log(`[v0] [MULTI-SPORT] Added ${propCards.length} ${apiToSport(sportKey).toUpperCase()} prop cards`);
+            }
+          } catch (error) {
+            console.error(`[v0] [MULTI-SPORT] Failed to fetch props for ${apiToSport(sportKey).toUpperCase()}:`, error);
+          }
         }
-      } else {
-        console.log(`[v0] [MULTI-SPORT] No cards returned for ${apiToSport(sportKey).toUpperCase()}`);
+      } catch (error) {
+        console.error('[v0] [MULTI-SPORT] Player props import failed:', error);
       }
     }
     
     // If we still don't have enough cards, add placeholder cards
     while (cards.length < count) {
-      const remainingSports = allSports.filter(s => !cards.some(c => c.data?.sport === s));
+      const remainingSports = orderedSports.filter(s => !cards.some(c => c.data?.sport === s));
       const sportToUse = remainingSports[0] || SPORT_KEYS.NBA.API;
       const displaySport = apiToSport(sportToUse).toUpperCase();
       
@@ -255,9 +351,93 @@ export async function generateContextualCards(
       });
     }
     
+    console.log(`[v0] [MULTI-SPORT] Final result: ${cards.length} cards from ${[...new Set(cards.map(c => c.category))].join(', ')}`);
+    
     return cards.slice(0, count);
   }
 
+  // Dedicated Arbitrage category - when user explicitly asks for arbitrage
+  if (category === 'arbitrage' || category === 'arb') {
+    console.log('[v0] [CARDS-GEN] Arbitrage category - fetching from Supabase with realtime');
+    try {
+      const supabase = (await import('@/lib/supabase/client')).createClient();
+      
+      // Fetch active arbitrage opportunities from Supabase (stored by API cron)
+      const { data: opportunities } = await supabase
+        .from('arbitrage_opportunities')
+        .select('*')
+        .eq('status', 'active')
+        .gt('expires_at', new Date().toISOString())
+        .order('profit_margin', { ascending: false })
+        .limit(count);
+      
+      if (opportunities && opportunities.length > 0) {
+        console.log(`[v0] [CARDS-GEN] Found ${opportunities.length} arbitrage opportunities`);
+        
+        opportunities.forEach((opp: any) => {
+          cards.push({
+            type: 'ARBITRAGE',
+            title: `${opp.away_team} @ ${opp.home_team}`,
+            icon: 'DollarSign',
+            category: 'ARBITRAGE',
+            subcategory: `${(opp.profit_margin * 100).toFixed(2)}% Profit`,
+            gradient: 'from-emerald-600 to-green-700',
+            data: {
+              matchup: `${opp.away_team} @ ${opp.home_team}`,
+              profitMargin: `${(opp.profit_margin * 100).toFixed(2)}%`,
+              totalStake: `$${opp.total_stake.toFixed(2)}`,
+              guaranteedProfit: `$${(opp.total_stake * opp.profit_margin).toFixed(2)}`,
+              side1: {
+                bookmaker: opp.bookmaker_1,
+                odds: opp.odds_1 > 0 ? `+${opp.odds_1}` : opp.odds_1,
+                stake: `$${opp.stake_1.toFixed(2)}`
+              },
+              side2: {
+                bookmaker: opp.bookmaker_2,
+                odds: opp.odds_2 > 0 ? `+${opp.odds_2}` : opp.odds_2,
+                stake: `$${opp.stake_2.toFixed(2)}`
+              },
+              expiresIn: Math.round((new Date(opp.expires_at).getTime() - Date.now()) / 60000) + ' min',
+              realData: true,
+              status: 'ACTIVE'
+            },
+            metadata: {
+              realData: true,
+              dataSource: 'Supabase Arbitrage Detector',
+              timestamp: opp.detected_at,
+              expiresAt: opp.expires_at
+            }
+          });
+        });
+        
+        return cards;
+      } else {
+        console.log('[v0] [CARDS-GEN] No active arbitrage opportunities');
+      }
+    } catch (error) {
+      console.error('[v0] [CARDS-GEN] Arbitrage fetch error:', error);
+    }
+    
+    // Fallback if no opportunities found
+    cards.push({
+      type: 'ARBITRAGE',
+      title: 'Arbitrage Scanner',
+      icon: 'DollarSign',
+      category: 'ARBITRAGE',
+      subcategory: 'No Opportunities',
+      gradient: 'from-emerald-600 to-teal-700',
+      data: {
+        description: 'Continuously scanning for risk-free profit opportunities',
+        note: 'No arbitrage opportunities currently available',
+        checkingMarkets: 'Monitoring all sportsbooks in real-time',
+        realData: true,
+        status: 'SCANNING'
+      }
+    });
+    
+    return cards;
+  }
+  
   // Betting/Arbitrage cards (default)
   if (category === 'betting' || !category) {
     // Try to detect real arbitrage opportunities
@@ -310,31 +490,293 @@ export async function generateContextualCards(
     }
   }
 
-  // Kalshi/Prediction Markets - Fetch real market data
-  if (category === 'kalshi') {
-    console.log('[v0] [CARDS GENERATOR] Kalshi category detected, fetching live markets');
+  // Line Movement category - when user asks about line moves, steam, sharp money
+  if (category === 'lines' || category === 'line_movement' || category === 'steam') {
+    console.log('[v0] [CARDS-GEN] Line movement category - fetching recent movements');
     try {
-      const { enrichCardsWithKalshi } = await import('@/lib/kalshi-api-client');
-      const enrichedCards = await enrichCardsWithKalshi(cards, 'sports');
-      console.log('[v0] [CARDS GENERATOR] Kalshi enrichment complete:', enrichedCards.length - cards.length, 'markets added');
-      return enrichedCards;
+      const supabase = (await import('@/lib/supabase/client')).createClient();
+      
+      // Fetch recent significant line movements (last 24 hours)
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: movements } = await supabase
+        .from('line_movement')
+        .select('*')
+        .gt('updated_at', oneDayAgo)
+        .order('updated_at', { ascending: false })
+        .limit(count * 3);
+      
+      if (movements && movements.length > 0) {
+        console.log(`[v0] [CARDS-GEN] Found ${movements.length} line movements`);
+        
+        // Group by game and show most significant movements
+        const gameMovements = new Map();
+        movements.forEach((move: any) => {
+          const key = `${move.away_team}_${move.home_team}`;
+          if (!gameMovements.has(key) || Math.abs(move.line_change || 0) > Math.abs(gameMovements.get(key).line_change || 0)) {
+            gameMovements.set(key, move);
+          }
+        });
+        
+        const topMovements = Array.from(gameMovements.values()).slice(0, count);
+        
+        topMovements.forEach(move => {
+          const lineChange = move.line_change || 0;
+          const direction = lineChange > 0 ? 'UP' : 'DOWN';
+          const isSteam = Math.abs(lineChange) > 2;
+          
+          cards.push({
+            type: 'LINE_MOVEMENT',
+            title: `${move.away_team} @ ${move.home_team}`,
+            icon: isSteam ? 'TrendingUp' : 'Activity',
+            category: 'LINE MOVEMENT',
+            subcategory: isSteam ? `STEAM ${direction}` : `${direction} ${Math.abs(lineChange).toFixed(1)} pts`,
+            gradient: isSteam ? 'from-red-600 to-orange-600' : 'from-blue-600 to-indigo-600',
+            data: {
+              matchup: `${move.away_team} @ ${move.home_team}`,
+              lineChange: `${lineChange > 0 ? '+' : ''}${lineChange.toFixed(1)} points`,
+              oldLine: move.old_line ? `${move.old_line > 0 ? '+' : ''}${move.old_line}` : 'N/A',
+              newLine: move.new_line ? `${move.new_line > 0 ? '+' : ''}${move.new_line}` : 'N/A',
+              bookmaker: move.bookmaker || 'Multiple Books',
+              timestamp: new Date(move.updated_at).toLocaleString(),
+              isSteamMove: isSteam,
+              direction: direction,
+              sharpMoney: isSteam ? `Heavy ${direction === 'UP' ? 'home' : 'away'} action` : 'Moderate movement',
+              realData: true,
+              status: isSteam ? 'STEAM' : 'MOVEMENT'
+            },
+            metadata: {
+              realData: true,
+              dataSource: 'Line Movement Tracker',
+              timestamp: move.updated_at,
+              gameId: move.game_id
+            }
+          });
+        });
+        
+        return cards;
+      } else {
+        console.log('[v0] [CARDS-GEN] No recent line movements');
+      }
     } catch (error) {
-      console.error('[v0] [CARDS GENERATOR] Kalshi enrichment failed:', error);
-      // Fallback to placeholder card
-      cards.push({
-        type: 'PREDICTION_MARKET',
-        title: 'Prediction Markets',
-        icon: 'BarChart',
-        category: 'KALSHI',
-        subcategory: 'Live Markets',
-        gradient: 'from-purple-600 to-indigo-700',
-        data: {
-          description: 'Real-time prediction market probabilities',
-          note: 'Live data temporarily unavailable',
-          marketType: 'Binary Outcome'
-        }
-      });
+      console.error('[v0] [CARDS-GEN] Line movement fetch error:', error);
     }
+    
+    // Fallback
+    cards.push({
+      type: 'LINE_MOVEMENT',
+      title: 'Line Movement Tracker',
+      icon: 'Activity',
+      category: 'LINE MOVEMENT',
+      subcategory: 'No Recent Movements',
+      gradient: 'from-blue-600 to-indigo-600',
+      data: {
+        description: 'Monitoring odds movements across all sportsbooks',
+        note: 'No significant line movements in the last 24 hours',
+        tracking: 'All major sports and markets',
+        realData: true,
+        status: 'MONITORING'
+      }
+    });
+    
+    return cards;
+  }
+  
+  // Kalshi/Prediction Markets - Fetch ALL markets (sports, elections, politics, everything)
+  if (category === 'kalshi') {
+    console.log('[v0] [CARDS-GEN] Kalshi category - fetching ALL markets from API with retry logic');
+    try {
+      const { fetchKalshiMarketsWithRetry, kalshiMarketToCard } = await import('@/lib/kalshi-client');
+      
+      // Fetch ALL open markets from Kalshi with retry logic (no category filter)
+      console.log('[v0] [CARDS-GEN] Calling Kalshi API for all open markets (with 3 retry attempts)...');
+      const markets = await fetchKalshiMarketsWithRetry({ 
+        status: 'open', 
+        limit: Math.max(count, 50), // Fetch more to ensure variety
+        maxRetries: 3
+      });
+      
+      console.log(`[v0] [CARDS-GEN] Kalshi API returned ${markets.length} total markets`);
+      
+      if (markets.length > 0) {
+        // Convert to cards and take requested count
+        const kalshiCards = markets.slice(0, count).map(kalshiMarketToCard);
+        cards.push(...kalshiCards);
+        console.log(`[v0] [CARDS-GEN] Added ${kalshiCards.length} Kalshi market cards`);
+        console.log('[v0] [CARDS-GEN] Market categories:', [...new Set(markets.map(m => m.category))].join(', '));
+        return cards;
+      } else {
+        console.warn('[v0] [CARDS-GEN] Kalshi API returned 0 markets - may be connectivity issue');
+      }
+    } catch (error) {
+      console.error('[v0] [CARDS-GEN] Kalshi API error:', error);
+    }
+    
+    // Fallback to placeholder if no markets available
+    cards.push({
+      type: 'PREDICTION_MARKET',
+      title: 'Kalshi Markets Unavailable',
+      icon: 'BarChart',
+      category: 'KALSHI',
+      subcategory: 'Connection Issue',
+      gradient: 'from-purple-600 to-indigo-700',
+      data: {
+        description: 'Unable to fetch Kalshi markets',
+        note: 'Check API connectivity and try again',
+        marketType: 'All Categories',
+        realData: false
+      }
+    });
+  }
+
+  // Portfolio/Kelly Sizing - when user asks about bet sizing, bankroll management, Kelly criterion
+  if (category === 'portfolio' || category === 'kelly' || category === 'sizing' || category === 'bankroll') {
+    console.log('[v0] [CARDS-GEN] Portfolio/Kelly category - calculating optimal bet sizes');
+    try {
+      const supabase = (await import('@/lib/supabase/client')).createClient();
+      
+      // Get current capital state
+      const { data: capitalState } = await supabase
+        .from('capital_state')
+        .select('*')
+        .eq('active', true)
+        .single();
+      
+      if (capitalState) {
+        // Get current bet allocations
+        const { data: allocations } = await supabase
+          .from('bet_allocations')
+          .select('*')
+          .in('status', ['pending', 'placed'])
+          .order('allocated_capital', { ascending: false })
+          .limit(count);
+        
+        const totalAllocated = allocations?.reduce((sum: number, bet: any) => sum + bet.allocated_capital, 0) || 0;
+        const utilization = (totalAllocated / capitalState.total_capital) * 100;
+        
+        // Portfolio summary card
+        cards.push({
+          type: 'PORTFOLIO',
+          title: 'Portfolio Overview',
+          icon: 'Wallet',
+          category: 'PORTFOLIO',
+          subcategory: `${utilization.toFixed(1)}% Deployed`,
+          gradient: 'from-purple-600 to-pink-600',
+          data: {
+            totalBankroll: `$${capitalState.total_capital.toFixed(2)}`,
+            deployed: `$${totalAllocated.toFixed(2)}`,
+            available: `$${(capitalState.total_capital - totalAllocated).toFixed(2)}`,
+            utilizationRate: `${utilization.toFixed(1)}%`,
+            riskBudget: `${(capitalState.risk_budget * 100).toFixed(0)}%`,
+            kellyScale: `${(capitalState.kelly_scale * 100).toFixed(0)}% (${capitalState.kelly_scale === 0.25 ? 'Quarter Kelly' : capitalState.kelly_scale === 0.5 ? 'Half Kelly' : 'Custom'})`,
+            maxSinglePosition: `${(capitalState.max_single_position * 100).toFixed(0)}%`,
+            activeBets: allocations?.length || 0,
+            realData: true,
+            status: utilization > 80 ? 'HIGH_UTILIZATION' : utilization > 50 ? 'MODERATE' : 'CONSERVATIVE'
+          },
+          metadata: {
+            realData: true,
+            dataSource: 'Capital State Manager',
+            timestamp: capitalState.updated_at
+          }
+        });
+        
+        // Show top allocations if any exist
+        if (allocations && allocations.length > 0) {
+          allocations.slice(0, Math.min(2, count - 1)).forEach((bet: any) => {
+            const kellyPct = (bet.kelly_fraction * 100).toFixed(2);
+            cards.push({
+              type: 'KELLY_BET',
+              title: bet.matchup || 'Bet Allocation',
+              icon: 'Target',
+              category: 'KELLY SIZING',
+              subcategory: `${kellyPct}% Kelly`,
+              gradient: 'from-indigo-600 to-purple-600',
+              data: {
+                matchup: bet.matchup,
+                sport: bet.sport?.toUpperCase(),
+                edge: `${(bet.edge * 100).toFixed(2)}%`,
+                confidence: `${(bet.confidence_score * 100).toFixed(0)}%`,
+                kellyFraction: `${kellyPct}%`,
+                recommendedStake: `$${bet.allocated_capital.toFixed(2)}`,
+                expectedValue: `$${(bet.allocated_capital * bet.edge).toFixed(2)}`,
+                status: bet.status?.toUpperCase(),
+                realData: true
+              },
+              metadata: {
+                realData: true,
+                dataSource: 'Capital Allocator',
+                timestamp: bet.created_at
+              }
+            });
+          });
+        }
+        
+        return cards;
+      }
+    } catch (error) {
+      console.error('[v0] [CARDS-GEN] Portfolio fetch error:', error);
+    }
+    
+    // Fallback
+    cards.push({
+      type: 'PORTFOLIO',
+      title: 'Portfolio Manager',
+      icon: 'Wallet',
+      category: 'PORTFOLIO',
+      subcategory: 'Kelly Criterion',
+      gradient: 'from-purple-600 to-pink-600',
+      data: {
+        description: 'Optimal bet sizing using Kelly Criterion with fractional scaling',
+        features: ['Risk Management', 'Capital Allocation', 'Bankroll Protection'],
+        note: 'Initialize capital state to start tracking',
+        realData: false,
+        status: 'SETUP_REQUIRED'
+      }
+    });
+    
+    return cards;
+  }
+  
+  // Player Props - Fetch real player prop markets
+  if (category === 'props' || category === 'player_props') {
+    console.log('[v0] [CARDS-GEN] Player props category - fetching live markets');
+    try {
+      const { fetchPlayerProps, playerPropToCard } = await import('@/lib/player-props-service');
+      
+      if (normalizedSport) {
+        const props = await fetchPlayerProps({ 
+          sport: normalizedSport, 
+          useCache: true, 
+          storeResults: true 
+        });
+        
+        console.log(`[v0] [CARDS-GEN] Fetched ${props.length} player props`);
+        
+        if (props.length > 0) {
+          const propCards = props.slice(0, count).map(playerPropToCard);
+          cards.push(...propCards);
+          console.log(`[v0] [CARDS-GEN] Added ${propCards.length} player prop cards`);
+          return cards;
+        }
+      }
+    } catch (error) {
+      console.error('[v0] [CARDS-GEN] Player props error:', error);
+    }
+    
+    // Fallback placeholder
+    cards.push({
+      type: 'PLAYER_PROP',
+      title: 'Player Props',
+      icon: 'User',
+      category: displaySport,
+      subcategory: 'Player Props',
+      gradient: 'from-blue-600 to-cyan-600',
+      data: {
+        description: 'Player-specific betting markets',
+        note: 'Loading prop markets...',
+        realData: false
+      }
+    });
   }
 
   // DFS cards
@@ -385,9 +827,9 @@ export async function generateContextualCards(
       }
     });
   }
-
+  
   console.log('[v0] [CARDS GENERATOR] ✓ Generated', cards.length, 'cards (before weather enrichment)');
-  console.log('[v0] [CARDS GENERATOR] Card titles:', cards.map(c => c.title).join(', '));
+  console.log('[v0] [CARDS GENERATOR] Card titles:', cards.map((c: InsightCard) => c.title).join(', '));
 
   // Add weather cards for outdoor sports if betting category
   if ((category === 'betting' || !category) && normalizedSport) {

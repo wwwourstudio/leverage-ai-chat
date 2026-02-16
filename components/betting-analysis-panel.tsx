@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, AlertCircle, CheckCircle, DollarSign, Target, Shield } from 'lucide-react';
+import { useState } from 'react';
+import { TrendingUp, TrendingDown, AlertCircle, DollarSign, Target, Shield } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 
 interface OddsData {

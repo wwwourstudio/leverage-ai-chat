@@ -35,14 +35,14 @@ export function ChatMessage({ message, onEdit, onCopy }: ChatMessageProps) {
       <div className={`max-w-3xl ${message.role === 'user' ? 'order-2' : ''}`}>
         <div className={`rounded-2xl px-5 py-4 ${
           message.role === 'user' 
-            ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white'
-            : 'bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 border border-gray-700/60'
+            ? 'bg-linear-to-br from-blue-600 to-indigo-600 text-white'
+            : 'bg-linear-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 border border-gray-700/60'
         }`}>
           {isEditing ? (
             <div className="space-y-3">
               <textarea
                 value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditContent(e.target.value)}
                 className="w-full bg-gray-800 text-white rounded-lg p-3 min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <div className="flex gap-2">

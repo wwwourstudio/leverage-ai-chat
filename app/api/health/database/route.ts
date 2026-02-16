@@ -11,10 +11,10 @@ export async function GET() {
   const diagnostics = {
     timestamp: new Date().toISOString(),
     status: 'unknown' as 'healthy' | 'degraded' | 'down' | 'setup_required',
-    connection: { status: 'unknown' as string, message: '' },
-    environment: { status: 'unknown' as string, variables: {} as Record<string, boolean> },
-    schema: { status: 'unknown' as string, tables: [] as string[], missingTables: [] as string[] },
-    sampleQuery: { status: 'unknown' as string, message: '' },
+    connection: { status: 'unknown', message: '' },
+    environment: { status: 'unknown', variables: {} as Record<string, boolean> },
+    schema: { status: 'unknown', tables: [] as string[], missingTables: [] as string[] },
+    sampleQuery: { status: 'unknown', message: '' },
     recommendations: [] as string[]
   };
 
@@ -49,9 +49,7 @@ export async function GET() {
     });
 
     // Test connection with a simple query
-    const { error: connectionError } = await supabase.rpc('pg_backend_pid').catch(() => ({
-      error: null
-    }));
+    const { error: connectionError } = await supabase.rpc('pg_backend_pid');
     
     // If rpc doesn't work, try a simple table query
     if (connectionError) {

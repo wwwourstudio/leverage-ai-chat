@@ -71,8 +71,8 @@ export function calculatePortfolioStats(bets: UserBet[]): PortfolioStats {
   const wonBets = bets.filter(b => b.status === 'won');
   const lostBets = bets.filter(b => b.status === 'lost');
 
-  const totalStaked = bets.reduce((sum, bet) => sum + bet.stake, 0);
-  const totalReturned = wonBets.reduce((sum, bet) => sum + (bet.actualPayout || 0), 0);
+  const totalStaked = bets.reduce((sum: number, bet: UserBet) => sum + bet.stake, 0);
+  const totalReturned = wonBets.reduce((sum: number, bet: UserBet) => sum + (bet.actualPayout || 0), 0);
   const netProfit = totalReturned - totalStaked;
   const roi = totalStaked > 0 ? (netProfit / totalStaked) * 100 : 0;
 

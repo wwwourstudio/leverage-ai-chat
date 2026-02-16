@@ -1,9 +1,12 @@
 /**
  * Historical Data Backfill Script
  * Imports past seasons of game results and odds data
+ * 
+ * NOTE: This script requires the historical-data-scraper module to be implemented
  */
 
-import { scrapeESPNGameResults, importHistoricalOdds } from '@/lib/historical-data-scraper';
+// TODO: Implement historical-data-scraper module
+// import { scrapeESPNResults } from '@/lib/historical-data-scraper';
 
 const SPORTS = ['NFL', 'NBA', 'MLB', 'NHL'];
 const START_DATE = '2021-01-01';
@@ -18,23 +21,17 @@ async function backfillHistoricalData() {
     console.log(`\n=== Processing ${sport} ===`);
     
     try {
+      // TODO: Uncomment when historical-data-scraper module is implemented
       // Scrape game results from ESPN
       console.log(`Fetching ${sport} game results...`);
-      const results = await scrapeESPNGameResults(
-        sport,
-        new Date(START_DATE),
-        new Date(END_DATE)
-      );
-      console.log(`✓ Scraped ${results.length} ${sport} games`);
+      // const results = await scrapeESPNResults(
+      //   sport,
+      //   new Date(START_DATE),
+      //   new Date(END_DATE)
+      // );
+      // console.log(`✓ Scraped ${results.length} ${sport} games`);
       
-      // Import historical odds if available
-      console.log(`Fetching ${sport} historical odds...`);
-      const odds = await importHistoricalOdds(
-        sport,
-        new Date(START_DATE),
-        new Date(END_DATE)
-      );
-      console.log(`✓ Imported ${odds.length} ${sport} odds records`);
+      console.log(`⚠ Skipping ${sport} - scrapeESPNResults not yet implemented`);
       
     } catch (error) {
       console.error(`✗ Error processing ${sport}:`, error);

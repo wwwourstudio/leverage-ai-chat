@@ -241,7 +241,7 @@ Be concise and focus on actionable insights.
         model: 'xai/grok-4-fast',
         prompt,
         temperature: 0.7,
-        maxTokens: 500,
+        maxRetries: 2,
       });
 
       return {
@@ -272,13 +272,13 @@ Be concise and focus on actionable insights.
       const enrichedRecords = await Promise.all(
         records.map(async (record) => {
   try {
-    const prompt = enrichmentPrompt(record);
-    const result = await generateText({
-      model: 'xai/grok-4-fast',
-      prompt,
-      temperature: 0.7,
-      maxTokens: 200,
-    });
+  const prompt = enrichmentPrompt(record);
+  const result = await generateText({
+    model: 'xai/grok-4-fast',
+    prompt,
+    temperature: 0.7,
+    maxRetries: 2,
+  });
 
             return {
               ...record,
@@ -374,7 +374,7 @@ Respond with "VALID" if okay, or "INVALID: [reason]" if there are issues.
     model: 'xai/grok-4-fast',
     prompt,
     temperature: 0.3,
-    maxTokens: 100,
+    maxRetries: 2,
   });
 
       const response = result.text.trim();

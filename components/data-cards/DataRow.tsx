@@ -31,7 +31,7 @@ export function DataRow({ label, value, highlight, trend }: DataRowProps) {
 
   return (
     <div className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-all duration-200 group/item">
-      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex-shrink-0 mr-4">
+      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide shrink-0 mr-4">
         {formattedLabel}
       </span>
       <span className={`text-sm font-bold text-right flex items-center gap-1.5 ${
@@ -62,8 +62,8 @@ export function DataGrid({ data, empty = 'No data available' }: DataGridProps) {
 
   return (
     <div className="space-y-3">
-      {entries.map(([key, value], i) => (
-        <DataRow key={i} label={key} value={value} />
+      {entries.map(([label, value], i) => (
+        <DataRow key={i} label={label} value={value} />
       ))}
     </div>
   );

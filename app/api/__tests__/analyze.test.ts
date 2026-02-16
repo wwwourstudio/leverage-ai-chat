@@ -50,7 +50,7 @@ describe('POST /api/analyze', () => {
 
   it('should return 500 when AI gateway is not configured', async () => {
     const originalKey = process.env.XAI_API_KEY;
-    process.env.XAI_API_KEY = undefined;
+    process.env.XAI_API_KEY = '';
     
     const request = new NextRequest('http://localhost:3000/api/analyze', {
       method: 'POST',

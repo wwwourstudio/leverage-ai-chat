@@ -24,7 +24,7 @@ describe('Config Module', () => {
 
   it('should return false when Supabase env vars are missing', () => {
     const originalUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    process.env.NEXT_PUBLIC_SUPABASE_URL = undefined;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = '';
     
     expect(isSupabaseConfigured()).toBe(false);
     
@@ -42,7 +42,7 @@ describe('Config Module', () => {
 
   it('should return false when XAI_API_KEY is missing', () => {
     const originalKey = process.env.XAI_API_KEY;
-    process.env.XAI_API_KEY = undefined;
+    process.env.XAI_API_KEY = '';
     
     expect(isGrokConfigured()).toBe(false);
     
@@ -60,7 +60,7 @@ describe('Config Module', () => {
 
   it('should return false when ODDS_API_KEY is missing', () => {
     const originalKey = process.env.ODDS_API_KEY;
-    process.env.ODDS_API_KEY = undefined;
+    process.env.ODDS_API_KEY = '';
     
     expect(isOddsApiConfigured()).toBe(false);
     
@@ -96,7 +96,7 @@ describe('Config Module', () => {
 
   it('should mark allConfigured as false when any service is missing', () => {
     const originalKey = process.env.ODDS_API_KEY;
-    process.env.ODDS_API_KEY = undefined;
+    process.env.ODDS_API_KEY = '';
     
     const status = getServiceStatus();
     

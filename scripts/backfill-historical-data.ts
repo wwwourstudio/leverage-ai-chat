@@ -3,7 +3,7 @@
  * Imports past seasons of game results and odds data
  */
 
-import { scrapeESPNGameResults, importHistoricalOdds } from '@/lib/historical-data-scraper';
+import { scrapeESPNResults } from '@/lib/historical-data-scraper';
 
 const SPORTS = ['NFL', 'NBA', 'MLB', 'NHL'];
 const START_DATE = '2021-01-01';
@@ -20,21 +20,12 @@ async function backfillHistoricalData() {
     try {
       // Scrape game results from ESPN
       console.log(`Fetching ${sport} game results...`);
-      const results = await scrapeESPNGameResults(
+      const results = await scrapeESPNResults(
         sport,
         new Date(START_DATE),
         new Date(END_DATE)
       );
       console.log(`✓ Scraped ${results.length} ${sport} games`);
-      
-      // Import historical odds if available
-      console.log(`Fetching ${sport} historical odds...`);
-      const odds = await importHistoricalOdds(
-        sport,
-        new Date(START_DATE),
-        new Date(END_DATE)
-      );
-      console.log(`✓ Imported ${odds.length} ${sport} odds records`);
       
     } catch (error) {
       console.error(`✗ Error processing ${sport}:`, error);

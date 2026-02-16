@@ -33,7 +33,7 @@ export class SupabaseOddsService {
    * Store odds in cache
    */
   async storeOdds(sport: string, sportKey: string, games: any[]) {
-    const records = games.map(game => ({
+    const records = games.map((game: any) => ({
       sport,
       sport_key: sportKey,
       game_id: game.id,
@@ -65,7 +65,7 @@ export class SupabaseOddsService {
   async storeSportOdds(sport: string, games: any[]) {
     const tableName = `${sport}_odds`;
     
-    const records = games.map(game => {
+    const records = games.map((game: any) => {
       const firstBook = game.bookmakers?.[0];
       const h2hMarket = firstBook?.markets?.find((m: any) => m.key === 'h2h');
       const spreadsMarket = firstBook?.markets?.find((m: any) => m.key === 'spreads');

@@ -20,6 +20,8 @@ export interface ServiceStatus {
   supabase: ConfigStatus;
   grok: ConfigStatus;
   odds: ConfigStatus;
+  oddsApi: ConfigStatus; // Alias for 'odds' for backward compatibility
+  allConfigured: boolean;
   overall: {
     ready: boolean;
     criticalMissing: number;
@@ -253,12 +255,16 @@ export function getServiceStatus(): ServiceStatus {
     grok.warnings.length +
     odds.warnings.length;
 
+  const allConfigured = criticalMissing === 0;
+
   return {
     supabase,
     grok,
     odds,
+    oddsApi: odds, // Alias for backward compatibility
+    allConfigured,
     overall: {
-      ready: criticalMissing === 0,
+      ready: allConfigured,
       criticalMissing,
       warningCount,
     },

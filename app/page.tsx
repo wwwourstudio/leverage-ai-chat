@@ -755,11 +755,11 @@ export default function UnifiedAIPlatform() {
         if (context.sport && context.oddsData?.sport && context.oddsData.sport !== sportToApi(context.sport)) {
           if (isDev) console.error('[CROSS-SPORT BLOCKED] Attempted contamination prevented:', {
             detected: context.sport,
-            fetched: context.oddsData.sport
-          });
-          // Clear contaminated data
-          delete context.oddsData;
-          context.crossSportError = true;
+          fetched: context.oddsData.sport
+        });
+        // Clear contaminated data
+        context.oddsData = undefined as any;
+        context.crossSportError = true;
         }
       }
       

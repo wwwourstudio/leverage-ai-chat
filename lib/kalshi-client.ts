@@ -15,7 +15,65 @@ export interface KalshiMarket {
   volume: number;
   openInterest: number;
   closeTime: string;
-  status: 'open' | 'closed' | 'settled';
+  status: string;
+}
+
+// In-memory cache for Kalshi markets
+interface CacheEntry {
+  data: KalshiMarket[];
+  timestamp: number;
+  ttl: number;
+}
+
+const marketCache = new Map<string, CacheEntry>();
+
+/**
+ * Generate cache key from parameters
+ */
+function getCacheKey(params?: {
+  category?: string;
+  status?: string;
+  limit?: number;
+  search?: string;
+}): string {
+  const { category, status, limit, search } = params || {};
+  return `kalshi:${category || 'all'}:${status || 'open'}:${limit || 20}:${search || ''}`;
+}
+
+/**
+ * Get cached markets if available and not expired
+ */
+function getCachedMarkets(cacheKey: string): KalshiMarket[] | null {
+  const cached = marketCache.get(cacheKey);
+  
+  if (!cached) {
+    return null;
+  }
+  
+  const now = Date.now();
+  const isExpired = (now - cached.timestamp) > cached.ttl;
+  
+  if (isExpired) {
+    console.log('[v0] [KALSHI] Cache expired for key:', cacheKey);
+    marketCache.delete(cacheKey);
+    return null;
+  }
+  
+  const remainingMs = cached.ttl - (now - cached.timestamp);
+  console.log(`[v0] [KALSHI] Cache hit! Key: ${cacheKey}, Remaining TTL: ${Math.floor(remainingMs / 1000)}s`);
+  return cached.data;
+}
+
+/**
+ * Store markets in cache with TTL
+ */
+function cacheMarkets(cacheKey: string, markets: KalshiMarket[], ttlMs: number = 60000): void {
+  marketCache.set(cacheKey, {
+    data: markets,
+    timestamp: Date.now(),
+    ttl: ttlMs
+  });
+  console.log(`[v0] [KALSHI] Cached ${markets.length} markets with ${ttlMs / 1000}s TTL`);
 }
 
 export interface KalshiSeries {
@@ -41,8 +99,23 @@ export async function fetchKalshiMarkets(params?: {
   status?: 'open' | 'closed';
   limit?: number;
   search?: string;
+  useCache?: boolean;
+  cacheTtlMs?: number;
 }): Promise<KalshiMarket[]> {
-  const { category, status = 'open', limit = 20, search } = params || {};
+  const { category, status = 'open', limit = 20, search, useCache = true, cacheTtlMs = 60000 } = params || {};
+  
+  // Check cache first
+  if (useCache) {
+    const cacheKey = getCacheKey({ category, status, limit, search });
+    const cached = getCachedMarkets(cacheKey);
+    
+    if (cached) {
+      console.log('[v0] [KALSHI] Returning cached markets');
+      return cached;
+    }
+    
+    console.log('[v0] [KALSHI] Cache miss, fetching from API...');
+  }
   
   try {
     const baseUrl = 'https://trading-api.kalshi.com/trade-api/v2';
@@ -79,30 +152,41 @@ export async function fetchKalshiMarkets(params?: {
     
     const url = `${baseUrl}/markets?${queryParams}`;
     
-    console.log('[v0] [KALSHI] Fetching markets:', url);
-    console.log('[v0] [KALSHI] Parameters:', { category: finalCategory, status, limit, search });
+    console.log('[v0] [KALSHI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('[v0] [KALSHI] Fetching markets from Kalshi API');
+    console.log('[v0] [KALSHI] URL:', url);
+    console.log('[v0] [KALSHI] Params:', { category: finalCategory, status, limit, search });
+    console.log('[v0] [KALSHI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
     const response = await fetch(url, {
       headers: {
         'Accept': 'application/json',
+        'User-Agent': 'LeverageAI/1.0'
       },
       // Add timeout to prevent hanging
       signal: AbortSignal.timeout(10000),
     });
     
+    console.log('[v0] [KALSHI] Response status:', response.status, response.statusText);
+    
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[v0] [KALSHI] API Error Response:', errorText.substring(0, 500));
+      console.error('[v0] [KALSHI] ❌ API Error Response:', errorText.substring(0, 500));
       throw new Error(`Kalshi API error: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
+    console.log('[v0] [KALSHI] ✓ Response received, parsing data...');
     
     // Check if we got valid data
     if (!data.markets || !Array.isArray(data.markets)) {
-      console.warn('[v0] [KALSHI] Unexpected response format:', JSON.stringify(data).substring(0, 200));
+      console.error('[v0] [KALSHI] ❌ Unexpected response format');
+      console.error('[v0] [KALSHI] Response keys:', Object.keys(data));
+      console.error('[v0] [KALSHI] Response sample:', JSON.stringify(data).substring(0, 500));
       return [];
     }
+    
+    console.log(`[v0] [KALSHI] Raw markets count: ${data.markets.length}`);
     
     const markets: KalshiMarket[] = data.markets.map((m: any) => ({
       ticker: m.ticker,
@@ -117,35 +201,78 @@ export async function fetchKalshiMarkets(params?: {
       status: m.status,
     }));
     
-    console.log(`[v0] [KALSHI] ✓ Fetched ${markets.length} markets`);
+    console.log(`[v0] [KALSHI] ✓✓✓ Successfully fetched ${markets.length} markets`);
+    console.log('[v0] [KALSHI] Categories found:', [...new Set(markets.map(m => m.category))].slice(0, 10).join(', '));
+    console.log('[v0] [KALSHI] Sample markets:');
+    markets.slice(0, 3).forEach(m => console.log(`[v0] [KALSHI]   - ${m.title} (${m.category})`));
+    console.log('[v0] [KALSHI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
-    // If looking for election markets specifically, filter results
-    if (category && ['election', 'elections', '2026', 'politics'].includes(category.toLowerCase())) {
-      const electionKeywords = ['election', '2026', 'president', 'harris', 'trump', 'h2h'];
-      const filteredMarkets = markets.filter(m => 
-        electionKeywords.some(kw => 
-          m.title.toLowerCase().includes(kw) || 
-          m.category.toLowerCase().includes(kw)
-        )
-      );
-      
-      if (filteredMarkets.length > 0) {
-        console.log(`[v0] [KALSHI] Found ${filteredMarkets.length} election-related markets`);
-        return filteredMarkets;
-      } else {
-        console.warn('[v0] [KALSHI] No election markets found with current filters');
-      }
+    // Store in cache if enabled
+    if (useCache && markets.length > 0) {
+      const cacheKey = getCacheKey({ category, status, limit, search });
+      cacheMarkets(cacheKey, markets, cacheTtlMs);
     }
     
     return markets;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      console.error('[v0] [KALSHI] Request timeout - API may be slow or unavailable');
+      console.error('[v0] [KALSHI] ❌ Request timeout after 10s - API may be slow or unavailable');
+    } else if (error instanceof Error) {
+      console.error('[v0] [KALSHI] ❌ Failed to fetch markets:', error.message);
     } else {
-      console.error('[v0] [KALSHI] Failed to fetch markets:', error);
+      console.error('[v0] [KALSHI] ❌ Unknown error:', error);
     }
     return [];
   }
+}
+
+/**
+ * Fetch Kalshi markets with retry logic and exponential backoff
+ */
+export async function fetchKalshiMarketsWithRetry(params?: {
+  category?: string;
+  status?: 'open' | 'closed';
+  limit?: number;
+  search?: string;
+  maxRetries?: number;
+}): Promise<KalshiMarket[]> {
+  const { maxRetries = 3, ...fetchParams } = params || {};
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[v0] [KALSHI] Attempt ${attempt}/${maxRetries}`);
+      const markets = await fetchKalshiMarkets(fetchParams);
+      
+      if (markets.length > 0) {
+        console.log(`[v0] [KALSHI] ✓ Success on attempt ${attempt}`);
+        return markets;
+      }
+      
+      // If we got 0 markets, it might be a real response or an error
+      // Only retry if we're not on the last attempt
+      if (attempt < maxRetries) {
+        const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        console.log(`[v0] [KALSHI] Got 0 markets, retrying in ${backoffMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+      } else {
+        console.warn('[v0] [KALSHI] All retry attempts exhausted, returning empty array');
+        return markets;
+      }
+    } catch (error) {
+      console.error(`[v0] [KALSHI] Attempt ${attempt} failed:`, error);
+      
+      if (attempt < maxRetries) {
+        const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        console.log(`[v0] [KALSHI] Retrying in ${backoffMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+      } else {
+        console.error('[v0] [KALSHI] All retry attempts failed');
+        return [];
+      }
+    }
+  }
+  
+  return [];
 }
 
 /**

@@ -544,39 +544,48 @@ export async function generateContextualCards(
     return cards;
   }
   
-  // Kalshi/Prediction Markets - Use unified service with Supabase caching
+  // Kalshi/Prediction Markets - Fetch ALL markets (sports, elections, politics, everything)
   if (category === 'kalshi') {
-    console.log('[v0] [CARDS-GEN] Kalshi category - using unified service with caching');
+    console.log('[v0] [CARDS-GEN] Kalshi category - fetching ALL markets from API with retry logic');
     try {
-      const { getSportsKalshiMarkets } = await import('@/lib/unified-kalshi-service');
-      const { kalshiMarketToCard } = await import('@/lib/kalshi-client');
+      const { fetchKalshiMarketsWithRetry, kalshiMarketToCard } = await import('@/lib/kalshi-client');
       
-      // Fetch markets with caching (stored in Supabase for realtime sync)
-      const markets = await getSportsKalshiMarkets(normalizedSport);
-      console.log(`[v0] [CARDS-GEN] Fetched ${markets.length} Kalshi markets from unified service`);
+      // Fetch ALL open markets from Kalshi with retry logic (no category filter)
+      console.log('[v0] [CARDS-GEN] Calling Kalshi API for all open markets (with 3 retry attempts)...');
+      const markets = await fetchKalshiMarketsWithRetry({ 
+        status: 'open', 
+        limit: Math.max(count, 50), // Fetch more to ensure variety
+        maxRetries: 3
+      });
+      
+      console.log(`[v0] [CARDS-GEN] Kalshi API returned ${markets.length} total markets`);
       
       if (markets.length > 0) {
+        // Convert to cards and take requested count
         const kalshiCards = markets.slice(0, count).map(kalshiMarketToCard);
         cards.push(...kalshiCards);
         console.log(`[v0] [CARDS-GEN] Added ${kalshiCards.length} Kalshi market cards`);
+        console.log('[v0] [CARDS-GEN] Market categories:', [...new Set(markets.map(m => m.category))].join(', '));
         return cards;
+      } else {
+        console.warn('[v0] [CARDS-GEN] Kalshi API returned 0 markets - may be connectivity issue');
       }
     } catch (error) {
-      console.error('[v0] [CARDS-GEN] Unified Kalshi service error:', error);
+      console.error('[v0] [CARDS-GEN] Kalshi API error:', error);
     }
     
     // Fallback to placeholder if no markets available
     cards.push({
       type: 'PREDICTION_MARKET',
-      title: 'Prediction Markets',
+      title: 'Kalshi Markets Unavailable',
       icon: 'BarChart',
       category: 'KALSHI',
-      subcategory: 'Live Markets',
+      subcategory: 'Connection Issue',
       gradient: 'from-purple-600 to-indigo-700',
       data: {
-        description: 'Real-time prediction market probabilities',
-        note: 'Loading markets from Kalshi...',
-        marketType: 'Binary Outcome',
+        description: 'Unable to fetch Kalshi markets',
+        note: 'Check API connectivity and try again',
+        marketType: 'All Categories',
         realData: false
       }
     });

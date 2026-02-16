@@ -78,16 +78,10 @@ class Logger {
 
   /**
    * Generate or retrieve request ID for tracing
+   * Note: headers() is async in Next.js 16 but we call this synchronously,
+   * so we generate a fallback ID and let headers be resolved elsewhere if needed
    */
-  private async getRequestId(): Promise<string> {
-    try {
-      const headersList = await headers();
-      const existingId = headersList.get('x-request-id') || headersList.get('x-vercel-id');
-      if (existingId) return existingId;
-    } catch {
-      // Headers not available (client-side or non-request context)
-    }
-    
+  private getRequestId(): string {
     return `req_${Date.now()}_${++this.requestIdCounter}`;
   }
 

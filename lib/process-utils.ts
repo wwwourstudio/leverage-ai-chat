@@ -182,7 +182,7 @@ export function formatProcessInfo(info: ProcessInfo = getProcessInfo()): string 
     parts.push(`uptime: ${hours}h ${minutes}m`);
   }
 
-  if (info.memoryUsage) {
+  if (info.memoryUsage && info.memoryUsage.heapUsed !== null && info.memoryUsage.heapTotal !== null) {
     const heapUsedMB = Math.round(info.memoryUsage.heapUsed / 1024 / 1024);
     const heapTotalMB = Math.round(info.memoryUsage.heapTotal / 1024 / 1024);
     parts.push(`memory: ${heapUsedMB}/${heapTotalMB} MB`);

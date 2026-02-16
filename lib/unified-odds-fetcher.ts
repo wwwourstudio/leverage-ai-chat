@@ -48,15 +48,15 @@ export async function getOddsWithCache(
   try {
     console.log(`[UnifiedFetcher] ====== CALLING THE ODDS API ======`);
     console.log(`[UnifiedFetcher] - sport: ${sport}`);
-    console.log(`[UnifiedFetcher] - markets: ['h2h', 'spreads', 'totals']`);
+    console.log(`[UnifiedFetcher] - markets: ['h2h', 'spreads', 'totals', 'player_props']`);
     console.log(`[UnifiedFetcher] - regions: ['us']`);
     console.log(`[UnifiedFetcher] - oddsFormat: 'american'`);
     console.log(`[UnifiedFetcher] - skipCache: ${!useCache}`);
-    console.log(`[UnifiedFetcher] - API URL will be: https://api.the-odds-api.com/v4/sports/${sport}/odds/?markets=h2h,spreads,totals`);
+    console.log(`[UnifiedFetcher] - API URL will be: https://api.the-odds-api.com/v4/sports/${sport}/odds/?markets=h2h,spreads,totals,player_props`);
     console.log(`[UnifiedFetcher] ====================================`);
     
     const oddsData = await fetchLiveOdds(sport, {
-      markets: ['h2h', 'spreads', 'totals'],
+      markets: ['h2h', 'spreads', 'totals', 'player_props'],
       regions: ['us'],
       oddsFormat: 'american',
       apiKey,

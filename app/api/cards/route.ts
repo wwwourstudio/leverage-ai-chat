@@ -163,9 +163,9 @@ export async function POST(req: NextRequest) {
           const normalizedKey = validation.normalizedKey;
           const sportInfo = getSportInfo(normalizedKey);
           
-          console.log(`[v0] Fetching ${sportInfo.name} odds...`);
+          console.log(`[v0] Fetching ${sportInfo.name} odds with ALL markets (H2H, Spreads, Totals, Props)...`);
           const oddsData = await fetchLiveOdds(normalizedKey, {
-            markets: [ODDS_MARKETS.H2H, ODDS_MARKETS.SPREADS, ODDS_MARKETS.TOTALS],
+            markets: [ODDS_MARKETS.H2H, ODDS_MARKETS.SPREADS, ODDS_MARKETS.TOTALS, ODDS_MARKETS.PLAYER_PROPS],
             regions: [BETTING_REGIONS.US],
             apiKey: oddsApiKey
           });

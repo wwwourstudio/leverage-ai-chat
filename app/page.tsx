@@ -18,6 +18,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data-service';
 import { API_ENDPOINTS } from '@/lib/constants';
+import { createClient } from '@/lib/supabase/client';
 import { MessageList } from '@/components/message-list';
 import { MobileChatInput } from '@/components/mobile-chat-input';
 import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2 } from 'lucide-react';
@@ -271,9 +272,8 @@ export default function UnifiedAIPlatform() {
   // Check Supabase auth session on mount
   useEffect(() => {
     (async () => {
-      try {
-        const { createClient } = await import('@/lib/supabase/client');
-        const supabase = createClient();
+  try {
+  const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
@@ -3075,7 +3075,6 @@ export default function UnifiedAIPlatform() {
                     }
                     
                     try {
-                      const { createClient } = await import('@/lib/supabase/client');
                       const supabase = createClient();
                       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
                       
@@ -3113,7 +3112,6 @@ export default function UnifiedAIPlatform() {
                 <button
                   onClick={async () => {
                     try {
-                      const { createClient } = await import('@/lib/supabase/client');
                       const supabase = createClient();
                       await supabase.auth.signInWithOAuth({
                         provider: 'google',
@@ -3209,7 +3207,6 @@ export default function UnifiedAIPlatform() {
                     }
                     
                     try {
-                      const { createClient } = await import('@/lib/supabase/client');
                       const supabase = createClient();
                       const { data, error } = await supabase.auth.signUp({
                         email,
@@ -3250,7 +3247,6 @@ export default function UnifiedAIPlatform() {
                 <button
                   onClick={async () => {
                     try {
-                      const { createClient } = await import('@/lib/supabase/client');
                       const supabase = createClient();
                       await supabase.auth.signInWithOAuth({
                         provider: 'google',

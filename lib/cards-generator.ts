@@ -215,23 +215,17 @@ export interface InsightCard {
  * @param category - Type of analysis (betting, kalshi, dfs, fantasy)
  * @param sport - Sport key in either short form ('nba') or API format ('basketball_nba')
  * @param count - Number of cards to generate (default: 3)
- * @param multiSport - If true, generates cards from multiple sports (default: false)
+ * @param multiSport - If true, generates cards from ALL major sports (default: true when no sport specified)
  */
 export async function generateContextualCards(
   category?: string,
   sport?: string,
   count: number = 3,
-  multiSport: boolean = false
+  multiSport: boolean = !sport // DEFAULT TO TRUE WHEN NO SPORT SPECIFIED
 ): Promise<InsightCard[]> {
   const cards: InsightCard[] = [];
-
-  // If no sport specified, intelligently select one with active games
-  let sportToUse = sport;
-  if (!sportToUse && !multiSport) {
-    const { getBestSportForOdds } = await import('@/lib/active-sports-detector');
-    sportToUse = getBestSportForOdds();
-    console.log(`[v0] [CARDS-GEN] No sport specified, intelligently selected: ${sportToUse}`);
-  }
+  
+  console.log(`[v0] [CARDS-GEN] Starting with multiSport=${multiSport}, sport=${sport}, category=${category}`);
 
   // Normalize sport to API format, then get display name
   const normalizedSport = sportToUse ? sportToApi(sportToUse) : undefined;
@@ -241,62 +235,89 @@ export async function generateContextualCards(
   console.log('[v0] [CARDS GENERATOR] Input:', { category, sport: sportToUse, normalizedSport, displaySport, multiSport });
   console.log('[v0] [CARDS GENERATOR] Category:', category, '| Display Sport:', displaySport, '| Count:', count);
   
-  // If multiSport requested, generate variety from multiple sports with REAL data
+  // If multiSport requested, generate variety from ALL major sports with REAL data
   if (multiSport) {
-    console.log('[v0] [CARDS GENERATOR] Multi-sport mode - fetching real odds from sports with games');
+    console.log('[v0] [CARDS GENERATOR] Multi-sport mode - fetching from ALL MAJOR SPORTS (NFL, NBA, MLB, NHL)');
     
-    // Use intelligent sport selection to prioritize sports with active games
-    const { getSportsWithGames } = await import('@/lib/active-sports-detector');
-    const activeSports = getSportsWithGames();
+    // FORCE query ALL major sports - don't rely on "active sports detector"
+    const allMajorSports = [
+      SPORT_KEYS.NFL.API,      // americanfootball_nfl
+      SPORT_KEYS.NBA.API,      // basketball_nba
+      SPORT_KEYS.MLB.API,      // baseball_mlb
+      SPORT_KEYS.NHL.API,      // icehockey_nhl
+    ];
     
-    console.log('[v0] [CARDS GENERATOR] Active sports detected:', activeSports.map(s => `${s.sport} (${s.likelihood})`).join(', '));
+    // If user specified a sport, prioritize it first
+    const orderedSports = normalizedSport 
+      ? [normalizedSport, ...allMajorSports.filter(s => s !== normalizedSport)]
+      : allMajorSports;
     
-    // Prioritize sport from query if provided, otherwise use sports with high likelihood of games
-    const primarySport = normalizedSport || activeSports[0]?.apiKey || SPORT_KEYS.NHL.API;
-    const allSports = activeSports
-      .filter(s => s.likelihood === 'high' || s.likelihood === 'medium')
-      .map(s => s.apiKey)
-      .slice(0, 4);
+    console.log('[v0] [CARDS GENERATOR] Will query sports in order:', orderedSports.map(s => apiToSport(s).toUpperCase()).join(', '));
     
-    // Reorder to put primary sport first
-    const orderedSports = [
-      primarySport,
-      ...allSports.filter(s => s !== primarySport)
-    ].slice(0, 3); // Top 3 sports
+    // Fetch from ALL sports in parallel for speed
+    console.log('[v0] [MULTI-SPORT] Fetching odds from all sports in PARALLEL...');
+    const allSportCards = await Promise.all(
+      orderedSports.map(async (sportKey) => {
+        console.log(`[v0] [MULTI-SPORT] Starting fetch for ${apiToSport(sportKey).toUpperCase()}`);
+        try {
+          const sportCards = await generateSportSpecificCards(sportKey, 5, category);
+          console.log(`[v0] [MULTI-SPORT] ✓ ${apiToSport(sportKey).toUpperCase()}: ${sportCards.length} cards`);
+          return { sport: sportKey, cards: sportCards };
+        } catch (error) {
+          console.error(`[v0] [MULTI-SPORT] ✗ ${apiToSport(sportKey).toUpperCase()} failed:`, error);
+          return { sport: sportKey, cards: [] };
+        }
+      })
+    );
     
-    console.log('[v0] [CARDS GENERATOR] Sport priority order:', orderedSports.map(s => apiToSport(s).toUpperCase()));
+    console.log('[v0] [MULTI-SPORT] All fetches complete');
     
-    // Try each sport until we have enough cards with real data
-    for (const sportKey of orderedSports) {
+    // Collect cards from sports that returned data
+    for (const { sport: sportKey, cards: sportCards } of allSportCards) {
       if (cards.length >= count) break;
       
-      const cardsNeeded = count - cards.length;
-      console.log(`[v0] [MULTI-SPORT] Requesting 3 cards from ${apiToSport(sportKey).toUpperCase()}`);
-      const sportCards = await generateSportSpecificCards(sportKey, 3, category); // Request 3 cards per sport
-      console.log(`[v0] [MULTI-SPORT] Received ${sportCards.length} cards from ${apiToSport(sportKey).toUpperCase()}`);
-      
-      // Use ALL returned cards - they should already be properly structured
       if (sportCards.length > 0) {
+        const cardsNeeded = count - cards.length;
         const cardsToAdd = sportCards.slice(0, cardsNeeded);
         cards.push(...cardsToAdd);
-        console.log(`[v0] [MULTI-SPORT] Added ${cardsToAdd.length} cards for ${apiToSport(sportKey).toUpperCase()}`);
+        console.log(`[v0] [MULTI-SPORT] Added ${cardsToAdd.length} ${apiToSport(sportKey).toUpperCase()} cards`);
+      }
+    }
+    
+    // Try to add player props if we still need more cards
+    if (cards.length < count) {
+      console.log('[v0] [MULTI-SPORT] Not enough game cards, trying player props...');
+      try {
+        const { fetchPlayerProps, playerPropToCard } = await import('@/lib/player-props-service');
         
-        // Log first card details for verification
-        if (cardsToAdd[0]) {
-          console.log(`[v0] [MULTI-SPORT] First card:`, {
-            title: cardsToAdd[0].title,
-            category: cardsToAdd[0].category,
-            hasData: !!cardsToAdd[0].data
-          });
+        for (const sportKey of orderedSports) {
+          if (cards.length >= count) break;
+          
+          try {
+            const props = await fetchPlayerProps({ 
+              sport: sportKey, 
+              useCache: true, 
+              storeResults: true 
+            });
+            
+            if (props.length > 0) {
+              const propsNeeded = count - cards.length;
+              const propCards = props.slice(0, propsNeeded).map(playerPropToCard);
+              cards.push(...propCards);
+              console.log(`[v0] [MULTI-SPORT] Added ${propCards.length} ${apiToSport(sportKey).toUpperCase()} prop cards`);
+            }
+          } catch (error) {
+            console.error(`[v0] [MULTI-SPORT] Failed to fetch props for ${apiToSport(sportKey).toUpperCase()}:`, error);
+          }
         }
-      } else {
-        console.log(`[v0] [MULTI-SPORT] No cards returned for ${apiToSport(sportKey).toUpperCase()}`);
+      } catch (error) {
+        console.error('[v0] [MULTI-SPORT] Player props import failed:', error);
       }
     }
     
     // If we still don't have enough cards, add placeholder cards
     while (cards.length < count) {
-      const remainingSports = allSports.filter(s => !cards.some(c => c.data?.sport === s));
+      const remainingSports = orderedSports.filter(s => !cards.some(c => c.data?.sport === s));
       const sportToUse = remainingSports[0] || SPORT_KEYS.NBA.API;
       const displaySport = apiToSport(sportToUse).toUpperCase();
       
@@ -315,6 +336,8 @@ export async function generateContextualCards(
         }
       });
     }
+    
+    console.log(`[v0] [MULTI-SPORT] Final result: ${cards.length} cards from ${[...new Set(cards.map(c => c.category))].join(', ')}`);
     
     return cards.slice(0, count);
   }

@@ -49,7 +49,8 @@ describe('POST /api/analyze', () => {
   });
 
   it('should return 500 when AI gateway is not configured', async () => {
-    delete process.env.XAI_API_KEY;
+    const originalKey = process.env.XAI_API_KEY;
+    process.env.XAI_API_KEY = undefined;
     
     const request = new NextRequest('http://localhost:3000/api/analyze', {
       method: 'POST',
@@ -64,6 +65,9 @@ describe('POST /api/analyze', () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toContain('not configured');
+    
+    // Restore original value
+    process.env.XAI_API_KEY = originalKey;
   });
 
   it('should successfully analyze a valid query', async () => {

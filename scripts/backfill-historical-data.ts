@@ -21,14 +21,17 @@ async function backfillHistoricalData() {
     console.log(`\n=== Processing ${sport} ===`);
     
     try {
+      // TODO: Uncomment when historical-data-scraper module is implemented
       // Scrape game results from ESPN
       console.log(`Fetching ${sport} game results...`);
-      const results = await scrapeESPNResults(
-        sport,
-        new Date(START_DATE),
-        new Date(END_DATE)
-      );
-      console.log(`✓ Scraped ${results.length} ${sport} games`);
+      // const results = await scrapeESPNResults(
+      //   sport,
+      //   new Date(START_DATE),
+      //   new Date(END_DATE)
+      // );
+      // console.log(`✓ Scraped ${results.length} ${sport} games`);
+      
+      console.log(`⚠ Skipping ${sport} - scrapeESPNResults not yet implemented`);
       
     } catch (error) {
       console.error(`✗ Error processing ${sport}:`, error);

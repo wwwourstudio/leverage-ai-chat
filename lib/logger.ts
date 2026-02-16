@@ -32,6 +32,7 @@ interface LogContext {
   duration?: number;
   error?: string | Error;
   cacheSize?: number;
+  threshold?: number;
   metadata?: Record<string, any>;
 }
 
@@ -78,9 +79,9 @@ class Logger {
   /**
    * Generate or retrieve request ID for tracing
    */
-  private getRequestId(): string {
+  private async getRequestId(): Promise<string> {
     try {
-      const headersList = headers();
+      const headersList = await headers();
       const existingId = headersList.get('x-request-id') || headersList.get('x-vercel-id');
       if (existingId) return existingId;
     } catch {

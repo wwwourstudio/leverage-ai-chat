@@ -62,7 +62,7 @@ export class DataService {
 
     // Store in database cache
     if (oddsData && oddsData.length > 0) {
-      const records = oddsData.map(game => ({
+      const records = oddsData.map((game: any) => ({
         sport_key: sportKey,
         game_id: game.id,
         home_team: game.home_team,

@@ -159,7 +159,7 @@ export async function detectSharpMoney(sport: string, lookbackHours: number = 24
     }
     
     // Get unique game IDs
-    const gameIds = [...new Set(recentGames.map(g => g.game_id))];
+    const gameIds = [...new Set(recentGames.map((g: any) => g.game_id))];
     
     // Analyze each game
     const sharpMovements: LineMovement[] = [];

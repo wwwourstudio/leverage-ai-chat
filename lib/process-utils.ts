@@ -4,6 +4,12 @@
  * (Node.js, Edge Runtime, Serverless, etc.)
  */
 
+// Global type declarations for runtime detection
+declare global {
+  const EdgeRuntime: string | undefined;
+  const WebSocketPair: any;
+}
+
 export interface ProcessInfo {
   nodeVersion: string | null;
   platform: string | null;

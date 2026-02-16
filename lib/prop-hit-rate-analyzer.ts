@@ -142,7 +142,7 @@ export async function getRecentPropHistory(
 function analyzeTrend(
   recentGames: PropHistoryEntry[]
 ): 'improving' | 'declining' | 'stable' | 'insufficient_data' {
-  const completedGames = recentGames.filter(g => g.hit !== null);
+  const completedGames = recentGames.filter((g: PropHistoryEntry) => g.hit !== null);
   
   if (completedGames.length < 5) {
     return 'insufficient_data';
@@ -154,9 +154,9 @@ function analyzeTrend(
   const secondHalf = completedGames.slice(0, midpoint);
   
   const firstHalfHitRate = 
-    firstHalf.filter(g => g.hit).length / firstHalf.length;
+    firstHalf.filter((g: PropHistoryEntry) => g.hit).length / firstHalf.length;
   const secondHalfHitRate = 
-    secondHalf.filter(g => g.hit).length / secondHalf.length;
+    secondHalf.filter((g: PropHistoryEntry) => g.hit).length / secondHalf.length;
   
   const difference = secondHalfHitRate - firstHalfHitRate;
   
@@ -285,8 +285,8 @@ export function formatHitRateAnalysis(analysis: PropAnalysis): string {
   }
   
   const { hitRate, trend, confidence, recommendation, recentGames } = analysis;
-  const recentHits = recentGames.filter(g => g.hit).length;
-  const recentTotal = recentGames.filter(g => g.hit !== null).length;
+  const recentHits = recentGames.filter((g: PropHistoryEntry) => g.hit).length;
+  const recentTotal = recentGames.filter((g: PropHistoryEntry) => g.hit !== null).length;
   
   const lines = [
     `📊 ${hitRate.playerName} - ${hitRate.statType.toUpperCase()}`,

@@ -286,7 +286,7 @@ export default function UnifiedAIPlatform() {
         }
         
         // Listen for auth changes (OAuth redirect, signout, etc.)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
           if (session?.user) {
             setIsLoggedIn(true);
             setUser({
@@ -1742,13 +1742,13 @@ export default function UnifiedAIPlatform() {
                     </div>
                     <div className="flex flex-col gap-1">
                       <button
-                        onClick={(e) => handleStarChat(chat.id, e)}
+                        onClick={(e: React.MouseEvent) => handleStarChat(chat.id, e)}
                         className="p-1 rounded-md hover:bg-gray-700/50 transition-all opacity-100"
                       >
                         <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
                       </button>
                       <button
-                        onClick={(e) => handleDeleteChat(chat.id, e)}
+                        onClick={(e: React.MouseEvent) => handleDeleteChat(chat.id, e)}
                         className="p-1 rounded-md hover:bg-gray-700/50 opacity-0 group-hover:opacity-100 transition-all"
                       >
                         <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
@@ -1813,7 +1813,7 @@ export default function UnifiedAIPlatform() {
                           {chat.title}
                         </h3>
                         <button
-                          onClick={(e) => handleEditChatTitle(chat.id, chat.title, e)}
+                          onClick={(e: React.MouseEvent) => handleEditChatTitle(chat.id, chat.title, e)}
                           className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-gray-700/50 rounded transition-all flex-shrink-0"
                           title="Edit title"
                         >
@@ -1837,7 +1837,7 @@ export default function UnifiedAIPlatform() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <button
-                    onClick={(e) => handleStarChat(chat.id, e)}
+                    onClick={(e: React.MouseEvent) => handleStarChat(chat.id, e)}
                     className={`p-1 rounded-md hover:bg-gray-700/50 transition-all ${
                       chat.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                     }`}
@@ -1849,7 +1849,7 @@ export default function UnifiedAIPlatform() {
                     />
                   </button>
                   <button
-                    onClick={(e) => handleDeleteChat(chat.id, e)}
+                    onClick={(e: React.MouseEvent) => handleDeleteChat(chat.id, e)}
                     className="p-1 rounded-md hover:bg-gray-700/50 opacity-0 group-hover:opacity-100 transition-all"
                   >
                     <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />

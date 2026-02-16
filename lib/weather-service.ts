@@ -230,6 +230,7 @@ interface WeatherCard {
     humidity: string;
     precipitation: string;
     gameImpact: string;
+    gameTime?: string;
   };
   [key: string]: any; // Index signature for Card compatibility
 }

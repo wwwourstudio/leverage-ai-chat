@@ -17,7 +17,7 @@ export function ArbitrageDashboard() {
   }, []);
 
   // Subscribe to real-time updates from Supabase
-  useRealtimeSubscription('arbitrage_opportunities', (payload) => {
+  useRealtimeSubscription('arbitrage_opportunities', (payload: any) => {
     console.log('[ArbitrageDashboard] Real-time update:', payload);
     if (payload.eventType === 'INSERT') {
       setOpportunities(prev => [payload.new as ArbitrageOpportunity, ...prev]);

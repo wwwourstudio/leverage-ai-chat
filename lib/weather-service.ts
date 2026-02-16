@@ -234,6 +234,7 @@ interface WeatherCard {
     gameImpact: string;
     gameTime?: string;
   };
+  realData?: boolean; // Track if weather data is real or mocked
   [key: string]: any; // Index signature for Card compatibility
 }
 

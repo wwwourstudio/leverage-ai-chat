@@ -1,9 +1,12 @@
 /**
  * Historical Data Backfill Script
  * Imports past seasons of game results and odds data
+ * 
+ * NOTE: This script requires the historical-data-scraper module to be implemented
  */
 
-import { scrapeESPNResults } from '@/lib/historical-data-scraper';
+// TODO: Implement historical-data-scraper module
+// import { scrapeESPNResults } from '@/lib/historical-data-scraper';
 
 const SPORTS = ['NFL', 'NBA', 'MLB', 'NHL'];
 const START_DATE = '2021-01-01';

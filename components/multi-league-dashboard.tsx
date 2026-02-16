@@ -95,7 +95,7 @@ export function MultiLeagueDashboard() {
               key={league.sport}
               className="relative overflow-hidden rounded-2xl bg-gray-800 border border-gray-700 hover:border-gray-600 transition-all duration-300 hover:scale-105"
             >
-              <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-10`} />
+              <div className={`absolute inset-0 bg-linear-to-br ${gradient} opacity-10`} />
               
               <div className="relative p-6 space-y-4">
                 <div className="flex items-start justify-between">

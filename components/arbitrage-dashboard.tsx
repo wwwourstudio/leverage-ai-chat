@@ -17,18 +17,17 @@ export function ArbitrageDashboard() {
   }, []);
 
   // Subscribe to real-time updates from Supabase
-  useRealtimeSubscription('arbitrage_opportunities', (payload: any) => {
-    console.log('[ArbitrageDashboard] Real-time update:', payload);
-    if (payload.eventType === 'INSERT') {
-      setOpportunities(prev => [payload.new as ArbitrageOpportunity, ...prev]);
-    } else if (payload.eventType === 'UPDATE') {
-      setOpportunities(prev => 
-        prev.map((opp: ArbitrageOpportunity) => opp.event === (payload.new as ArbitrageOpportunity).event ? payload.new as ArbitrageOpportunity : opp)
-      );
-    } else if (payload.eventType === 'DELETE') {
-      setOpportunities(prev => prev.filter((opp: ArbitrageOpportunity) => opp.event !== (payload.old as ArbitrageOpportunity).event));
+  // Note: useRealtimeSubscription expects a filter object as second parameter, not a callback
+  // For now, using the hook without custom callback - it returns { data, loading, error }
+  const { data: realtimeOpps } = useRealtimeSubscription('arbitrage_opportunities');
+  
+  // Update opportunities when realtime data changes
+  useEffect(() => {
+    if (realtimeOpps && realtimeOpps.length > 0) {
+      console.log('[ArbitrageDashboard] Real-time update received:', realtimeOpps.length, 'opportunities');
+      setOpportunities(realtimeOpps as ArbitrageOpportunity[]);
     }
-  });
+  }, [realtimeOpps]);
 
   const fetchOpportunities = async () => {
     setLoading(true);

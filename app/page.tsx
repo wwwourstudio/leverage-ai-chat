@@ -3063,7 +3063,7 @@ export default function UnifiedAIPlatform() {
                 </div>
 
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     const emailInput = document.getElementById('login-email') as HTMLInputElement;
                     const email = emailInput?.value || '';
                     const passwordInput = document.getElementById('login-password') as HTMLInputElement;
@@ -3193,7 +3193,7 @@ export default function UnifiedAIPlatform() {
                 </div>
 
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     const nameInput = document.getElementById('signup-name') as HTMLInputElement;
                     const emailInput = document.getElementById('signup-email') as HTMLInputElement;
                     const passwordInput = document.getElementById('signup-password') as HTMLInputElement;

@@ -141,7 +141,7 @@ export class DataService {
   async storeEdgeOpportunities(opportunities: any[]) {
     await this.init();
 
-    const records = opportunities.map(opp => ({
+    const records = opportunities.map((opp: any) => ({
       market_id: opp.market_id,
       sport: opp.sport,
       matchup: opp.matchup,

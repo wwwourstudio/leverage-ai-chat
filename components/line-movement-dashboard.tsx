@@ -199,7 +199,7 @@ export function LineMovementDashboard() {
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredMovements.map((move) => (
+            {filteredMovements.map((move: LineMovement) => (
               <div
                 key={move.id}
                 className="rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50"

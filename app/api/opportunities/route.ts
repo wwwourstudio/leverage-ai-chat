@@ -61,7 +61,7 @@ export async function GET(request: Request) {
 
       return NextResponse.json({
         success: true,
-        opportunities: data?.map(opp => ({
+        opportunities: data?.map((opp: any) => ({
           event: opp.event,
           sport: opp.sport,
           homeTeam: opp.home_team,

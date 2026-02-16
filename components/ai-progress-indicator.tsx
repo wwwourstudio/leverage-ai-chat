@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, Clock, Zap, AlertCircle } from 'lucide-react';
+import { Clock, Zap, AlertCircle } from 'lucide-react';
 
 interface AIProgressIndicatorProps {
   startTime?: number;
@@ -99,9 +99,8 @@ export function AIProgressIndicator({ startTime, stage = 'analyzing' }: AIProgre
         </div>
         <div className="h-1 bg-gray-800/60 rounded-full overflow-hidden">
           <div
-            className={`h-full ${getProgressColor()} transition-all duration-300 ease-out ${
-              elapsed > 15000 ? 'animate-pulse' : ''
-            }`}
+            className={`h-full ${getProgressColor()} transition-all duration-300 ease-out ${elapsed > 15000 ? 'animate-pulse' : ''
+              }`}
             style={{ width: `${getProgressWidth()}%` }}
           />
         </div>

@@ -22,6 +22,18 @@ interface GameLocation {
   stadium?: string;
 }
 
+interface WeatherCard {
+  location: string;
+  matchup?: string;
+  temperature: string;
+  condition: string;
+  wind: string;
+  humidity: string;
+  precipitation: string;
+  gameImpact: string;
+  gameTime?: string;
+}
+
 // Weather cache to avoid excessive API calls
 const weatherCache = new Map<string, { data: WeatherData; timestamp: number }>();
 const WEATHER_CACHE_TTL = 15 * 60 * 1000; // 15 minutes (weather doesn't change quickly)

@@ -209,8 +209,8 @@ export function subscribeToKalshiMarkets(
     .channel('kalshi-markets')
     .on('postgres_changes', 
       { event: '*', schema: 'public', table: 'kalshi_markets' },
-      (payload) => {
-        const row = payload.new as any;
+      (payload: any) => {
+        const row = payload.new as Record<string, any>;
         if (!row) return;
         
         // Apply filters

@@ -45,11 +45,11 @@ export function useRealtime<T>(
             {
               event: '*',
               schema: 'public',
-              table: table,
-              filter: filter ? `${filter.column}=eq.${filter.value}` : undefined
-            },
-            (payload) => {
-              console.log(`[Realtime] ${payload.eventType} on ${table}`, payload);
+      table: table,
+      filter: filter ? `${filter.column}=eq.${filter.value}` : undefined
+    },
+    (payload: any) => {
+      console.log(`[Realtime] ${payload.eventType} on ${table}`, payload);
               
               if (payload.eventType === 'INSERT') {
                 setData((prev) => [...prev, payload.new as T]);

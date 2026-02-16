@@ -451,6 +451,57 @@ export function kalshiMarketToCard(market: KalshiMarket): any {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Kalshi Volatility Analysis (consolidated from lib/kalshi/analyzeKalshiVolatility.ts)
+// ---------------------------------------------------------------------------
+
+export interface KalshiVolatilityInput {
+  yesPrice: number;
+  noPrice: number;
+  volume: number;
+  historicalPrices: number[];
+}
+
+export interface KalshiAnalysis {
+  impliedProbability: number;
+  volatility: number;
+  edgeEstimate: number;
+  riskLevel: "low" | "medium" | "high";
+}
+
+/**
+ * Calculate standard deviation of an array of numbers
+ */
+function standardDeviation(values: number[]): number {
+  if (values.length === 0) return 0;
+  const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+  const squaredDiffs = values.map(val => Math.pow(val - mean, 2));
+  const variance = squaredDiffs.reduce((sum, val) => sum + val, 0) / values.length;
+  return Math.sqrt(variance);
+}
+
+/**
+ * Analyze Kalshi market volatility and edge
+ * @param market - Kalshi market data with historical prices
+ * @param modelProbability - Model's estimated probability (0-1)
+ */
+export function analyzeKalshiVolatility(
+  market: KalshiVolatilityInput,
+  modelProbability: number
+): KalshiAnalysis {
+  const impliedProbability = market.yesPrice / 100;
+  const normalizedPrices = market.historicalPrices.map(price => price / 100);
+  const volatility = standardDeviation(normalizedPrices);
+  const edgeEstimate = modelProbability - impliedProbability;
+
+  let riskLevel: "low" | "medium" | "high";
+  if (volatility < 0.05) riskLevel = "low";
+  else if (volatility <= 0.12) riskLevel = "medium";
+  else riskLevel = "high";
+
+  return { impliedProbability, volatility, edgeEstimate, riskLevel };
+}
+
 /**
  * Fetch Kalshi cards for a specific sport
  */

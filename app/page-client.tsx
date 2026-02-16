@@ -279,7 +279,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     return true;
   };
 
-  const addCredits = (amount: number) => {
+  const addCredits = (amount: number): void => {
     const data = getCreditData();
     const updated = { ...data, credits: data.credits + amount };
     localStorage.setItem('userCredits', JSON.stringify(updated));

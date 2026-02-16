@@ -17,7 +17,9 @@ export function createClient() {
     )
   }
 
-  client = createBrowserClient(supabaseUrl, supabaseAnonKey)
+  client = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    db: { schema: 'api' }
+  })
 
   return client
 }

@@ -217,7 +217,7 @@ export default function TradingEngineDashboard() {
                   <div className="bg-muted/50 rounded-xl p-4">
                     <div className="text-sm text-muted-foreground mb-1">Confidence</div>
                     <div className="text-xl font-bold text-[var(--success)]">
-                      {results.sharp.isReverseLineMovement ? 'High' : 'Medium'}
+                      {results.sharpSignal?.isReverseLineMovement ? 'High' : 'Medium'}
                     </div>
                   </div>
                 </div>

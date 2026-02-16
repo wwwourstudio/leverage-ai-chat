@@ -34,12 +34,15 @@ export function LineMovementDashboard() {
   }, []);
 
   // Subscribe to real-time line movement updates
-  useRealtimeSubscription('line_movement', (payload) => {
-    console.log('[LineMovement] Real-time update:', payload);
-    if (payload.eventType === 'INSERT') {
-      setMovements(prev => [transformRecord(payload.new), ...prev]);
+  const { data: realtimeMovements } = useRealtimeSubscription('line_movement');
+  
+  // Update movements when realtime data changes
+  useEffect(() => {
+    if (realtimeMovements && realtimeMovements.length > 0) {
+      console.log('[LineMovement] Real-time update received:', realtimeMovements.length, 'movements');
+      setMovements(realtimeMovements.map((record: any) => transformRecord(record)));
     }
-  });
+  }, [realtimeMovements]);
 
   const fetchLineMovements = async () => {
     setLoading(true);

@@ -140,10 +140,14 @@ interface InsightCard {
 }
 
 export interface ServerDataProps {
-  initialCards?: any[];
-  initialInsights?: any;
-  userSession?: any;
+  initialCards: any[];
+  initialInsights: any;
+  userSession: any;
   serverTime: string;
+  missingKeys: string[];
+  envErrors: string[];
+  dataSourcesUsed: string[];
+  fetchErrors: string[];
 }
 
 interface UnifiedAIPlatformProps {
@@ -218,6 +222,16 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   useEffect(() => {
     if (serverData?.initialCards && serverData.initialCards.length > 0) {
       console.log('[v0] Client: Pre-loading', serverData.initialCards.length, 'server-fetched cards');
+      console.log('[v0] Client: Data sources used:', serverData.dataSourcesUsed?.join(', ') || 'none');
+      
+      if (serverData.fetchErrors && serverData.fetchErrors.length > 0) {
+        console.warn('[v0] Client: Data fetch had errors:', serverData.fetchErrors);
+      }
+      
+      if (serverData.missingKeys && serverData.missingKeys.length > 0) {
+        console.warn('[v0] Client: Missing API keys:', serverData.missingKeys.join(', '));
+      }
+      
       setMessages(prev => {
         const welcomeMsg = prev[0];
         return [{
@@ -225,8 +239,10 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           cards: serverData.initialCards as any[]
         }];
       });
+    } else {
+      console.log('[v0] Client: No server-fetched cards available, will fetch dynamically');
     }
-  }, [serverData?.initialCards]);
+  }, [serverData?.initialCards, serverData?.fetchErrors, serverData?.missingKeys, serverData?.dataSourcesUsed]);
   
   // Credit system utilities
   const MESSAGE_LIMIT = 15;

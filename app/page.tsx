@@ -8,80 +8,52 @@
  */
 
 import { Suspense } from 'react';
-import { createClient } from '@/lib/supabase/server';
-import { validateServerEnv, logEnvValidation, getMissingAPIKeys } from '@/lib/env-validator';
+import { loadServerData, type ServerDataResult } from '@/lib/server-data-loader';
+import { logEnvValidation, validateServerEnv } from '@/lib/env-validator';
 import UnifiedAIPlatform from './page-client';
 
-export interface ServerDataProps {
-  initialCards?: any[];
-  initialInsights?: any;
-  userSession?: any;
-  serverTime: string;
-  missingKeys?: string[];
-  envErrors?: string[];
+export interface ServerDataProps extends ServerDataResult {
+  // Extended with data source tracking
 }
 
 async function fetchInitialServerData(): Promise<ServerDataProps> {
-  console.log('[v0] Server: Fetching initial data for page load...');
+  console.log('[v0] Server: === Page Load - Fetching All Data ===');
   
-  // Validate environment variables first
+  // Log environment validation for debugging
   const envValidation = validateServerEnv();
   logEnvValidation(envValidation, 'server');
   
-  const missingKeys = getMissingAPIKeys();
-  if (missingKeys.length > 0) {
-    console.warn('[v0] Server: Missing API keys:', missingKeys.join(', '));
-  }
-  
-  try {
-    // Fetch initial cards from server-side API
-    const cardsResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/cards?category=all&limit=12`, {
-      cache: 'no-store',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+  // Use enhanced data loader with parallel fetching and comprehensive error handling
+  const serverData = await loadServerData({
+    category: 'all',
+    limit: 12,
+    includeKalshi: true,
+    includeOdds: true,
+  });
 
-    let initialCards = [];
-    if (cardsResponse.ok) {
-      const cardsData = await cardsResponse.json();
-      initialCards = cardsData.cards || [];
-      console.log('[v0] Server: Pre-fetched', initialCards.length, 'cards');
-    }
+  // Log data fetch results
+  console.log('[v0] Server: Data fetch summary:');
+  console.log('  - Cards:', serverData.initialCards.length);
+  console.log('  - Session:', serverData.userSession ? 'authenticated' : 'anonymous');
+  console.log('  - Sources:', serverData.dataSourcesUsed.join(', '));
+  console.log('  - Missing Keys:', serverData.missingKeys.length);
+  console.log('  - Errors:', serverData.fetchErrors.length);
 
-    // Get user session server-side
-    const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    console.log('[v0] Server: User session:', session ? 'authenticated' : 'anonymous');
-
-    return {
-      initialCards,
-      userSession: session ? {
-        user: {
-          id: session.user.id,
-          email: session.user.email,
-          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
-        }
-      } : null,
-      serverTime: new Date().toISOString(),
-      missingKeys,
-      envErrors: envValidation.errors,
-    };
-  } catch (error) {
-    console.error('[v0] Server: Error fetching initial data:', error);
-    return {
-      initialCards: [],
-      userSession: null,
-      serverTime: new Date().toISOString(),
-      missingKeys,
-      envErrors: envValidation.errors,
-    };
-  }
+  return serverData;
 }
 
 export default async function Page() {
   const serverData = await fetchInitialServerData();
+
+  // Display data quality metrics in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[v0] Page: Hydrating with server data:', {
+      cardsCount: serverData.initialCards.length,
+      hasSession: !!serverData.userSession,
+      dataQuality: serverData.fetchErrors.length === 0 ? 'GOOD' : 'DEGRADED',
+      sources: serverData.dataSourcesUsed,
+    });
+  }
 
   return (
     <Suspense fallback={<PageSkeleton />}>

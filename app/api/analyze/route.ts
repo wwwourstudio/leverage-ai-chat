@@ -7,8 +7,11 @@ import {
   SYSTEM_PROMPT,
   ERROR_MESSAGES,
   LOG_PREFIXES,
-  ATTACHMENT_TYPES
+  ATTACHMENT_TYPES,
+  ENV_KEYS,
+  DEFAULT_SOURCES
 } from '@/lib/constants';
+import { APP_TABLES } from '@/lib/supabase-validator';
 import { getLeveragedAI } from '@/lib/leveraged-ai';
 import { 
   fetchPlayerProjections, 

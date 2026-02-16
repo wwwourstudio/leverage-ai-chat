@@ -49,9 +49,7 @@ export async function GET() {
     });
 
     // Test connection with a simple query
-    const { error: connectionError } = await supabase.rpc('pg_backend_pid').catch(() => ({
-      error: null
-    }));
+    const { error: connectionError } = await supabase.rpc('pg_backend_pid');
     
     // If rpc doesn't work, try a simple table query
     if (connectionError) {

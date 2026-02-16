@@ -24,6 +24,7 @@ export interface PlayerProp {
 
 export interface PlayerPropsOptions {
   sport: string;
+  propType?: string; // Optional filter for specific prop types (e.g., 'player_points', 'player_rebounds')
   useCache?: boolean;
   storeResults?: boolean;
 }

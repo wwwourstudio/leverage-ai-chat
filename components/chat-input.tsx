@@ -68,7 +68,7 @@ export function ChatInput({
         <input
           type="text"
           value={input}
-          onChange={(e) => onInputChange(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => onInputChange(e.target.value)}
           placeholder="Ask about betting, fantasy, DFS, or prediction markets..."
           disabled={isTyping}
           className="flex-1 px-5 py-3 bg-gray-800/60 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 border border-gray-700/50 placeholder-gray-500"
@@ -77,7 +77,7 @@ export function ChatInput({
         <button
           type="submit"
           disabled={isTyping || !input.trim()}
-          className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:from-blue-500 hover:to-purple-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg"
+          className="px-6 py-3 bg-linear-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:from-blue-500 hover:to-purple-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg"
         >
           <Send className="w-5 h-5" />
           Send

@@ -157,9 +157,11 @@ interface UnifiedAIPlatformProps {
 export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps) {
   // Dynamic welcome message based on time, category, and sport season
   const getWelcomeMessage = (category: string) => {
-    const hour = new Date().getHours();
+    // Use server time to prevent hydration mismatch
+    const now = serverData?.serverTime ? new Date(serverData.serverTime) : new Date();
+    const hour = now.getHours();
     const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-    const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
     
     const categoryMessages: Record<string, string> = {
       betting: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is scanning live odds across all major sportsbooks. Ask me about tonight's lines, player props, sharp money, or arbitrage opportunities.`,

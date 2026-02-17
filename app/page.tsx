@@ -1801,13 +1801,13 @@ export default function UnifiedAIPlatform() {
                     </div>
                     <div className="flex flex-col gap-1">
                       <button
-                        onClick={(e) => handleStarChat(chat.id, e)}
+                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleStarChat(chat.id, e)}
                         className="p-1 rounded-md hover:bg-gray-700/50 transition-all opacity-100"
                       >
                         <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
                       </button>
                       <button
-                        onClick={(e) => handleDeleteChat(chat.id, e)}
+                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleDeleteChat(chat.id, e)}
                         className="p-1 rounded-md hover:bg-gray-700/50 opacity-0 group-hover:opacity-100 transition-all"
                       >
                         <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
@@ -1856,7 +1856,7 @@ export default function UnifiedAIPlatform() {
                           onClick={(e: React.MouseEvent<HTMLInputElement>) => e.stopPropagation()}
                         />
                         <button
-                          onClick={(e) => {
+                          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                             e.stopPropagation();
                             handleSaveChatTitle(chat.id);
                           }}
@@ -1872,7 +1872,7 @@ export default function UnifiedAIPlatform() {
                           {chat.title}
                         </h3>
                         <button
-                          onClick={(e) => handleEditChatTitle(chat.id, chat.title, e)}
+                          onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleEditChatTitle(chat.id, chat.title, e)}
                           className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-gray-700/50 rounded transition-all flex-shrink-0"
                           title="Edit title"
                         >
@@ -1896,7 +1896,7 @@ export default function UnifiedAIPlatform() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <button
-                    onClick={(e) => handleStarChat(chat.id, e)}
+                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleStarChat(chat.id, e)}
                     className={`p-1 rounded-md hover:bg-gray-700/50 transition-all ${
                       chat.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                     }`}
@@ -1908,7 +1908,7 @@ export default function UnifiedAIPlatform() {
                     />
                   </button>
                   <button
-                    onClick={(e) => handleDeleteChat(chat.id, e)}
+                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleDeleteChat(chat.id, e)}
                     className="p-1 rounded-md hover:bg-gray-700/50 opacity-0 group-hover:opacity-100 transition-all"
                   >
                     <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
@@ -2097,7 +2097,7 @@ export default function UnifiedAIPlatform() {
               <textarea
                 ref={textareaRef}
                 value={input}
-                onChange={(e) => {
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
                   setInput(e.target.value);
                   adjustTextareaHeight();
                 }}
@@ -2864,8 +2864,8 @@ export default function UnifiedAIPlatform() {
                 <input
                   type="text"
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
+                  onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
                       handleSubmit(e as React.FormEvent<HTMLInputElement>);
@@ -2931,7 +2931,7 @@ export default function UnifiedAIPlatform() {
       {/* Purchase Credits Modal */}
       {showPurchaseModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowPurchaseModal(false)}>
-          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}>
             <button
               onClick={() => setShowPurchaseModal(false)}
               className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
@@ -2957,7 +2957,7 @@ export default function UnifiedAIPlatform() {
                       type="number"
                       min="10"
                       value={purchaseAmount}
-                      onChange={(e) => setPurchaseAmount(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPurchaseAmount(e.target.value)}
                       placeholder="10"
                       className="w-full pl-8 pr-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                     />
@@ -3021,7 +3021,7 @@ export default function UnifiedAIPlatform() {
       {/* Subscription Modal */}
       {showSubscriptionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowSubscriptionModal(false)}>
-          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}>
             <button
               onClick={() => setShowSubscriptionModal(false)}
               className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"

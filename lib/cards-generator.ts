@@ -23,121 +23,121 @@ async function generateSportSpecificCards(
   // FORCE MINIMUM 3 CARDS - OVERRIDE ANY COUNT PARAMETER
   const actualCount = Math.max(count, 3);
   console.log(`[v0] [CARDS-GEN] ENTRY: sport=${sport} requestedCount=${count} OVERRIDING TO actualCount=${actualCount}`);
-  
+
   const cards: InsightCard[] = [];
   const displaySport = apiToSport(sport).toUpperCase();
   console.log(`[v0] [SPORT CARDS] Display sport: ${displaySport}`);
-  
+
   // Fetch real live odds for this sport using unified service
   if (category === 'betting' || !category) {
     console.log(`[v0] [CARDS-GEN] ===== FETCHING ODDS FOR ${displaySport} =====`);
     console.log(`[v0] [CARDS-GEN] Sport key: ${sport}`);
     console.log(`[v0] [CARDS-GEN] Category: ${category || 'default (betting)'}`);
     console.log(`[v0] [CARDS-GEN] Requested count: ${count}, Actual count: ${actualCount}`);
-    
+
     try {
       const { getOddsWithCache } = await import('@/lib/unified-odds-fetcher');
-      
+
       // Check API key availability
       const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
       console.log(`[v0] [CARDS-GEN] API Key present: ${!!apiKey}`);
-      
+
       if (!apiKey) {
         console.error(`[v0] [CARDS-GEN] ❌ CRITICAL: No ODDS_API_KEY found in environment!`);
         throw new Error('ODDS_API_KEY not configured');
       }
-      
+
       // Use unified service - automatically handles API + Supabase caching + storage
       console.log(`[v0] [CARDS-GEN] Calling getOddsWithCache...`);
       const oddsData = await getOddsWithCache(sport, {
         useCache: false, // Skip cache to get fresh data with all markets
         storeResults: true // Store in Supabase for realtime sync
       });
-      
+
       console.log(`[v0] [CARDS-GEN] ✓ Unified service returned ${oddsData?.length || 0} games`);
       console.log(`[v0] [CARDS-GEN] Data is array: ${Array.isArray(oddsData)}`);
       console.log(`[v0] [CARDS-GEN] Data is null/undefined: ${oddsData == null}`);
-      
+
       if (oddsData && oddsData.length > 0) {
         console.log(`[v0] [CARDS-GEN] SUCCESS: Found ${oddsData.length} games for ${displaySport}`);
-          
-          const gamesToShow = Math.min(actualCount, oddsData.length);
-          for (let i = 0; i < gamesToShow; i++) {
-            const game = oddsData[i];
-            const isCompleted = game.completed === true;
-            const hasBookmakers = game.bookmakers && game.bookmakers.length > 0;
-            const firstBook = hasBookmakers ? game.bookmakers[0] : null;
-            
-            // For completed games with scores
-            if (isCompleted && game.scores) {
-              const homeScore = game.scores?.find((s: any) => s.name === game.home_team);
-              const awayScore = game.scores?.find((s: any) => s.name === game.away_team);
-              
-              cards.push({
-                type: CARD_TYPES.LIVE_ODDS,
-                title: `${game.away_team} @ ${game.home_team}`,
-                icon: 'CheckCircle',
-                category: displaySport,
-                subcategory: 'Final Score',
-                gradient: getSportGradient(sport),
-                data: {
-                  matchup: `${game.away_team} @ ${game.home_team}`,
-                  gameTime: new Date(game.commence_time).toLocaleString(),
-                  finalScore: `${game.away_team} ${awayScore?.score || '?'} - ${homeScore?.score || '?'} ${game.home_team}`,
-                  homeScore: homeScore?.score || '?',
-                  awayScore: awayScore?.score || '?',
-                  completed: true,
-                  realData: true,
-                  status: 'FINAL'
-                },
-                metadata: { realData: true, dataSource: 'The Odds API Scores', gameId: game.id }
-              });
-              continue;
-            }
-            
-            // For upcoming games with odds
-            const h2hMarket = firstBook?.markets?.find((m: any) => m.key === 'h2h');
-            const spreadsMarket = firstBook?.markets?.find((m: any) => m.key === 'spreads');
-            const totalsMarket = firstBook?.markets?.find((m: any) => m.key === 'totals');
-            
-            const h2hOutcomes = h2hMarket?.outcomes || [];
-            const homeOdds = h2hOutcomes.find((o: any) => o.name === game.home_team);
-            const awayOdds = h2hOutcomes.find((o: any) => o.name === game.away_team);
-            
-            const spreadOutcomes = spreadsMarket?.outcomes || [];
-            const homeSpread = spreadOutcomes.find((o: any) => o.name === game.home_team);
-            const awaySpread = spreadOutcomes.find((o: any) => o.name === game.away_team);
-            
-            const totalOutcomes = totalsMarket?.outcomes || [];
-            const over = totalOutcomes.find((o: any) => o.name === 'Over');
-            const under = totalOutcomes.find((o: any) => o.name === 'Under');
-            
-            const subcategory = hasBookmakers ? 'H2H Markets' : 'Upcoming';
-            
+
+        const gamesToShow = Math.min(actualCount, oddsData.length);
+        for (let i = 0; i < gamesToShow; i++) {
+          const game = oddsData[i];
+          const isCompleted = game.completed === true;
+          const hasBookmakers = game.bookmakers && game.bookmakers.length > 0;
+          const firstBook = hasBookmakers ? game.bookmakers[0] : null;
+
+          // For completed games with scores
+          if (isCompleted && game.scores) {
+            const homeScore = game.scores?.find((s: any) => s.name === game.home_team);
+            const awayScore = game.scores?.find((s: any) => s.name === game.away_team);
+
             cards.push({
               type: CARD_TYPES.LIVE_ODDS,
               title: `${game.away_team} @ ${game.home_team}`,
-              icon: 'TrendingUp',
+              icon: 'CheckCircle',
               category: displaySport,
-              subcategory,
+              subcategory: 'Final Score',
               gradient: getSportGradient(sport),
               data: {
                 matchup: `${game.away_team} @ ${game.home_team}`,
                 gameTime: new Date(game.commence_time).toLocaleString(),
-                homeOdds: homeOdds ? (homeOdds.price > 0 ? `+${homeOdds.price}` : `${homeOdds.price}`) : 'N/A',
-                awayOdds: awayOdds ? (awayOdds.price > 0 ? `+${awayOdds.price}` : `${awayOdds.price}`) : 'N/A',
-                homeSpread: homeSpread ? `${homeSpread.point > 0 ? '+' : ''}${homeSpread.point} (${homeSpread.price > 0 ? '+' : ''}${homeSpread.price})` : 'N/A',
-                awaySpread: awaySpread ? `${awaySpread.point > 0 ? '+' : ''}${awaySpread.point} (${awaySpread.price > 0 ? '+' : ''}${awaySpread.price})` : 'N/A',
-                overUnder: over && under ? `O/U ${over.point}: Over ${over.price > 0 ? '+' : ''}${over.price} / Under ${under.price > 0 ? '+' : ''}${under.price}` : 'N/A',
-                bookmaker: firstBook?.title || 'N/A',
-                bookmakerCount: game.bookmakers?.length || 0,
+                finalScore: `${game.away_team} ${awayScore?.score || '?'} - ${homeScore?.score || '?'} ${game.home_team}`,
+                homeScore: homeScore?.score || '?',
+                awayScore: awayScore?.score || '?',
+                completed: true,
                 realData: true,
-                status: hasBookmakers ? 'VALUE' : 'UPCOMING'
+                status: 'FINAL'
               },
-              metadata: { realData: true, dataSource: 'The Odds API', gameId: game.id }
+              metadata: { realData: true, dataSource: 'The Odds API Scores', gameId: game.id }
             });
+            continue;
+          }
+
+          // For upcoming games with odds
+          const h2hMarket = firstBook?.markets?.find((m: any) => m.key === 'h2h');
+          const spreadsMarket = firstBook?.markets?.find((m: any) => m.key === 'spreads');
+          const totalsMarket = firstBook?.markets?.find((m: any) => m.key === 'totals');
+
+          const h2hOutcomes = h2hMarket?.outcomes || [];
+          const homeOdds = h2hOutcomes.find((o: any) => o.name === game.home_team);
+          const awayOdds = h2hOutcomes.find((o: any) => o.name === game.away_team);
+
+          const spreadOutcomes = spreadsMarket?.outcomes || [];
+          const homeSpread = spreadOutcomes.find((o: any) => o.name === game.home_team);
+          const awaySpread = spreadOutcomes.find((o: any) => o.name === game.away_team);
+
+          const totalOutcomes = totalsMarket?.outcomes || [];
+          const over = totalOutcomes.find((o: any) => o.name === 'Over');
+          const under = totalOutcomes.find((o: any) => o.name === 'Under');
+
+          const subcategory = hasBookmakers ? 'H2H Markets' : 'Upcoming';
+
+          cards.push({
+            type: CARD_TYPES.LIVE_ODDS,
+            title: `${game.away_team} @ ${game.home_team}`,
+            icon: 'TrendingUp',
+            category: displaySport,
+            subcategory,
+            gradient: getSportGradient(sport),
+            data: {
+              matchup: `${game.away_team} @ ${game.home_team}`,
+              gameTime: new Date(game.commence_time).toLocaleString(),
+              homeOdds: homeOdds ? (homeOdds.price > 0 ? `+${homeOdds.price}` : `${homeOdds.price}`) : 'N/A',
+              awayOdds: awayOdds ? (awayOdds.price > 0 ? `+${awayOdds.price}` : `${awayOdds.price}`) : 'N/A',
+              homeSpread: homeSpread ? `${homeSpread.point > 0 ? '+' : ''}${homeSpread.point} (${homeSpread.price > 0 ? '+' : ''}${homeSpread.price})` : 'N/A',
+              awaySpread: awaySpread ? `${awaySpread.point > 0 ? '+' : ''}${awaySpread.point} (${awaySpread.price > 0 ? '+' : ''}${awaySpread.price})` : 'N/A',
+              overUnder: over && under ? `O/U ${over.point}: Over ${over.price > 0 ? '+' : ''}${over.price} / Under ${under.price > 0 ? '+' : ''}${under.price}` : 'N/A',
+              bookmaker: firstBook?.title || 'N/A',
+              bookmakerCount: game.bookmakers?.length || 0,
+              realData: true,
+              status: hasBookmakers ? 'VALUE' : 'UPCOMING'
+            },
+            metadata: { realData: true, dataSource: 'The Odds API', gameId: game.id }
+          });
         }
-        
+
         console.log(`[v0] [CARDS-GEN] Created ${cards.length} cards with real data`);
         return cards;
       } else {
@@ -154,20 +154,20 @@ async function generateSportSpecificCards(
       console.error(`[v0] [CARDS-GEN] Stack trace:`, (error as Error).stack);
     }
   }
-  
+
   // Fallback: Add informative card if no real data
   if (cards.length < count) {
     console.log(`[v0] [CARDS-GEN] FALLBACK: No real data for ${displaySport}, creating informative placeholder`);
-    
+
     // Determine why there's no data based on sport and date
     const now = new Date();
     const month = now.getMonth() + 1; // 1-12
     const isNFLOffseason = month < 9 || month === 12; // Sept-Feb season
     const isMLBOffseason = month < 4 || month > 10; // Apr-Oct season
-    
+
     let reason = 'No games scheduled today';
     let details = 'Games typically appear 24-48 hours before start time';
-    
+
     if (displaySport === 'NFL' && isNFLOffseason) {
       reason = 'NFL Offseason';
       details = 'NFL season runs September through February';
@@ -179,7 +179,7 @@ async function generateSportSpecificCards(
     } else if (displaySport === 'NHL') {
       details = 'NHL games typically scheduled evening EST';
     }
-    
+
     cards.push({
       type: CARD_TYPES.LIVE_ODDS,
       title: `${displaySport} - ${reason}`,
@@ -198,7 +198,7 @@ async function generateSportSpecificCards(
       }
     });
   }
-  
+
   return cards;
 }
 
@@ -238,7 +238,7 @@ export async function generateContextualCards(
   multiSport: boolean = !sport // DEFAULT TO TRUE WHEN NO SPORT SPECIFIED
 ): Promise<InsightCard[]> {
   const cards: InsightCard[] = [];
-  
+
   console.log(`[v0] [CARDS-GEN] Starting with multiSport=${multiSport}, sport=${sport}, category=${category}`);
 
   // Normalize sport to API format, then get display name
@@ -248,11 +248,11 @@ export async function generateContextualCards(
   console.log('[v0] [CARDS GENERATOR] Generating cards...');
   console.log('[v0] [CARDS GENERATOR] Input:', { category, sport, normalizedSport, displaySport, multiSport });
   console.log('[v0] [CARDS GENERATOR] Category:', category, '| Display Sport:', displaySport, '| Count:', count);
-  
+
   // If multiSport requested, generate variety from ALL major sports with REAL data
   if (multiSport) {
     console.log('[v0] [CARDS GENERATOR] Multi-sport mode - fetching from ALL MAJOR SPORTS (NFL, NBA, MLB, NHL)');
-    
+
     // FORCE query ALL major sports - don't rely on "active sports detector"
     const allMajorSports = [
       SPORT_KEYS.NFL.API,      // americanfootball_nfl
@@ -260,14 +260,14 @@ export async function generateContextualCards(
       SPORT_KEYS.MLB.API,      // baseball_mlb
       SPORT_KEYS.NHL.API,      // icehockey_nhl
     ];
-    
+
     // If user specified a sport, prioritize it first
-    const orderedSports = normalizedSport 
+    const orderedSports = normalizedSport
       ? [normalizedSport, ...allMajorSports.filter(s => s !== normalizedSport)]
       : allMajorSports;
-    
+
     console.log('[v0] [CARDS GENERATOR] Will query sports in order:', orderedSports.map(s => apiToSport(s).toUpperCase()).join(', '));
-    
+
     // Fetch from ALL sports in parallel for speed
     console.log('[v0] [MULTI-SPORT] Fetching odds from all sports in PARALLEL...');
     const allSportCards = await Promise.all(
@@ -283,13 +283,13 @@ export async function generateContextualCards(
         }
       })
     );
-    
+
     console.log('[v0] [MULTI-SPORT] All fetches complete');
-    
+
     // Collect cards from sports that returned data
     for (const { sport: sportKey, cards: sportCards } of allSportCards) {
       if (cards.length >= count) break;
-      
+
       if (sportCards.length > 0) {
         const cardsNeeded = count - cards.length;
         const cardsToAdd = sportCards.slice(0, cardsNeeded);
@@ -297,23 +297,23 @@ export async function generateContextualCards(
         console.log(`[v0] [MULTI-SPORT] Added ${cardsToAdd.length} ${apiToSport(sportKey).toUpperCase()} cards`);
       }
     }
-    
+
     // Try to add player props if we still need more cards
     if (cards.length < count) {
       console.log('[v0] [MULTI-SPORT] Not enough game cards, trying player props...');
       try {
         const { fetchPlayerProps, playerPropToCard } = await import('@/lib/player-props-service');
-        
+
         for (const sportKey of orderedSports) {
           if (cards.length >= count) break;
-          
+
           try {
-            const props = await fetchPlayerProps({ 
-              sport: sportKey, 
-              useCache: true, 
-              storeResults: true 
+            const props = await fetchPlayerProps({
+              sport: sportKey,
+              useCache: true,
+              storeResults: true
             });
-            
+
             if (props.length > 0) {
               const propsNeeded = count - cards.length;
               const propCards = props.slice(0, propsNeeded).map(playerPropToCard);
@@ -328,13 +328,13 @@ export async function generateContextualCards(
         console.error('[v0] [MULTI-SPORT] Player props import failed:', error);
       }
     }
-    
+
     // If we still don't have enough cards, add placeholder cards
     while (cards.length < count) {
       const remainingSports = orderedSports.filter(s => !cards.some(c => c.data?.sport === s));
       const sportToUse = remainingSports[0] || SPORT_KEYS.NBA.API;
       const displaySport = apiToSport(sportToUse).toUpperCase();
-      
+
       cards.push({
         type: CARD_TYPES.LIVE_ODDS,
         title: `${displaySport} Live Odds`,
@@ -350,9 +350,9 @@ export async function generateContextualCards(
         }
       });
     }
-    
+
     console.log(`[v0] [MULTI-SPORT] Final result: ${cards.length} cards from ${[...new Set(cards.map(c => c.category))].join(', ')}`);
-    
+
     return cards.slice(0, count);
   }
 
@@ -361,7 +361,7 @@ export async function generateContextualCards(
     console.log('[v0] [CARDS-GEN] Arbitrage category - fetching from Supabase with realtime');
     try {
       const supabase = (await import('@/lib/supabase/client')).createClient();
-      
+
       // Fetch active arbitrage opportunities from Supabase (stored by API cron)
       const { data: opportunities } = await supabase
         .from('arbitrage_opportunities')
@@ -370,10 +370,10 @@ export async function generateContextualCards(
         .gt('expires_at', new Date().toISOString())
         .order('profit_margin', { ascending: false })
         .limit(count);
-      
+
       if (opportunities && opportunities.length > 0) {
         console.log(`[v0] [CARDS-GEN] Found ${opportunities.length} arbitrage opportunities`);
-        
+
         opportunities.forEach((opp: any) => {
           cards.push({
             type: 'ARBITRAGE',
@@ -409,7 +409,7 @@ export async function generateContextualCards(
             }
           });
         });
-        
+
         return cards;
       } else {
         console.log('[v0] [CARDS-GEN] No active arbitrage opportunities');
@@ -417,7 +417,7 @@ export async function generateContextualCards(
     } catch (error) {
       console.error('[v0] [CARDS-GEN] Arbitrage fetch error:', error);
     }
-    
+
     // Fallback if no opportunities found
     cards.push({
       type: 'ARBITRAGE',
@@ -434,10 +434,10 @@ export async function generateContextualCards(
         status: 'SCANNING'
       }
     });
-    
+
     return cards;
   }
-  
+
   // Betting/Arbitrage cards (default)
   if (category === 'betting' || !category) {
     // Try to detect real arbitrage opportunities
@@ -445,13 +445,13 @@ export async function generateContextualCards(
     try {
       const { detectArbitrageFromContext } = await import('@/lib/arbitrage-detector');
       const arbitrageCards = await detectArbitrageFromContext(normalizedSport);
-      
+
       console.log('[v0] [CARDS GENERATOR] Arbitrage cards returned:', {
         isArray: Array.isArray(arbitrageCards),
         length: arbitrageCards?.length || 0,
         firstCard: arbitrageCards?.[0]?.title || 'none'
       });
-      
+
       if (arbitrageCards && arbitrageCards.length > 0) {
         console.log('[v0] [CARDS GENERATOR] Adding', arbitrageCards.length, 'cards (arbitrage or live odds)');
         cards.push(...arbitrageCards.slice(0, 3)); // Add up to 3 cards (arbitrage or live odds)
@@ -495,7 +495,7 @@ export async function generateContextualCards(
     console.log('[v0] [CARDS-GEN] Line movement category - fetching recent movements');
     try {
       const supabase = (await import('@/lib/supabase/client')).createClient();
-      
+
       // Fetch recent significant line movements (last 24 hours)
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data: movements } = await supabase
@@ -504,10 +504,10 @@ export async function generateContextualCards(
         .gt('updated_at', oneDayAgo)
         .order('updated_at', { ascending: false })
         .limit(count * 3);
-      
+
       if (movements && movements.length > 0) {
         console.log(`[v0] [CARDS-GEN] Found ${movements.length} line movements`);
-        
+
         // Group by game and show most significant movements
         const gameMovements = new Map();
         movements.forEach((move: any) => {
@@ -516,14 +516,14 @@ export async function generateContextualCards(
             gameMovements.set(key, move);
           }
         });
-        
+
         const topMovements = Array.from(gameMovements.values()).slice(0, count);
-        
+
         topMovements.forEach(move => {
           const lineChange = move.line_change || 0;
           const direction = lineChange > 0 ? 'UP' : 'DOWN';
           const isSteam = Math.abs(lineChange) > 2;
-          
+
           cards.push({
             type: 'LINE_MOVEMENT',
             title: `${move.away_team} @ ${move.home_team}`,
@@ -552,7 +552,7 @@ export async function generateContextualCards(
             }
           });
         });
-        
+
         return cards;
       } else {
         console.log('[v0] [CARDS-GEN] No recent line movements');
@@ -560,7 +560,7 @@ export async function generateContextualCards(
     } catch (error) {
       console.error('[v0] [CARDS-GEN] Line movement fetch error:', error);
     }
-    
+
     // Fallback
     cards.push({
       type: 'LINE_MOVEMENT',
@@ -577,26 +577,26 @@ export async function generateContextualCards(
         status: 'MONITORING'
       }
     });
-    
+
     return cards;
   }
-  
+
   // Kalshi/Prediction Markets - Fetch ALL markets (sports, elections, politics, everything)
   if (category === 'kalshi') {
     console.log('[v0] [CARDS-GEN] Kalshi category - fetching ALL markets from API with retry logic');
     try {
       const { fetchKalshiMarketsWithRetry, kalshiMarketToCard } = await import('@/lib/kalshi-client');
-      
+
       // Fetch ALL open markets from Kalshi with retry logic (no category filter)
       console.log('[v0] [CARDS-GEN] Calling Kalshi API for all open markets (with 3 retry attempts)...');
-      const markets = await fetchKalshiMarketsWithRetry({ 
-        status: 'open', 
+      const markets = await fetchKalshiMarketsWithRetry({
+        status: 'open',
         limit: Math.max(count, 50), // Fetch more to ensure variety
         maxRetries: 3
       });
-      
+
       console.log(`[v0] [CARDS-GEN] Kalshi API returned ${markets.length} total markets`);
-      
+
       if (markets.length > 0) {
         // Convert to cards and take requested count
         const kalshiCards = markets.slice(0, count).map(kalshiMarketToCard);
@@ -610,7 +610,7 @@ export async function generateContextualCards(
     } catch (error) {
       console.error('[v0] [CARDS-GEN] Kalshi API error:', error);
     }
-    
+
     // Fallback to placeholder if no markets available
     cards.push({
       type: 'PREDICTION_MARKET',
@@ -633,14 +633,14 @@ export async function generateContextualCards(
     console.log('[v0] [CARDS-GEN] Portfolio/Kelly category - calculating optimal bet sizes');
     try {
       const supabase = (await import('@/lib/supabase/client')).createClient();
-      
+
       // Get current capital state
       const { data: capitalState } = await supabase
         .from('capital_state')
         .select('*')
         .eq('active', true)
         .single();
-      
+
       if (capitalState) {
         // Get current bet allocations
         const { data: allocations } = await supabase
@@ -649,10 +649,10 @@ export async function generateContextualCards(
           .in('status', ['pending', 'placed'])
           .order('allocated_capital', { ascending: false })
           .limit(count);
-        
+
         const totalAllocated = allocations?.reduce((sum: number, bet: any) => sum + bet.allocated_capital, 0) || 0;
         const utilization = (totalAllocated / capitalState.total_capital) * 100;
-        
+
         // Portfolio summary card
         cards.push({
           type: 'PORTFOLIO',
@@ -679,7 +679,7 @@ export async function generateContextualCards(
             timestamp: capitalState.updated_at
           }
         });
-        
+
         // Show top allocations if any exist
         if (allocations && allocations.length > 0) {
           allocations.slice(0, Math.min(2, count - 1)).forEach((bet: any) => {
@@ -710,13 +710,13 @@ export async function generateContextualCards(
             });
           });
         }
-        
+
         return cards;
       }
     } catch (error) {
       console.error('[v0] [CARDS-GEN] Portfolio fetch error:', error);
     }
-    
+
     // Fallback
     cards.push({
       type: 'PORTFOLIO',
@@ -733,25 +733,25 @@ export async function generateContextualCards(
         status: 'SETUP_REQUIRED'
       }
     });
-    
+
     return cards;
   }
-  
+
   // Player Props - Fetch real player prop markets
   if (category === 'props' || category === 'player_props') {
     console.log('[v0] [CARDS-GEN] Player props category - fetching live markets');
     try {
       const { fetchPlayerProps, playerPropToCard } = await import('@/lib/player-props-service');
-      
+
       if (normalizedSport) {
-        const props = await fetchPlayerProps({ 
-          sport: normalizedSport, 
-          useCache: true, 
-          storeResults: true 
+        const props = await fetchPlayerProps({
+          sport: normalizedSport,
+          useCache: true,
+          storeResults: true
         });
-        
+
         console.log(`[v0] [CARDS-GEN] Fetched ${props.length} player props`);
-        
+
         if (props.length > 0) {
           const propCards = props.slice(0, count).map(playerPropToCard);
           cards.push(...propCards);
@@ -762,7 +762,7 @@ export async function generateContextualCards(
     } catch (error) {
       console.error('[v0] [CARDS-GEN] Player props error:', error);
     }
-    
+
     // Fallback placeholder
     cards.push({
       type: 'PLAYER_PROP',
@@ -827,15 +827,15 @@ export async function generateContextualCards(
       }
     });
   }
-  
+
   console.log('[v0] [CARDS GENERATOR] ✓ Generated', cards.length, 'cards (before weather enrichment)');
   console.log('[v0] [CARDS GENERATOR] Card titles:', cards.map((c: InsightCard) => c.title).join(', '));
 
   // Add weather cards for outdoor sports if betting category
   if ((category === 'betting' || !category) && normalizedSport) {
-    const isOutdoorSport = normalizedSport === 'americanfootball_nfl' || 
-                          normalizedSport === 'baseball_mlb';
-    
+    const isOutdoorSport = normalizedSport === 'americanfootball_nfl' ||
+      normalizedSport === 'baseball_mlb';
+
     if (isOutdoorSport) {
       console.log('[v0] [CARDS GENERATOR] Outdoor sport detected, attempting weather enrichment');
       try {

@@ -195,8 +195,11 @@ export default function UnifiedAIPlatform() {
     }
   ]);
 
-  // Update welcome message with time-based greeting after hydration (client-only)
+  // Track client-side mount to avoid hydration mismatch on time-dependent content
+  const [isMounted, setIsMounted] = useState(false);
+  
   useEffect(() => {
+    setIsMounted(true);
     setMessages(prev => {
       if (prev.length === 1 && prev[0].isWelcome) {
         return [{
@@ -2311,8 +2314,10 @@ export default function UnifiedAIPlatform() {
                             );
                           })()
                         ) : (
-                          <div className="text-sm leading-relaxed font-medium space-y-3">
-                            {message.content.split('\n\n').map((paragraph, pIdx) => {
+                          <div className="text-sm leading-relaxed font-medium space-y-3" suppressHydrationWarning>
+                            {(!isMounted && message.isWelcome) ? (
+                              <p>{message.content}</p>
+                            ) : message.content.split('\n\n').map((paragraph, pIdx) => {
                               // Check if paragraph contains bullet points
                               if (paragraph.includes('\n**') && paragraph.includes('**')) {
                                 const lines = paragraph.split('\n');

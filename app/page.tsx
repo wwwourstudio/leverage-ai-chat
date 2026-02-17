@@ -334,7 +334,7 @@ export default function UnifiedAIPlatform() {
           if (session?.user) {
             setIsLoggedIn(true);
             setUser({
-              name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+              name: (session.user.user_metadata?.full_name as string) || session.user.email?.split('@')[0] || 'User',
               email: session.user.email || ''
             });
             setShowLoginModal(false);

@@ -16,7 +16,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data-service';
+import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data';
 import { API_ENDPOINTS } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/client';
 import { AuthModals } from '@/components/AuthModals';

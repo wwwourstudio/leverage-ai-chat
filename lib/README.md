@@ -2,6 +2,97 @@
 
 This directory contains core services, utilities, and configurations for the Leverage AI application.
 
+## 🎯 Recent Refactoring (2026-02-17)
+
+The `/lib` folder has been comprehensively refactored to eliminate code duplication and improve maintainability:
+
+### Consolidated Modules
+
+#### `/lib/data/` - Unified Data Layer
+**Replaced**: `data-service.ts`, `supabase-data-service.ts`
+- All API data fetching with caching
+- Database queries (Supabase)
+- Data transformation utilities
+- Single import: `import { fetchDynamicCards, fetchUserInsights, fetchOddsFromDB } from '@/lib/data'`
+
+#### `/lib/odds/` - Unified Odds Service
+**Replaced**: `odds-api-client.ts`, `enhanced-odds-client.ts`, `unified-odds-fetcher.ts`
+- The Odds API integration
+- Real-time odds fetching with cache
+- Sport validation & normalization
+- Arbitrage opportunity detection
+- Single import: `import { fetchLiveOdds, validateSportKey, findArbitrageOpportunities } from '@/lib/odds'`
+
+#### `/lib/weather/` - Unified Weather Service
+**Replaced**: `weather-service.ts`, `weather-analytics.ts`
+- Open-Meteo API integration
+- Stadium-specific weather lookups
+- Weather impact analysis
+- Single import: `import { getWeatherForGame, analyzeWeatherImpact } from '@/lib/weather'`
+
+#### `/lib/utils/` - Unified Utilities
+**Replaced**: `auth-utils.ts`, `debug-utils.ts`, `process-utils.ts`
+- Styling utilities (`cn()`)
+- Authentication helpers
+- Debug logging & performance tracking
+- Process/runtime information
+- Single import: `import { cn, getServerUser, debugLog, PerformanceTimer } from '@/lib/utils'`
+
+#### `/lib/arbitrage/` - Arbitrage Detection
+**Replaced**: `arbitrage.ts`, `arbitrage-detector.ts`, `arbitrage/detectArbitrage.ts`
+- Consolidated arbitrage detection logic
+- Market efficiency analysis
+- Opportunity ranking
+- Single import: `import { detectArbitrage, calculateProfitMargin } from '@/lib/arbitrage'`
+
+#### `/lib/kelly/` - Kelly Criterion
+**Replaced**: `kelly.ts`, `kelly/calculateKelly.ts`
+- Bet sizing calculations
+- Portfolio allocation
+- Risk management
+- Single import: `import { calculateKelly, calculateOptimalBankroll } from '@/lib/kelly'`
+
+#### `/lib/kalshi/` - Kalshi Integration
+**Replaced**: `kalshi-api-client.ts`, `kalshi-client.ts`
+- Kalshi prediction market API
+- Market data fetching
+- Contract analysis
+- Single import: `import { fetchKalshiMarkets, analyzeContract } from '@/lib/kalshi'`
+
+### Configuration Consolidation
+
+#### `/lib/config.ts` - Unified Configuration
+**Replaced**: `dynamic-config.ts` (merged into `config.ts`)
+- Environment variable management
+- Service status checking
+- Configuration validation
+- Both static and dynamic config in one file
+
+### Migration Guide
+
+**Old Import → New Import**
+```typescript
+// Data fetching
+import { fetchDynamicCards } from '@/lib/data-service';
+// NOW: import { fetchDynamicCards } from '@/lib/data';
+
+// Odds fetching
+import { fetchLiveOdds } from '@/lib/odds-api-client';
+// NOW: import { fetchLiveOdds } from '@/lib/odds';
+
+// Weather
+import { getWeatherForGame } from '@/lib/weather-service';
+// NOW: import { getWeatherForGame } from '@/lib/weather';
+
+// Utilities
+import { debugLog } from '@/lib/debug-utils';
+// NOW: import { debugLog } from '@/lib/utils';
+```
+
+**Backward Compatibility**: `/lib/utils.ts` re-exports from `/lib/utils/index.ts` to maintain compatibility during migration.
+
+---
+
 ## Services
 
 ### `player-projections.ts`

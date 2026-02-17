@@ -38,7 +38,10 @@ interface FileAttachment {
   type: 'image' | 'csv';
   url: string;
   size: number;
-  data?: Record<string, string>[];
+  data?: {
+    headers: string[];
+    rows: string[][];
+  };
 }
 
 interface APIResponse<T = unknown> {
@@ -1211,14 +1214,11 @@ export default function UnifiedAIPlatform() {
         const text = await file.text();
         const delimiter = file.name.endsWith('.tsv') || fileType === 'text/tab-separated-values' ? '\t' : ',';
         const parsed = parseDelimitedFile(text, delimiter);
-        // Convert { headers, rows } to Record<string, string>[]
-        attachment.data = parsed.rows.map(row => {
-          const record: Record<string, string> = {};
-          parsed.headers.forEach((header, index) => {
-            record[header] = row[index] || '';
-          });
-          return record;
-        });
+        // Store the parsed data with headers and rows
+        attachment.data = {
+          headers: parsed.headers,
+          rows: parsed.rows
+        };
       }
 
       newAttachments.push(attachment);

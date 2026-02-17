@@ -5,6 +5,22 @@
 
 import { createClient } from '@/lib/supabase/client';
 
+// Module-level guard: once we detect the table is missing, stop retrying
+let tableAvailable: boolean | null = null;
+let tableMissingLogged = false;
+
+function handleTableMissing(context: string, error: any): void {
+  if (!tableMissingLogged) {
+    console.warn(`[LINE-TRACKER] Table 'line_movement' does not exist. ${context} will be skipped until the table is created. Error: ${error?.code || error?.message || 'unknown'}`);
+    tableMissingLogged = true;
+  }
+  tableAvailable = false;
+}
+
+function isTableMissingError(error: any): boolean {
+  return error?.code === 'PGRST205' || error?.code === '42P01' || error?.message?.includes('line_movement');
+}
+
 export interface LineSnapshot {
   id: string;
   gameId: string;
@@ -38,6 +54,8 @@ export interface LineMovement {
  * Track line movement by storing historical snapshots
  */
 export async function trackLineSnapshot(snapshot: Omit<LineSnapshot, 'id' | 'timestamp'>): Promise<void> {
+  if (tableAvailable === false) return;
+  
   const supabase = createClient();
   
   try {
@@ -55,10 +73,16 @@ export async function trackLineSnapshot(snapshot: Omit<LineSnapshot, 'id' | 'tim
       });
     
     if (error) {
-      console.error('[v0] [LINE-TRACKER] Failed to store snapshot:', error);
+      if (isTableMissingError(error)) {
+        handleTableMissing('trackLineSnapshot', error);
+        return;
+      }
+      console.error('[LINE-TRACKER] Failed to store snapshot:', error.message);
+    } else {
+      tableAvailable = true;
     }
   } catch (error) {
-    console.error('[v0] [LINE-TRACKER] Storage exception:', error);
+    console.error('[LINE-TRACKER] Storage exception:', error);
   }
 }
 
@@ -66,6 +90,8 @@ export async function trackLineSnapshot(snapshot: Omit<LineSnapshot, 'id' | 'tim
  * Analyze line movement for a specific game
  */
 export async function analyzeLineMovement(gameId: string, marketType: string = 'h2h'): Promise<LineMovement[]> {
+  if (tableAvailable === false) return [];
+  
   const supabase = createClient();
   
   try {
@@ -77,7 +103,14 @@ export async function analyzeLineMovement(gameId: string, marketType: string = '
       .eq('market_type', marketType)
       .order('timestamp', { ascending: true });
     
-    if (error || !snapshots || snapshots.length === 0) {
+    if (error) {
+      if (isTableMissingError(error)) {
+        handleTableMissing('analyzeLineMovement', error);
+      }
+      return [];
+    }
+    
+    if (!snapshots || snapshots.length === 0) {
       return [];
     }
     
@@ -142,6 +175,8 @@ export async function analyzeLineMovement(gameId: string, marketType: string = '
  * Detect sharp money indicators
  */
 export async function detectSharpMoney(sport: string, lookbackHours: number = 24): Promise<LineMovement[]> {
+  if (tableAvailable === false) return [];
+  
   const supabase = createClient();
   
   try {
@@ -154,7 +189,14 @@ export async function detectSharpMoney(sport: string, lookbackHours: number = 24
       .gte('timestamp', cutoffTime)
       .order('timestamp', { ascending: false });
     
-    if (error || !recentGames) {
+    if (error) {
+      if (isTableMissingError(error)) {
+        handleTableMissing('detectSharpMoney', error);
+      }
+      return [];
+    }
+    
+    if (!recentGames) {
       return [];
     }
     
@@ -231,7 +273,9 @@ export function lineMovementToCard(movement: LineMovement): any {
  * Monitor and track odds automatically
  */
 export async function monitorOddsChanges(oddsData: any[], sport: string): Promise<void> {
-  console.log(`[v0] [LINE-TRACKER] Monitoring ${oddsData.length} games for ${sport}`);
+  if (tableAvailable === false) return;
+  
+  console.log(`[LINE-TRACKER] Monitoring ${oddsData.length} games for ${sport}`);
   
   for (const game of oddsData) {
     for (const bookmaker of game.bookmakers || []) {
@@ -251,5 +295,5 @@ export async function monitorOddsChanges(oddsData: any[], sport: string): Promis
     }
   }
   
-  console.log(`[v0] [LINE-TRACKER] Completed odds monitoring for ${sport}`);
+  console.log(`[LINE-TRACKER] Completed odds monitoring for ${sport}`);
 }

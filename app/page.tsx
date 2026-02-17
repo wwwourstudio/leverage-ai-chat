@@ -158,15 +158,15 @@ export default function UnifiedAIPlatform() {
   };
 
   const [messages, setMessages] = useState<Message[]>([
-  {
-  role: 'assistant',
-  content: '**Leverage AI** - Powered by Grok AI\n\nI\'m connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.',
-  timestamp: new Date(),
-  isWelcome: true,
-  cards: [],
-  insights: {
-  totalValue: 0,
-  winRate: 0,
+    {
+      role: 'assistant',
+      content: '**Leverage AI** - Powered by Grok AI\n\nI\'m connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.',
+      timestamp: new Date(0),
+      isWelcome: true,
+      cards: [],
+      insights: {
+        totalValue: 0,
+        winRate: 0,
         roi: 0,
         activeContests: 0,
         totalInvested: 0
@@ -174,13 +174,14 @@ export default function UnifiedAIPlatform() {
     }
   ]);
 
-  // Update welcome message with time-based greeting after hydration
+  // Update welcome message with time-based greeting after hydration (client-only)
   useEffect(() => {
     setMessages(prev => {
       if (prev.length === 1 && prev[0].isWelcome) {
         return [{
           ...prev[0],
-          content: getWelcomeMessage('all')
+          content: getWelcomeMessage('all'),
+          timestamp: new Date(),
         }];
       }
       return prev;
@@ -348,12 +349,21 @@ export default function UnifiedAIPlatform() {
       id: 'chat-1',
       title: 'New Chat',
       preview: 'Start a conversation to get real-time sports betting insights...',
-      timestamp: new Date(),
+      timestamp: new Date(0),
       starred: false,
       category: 'all',
       tags: []
     }
   ]);
+
+  // Hydrate chat timestamp client-side
+  useEffect(() => {
+    setChats(prev => prev.map(chat =>
+      chat.id === 'chat-1' && chat.timestamp.getTime() === 0
+        ? { ...chat, timestamp: new Date() }
+        : chat
+    ));
+  }, []);
 
   const categories = [
     { id: 'all', name: 'All', icon: Layers, color: 'text-blue-400', desc: 'Everything' },
@@ -1750,7 +1760,7 @@ export default function UnifiedAIPlatform() {
                             </span>
                           ))}
                         </div>
-                        <span className="text-[10px] font-medium text-gray-600">{formatTimestamp(chat.timestamp)}</span>
+                        <span className="text-[10px] font-medium text-gray-600" suppressHydrationWarning>{formatTimestamp(chat.timestamp)}</span>
                       </div>
                     </div>
                     <div className="flex flex-col gap-1">
@@ -1845,7 +1855,7 @@ export default function UnifiedAIPlatform() {
                         </span>
                       ))}
                     </div>
-                    <span className="text-[10px] font-medium text-gray-600">{formatTimestamp(chat.timestamp)}</span>
+                    <span className="text-[10px] font-medium text-gray-600" suppressHydrationWarning>{formatTimestamp(chat.timestamp)}</span>
                   </div>
                 </div>
                 <div className="flex flex-col gap-1">
@@ -1989,7 +1999,7 @@ export default function UnifiedAIPlatform() {
                 
                 return (
                   <div
-                    key={`message-${index}-${message.timestamp.getTime()}`}
+                    key={`message-${index}`}
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn ${isGrouped ? 'mt-2' : 'mt-6'}`}
                   >
                 <div className={`max-w-4xl ${message.role === 'user' ? 'w-auto' : 'w-full'}`}>
@@ -2645,7 +2655,7 @@ export default function UnifiedAIPlatform() {
                       </button>
                       <div className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-gray-900/50 rounded-lg border border-gray-800/50">
                         <Clock className="w-3.5 h-3.5 text-gray-600" />
-                        <span className="text-xs font-medium text-gray-500 tabular-nums">{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="text-xs font-medium text-gray-500 tabular-nums" suppressHydrationWarning>{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     </div>
                   )}

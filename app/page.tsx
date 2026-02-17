@@ -38,10 +38,10 @@ interface FileAttachment {
   type: 'image' | 'csv';
   url: string;
   size: number;
-  data?: any; // For CSV parsed data
+  data?: Record<string, string>[];
 }
 
-interface APIResponse<T = any> {
+interface APIResponse<T = unknown> {
   success: boolean;
   error?: string;
   data?: T;
@@ -62,12 +62,17 @@ interface APIResponse<T = any> {
   errorType?: string; // Type of error that occurred
 }
 
+interface OddsMarket {
+  key: string;
+  outcomes: Array<{ name: string; price: number; point?: number }>;
+}
+
 interface OddsEvent {
   sport_title: string;
   bookmakers?: Array<{
     key: string;
     title: string;
-    markets: any[];
+    markets: OddsMarket[];
   }>;
 }
 
@@ -131,12 +136,28 @@ interface Chat {
 interface InsightCard {
   type: string;
   title: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   category: string;
   subcategory: string;
   gradient: string;
   data: Record<string, string | number>;
   status: string;
+}
+
+interface QueryContext {
+  sport: string | null;
+  marketType: string | null;
+  platform: string | null;
+  isSportsQuery: boolean;
+  isPoliticalMarket: boolean;
+  hasBettingIntent: boolean;
+  previousMessages: Array<{ role: string; content: string }>;
+  oddsData?: Record<string, unknown> & { sport?: string };
+  oddsError?: unknown;
+  oddsErrorMessage?: string;
+  noGamesAvailable?: boolean;
+  noGamesMessage?: string;
+  crossSportError?: boolean;
 }
 
 export default function UnifiedAIPlatform() {
@@ -158,21 +179,38 @@ export default function UnifiedAIPlatform() {
   };
 
   const [messages, setMessages] = useState<Message[]>([
-  {
-  role: 'assistant',
-  content: getWelcomeMessage('all'),
-  timestamp: new Date(),
-  isWelcome: true,
-  cards: [],
-  insights: {
-  totalValue: 0,
-  winRate: 0,
+    {
+      role: 'assistant',
+      content: '**Leverage AI** - Powered by Grok AI\n\nI\'m connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.',
+      timestamp: new Date(0),
+      isWelcome: true,
+      cards: [],
+      insights: {
+        totalValue: 0,
+        winRate: 0,
         roi: 0,
         activeContests: 0,
         totalInvested: 0
       }
     }
   ]);
+
+  // Track client-side mount to avoid hydration mismatch on time-dependent content
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+    setMessages(prev => {
+      if (prev.length === 1 && prev[0].isWelcome) {
+        return [{
+          ...prev[0],
+          content: getWelcomeMessage('all'),
+          timestamp: new Date(),
+        }];
+      }
+      return prev;
+    });
+  }, []);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -193,7 +231,7 @@ export default function UnifiedAIPlatform() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<{ name: string; email: string; avatar?: string } | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
-  const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string }>>([]);
+  const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -335,12 +373,21 @@ export default function UnifiedAIPlatform() {
       id: 'chat-1',
       title: 'New Chat',
       preview: 'Start a conversation to get real-time sports betting insights...',
-      timestamp: new Date(),
+      timestamp: new Date(0),
       starred: false,
       category: 'all',
       tags: []
     }
   ]);
+
+  // Hydrate chat timestamp client-side
+  useEffect(() => {
+    setChats(prev => prev.map(chat =>
+      chat.id === 'chat-1' && chat.timestamp.getTime() === 0
+        ? { ...chat, timestamp: new Date() }
+        : chat
+    ));
+  }, []);
 
   const categories = [
     { id: 'all', name: 'All', icon: Layers, color: 'text-blue-400', desc: 'Everything' },
@@ -393,13 +440,13 @@ export default function UnifiedAIPlatform() {
 
   const generateContextualSuggestions = (userMessage: string, responseCards: InsightCard[]) => {
     const msgLower = userMessage.toLowerCase();
-    const suggestions: Array<{ label: string; icon: any; category: string }> = [];
+    const suggestions: Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }> = [];
     
     console.log('[v0] ==========================================');
       console.log('[v0] GENERATING CONTEXTUAL SUGGESTIONS');
       console.log('[v0] User message:', userMessage);
       console.log('[v0] Response cards received:', responseCards.length);
-      console.log('[v0] Card details:', responseCards.map((c: any) => ({ type: c.type, category: c.category })));
+      console.log('[v0] Card details:', responseCards.map((c: InsightCard) => ({ type: c.type, category: c.category })));
     
     // Analyze the AI's response cards to understand what was provided
     const cardTypes = responseCards.map(card => card.type);
@@ -592,7 +639,7 @@ export default function UnifiedAIPlatform() {
     return uniqueSuggestions.slice(0, 7);
   };
 
-  const handleFollowUp = (action: 'correlated' | 'metrics', cardData?: any) => {
+  const handleFollowUp = (action: 'correlated' | 'metrics', _cardData?: InsightCard) => {
     console.log('[v0] Generating follow-up response:', action);
     
     // Check if user has credits
@@ -684,15 +731,15 @@ export default function UnifiedAIPlatform() {
       // Override isPoliticalMarket if platform is kalshi
       const finalIsPoliticalMarket = isPoliticalMarket || detectedPlatform === 'kalshi';
       
-      const context: any = {
-        sport: detectedSport,
-        marketType: extractMarketType(userMessage),
-        platform: detectedPlatform,
-        isSportsQuery,
-        isPoliticalMarket: finalIsPoliticalMarket,
-        hasBettingIntent,
-        previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }))
-      };
+    const context: QueryContext = {
+      sport: detectedSport,
+      marketType: extractMarketType(userMessage),
+      platform: detectedPlatform,
+      isSportsQuery,
+      isPoliticalMarket: finalIsPoliticalMarket,
+      hasBettingIntent,
+      previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }))
+    };
 
       if (isDev) {
         console.log('[v0] Extracted context:', context);
@@ -738,8 +785,7 @@ export default function UnifiedAIPlatform() {
               if (oddsResult?.events?.length > 0) {
                 const sportName = sportKey.replace('_', ' ').toUpperCase();
                 if (isDev) console.log(`[v0] ✅ Found ${oddsResult.events.length} live games in ${sportName}`);
-                context.oddsData = oddsResult;
-                context.oddsData.sport = sportKey;
+                context.oddsData = { ...oddsResult, sport: sportKey };
               } else {
                 if (isDev) console.log('[NO GAMES FOUND]', context.sport);
                 // NO fallback - return status indicating no games
@@ -783,8 +829,7 @@ export default function UnifiedAIPlatform() {
                 if (oddsResult?.events?.length > 0) {
                   const sportName = sportKey.replace('_', ' ').toUpperCase();
                   if (isDev) console.log(`[v0] ✅ Fallback success - Found ${oddsResult.events.length} games in ${sportName}`);
-                  context.oddsData = oddsResult;
-                  context.oddsData.sport = sportKey;
+                  context.oddsData = { ...oddsResult, sport: sportKey };
                   foundData = true;
                   break;
                 }
@@ -808,7 +853,7 @@ export default function UnifiedAIPlatform() {
           fetched: context.oddsData.sport
         });
         // Clear contaminated data
-        context.oddsData = undefined as any;
+        context.oddsData = undefined;
         context.crossSportError = true;
         }
       }
@@ -1007,7 +1052,7 @@ export default function UnifiedAIPlatform() {
     return null;
   };
 
-  const selectRelevantCards = async (userMessage: string, context?: any): Promise<InsightCard[]> => {
+  const selectRelevantCards = async (userMessage: string, context?: QueryContext): Promise<InsightCard[]> => {
     const msgLower = userMessage.toLowerCase();
     
     // Extract sport and category from message
@@ -1078,7 +1123,7 @@ export default function UnifiedAIPlatform() {
     }
     
     // Map icon string to actual icon component
-    const iconMap: Record<string, any> = {
+    const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
       'Zap': Zap,
       'Target': Target,
       'Award': Award,
@@ -1420,7 +1465,7 @@ export default function UnifiedAIPlatform() {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e as any);
+      handleSubmit(e as unknown as React.FormEvent);
     }
   };
 
@@ -1439,7 +1484,7 @@ export default function UnifiedAIPlatform() {
   };
 
   const getStatusBadge = (status: string) => {
-    const badges: Record<string, any> = {
+    const badges: Record<string, { bg: string; text: string; border: string; icon: React.ComponentType<{ className?: string }>; label: string }> = {
       hot: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30', icon: Flame, label: 'HOT' },
       value: { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/30', icon: DollarSign, label: 'VALUE' },
       optimal: { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/30', icon: Award, label: 'OPTIMAL' },
@@ -1737,7 +1782,7 @@ export default function UnifiedAIPlatform() {
                             </span>
                           ))}
                         </div>
-                        <span className="text-[10px] font-medium text-gray-600">{formatTimestamp(chat.timestamp)}</span>
+                        <span className="text-[10px] font-medium text-gray-600" suppressHydrationWarning>{formatTimestamp(chat.timestamp)}</span>
                       </div>
                     </div>
                     <div className="flex flex-col gap-1">
@@ -1832,7 +1877,7 @@ export default function UnifiedAIPlatform() {
                         </span>
                       ))}
                     </div>
-                    <span className="text-[10px] font-medium text-gray-600">{formatTimestamp(chat.timestamp)}</span>
+                    <span className="text-[10px] font-medium text-gray-600" suppressHydrationWarning>{formatTimestamp(chat.timestamp)}</span>
                   </div>
                 </div>
                 <div className="flex flex-col gap-1">
@@ -1976,7 +2021,7 @@ export default function UnifiedAIPlatform() {
                 
                 return (
                   <div
-                    key={`message-${index}-${message.timestamp.getTime()}`}
+                    key={`message-${index}`}
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn ${isGrouped ? 'mt-2' : 'mt-6'}`}
                   >
                 <div className={`max-w-4xl ${message.role === 'user' ? 'w-auto' : 'w-full'}`}>
@@ -2269,8 +2314,10 @@ export default function UnifiedAIPlatform() {
                             );
                           })()
                         ) : (
-                          <div className="text-sm leading-relaxed font-medium space-y-3">
-                            {message.content.split('\n\n').map((paragraph, pIdx) => {
+                          <div className="text-sm leading-relaxed font-medium space-y-3" suppressHydrationWarning>
+                            {(!isMounted && message.isWelcome) ? (
+                              <p>{message.content}</p>
+                            ) : message.content.split('\n\n').map((paragraph, pIdx) => {
                               // Check if paragraph contains bullet points
                               if (paragraph.includes('\n**') && paragraph.includes('**')) {
                                 const lines = paragraph.split('\n');
@@ -2303,7 +2350,7 @@ export default function UnifiedAIPlatform() {
                               if (paragraph.includes('**')) {
                                 const parts = paragraph.split('**');
                                 return (
-                                  <p key={pIdx}>
+                                  <p key={pIdx} suppressHydrationWarning>
                                     {parts.map((part, partIdx) => {
                                       if (partIdx % 2 === 1) {
                                         return <span key={partIdx} className="font-black text-white">{part}</span>;
@@ -2314,7 +2361,7 @@ export default function UnifiedAIPlatform() {
                                 );
                               }
                               
-                              return <p key={pIdx}>{paragraph}</p>;
+                              return <p key={pIdx} suppressHydrationWarning>{paragraph}</p>;
                             })}
                           </div>
                         )}
@@ -2409,14 +2456,17 @@ export default function UnifiedAIPlatform() {
                     <div className="mt-5">
                       {message.cards && message.cards.length > 0 && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                          {message.cards.map((card, cardIndex) => (
-                            <DynamicCardRenderer
-                              key={`${card.type}-${cardIndex}`}
-                              card={card}
-                              index={cardIndex}
-                              onAnalyze={() => generateDetailedAnalysis(card)}
-                            />
-                          ))}
+                          {message.cards.map((card, cardIndex) => {
+                            const { icon: _icon, ...cardData } = card;
+                            return (
+                              <DynamicCardRenderer
+                                key={`${card.type}-${cardIndex}`}
+                                card={cardData}
+                                index={cardIndex}
+                                onAnalyze={() => generateDetailedAnalysis(card)}
+                              />
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -2632,7 +2682,7 @@ export default function UnifiedAIPlatform() {
                       </button>
                       <div className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-gray-900/50 rounded-lg border border-gray-800/50">
                         <Clock className="w-3.5 h-3.5 text-gray-600" />
-                        <span className="text-xs font-medium text-gray-500 tabular-nums">{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="text-xs font-medium text-gray-500 tabular-nums" suppressHydrationWarning>{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     </div>
                   )}

@@ -5,8 +5,7 @@
  * NOTE: This script requires the historical-data-scraper module to be implemented
  */
 
-// TODO: Implement historical-data-scraper module
-// import { scrapeESPNResults } from '@/lib/historical-data-scraper';
+// TODO: Implement a historical data scraping function
 
 const SPORTS = ['NFL', 'NBA', 'MLB', 'NHL'];
 const START_DATE = '2021-01-01';

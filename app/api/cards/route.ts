@@ -21,8 +21,11 @@ import {
   type TransformedOdds
 } from '@/lib/odds-transformer';
 import { enrichCardsWithWeather } from '@/lib/weather-service';
+import { fetchUnifiedData } from '@/lib/unified-data-service';
 
-export const runtime = 'edge';
+// Using Node.js runtime for server-side fetch compatibility
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 interface CardRequest {
   sport?: string;
@@ -131,103 +134,66 @@ export async function POST(req: NextRequest) {
     const oddsApiKey = process.env[ENV_KEYS.ODDS_API_KEY];
     console.log(`${LOG_PREFIXES.API} Odds API Key configured:`, oddsApiKey ? 'YES' : 'NO');
     
-    // Fetch real odds data if available
-    let liveOddsData: any[] = [];
-    let validationResult = null;
+    // Use unified data service to fetch from both Odds API and Kalshi
+    console.log(`${LOG_PREFIXES.API} → Using Unified Data Service to fetch from Odds API + Kalshi...`);
+    const unifiedResult = await fetchUnifiedData({
+      sport: finalSport,
+      category,
+      limit,
+      includeKalshi: true,
+      includeOdds: !!oddsApiKey,
+      oddsApiKey: oddsApiKey || undefined,
+      useCache: true
+    });
     
-    // Always fetch multiple sports to show variety in cards
-    // If a specific sport is requested, prioritize it but still include others
-    const sportsToFetch = finalSport 
-      ? [finalSport, 'basketball_nba', 'americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb'].filter((s, i, arr) => arr.indexOf(s) === i).slice(0, 3)
-      : ['basketball_nba', 'americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb'];
-    
-    console.log(`${LOG_PREFIXES.API} Sports to fetch: ${sportsToFetch.join(', ')}${finalSport ? ` (prioritizing ${finalSport})` : ' (showing variety from all active sports)'}`);
-    
-    // Store odds data by sport to maintain separation
+    // Extract data from unified result
+    const liveOddsData = unifiedResult.oddsData;
+    const kalshiData = unifiedResult.kalshiData;
     const oddsBySport: Record<string, any[]> = {};
     
-    if (oddsApiKey) {
-      console.log(`[v0] Starting odds fetch for ${sportsToFetch.length} sport(s) to ensure variety`);
-      
-      // Fetch odds from all specified sports in parallel
-      const fetchPromises = sportsToFetch.map(async (sportKey) => {
-        try {
-          console.log(`[v0] Fetching odds for: ${sportKey}`);
-          const validation = validateSportKey(sportKey);
-          
-          if (!validation.isValid) {
-            console.log(`${LOG_PREFIXES.API} Skipping invalid sport: ${sportKey}`);
-            return { sport: sportKey, data: [] };
-          }
-          
-          const normalizedKey = validation.normalizedKey;
-          const sportInfo = getSportInfo(normalizedKey);
-          
-          console.log(`[v0] Fetching ${sportInfo.name} odds with ALL markets (H2H, Spreads, Totals, Props)...`);
-          const oddsData = await fetchLiveOdds(normalizedKey, {
-            markets: [ODDS_MARKETS.H2H, ODDS_MARKETS.SPREADS, ODDS_MARKETS.TOTALS, ODDS_MARKETS.PLAYER_PROPS],
-            regions: [BETTING_REGIONS.US],
-            apiKey: oddsApiKey
-          });
-          
-          const eventsArray = Array.isArray(oddsData) ? oddsData : [];
-          console.log(`${LOG_PREFIXES.API} ✓ Fetched ${eventsArray.length} ${sportInfo.name} events`);
-          return { sport: normalizedKey, data: eventsArray };
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          console.log(`${LOG_PREFIXES.API} ✗ Error fetching ${sportKey}:`, errorMessage);
-          return { sport: sportKey, data: [] };
+    // Reorganize odds by sport for backward compatibility
+    liveOddsData.forEach((event: any) => {
+      const sportKey = event.sport_key || event.sport_title?.toLowerCase().replace(/\s+/g, '_');
+      if (sportKey) {
+        if (!oddsBySport[sportKey]) {
+          oddsBySport[sportKey] = [];
         }
-      });
-      
-      try {
-        const results = await Promise.all(fetchPromises);
-        
-        // Organize data by sport
-        results.forEach(result => {
-          if (result.data.length > 0) {
-            oddsBySport[result.sport] = result.data;
-            liveOddsData.push(...result.data);
-          }
-        });
-        
-        console.log(`${LOG_PREFIXES.API} ✓ Odds by sport:`, Object.keys(oddsBySport).map(s => `${s}: ${oddsBySport[s].length}`).join(', '));
-        console.log(`${LOG_PREFIXES.API} ✓ Combined total: ${liveOddsData.length} events from ${Object.keys(oddsBySport).length} sports`);
-        
-        // Store validation result from first sport for response
-        if (sport) {
-          validationResult = validateSportKey(sport);
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.log(`${LOG_PREFIXES.API} Error in multi-sport fetch:`, errorMessage);
+        oddsBySport[sportKey].push(event);
       }
-    } else {
-      console.log(`[v0] No odds API key found - skipping odds fetch`);
-    }
-
-    // Generate cards based on category and available data
-    console.log(`${LOG_PREFIXES.API} → Calling generateDynamicCards...`);
-    console.log(`${LOG_PREFIXES.API} Generation parameters:`, {
-      category,
-      sport,
-      hasOddsData: !!liveOddsData,
-      oddsEventsCount: liveOddsData?.length || 0,
-      oddsBySportCount: Object.keys(oddsBySport).length,
-      hasUserContext: !!userContext,
-      limit
     });
     
-    let cards = await generateDynamicCards({
-      category,
-      sport: finalSport ?? undefined,
-      oddsData: liveOddsData,
-      oddsBySport, // Pass the separated data
-      userContext,
-      limit
-    });
+    console.log(`${LOG_PREFIXES.API} ✓ Unified Data Service Results:`);
+    console.log(`${LOG_PREFIXES.API}   - Odds: ${unifiedResult.metadata.oddsCount} events`);
+    console.log(`${LOG_PREFIXES.API}   - Kalshi: ${unifiedResult.metadata.kalshiCount} markets`);
+    console.log(`${LOG_PREFIXES.API}   - Pre-generated cards: ${unifiedResult.combinedCards.length}`);
+    console.log(`${LOG_PREFIXES.API}   - Errors: ${unifiedResult.errors.length}`);
+    
+    if (unifiedResult.errors.length > 0) {
+      console.warn(`${LOG_PREFIXES.API} Data fetch errors:`, unifiedResult.errors.join(', '));
+    }
+    
+    const validationResult = sport ? validateSportKey(sport) : null;
 
-    console.log(`${LOG_PREFIXES.API} ✓ Generated ${cards.length} cards`);
+    // Start with pre-generated unified cards from both sources
+    let cards = unifiedResult.combinedCards;
+    console.log(`${LOG_PREFIXES.API} ✓ Starting with ${cards.length} unified cards (Odds + Kalshi)`);
+    
+    // If we need more cards, generate additional ones from the odds data
+    if (cards.length < limit && liveOddsData.length > 0) {
+      console.log(`${LOG_PREFIXES.API} → Generating additional cards from odds data...`);
+      const additionalCards = await generateDynamicCards({
+        category,
+        sport: finalSport ?? undefined,
+        oddsData: liveOddsData,
+        oddsBySport,
+        userContext,
+        limit: limit - cards.length
+      });
+      cards.push(...additionalCards);
+      console.log(`${LOG_PREFIXES.API} ✓ Added ${additionalCards.length} cards from odds`);
+    }
+
+    console.log(`${LOG_PREFIXES.API} ✓ Total cards after generation: ${cards.length}`);
     
     // Enrich cards with weather data for NFL/MLB games
     if (cards.length > 0 && (sport?.includes('nfl') || sport?.includes('mlb'))) {
@@ -257,11 +223,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Track actual data sources with weather for outdoor sports
-    const dataSources: string[] = [];
-    if (liveOddsData.length > 0) {
-      dataSources.push('The Odds API (real-time odds from 15+ sportsbooks)');
-    }
+    // Track actual data sources (start with unified service sources)
+    const dataSources: string[] = [...unifiedResult.dataSources];
     
     // Add weather data source for outdoor sports
     const outdoorSports = ['nfl', 'mlb', 'ncaaf'];
@@ -270,6 +233,7 @@ export async function POST(req: NextRequest) {
       console.log(`${LOG_PREFIXES.API} Weather data relevant for ${finalSport} - marked as source`);
     }
     
+    // Add fallback sources if no real data
     if (dataSources.length === 0) {
       dataSources.push('Grok 4 Fast AI (xAI)');
       dataSources.push('Statistical Models & Historical Data');

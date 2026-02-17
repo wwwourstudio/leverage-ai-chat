@@ -8,35 +8,32 @@ import { Loader2, RefreshCw, CheckCircle2, XCircle, AlertCircle, Clock } from 'l
 
 interface SportResult {
   sport: string;
-  sportKey: string;
-  status: string;
-  gamesAvailable: number;
-  responseTime: number;
-  apiStatus?: number;
-  remainingRequests?: string;
-  usedRequests?: string;
+  apiKey: string;
+  status: 'success' | 'no_games' | 'error';
+  eventCount?: number;
+  httpStatus?: number;
+  apiUrl?: string;
   error?: string;
-  sampleGame?: {
-    id: string;
-    homeTeam: string;
-    awayTeam: string;
-    commenceTime: string;
-  };
 }
 
 interface DiagnosticsResponse {
-  success: boolean;
+  configured: boolean;
+  apiKeyPrefix?: string;
+  timestamp: string;
   summary: {
-    overallHealth: string;
-    totalSportsTested: number;
-    successfulSports: number;
-    failedSports: number;
-    totalGamesAvailable: number;
-    totalDiagnosticTime: number;
-    timestamp: string;
+    total: number;
+    success: number;
+    noGames: number;
+    errors: number;
   };
   results: SportResult[];
   recommendations: string[];
+}
+
+function deriveOverallHealth(summary: DiagnosticsResponse['summary']): string {
+  if (summary.errors === summary.total) return 'critical';
+  if (summary.errors > 0 || summary.success === 0) return 'degraded';
+  return 'healthy';
 }
 
 export default function APIHealthDashboard() {
@@ -47,12 +44,12 @@ export default function APIHealthDashboard() {
   const runDiagnostics = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/odds/diagnostics');
+      const response = await fetch('/api/odds/test');
       const data = await response.json();
       setDiagnostics(data);
       setLastRun(new Date().toLocaleTimeString());
     } catch (error) {
-      console.error('[v0] Diagnostics error:', error);
+      console.error('Diagnostics error:', error);
     } finally {
       setLoading(false);
     }
@@ -75,11 +72,11 @@ export default function APIHealthDashboard() {
     }
   };
 
-  const getStatusIcon = (status: string, gamesAvailable: number) => {
+  const getStatusIcon = (status: string, eventCount?: number) => {
     if (status === 'error') {
       return <XCircle className="h-5 w-5 text-red-500" />;
     }
-    if (gamesAvailable === 0) {
+    if (status === 'no_games' || eventCount === 0) {
       return <AlertCircle className="h-5 w-5 text-yellow-500" />;
     }
     return <CheckCircle2 className="h-5 w-5 text-green-500" />;
@@ -132,7 +129,7 @@ export default function APIHealthDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-2">
-                  {getHealthBadge(diagnostics.summary.overallHealth)}
+                  {getHealthBadge(deriveOverallHealth(diagnostics.summary))}
                 </div>
               </CardContent>
             </Card>
@@ -143,7 +140,7 @@ export default function APIHealthDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {diagnostics.summary.successfulSports} / {diagnostics.summary.totalSportsTested}
+                  {diagnostics.summary.success} / {diagnostics.summary.total}
                 </div>
               </CardContent>
             </Card>
@@ -153,16 +150,20 @@ export default function APIHealthDashboard() {
                 <CardTitle className="text-sm font-medium">Total Games</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{diagnostics.summary.totalGamesAvailable}</div>
+                <div className="text-2xl font-bold">
+                  {diagnostics.results.reduce((sum, r) => sum + (r.eventCount || 0), 0)}
+                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Diagnostic Time</CardTitle>
+                <CardTitle className="text-sm font-medium">Off-Season</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{diagnostics.summary.totalDiagnosticTime}ms</div>
+                <div className="text-2xl font-bold">
+                  {diagnostics.summary.noGames} sport{diagnostics.summary.noGames !== 1 ? 's' : ''}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -178,7 +179,7 @@ export default function APIHealthDashboard() {
                 <ul className="space-y-2">
                   {diagnostics.recommendations.map((rec, idx) => (
                     <li key={idx} className="flex items-start gap-2 text-sm">
-                      <span className="text-primary mt-0.5">•</span>
+                      <span className="text-primary mt-0.5">{'•'}</span>
                       <span>{rec}</span>
                     </li>
                   ))}
@@ -190,47 +191,35 @@ export default function APIHealthDashboard() {
           {/* Sport Status Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {diagnostics.results.map((result) => (
-              <Card key={result.sportKey} className="relative">
+              <Card key={result.apiKey} className="relative">
                 <CardHeader className="pb-4">
                   <div className="flex items-start justify-between">
                     <div>
                       <CardTitle className="text-base">{result.sport}</CardTitle>
                       <CardDescription className="text-xs mt-1">
-                        {result.sportKey}
+                        {result.apiKey}
                       </CardDescription>
                     </div>
-                    {getStatusIcon(result.status, result.gamesAvailable)}
+                    {getStatusIcon(result.status, result.eventCount)}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
                       <p className="text-muted-foreground text-xs">Games Available</p>
-                      <p className="font-semibold text-lg">{result.gamesAvailable}</p>
+                      <p className="font-semibold text-lg">{result.eventCount ?? 0}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground text-xs">Response Time</p>
-                      <p className="font-semibold text-lg">{result.responseTime}ms</p>
+                      <p className="text-muted-foreground text-xs">HTTP Status</p>
+                      <p className="font-semibold text-lg">{result.httpStatus ?? '--'}</p>
                     </div>
                   </div>
 
-                  {result.status === 'success' && result.remainingRequests && (
+                  {result.status === 'no_games' && (
                     <div className="pt-3 border-t">
-                      <p className="text-xs text-muted-foreground">API Quota</p>
-                      <p className="text-sm font-medium mt-1">
-                        {result.remainingRequests} requests remaining
-                      </p>
-                    </div>
-                  )}
-
-                  {result.sampleGame && (
-                    <div className="pt-3 border-t">
-                      <p className="text-xs text-muted-foreground mb-1">Sample Game</p>
-                      <p className="text-xs font-medium text-pretty">
-                        {result.sampleGame.awayTeam} @ {result.sampleGame.homeTeam}
-                      </p>
+                      <p className="text-xs text-yellow-600 font-medium">No Games</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(result.sampleGame.commenceTime).toLocaleString()}
+                        This sport may be out of season or have no scheduled games right now.
                       </p>
                     </div>
                   )}

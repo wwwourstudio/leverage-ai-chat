@@ -56,7 +56,7 @@ interface LogEntry {
 class Logger {
   private static instance: Logger;
   private requestIdCounter = 0;
-  
+
   // Performance thresholds (in ms)
   private performanceThresholds: Record<string, PerformanceThreshold> = {
     'database.query': { warn: 500, error: 2000 },
@@ -66,7 +66,7 @@ class Logger {
     'api.request': { warn: 2000, error: 5000 },
   };
 
-  private constructor() {}
+  private constructor() { }
 
   static getInstance(): Logger {
     if (!Logger.instance) {
@@ -121,7 +121,7 @@ class Logger {
    */
   private output(entry: LogEntry): void {
     const formatted = JSON.stringify(entry);
-    
+
     switch (entry.level) {
       case LogLevel.DEBUG:
         console.debug(formatted);
@@ -150,7 +150,7 @@ class Logger {
   private sendToMonitoring(entry: LogEntry): void {
     // TODO: Integrate with monitoring service (Sentry, Datadog, Vercel Analytics)
     // Example: Sentry.captureException(entry.error, { extra: entry.context });
-    
+
     if (typeof window !== 'undefined' && (window as any).gtag) {
       (window as any).gtag('event', 'exception', {
         description: entry.message,
@@ -254,7 +254,7 @@ class Logger {
    */
   database(operation: 'query' | 'insert' | 'update' | 'delete', context: LogContext): void {
     const { duration, ...rest } = context;
-    
+
     if (duration !== undefined) {
       this.checkPerformance(`database.${operation}`, duration, rest);
     }
@@ -270,7 +270,7 @@ class Logger {
     context: LogContext & { model?: string; tokens?: number; cost?: number }
   ): void {
     const { duration, ...rest } = context;
-    
+
     if (duration !== undefined) {
       this.checkPerformance('ai.inference', duration, rest);
     }
@@ -289,7 +289,7 @@ class Logger {
   ): void {
     const { duration, ...rest } = context;
     const fullContext = { ...rest, statusCode, method, endpoint };
-    
+
     if (duration !== undefined) {
       this.checkPerformance('api.request', duration, fullContext);
     }
@@ -309,7 +309,7 @@ class Logger {
    */
   systemInit(component: string, success: boolean, context?: LogContext): void {
     const message = `${component} initialization ${success ? 'completed' : 'failed'}`;
-    
+
     if (success) {
       this.info(LogCategory.SYSTEM, message, { ...context, component });
     } else {
@@ -357,13 +357,13 @@ export function createScopedLogger(component: string, persistentContext: LogCont
   return {
     debug: (message: string, context?: LogContext) =>
       logger.debug(LogCategory.SYSTEM, message, { ...persistentContext, component, ...context }),
-    
+
     info: (message: string, context?: LogContext) =>
       logger.info(LogCategory.SYSTEM, message, { ...persistentContext, component, ...context }),
-    
+
     warn: (message: string, context?: LogContext) =>
       logger.warn(LogCategory.SYSTEM, message, { ...persistentContext, component, ...context }),
-    
+
     error: (message: string, contextOrError?: LogContext | Error, error?: Error) =>
       logger.error(
         LogCategory.SYSTEM,
@@ -388,7 +388,7 @@ export function logExecution(category: LogCategory, operationName?: string) {
 
     descriptor.value = async function (...args: any[]) {
       const endTimer = logger.startTimer(operation);
-      
+
       try {
         const result = await originalMethod.apply(this, args);
         endTimer();

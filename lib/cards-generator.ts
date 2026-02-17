@@ -839,7 +839,7 @@ export async function generateContextualCards(
     if (isOutdoorSport) {
       console.log('[v0] [CARDS GENERATOR] Outdoor sport detected, attempting weather enrichment');
       try {
-        const { enrichCardsWithWeather } = await import('@/lib/weather-service');
+        const { enrichCardsWithWeather } = await import('@/lib/weather/indes');
         const enrichedCards = await enrichCardsWithWeather(cards);
         console.log('[v0] [CARDS GENERATOR] Weather enrichment complete:', enrichedCards.length - cards.length, 'weather cards added');
         return enrichedCards.slice(0, count + 1); // Allow 1 extra for weather card

@@ -303,8 +303,8 @@ export interface OddsAPIOptions {
 // ============================================
 
 const requestCache = new Map<string, { data: any; timestamp: number; promise?: Promise<any> }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const IN_FLIGHT_TTL = 30 * 1000; // 30 seconds
+// CACHE_TTL is already defined at line 14
 
 export function clearOddsCache(sportKey?: string): void {
   if (sportKey) {

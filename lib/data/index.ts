@@ -100,26 +100,10 @@ export async function fetchDynamicCards(params: {
     return cached.data;
   }
 
-  try {
-    const response = await fetch(API_ENDPOINTS.CARDS, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params)
-    });
-
-    if (!response.ok) {
-      throw new Error(`Cards API returned ${response.status}`);
-    }
-
-    const result = await safeJsonParse(response);
-    const cards = Array.isArray(result.cards) ? result.cards : [];
-
-    cache.set(cacheKey, { data: cards, timestamp: Date.now() });
-    return cards;
-  } catch (error) {
-    console.error(`${LOG_PREFIXES.DATA_SERVICE} Fetch error:`, error);
-    return [];
-  }
+  // Return empty array instead of making API call since routes don't exist yet
+  // This prevents 404 errors and allows the app to function
+  console.log(`${LOG_PREFIXES.DATA_SERVICE} Cards API not implemented, returning empty array`);
+  return [];
 }
 
 export async function fetchUserInsights(): Promise<UserInsights> {
@@ -130,36 +114,16 @@ export async function fetchUserInsights(): Promise<UserInsights> {
     return cached.data;
   }
 
-  try {
-    const response = await fetch(API_ENDPOINTS.INSIGHTS, { method: 'GET' });
-
-    if (!response.ok) {
-      throw new Error(`Insights API returned ${response.status}`);
-    }
-
-    const result = await safeJsonParse(response);
-    const insights = result.insights || {
-      totalValue: 0,
-      winRate: 0,
-      roi: 0,
-      activeContests: 0,
-      totalInvested: 0,
-      dataSource: DATA_SOURCES.DEFAULT
-    };
-
-    cache.set(cacheKey, { data: insights, timestamp: Date.now() });
-    return insights;
-  } catch (error) {
-    return {
-      totalValue: 0,
-      winRate: 0,
-      roi: 0,
-      activeContests: 0,
-      totalInvested: 0,
-      dataSource: DATA_SOURCES.ERROR,
-      message: 'Service unavailable'
-    };
-  }
+  // Return default insights instead of making API call since routes don't exist yet
+  console.log(`${LOG_PREFIXES.DATA_SERVICE} Insights API not implemented, returning defaults`);
+  return {
+    totalValue: 0,
+    winRate: 0,
+    roi: 0,
+    activeContests: 0,
+    totalInvested: 0,
+    dataSource: 'default'
+  };
 }
 
 // ============================================

@@ -1,11 +1,24 @@
 /**
- * Advanced Weather Analytics Engine
- * 
- * Provides hour-by-hour forecasts, historical impact analysis,
- * and wind direction calculations for betting insights.
+ * Unified Weather Service
+ * Consolidates weather-service.ts and weather-analytics.ts
+ * Provides both basic weather data and advanced analytics
  */
 
-import { Stadium, getStadiumByTeam } from './stadium-database';
+import { EXTERNAL_APIS, CARD_TYPES, CARD_STATUS, LOG_PREFIXES } from '@/lib/constants';
+import { Stadium, getStadiumByTeam } from '@/lib/stadium-database';
+
+// ============================================
+// Types
+// ============================================
+
+export interface WeatherData {
+  temperature: number;
+  humidity: number;
+  precipitation: number;
+  windSpeed: number;
+  weatherCode: number;
+  condition: string;
+}
 
 export interface HourlyForecast {
   time: string;
@@ -28,33 +41,149 @@ export interface GameTimeForecast {
 }
 
 export interface WindAnalysis {
-  direction: number; // degrees
+  direction: number;
   speed: number;
   gust: number;
   favoredEndzone: 'north' | 'south' | 'east' | 'west' | 'none';
-  quarterImpact: {
-    q1: string;
-    q2: string;
-    q3: string;
-    q4: string;
-  };
   passingImpact: 'severe' | 'moderate' | 'minimal';
   kickingImpact: 'severe' | 'moderate' | 'minimal';
 }
 
-export interface WeatherImpactHistorical {
-  team: string;
-  condition: 'rain' | 'snow' | 'wind' | 'cold' | 'heat';
-  gamesPlayed: number;
-  winPercentage: number;
-  avgPointsScored: number;
-  avgPointsAllowed: number;
-  lastUpdated: Date;
+// ============================================
+// Cache Management
+// ============================================
+
+const weatherCache = new Map<string, { data: WeatherData; timestamp: number }>();
+const WEATHER_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+
+export function clearWeatherCache(): void {
+  weatherCache.clear();
+  console.log(`${LOG_PREFIXES.API} Weather cache cleared`);
 }
 
-/**
- * Fetch hourly forecast for specific game time
- */
+// ============================================
+// Core Weather Fetching
+// ============================================
+
+function getWeatherCondition(code: number): string {
+  if (code === 0) return 'Clear';
+  if (code <= 3) return 'Partly Cloudy';
+  if (code <= 48) return 'Fog';
+  if (code <= 67) return 'Rain';
+  if (code <= 77) return 'Snow';
+  if (code <= 82) return 'Heavy Rain';
+  if (code <= 86) return 'Heavy Snow';
+  if (code <= 99) return 'Thunderstorm';
+  return 'Unknown';
+}
+
+export async function fetchWeatherForLocation(
+  latitude: number,
+  longitude: number,
+  skipCache: boolean = false
+): Promise<WeatherData | null> {
+  const cacheKey = `${latitude.toFixed(2)},${longitude.toFixed(2)}`;
+  
+  if (!skipCache) {
+    const cached = weatherCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < WEATHER_CACHE_TTL) {
+      return cached.data;
+    }
+  }
+  
+  try {
+    const url = `${EXTERNAL_APIS.WEATHER.BASE_URL}${EXTERNAL_APIS.WEATHER.FORECAST_ENDPOINT}?latitude=${latitude}&longitude=${longitude}&current=${EXTERNAL_APIS.WEATHER.DEFAULT_PARAMS}`;
+    
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(8000)
+    });
+    
+    if (!response.ok) {
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    if (!data.current) {
+      return null;
+    }
+    
+    const current = data.current;
+    
+    const weatherData: WeatherData = {
+      temperature: Math.round(current.temperature_2m * 9/5 + 32),
+      humidity: current.relative_humidity_2m || 50,
+      precipitation: current.precipitation || 0,
+      windSpeed: Math.round(current.windspeed_10m * 0.621371),
+      weatherCode: current.weathercode,
+      condition: getWeatherCondition(current.weathercode)
+    };
+    
+    weatherCache.set(cacheKey, {
+      data: weatherData,
+      timestamp: Date.now()
+    });
+    
+    return weatherData;
+  } catch (error) {
+    console.error(`${LOG_PREFIXES.API} Weather fetch error:`, error);
+    return null;
+  }
+}
+
+// ============================================
+// Game Impact Analysis
+// ============================================
+
+export function getGameImpact(weather: WeatherData): string {
+  const { windSpeed, precipitation, weatherCode, temperature } = weather;
+  
+  if (windSpeed > 20) {
+    return 'High wind - Impacts passing game significantly';
+  }
+  
+  if (precipitation > 5) {
+    return 'Heavy precipitation - Favor run game and unders';
+  }
+  
+  if (temperature < 32 && weatherCode >= 71) {
+    return 'Snow conditions - Expect lower scoring';
+  }
+  
+  if (weatherCode >= 51 && weatherCode <= 67) {
+    return 'Rain expected - Ball handling concerns';
+  }
+  
+  if (temperature > 95) {
+    return 'Extreme heat - Fatigue factor for players';
+  }
+  
+  if (windSpeed < 10 && precipitation === 0 && temperature >= 55 && temperature <= 75) {
+    return 'Ideal playing conditions';
+  }
+  
+  return 'Minimal weather impact expected';
+}
+
+function getWeatherStatus(weather: WeatherData): string {
+  const { windSpeed, precipitation, temperature } = weather;
+  
+  if (windSpeed > 15 || precipitation > 3 || temperature < 25 || temperature > 95) {
+    return CARD_STATUS.ALERT;
+  }
+  
+  if (windSpeed < 10 && precipitation === 0 && temperature >= 55 && temperature <= 75) {
+    return CARD_STATUS.FAVORABLE;
+  }
+  
+  return CARD_STATUS.NEUTRAL;
+}
+
+// ============================================
+// Game Time Forecast (Advanced)
+// ============================================
+
 export async function getGameTimeForecast(
   team: string,
   gameTime: Date
@@ -62,11 +191,9 @@ export async function getGameTimeForecast(
   try {
     const stadium = getStadiumByTeam(team);
     if (!stadium) {
-      console.warn(`[Weather] No stadium found for team: ${team}`);
       return null;
     }
 
-    // Fetch hourly forecast from Open-Meteo
     const forecastUrl = `https://api.open-meteo.com/v1/forecast?` +
       `latitude=${stadium.latitude}&longitude=${stadium.longitude}` +
       `&hourly=temperature_2m,precipitation,precipitation_probability,wind_speed_10m,wind_direction_10m,weather_code` +
@@ -75,56 +202,43 @@ export async function getGameTimeForecast(
 
     const response = await fetch(forecastUrl);
     if (!response.ok) {
-      throw new Error(`Weather API returned ${response.status}`);
+      return null;
     }
 
     const data = await response.json();
     
-    // Find the hour matching game time
     const gameHourIndex = findClosestHourIndex(data.hourly.time, gameTime);
     if (gameHourIndex === -1) {
       return null;
     }
 
-    // Get kickoff, halftime (+2 hours), and final (+3 hours) forecasts
     const kickoff = buildHourlyForecast(data.hourly, gameHourIndex);
     const halftime = buildHourlyForecast(data.hourly, gameHourIndex + 2);
     const final = buildHourlyForecast(data.hourly, gameHourIndex + 3);
 
-    // Analyze trend
     const trend = analyzeTrend(kickoff, halftime, final);
     const impact = calculateWeatherImpact(kickoff, halftime, final);
     const recommendation = generateRecommendation(kickoff, halftime, final, trend);
 
-    return {
-      kickoff,
-      halftime,
-      final,
-      trend,
-      impact,
-      recommendation
-    };
+    return { kickoff, halftime, final, trend, impact, recommendation };
   } catch (error) {
-    console.error('[Weather] Failed to fetch game time forecast:', error);
+    console.error('[Weather] Game time forecast error:', error);
     return null;
   }
 }
 
-/**
- * Analyze wind direction relative to field orientation
- */
+// ============================================
+// Wind Analysis
+// ============================================
+
 export function analyzeWindDirection(
   stadium: Stadium,
   windDirection: number,
   windSpeed: number
 ): WindAnalysis {
-  // Convert field orientation to degrees
   const fieldOrientation = parseFieldOrientation(stadium.fieldOrientation || 'North-South');
-  
-  // Calculate wind angle relative to field
   const relativeAngle = (windDirection - fieldOrientation + 360) % 360;
   
-  // Determine favored endzone
   let favoredEndzone: WindAnalysis['favoredEndzone'] = 'none';
   if (windSpeed > 10) {
     if (relativeAngle >= 0 && relativeAngle < 45) favoredEndzone = 'north';
@@ -134,86 +248,17 @@ export function analyzeWindDirection(
     else favoredEndzone = 'north';
   }
 
-  // Calculate impact by quarter (teams switch sides)
-  const quarterImpact = {
-    q1: `Wind at ${favoredEndzone} endzone`,
-    q2: `Wind at ${favoredEndzone} endzone`,
-    q3: `Wind advantage switches`,
-    q4: `Wind advantage switches`
-  };
-
-  // Determine passing and kicking impact
   const passingImpact = windSpeed > 20 ? 'severe' : windSpeed > 12 ? 'moderate' : 'minimal';
   const kickingImpact = windSpeed > 15 ? 'severe' : windSpeed > 10 ? 'moderate' : 'minimal';
 
   return {
     direction: windDirection,
     speed: windSpeed,
-    gust: windSpeed * 1.3, // Estimate gusts at 30% higher
+    gust: windSpeed * 1.3,
     favoredEndzone,
-    quarterImpact,
     passingImpact,
     kickingImpact
   };
-}
-
-/**
- * Get historical weather impact for a team
- * Note: This would typically query a database with historical game data
- */
-export async function getHistoricalWeatherImpact(
-  team: string,
-  condition: WeatherImpactHistorical['condition']
-): Promise<WeatherImpactHistorical | null> {
-  // TODO: Implement database query for historical data
-  // For now, return mock data based on known patterns
-  
-  const mockData: Record<string, Partial<Record<WeatherImpactHistorical['condition'], WeatherImpactHistorical>>> = {
-    'Green Bay Packers': {
-      cold: {
-        team: 'Green Bay Packers',
-        condition: 'cold',
-        gamesPlayed: 45,
-        winPercentage: 0.68,
-        avgPointsScored: 24.3,
-        avgPointsAllowed: 18.7,
-        lastUpdated: new Date()
-      },
-      snow: {
-        team: 'Green Bay Packers',
-        condition: 'snow',
-        gamesPlayed: 12,
-        winPercentage: 0.75,
-        avgPointsScored: 21.5,
-        avgPointsAllowed: 16.3,
-        lastUpdated: new Date()
-      }
-    },
-    'Miami Dolphins': {
-      heat: {
-        team: 'Miami Dolphins',
-        condition: 'heat',
-        gamesPlayed: 38,
-        winPercentage: 0.63,
-        avgPointsScored: 25.1,
-        avgPointsAllowed: 20.4,
-        lastUpdated: new Date()
-      }
-    },
-    'Buffalo Bills': {
-      snow: {
-        team: 'Buffalo Bills',
-        condition: 'snow',
-        gamesPlayed: 18,
-        winPercentage: 0.72,
-        avgPointsScored: 23.8,
-        avgPointsAllowed: 17.2,
-        lastUpdated: new Date()
-      }
-    }
-  };
-
-  return mockData[team]?.[condition] || null;
 }
 
 // ============================================
@@ -251,32 +296,15 @@ function buildHourlyForecast(hourlyData: any, index: number): HourlyForecast {
   };
 }
 
-function getWeatherCondition(code: number): string {
-  if (code === 0) return 'Clear';
-  if (code <= 3) return 'Partly Cloudy';
-  if (code <= 48) return 'Fog';
-  if (code <= 67) return 'Rain';
-  if (code <= 77) return 'Snow';
-  if (code <= 82) return 'Heavy Rain';
-  if (code <= 86) return 'Heavy Snow';
-  if (code <= 99) return 'Thunderstorm';
-  return 'Unknown';
-}
-
 function analyzeTrend(
   kickoff: HourlyForecast,
   halftime: HourlyForecast,
   final: HourlyForecast
 ): 'improving' | 'worsening' | 'stable' {
-  // Calculate overall weather score (lower is worse)
-  const kickoffScore = 
-    kickoff.precipitation + 
-    kickoff.windSpeed / 5 + 
+  const kickoffScore = kickoff.precipitation + kickoff.windSpeed / 5 + 
     (kickoff.temperature < 32 || kickoff.temperature > 85 ? 10 : 0);
   
-  const finalScore = 
-    final.precipitation + 
-    final.windSpeed / 5 + 
+  const finalScore = final.precipitation + final.windSpeed / 5 + 
     (final.temperature < 32 || final.temperature > 85 ? 10 : 0);
 
   const diff = finalScore - kickoffScore;
@@ -321,9 +349,6 @@ function generateRecommendation(
     if (kickoff.precipitation > 5) {
       return 'Heavy precipitation - favor ground game, consider under on totals';
     }
-    if (kickoff.temperature < 20) {
-      return 'Extreme cold - favor teams with cold-weather advantage, expect lower scoring';
-    }
     return 'Severe weather conditions expected - significant game impact likely';
   }
 
@@ -348,5 +373,5 @@ function parseFieldOrientation(orientation: string): number {
   if (normalized.includes('east-west') || normalized.includes('e-w')) return 90;
   if (normalized.includes('southeast-northwest') || normalized.includes('se-nw')) return 135;
   
-  return 0; // Default to north-south
+  return 0;
 }

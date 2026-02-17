@@ -1,11 +1,14 @@
 /**
  * Unified Odds Service
- * Consolidates odds-api-client, enhanced-odds-client, and unified-odds-fetcher
- * Single source of truth for all odds data fetching
+ * Consolidates odds-api-client, enhanced-odds-client, unified-odds-fetcher, and supabase-odds-service
+ * Single source of truth for all odds data fetching and storage
  */
 
 import { ENV_KEYS, LOG_PREFIXES, EXTERNAL_APIS } from '@/lib/constants';
-import { supabaseOddsService } from '@/lib/supabase-odds-service';
+import { createClient } from '@/lib/supabase/client';
+
+// Re-export Supabase odds service singleton
+export { supabaseOddsService } from '@/lib/supabase-odds-service';
 
 // ============================================
 // Types & Constants

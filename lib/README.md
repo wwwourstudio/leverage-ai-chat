@@ -53,11 +53,18 @@ The `/lib` folder has been comprehensively refactored to eliminate code duplicat
 - Single import: `import { calculateKelly, calculateOptimalBankroll } from '@/lib/kelly'`
 
 #### `/lib/kalshi/` - Kalshi Integration
-**Replaced**: `kalshi-api-client.ts`, `kalshi-client.ts`
+**Replaced**: `kalshi-api-client.ts`, `kalshi-client.ts`, `unified-kalshi-service.ts`
 - Kalshi prediction market API
-- Market data fetching
-- Contract analysis
-- Single import: `import { fetchKalshiMarkets, analyzeContract } from '@/lib/kalshi'`
+- Market data fetching with Supabase caching
+- Contract analysis & election markets
+- Single import: `import { fetchKalshiMarkets, getElectionKalshiMarkets } from '@/lib/kalshi'`
+
+#### `/lib/players/` - Player Data Service (NEW)
+**Replaced**: `player-props-service.ts`, `player-projections.ts`
+- Player props from The Odds API
+- Player projections and stat analysis
+- Comprehensive player betting markets
+- Single import: `import { fetchPlayerProps, fetchPlayerProjections, getPlayerProps } from '@/lib/players'`
 
 ### Configuration Consolidation
 
@@ -87,32 +94,23 @@ import { getWeatherForGame } from '@/lib/weather-service';
 // Utilities
 import { debugLog } from '@/lib/debug-utils';
 // NOW: import { debugLog } from '@/lib/utils';
+
+// Player data
+import { fetchPlayerProjections } from '@/lib/player-projections';
+// NOW: import { fetchPlayerProjections } from '@/lib/players';
+
+// Kalshi markets
+import { getKalshiMarketsWithCache } from '@/lib/unified-kalshi-service';
+// NOW: import { fetchKalshiMarkets } from '@/lib/kalshi';
 ```
 
 **Backward Compatibility**: `/lib/utils.ts` re-exports from `/lib/utils/index.ts` to maintain compatibility during migration.
 
 ---
 
-## Services
+## Core Services
 
-### `player-projections.ts`
-Fetches real-time player projection data from The Odds API.
-
-**Key Functions:**
-- `fetchPlayerProjections(playerName, sport)` - Fetches player prop data
-- `formatProjectionSummary(response)` - Formats projections into readable text
-- `extractPlayerName(query)` - Extracts player name from query string
-- `isPlayerProjectionQuery(query)` - Detects if query is about player props
-
-**Usage:**
-```typescript
-import { fetchPlayerProjections } from '@/lib/player-projections';
-
-const projections = await fetchPlayerProjections('Mike Trout', 'baseball_mlb');
-if (projections.success) {
-  console.log(projections.projections); // Array of PlayerProjection
-}
-```
+All services are now organized into domain-specific modules under `/lib/[domain]/index.ts`. See the Consolidated Modules section above for complete documentation.
 
 ### `constants.ts`
 Central configuration for API endpoints, system prompts, and default values.

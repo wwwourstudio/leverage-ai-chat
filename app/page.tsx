@@ -2316,7 +2316,7 @@ export default function UnifiedAIPlatform() {
                               if (paragraph.includes('**')) {
                                 const parts = paragraph.split('**');
                                 return (
-                                  <p key={pIdx}>
+                                  <p key={pIdx} suppressHydrationWarning>
                                     {parts.map((part, partIdx) => {
                                       if (partIdx % 2 === 1) {
                                         return <span key={partIdx} className="font-black text-white">{part}</span>;
@@ -2327,7 +2327,7 @@ export default function UnifiedAIPlatform() {
                                 );
                               }
                               
-                              return <p key={pIdx}>{paragraph}</p>;
+                              return <p key={pIdx} suppressHydrationWarning>{paragraph}</p>;
                             })}
                           </div>
                         )}

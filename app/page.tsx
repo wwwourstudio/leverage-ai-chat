@@ -200,17 +200,23 @@ export default function UnifiedAIPlatform() {
   
   useEffect(() => {
     setIsMounted(true);
-    setMessages(prev => {
-      if (prev.length === 1 && prev[0].isWelcome) {
-        return [{
-          ...prev[0],
-          content: getWelcomeMessage('all'),
-          timestamp: new Date(),
-        }];
-      }
-      return prev;
-    });
   }, []);
+  
+  // Update welcome message ONLY after client mount
+  useEffect(() => {
+    if (isMounted) {
+      setMessages(prev => {
+        if (prev.length === 1 && prev[0].isWelcome) {
+          return [{
+            ...prev[0],
+            content: getWelcomeMessage('all'),
+            timestamp: new Date(),
+          }];
+        }
+        return prev;
+      });
+    }
+  }, [isMounted]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -324,7 +330,7 @@ export default function UnifiedAIPlatform() {
         }
         
         // Listen for auth changes (OAuth redirect, signout, etc.)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: unknown, session: { user: { user_metadata?: Record<string, unknown>; email?: string } } | null) => {
           if (session?.user) {
             setIsLoggedIn(true);
             setUser({
@@ -1205,7 +1211,14 @@ export default function UnifiedAIPlatform() {
         const text = await file.text();
         const delimiter = file.name.endsWith('.tsv') || fileType === 'text/tab-separated-values' ? '\t' : ',';
         const parsed = parseDelimitedFile(text, delimiter);
-        attachment.data = parsed;
+        // Convert { headers, rows } to Record<string, string>[]
+        attachment.data = parsed.rows.map(row => {
+          const record: Record<string, string> = {};
+          parsed.headers.forEach((header, index) => {
+            record[header] = row[index] || '';
+          });
+          return record;
+        });
       }
 
       newAttachments.push(attachment);
@@ -2314,10 +2327,8 @@ export default function UnifiedAIPlatform() {
                             );
                           })()
                         ) : (
-                          <div className="text-sm leading-relaxed font-medium space-y-3" suppressHydrationWarning>
-                            {(!isMounted && message.isWelcome) ? (
-                              <p>{message.content}</p>
-                            ) : message.content.split('\n\n').map((paragraph, pIdx) => {
+                          <div className="text-sm leading-relaxed font-medium space-y-3">
+                            {message.content.split('\n\n').map((paragraph, pIdx) => {
                               // Check if paragraph contains bullet points
                               if (paragraph.includes('\n**') && paragraph.includes('**')) {
                                 const lines = paragraph.split('\n');

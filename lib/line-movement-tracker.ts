@@ -168,7 +168,7 @@ export async function analyzeLineMovement(gameId: string, marketType: string = '
     
     return Object.values(movements);
   } catch (error) {
-    console.error('[v0] [LINE-TRACKER] Analysis error:', error);
+    console.error('[LINE-TRACKER] Analysis error:', error);
     return [];
   }
 }
@@ -223,7 +223,7 @@ export async function detectSharpMoney(sport: string, lookbackHours: number = 24
     
     return sharpMovements;
   } catch (error) {
-    console.error('[v0] [LINE-TRACKER] Sharp money detection error:', error);
+    console.error('[LINE-TRACKER] Sharp money detection error:', error);
     return [];
   }
 }

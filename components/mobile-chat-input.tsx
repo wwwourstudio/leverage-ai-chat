@@ -12,7 +12,7 @@ interface MobileChatInputProps {
 export function MobileChatInput({ onSend, disabled, placeholder = "Ask about betting opportunities..." }: MobileChatInputProps) {
   const [input, setInput] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (input.trim() && !disabled) {
       onSend(input.trim());

@@ -1254,7 +1254,7 @@ export default function UnifiedAIPlatform() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!input.trim() && uploadedFiles.length === 0) return;
 
@@ -1477,7 +1477,7 @@ export default function UnifiedAIPlatform() {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e as unknown as React.FormEvent);
+              handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>);
     }
   };
 
@@ -2866,7 +2866,7 @@ export default function UnifiedAIPlatform() {
                   onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      handleSubmit(e as React.FormEvent<HTMLInputElement>);
+                      handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>);
                     }
                   }}
                   placeholder="Ask about betting odds, fantasy strategy, DFS lineups, or Kalshi markets..."

@@ -160,7 +160,7 @@ export default function UnifiedAIPlatform() {
   const [messages, setMessages] = useState<Message[]>([
   {
   role: 'assistant',
-  content: getWelcomeMessage('all'),
+  content: '**Leverage AI** - Powered by Grok AI\n\nI\'m connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.',
   timestamp: new Date(),
   isWelcome: true,
   cards: [],
@@ -173,6 +173,19 @@ export default function UnifiedAIPlatform() {
       }
     }
   ]);
+
+  // Update welcome message with time-based greeting after hydration
+  useEffect(() => {
+    setMessages(prev => {
+      if (prev.length === 1 && prev[0].isWelcome) {
+        return [{
+          ...prev[0],
+          content: getWelcomeMessage('all')
+        }];
+      }
+      return prev;
+    });
+  }, []);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);

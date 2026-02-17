@@ -38,10 +38,10 @@ interface FileAttachment {
   type: 'image' | 'csv';
   url: string;
   size: number;
-  data?: any; // For CSV parsed data
+  data?: Record<string, string>[];
 }
 
-interface APIResponse<T = any> {
+interface APIResponse<T = unknown> {
   success: boolean;
   error?: string;
   data?: T;
@@ -62,12 +62,17 @@ interface APIResponse<T = any> {
   errorType?: string; // Type of error that occurred
 }
 
+interface OddsMarket {
+  key: string;
+  outcomes: Array<{ name: string; price: number; point?: number }>;
+}
+
 interface OddsEvent {
   sport_title: string;
   bookmakers?: Array<{
     key: string;
     title: string;
-    markets: any[];
+    markets: OddsMarket[];
   }>;
 }
 
@@ -131,12 +136,28 @@ interface Chat {
 interface InsightCard {
   type: string;
   title: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   category: string;
   subcategory: string;
   gradient: string;
   data: Record<string, string | number>;
   status: string;
+}
+
+interface QueryContext {
+  sport: string | null;
+  marketType: string | null;
+  platform: string | null;
+  isSportsQuery: boolean;
+  isPoliticalMarket: boolean;
+  hasBettingIntent: boolean;
+  previousMessages: Array<{ role: string; content: string }>;
+  oddsData?: Record<string, unknown> & { sport?: string };
+  oddsError?: unknown;
+  oddsErrorMessage?: string;
+  noGamesAvailable?: boolean;
+  noGamesMessage?: string;
+  crossSportError?: boolean;
 }
 
 export default function UnifiedAIPlatform() {
@@ -207,7 +228,7 @@ export default function UnifiedAIPlatform() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<{ name: string; email: string; avatar?: string } | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
-  const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string }>>([]);
+  const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -416,13 +437,13 @@ export default function UnifiedAIPlatform() {
 
   const generateContextualSuggestions = (userMessage: string, responseCards: InsightCard[]) => {
     const msgLower = userMessage.toLowerCase();
-    const suggestions: Array<{ label: string; icon: any; category: string }> = [];
+    const suggestions: Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }> = [];
     
     console.log('[v0] ==========================================');
       console.log('[v0] GENERATING CONTEXTUAL SUGGESTIONS');
       console.log('[v0] User message:', userMessage);
       console.log('[v0] Response cards received:', responseCards.length);
-      console.log('[v0] Card details:', responseCards.map((c: any) => ({ type: c.type, category: c.category })));
+      console.log('[v0] Card details:', responseCards.map((c: InsightCard) => ({ type: c.type, category: c.category })));
     
     // Analyze the AI's response cards to understand what was provided
     const cardTypes = responseCards.map(card => card.type);
@@ -615,7 +636,7 @@ export default function UnifiedAIPlatform() {
     return uniqueSuggestions.slice(0, 7);
   };
 
-  const handleFollowUp = (action: 'correlated' | 'metrics', cardData?: any) => {
+  const handleFollowUp = (action: 'correlated' | 'metrics', _cardData?: InsightCard) => {
     console.log('[v0] Generating follow-up response:', action);
     
     // Check if user has credits
@@ -707,15 +728,15 @@ export default function UnifiedAIPlatform() {
       // Override isPoliticalMarket if platform is kalshi
       const finalIsPoliticalMarket = isPoliticalMarket || detectedPlatform === 'kalshi';
       
-      const context: any = {
-        sport: detectedSport,
-        marketType: extractMarketType(userMessage),
-        platform: detectedPlatform,
-        isSportsQuery,
-        isPoliticalMarket: finalIsPoliticalMarket,
-        hasBettingIntent,
-        previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }))
-      };
+    const context: QueryContext = {
+      sport: detectedSport,
+      marketType: extractMarketType(userMessage),
+      platform: detectedPlatform,
+      isSportsQuery,
+      isPoliticalMarket: finalIsPoliticalMarket,
+      hasBettingIntent,
+      previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }))
+    };
 
       if (isDev) {
         console.log('[v0] Extracted context:', context);
@@ -761,8 +782,7 @@ export default function UnifiedAIPlatform() {
               if (oddsResult?.events?.length > 0) {
                 const sportName = sportKey.replace('_', ' ').toUpperCase();
                 if (isDev) console.log(`[v0] ✅ Found ${oddsResult.events.length} live games in ${sportName}`);
-                context.oddsData = oddsResult;
-                context.oddsData.sport = sportKey;
+                context.oddsData = { ...oddsResult, sport: sportKey };
               } else {
                 if (isDev) console.log('[NO GAMES FOUND]', context.sport);
                 // NO fallback - return status indicating no games
@@ -806,8 +826,7 @@ export default function UnifiedAIPlatform() {
                 if (oddsResult?.events?.length > 0) {
                   const sportName = sportKey.replace('_', ' ').toUpperCase();
                   if (isDev) console.log(`[v0] ✅ Fallback success - Found ${oddsResult.events.length} games in ${sportName}`);
-                  context.oddsData = oddsResult;
-                  context.oddsData.sport = sportKey;
+                  context.oddsData = { ...oddsResult, sport: sportKey };
                   foundData = true;
                   break;
                 }
@@ -831,7 +850,7 @@ export default function UnifiedAIPlatform() {
           fetched: context.oddsData.sport
         });
         // Clear contaminated data
-        context.oddsData = undefined as any;
+        context.oddsData = undefined;
         context.crossSportError = true;
         }
       }
@@ -1030,7 +1049,7 @@ export default function UnifiedAIPlatform() {
     return null;
   };
 
-  const selectRelevantCards = async (userMessage: string, context?: any): Promise<InsightCard[]> => {
+  const selectRelevantCards = async (userMessage: string, context?: QueryContext): Promise<InsightCard[]> => {
     const msgLower = userMessage.toLowerCase();
     
     // Extract sport and category from message
@@ -1101,7 +1120,7 @@ export default function UnifiedAIPlatform() {
     }
     
     // Map icon string to actual icon component
-    const iconMap: Record<string, any> = {
+    const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
       'Zap': Zap,
       'Target': Target,
       'Award': Award,
@@ -1443,7 +1462,7 @@ export default function UnifiedAIPlatform() {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e as any);
+      handleSubmit(e as unknown as React.FormEvent);
     }
   };
 
@@ -1462,7 +1481,7 @@ export default function UnifiedAIPlatform() {
   };
 
   const getStatusBadge = (status: string) => {
-    const badges: Record<string, any> = {
+    const badges: Record<string, { bg: string; text: string; border: string; icon: React.ComponentType<{ className?: string }>; label: string }> = {
       hot: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30', icon: Flame, label: 'HOT' },
       value: { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/30', icon: DollarSign, label: 'VALUE' },
       optimal: { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/30', icon: Award, label: 'OPTIMAL' },
@@ -2432,14 +2451,17 @@ export default function UnifiedAIPlatform() {
                     <div className="mt-5">
                       {message.cards && message.cards.length > 0 && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                          {message.cards.map((card, cardIndex) => (
-                            <DynamicCardRenderer
-                              key={`${card.type}-${cardIndex}`}
-                              card={card}
-                              index={cardIndex}
-                              onAnalyze={() => generateDetailedAnalysis(card)}
-                            />
-                          ))}
+                          {message.cards.map((card, cardIndex) => {
+                            const { icon: _icon, ...cardData } = card;
+                            return (
+                              <DynamicCardRenderer
+                                key={`${card.type}-${cardIndex}`}
+                                card={cardData}
+                                index={cardIndex}
+                                onAnalyze={() => generateDetailedAnalysis(card)}
+                              />
+                            );
+                          })}
                         </div>
                       )}
                     </div>

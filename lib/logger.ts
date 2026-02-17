@@ -3,7 +3,6 @@
  * Provides request tracing, performance monitoring, and alerting hooks
  */
 
-import { headers } from 'next/headers';
 
 export enum LogLevel {
   DEBUG = 'debug',

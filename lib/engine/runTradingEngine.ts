@@ -3,12 +3,11 @@
  * Orchestrates all trading analysis modules
  */
 
-import { detectArbitrage, type BookOdds, type ArbitrageOpportunity } from '../arbitrage/detectArbitrage';
+import { detectArbitrage, americanToProbability, type BookOdds, type ArbitrageOpportunity } from '@/lib/arbitrage';
 import { detectSharpMoney, type LineSnapshot, type SharpSignal } from '../sharp/detectSharpMoney';
-import { calculateKelly, type KellyResult } from '../kelly/calculateKelly';
+import { calculateKelly, type KellyResult } from '@/lib/kelly';
 import { analyzeLineMovement, type LineMovementAnalysis } from '../lines/analyzeLineMovement';
 import { analyzeKalshiVolatility, type KalshiMarket, type KalshiAnalysis } from '../kalshi/analyzeKalshiVolatility';
-import { americanToProbability } from '../arbitrage/detectArbitrage';
 
 export interface TradingInput {
   odds?: BookOdds[];

@@ -175,10 +175,10 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   };
 
   const [messages, setMessages] = useState<Message[]>([
-  {
+    {
   role: 'assistant',
   content: getWelcomeMessage('all'),
-  timestamp: new Date(),
+  timestamp: serverData?.serverTime ? new Date(serverData.serverTime) : new Date(),
   isWelcome: true,
   cards: [],
   insights: {

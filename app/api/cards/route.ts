@@ -23,7 +23,9 @@ import {
 import { enrichCardsWithWeather } from '@/lib/weather-service';
 import { fetchUnifiedData } from '@/lib/unified-data-service';
 
-export const runtime = 'edge';
+// Using Node.js runtime for server-side fetch compatibility
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 interface CardRequest {
   sport?: string;

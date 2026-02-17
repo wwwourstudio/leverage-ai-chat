@@ -39,9 +39,9 @@ export function DataFallback({ error, retry, type = 'unavailable' }: DataFallbac
   const { icon: Icon, title, message, color } = config[type];
 
   return (
-    <div className={`bg-gradient-to-br from-${color}-900/10 to-${color}-800/10 border border-${color}-500/20 rounded-xl p-6`}>
+    <div className={`bg-linear-to-br from-${color}-900/10 to-${color}-800/10 border border-${color}-500/20 rounded-xl p-6`}>
       <div className="flex items-start gap-4">
-        <div className={`w-10 h-10 bg-${color}-500/20 rounded-full flex items-center justify-center flex-shrink-0`}>
+        <div className={`w-10 h-10 bg-${color}-500/20 rounded-full flex items-center justify-center shrink-0`}>
           <Icon className={`w-5 h-5 text-${color}-400`} />
         </div>
         <div className="flex-1">

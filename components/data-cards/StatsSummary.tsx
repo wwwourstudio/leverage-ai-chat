@@ -11,8 +11,8 @@ function StatCard({ label, value, gradient = 'from-gray-800 to-gray-900', trend 
   const trendColor = trend === 'up' ? 'text-green-400' : trend === 'down' ? 'text-red-400' : 'text-gray-400';
   
   return (
-    <div className={`relative bg-gradient-to-br ${gradient} backdrop-blur-sm rounded-xl p-4 border border-gray-700/50 hover:border-gray-600/70 transition-all duration-300 overflow-hidden group`}>
-      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+    <div className={`relative bg-linear-to-br ${gradient} backdrop-blur-sm rounded-xl p-4 border border-gray-700/50 hover:border-gray-600/70 transition-all duration-300 overflow-hidden group`}>
+      <div className="absolute inset-0 bg-linear-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
       <div className="relative">
         <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">{label}</div>
         <div className={`text-2xl font-bold ${trendColor}`}>{value}</div>

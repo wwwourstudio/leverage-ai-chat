@@ -46,7 +46,7 @@ function ErrorState({ error, className }: { error: string; className?: string })
     <div
       className={cn(
         'relative rounded-2xl p-6 backdrop-blur-xl border',
-        'bg-gradient-to-br from-red-950/40 to-red-900/30',
+        'bg-linear-to-br from-red-950/40 to-red-900/30',
         'border-red-800/50 shadow-lg',
         className
       )}
@@ -54,7 +54,7 @@ function ErrorState({ error, className }: { error: string; className?: string })
       aria-live="polite"
     >
       <div className="flex items-center gap-3 text-red-300">
-        <AlertCircle className="w-6 h-6 flex-shrink-0" aria-hidden="true" />
+        <AlertCircle className="w-6 h-6 shrink-0" aria-hidden="true" />
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-bold text-red-200">Error Loading Card</h3>
           <p className="text-xs text-red-400 mt-1 break-words">{error}</p>
@@ -72,7 +72,7 @@ function LoadingState({ className }: { className?: string }) {
     <div
       className={cn(
         'relative rounded-2xl p-6 backdrop-blur-xl border',
-        'bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95',
+        'bg-linear-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95',
         'border-gray-700/60 shadow-lg',
         className
       )}
@@ -106,8 +106,8 @@ function CardHeader({
         {/* Icon container with gradient background */}
         <div
           className={cn(
-            'p-3 rounded-xl shadow-lg ring-4 flex-shrink-0 transition-all',
-            'bg-gradient-to-br',
+            'p-3 rounded-xl shadow-lg ring-4 shrink-0 transition-all',
+            'bg-linear-to-br',
             gradient,
             'ring-gray-800/50 group-hover:ring-gray-700/50'
           )}
@@ -123,7 +123,7 @@ function CardHeader({
             <span className="text-xs font-bold text-gray-400 uppercase tracking-widest truncate">
               {category}
             </span>
-            <span className="text-gray-600 flex-shrink-0" aria-hidden="true">
+            <span className="text-gray-600 shrink-0" aria-hidden="true">
               •
             </span>
             <span className="text-xs font-medium text-gray-500 truncate">{subcategory}</span>
@@ -226,7 +226,7 @@ export const BaseCard = memo(function BaseCard({
     <article
       className={cn(
         'group relative rounded-2xl p-5 backdrop-blur-xl border shadow-xl overflow-hidden',
-        'bg-gradient-to-br from-gray-900/98 via-gray-850/98 to-gray-900/98',
+        'bg-linear-to-br from-gray-900/98 via-gray-850/98 to-gray-900/98',
         'border-gray-700/50 hover:border-gray-500/70',
         'transition-all duration-300',
         'hover:shadow-2xl hover:shadow-gray-950/50',
@@ -236,7 +236,7 @@ export const BaseCard = memo(function BaseCard({
       {/* Animated gradient overlay on hover */}
       <div
         className={cn(
-          'absolute inset-0 bg-gradient-to-br opacity-0 transition-opacity duration-700',
+          'absolute inset-0 bg-linear-to-br opacity-0 transition-opacity duration-700',
           'group-hover:opacity-10',
           gradient
         )}
@@ -246,7 +246,7 @@ export const BaseCard = memo(function BaseCard({
       {/* Accent line on left edge */}
       <div
         className={cn(
-          'absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b transition-opacity',
+          'absolute left-0 top-0 bottom-0 w-1 bg-linear-to-b transition-opacity',
           'opacity-60 group-hover:opacity-100',
           gradient
         )}

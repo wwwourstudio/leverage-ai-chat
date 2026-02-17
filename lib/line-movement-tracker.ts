@@ -5,6 +5,24 @@
 
 import { createClient } from '@/lib/supabase/client';
 
+// Module-level guard: once we detect the table is missing, stop retrying
+let tableAvailable: boolean | null = null;
+let tableMissingLogged = false;
+
+function handleTableMissing(context: string, error: unknown): void {
+  if (!tableMissingLogged) {
+    const errObj = error as Record<string, string> | null;
+    console.warn(`[LINE-TRACKER] Table 'line_movement' does not exist. ${context} will be skipped until the table is created. Error: ${errObj?.code || errObj?.message || 'unknown'}`);
+    tableMissingLogged = true;
+  }
+  tableAvailable = false;
+}
+
+function isTableMissingError(error: unknown): boolean {
+  const errObj = error as Record<string, string> | null;
+  return errObj?.code === 'PGRST205' || errObj?.code === '42P01' || (errObj?.message?.includes('line_movement') ?? false);
+}
+
 export interface LineSnapshot {
   id: string;
   gameId: string;
@@ -38,6 +56,8 @@ export interface LineMovement {
  * Track line movement by storing historical snapshots
  */
 export async function trackLineSnapshot(snapshot: Omit<LineSnapshot, 'id' | 'timestamp'>): Promise<void> {
+  if (tableAvailable === false) return;
+  
   const supabase = createClient();
   
   try {
@@ -55,10 +75,16 @@ export async function trackLineSnapshot(snapshot: Omit<LineSnapshot, 'id' | 'tim
       });
     
     if (error) {
-      console.error('[v0] [LINE-TRACKER] Failed to store snapshot:', error);
+      if (isTableMissingError(error)) {
+        handleTableMissing('trackLineSnapshot', error);
+        return;
+      }
+      console.error('[LINE-TRACKER] Failed to store snapshot:', error.message);
+    } else {
+      tableAvailable = true;
     }
   } catch (error) {
-    console.error('[v0] [LINE-TRACKER] Storage exception:', error);
+    console.error('[LINE-TRACKER] Storage exception:', error);
   }
 }
 
@@ -66,6 +92,8 @@ export async function trackLineSnapshot(snapshot: Omit<LineSnapshot, 'id' | 'tim
  * Analyze line movement for a specific game
  */
 export async function analyzeLineMovement(gameId: string, marketType: string = 'h2h'): Promise<LineMovement[]> {
+  if (tableAvailable === false) return [];
+  
   const supabase = createClient();
   
   try {
@@ -77,7 +105,14 @@ export async function analyzeLineMovement(gameId: string, marketType: string = '
       .eq('market_type', marketType)
       .order('timestamp', { ascending: true });
     
-    if (error || !snapshots || snapshots.length === 0) {
+    if (error) {
+      if (isTableMissingError(error)) {
+        handleTableMissing('analyzeLineMovement', error);
+      }
+      return [];
+    }
+    
+    if (!snapshots || snapshots.length === 0) {
       return [];
     }
     
@@ -133,7 +168,7 @@ export async function analyzeLineMovement(gameId: string, marketType: string = '
     
     return Object.values(movements);
   } catch (error) {
-    console.error('[v0] [LINE-TRACKER] Analysis error:', error);
+    console.error('[LINE-TRACKER] Analysis error:', error);
     return [];
   }
 }
@@ -142,6 +177,8 @@ export async function analyzeLineMovement(gameId: string, marketType: string = '
  * Detect sharp money indicators
  */
 export async function detectSharpMoney(sport: string, lookbackHours: number = 24): Promise<LineMovement[]> {
+  if (tableAvailable === false) return [];
+  
   const supabase = createClient();
   
   try {
@@ -154,12 +191,19 @@ export async function detectSharpMoney(sport: string, lookbackHours: number = 24
       .gte('timestamp', cutoffTime)
       .order('timestamp', { ascending: false });
     
-    if (error || !recentGames) {
+    if (error) {
+      if (isTableMissingError(error)) {
+        handleTableMissing('detectSharpMoney', error);
+      }
+      return [];
+    }
+    
+    if (!recentGames) {
       return [];
     }
     
   // Get unique game IDs
-  const gameIds = [...new Set(recentGames.map((g: any) => g.game_id))] as string[];
+  const gameIds = [...new Set(recentGames.map((g: Record<string, unknown>) => String(g.game_id || '')))];
   
   // Analyze each game
   const sharpMovements: LineMovement[] = [];
@@ -179,7 +223,7 @@ export async function detectSharpMoney(sport: string, lookbackHours: number = 24
     
     return sharpMovements;
   } catch (error) {
-    console.error('[v0] [LINE-TRACKER] Sharp money detection error:', error);
+    console.error('[LINE-TRACKER] Sharp money detection error:', error);
     return [];
   }
 }
@@ -187,7 +231,7 @@ export async function detectSharpMoney(sport: string, lookbackHours: number = 24
 /**
  * Get line movement summary for display
  */
-export function lineMovementToCard(movement: LineMovement): any {
+export function lineMovementToCard(movement: LineMovement): Record<string, unknown> {
   const movementLabel = movement.movementType === 'steam' 
     ? 'STEAM MOVE' 
     : movement.movementType === 'reverse'
@@ -230,26 +274,31 @@ export function lineMovementToCard(movement: LineMovement): any {
 /**
  * Monitor and track odds automatically
  */
-export async function monitorOddsChanges(oddsData: any[], sport: string): Promise<void> {
-  console.log(`[v0] [LINE-TRACKER] Monitoring ${oddsData.length} games for ${sport}`);
+export async function monitorOddsChanges(oddsData: Array<Record<string, unknown>>, sport: string): Promise<void> {
+  if (tableAvailable === false) return;
+  
+  console.log(`[LINE-TRACKER] Monitoring ${oddsData.length} games for ${sport}`);
   
   for (const game of oddsData) {
-    for (const bookmaker of game.bookmakers || []) {
-      for (const market of bookmaker.markets || []) {
-        for (const outcome of market.outcomes || []) {
+    const bookmakers = (game.bookmakers as Array<Record<string, unknown>>) || [];
+    for (const bookmaker of bookmakers) {
+      const markets = (bookmaker.markets as Array<Record<string, unknown>>) || [];
+      for (const market of markets) {
+        const outcomes = (market.outcomes as Array<Record<string, unknown>>) || [];
+        for (const outcome of outcomes) {
           await trackLineSnapshot({
-            gameId: game.id,
+            gameId: String(game.id || ''),
             sport,
-            marketType: market.key,
-            team: outcome.name,
-            line: outcome.point,
-            odds: outcome.price,
-            bookmaker: bookmaker.title,
+            marketType: String(market.key || ''),
+            team: String(outcome.name || ''),
+            line: outcome.point as number | undefined,
+            odds: Number(outcome.price || 0),
+            bookmaker: String(bookmaker.title || ''),
           });
         }
       }
     }
   }
   
-  console.log(`[v0] [LINE-TRACKER] Completed odds monitoring for ${sport}`);
+  console.log(`[LINE-TRACKER] Completed odds monitoring for ${sport}`);
 }

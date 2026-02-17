@@ -4,7 +4,7 @@
  * Combines API fetching with database queries
  */
 
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/client';
 import { CACHE_CONFIG, API_ENDPOINTS, LOG_PREFIXES, DATA_SOURCES } from '@/lib/constants';
 import type { Result } from '@/lib/types';
 import { Ok, Err } from '@/lib/types';

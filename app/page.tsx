@@ -1752,12 +1752,12 @@ export default function UnifiedAIPlatform() {
                             <input
                               type="text"
                               value={editingChatTitle}
-                              onChange={(e) => setEditingChatTitle(e.target.value)}
-                              onKeyDown={(e) => handleKeyDownChatTitle(e, chat.id)}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingChatTitle(e.target.value)}
+                              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => handleKeyDownChatTitle(e, chat.id)}
                               onBlur={() => handleSaveChatTitle(chat.id)}
                               className="flex-1 bg-gray-800/80 border border-blue-500/50 rounded-md px-2 py-1 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                               autoFocus
-                              onClick={(e) => e.stopPropagation()}
+                              onClick={(e: React.MouseEvent<HTMLInputElement>) => e.stopPropagation()}
                             />
                             <button
                               onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
@@ -1847,12 +1847,12 @@ export default function UnifiedAIPlatform() {
                         <input
                           type="text"
                           value={editingChatTitle}
-                          onChange={(e) => setEditingChatTitle(e.target.value)}
-                          onKeyDown={(e) => handleKeyDownChatTitle(e, chat.id)}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingChatTitle(e.target.value)}
+                          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => handleKeyDownChatTitle(e, chat.id)}
                           onBlur={() => handleSaveChatTitle(chat.id)}
                           className="flex-1 bg-gray-800/80 border border-blue-500/50 rounded-md px-2 py-1 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                           autoFocus
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e: React.MouseEvent<HTMLInputElement>) => e.stopPropagation()}
                         />
                         <button
                           onClick={(e) => {

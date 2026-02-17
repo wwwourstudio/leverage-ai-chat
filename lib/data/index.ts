@@ -185,7 +185,7 @@ export async function fetchOddsFromDB(
   options: { limit?: number; from?: Date; to?: Date; team?: string } = {}
 ): Promise<Result<OddsRecord[], Error>> {
   try {
-    const supabase = await createClient();
+    const supabase = createClient();
     const tableName = getSportTable(sport);
     
     if (!tableName) {

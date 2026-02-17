@@ -167,7 +167,7 @@ export default function UnifiedAIPlatform() {
     const hour = new Date().getHours();
     const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
     const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-    
+
     const categoryMessages: Record<string, string> = {
       betting: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is scanning live odds across all major sportsbooks. Ask me about tonight's lines, player props, sharp money, or arbitrage opportunities.`,
       fantasy: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is ready for fantasy analysis. Ask about draft strategy, waiver targets, trade values, or bestball stacking for NFBC/NFFC.`,
@@ -175,7 +175,7 @@ export default function UnifiedAIPlatform() {
       kalshi: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is monitoring Kalshi prediction markets in real-time. Ask about election contracts, weather markets, economic events, or cross-market arbitrage.`,
       all: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** - Powered by Grok AI\n\nI'm connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.`
     };
-    
+
     return categoryMessages[category] || categoryMessages.all;
   };
 
@@ -198,11 +198,11 @@ export default function UnifiedAIPlatform() {
 
   // Track client-side mount to avoid hydration mismatch on time-dependent content
   const [isMounted, setIsMounted] = useState(false);
-  
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
-  
+
   // Update welcome message ONLY after client mount
   useEffect(() => {
     if (isMounted) {
@@ -242,7 +242,7 @@ export default function UnifiedAIPlatform() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  
+
   // Credit system utilities
   const MESSAGE_LIMIT = 15;
   const CHAT_LIMIT = 10;
@@ -321,7 +321,7 @@ export default function UnifiedAIPlatform() {
       try {
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         if (session?.user) {
           setIsLoggedIn(true);
           setUser({
@@ -329,7 +329,7 @@ export default function UnifiedAIPlatform() {
             email: session.user.email || ''
           });
         }
-        
+
         // Listen for auth changes (OAuth redirect, signout, etc.)
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: unknown, session: { user: { user_metadata?: Record<string, unknown>; email?: string } } | null) => {
           if (session?.user) {
@@ -345,7 +345,7 @@ export default function UnifiedAIPlatform() {
             setUser(null);
           }
         });
-        
+
         return () => subscription.unsubscribe();
       } catch (err) {
         console.error('[v0] Auth check failed:', err);
@@ -419,9 +419,9 @@ export default function UnifiedAIPlatform() {
 
   // Loading skeleton for cards
   const CardLoadingSkeleton = () => (
-    <div className="group relative bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/60 overflow-hidden animate-pulse">
+    <div className="group relative bg-linear-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/60 overflow-hidden animate-pulse">
       <div className="flex items-start gap-4 mb-5">
-        <div className="w-12 h-12 rounded-xl bg-gray-700/50"></div>
+        <div className="w-12 h-12 rbg-linear-to-br-700/50"></div>
         <div className="flex-1 space-y-2">
           <div className="h-3 w-24 bg-gray-700/50 rounded"></div>
           <div className="h-4 w-48 bg-gray-700/50 rounded"></div>
@@ -449,13 +449,13 @@ export default function UnifiedAIPlatform() {
   const generateContextualSuggestions = (userMessage: string, responseCards: InsightCard[]) => {
     const msgLower = userMessage.toLowerCase();
     const suggestions: Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }> = [];
-    
+
     console.log('[v0] ==========================================');
-      console.log('[v0] GENERATING CONTEXTUAL SUGGESTIONS');
-      console.log('[v0] User message:', userMessage);
-      console.log('[v0] Response cards received:', responseCards.length);
-      console.log('[v0] Card details:', responseCards.map((c: InsightCard) => ({ type: c.type, category: c.category })));
-    
+    console.log('[v0] GENERATING CONTEXTUAL SUGGESTIONS');
+    console.log('[v0] User message:', userMessage);
+    console.log('[v0] Response cards received:', responseCards.length);
+    console.log('[v0] Card details:', responseCards.map((c: InsightCard) => ({ type: c.type, category: c.category })));
+
     // Analyze the AI's response cards to understand what was provided
     const cardTypes = responseCards.map(card => card.type);
     const categories = [...new Set(responseCards.map(card => card.category))];
@@ -465,9 +465,9 @@ export default function UnifiedAIPlatform() {
     const hasKalshi = cardTypes.includes('kalshi-market') || cardTypes.includes('kalshi-weather');
     const hasCrossPlatform = cardTypes.includes('cross-platform');
     const hasPlayerProps = cardTypes.includes('player-prop');
-    
+
     console.log('[v0] Detected card types:', { hasLiveOdds, hasDFSLineup, hasFantasy, hasKalshi, hasCrossPlatform, hasPlayerProps });
-    
+
     // Analyze user message context for deeper understanding
     const isBetting = msgLower.includes('bet') || msgLower.includes('odds') || msgLower.includes('line');
     const isFantasy = msgLower.includes('draft') || msgLower.includes('fantasy') || msgLower.includes('adp');
@@ -476,7 +476,7 @@ export default function UnifiedAIPlatform() {
     const isNBA = msgLower.includes('nba') || msgLower.includes('lakers') || msgLower.includes('warriors') || msgLower.includes('basketball');
     const isNFL = msgLower.includes('nfl') || msgLower.includes('chiefs') || msgLower.includes('football');
     const isMLB = msgLower.includes('mlb') || msgLower.includes('baseball');
-    
+
     // PRIORITY 1: Generate suggestions based on what the AI just showed (response cards)
     if (hasLiveOdds) {
       suggestions.push(
@@ -485,7 +485,7 @@ export default function UnifiedAIPlatform() {
         { label: 'Compare this with sharp money direction', icon: Activity, category: 'betting' }
       );
     }
-    
+
     if (hasDFSLineup) {
       suggestions.push(
         { label: 'What is the leverage score for this lineup?', icon: Award, category: 'dfs' },
@@ -493,7 +493,7 @@ export default function UnifiedAIPlatform() {
         { label: 'Show me the betting lines supporting these picks', icon: TrendingUp, category: 'all' }
       );
     }
-    
+
     if (hasPlayerProps) {
       suggestions.push(
         { label: 'Stack this prop with correlated DFS plays', icon: Layers, category: 'all' },
@@ -501,7 +501,7 @@ export default function UnifiedAIPlatform() {
         { label: 'Find similar props across other games', icon: Search, category: 'betting' }
       );
     }
-    
+
     if (hasFantasy) {
       suggestions.push(
         { label: 'Show me waiver wire adds in this range', icon: Star, category: 'fantasy' },
@@ -509,7 +509,7 @@ export default function UnifiedAIPlatform() {
         { label: 'Compare this to betting market expectations', icon: Layers, category: 'all' }
       );
     }
-    
+
     if (hasKalshi) {
       suggestions.push(
         { label: 'How does this correlate with betting markets?', icon: Sparkles, category: 'all' },
@@ -517,14 +517,14 @@ export default function UnifiedAIPlatform() {
         { label: 'What other Kalshi markets are related?', icon: BarChart3, category: 'kalshi' }
       );
     }
-    
+
     if (hasCrossPlatform) {
       suggestions.push(
         { label: 'Find more cross-platform correlation plays', icon: Sparkles, category: 'all' },
         { label: 'Optimize my bankroll across these opportunities', icon: PieChart, category: 'all' }
       );
     }
-    
+
     // PRIORITY 2: Sport-specific deep dives based on response
     if (categories.includes('NBA')) {
       suggestions.push(
@@ -532,14 +532,14 @@ export default function UnifiedAIPlatform() {
         { label: 'Show me NBA pace-up game environments', icon: Zap, category: 'dfs' }
       );
     }
-    
+
     if (categories.includes('NFL')) {
       suggestions.push(
         { label: 'Analyze weather impact on these games', icon: Activity, category: 'betting' },
         { label: 'Show me correlated TD scorer + game total bets', icon: Medal, category: 'betting' }
       );
     }
-    
+
     // PRIORITY 3: Generate contextual follow-ups based on user message context
     if (isBetting && suggestions.length < 5) {
       suggestions.push(
@@ -566,53 +566,53 @@ export default function UnifiedAIPlatform() {
         { label: 'Political markets with sharp edge', icon: TrendingUp, category: 'kalshi' }
       );
     }
-    
+
     // PRIORITY 4: Predictive next-step suggestions based on card data
     responseCards.forEach(card => {
       if (suggestions.length >= 7) return;
-      
+
       // Generate specific suggestions based on card type and data
       if (card.type === 'live-odds' && card.data.movement) {
-        suggestions.push({ 
-          label: `Track ${card.data.matchup} live until game time`, 
-          icon: Clock, 
-          category: 'betting' 
+        suggestions.push({
+          label: `Track ${card.data.matchup} live until game time`,
+          icon: Clock,
+          category: 'betting'
         });
       }
-      
+
       if (card.type === 'dfs-lineup' && card.data.topPlay) {
-        suggestions.push({ 
-          label: `Build alternate lineup fading ${card.data.topPlay}`, 
-          icon: Users, 
-          category: 'dfs' 
+        suggestions.push({
+          label: `Build alternate lineup fading ${card.data.topPlay}`,
+          icon: Users,
+          category: 'dfs'
         });
       }
-      
+
       if (card.type === 'player-prop' && card.data.player) {
-        suggestions.push({ 
-          label: `Find correlated ${card.data.player} same-game parlays`, 
-          icon: Medal, 
-          category: 'betting' 
+        suggestions.push({
+          label: `Find correlated ${card.data.player} same-game parlays`,
+          icon: Medal,
+          category: 'betting'
         });
       }
-      
+
       if (card.type === 'adp-analysis' && card.data.player) {
-        suggestions.push({ 
-          label: `Show similar value picks in this ADP range`, 
-          icon: Search, 
-          category: 'fantasy' 
+        suggestions.push({
+          label: `Show similar value picks in this ADP range`,
+          icon: Search,
+          category: 'fantasy'
         });
       }
-      
+
       if (card.type === 'kalshi-market' && card.data.event) {
-        suggestions.push({ 
-          label: `Alert me on ${card.data.market} price movements`, 
-          icon: Bell, 
-          category: 'kalshi' 
+        suggestions.push({
+          label: `Alert me on ${card.data.market} price movements`,
+          icon: Bell,
+          category: 'kalshi'
         });
       }
     });
-    
+
     // PRIORITY 5: Intelligent universal suggestions based on what wasn't covered
     const universalSuggestions = [
       { label: 'What are tonight\'s best value opportunities?', icon: Sparkles, category: 'all' },
@@ -624,7 +624,7 @@ export default function UnifiedAIPlatform() {
       { label: 'Breaking news and injury updates', icon: AlertCircle, category: 'all' },
       { label: 'Show me arbitrage opportunities', icon: DollarSign, category: 'all' }
     ];
-    
+
     // Add contextual universal suggestions
     for (const suggestion of universalSuggestions) {
       if (suggestions.length >= 7) break;
@@ -632,24 +632,24 @@ export default function UnifiedAIPlatform() {
         suggestions.push(suggestion);
       }
     }
-    
+
     // PRIORITY 6: Ensure we have exactly 5-7 suggestions with intelligent deduplication
     const uniqueSuggestions = suggestions.filter((suggestion, index, self) =>
       index === self.findIndex((s) => s.label === suggestion.label)
     );
-    
+
     console.log('[v0] Generated', suggestions.length, 'total suggestions');
     console.log('[v0] Filtered to', uniqueSuggestions.length, 'unique suggestions');
     console.log('[v0] Suggestion labels:', uniqueSuggestions.map(s => s.label));
     console.log('[v0] ==========================================');
-    
+
     // Return 5-7 unique suggestions for optimal UX
     return uniqueSuggestions.slice(0, 7);
   };
 
   const handleFollowUp = (action: 'correlated' | 'metrics', _cardData?: InsightCard) => {
     console.log('[v0] Generating follow-up response:', action);
-    
+
     // Check if user has credits
     if (!consumeCredit()) {
       console.log('[v0] No credits remaining, showing purchase modal');
@@ -657,7 +657,7 @@ export default function UnifiedAIPlatform() {
     }
 
     setIsTyping(true);
-    
+
     setTimeout(() => {
       let responseText = '';
       let responseCards: InsightCard[] = [];
@@ -707,54 +707,54 @@ export default function UnifiedAIPlatform() {
     setInput(analysisPrompt);
     generateRealResponse(analysisPrompt);
   };
-  
+
   const generateRealResponse = async (userMessage: string) => {
     setIsTyping(true);
     const startTime = Date.now();
     const isDev = process.env.NODE_ENV !== 'production';
-    
+
     try {
       console.log('[v0] Starting real AI analysis for:', userMessage);
-      
+
       // Extract context from user message with strict detection flags
       const lowerMsg = userMessage.toLowerCase();
-      
+
       // Political market keywords
       const politicalKeywords = ['kalshi', 'election', 'politics', 'cpi', 'inflation', 'fed', 'approval rating', 'recession', 'polymarket', 'prediction market'];
       const isPoliticalMarket = politicalKeywords.some(k => lowerMsg.includes(k));
-      
+
       // Sports detection
       const detectedSport = extractSport(userMessage);
-      
+
       // Betting intent keywords
       const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'arbitrage', 'arb', 'h2h', 'value', 'sportsbook', 'draftkings', 'fanduel', 'moneyline', 'prop', 'parlay'];
       const hasBettingIntent = bettingKeywords.some(k => lowerMsg.includes(k));
-      
+
       // Sports query detection (not political)
       const sportsKeywords = ['nba', 'nfl', 'nhl', 'mlb', 'basketball', 'football', 'hockey', 'baseball', 'ncaa'];
       const isSportsQuery = sportsKeywords.some(k => lowerMsg.includes(k)) && !isPoliticalMarket;
-      
+
       const detectedPlatform = extractPlatform(userMessage);
-      
+
       // Override isPoliticalMarket if platform is kalshi
       const finalIsPoliticalMarket = isPoliticalMarket || detectedPlatform === 'kalshi';
-      
-    const context: QueryContext = {
-      sport: detectedSport,
-      marketType: extractMarketType(userMessage),
-      platform: detectedPlatform,
-      isSportsQuery,
-      isPoliticalMarket: finalIsPoliticalMarket,
-      hasBettingIntent,
-      previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }))
-    };
+
+      const context: QueryContext = {
+        sport: detectedSport,
+        marketType: extractMarketType(userMessage),
+        platform: detectedPlatform,
+        isSportsQuery,
+        isPoliticalMarket: finalIsPoliticalMarket,
+        hasBettingIntent,
+        previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }))
+      };
 
       if (isDev) {
         console.log('[v0] Extracted context:', context);
         console.log('[SPORT DETECTED]', detectedSport || 'none');
         console.log('[POLITICAL MARKET DETECTED]', finalIsPoliticalMarket);
       }
-      
+
       // HARD STOP: Political markets NEVER fetch sports odds
       if (context.isPoliticalMarket) {
         if (isDev) console.log('[POLITICAL MARKET DETECTED] Skipping sports odds fetch');
@@ -764,32 +764,32 @@ export default function UnifiedAIPlatform() {
         // Only fetch sports odds if this is explicitly a sports betting query
         if (isDev) console.log('[ODDS FETCH ATTEMPT] Sports betting query detected');
         if (isDev) console.log('[v0] === ODDS FETCH STARTING ===');
-        
+
         // Import SPORT_KEYS for consistent API format
         const { SPORT_KEYS, sportToApi } = await import('@/lib/constants');
-        
+
         // IF SPORT IS EXPLICITLY DETECTED: Fetch ONLY that sport, NO fallback
         if (context.sport) {
           const sportKey = sportToApi(context.sport);
-          
+
           if (isDev) {
             console.log('[v0] Fetching ONLY detected sport:', sportKey);
             console.log('[NO FALLBACK] Explicit sport detected');
           }
-          
+
           try {
             const oddsResponse = await fetch('/api/odds', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ sport: sportKey, marketType: context.marketType || 'h2h' })
             });
-            
+
             if (!oddsResponse.ok) {
               const errorText = await oddsResponse.text();
               if (isDev) console.error(`[v0] Odds API error (${oddsResponse.status}):`, errorText.substring(0, 100));
             } else {
               const oddsResult = await oddsResponse.json();
-              
+
               if (oddsResult?.events?.length > 0) {
                 const sportName = sportKey.replace('_', ' ').toUpperCase();
                 if (isDev) console.log(`[v0] ✅ Found ${oddsResult.events.length} live games in ${sportName}`);
@@ -809,31 +809,31 @@ export default function UnifiedAIPlatform() {
         } else {
           // ONLY ALLOW FALLBACK IF NO SPORT DETECTED
           if (isDev) console.log('[v0] No specific sport detected - attempting fallback rotation');
-          
+
           const fallbackSports = [
             SPORT_KEYS.NBA.API,
             SPORT_KEYS.NFL.API,
             SPORT_KEYS.NHL.API,
             SPORT_KEYS.MLB.API
           ];
-          
+
           let foundData = false;
-          
+
           for (const sportKey of fallbackSports) {
             if (foundData) break;
-            
+
             if (isDev) console.log(`[v0] Trying fallback sport: ${sportKey}`);
-            
+
             try {
               const oddsResponse = await fetch('/api/odds', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sport: sportKey, marketType: 'h2h' })
               });
-              
+
               if (oddsResponse.ok) {
                 const oddsResult = await oddsResponse.json();
-                
+
                 if (oddsResult?.events?.length > 0) {
                   const sportName = sportKey.replace('_', ' ').toUpperCase();
                   if (isDev) console.log(`[v0] ✅ Fallback success - Found ${oddsResult.events.length} games in ${sportName}`);
@@ -846,26 +846,26 @@ export default function UnifiedAIPlatform() {
               if (isDev) console.error(`[v0] Exception fetching ${sportKey}:`, err);
             }
           }
-          
+
           if (!foundData && isDev) {
             console.warn('[v0] ⚠️ ODDS FETCH FAILED - No live games found across all sports');
           }
         }
-        
+
         if (isDev) console.log('[v0] === ODDS FETCH COMPLETE ===');
-        
+
         // HARD CROSS-SPORT CONTAMINATION GUARD
         if (context.sport && context.oddsData?.sport && context.oddsData.sport !== sportToApi(context.sport)) {
           if (isDev) console.error('[CROSS-SPORT BLOCKED] Attempted contamination prevented:', {
             detected: context.sport,
-          fetched: context.oddsData.sport
-        });
-        // Clear contaminated data
-        context.oddsData = undefined;
-        context.crossSportError = true;
+            fetched: context.oddsData.sport
+          });
+          // Clear contaminated data
+          context.oddsData = undefined;
+          context.crossSportError = true;
         }
       }
-      
+
       // Fetch real data from our API routes
       const analysisResult = await fetch('/api/analyze', {
         method: 'POST',
@@ -875,7 +875,7 @@ export default function UnifiedAIPlatform() {
           context
         })
       }).then(res => res.json() as Promise<APIResponse>);
-      
+
       console.log('[v0] Analysis result received:', {
         success: analysisResult.success,
         hasText: !!analysisResult.text,
@@ -890,13 +890,13 @@ export default function UnifiedAIPlatform() {
       // Handle API errors with smart fallback
       const processingTime = Date.now() - startTime;
       let newMessage: Message;
-      
+
       if (!analysisResult.success) {
         console.log('[v0] API call failed, using contextual cards');
-        
+
         const fallbackCards = await selectRelevantCards(userMessage, context);
         const errorMessage = analysisResult.error || 'API temporarily unavailable';
-        
+
         newMessage = {
           role: 'assistant',
           content: `I'm processing your request using cached data since live services are temporarily limited. ${errorMessage}\n\nHere's what I can tell you:`,
@@ -952,17 +952,17 @@ export default function UnifiedAIPlatform() {
           }
         };
       }
-      
+
       // Add message to state
       setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
-      
+
       // Generate contextual suggestions
       const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);
       setSuggestedPrompts(contextualSuggestions);
       console.log('[v0] Generated contextual suggestions:', contextualSuggestions.length);
     } catch (error) {
       console.error('[v0] Error generating real response:', error);
-      
+
       // Fallback to basic response with error indication
       const fallbackCards = await selectRelevantCards(userMessage);
       setMessages((prev: Message[]) => [...prev, {
@@ -1002,42 +1002,42 @@ export default function UnifiedAIPlatform() {
   // Helper functions for context extraction
   const extractSport = (message: string): string | null => {
     const msgLower = message.toLowerCase();
-    
+
     console.log('[v0] Extracting sport from:', message);
-    
+
     // Basketball
     if (msgLower.includes('nba') || msgLower.includes('basketball')) {
       console.log('[v0] Detected sport: NBA');
       return 'nba';
     }
-    
+
     // Football
     if (msgLower.includes('nfl') || msgLower.includes('football')) {
       console.log('[v0] Detected sport: NFL');
       return 'nfl';
     }
-    
+
     // Baseball - enhanced detection for fantasy baseball
-    if (msgLower.includes('mlb') || msgLower.includes('baseball') || 
-        msgLower.includes('nfbc') || msgLower.includes('nffc') || 
-        msgLower.includes('nfbkc') || msgLower.includes('tgfbi')) {
+    if (msgLower.includes('mlb') || msgLower.includes('baseball') ||
+      msgLower.includes('nfbc') || msgLower.includes('nffc') ||
+      msgLower.includes('nfbkc') || msgLower.includes('tgfbi')) {
       console.log('[v0] Detected sport: MLB (baseball/fantasy baseball)');
       return 'mlb';
     }
-    
+
     // Hockey
     if (msgLower.includes('nhl') || msgLower.includes('hockey')) {
       console.log('[v0] Detected sport: NHL');
       return 'nhl';
     }
-    
+
     // NCAA
     if (msgLower.includes('ncaa')) {
       const sport = msgLower.includes('basketball') ? 'ncaab' : 'ncaaf';
       console.log('[v0] Detected sport:', sport);
       return sport;
     }
-    
+
     console.log('[v0] No specific sport detected');
     return null;
   };
@@ -1062,11 +1062,11 @@ export default function UnifiedAIPlatform() {
 
   const selectRelevantCards = async (userMessage: string, context?: QueryContext): Promise<InsightCard[]> => {
     const msgLower = userMessage.toLowerCase();
-    
+
     // Extract sport and category from message
     const sport = extractSport(userMessage);
     let category = 'all';
-    
+
     if (msgLower.includes('bet') || msgLower.includes('odds')) {
       category = 'betting';
     } else if (msgLower.includes('dfs') || msgLower.includes('lineup')) {
@@ -1076,22 +1076,22 @@ export default function UnifiedAIPlatform() {
     } else if (msgLower.includes('kalshi') || msgLower.includes('market')) {
       category = 'kalshi';
     }
-    
+
     console.log('[v0] Fetching dynamic cards for:', { sport, category });
-    
+
     try {
       // Fetch dynamic cards from API
       console.log('[v0] Requesting dynamic cards with params:', { sport, category, context, limit: 3 });
-      
+
       const dynamicCards = await fetchDynamicCards({
         sport: sport || undefined,
         category,
         userContext: context,
         limit: 3
       });
-      
+
       console.log('[v0] Received dynamic cards response:', dynamicCards.length, 'cards');
-      
+
       if (dynamicCards.length === 0) {
         console.log('[v0] WARNING: Zero dynamic cards returned from API. Check:');
         console.log('[v0] - Sport extracted:', sport);
@@ -1099,13 +1099,13 @@ export default function UnifiedAIPlatform() {
         console.log('[v0] - API endpoint configured:', API_ENDPOINTS?.CARDS || 'undefined');
         console.log('[v0] - Context provided:', context);
       }
-      
+
       // Convert DynamicCard to InsightCard format
       const convertedCards = dynamicCards.map(card => {
         console.log('[v0] Converting card:', card.type, card.title);
         return convertToInsightCard(card);
       });
-      
+
       console.log('[v0] Returning', convertedCards.length, 'converted insight cards');
       return convertedCards;
     } catch (error) {
@@ -1118,18 +1118,18 @@ export default function UnifiedAIPlatform() {
 
   const convertToInsightCard = (dynamicCard: DynamicCard): InsightCard => {
     console.log('[v0] Converting dynamic card:', dynamicCard.type, dynamicCard.title);
-    
+
     // Validate required fields
     if (!dynamicCard || typeof dynamicCard !== 'object') {
       console.error('[v0] Invalid card: not an object', dynamicCard);
       throw new Error('Invalid card data: must be an object');
     }
-    
+
     if (!dynamicCard.type || !dynamicCard.title) {
       console.error('[v0] Invalid card: missing required fields', dynamicCard);
       throw new Error('Invalid card data: missing type or title');
     }
-    
+
     // Map icon string to actual icon component
     const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
       'Zap': Zap,
@@ -1143,7 +1143,7 @@ export default function UnifiedAIPlatform() {
       'Activity': Activity,
       'Sparkles': Sparkles
     };
-    
+
     // Ensure all required fields have valid values
     const validatedCard: InsightCard = {
       type: String(dynamicCard.type || 'unknown'),
@@ -1155,7 +1155,7 @@ export default function UnifiedAIPlatform() {
       data: dynamicCard.data && typeof dynamicCard.data === 'object' ? dynamicCard.data : {},
       status: String(dynamicCard.status || 'active')
     };
-    
+
     console.log('[v0] Validated card:', validatedCard.type, validatedCard.title);
     return validatedCard;
   };
@@ -1165,7 +1165,7 @@ export default function UnifiedAIPlatform() {
       { name: 'Grok AI Model', type: 'model' as const, reliability: 94 },
       { name: 'Supabase Trust System', type: 'database' as const, reliability: 96 }
     ];
-    
+
     if (oddsData?.success && oddsData.data) {
       sources.push({
         name: 'The Odds API (Live)',
@@ -1174,7 +1174,7 @@ export default function UnifiedAIPlatform() {
         url: 'https://the-odds-api.com'
       });
     }
-    
+
     return sources;
   };
 
@@ -1225,7 +1225,7 @@ export default function UnifiedAIPlatform() {
 
     setUploadedFiles((prev: FileAttachment[]) => [...prev, ...newAttachments]);
     console.log('[v0] Files uploaded:', newAttachments.length);
-    
+
     // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -1237,7 +1237,7 @@ export default function UnifiedAIPlatform() {
     if (lines.length === 0) return { headers: [], rows: [] };
 
     const headers = lines[0].split(delimiter).map(h => h.trim());
-    const rows = lines.slice(1).map(line => 
+    const rows = lines.slice(1).map(line =>
       line.split(delimiter).map(cell => cell.trim())
     );
 
@@ -1254,7 +1254,7 @@ export default function UnifiedAIPlatform() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() && uploadedFiles.length === 0) return;
 
@@ -1273,7 +1273,7 @@ export default function UnifiedAIPlatform() {
 
     setMessages((prev: Message[]) => [...prev, userMessage]);
     setUploadedFiles([]);
-    
+
     // Update chat preview and title based on first user message
     setChats((prevChats: Chat[]) => prevChats.map((chat: Chat) => {
       if (chat.id === activeChat) {
@@ -1281,13 +1281,13 @@ export default function UnifiedAIPlatform() {
         // Update preview with user's message
         updatedChat.preview = input.slice(0, 50) + (input.length > 50 ? '...' : '');
         updatedChat.timestamp = new Date();
-        
+
         // Auto-generate title from first message if still default
         if (chat.title === 'New Analysis' && input.length > 0) {
           const words = input.split(' ').slice(0, 5).join(' ');
           updatedChat.title = words + (input.split(' ').length > 5 ? '...' : '');
         }
-        
+
         // Auto-tag based on message content
         const contentLower = input.toLowerCase();
         const newTags = [...chat.tags];
@@ -1298,12 +1298,12 @@ export default function UnifiedAIPlatform() {
         if (contentLower.includes('draft') || contentLower.includes('adp')) newTags.push('draft');
         if (contentLower.includes('bet') || contentLower.includes('odds')) newTags.push('live');
         updatedChat.tags = [...new Set(newTags)].slice(0, 3);
-        
+
         return updatedChat;
       }
       return chat;
     }));
-    
+
     setInput('');
     generateRealResponse(input);
   };
@@ -1318,7 +1318,7 @@ export default function UnifiedAIPlatform() {
     const newChatId = `chat-${Date.now()}`;
     // Generate dynamic welcome message based on selected category
     const welcomeMessage = getWelcomeMessage(selectedCategory);
-    
+
     // Category-specific titles
     const categoryTitles = {
       all: 'New Analysis',
@@ -1327,7 +1327,7 @@ export default function UnifiedAIPlatform() {
       dfs: 'New DFS Lineup Analysis',
       kalshi: 'New Kalshi Market Analysis'
     };
-    
+
     const newChat: Chat = {
       id: newChatId,
       title: categoryTitles[selectedCategory as keyof typeof categoryTitles] || 'New Analysis',
@@ -1403,14 +1403,14 @@ export default function UnifiedAIPlatform() {
       }));
       setEditingMessageIndex(null);
       setEditingContent('');
-      
-  // Re-generate response after editing user message
-  if (messages[index].role === 'user') {
-    const newMessages = messages.slice(0, index + 1);
-    setMessages(newMessages);
-    generateRealResponse(editingContent);
-  }
-  }
+
+      // Re-generate response after editing user message
+      if (messages[index].role === 'user') {
+        const newMessages = messages.slice(0, index + 1);
+        setMessages(newMessages);
+        generateRealResponse(editingContent);
+      }
+    }
   };
 
   const handleCancelEdit = () => {
@@ -1477,7 +1477,7 @@ export default function UnifiedAIPlatform() {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-              handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>);
+      handleSubmit(e as unknown as React.FormEvent);
     }
   };
 
@@ -1516,7 +1516,7 @@ export default function UnifiedAIPlatform() {
     if (!card || typeof card !== 'object') {
       return null;
     }
-    
+
     // Ensure required fields exist with fallbacks
     const safeCard = {
       icon: card.icon || Zap,
@@ -1528,24 +1528,24 @@ export default function UnifiedAIPlatform() {
       data: card.data && typeof card.data === 'object' ? card.data : {},
       type: card.type || 'default'
     };
-    
+
     const Icon = safeCard.icon;
     const badge = getStatusBadge(safeCard.status);
     const BadgeIcon = badge.icon;
     const dataEntries = Object.entries(safeCard.data);
-    
+
     // Enhanced visual design with glassmorphism and better data presentation
     return (
       <div
         key={`card-${index}-${safeCard.type}`}
-        className="group relative bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/60 hover:border-gray-500/80 transition-all duration-500 shadow-2xl hover:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] hover:scale-[1.02] overflow-hidden"
+        className="group relative bg-linear-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/60 hover:border-gray-500/80 transition-all duration-500 shadow-2xl hover:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] hover:scale-[1.02] overflow-hidden"
       >
         {/* Animated gradient overlay */}
-        <div className={`absolute inset-0 bg-gradient-to-br ${safeCard.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-700`}></div>
-        
+        <div className={`absolute inset-0 bg-linear-to-br ${safeCard.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-700`}></div>
+
         {/* Accent line on left */}
-        <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${safeCard.gradient} opacity-60 group-hover:opacity-100 transition-opacity`}></div>
-        
+        <div className={`absolute left-0 top-0 bottom-0 w-1 bg-linear-to-b ${safeCard.gradient} opacity-60 group-hover:opacity-100 transition-opacity`}></div>
+
         {/* Header section with icon and title */}
         <div className="relative flex items-start justify-between mb-5">
           <div className="flex items-start gap-4 flex-1">
@@ -1566,7 +1566,7 @@ export default function UnifiedAIPlatform() {
             </div>
           </div>
         </div>
-        
+
         {/* Enhanced data grid with better visual hierarchy */}
         <div className="relative space-y-2">
           {dataEntries.length > 0 ? (
@@ -1575,7 +1575,7 @@ export default function UnifiedAIPlatform() {
                 .replace(/([A-Z])/g, ' $1')
                 .replace(/^./, str => str.toUpperCase())
                 .trim();
-              
+
               // Enhanced metric detection
               const valueStr = String(value);
               const isPercentage = valueStr.includes('%');
@@ -1583,14 +1583,14 @@ export default function UnifiedAIPlatform() {
               const isUpTrend = valueStr.includes('↑') || valueStr.toLowerCase().includes('up');
               const isDownTrend = valueStr.includes('↓') || valueStr.toLowerCase().includes('down');
               const isHighValue = valueStr.includes('elite') || valueStr.includes('optimal');
-              
+
               // Assign colors based on context
               let valueColor = 'text-gray-300';
               if (isUpTrend) valueColor = 'text-green-400';
               else if (isDownTrend) valueColor = 'text-red-400';
               else if (isHighValue) valueColor = 'text-purple-400';
               else if (isDollar || isPercentage) valueColor = 'text-blue-400';
-              
+
               return (
                 <div key={i} className="group/item relative">
                   <div className="flex items-center justify-between py-2.5 px-3.5 rounded-lg bg-gradient-to-r from-gray-800/40 to-gray-800/20 hover:from-gray-800/60 hover:to-gray-800/40 transition-all duration-200 border border-gray-700/30 hover:border-gray-600/50">
@@ -1614,7 +1614,7 @@ export default function UnifiedAIPlatform() {
         </div>
 
         <div className="relative mt-4 pt-4 border-t border-gray-700/50">
-          <button 
+          <button
             onClick={() => generateDetailedAnalysis(card)}
             className="w-full flex items-center justify-center gap-2 text-xs font-bold text-gray-400 hover:text-white transition-colors group/btn"
           >
@@ -1627,9 +1627,9 @@ export default function UnifiedAIPlatform() {
   };
 
   const filteredChats = selectedCategory === 'all'
-  ? chats
-      : chats.filter((chat: Chat) => chat.category === selectedCategory);
-  
+    ? chats
+    : chats.filter((chat: Chat) => chat.category === selectedCategory);
+
   // Platform-specific AI-powered prompt suggestions
   const platformPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }>> = {
     all: [
@@ -1675,16 +1675,15 @@ export default function UnifiedAIPlatform() {
     <div className="flex h-screen bg-black text-white overflow-hidden font-sans">
       {/* Sidebar */}
       <div
-        className={`${
-          sidebarOpen ? 'w-80' : 'w-0'
-        } bg-gradient-to-b from-gray-950 via-gray-900 to-black border-r border-gray-800/50 transition-all duration-300 overflow-hidden flex flex-col backdrop-blur-xl`}
+        className={`${sidebarOpen ? 'w-80' : 'w-0'
+          } bg-gradient-to-b from-gray-950 via-gray-900 to-black border-r border-gray-800/50 transition-all duration-300 overflow-hidden flex flex-col backdrop-blur-xl`}
       >
         <div className="p-4 border-b border-gray-800/50 bg-gradient-to-b from-gray-900/50 to-transparent">
           <button
             onClick={handleNewChat}
-            className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white rounded-full px-4 py-3 transition-all duration-300 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 flex items-center justify-center gap-2 font-bold group relative overflow-hidden"
+            className="w-full bg-linear-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white rounded-full px-4 py-3 transition-all duration-300 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 flex items-center justify-center gap-2 font-bold group relative overflow-hidden"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+            <div className="absolute inset-0 bg-linear-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
             <Plus className="w-4 h-4 relative z-10 group-hover:rotate-90 transition-transform duration-300" />
             <span className="relative z-10 text-sm">New Analysis</span>
           </button>
@@ -1699,16 +1698,14 @@ export default function UnifiedAIPlatform() {
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={`group/pill flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 border whitespace-nowrap flex-shrink-0 ${
-                      isActive
-                        ? 'bg-gray-800 text-white border-gray-700 shadow-lg'
-                        : 'bg-transparent text-gray-500 border-gray-800 hover:text-gray-300 hover:bg-gray-800/50 hover:border-gray-700'
-                    }`}
+                    className={`group/pill flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 border whitespace-nowrap flex-shrink-0 ${isActive
+                      ? 'bg-gray-800 text-white border-gray-700 shadow-lg'
+                      : 'bg-transparent text-gray-500 border-gray-800 hover:text-gray-300 hover:bg-gray-800/50 hover:border-gray-700'
+                      }`}
                     title={cat.desc}
                   >
-                    <Icon className={`w-3.5 h-3.5 transition-colors duration-300 ${
-                      isActive ? cat.color : 'text-gray-600 group-hover/pill:text-gray-400'
-                    }`} />
+                    <Icon className={`w-3.5 h-3.5 transition-colors duration-300 ${isActive ? cat.color : 'text-gray-600 group-hover/pill:text-gray-400'
+                      }`} />
                     <span>{cat.id === 'all' ? 'ALL' : cat.name.toUpperCase()}</span>
                   </button>
                 );
@@ -1719,7 +1716,7 @@ export default function UnifiedAIPlatform() {
 
         <div className="flex-1 overflow-y-auto p-2.5 space-y-3 custom-scrollbar">
           {/* Starred Chats Section */}
-                  {filteredChats.filter((chat: Chat) => chat.starred).length > 0 && (
+          {filteredChats.filter((chat: Chat) => chat.starred).length > 0 && (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between px-2.5 py-1.5">
                 <div className="flex items-center gap-2">
@@ -1736,11 +1733,10 @@ export default function UnifiedAIPlatform() {
                 <div
                   key={chat.id}
                   onClick={() => handleSelectChat(chat.id)}
-                  className={`group relative rounded-lg p-3 cursor-pointer transition-all duration-300 ${
-                    activeChat === chat.id
-                      ? 'bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10 border border-blue-500/30 shadow-lg shadow-blue-500/10'
-                      : 'bg-gray-900/30 hover:bg-gray-800/50 border border-transparent hover:border-gray-700/50'
-                  }`}
+                  className={`group relative rounded-lg p-3 cursor-pointer transition-all duration-300 ${activeChat === chat.id
+                    ? 'bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10 border border-blue-500/30 shadow-lg shadow-blue-500/10'
+                    : 'bg-gray-900/30 hover:bg-gray-800/50 border border-transparent hover:border-gray-700/50'
+                    }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
@@ -1785,7 +1781,7 @@ export default function UnifiedAIPlatform() {
                         )}
                       </div>
                       <p className="text-[11px] text-gray-400 truncate mb-2 leading-tight">{chat.preview}</p>
-                      
+
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1 flex-wrap">
                           {chat.tags.slice(0, 2).map((tag, i) => (
@@ -1824,97 +1820,94 @@ export default function UnifiedAIPlatform() {
                 {selectedCategory === 'all' ? 'All Chats' : categories.find(c => c.id === selectedCategory)?.name || 'Chats'}
               </span>
               <span className="text-[10px] font-bold text-gray-600">
-                  {filteredChats.filter((chat: Chat) => !chat.starred).length}
+                {filteredChats.filter((chat: Chat) => !chat.starred).length}
               </span>
             </div>
             {filteredChats.filter(chat => !chat.starred).map((chat) => (
-            <div
-              key={chat.id}
-              onClick={() => handleSelectChat(chat.id)}
-              className={`group relative rounded-lg p-3 cursor-pointer transition-all duration-300 ${
-                activeChat === chat.id
+              <div
+                key={chat.id}
+                onClick={() => handleSelectChat(chat.id)}
+                className={`group relative rounded-lg p-3 cursor-pointer transition-all duration-300 ${activeChat === chat.id
                   ? 'bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10 border border-blue-500/30 shadow-lg shadow-blue-500/10'
                   : 'bg-gray-900/30 hover:bg-gray-800/50 border border-transparent hover:border-gray-700/50'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5 group/title">
-                    <MessageSquare className={`w-3.5 h-3.5 ${activeChat === chat.id ? 'text-blue-400' : 'text-gray-500'} flex-shrink-0`} />
-                    {editingChatId === chat.id ? (
-                      <div className="flex-1 flex items-center gap-1">
-                        <input
-                          type="text"
-                          value={editingChatTitle}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingChatTitle(e.target.value)}
-                          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => handleKeyDownChatTitle(e, chat.id)}
-                          onBlur={() => handleSaveChatTitle(chat.id)}
-                          className="flex-1 bg-gray-800/80 border border-blue-500/50 rounded-md px-2 py-1 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                          autoFocus
-                          onClick={(e: React.MouseEvent<HTMLInputElement>) => e.stopPropagation()}
-                        />
-                        <button
-                          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                            e.stopPropagation();
-                            handleSaveChatTitle(chat.id);
-                          }}
-                          className="p-1 hover:bg-gray-700/50 rounded transition-all"
-                          title="Save title"
-                        >
-                          <CheckCircle className="w-3.5 h-3.5 text-green-400" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex-1 flex items-center gap-1.5 min-w-0">
-                        <h3 className="text-xs font-bold text-white truncate flex-1">
-                          {chat.title}
-                        </h3>
-                        <button
-                          onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleEditChatTitle(chat.id, chat.title, e)}
-                          className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-gray-700/50 rounded transition-all flex-shrink-0"
-                          title="Edit title"
-                        >
-                          <Edit3 className="w-3 h-3 text-gray-500 hover:text-blue-400" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-gray-400 truncate mb-2 leading-tight">{chat.preview}</p>
-                  
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {chat.tags.slice(0, 2).map((tag, i) => (
-                        <span key={i} className="px-1.5 py-0.5 bg-gray-800/50 border border-gray-700/50 rounded text-[10px] font-semibold text-gray-500">
-                          {tag}
-                        </span>
-                      ))}
+                  }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5 group/title">
+                      <MessageSquare className={`w-3.5 h-3.5 ${activeChat === chat.id ? 'text-blue-400' : 'text-gray-500'} flex-shrink-0`} />
+                      {editingChatId === chat.id ? (
+                        <div className="flex-1 flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={editingChatTitle}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingChatTitle(e.target.value)}
+                            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => handleKeyDownChatTitle(e, chat.id)}
+                            onBlur={() => handleSaveChatTitle(chat.id)}
+                            className="flex-1 bg-gray-800/80 border border-blue-500/50 rounded-md px-2 py-1 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                            autoFocus
+                            onClick={(e: React.MouseEvent<HTMLInputElement>) => e.stopPropagation()}
+                          />
+                          <button
+                            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                              e.stopPropagation();
+                              handleSaveChatTitle(chat.id);
+                            }}
+                            className="p-1 hover:bg-gray-700/50 rounded transition-all"
+                            title="Save title"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5 text-green-400" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                          <h3 className="text-xs font-bold text-white truncate flex-1">
+                            {chat.title}
+                          </h3>
+                          <button
+                            onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleEditChatTitle(chat.id, chat.title, e)}
+                            className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-gray-700/50 rounded transition-all shrink-0"
+                            title="Edit title"
+                          >
+                            <Edit3 className="w-3 h-3 text-gray-500 hover:text-blue-400" />
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <span className="text-[10px] font-medium text-gray-600" suppressHydrationWarning>{formatTimestamp(chat.timestamp)}</span>
+                    <p className="text-[11px] text-gray-400 truncate mb-2 leading-tight">{chat.preview}</p>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {chat.tags.slice(0, 2).map((tag, i) => (
+                          <span key={i} className="px-1.5 py-0.5 bg-gray-800/50 border border-gray-700/50 rounded text-[10px] font-semibold text-gray-500">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                      <span className="text-[10px] font-medium text-gray-600" suppressHydrationWarning>{formatTimestamp(chat.timestamp)}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <button
-                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleStarChat(chat.id, e)}
-                    className={`p-1 rounded-md hover:bg-gray-700/50 transition-all ${
-                      chat.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                    }`}
-                  >
-                    <Star
-                      className={`w-3.5 h-3.5 ${
-                        chat.starred ? 'text-yellow-400 fill-yellow-400' : 'text-gray-500'
-                      }`}
-                    />
-                  </button>
-                  <button
-                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleDeleteChat(chat.id, e)}
-                    className="p-1 rounded-md hover:bg-gray-700/50 opacity-0 group-hover:opacity-100 transition-all"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
-                  </button>
+                  <div className="flex flex-col gap-1">
+                    <button
+                      onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleStarChat(chat.id, e)}
+                      className={`p-1 rounded-md hover:bg-gray-700/50 transition-all ${chat.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                        }`}
+                    >
+                      <Star
+                        className={`w-3.5 h-3.5 ${chat.starred ? 'text-yellow-400 fill-yellow-400' : 'text-gray-500'
+                          }`}
+                      />
+                    </button>
+                    <button
+                      onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleDeleteChat(chat.id, e)}
+                      className="p-1 rounded-md hover:bg-gray-700/50 opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
           </div>
         </div>
       </div>
@@ -1943,8 +1936,8 @@ export default function UnifiedAIPlatform() {
                   </div>
                 </div>
                 <div>
-                  <h1 className="text-xl font-black bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent tracking-tight">
-                    Leverage AI 
+                  <h1 className="text-xl font-black bg-linear-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent tracking-tight">
+                    Leverage AI
                   </h1>
                   <p className="text-[11px] font-bold text-gray-500 tracking-wide">Sports Intelligence </p>
                 </div>
@@ -1957,7 +1950,7 @@ export default function UnifiedAIPlatform() {
                   <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-900/50 border border-gray-800">
                     <div className="flex items-center gap-2.5">
                       <div className="relative">
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                        <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
                           {user.avatar ? (
                             <img src={user.avatar || "/placeholder.svg"} alt={user.name} className="w-full h-full rounded-full object-cover" />
                           ) : (
@@ -1979,7 +1972,7 @@ export default function UnifiedAIPlatform() {
                     <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-gray-950 shadow-lg shadow-red-500/50 animate-pulse"></div>
                   </button>
                   <button className="p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 border border-gray-800 hover:border-gray-700 hover:shadow-lg group active:scale-95 border-none bg-transparent">
-                    <Settings className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors group-hover:rotate-90 transition-transform" />
+                    <Settings className="w-5 h-5 text-gray-400 group-hover:text-gray-300 group-hover:rotate-90 transition-transform" />
                   </button>
                 </>
               ) : (
@@ -1993,7 +1986,7 @@ export default function UnifiedAIPlatform() {
                   </button>
                   <button
                     onClick={() => setShowSignupModal(true)}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-sm font-bold transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40"
+                    className="px-4 py-2 rounded-xl bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-sm font-bold transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40"
                   >
                     Sign up
                   </button>
@@ -2004,9 +1997,9 @@ export default function UnifiedAIPlatform() {
         </div>
 
         {/* Messages Container - Dynamic Data-Driven Interface */}
-        <div 
+        <div
           className="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar scroll-smooth"
-          style={{ 
+          style={{
             scrollBehavior: 'smooth',
             WebkitOverflowScrolling: 'touch'
           }}
@@ -2030,704 +2023,692 @@ export default function UnifiedAIPlatform() {
                 const prevMessage = index > 0 ? messages[index - 1] : null;
                 const isGrouped = prevMessage && prevMessage.role === message.role;
                 const _showTimestamp = !isGrouped || index === messages.length - 1;
-                
+
                 return (
                   <div
                     key={`message-${index}`}
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn ${isGrouped ? 'mt-2' : 'mt-6'}`}
                   >
-                <div className={`max-w-4xl ${message.role === 'user' ? 'w-auto' : 'w-full'}`}>
-                  {message.role === 'assistant' && (
-                    <div className="flex items-center gap-3 mb-3 flex-wrap">
-                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30 rounded-full">
-                        <Sparkles className="w-4.5 h-4.5 text-white" />
-                      </div>
-                      <span className="text-sm font-bold bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">Leverage AI</span>
-                      
-                      {/* Data Verification Badge */}
-                      {message.sources && message.sources.length > 0 && !message.isWelcome && (
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-500/10 border border-green-500/30 rounded-full">
-                          <CheckCheck className="w-3 h-3 text-green-400" />
-                          <span className="text-[10px] font-black text-green-400 uppercase tracking-wide">Verified</span>
-                        </div>
-                      )}
-                      
-                      {message.confidence && (
-                        <div className="flex items-center gap-2 px-3 py-1 bg-gray-800/50 border border-gray-700/50 rounded-full">
-                          <Activity className="w-3.5 h-3.5 text-green-400" />
-                          <span className="text-xs font-bold text-gray-400">{message.confidence}% confidence</span>
-                        </div>
-                      )}
-                      
-                      {/* Trust Level Indicator */}
-                      {message.trustMetrics && !message.isWelcome && (
-                        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${
-                          message.trustMetrics.trustLevel === 'high' ? 'bg-blue-500/10 border-blue-500/30' :
-                          message.trustMetrics.trustLevel === 'medium' ? 'bg-yellow-500/10 border-yellow-500/30' :
-                          'bg-orange-500/10 border-orange-500/30'
-                        }`}>
-                          <Shield className={`w-3 h-3 ${
-                            message.trustMetrics.trustLevel === 'high' ? 'text-blue-400' :
-                            message.trustMetrics.trustLevel === 'medium' ? 'text-yellow-400' :
-                            'text-orange-400'
-                          }`} />
-                          <span className={`text-[10px] font-black uppercase tracking-wide ${
-                            message.trustMetrics.trustLevel === 'high' ? 'text-blue-400' :
-                            message.trustMetrics.trustLevel === 'medium' ? 'text-yellow-400' :
-                            'text-orange-400'
-                          }`}>
-                            {message.trustMetrics.adjustedTone}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  <div
-                    className={`rounded-2xl px-5 py-4 relative group/message ${
-                      message.role === 'user'
-                        ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xl shadow-blue-500/20'
-                        : 'bg-gradient-to-br from-gray-900/80 via-gray-850/80 to-gray-900/80 text-gray-100 border border-gray-700/50 backdrop-blur-sm'
-                    }`}
-                  >
-                    {editingMessageIndex === index ? (
-                      <div className="space-y-3">
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
-                  setInput(e.target.value);
-                  adjustTextareaHeight();
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder={selectedCategory === 'all' ? "Ask about sports betting, fantasy, DFS, or prediction markets..." : 
-                             selectedCategory === 'betting' ? "e.g. 'Best value plays for tonight's games'" :
-                             selectedCategory === 'fantasy' ? "e.g. 'NFBC draft strategy for pick 3'" :
-                             selectedCategory === 'dfs' ? "e.g. 'Optimal GPP stack for tonight'" :
-                             "e.g. 'Weather-correlated Kalshi markets'"}
-                className="flex-1 bg-transparent text-white placeholder-gray-400 focus:outline-none text-[13px] leading-relaxed resize-none min-h-[44px] max-h-[200px] pr-2"
-                rows={1}
-                disabled={isTyping}
-              />
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleSaveEdit(index)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all"
-                          >
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            Save & Regenerate
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs font-bold transition-all"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        {/* Check if this is a detailed analysis with structured data */}
-                        {message.content.includes('__DETAILED_ANALYSIS__') ? (
-                          (() => {
-                            const match = message.content.match(/__DETAILED_ANALYSIS__(.+)__END_ANALYSIS__/);
-                            if (!match) return <p className="text-sm leading-relaxed font-medium">{message.content}</p>;
-                            
-                            const data = JSON.parse(match[1]);
-                            const { card, metrics, overview, marketContext, riskAssessment, recommendations } = data;
-                            
-                            // Map card type to icon component
-                            const getCardIcon = (type: string) => {
-                              const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-                                'live-odds': Zap,
-                                'player-prop': Target,
-                                'dfs-lineup': Award,
-                                'dfs-value': DollarSign,
-                                'adp-analysis': TrendingUp,
-                                'bestball-stack': Medal,
-                                'auction-value': ShoppingCart,
-                                'kalshi-market': BarChart3,
-                                'kalshi-weather': Activity,
-                                'cross-platform': Sparkles,
-                                'ai-prediction': Sparkles,
-                              };
-                              return iconMap[type] || Sparkles;
-                            };
-                            
-                            const CardIcon = getCardIcon(card.type);
-                            
-                            return (
-                              <div className="space-y-6">
-                                {/* Header Section */}
-                                <div className="flex items-start gap-4">
-                                  <div className={`p-3 rounded-xl bg-gradient-to-br ${card.gradient} shadow-lg flex-shrink-0`}>
-                                    <CardIcon className="w-6 h-6 text-white" />
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-3 mb-2">
-                                      <h2 className="text-xl font-black text-white">{card.title}</h2>
-                                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide ${
-                                        card.status === 'hot' || card.status === 'elite' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                                        card.status === 'strong' || card.status === 'optimal' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
-                                        'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                                      }`}>{card.status}</span>
-                                    </div>
-                                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">
-                                      {card.category} • {card.subcategory}
-                                    </p>
-                                  </div>
-                                </div>
+                    <div className={`max-w-4xl ${message.role === 'user' ? 'w-auto' : 'w-full'}`}>
+                      {message.role === 'assistant' && (
+                        <div className="flex items-center gap-3 mb-3 flex-wrap">
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30 rounded-full">
+                            <Sparkles className="w-4.5 h-4.5 text-white" />
+                          </div>
+                          <span className="text-sm font-bold bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">Leverage AI</span>
 
-                                {/* Overview */}
-                                <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 border border-gray-700/50 rounded-xl p-4">
-                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-2">
-                                    <Info className="w-3.5 h-3.5" />
-                                    Overview
-                                  </h3>
-                                  <p className="text-sm text-gray-200 leading-relaxed">{overview}</p>
-                                </div>
+                          {/* Data Verification Badge */}
+                          {message.sources && message.sources.length > 0 && !message.isWelcome && (
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-500/10 border border-green-500/30 rounded-full">
+                              <CheckCheck className="w-3 h-3 text-green-400" />
+                              <span className="text-[10px] font-black text-green-400 uppercase tracking-wide">Verified</span>
+                            </div>
+                          )}
 
-                                {/* Key Metrics Grid */}
-                                <div>
-                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <BarChart className="w-3.5 h-3.5" />
-                                    Key Metrics
-                                  </h3>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {metrics.map((metric: { label: string; value: string }, idx: number) => (
-                                      <div 
-                                        key={idx}
-                                        className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 rounded-xl p-3.5 hover:border-gray-600/50 transition-colors"
-                                      >
-                                        <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">{metric.label}</div>
-                                        <div className="text-base font-black text-white">{metric.value}</div>
+                          {message.confidence && (
+                            <div className="flex items-center gap-2 px-3 py-1 bg-gray-800/50 border border-gray-700/50 rounded-full">
+                              <Activity className="w-3.5 h-3.5 text-green-400" />
+                              <span className="text-xs font-bold text-gray-400">{message.confidence}% confidence</span>
+                            </div>
+                          )}
+
+                          {/* Trust Level Indicator */}
+                          {message.trustMetrics && !message.isWelcome && (
+                            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${message.trustMetrics.trustLevel === 'high' ? 'bg-blue-500/10 border-blue-500/30' :
+                              message.trustMetrics.trustLevel === 'medium' ? 'bg-yellow-500/10 border-yellow-500/30' :
+                                'bg-orange-500/10 border-orange-500/30'
+                              }`}>
+                              <Shield className={`w-3 h-3 ${message.trustMetrics.trustLevel === 'high' ? 'text-blue-400' :
+                                message.trustMetrics.trustLevel === 'medium' ? 'text-yellow-400' :
+                                  'text-orange-400'
+                                }`} />
+                              <span className={`text-[10px] font-black uppercase tracking-wide ${message.trustMetrics.trustLevel === 'high' ? 'text-blue-400' :
+                                message.trustMetrics.trustLevel === 'medium' ? 'text-yellow-400' :
+                                  'text-orange-400'
+                                }`}>
+                                {message.trustMetrics.adjustedTone}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div
+                        className={`rounded-2xl px-5 py-4 relative group/message ${message.role === 'user'
+                          ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xl shadow-blue-500/20'
+                          : 'bg-gradient-to-br from-gray-900/80 via-gray-850/80 to-gray-900/80 text-gray-100 border border-gray-700/50 backdrop-blur-sm'
+                          }`}
+                      >
+                        {editingMessageIndex === index ? (
+                          <div className="space-y-3">
+                            <textarea
+                              ref={textareaRef}
+                              value={input}
+                              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                                setInput(e.target.value);
+                                adjustTextareaHeight();
+                              }}
+                              onKeyDown={handleKeyDown}
+                              placeholder={selectedCategory === 'all' ? "Ask about sports betting, fantasy, DFS, or prediction markets..." :
+                                selectedCategory === 'betting' ? "e.g. 'Best value plays for tonight's games'" :
+                                  selectedCategory === 'fantasy' ? "e.g. 'NFBC draft strategy for pick 3'" :
+                                    selectedCategory === 'dfs' ? "e.g. 'Optimal GPP stack for tonight'" :
+                                      "e.g. 'Weather-correlated Kalshi markets'"}
+                              className="flex-1 bg-transparent text-white placeholder-gray-400 focus:outline-none text-[13px] leading-relaxed resize-none min-h-[44px] max-h-[200px] pr-2"
+                              rows={1}
+                              disabled={isTyping}
+                            />
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleSaveEdit(index)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all"
+                              >
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                Save & Regenerate
+                              </button>
+                              <button
+                                onClick={handleCancelEdit}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs font-bold transition-all"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {/* Check if this is a detailed analysis with structured data */}
+                            {message.content.includes('__DETAILED_ANALYSIS__') ? (
+                              (() => {
+                                const match = message.content.match(/__DETAILED_ANALYSIS__(.+)__END_ANALYSIS__/);
+                                if (!match) return <p className="text-sm leading-relaxed font-medium">{message.content}</p>;
+
+                                const data = JSON.parse(match[1]);
+                                const { card, metrics, overview, marketContext, riskAssessment, recommendations } = data;
+
+                                // Map card type to icon component
+                                const getCardIcon = (type: string) => {
+                                  const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+                                    'live-odds': Zap,
+                                    'player-prop': Target,
+                                    'dfs-lineup': Award,
+                                    'dfs-value': DollarSign,
+                                    'adp-analysis': TrendingUp,
+                                    'bestball-stack': Medal,
+                                    'auction-value': ShoppingCart,
+                                    'kalshi-market': BarChart3,
+                                    'kalshi-weather': Activity,
+                                    'cross-platform': Sparkles,
+                                    'ai-prediction': Sparkles,
+                                  };
+                                  return iconMap[type] || Sparkles;
+                                };
+
+                                const CardIcon = getCardIcon(card.type);
+
+                                return (
+                                  <div className="space-y-6">
+                                    {/* Header Section */}
+                                    <div className="flex items-start gap-4">
+                                      <div className={`p-3 rounded-xl bg-linear-to-br ${card.gradient} shadow-lg shrink-0`}>
+                                        <CardIcon className="w-6 h-6 text-white" />
                                       </div>
-                                    ))}
-                                  </div>
-                                </div>
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-3 mb-2">
+                                          <h2 className="text-xl font-black text-white">{card.title}</h2>
+                                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide ${card.status === 'hot' || card.status === 'elite' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                                            card.status === 'strong' || card.status === 'optimal' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
+                                              'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                            }`}>{card.status}</span>
+                                        </div>
+                                        <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">
+                                          {card.category} • {card.subcategory}
+                                        </p>
+                                      </div>
+                                    </div>
 
-                                {/* Market Context */}
-                                <div className="bg-gradient-to-br from-blue-900/20 to-indigo-900/20 border border-blue-700/30 rounded-xl p-4">
-                                  <h3 className="text-xs font-black text-blue-400 uppercase tracking-wide mb-2 flex items-center gap-2">
-                                    <TrendingUp className="w-3.5 h-3.5" />
-                                    Market Context & Edge
-                                  </h3>
-                                  <p className="text-sm text-gray-200 leading-relaxed">{marketContext}</p>
+                                    {/* Overview */}
+                                    <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 border border-gray-700/50 rounded-xl p-4">
+                                      <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                        <Info className="w-3.5 h-3.5" />
+                                        Overview
+                                      </h3>
+                                      <p className="text-sm text-gray-200 leading-relaxed">{overview}</p>
+                                    </div>
+
+                                    {/* Key Metrics Grid */}
+                                    <div>
+                                      <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                        <BarChart className="w-3.5 h-3.5" />
+                                        Key Metrics
+                                      </h3>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {metrics.map((metric: { label: string; value: string }, idx: number) => (
+                                          <div
+                                            key={idx}
+                                            className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 rounded-xl p-3.5 hover:border-gray-600/50 transition-colors"
+                                          >
+                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">{metric.label}</div>
+                                            <div className="text-base font-black text-white">{metric.value}</div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    {/* Market Context */}
+                                    <div className="bg-gradient-to-br from-blue-900/20 to-indigo-900/20 border border-blue-700/30 rounded-xl p-4">
+                                      <h3 className="text-xs font-black text-blue-400 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                        <TrendingUp className="w-3.5 h-3.5" />
+                                        Market Context & Edge
+                                      </h3>
+                                      <p className="text-sm text-gray-200 leading-relaxed">{marketContext}</p>
+                                    </div>
+
+                                    {/* Risk Assessment */}
+                                    <div>
+                                      <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                        <Shield className="w-3.5 h-3.5" />
+                                        Risk Assessment
+                                      </h3>
+                                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-700/30 rounded-xl p-4">
+                                          <div className="text-[10px] font-bold text-green-500 uppercase tracking-wide mb-1.5">Conviction Level</div>
+                                          <div className="text-lg font-black text-green-400">{riskAssessment.convictionLevel}</div>
+                                        </div>
+                                        <div className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border border-yellow-700/30 rounded-xl p-4">
+                                          <div className="text-[10px] font-bold text-yellow-500 uppercase tracking-wide mb-1.5">Risk Category</div>
+                                          <div className="text-sm font-black text-yellow-400">{riskAssessment.riskCategory}</div>
+                                        </div>
+                                        <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-700/30 rounded-xl p-4">
+                                          <div className="text-[10px] font-bold text-purple-500 uppercase tracking-wide mb-1.5">Position Sizing</div>
+                                          <div className="text-lg font-black text-purple-400">{riskAssessment.positionSize}</div>
+                                          <div className="text-[10px] text-gray-500 mt-1">of bankroll</div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Strategic Recommendations */}
+                                    <div>
+                                      <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                        <Target className="w-3.5 h-3.5" />
+                                        Strategic Recommendations
+                                      </h3>
+                                      <div className="space-y-2.5">
+                                        {recommendations.map((rec: { label: string; value: string }, idx: number) => (
+                                          <div
+                                            key={idx}
+                                            className="bg-linear-to-r from-gray-800/40 to-gray-900/40 border border-gray-700/50 rounded-xl p-4 hover:border-gray-600/50 transition-colors"
+                                          >
+                                            <div className="flex items-start gap-3">
+                                              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                <span className="text-white text-xs font-black">{idx + 1}</span>
+                                              </div>
+                                              <div className="flex-1">
+                                                <div className="text-xs font-black text-gray-300 mb-1">{rec.label}</div>
+                                                <div className="text-sm text-gray-400 leading-relaxed">{rec.value}</div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    {/* Next Steps CTA */}
+                                    <div className="bg-gradient-to-r from-indigo-900/30 via-purple-900/30 to-pink-900/30 border border-indigo-600/30 rounded-xl p-5">
+                                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                        <p className="text-sm text-gray-300 leading-relaxed">
+                                          <span className="font-bold text-white">Next Steps:</span> Would you like me to show correlated opportunities or dive deeper into any specific metric?
+                                        </p>
+                                        <button
+                                          onClick={() => {
+                                            console.log('[v0] Yes button clicked - showing correlated opportunities');
+                                            handleFollowUp('correlated', card);
+                                          }}
+                                          disabled={isTyping}
+                                          className="group relative flex items-center justify-center gap-2.5 px-8 py-3.5 bg-linear-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-600 disabled:via-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-black text-base rounded-xl transition-all duration-300 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:shadow-xl hover:scale-105 active:scale-95 min-w-[140px] shrink-0"
+                                        >
+                                          {isTyping ? (
+                                            <>
+                                              <Loader2 className="w-5 h-5 animate-spin" />
+                                              <span>Loading...</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <CheckCircle2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                              <span className="tracking-wide">YES</span>
+                                              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                            </>
+                                          )}
+                                        </button>
+                                      </div>
+
+                                      {/* Secondary Options */}
+                                      <div className="mt-4 pt-4 border-t border-indigo-600/20">
+                                        <p className="text-xs text-gray-400 mb-3 font-semibold">Or choose a specific action:</p>
+                                        <div className="flex flex-wrap gap-2">
+                                          <button
+                                            onClick={() => {
+                                              console.log('[v0] Correlated opportunities button clicked');
+                                              handleFollowUp('correlated', card);
+                                            }}
+                                            disabled={isTyping}
+                                            className="flex items-center gap-2 px-3.5 py-2 bg-gray-800/50 hover:bg-gray-700/50 disabled:bg-gray-800/30 disabled:cursor-not-allowed border border-gray-700/50 hover:border-blue-500/50 text-gray-300 hover:text-white font-semibold text-xs rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+                                          >
+                                            <Sparkles className="w-3.5 h-3.5" />
+                                            Correlated Plays
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              console.log('[v0] Metrics analysis button clicked');
+                                              handleFollowUp('metrics', card);
+                                            }}
+                                            disabled={isTyping}
+                                            className="flex items-center gap-2 px-3.5 py-2 bg-gray-800/50 hover:bg-gray-700/50 disabled:bg-gray-800/30 disabled:cursor-not-allowed border border-gray-700/50 hover:border-purple-500/50 text-gray-300 hover:text-white font-semibold text-xs rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+                                          >
+                                            <BarChart className="w-3.5 h-3.5" />
+                                            Deep Metrics
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })()
+                            ) : (
+                              <div className="text-sm leading-relaxed font-medium space-y-3">
+                                {message.content.split('\n\n').map((paragraph, pIdx) => {
+                                  // Check if paragraph contains bullet points
+                                  if (paragraph.includes('\n**') && paragraph.includes('**')) {
+                                    const lines = paragraph.split('\n');
+                                    return (
+                                      <div key={pIdx} className="space-y-2">
+                                        {lines.map((line, lIdx) => {
+                                          // Bold text with ** **
+                                          if (line.includes('**')) {
+                                            const parts = line.split('**');
+                                            return (
+                                              <div key={lIdx} className="flex items-start gap-2">
+                                                {parts.map((part, partIdx) => {
+                                                  if (partIdx % 2 === 1) {
+                                                    return <span key={partIdx} className="font-black text-white">{part}</span>;
+                                                  } else if (part.trim()) {
+                                                    return <span key={partIdx} className="text-gray-300">{part}</span>;
+                                                  }
+                                                  return null;
+                                                })}
+                                              </div>
+                                            );
+                                          }
+                                          return <div key={lIdx}>{line}</div>;
+                                        })}
+                                      </div>
+                                    );
+                                  }
+
+                                  // Regular paragraph with bold support
+                                  if (paragraph.includes('**')) {
+                                    const parts = paragraph.split('**');
+                                    return (
+                                      <p key={pIdx} suppressHydrationWarning>
+                                        {parts.map((part, partIdx) => {
+                                          if (partIdx % 2 === 1) {
+                                            return <span key={partIdx} className="font-black text-white">{part}</span>;
+                                          }
+                                          return <span key={partIdx}>{part}</span>;
+                                        })}
+                                      </p>
+                                    );
+                                  }
+
+                                  return <p key={pIdx} suppressHydrationWarning>{paragraph}</p>;
+                                })}
+                              </div>
+                            )}
+
+                            {/* File Attachments Display */}
+                            {message.attachments && message.attachments.length > 0 && (
+                              <div className="mt-4 space-y-3">
+                                {message.attachments.map((attachment) => (
+                                  <div key={attachment.id}>
+                                    {attachment.type === 'image' && (
+                                      <div className="relative group/img rounded-xl overflow-hidden border border-gray-700/50 bg-gray-900/50">
+                                        <img
+                                          src={attachment.url || "/placeholder.svg"}
+                                          alt={attachment.name}
+                                          className="w-full max-w-xl rounded-xl"
+                                        />
+                                        <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 to-transparent p-3 opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                          <div className="flex items-center gap-2">
+                                            <ImageIcon className="w-4 h-4 text-gray-400" />
+                                            <span className="text-xs font-bold text-gray-300">{attachment.name}</span>
+                                            <span className="text-xs text-gray-500 ml-auto">{(attachment.size / 1024).toFixed(1)} KB</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {attachment.type === 'csv' && attachment.data && (
+                                      <div className="rounded-xl border border-gray-700/50 bg-gray-900/50 overflow-hidden">
+                                        <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-800/50 border-b border-gray-700/50">
+                                          <FileText className="w-4 h-4 text-green-400" />
+                                          <span className="text-xs font-bold text-gray-300">{attachment.name}</span>
+                                          <span className="text-xs text-gray-500 ml-auto">
+                                            {attachment.data.rows.length} rows × {attachment.data.headers.length} columns
+                                          </span>
+                                        </div>
+                                        <div className="overflow-x-auto max-h-96 custom-scrollbar">
+                                          <table className="w-full text-xs">
+                                            <thead className="sticky top-0 bg-gray-800/80 backdrop-blur-sm">
+                                              <tr>
+                                                {attachment.data.headers.map((header: string, idx: number) => (
+                                                  <th key={idx} className="px-4 py-2.5 text-left font-bold text-gray-300 border-b border-gray-700/50">
+                                                    {header}
+                                                  </th>
+                                                ))}
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {attachment.data.rows.slice(0, 100).map((row: string[], rowIdx: number) => (
+                                                <tr key={rowIdx} className="hover:bg-gray-800/30 transition-colors border-b border-gray-800/30">
+                                                  {row.map((cell: string, cellIdx: number) => (
+                                                    <td key={cellIdx} className="px-4 py-2.5 text-gray-400 font-medium">
+                                                      {cell}
+                                                    </td>
+                                                  ))}
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                          {attachment.data.rows.length > 100 && (
+                                            <div className="px-4 py-3 bg-gray-800/30 text-center">
+                                              <span className="text-xs text-gray-500">
+                                                Showing first 100 rows of {attachment.data.rows.length}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {message.editHistory && message.editHistory.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-gray-700/50">
+                                <details className="text-xs text-gray-500">
+                                  <summary className="cursor-pointer hover:text-gray-400 flex items-center gap-1.5">
+                                    <RotateCcw className="w-3 h-3" />
+                                    Edited {message.editHistory.length} time{message.editHistory.length !== 1 ? 's' : ''}
+                                  </summary>
+                                </details>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+
+
+                      {/* Dynamic Cards Section with Enhanced UX */}
+                      {message.role === 'assistant' && (
+                        <div className="mt-5">
+                          {message.cards && message.cards.length > 0 && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                              {message.cards.map((card, cardIndex) => {
+                                const { icon: _icon, ...cardData } = card;
+                                return (
+                                  <div key={`${card.type}-${cardIndex}`}>
+                                    <DynamicCardRenderer
+                                      card={cardData}
+                                      index={cardIndex}
+                                      onAnalyze={() => generateDetailedAnalysis(card)}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Combined Metadata: Source Credibility & AI Trust - Hidden for welcome message */}
+                      {message.role === 'assistant' && !message.isWelcome && (message.sources || message.trustMetrics) && (
+                        <div className="mt-4 ml-11">
+                          {/* Compact Metadata Summary */}
+                          <div className="flex items-center gap-3 text-[11px] text-gray-600">
+                            {message.modelUsed && (
+                              <span className="flex items-center gap-1.5">
+                                <BookOpen className="w-3 h-3 text-purple-500/60" />
+                                <span>Model: <span className="text-gray-500 font-semibold">{message.modelUsed}</span></span>
+                              </span>
+                            )}
+                            {message.processingTime && (
+                              <span className="flex items-center gap-1.5">
+                                <Zap className="w-3 h-3 text-yellow-500/60" />
+                                <span>Processed in: <span className="text-gray-500 font-semibold tabular-nums">{message.processingTime}ms</span></span>
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Collapsible Source Credibility */}
+                          {message.sources && message.sources.length > 0 && (
+                            <details className="mt-3 group/sources">
+                              <summary className="cursor-pointer list-none flex items-center gap-2 text-[11px] text-gray-600 hover:text-gray-500 transition-colors">
+                                <Shield className="w-3.5 h-3.5 text-blue-500/60" />
+                                <span className="font-semibold uppercase tracking-wide">Source Credibility</span>
+                                <span className="text-gray-700">({message.sources.length} sources)</span>
+                                <ChevronRight className="w-3 h-3 group-open/sources:rotate-90 transition-transform" />
+                              </summary>
+                              <div className="mt-3 flex flex-wrap gap-2 pl-5">
+                                {message.sources.map((source, idx) => {
+                                  const reliabilityColor = source.reliability >= 95 ? 'text-green-500 border-green-600/20' :
+                                    source.reliability >= 90 ? 'text-blue-500 border-blue-600/20' :
+                                      'text-yellow-500 border-yellow-600/20';
+                                  const Icon = source.type === 'database' ? Database :
+                                    source.type === 'api' ? Activity :
+                                      source.type === 'model' ? Sparkles :
+                                        RefreshCw;
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border bg-gray-900/30 ${reliabilityColor} text-[11px]`}
+                                      title={`${source.name} - ${source.reliability}% reliability`}
+                                    >
+                                      <Icon className="w-3 h-3" />
+                                      <span className="font-semibold">{source.name}</span>
+                                      <span className="font-bold tabular-nums">{source.reliability}%</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </details>
+                          )}
+
+                          {/* Collapsible AI Trust & Integrity */}
+                          {message.trustMetrics && (
+                            <details className="mt-3 group/trust">
+                              <summary className="cursor-pointer list-none flex items-center gap-2 text-[11px] text-gray-600 hover:text-gray-500 transition-colors">
+                                <Shield className="w-3.5 h-3.5 text-green-500/60" />
+                                <span className="font-semibold uppercase tracking-wide">AI Trust & Integrity</span>
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${message.trustMetrics.trustLevel === 'high' ? 'bg-green-600/20 text-green-500' :
+                                  message.trustMetrics.trustLevel === 'medium' ? 'bg-blue-600/20 text-blue-500' :
+                                    'bg-orange-600/20 text-orange-500'
+                                  }`}>
+                                  {message.trustMetrics.finalConfidence}% {message.trustMetrics.trustLevel === 'high' ? 'High' : message.trustMetrics.trustLevel === 'medium' ? 'Med' : 'Low'} Trust
+                                </span>
+                                <ChevronRight className="w-3 h-3 group-open/trust:rotate-90 transition-transform" />
+                              </summary>
+                              <div className="mt-3 space-y-3 pl-5">
+                                {/* Trust Metrics Grid */}
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
+                                    <span className="text-[10px] text-gray-600 font-semibold">Benford Market</span>
+                                    <span className={`text-[11px] font-bold tabular-nums ${message.trustMetrics.benfordIntegrity >= 80 ? 'text-green-500' :
+                                      message.trustMetrics.benfordIntegrity >= 60 ? 'text-yellow-500' : 'text-red-500'
+                                      }`}>
+                                      {message.trustMetrics.benfordIntegrity}%
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
+                                    <span className="text-[10px] text-gray-600 font-semibold">Odds Alignment</span>
+                                    <span className={`text-[11px] font-bold tabular-nums ${message.trustMetrics.oddsAlignment >= 80 ? 'text-green-500' :
+                                      message.trustMetrics.oddsAlignment >= 60 ? 'text-yellow-500' : 'text-red-500'
+                                      }`}>
+                                      {message.trustMetrics.oddsAlignment}%
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
+                                    <span className="text-[10px] text-gray-600 font-semibold">Market Consensus</span>
+                                    <span className={`text-[11px] font-bold tabular-nums ${message.trustMetrics.marketConsensus >= 80 ? 'text-green-500' :
+                                      message.trustMetrics.marketConsensus >= 60 ? 'text-yellow-500' : 'text-red-500'
+                                      }`}>
+                                      {message.trustMetrics.marketConsensus}%
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
+                                    <span className="text-[10px] text-gray-600 font-semibold">Historical Accuracy</span>
+                                    <span className={`text-[11px] font-bold tabular-nums ${message.trustMetrics.historicalAccuracy >= 80 ? 'text-green-500' :
+                                      message.trustMetrics.historicalAccuracy >= 60 ? 'text-yellow-500' : 'text-red-500'
+                                      }`}>
+                                      {message.trustMetrics.historicalAccuracy}%
+                                    </span>
+                                  </div>
                                 </div>
 
                                 {/* Risk Assessment */}
-                                <div>
-                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <Shield className="w-3.5 h-3.5" />
-                                    Risk Assessment
-                                  </h3>
-                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-700/30 rounded-xl p-4">
-                                      <div className="text-[10px] font-bold text-green-500 uppercase tracking-wide mb-1.5">Conviction Level</div>
-                                      <div className="text-lg font-black text-green-400">{riskAssessment.convictionLevel}</div>
-                                    </div>
-                                    <div className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border border-yellow-700/30 rounded-xl p-4">
-                                      <div className="text-[10px] font-bold text-yellow-500 uppercase tracking-wide mb-1.5">Risk Category</div>
-                                      <div className="text-sm font-black text-yellow-400">{riskAssessment.riskCategory}</div>
-                                    </div>
-                                    <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-700/30 rounded-xl p-4">
-                                      <div className="text-[10px] font-bold text-purple-500 uppercase tracking-wide mb-1.5">Position Sizing</div>
-                                      <div className="text-lg font-black text-purple-400">{riskAssessment.positionSize}</div>
-                                      <div className="text-[10px] text-gray-500 mt-1">of bankroll</div>
-                                    </div>
-                                  </div>
+                                <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
+                                  <span className="text-[10px] text-gray-600 font-semibold">Risk Level:</span>
+                                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${message.trustMetrics.riskLevel === 'low' ? 'bg-green-600/20 text-green-500' :
+                                    message.trustMetrics.riskLevel === 'medium' ? 'bg-yellow-600/20 text-yellow-500' :
+                                      'bg-red-600/20 text-red-500'
+                                    }`}>
+                                    {message.trustMetrics.riskLevel.charAt(0).toUpperCase() + message.trustMetrics.riskLevel.slice(1)} Risk
+                                  </span>
+                                  <span className="text-[10px] text-gray-700">• {message.trustMetrics.adjustedTone}</span>
                                 </div>
 
-                                {/* Strategic Recommendations */}
-                                <div>
-                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <Target className="w-3.5 h-3.5" />
-                                    Strategic Recommendations
-                                  </h3>
-                                  <div className="space-y-2.5">
-                                    {recommendations.map((rec: { label: string; value: string }, idx: number) => (
-                                      <div 
-                                        key={idx}
-                                        className="bg-gradient-to-r from-gray-800/40 to-gray-900/40 border border-gray-700/50 rounded-xl p-4 hover:border-gray-600/50 transition-colors"
-                                      >
-                                        <div className="flex items-start gap-3">
-                                          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                            <span className="text-white text-xs font-black">{idx + 1}</span>
-                                          </div>
-                                          <div className="flex-1">
-                                            <div className="text-xs font-black text-gray-300 mb-1">{rec.label}</div>
-                                            <div className="text-sm text-gray-400 leading-relaxed">{rec.value}</div>
-                                          </div>
+                                {/* Flags if present */}
+                                {message.trustMetrics.flags && message.trustMetrics.flags.length > 0 && (
+                                  <details className="group/flags">
+                                    <summary className="cursor-pointer list-none flex items-center gap-1.5 text-[10px] text-orange-600 hover:text-orange-500 transition-colors">
+                                      <AlertCircle className="w-3 h-3" />
+                                      <span className="font-semibold">{message.trustMetrics.flags.length} issue{message.trustMetrics.flags.length !== 1 ? 's' : ''} flagged</span>
+                                      <ChevronRight className="w-2.5 h-2.5 group-open/flags:rotate-90 transition-transform" />
+                                    </summary>
+                                    <div className="mt-2 space-y-1.5">
+                                      {message.trustMetrics.flags.map((flag, idx) => (
+                                        <div
+                                          key={idx}
+                                          className={`px-2.5 py-1.5 rounded-lg border text-[10px] ${flag.severity === 'error' ? 'bg-red-600/10 border-red-600/20 text-red-500' :
+                                            flag.severity === 'warning' ? 'bg-yellow-600/10 border-yellow-600/20 text-yellow-500' :
+                                              'bg-blue-600/10 border-blue-600/20 text-blue-500'
+                                            }`}
+                                        >
+                                          <div className="font-bold mb-0.5">{flag.type.charAt(0).toUpperCase() + flag.type.slice(1)} Check</div>
+                                          <div className="text-gray-600">{flag.message}</div>
                                         </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                {/* Next Steps CTA */}
-                                <div className="bg-gradient-to-r from-indigo-900/30 via-purple-900/30 to-pink-900/30 border border-indigo-600/30 rounded-xl p-5">
-                                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                                    <p className="text-sm text-gray-300 leading-relaxed">
-                                      <span className="font-bold text-white">Next Steps:</span> Would you like me to show correlated opportunities or dive deeper into any specific metric?
-                                    </p>
-                                    <button
-                                      onClick={() => {
-                                        console.log('[v0] Yes button clicked - showing correlated opportunities');
-                                        handleFollowUp('correlated', card);
-                                      }}
-                                      disabled={isTyping}
-                                      className="group relative flex items-center justify-center gap-2.5 px-8 py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-600 disabled:via-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-black text-base rounded-xl transition-all duration-300 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:shadow-xl hover:scale-105 active:scale-95 min-w-[140px] flex-shrink-0"
-                                    >
-                                      {isTyping ? (
-                                        <>
-                                          <Loader2 className="w-5 h-5 animate-spin" />
-                                          <span>Loading...</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <CheckCircle2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                                          <span className="tracking-wide">YES</span>
-                                          <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                        </>
-                                      )}
-                                    </button>
-                                  </div>
-                                  
-                                  {/* Secondary Options */}
-                                  <div className="mt-4 pt-4 border-t border-indigo-600/20">
-                                    <p className="text-xs text-gray-400 mb-3 font-semibold">Or choose a specific action:</p>
-                                    <div className="flex flex-wrap gap-2">
-                                      <button
-                                        onClick={() => {
-                                          console.log('[v0] Correlated opportunities button clicked');
-                                          handleFollowUp('correlated', card);
-                                        }}
-                                        disabled={isTyping}
-                                        className="flex items-center gap-2 px-3.5 py-2 bg-gray-800/50 hover:bg-gray-700/50 disabled:bg-gray-800/30 disabled:cursor-not-allowed border border-gray-700/50 hover:border-blue-500/50 text-gray-300 hover:text-white font-semibold text-xs rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
-                                      >
-                                        <Sparkles className="w-3.5 h-3.5" />
-                                        Correlated Plays
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          console.log('[v0] Metrics analysis button clicked');
-                                          handleFollowUp('metrics', card);
-                                        }}
-                                        disabled={isTyping}
-                                        className="flex items-center gap-2 px-3.5 py-2 bg-gray-800/50 hover:bg-gray-700/50 disabled:bg-gray-800/30 disabled:cursor-not-allowed border border-gray-700/50 hover:border-purple-500/50 text-gray-300 hover:text-white font-semibold text-xs rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
-                                      >
-                                        <BarChart className="w-3.5 h-3.5" />
-                                        Deep Metrics
-                                      </button>
+                                      ))}
                                     </div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })()
-                        ) : (
-                          <div className="text-sm leading-relaxed font-medium space-y-3">
-                            {message.content.split('\n\n').map((paragraph, pIdx) => {
-                              // Check if paragraph contains bullet points
-                              if (paragraph.includes('\n**') && paragraph.includes('**')) {
-                                const lines = paragraph.split('\n');
-                                return (
-                                  <div key={pIdx} className="space-y-2">
-                                    {lines.map((line, lIdx) => {
-                                      // Bold text with ** **
-                                      if (line.includes('**')) {
-                                        const parts = line.split('**');
-                                        return (
-                                          <div key={lIdx} className="flex items-start gap-2">
-                                            {parts.map((part, partIdx) => {
-                                              if (partIdx % 2 === 1) {
-                                                return <span key={partIdx} className="font-black text-white">{part}</span>;
-                                              } else if (part.trim()) {
-                                                return <span key={partIdx} className="text-gray-300">{part}</span>;
-                                              }
-                                              return null;
-                                            })}
-                                          </div>
-                                        );
-                                      }
-                                      return <div key={lIdx}>{line}</div>;
-                                    })}
-                                  </div>
-                                );
-                              }
-                              
-                              // Regular paragraph with bold support
-                              if (paragraph.includes('**')) {
-                                const parts = paragraph.split('**');
-                                return (
-                                  <p key={pIdx} suppressHydrationWarning>
-                                    {parts.map((part, partIdx) => {
-                                      if (partIdx % 2 === 1) {
-                                        return <span key={partIdx} className="font-black text-white">{part}</span>;
-                                      }
-                                      return <span key={partIdx}>{part}</span>;
-                                    })}
-                                  </p>
-                                );
-                              }
-                              
-                              return <p key={pIdx} suppressHydrationWarning>{paragraph}</p>;
-                            })}
-                          </div>
-                        )}
-                        
-                        {/* File Attachments Display */}
-                        {message.attachments && message.attachments.length > 0 && (
-                          <div className="mt-4 space-y-3">
-                            {message.attachments.map((attachment) => (
-                              <div key={attachment.id}>
-                                {attachment.type === 'image' && (
-                                  <div className="relative group/img rounded-xl overflow-hidden border border-gray-700/50 bg-gray-900/50">
-                                    <img 
-                                      src={attachment.url || "/placeholder.svg"} 
-                                      alt={attachment.name}
-                                      className="w-full max-w-xl rounded-xl"
-                                    />
-                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 opacity-0 group-hover/img:opacity-100 transition-opacity">
-                                      <div className="flex items-center gap-2">
-                                        <ImageIcon className="w-4 h-4 text-gray-400" />
-                                        <span className="text-xs font-bold text-gray-300">{attachment.name}</span>
-                                        <span className="text-xs text-gray-500 ml-auto">{(attachment.size / 1024).toFixed(1)} KB</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                                
-                                {attachment.type === 'csv' && attachment.data && (
-                                  <div className="rounded-xl border border-gray-700/50 bg-gray-900/50 overflow-hidden">
-                                    <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-800/50 border-b border-gray-700/50">
-                                      <FileText className="w-4 h-4 text-green-400" />
-                                      <span className="text-xs font-bold text-gray-300">{attachment.name}</span>
-                                      <span className="text-xs text-gray-500 ml-auto">
-                                        {attachment.data.rows.length} rows × {attachment.data.headers.length} columns
-                                      </span>
-                                    </div>
-                                    <div className="overflow-x-auto max-h-96 custom-scrollbar">
-                                      <table className="w-full text-xs">
-                                        <thead className="sticky top-0 bg-gray-800/80 backdrop-blur-sm">
-                                          <tr>
-                                            {attachment.data.headers.map((header: string, idx: number) => (
-                                              <th key={idx} className="px-4 py-2.5 text-left font-bold text-gray-300 border-b border-gray-700/50">
-                                                {header}
-                                              </th>
-                                            ))}
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {attachment.data.rows.slice(0, 100).map((row: string[], rowIdx: number) => (
-                                            <tr key={rowIdx} className="hover:bg-gray-800/30 transition-colors border-b border-gray-800/30">
-                                              {row.map((cell: string, cellIdx: number) => (
-                                                <td key={cellIdx} className="px-4 py-2.5 text-gray-400 font-medium">
-                                                  {cell}
-                                                </td>
-                                              ))}
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                      {attachment.data.rows.length > 100 && (
-                                        <div className="px-4 py-3 bg-gray-800/30 text-center">
-                                          <span className="text-xs text-gray-500">
-                                            Showing first 100 rows of {attachment.data.rows.length}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
+                                  </details>
                                 )}
                               </div>
-                            ))}
-                          </div>
-                        )}
-                        
-                        {message.editHistory && message.editHistory.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-gray-700/50">
-                            <details className="text-xs text-gray-500">
-                              <summary className="cursor-pointer hover:text-gray-400 flex items-center gap-1.5">
-                                <RotateCcw className="w-3 h-3" />
-                                Edited {message.editHistory.length} time{message.editHistory.length !== 1 ? 's' : ''}
-                              </summary>
                             </details>
+                          )}
+                        </div>
+                      )}
+
+
+                      {/* Message Actions - Hidden for welcome message */}
+                      {!message.isWelcome && (
+                        <div className={`flex items-center flex-wrap gap-2 mt-5 ${message.role === 'assistant' ? 'ml-11' : ''}`}>
+                          {message.role === 'user' && editingMessageIndex !== index && (
+                            <button
+                              onClick={() => handleEditMessage(index)}
+                              className="flex items-center gap-2 px-3.5 py-2 rounded-xl hover:bg-gray-800/60 active:bg-gray-800/80 transition-all group/action border border-gray-800 hover:border-gray-700"
+                              title="Edit this message"
+                              aria-label="Edit message"
+                            >
+                              <Edit3 className="w-4 h-4 text-gray-500 group-hover/action:text-blue-400 transition-colors" />
+                              <span className="text-xs font-bold text-gray-500 group-hover/action:text-blue-400">Edit</span>
+                            </button>
+                          )}
+                          {message.role === 'assistant' && (
+                            <>
+                              <button
+                                onClick={() => handleVote(index, 'up')}
+                                className="flex items-center gap-2 px-3.5 py-2 rounded-xl hover:bg-green-500/10 active:bg-green-500/20 transition-all group/action border border-transparent hover:border-green-500/30"
+                                title="This response was helpful"
+                                aria-label="Mark as helpful"
+                              >
+                                <ThumbsUp className="w-4 h-4 text-gray-500 group-hover/action:text-green-400 transition-colors" />
+                                <span className="text-xs font-bold text-gray-500 group-hover/action:text-green-400">Helpful</span>
+                              </button>
+                              <button
+                                onClick={() => handleVote(index, 'down')}
+                                className="flex items-center gap-2 px-3.5 py-2 rounded-xl hover:bg-red-500/10 active:bg-red-500/20 transition-all group/action border border-transparent hover:border-red-500/30"
+                                title="This response needs improvement"
+                                aria-label="Mark as needing improvement"
+                              >
+                                <ThumbsDown className="w-4 h-4 text-gray-500 group-hover/action:text-red-400 transition-colors" />
+                                <span className="text-xs font-bold text-gray-500 group-hover/action:text-red-400">Improve</span>
+                              </button>
+                              <button
+                                onClick={() => handleRegenerateResponse(index)}
+                                className="flex items-center gap-2 px-3.5 py-2 rounded-xl hover:bg-purple-500/10 active:bg-purple-500/20 transition-all group/action border border-transparent hover:border-purple-500/30"
+                                title="Regenerate this response"
+                                aria-label="Regenerate response"
+                              >
+                                <RotateCcw className="w-4 h-4 text-gray-500 group-hover/action:text-purple-400 transition-colors" />
+                                <span className="text-xs font-bold text-gray-500 group-hover/action:text-purple-400">Regenerate</span>
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={() => handleCopyMessage(message.content)}
+                            className="flex items-center gap-2 px-3.5 py-2 rounded-xl hover:bg-cyan-500/10 active:bg-cyan-500/20 transition-all group/action border border-transparent hover:border-cyan-500/30"
+                            title="Copy message to clipboard"
+                            aria-label="Copy message"
+                          >
+                            <Copy className="w-4 h-4 text-gray-500 group-hover/action:text-cyan-400 transition-colors" />
+                            <span className="text-xs font-bold text-gray-500 group-hover/action:text-cyan-400">Copy</span>
+                          </button>
+                          <div className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-gray-900/50 rounded-lg border border-gray-800/50">
+                            <Clock className="w-3.5 h-3.5 text-gray-600" />
+                            <span className="text-xs font-medium text-gray-500 tabular-nums" suppressHydrationWarning>{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-
-
-                  {/* Dynamic Cards Section with Enhanced UX */}
-                  {message.role === 'assistant' && (
-                    <div className="mt-5">
-                      {message.cards && message.cards.length > 0 && (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                          {message.cards.map((card, cardIndex) => {
-                            const { icon: _icon, ...cardData } = card;
-                            return (
-                              <div key={`${card.type}-${cardIndex}`}>
-                                <DynamicCardRenderer
-                                  card={cardData}
-                                  index={cardIndex}
-                                  onAnalyze={() => generateDetailedAnalysis(card)}
-                                />
-                              </div>
-                            );
-                          })}
                         </div>
                       )}
                     </div>
-                  )}
+                  </div>
+                );
+              })
+            )}
 
-                  {/* Combined Metadata: Source Credibility & AI Trust - Hidden for welcome message */}
-                  {message.role === 'assistant' && !message.isWelcome && (message.sources || message.trustMetrics) && (
-                    <div className="mt-4 ml-11">
-                      {/* Compact Metadata Summary */}
-                      <div className="flex items-center gap-3 text-[11px] text-gray-600">
-                        {message.modelUsed && (
-                          <span className="flex items-center gap-1.5">
-                            <BookOpen className="w-3 h-3 text-purple-500/60" />
-                            <span>Model: <span className="text-gray-500 font-semibold">{message.modelUsed}</span></span>
-                          </span>
-                        )}
-                        {message.processingTime && (
-                          <span className="flex items-center gap-1.5">
-                            <Zap className="w-3 h-3 text-yellow-500/60" />
-                            <span>Processed in: <span className="text-gray-500 font-semibold tabular-nums">{message.processingTime}ms</span></span>
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Collapsible Source Credibility */}
-                      {message.sources && message.sources.length > 0 && (
-                        <details className="mt-3 group/sources">
-                          <summary className="cursor-pointer list-none flex items-center gap-2 text-[11px] text-gray-600 hover:text-gray-500 transition-colors">
-                            <Shield className="w-3.5 h-3.5 text-blue-500/60" />
-                            <span className="font-semibold uppercase tracking-wide">Source Credibility</span>
-                            <span className="text-gray-700">({message.sources.length} sources)</span>
-                            <ChevronRight className="w-3 h-3 group-open/sources:rotate-90 transition-transform" />
-                          </summary>
-                          <div className="mt-3 flex flex-wrap gap-2 pl-5">
-                            {message.sources.map((source, idx) => {
-                              const reliabilityColor = source.reliability >= 95 ? 'text-green-500 border-green-600/20' :
-                                                      source.reliability >= 90 ? 'text-blue-500 border-blue-600/20' :
-                                                      'text-yellow-500 border-yellow-600/20';
-                              const Icon = source.type === 'database' ? Database : 
-                                          source.type === 'api' ? Activity : 
-                                          source.type === 'model' ? Sparkles : 
-                                          RefreshCw;
-                              return (
-                                <div 
-                                  key={idx} 
-                                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border bg-gray-900/30 ${reliabilityColor} text-[11px]`}
-                                  title={`${source.name} - ${source.reliability}% reliability`}
-                                >
-                                  <Icon className="w-3 h-3" />
-                                  <span className="font-semibold">{source.name}</span>
-                                  <span className="font-bold tabular-nums">{source.reliability}%</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </details>
-                      )}
-
-                      {/* Collapsible AI Trust & Integrity */}
-                      {message.trustMetrics && (
-                        <details className="mt-3 group/trust">
-                          <summary className="cursor-pointer list-none flex items-center gap-2 text-[11px] text-gray-600 hover:text-gray-500 transition-colors">
-                            <Shield className="w-3.5 h-3.5 text-green-500/60" />
-                            <span className="font-semibold uppercase tracking-wide">AI Trust & Integrity</span>
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              message.trustMetrics.trustLevel === 'high' ? 'bg-green-600/20 text-green-500' :
-                              message.trustMetrics.trustLevel === 'medium' ? 'bg-blue-600/20 text-blue-500' :
-                              'bg-orange-600/20 text-orange-500'
-                            }`}>
-                              {message.trustMetrics.finalConfidence}% {message.trustMetrics.trustLevel === 'high' ? 'High' : message.trustMetrics.trustLevel === 'medium' ? 'Med' : 'Low'} Trust
-                            </span>
-                            <ChevronRight className="w-3 h-3 group-open/trust:rotate-90 transition-transform" />
-                          </summary>
-                          <div className="mt-3 space-y-3 pl-5">
-                            {/* Trust Metrics Grid */}
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
-                                <span className="text-[10px] text-gray-600 font-semibold">Benford Market</span>
-                                <span className={`text-[11px] font-bold tabular-nums ${
-                                  message.trustMetrics.benfordIntegrity >= 80 ? 'text-green-500' :
-                                  message.trustMetrics.benfordIntegrity >= 60 ? 'text-yellow-500' : 'text-red-500'
-                                }`}>
-                                  {message.trustMetrics.benfordIntegrity}%
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
-                                <span className="text-[10px] text-gray-600 font-semibold">Odds Alignment</span>
-                                <span className={`text-[11px] font-bold tabular-nums ${
-                                  message.trustMetrics.oddsAlignment >= 80 ? 'text-green-500' :
-                                  message.trustMetrics.oddsAlignment >= 60 ? 'text-yellow-500' : 'text-red-500'
-                                }`}>
-                                  {message.trustMetrics.oddsAlignment}%
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
-                                <span className="text-[10px] text-gray-600 font-semibold">Market Consensus</span>
-                                <span className={`text-[11px] font-bold tabular-nums ${
-                                  message.trustMetrics.marketConsensus >= 80 ? 'text-green-500' :
-                                  message.trustMetrics.marketConsensus >= 60 ? 'text-yellow-500' : 'text-red-500'
-                                }`}>
-                                  {message.trustMetrics.marketConsensus}%
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
-                                <span className="text-[10px] text-gray-600 font-semibold">Historical Accuracy</span>
-                                <span className={`text-[11px] font-bold tabular-nums ${
-                                  message.trustMetrics.historicalAccuracy >= 80 ? 'text-green-500' :
-                                  message.trustMetrics.historicalAccuracy >= 60 ? 'text-yellow-500' : 'text-red-500'
-                                }`}>
-                                  {message.trustMetrics.historicalAccuracy}%
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Risk Assessment */}
-                            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
-                              <span className="text-[10px] text-gray-600 font-semibold">Risk Level:</span>
-                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${
-                                message.trustMetrics.riskLevel === 'low' ? 'bg-green-600/20 text-green-500' :
-                                message.trustMetrics.riskLevel === 'medium' ? 'bg-yellow-600/20 text-yellow-500' :
-                                'bg-red-600/20 text-red-500'
-                              }`}>
-                                {message.trustMetrics.riskLevel.charAt(0).toUpperCase() + message.trustMetrics.riskLevel.slice(1)} Risk
-                              </span>
-                              <span className="text-[10px] text-gray-700">• {message.trustMetrics.adjustedTone}</span>
-                            </div>
-
-                            {/* Flags if present */}
-                            {message.trustMetrics.flags && message.trustMetrics.flags.length > 0 && (
-                              <details className="group/flags">
-                                <summary className="cursor-pointer list-none flex items-center gap-1.5 text-[10px] text-orange-600 hover:text-orange-500 transition-colors">
-                                  <AlertCircle className="w-3 h-3" />
-                                  <span className="font-semibold">{message.trustMetrics.flags.length} issue{message.trustMetrics.flags.length !== 1 ? 's' : ''} flagged</span>
-                                  <ChevronRight className="w-2.5 h-2.5 group-open/flags:rotate-90 transition-transform" />
-                                </summary>
-                                <div className="mt-2 space-y-1.5">
-                                  {message.trustMetrics.flags.map((flag, idx) => (
-                                    <div 
-                                      key={idx}
-                                      className={`px-2.5 py-1.5 rounded-lg border text-[10px] ${
-                                        flag.severity === 'error' ? 'bg-red-600/10 border-red-600/20 text-red-500' :
-                                        flag.severity === 'warning' ? 'bg-yellow-600/10 border-yellow-600/20 text-yellow-500' :
-                                        'bg-blue-600/10 border-blue-600/20 text-blue-500'
-                                      }`}
-                                    >
-                                      <div className="font-bold mb-0.5">{flag.type.charAt(0).toUpperCase() + flag.type.slice(1)} Check</div>
-                                      <div className="text-gray-600">{flag.message}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </details>
-                            )}
-                          </div>
-                        </details>
-                      )}
-                    </div>
-                  )}
-
-
-                  {/* Message Actions - Hidden for welcome message */}
-                  {!message.isWelcome && (
-                    <div className={`flex items-center flex-wrap gap-2 mt-5 ${message.role === 'assistant' ? 'ml-11' : ''}`}>
-                      {message.role === 'user' && editingMessageIndex !== index && (
-                        <button
-                          onClick={() => handleEditMessage(index)}
-                          className="flex items-center gap-2 px-3.5 py-2 rounded-xl hover:bg-gray-800/60 active:bg-gray-800/80 transition-all group/action border border-gray-800 hover:border-gray-700"
-                          title="Edit this message"
-                          aria-label="Edit message"
-                        >
-                          <Edit3 className="w-4 h-4 text-gray-500 group-hover/action:text-blue-400 transition-colors" />
-                          <span className="text-xs font-bold text-gray-500 group-hover/action:text-blue-400">Edit</span>
-                        </button>
-                      )}
-                      {message.role === 'assistant' && (
-                        <>
-                          <button
-                            onClick={() => handleVote(index, 'up')}
-                            className="flex items-center gap-2 px-3.5 py-2 rounded-xl hover:bg-green-500/10 active:bg-green-500/20 transition-all group/action border border-transparent hover:border-green-500/30"
-                            title="This response was helpful"
-                            aria-label="Mark as helpful"
-                          >
-                            <ThumbsUp className="w-4 h-4 text-gray-500 group-hover/action:text-green-400 transition-colors" />
-                            <span className="text-xs font-bold text-gray-500 group-hover/action:text-green-400">Helpful</span>
-                          </button>
-                          <button
-                            onClick={() => handleVote(index, 'down')}
-                            className="flex items-center gap-2 px-3.5 py-2 rounded-xl hover:bg-red-500/10 active:bg-red-500/20 transition-all group/action border border-transparent hover:border-red-500/30"
-                            title="This response needs improvement"
-                            aria-label="Mark as needing improvement"
-                          >
-                            <ThumbsDown className="w-4 h-4 text-gray-500 group-hover/action:text-red-400 transition-colors" />
-                            <span className="text-xs font-bold text-gray-500 group-hover/action:text-red-400">Improve</span>
-                          </button>
-                          <button
-                            onClick={() => handleRegenerateResponse(index)}
-                            className="flex items-center gap-2 px-3.5 py-2 rounded-xl hover:bg-purple-500/10 active:bg-purple-500/20 transition-all group/action border border-transparent hover:border-purple-500/30"
-                            title="Regenerate this response"
-                            aria-label="Regenerate response"
-                          >
-                            <RotateCcw className="w-4 h-4 text-gray-500 group-hover/action:text-purple-400 transition-colors" />
-                            <span className="text-xs font-bold text-gray-500 group-hover/action:text-purple-400">Regenerate</span>
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => handleCopyMessage(message.content)}
-                        className="flex items-center gap-2 px-3.5 py-2 rounded-xl hover:bg-cyan-500/10 active:bg-cyan-500/20 transition-all group/action border border-transparent hover:border-cyan-500/30"
-                        title="Copy message to clipboard"
-                        aria-label="Copy message"
-                      >
-                        <Copy className="w-4 h-4 text-gray-500 group-hover/action:text-cyan-400 transition-colors" />
-                        <span className="text-xs font-bold text-gray-500 group-hover/action:text-cyan-400">Copy</span>
-                      </button>
-                      <div className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-gray-900/50 rounded-lg border border-gray-800/50">
-                        <Clock className="w-3.5 h-3.5 text-gray-600" />
-                        <span className="text-xs font-medium text-gray-500 tabular-nums" suppressHydrationWarning>{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      </div>
-                    </div>
-                  )}
+            {isTyping && (
+              <div className="flex gap-3 animate-fade-in">
+                <div className="w-8 h-8 rounded-full bg-linear-to-br from-blue-600 to-purple-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/50 animate-pulse">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1 space-y-3">
+                  <div className="bg-linear-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl px-5 py-4 border border-gray-700/60 shadow-2xl">
+                    <AIProgressIndicator />
+                  </div>
                 </div>
               </div>
-            );
-          })
-        )}
+            )}
 
-      {isTyping && (
-        <div className="flex gap-3 animate-fade-in">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-500/50 animate-pulse">
-            <Sparkles className="w-4 h-4 text-white" />
-          </div>
-          <div className="flex-1 space-y-3">
-            <div className="bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl px-5 py-4 border border-gray-700/60 shadow-2xl">
-              <AIProgressIndicator />
-            </div>
-          </div>
-        </div>
-      )}
-            
             <div ref={messagesEndRef} />
           </div>
         </div>
 
         {/* Input Area */}
-        <div className="relative border-t border-gray-800/50 bg-gradient-to-b from-gray-950 to-black px-4 py-5 shadow-2xl backdrop-blur-xl">
-          <div className="absolute inset-0 bg-gradient-to-t from-blue-600/5 via-transparent to-transparent pointer-events-none"></div>
-          
+        <div className="relative border-t border-gray-800/50 bg-linear-to-b from-gray-950 to-black px-4 py-5 shadow-2xl backdrop-blur-xl">
+          <div className="absolute inset-0 bg-linear-to-t from-blue-600/5 via-transparent to-transparent pointer-events-none"></div>
+
           {/* Rate Limit Notification */}
           {showLimitNotification && (
             <div className="relative max-w-5xl mx-auto mb-4">
-              <div className="bg-gradient-to-r from-orange-500/10 via-red-500/10 to-orange-500/10 border border-orange-500/30 rounded-2xl p-4 backdrop-blur-sm shadow-xl">
+              <div className="bg-linear-to-r from-orange-500/10 via-red-500/10 to-orange-500/10 border border-orange-500/30 rounded-2xl p-4 backdrop-blur-sm shadow-xl">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3 flex-1">
                     <div className="p-2 bg-orange-500/20 rounded-xl">
@@ -2761,7 +2742,7 @@ export default function UnifiedAIPlatform() {
               {(suggestedPrompts.length > 0 && messages.length > 1 ? suggestedPrompts : quickActions).map((action, idx) => {
                 const Icon = action.icon;
                 const isSuggested = suggestedPrompts.length > 0 && messages.length > 1;
-                
+
                 return (
                   <button
                     key={`${action.label}-${idx}`}
@@ -2775,7 +2756,7 @@ export default function UnifiedAIPlatform() {
                           timestamp: new Date()
                         };
                         setMessages((prev: Message[]) => [...prev, userMessage]);
-                        
+
                         // Update chat metadata
                         setChats((prevChats: Chat[]) => prevChats.map((chat: Chat) => {
                           if (chat.id === activeChat) {
@@ -2790,16 +2771,15 @@ export default function UnifiedAIPlatform() {
                           }
                           return chat;
                         }));
-                        
-  setInput('');
-  generateRealResponse(action.label);
-  }, 0);
+
+                        setInput('');
+                        generateRealResponse(action.label);
+                      }, 0);
                     }}
-                    className={`group/prompt flex items-center gap-2.5 px-4 py-2.5 rounded-full border text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                      isSuggested 
-                        ? 'bg-gray-900/60 border-blue-500/50 text-gray-200 hover:bg-gradient-to-r hover:from-blue-600/20 hover:via-purple-600/20 hover:to-blue-600/20 hover:border-blue-400/70' 
-                        : 'bg-gray-900/60 border-gray-800/70 text-gray-400 hover:bg-gray-800/70 hover:border-gray-700 hover:text-gray-200'
-                    }`}
+                    className={`group/prompt flex items-center gap-2.5 px-4 py-2.5 rounded-full border text-sm font-medium whitespace-nowrap transition-all duration-200 ${isSuggested
+                      ? 'bg-gray-900/60 border-blue-500/50 text-gray-200 hover:bg-linear-to-r hover:from-blue-600/20 hover:via-purple-600/20 hover:to-blue-600/20 hover:border-blue-400/70'
+                      : 'bg-gray-900/60 border-gray-800/70 text-gray-400 hover:bg-gray-800/70 hover:border-gray-700 hover:text-gray-200'
+                      }`}
                   >
                     <Icon className={`w-4 h-4 ${isSuggested ? 'text-gray-400 group-hover/prompt:text-blue-400' : 'text-gray-500 group-hover/prompt:text-gray-400'}`} />
                     <span>{action.label}</span>
@@ -2858,7 +2838,7 @@ export default function UnifiedAIPlatform() {
                   onChange={handleFileUpload}
                   className="hidden"
                 />
-                
+
                 <input
                   type="text"
                   value={input}
@@ -2866,11 +2846,11 @@ export default function UnifiedAIPlatform() {
                   onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>);
+                      handleSubmit(e as React.FormEvent<HTMLInputElement>);
                     }
                   }}
                   placeholder="Ask about betting odds, fantasy strategy, DFS lineups, or Kalshi markets..."
-                  className="w-full bg-gradient-to-r from-gray-900/80 to-gray-850/80 border border-gray-700/50 hover:border-gray-600/50 focus:border-blue-500/50 rounded-2xl px-6 py-4.5 pr-32 font-medium text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all backdrop-blur-sm shadow-inner text-xs"
+                  className="w-full bg-linear-to-r from-gray-900/80 to-gray-850/80 border border-gray-700/50 hover:border-gray-600/50 focus:border-blue-500/50 rounded-2xl px-6 py-4.5 pr-32 font-medium text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all backdrop-blur-sm shadow-inner text-xs"
                   disabled={isTyping}
                   maxLength={500}
                 />
@@ -2892,9 +2872,9 @@ export default function UnifiedAIPlatform() {
               <button
                 type="submit"
                 disabled={(!input.trim() && uploadedFiles.length === 0) || isTyping}
-                className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-800 disabled:to-gray-900 disabled:cursor-not-allowed text-white rounded-2xl px-8 py-4.5 transition-all duration-300 shadow-xl shadow-blue-500/25 hover:shadow-blue-500/50 hover:shadow-2xl disabled:shadow-none flex items-center gap-2.5 font-bold group overflow-hidden hover:scale-[1.02] active:scale-95 disabled:hover:scale-100"
+                className="relative bg-linear-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-800 disabled:to-gray-900 disabled:cursor-not-allowed text-white rounded-2xl px-8 py-4.5 transition-all duration-300 shadow-xl shadow-blue-500/25 hover:shadow-blue-500/50 hover:shadow-2xl disabled:shadow-none flex items-center gap-2.5 font-bold group overflow-hidden hover:scale-[1.02] active:scale-95 disabled:hover:scale-100"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+                <div className="absolute inset-0 bg-linear-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
                 <Send className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
                 <span className="text-sm relative z-10 tracking-wide">Analyze</span>
               </button>
@@ -2905,11 +2885,10 @@ export default function UnifiedAIPlatform() {
                 Betting • Fantasy (NFBC/NFFC/NFBKC) • DFS • Kalshi • Real-time AI Analysis
               </p>
               <div className="flex items-center gap-3">
-                <div className={`flex items-center gap-2 text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all ${
-                  creditsRemaining <= 3 
-                    ? 'text-orange-400 bg-orange-500/10 border-orange-500/30' 
-                    : 'text-gray-500 bg-gray-900/30 border-gray-800'
-                }`}>
+                <div className={`flex items-center gap-2 text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all ${creditsRemaining <= 3
+                  ? 'text-orange-400 bg-orange-500/10 border-orange-500/30'
+                  : 'text-gray-500 bg-gray-900/30 border-gray-800'
+                  }`}>
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>{creditsRemaining} {creditsRemaining === 1 ? 'credit' : 'credits'} remaining</span>
                 </div>
@@ -2936,7 +2915,7 @@ export default function UnifiedAIPlatform() {
             >
               <X className="w-5 h-5" />
             </button>
-            
+
             <div className="p-8">
               <div className="text-center mb-6">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-orange-500/10 border border-orange-500/30 mb-4">
@@ -3026,7 +3005,7 @@ export default function UnifiedAIPlatform() {
             >
               <X className="w-5 h-5" />
             </button>
-            
+
             <div className="p-8">
               <div className="text-center mb-6">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-purple-500/10 border border-purple-500/30 mb-4">
@@ -3036,7 +3015,7 @@ export default function UnifiedAIPlatform() {
                 <p className="text-sm text-gray-400">Get 20 credits every month for continuous access</p>
               </div>
 
-              <div className="bg-gradient-to-br from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-xl p-6 mb-6">
+              <div className="bg-linear-to-br from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-xl p-6 mb-6">
                 <div className="flex items-baseline justify-center mb-4">
                   <span className="text-4xl font-black text-white">$20</span>
                   <span className="text-gray-400 ml-2">/month</span>

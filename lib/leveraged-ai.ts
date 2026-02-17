@@ -6,8 +6,8 @@
 
 import { SupabaseClient, createClient } from '@supabase/supabase-js';
 import { generateText } from 'ai';
-import { LOG_PREFIXES } from '@/lib/constants';
-import { safeQuery } from '@/lib/supabase-validator';
+import { ENV_KEYS, LOG_PREFIXES, AI_CONFIG } from '@/lib/constants';
+import { safeQuery, validateDataSchema, APP_TABLES } from '@/lib/supabase-validator';
 
 interface AIEnhancedQueryOptions {
   enableAIProcessing?: boolean;

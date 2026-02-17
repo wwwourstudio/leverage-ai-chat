@@ -320,14 +320,14 @@ export default function UnifiedAIPlatform() {
   // Check Supabase auth session on mount
   useEffect(() => {
     (async () => {
-  try {
-  const supabase = createClient();
+      try {
+        const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
           setIsLoggedIn(true);
           setUser({
-            name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+            name: (session.user.user_metadata?.full_name as string) || session.user.email?.split('@')[0] || 'User',
             email: session.user.email || ''
           });
         }
@@ -351,6 +351,7 @@ export default function UnifiedAIPlatform() {
         return () => subscription.unsubscribe();
       } catch (err) {
         console.error('[v0] Auth check failed:', err);
+        return undefined;
       }
     })();
   }, []);
@@ -2470,12 +2471,13 @@ export default function UnifiedAIPlatform() {
                           {message.cards.map((card, cardIndex) => {
                             const { icon: _icon, ...cardData } = card;
                             return (
-                              <DynamicCardRenderer
-                                key={`${card.type}-${cardIndex}`}
-                                card={cardData}
-                                index={cardIndex}
-                                onAnalyze={() => generateDetailedAnalysis(card)}
-                              />
+                              <div key={`${card.type}-${cardIndex}`}>
+                                <DynamicCardRenderer
+                                  card={cardData}
+                                  index={cardIndex}
+                                  onAnalyze={() => generateDetailedAnalysis(card)}
+                                />
+                              </div>
                             );
                           })}
                         </div>

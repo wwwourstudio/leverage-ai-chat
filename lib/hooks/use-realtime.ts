@@ -11,8 +11,10 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
  */
 export function useRealtime<T>(
   table: string,
-  filter?: { column: string; value: any }
+  filterOrCallback?: { column: string; value: any } | ((payload: any) => void),
 ) {
+  const filter = typeof filterOrCallback === 'object' ? filterOrCallback : undefined;
+  const onEvent = typeof filterOrCallback === 'function' ? filterOrCallback : undefined;
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -50,7 +52,9 @@ export function useRealtime<T>(
     },
     (payload: any) => {
       console.log(`[Realtime] ${payload.eventType} on ${table}`, payload);
-              
+              if (onEvent) {
+                onEvent(payload);
+              }
               if (payload.eventType === 'INSERT') {
                 setData((prev) => [...prev, payload.new as T]);
               } else if (payload.eventType === 'UPDATE') {

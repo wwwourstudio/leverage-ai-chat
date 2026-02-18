@@ -23,17 +23,6 @@ interface GameLocation {
   stadium?: string;
 }
 
-interface WeatherCard {
-  location: string;
-  matchup?: string;
-  temperature: string;
-  condition: string;
-  wind: string;
-  humidity: string;
-  precipitation: string;
-  gameImpact: string;
-  gameTime?: string;
-}
 
 // Weather cache to avoid excessive API calls
 const weatherCache = new Map<string, { data: WeatherData; timestamp: number }>();

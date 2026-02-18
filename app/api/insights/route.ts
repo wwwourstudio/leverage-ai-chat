@@ -74,38 +74,9 @@ export async function GET(req: NextRequest) {
       APP_TABLES.AI_RESPONSE_TRUST
     );
 
-    // Try to fetch AI predictions from trust system.
-    // Wrapped in its own try/catch because the Supabase client can throw
-    // a SyntaxError when the project URL is invalid or returns non-JSON.
-    let predictions: any[] = [];
-    try {
-      const { data, error } = await supabase
-        .from('ai_predictions')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (error) {
-        console.error('[API] Supabase query error:', error.message || error);
-        return NextResponse.json({
-          success: true,
-          insights: getDefaultInsights(),
-          dataSource: 'default'
-        });
-      }
-
-      predictions = data || [];
-    } catch (dbError: any) {
-      console.error('[API] Supabase connection failed:', dbError.message || dbError);
-      return NextResponse.json({
-        success: true,
-        insights: getDefaultInsights(),
-        dataSource: 'default'
-      });
-    }
-
     // Calculate real metrics from predictions
     const insights = calculateInsightsFromPredictions(predictions);
+    const trustMetrics = calculateTrustMetrics(predictions);
 
     return NextResponse.json({
       success: true,

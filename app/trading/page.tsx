@@ -124,7 +124,9 @@ export default function TradingEngineDashboard() {
         {results && (
           <>
             {/* Arbitrage Opportunities */}
-            {results.arbitrage && (
+            {results.arbitrage && results.arbitrage.length > 0 && (() => {
+              const arb = results.arbitrage![0];
+              return (
               <div className="bg-card border border-border rounded-2xl p-6 shadow-lg">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="p-3 bg-[var(--success)]/10 rounded-xl">
@@ -140,26 +142,26 @@ export default function TradingEngineDashboard() {
                   <div className="bg-muted/50 rounded-xl p-4">
                     <div className="text-sm text-muted-foreground mb-1">Total Implied Prob</div>
                     <div className="text-2xl font-bold text-foreground">
-                      {formatPercent(results.arbitrage.totalImpliedProbability)}
+                      {formatPercent(arb.totalImpliedProbability)}
                     </div>
                   </div>
                   <div className="bg-muted/50 rounded-xl p-4">
                     <div className="text-sm text-muted-foreground mb-1">Profit Margin</div>
                     <div className="text-2xl font-bold text-[var(--success)]">
-                      {formatPercent(results.arbitrage.profitMargin)}
+                      {formatPercent(arb.profitMargin)}
                     </div>
                   </div>
                   <div className="bg-muted/50 rounded-xl p-4">
                     <div className="text-sm text-muted-foreground mb-1">Expected Return</div>
                     <div className="text-2xl font-bold text-[var(--success)]">
-                      {formatCurrency(results.arbitrage.expectedReturn)}
+                      {formatCurrency(arb.expectedReturn ?? 0)}
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-3">
                   <div className="text-sm font-semibold text-foreground mb-2">Optimal Bet Allocation</div>
-                  {results.arbitrage.bets.map((bet, idx) => (
+                  {(arb.bets ?? []).map((bet: { outcome: string; bookmaker: string; stake: number; odds: number }, idx: number) => (
                     <div key={idx} className="flex items-center justify-between bg-background/50 rounded-xl p-4">
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
@@ -178,7 +180,8 @@ export default function TradingEngineDashboard() {
                   ))}
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* Sharp Money Detection */}
             {results.sharp && (
@@ -198,7 +201,7 @@ export default function TradingEngineDashboard() {
                     <div className="text-sm text-muted-foreground mb-1">Public Side</div>
                     <div className="text-xl font-bold text-foreground">{results.sharp.publicSide}</div>
                     <div className="text-sm text-muted-foreground mt-1">
-                      {formatPercent(results.sharp.publicPercentage)} tickets
+                      {formatPercent(results.sharp.publicPercentage ?? 0)} tickets
                     </div>
                   </div>
                   <div className="bg-muted/50 rounded-xl p-4">
@@ -211,7 +214,7 @@ export default function TradingEngineDashboard() {
                   <div className="bg-muted/50 rounded-xl p-4">
                     <div className="text-sm text-muted-foreground mb-1">Money % (Sharp)</div>
                     <div className="text-xl font-bold text-foreground">
-                      {formatPercent(results.sharp.moneyPercentage)}
+                      {formatPercent(results.sharp.moneyPercentage ?? 0)}
                     </div>
                   </div>
                   <div className="bg-muted/50 rounded-xl p-4">
@@ -241,7 +244,7 @@ export default function TradingEngineDashboard() {
                   <div className="bg-muted/50 rounded-xl p-4">
                     <div className="text-sm text-muted-foreground mb-1">Your Edge</div>
                     <div className="text-2xl font-bold text-[var(--success)]">
-                      {formatPercent(results.kelly.edge)}
+                      {formatPercent(results.kelly.edge ?? 0)}
                     </div>
                   </div>
                   <div className="bg-muted/50 rounded-xl p-4">
@@ -250,22 +253,22 @@ export default function TradingEngineDashboard() {
                       {formatCurrency(results.kelly.fullKellyStake)}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      {formatPercent(results.kelly.fullKellyPercent)} of bankroll
+                      {formatPercent(results.kelly.fullKellyPercent ?? 0)} of bankroll
                     </div>
                   </div>
                   <div className="bg-muted/50 rounded-xl p-4">
                     <div className="text-sm text-muted-foreground mb-1">Half Kelly</div>
                     <div className="text-2xl font-bold text-[var(--info)]">
-                      {formatCurrency(results.kelly.halfKellyStake)}
+                      {formatCurrency(results.kelly.halfKellyStake ?? 0)}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      {formatPercent(results.kelly.halfKellyPercent)} of bankroll
+                      {formatPercent(results.kelly.halfKellyPercent ?? 0)} of bankroll
                     </div>
                   </div>
                   <div className="bg-muted/50 rounded-xl p-4">
                     <div className="text-sm text-muted-foreground mb-1">Expected Value</div>
                     <div className="text-2xl font-bold text-[var(--success)]">
-                      {formatCurrency(results.kelly.expectedValue)}
+                      {formatCurrency(results.kelly.expectedValue ?? 0)}
                     </div>
                   </div>
                 </div>
@@ -350,7 +353,7 @@ export default function TradingEngineDashboard() {
                   <div className="bg-muted/50 rounded-xl p-4">
                     <div className="text-sm text-muted-foreground mb-1">Current Price</div>
                     <div className="text-2xl font-bold text-foreground">
-                      {formatPercent(results.kalshi.currentPrice)}
+                      {formatPercent(results.kalshi.currentPrice ?? 0)}
                     </div>
                   </div>
                   <div className="bg-muted/50 rounded-xl p-4">
@@ -365,15 +368,15 @@ export default function TradingEngineDashboard() {
                   <div className="bg-muted/50 rounded-xl p-4">
                     <div className="text-sm text-muted-foreground mb-1">Model Edge</div>
                     <div className={`text-2xl font-bold ${
-                      results.kalshi.edgeVsModel > 0 ? 'text-[var(--success)]' : 'text-destructive'
+                      (results.kalshi.edgeVsModel ?? 0) > 0 ? 'text-[var(--success)]' : 'text-destructive'
                     }`}>
-                      {results.kalshi.edgeVsModel > 0 ? '+' : ''}{formatPercent(results.kalshi.edgeVsModel)}
+                      {(results.kalshi.edgeVsModel ?? 0) > 0 ? '+' : ''}{formatPercent(results.kalshi.edgeVsModel ?? 0)}
                     </div>
                   </div>
                   <div className="bg-muted/50 rounded-xl p-4">
                     <div className="text-sm text-muted-foreground mb-1">24h Volume</div>
                     <div className="text-2xl font-bold text-foreground">
-                      {results.kalshi.volume24h.toLocaleString()}
+                      {(results.kalshi.volume24h ?? 0).toLocaleString()}
                     </div>
                   </div>
                 </div>
@@ -385,8 +388,8 @@ export default function TradingEngineDashboard() {
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <CheckCircle2 className="w-4 h-4 text-[var(--success)]" />
                 <span>
-                  Analysis complete • {results.metadata.modulesRun.length} modules executed • 
-                  Timestamp: {new Date(results.metadata.timestamp).toLocaleString()}
+                  Analysis complete • {results.metadata?.modulesRun?.length ?? 0} modules executed •
+                  Timestamp: {new Date(results.metadata?.timestamp ?? Date.now()).toLocaleString()}
                 </span>
               </div>
             </div>

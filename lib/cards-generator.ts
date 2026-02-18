@@ -36,7 +36,7 @@ async function generateSportSpecificCards(
     console.log(`[v0] [CARDS-GEN] Requested count: ${count}, Actual count: ${actualCount}`);
 
     try {
-      const { getOddsWithCache } = await import('@/lib/unified-odds-fetcher');
+      const { fetchLiveOdds } = await import('@/lib/odds');
 
       // Check API key availability
       const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
@@ -302,7 +302,7 @@ export async function generateContextualCards(
     if (cards.length < count) {
       console.log('[v0] [MULTI-SPORT] Not enough game cards, trying player props...');
       try {
-        const { fetchPlayerProps, playerPropToCard } = await import('@/lib/player-props-service');
+        const { fetchPlayerProps } = await import('@/lib/players');
 
         for (const sportKey of orderedSports) {
           if (cards.length >= count) break;
@@ -443,7 +443,7 @@ export async function generateContextualCards(
     // Try to detect real arbitrage opportunities
     console.log('[v0] [CARDS GENERATOR] Checking for arbitrage opportunities');
     try {
-      const { detectArbitrageFromContext } = await import('@/lib/arbitrage-detector');
+      const { detectArbitrage } = await import('@/lib/arbitrage');
       const arbitrageCards = await detectArbitrageFromContext(normalizedSport);
 
       console.log('[v0] [CARDS GENERATOR] Arbitrage cards returned:', {
@@ -585,7 +585,7 @@ export async function generateContextualCards(
   if (category === 'kalshi') {
     console.log('[v0] [CARDS-GEN] Kalshi category - fetching ALL markets from API with retry logic');
     try {
-      const { fetchKalshiMarketsWithRetry, kalshiMarketToCard } = await import('@/lib/kalshi-client');
+      const { fetchKalshiMarkets } = await import('@/lib/kalshi');
 
       // Fetch ALL open markets from Kalshi with retry logic (no category filter)
       console.log('[v0] [CARDS-GEN] Calling Kalshi API for all open markets (with 3 retry attempts)...');
@@ -741,7 +741,7 @@ export async function generateContextualCards(
   if (category === 'props' || category === 'player_props') {
     console.log('[v0] [CARDS-GEN] Player props category - fetching live markets');
     try {
-      const { fetchPlayerProps, playerPropToCard } = await import('@/lib/player-props-service');
+      const { fetchPlayerProps } = await import('@/lib/players');
 
       if (normalizedSport) {
         const props = await fetchPlayerProps({
@@ -839,7 +839,7 @@ export async function generateContextualCards(
     if (isOutdoorSport) {
       console.log('[v0] [CARDS GENERATOR] Outdoor sport detected, attempting weather enrichment');
       try {
-        const { enrichCardsWithWeather } = await import('@/lib/weather-service');
+        const { getWeatherForGame } = await import('@/lib/weather');
         const enrichedCards = await enrichCardsWithWeather(cards);
         console.log('[v0] [CARDS GENERATOR] Weather enrichment complete:', enrichedCards.length - cards.length, 'weather cards added');
         return enrichedCards.slice(0, count + 1); // Allow 1 extra for weather card

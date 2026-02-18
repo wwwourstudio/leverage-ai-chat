@@ -370,85 +370,50 @@ export async function POST(req: NextRequest) {
       userPrompt += `\nMarket Type: ${context.marketType}`;
     }
 
-    // Call Grok 4 Fast using xAI through Vercel AI Gateway
-    console.log(`[v0] Calling Grok 4 Fast via xAI...`);
-    console.log(`[v0] Model: ${AI_CONFIG.MODEL_NAME}`);
-    console.log(`[v0] Temperature: ${AI_CONFIG.DEFAULT_TEMPERATURE}`);
-    console.log(`[v0] Max Tokens: ${AI_CONFIG.DEFAULT_MAX_TOKENS}`);
-    
-    let aiResponse: string;
-    
+    // Call Grok API using xAI's API (compatible with OpenAI SDK format)
+    // Use AbortController to stay within Vercel Edge's ~25s timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+
+    let grokResponse: Response;
     try {
-      console.log(`[v0] [${Date.now() - startTime}ms] Sending request to Grok...`);
-      
-      // Race against timeout
-      const grokPromise = generateText({
-        model: AI_CONFIG.MODEL_NAME,
-        system: systemPrompt,
-        prompt: userPrompt,
-        temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-        maxRetries: 1,
+      grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${grokApiKey}`,
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: 'grok-3',
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt,
+            },
+            {
+              role: 'user',
+              content: userPrompt,
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: 1500,
+        }),
       });
-      
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Grok request timeout')), MAX_PROCESSING_TIME - 2000)
-      );
-      
-      const result = await Promise.race([grokPromise, timeoutPromise]) as Awaited<typeof grokPromise>;
-      
-      aiResponse = result.text;
-      const elapsed = Date.now() - startTime;
-      console.log(`${LOG_PREFIXES.API} ✓ Grok 4 Fast response received: ${aiResponse.length} chars (${elapsed}ms)`);
-      console.log(`${LOG_PREFIXES.API} Response preview:`, aiResponse.substring(0, 200));
-      
-      // Validate response quality - check for hallucination indicators
-      const hallucationIndicators = [
-        /\d{2,3}%.*win.*rate/i, // Specific win percentages without data
-        /\$\d+.*profit/i, // Dollar amounts without context
-        /\d+\.\d+.*points.*average/i, // Specific stats without source
-      ];
-      
-      let hasHallucination = false;
-      for (const pattern of hallucationIndicators) {
-        if (pattern.test(aiResponse) && !playerProjections?.success) {
-          console.warn(`${LOG_PREFIXES.API} ⚠️ Potential hallucination detected: ${pattern}`);
-          hasHallucination = true;
-        }
-      }
-      
-      if (hasHallucination && !playerProjections?.success) {
-        console.warn(`${LOG_PREFIXES.API} ⚠️ Response contained specific stats without real data`);
-        aiResponse = `⚠️ Real-time data not available for this query.\n\n• Check The Odds API for current odds\n• Visit sportsbooks for live lines\n• Request requires verified market data\n\nPlease try a different query or check back when more data is available.`;
-      }
-      
-      // Trim response if it's too long despite token limit
-      if (aiResponse.length > 600) {
-        const sentences = aiResponse.split(/[.!?]\s+/);
-        aiResponse = sentences.slice(0, 3).join('. ') + '.';
-        console.log(`${LOG_PREFIXES.API} Response trimmed to ${aiResponse.length} chars`);
-      }
-      
-    } catch (error) {
-      console.error(`${LOG_PREFIXES.API} ❌ Grok 4 Fast Error:`, error);
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error(`${LOG_PREFIXES.API} Error details:`, errorMsg);
-      
-      // Check if it's an API key issue
-      if (errorMsg.includes('401') || errorMsg.includes('unauthorized') || errorMsg.includes('API key')) {
-        return NextResponse.json({
-          success: false,
-          error: 'Grok AI authentication failed. Please verify XAI_API_KEY is correct.',
-          text: 'AI service authentication error. Please check your API configuration.',
-          useFallback: true
-        }, { status: 401 });
-      }
-      
-      // Generic error fallback
-      aiResponse = `⚠️ Unable to process request. Real-time AI analysis unavailable.\n\n• Check The Odds API directly for current lines\n• Visit sportsbooks for live odds\n• Verify weather conditions for outdoor games\n\nPlease try again or contact support if this persists.`;
+    } catch (fetchError: any) {
+      clearTimeout(timeout);
+      console.error('[API] Grok API fetch failed:', fetchError.name, fetchError.message);
+      return NextResponse.json({
+        success: false,
+        error: fetchError.name === 'AbortError' ? 'AI request timed out' : 'AI service unavailable',
+        useFallback: true,
+      });
     }
-    
-    if (!aiResponse || aiResponse.trim().length === 0) {
-      console.log(`${LOG_PREFIXES.API} Grok returned empty response`);
+    clearTimeout(timeout);
+
+    if (!grokResponse.ok) {
+      const errorData = await grokResponse.text();
+      console.error('[API] Grok API error:', grokResponse.status, errorData);
       return NextResponse.json({
         success: false,
         error: 'AI service returned empty response',
@@ -458,22 +423,25 @@ export async function POST(req: NextRequest) {
 
     console.log('[API] Grok response generated:', aiResponse.substring(0, 100));
 
-    // Calculate trust metrics with fast fallback (max 1.5 seconds)
-    console.log('[v0] Calculating trust metrics with timeout...');
-    const trustMetrics = await Promise.race([
-      calculateTrustMetrics(aiResponse, context, supabaseUrl, supabaseAnonKey),
-      new Promise((resolve) => setTimeout(() => {
-        console.log('[v0] Trust metrics timeout, using defaults');
-        resolve({
-          benfordIntegrity: 85,
-          oddsAlignment: 88,
-          marketConsensus: 85,
-          historicalAccuracy: 85,
-          finalConfidence: 86,
-          trustLevel: 'high' as const,
-          riskLevel: 'low' as const,
-          adjustedTone: 'Strong signal',
-          flags: []
+    // Calculate trust metrics
+    const trustMetrics = await calculateTrustMetrics(aiResponse, context, supabaseUrl, supabaseAnonKey);
+
+    // Store analysis in Supabase if configured
+    if (supabaseUrl && supabaseAnonKey) {
+      try {
+        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+        
+        await supabase.from('ai_response_trust').insert({
+          model_id: 'grok-3',
+          sport: context?.sport || 'general',
+          market_type: context?.marketType || 'analysis',
+          benford_score: trustMetrics.benfordIntegrity,
+          odds_alignment_score: trustMetrics.oddsAlignment,
+          consensus_score: trustMetrics.marketConsensus,
+          historical_accuracy_score: trustMetrics.historicalAccuracy,
+          final_confidence: trustMetrics.finalConfidence,
+          flags: trustMetrics.flags || [],
+          created_at: new Date().toISOString(),
         });
       }, 1500)) // Faster fallback: 1.5 seconds
     ]) as any;
@@ -561,7 +529,7 @@ export async function POST(req: NextRequest) {
       text: aiResponse,
       response: aiResponse,
       trustMetrics,
-      model: AI_CONFIG.MODEL_NAME,
+      model: 'grok-3',
       confidence: trustMetrics.finalConfidence,
       sources,
       cards: insightCards, // Add cards to response
@@ -670,22 +638,15 @@ async function calculateTrustMetrics(
 
   // Historical accuracy using LeveragedAI with AI-enhanced insights
   let historicalAccuracy = 85;
-  try {
-    const leveragedAI = getLeveragedAI();
-    
-    if (leveragedAI.isReady()) {
-      const queryResult = await leveragedAI.queryWithAI(
-        APP_TABLES.AI_RESPONSE_TRUST,
-        (builder: any) => builder
-          .select('final_confidence')
-          .eq('model_id', AI_CONFIG.MODEL_NAME)
-          .order('created_at', { ascending: false })
-          .limit(10),
-        {
-          enableAIProcessing: false,
-          timeout: 1000
-        }
-      );
+  if (supabaseUrl && supabaseAnonKey) {
+    try {
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      const { data } = await supabase
+        .from('ai_response_trust')
+        .select('final_confidence')
+        .eq('model_id', 'grok-3')
+        .order('created_at', { ascending: false })
+        .limit(20);
       
       if (queryResult.success && queryResult.data.length > 0) {
         const validData = queryResult.data.filter(
@@ -792,7 +753,47 @@ function calculateOddsAlignment(aiResponse: string, oddsData: any): number {
     return 85; // Default if no data
   }
 
-  // Simple alignment check - would be more sophisticated in production
-  // For now, return a baseline score that can be enhanced with actual odds comparison
-  return 88;
+  // Compare AI-mentioned probabilities against market-implied probabilities
+  const aiProbs = probMatches.map(m => parseInt(m.replace('%', '')));
+
+  // Extract implied probabilities from odds data
+  const marketProbs: number[] = [];
+  for (const event of oddsData.events) {
+    if (event.bookmakers) {
+      for (const bookmaker of event.bookmakers) {
+        for (const market of bookmaker.markets || []) {
+          for (const outcome of market.outcomes || []) {
+            if (outcome.price) {
+              // Convert American odds to implied probability
+              const price = outcome.price;
+              const impliedProb = price > 0
+                ? 100 / (price + 100) * 100
+                : Math.abs(price) / (Math.abs(price) + 100) * 100;
+              marketProbs.push(Math.round(impliedProb));
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (marketProbs.length === 0) {
+    return 85;
+  }
+
+  // Calculate alignment: how close are AI probabilities to market probabilities
+  let totalDeviation = 0;
+  let comparisons = 0;
+  for (const aiProb of aiProbs) {
+    // Find the closest market probability
+    const closestMarket = marketProbs.reduce((closest, mp) =>
+      Math.abs(mp - aiProb) < Math.abs(closest - aiProb) ? mp : closest
+    , marketProbs[0]);
+    totalDeviation += Math.abs(aiProb - closestMarket);
+    comparisons++;
+  }
+
+  const avgDeviation = comparisons > 0 ? totalDeviation / comparisons : 0;
+  // Convert deviation to alignment score (0 deviation = 100, 50+ deviation = 50)
+  return Math.max(50, Math.min(100, Math.round(100 - avgDeviation)));
 }

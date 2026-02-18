@@ -38,7 +38,7 @@ export function ArbitrageCard({ data, gradient = 'from-green-600 to-emerald-700'
     'bg-gray-500';
 
   return (
-    <div className={`rounded-2xl bg-linear-to-br ${gradient} p-6 text-white shadow-lg`}>
+    <div className={`rounded-2xl bg-gradient-to-br ${gradient} p-6 text-white shadow-lg`}>
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-2">

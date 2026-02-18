@@ -37,7 +37,7 @@ export function StatisticalVisualization({ distribution, benfordScore, alerts }:
     <div className="space-y-4">
       {/* Alerts Summary */}
       {alerts.length > 0 && (
-        <div className="bg-linear-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl p-4">
+        <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="w-4 h-4 text-amber-400" />
             <span className="text-sm font-bold text-amber-400">
@@ -60,7 +60,7 @@ export function StatisticalVisualization({ distribution, benfordScore, alerts }:
       )}
 
       {/* Benford Distribution Histogram */}
-      <div className="bg-linear-to-br from-slate-900/60 to-slate-800/60 border border-slate-700/50 rounded-xl p-4">
+      <div className="bg-gradient-to-br from-slate-900/60 to-slate-800/60 border border-slate-700/50 rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-blue-400" />
@@ -87,7 +87,7 @@ export function StatisticalVisualization({ distribution, benfordScore, alerts }:
                 <div className="w-full flex flex-col items-center gap-1">
                   {/* Observed bar */}
                   <div 
-                    className="w-full bg-linear-to-t from-blue-500 to-cyan-400 rounded-t transition-all duration-300"
+                    className="w-full bg-gradient-to-t from-blue-500 to-cyan-400 rounded-t transition-all duration-300"
                     style={{ height: `${observedHeight}px` }}
                     title={`Observed: ${observed.toFixed(1)}%`}
                   />
@@ -106,7 +106,7 @@ export function StatisticalVisualization({ distribution, benfordScore, alerts }:
         
         <div className="flex items-center justify-center gap-4 mt-3 text-xs">
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-linear-to-t from-blue-500 to-cyan-400 rounded" />
+            <div className="w-3 h-3 bg-gradient-to-t from-blue-500 to-cyan-400 rounded" />
             <span className="text-slate-400">Observed</span>
           </div>
           <div className="flex items-center gap-1">
@@ -118,18 +118,18 @@ export function StatisticalVisualization({ distribution, benfordScore, alerts }:
 
       {/* Statistical Metrics */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-linear-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-lg p-3">
+        <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-lg p-3">
           <div className="text-xs text-slate-400 mb-1">Benford Score</div>
           <div className="text-lg font-black text-blue-400">{(benfordScore * 100).toFixed(1)}%</div>
         </div>
-        <div className="bg-linear-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-lg p-3">
+        <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-lg p-3">
           <div className="text-xs text-slate-400 mb-1">Data Points</div>
           <div className="text-lg font-black text-purple-400">
             {Object.values(distribution).reduce((sum, val) => sum + val, 0) > 0 ? 
               Math.round(Object.values(distribution).reduce((sum, val) => sum + val, 0) * 100) : 0}
           </div>
         </div>
-        <div className="bg-linear-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-lg p-3">
+        <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-lg p-3">
           <div className="text-xs text-slate-400 mb-1">Anomalies</div>
           <div className="text-lg font-black text-amber-400">{alerts.length}</div>
         </div>

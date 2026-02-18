@@ -81,7 +81,7 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
   return (
     <div className={`relative rounded-2xl border p-4 mb-6 ${getBannerStyles()}`}>
       <div className="flex items-start gap-4">
-        <div className="shrink-0 mt-0.5">{getIcon()}</div>
+        <div className="flex-shrink-0 mt-0.5">{getIcon()}</div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-2">

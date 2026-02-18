@@ -16,7 +16,7 @@ interface ChatInputProps {
   isTyping: boolean;
   uploadedFiles: FileAttachment[];
   onInputChange: (value: string) => void;
-  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  onSubmit: (e: React.FormEvent) => void;
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   onRemoveAttachment: (id: string) => void;
 }

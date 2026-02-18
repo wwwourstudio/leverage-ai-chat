@@ -166,7 +166,7 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
                   : 'bg-blue-500/10 border-blue-500/20 text-blue-400'
               }`}
             >
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-medium capitalize">{flag.type}</div>
                 <div className="text-xs opacity-80 mt-0.5">{flag.message}</div>

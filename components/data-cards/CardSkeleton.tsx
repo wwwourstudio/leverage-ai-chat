@@ -2,12 +2,12 @@
 
 export function CardSkeleton() {
   return (
-    <div className="relative bg-linear-to-br from-gray-900/98 via-gray-850/98 to-gray-900/98 backdrop-blur-xl rounded-2xl p-5 border border-gray-700/50 overflow-hidden">
+    <div className="relative bg-gradient-to-br from-gray-900/98 via-gray-850/98 to-gray-900/98 backdrop-blur-xl rounded-2xl p-5 border border-gray-700/50 overflow-hidden">
       {/* Shimmer effect */}
-      <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-linear-to-r from-transparent via-white/5 to-transparent" />
+      <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
       
       {/* Accent line */}
-      <div className="absolute left-0 top-0 bottom-0 w-1 bg-linear-to-b from-gray-600/60 to-gray-700/60 animate-pulse" />
+      <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-gray-600/60 to-gray-700/60 animate-pulse" />
       
       {/* Header skeleton */}
       <div className="relative flex items-start gap-4 mb-5">

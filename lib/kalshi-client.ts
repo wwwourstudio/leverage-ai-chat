@@ -467,6 +467,10 @@ export interface KalshiAnalysis {
   volatility: number;
   edgeEstimate: number;
   riskLevel: "low" | "medium" | "high";
+  currentPrice?: number;
+  isVolatile?: boolean;
+  edgeVsModel?: number;
+  volume24h?: number;
 }
 
 /**

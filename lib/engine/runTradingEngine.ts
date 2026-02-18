@@ -36,6 +36,8 @@ export interface ArbitrageOpportunity {
   market: string;
   totalImpliedProbability: number;
   profitMargin: number;
+  expectedReturn?: number;
+  bets?: { outcome: string; bookmaker: string; stake: number; odds: number }[];
   recommendedStakes: {
     book: string;
     outcome: string;
@@ -53,6 +55,11 @@ export interface SharpSignal {
   direction: 'up' | 'down';
   confidence: number;
   reason: string;
+  isReverseLineMovement?: boolean;
+  publicSide?: string;
+  publicPercentage?: number;
+  sharpSide?: string;
+  moneyPercentage?: number;
 }
 
 export interface LineMovementAnalysis {
@@ -60,6 +67,8 @@ export interface LineMovementAnalysis {
   currentPrice: number;
   percentChange: number;
   movementStrength: 'weak' | 'moderate' | 'strong';
+  direction?: string;
+  strength?: string;
 }
 
 export interface KellyInput {
@@ -73,6 +82,11 @@ export interface KellyResult {
   fullKellyStake: number;
   fractionalKellyStake: number;
   recommendedStake: number;
+  edge?: number;
+  fullKellyPercent?: number;
+  halfKellyStake?: number;
+  halfKellyPercent?: number;
+  expectedValue?: number;
 }
 
 // Re-export Kalshi types so consumers only need this module
@@ -244,10 +258,13 @@ export interface TradingInput {
 
 export interface TradingEngineResult {
   arbitrage?: ArbitrageOpportunity[];
+  sharp?: SharpSignal | null;
   sharpSignal?: SharpSignal | null;
   lineMovement?: LineMovementAnalysis | null;
+  kalshi?: KalshiAnalysis;
   kalshiAnalysis?: KalshiAnalysis;
   kelly?: KellyResult;
+  metadata?: { processingTimeMs?: number; timestamp?: string; modulesRun?: string[] };
 }
 
 /**

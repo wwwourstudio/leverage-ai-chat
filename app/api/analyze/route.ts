@@ -1,5 +1,6 @@
 // Analyze API - Grok 4 Fast integration
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { generateText } from 'ai';
 import { randomUUID } from 'crypto';
 import {
@@ -168,7 +169,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Detect if this is a Kalshi query and fetch REAL market data
-    let kalshiMarkets = null;
+    let kalshiMarkets: any[] | null = null;
     const isKalshiQuery = queryLower.includes('kalshi') || 
                           queryLower.includes('election') || 
                           queryLower.includes('prediction market') ||
@@ -381,7 +382,7 @@ export async function POST(req: NextRequest) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${grokApiKey}`,
+          'Authorization': `Bearer ${xaiApiKey}`,
         },
         signal: controller.signal,
         body: JSON.stringify({
@@ -421,6 +422,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const responseData = await grokResponse.json();
+    const aiResponse = responseData.choices?.[0]?.message?.content || '';
+
     console.log('[API] Grok response generated:', aiResponse.substring(0, 100));
 
     // Calculate trust metrics
@@ -443,8 +447,10 @@ export async function POST(req: NextRequest) {
           flags: trustMetrics.flags || [],
           created_at: new Date().toISOString(),
         });
-      }, 1500)) // Faster fallback: 1.5 seconds
-    ]) as any;
+      } catch (insertError) {
+        console.log('[API] Failed to store trust metrics:', insertError instanceof Error ? insertError.message : String(insertError));
+      }
+    }
 
     // Store analysis in Supabase using LeveragedAI (non-blocking, AI-validated)
     Promise.resolve().then(() => {
@@ -495,7 +501,7 @@ export async function POST(req: NextRequest) {
       console.error('[v0] Error:', error);
       console.error('[v0] Error message:', error instanceof Error ? error.message : 'Unknown error');
       console.error('[v0] Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
-      console.error('[v0] Context:', { cardCategory, sport: context?.sport, useMultiSport });
+      console.error('[v0] Context:', { sport: context?.sport });
       console.error('[v0] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
       // Fallback: create a single default card with error details
@@ -648,8 +654,8 @@ async function calculateTrustMetrics(
         .order('created_at', { ascending: false })
         .limit(20);
       
-      if (queryResult.success && queryResult.data.length > 0) {
-        const validData = queryResult.data.filter(
+      if (data && data.length > 0) {
+        const validData = data.filter(
           (row: any) => typeof row.final_confidence === 'number'
         );
         
@@ -660,10 +666,10 @@ async function calculateTrustMetrics(
           console.log(`${LOG_PREFIXES.API} Historical accuracy from LeveragedAI: ${historicalAccuracy}% (${validData.length} records)`);
         }
       }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.log(`${LOG_PREFIXES.API} Could not fetch historical accuracy:`, errorMessage);
     }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.log(`${LOG_PREFIXES.API} Could not fetch historical accuracy:`, errorMessage);
   }
 
   const finalConfidence = Math.round(

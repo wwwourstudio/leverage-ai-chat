@@ -93,7 +93,7 @@ export function withErrorBoundary<P extends object>(
 ) {
   return function WrappedComponent(props: P) {
     return (
-      <ErrorBoundary fallback={fallback} children={<Component {...props} />}>
+      <ErrorBoundary fallback={fallback}>
         <Component {...props} />
       </ErrorBoundary>
     );

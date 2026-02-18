@@ -1,8 +1,8 @@
-import { beforeAll, afterEach } from 'vitest';
+import { beforeAll, afterEach, vi } from 'vitest';
 
 // Setup test environment variables before all tests
 beforeAll(() => {
-  process.env.NODE_ENV = 'test';
+  (process.env as Record<string, string>).NODE_ENV = 'test';
   
   // Supabase
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';

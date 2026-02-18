@@ -1,15 +1,107 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  ENV_KEYS,
+  LOG_PREFIXES,
+  DATA_SOURCES,
+  CARD_TYPES,
+  CARD_STATUS
+} from '@/lib/constants';
+import { validateSportKey, getSportInfo } from '@/lib/sports-validator';
+import {
+  fetchLiveOdds,
+  ODDS_MARKETS,
+  BETTING_REGIONS
+} from '@/lib/odds-api-client';
+import {
+  transformOddsEvents,
+  filterEventsByTimeRange,
+  sortEventsByValue,
+  formatAmericanOdds,
+  type OddsEvent,
+  type TransformedOdds
+} from '@/lib/odds-transformer';
+import { enrichCardsWithWeather } from '@/lib/weather-service';
+import { fetchUnifiedData } from '@/lib/unified-data-service';
 
-export const runtime = 'edge';
+// Using Node.js runtime for server-side fetch compatibility
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 interface CardRequest {
   sport?: string;
   category?: string;
   userContext?: {
+    sport?: string | null;
+    marketType?: string;
+    platform?: string;
+    previousMessages?: Array<{
+      role: string;
+      content: string;
+    }>;
     previousQueries?: string[];
     preferences?: string[];
   };
   limit?: number;
+}
+
+/**
+ * Analyzes user context from previous messages to determine actual sport intent
+ */
+function analyzeContextForSport(userContext?: CardRequest['userContext']): string | null {
+  if (!userContext) return null;
+  
+  console.log(`${LOG_PREFIXES.API} [Context Analyzer] Analyzing user context for sport detection`);
+  
+  // First check if sport is directly provided in context
+  if (userContext.sport) {
+    console.log(`${LOG_PREFIXES.API} [Context Analyzer] ✓ Sport from context.sport: ${userContext.sport}`);
+    return userContext.sport;
+  }
+  
+  // Analyze previous messages to extract sport intent
+  if (userContext.previousMessages && userContext.previousMessages.length > 0) {
+    console.log(`${LOG_PREFIXES.API} [Context Analyzer] Analyzing ${userContext.previousMessages.length} previous messages`);
+    
+    // Combine all message content
+    const combinedText = userContext.previousMessages
+      .map(msg => msg.content)
+      .join(' ')
+      .toLowerCase();
+    
+    console.log(`${LOG_PREFIXES.API} [Context Analyzer] Combined text sample: ${combinedText.substring(0, 150)}...`);
+    
+    // Enhanced sport detection including fantasy baseball keywords
+    if (combinedText.includes('nfbc') || combinedText.includes('nffc') || 
+        combinedText.includes('nfbkc') || combinedText.includes('tgfbi') ||
+        combinedText.includes('baseball') || combinedText.includes('mlb')) {
+      console.log(`${LOG_PREFIXES.API} [Context Analyzer] ✓ Detected MLB from fantasy baseball keywords`);
+      return 'mlb';
+    }
+    
+    if (combinedText.includes('nba') || combinedText.includes('basketball')) {
+      console.log(`${LOG_PREFIXES.API} [Context Analyzer] ✓ Detected NBA`);
+      return 'nba';
+    }
+    
+    if (combinedText.includes('nfl') || combinedText.includes('football')) {
+      console.log(`${LOG_PREFIXES.API} [Context Analyzer] ✓ Detected NFL`);
+      return 'nfl';
+    }
+    
+    if (combinedText.includes('nhl') || combinedText.includes('hockey')) {
+      console.log(`${LOG_PREFIXES.API} [Context Analyzer] ✓ Detected NHL`);
+      return 'nhl';
+    }
+  }
+  
+  // Check platform to infer sport (e.g., fantasy platform might indicate baseball)
+  if (userContext.platform === 'fantasy') {
+    console.log(`${LOG_PREFIXES.API} [Context Analyzer] Platform is 'fantasy' - defaulting to MLB for fantasy baseball`);
+    return 'mlb';
+  }
+  
+  console.log(`${LOG_PREFIXES.API} [Context Analyzer] ✗ No sport detected from context`);
+  return null;
 }
 
 /**
@@ -18,260 +110,436 @@ interface CardRequest {
  */
 export async function POST(req: NextRequest) {
   try {
-    console.log('[API] Dynamic cards generation started');
-    const body: CardRequest = await req.json();
-    const { sport, category, userContext, limit = 3 } = body;
-
-    const oddsApiKey = process.env.ODDS_API_KEY;
+    console.log(`${LOG_PREFIXES.API} ========================================`);
+    console.log(`${LOG_PREFIXES.API} CARDS API: POST REQUEST RECEIVED`);
+    console.log(`${LOG_PREFIXES.API} Timestamp:`, new Date().toISOString());
     
-    // Fetch real odds data if available
-    let liveOddsData = null;
-    if (oddsApiKey && sport) {
-      try {
-        const sportKey = mapSportToApiKey(sport);
-        const oddsUrl = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds?apiKey=${oddsApiKey}&regions=us&markets=h2h,spreads,totals&oddsFormat=american`;
-        
-        const oddsResponse = await fetch(oddsUrl);
-        if (oddsResponse.ok) {
-          liveOddsData = await oddsResponse.json();
-          console.log('[API] Fetched live odds:', liveOddsData?.length || 0, 'events');
+    const body: CardRequest = await req.json();
+    console.log(`${LOG_PREFIXES.API} Request body parsed:`, JSON.stringify(body, null, 2));
+    
+    const { sport, category, userContext, limit = 3 } = body;
+    console.log(`${LOG_PREFIXES.API} Extracted parameters:`);
+    console.log(`${LOG_PREFIXES.API} - Sport (direct): ${sport || 'not specified'}`);
+    console.log(`${LOG_PREFIXES.API} - Category: ${category || 'not specified'}`);
+    console.log(`${LOG_PREFIXES.API} - Limit: ${limit}`);
+    console.log(`${LOG_PREFIXES.API} - User context:`, userContext ? 'provided' : 'not provided');
+    
+    // Analyze context to determine actual sport intent
+    const contextualSport = analyzeContextForSport(userContext);
+    const finalSport = sport || contextualSport || undefined;
+    
+    console.log(`${LOG_PREFIXES.API} - Sport (from context): ${contextualSport || 'none'}`);
+    console.log(`${LOG_PREFIXES.API} - Sport (final): ${finalSport || 'none - will show variety'}`);
+
+    const oddsApiKey = process.env[ENV_KEYS.ODDS_API_KEY];
+    console.log(`${LOG_PREFIXES.API} Odds API Key configured:`, oddsApiKey ? 'YES' : 'NO');
+    
+    // Use unified data service to fetch from both Odds API and Kalshi
+    console.log(`${LOG_PREFIXES.API} → Using Unified Data Service to fetch from Odds API + Kalshi...`);
+    const unifiedResult = await fetchUnifiedData({
+      sport: finalSport,
+      category,
+      limit,
+      includeKalshi: true,
+      includeOdds: !!oddsApiKey,
+      oddsApiKey: oddsApiKey || undefined,
+      useCache: true
+    });
+    
+    // Extract data from unified result
+    const liveOddsData = unifiedResult.oddsData;
+    const kalshiData = unifiedResult.kalshiData;
+    const oddsBySport: Record<string, any[]> = {};
+    
+    // Reorganize odds by sport for backward compatibility
+    liveOddsData.forEach((event: any) => {
+      const sportKey = event.sport_key || event.sport_title?.toLowerCase().replace(/\s+/g, '_');
+      if (sportKey) {
+        if (!oddsBySport[sportKey]) {
+          oddsBySport[sportKey] = [];
         }
-      } catch (error) {
-        console.error('[API] Error fetching odds for cards:', error);
+        oddsBySport[sportKey].push(event);
       }
+    });
+    
+    console.log(`${LOG_PREFIXES.API} ✓ Unified Data Service Results:`);
+    console.log(`${LOG_PREFIXES.API}   - Odds: ${unifiedResult.metadata.oddsCount} events`);
+    console.log(`${LOG_PREFIXES.API}   - Kalshi: ${unifiedResult.metadata.kalshiCount} markets`);
+    console.log(`${LOG_PREFIXES.API}   - Pre-generated cards: ${unifiedResult.combinedCards.length}`);
+    console.log(`${LOG_PREFIXES.API}   - Errors: ${unifiedResult.errors.length}`);
+    
+    if (unifiedResult.errors.length > 0) {
+      console.warn(`${LOG_PREFIXES.API} Data fetch errors:`, unifiedResult.errors.join(', '));
+    }
+    
+    const validationResult = sport ? validateSportKey(sport) : null;
+
+    // Start with pre-generated unified cards from both sources
+    let cards = unifiedResult.combinedCards;
+    console.log(`${LOG_PREFIXES.API} ✓ Starting with ${cards.length} unified cards (Odds + Kalshi)`);
+    
+    // If we need more cards, generate additional ones from the odds data
+    if (cards.length < limit && liveOddsData.length > 0) {
+      console.log(`${LOG_PREFIXES.API} → Generating additional cards from odds data...`);
+      const additionalCards = await generateDynamicCards({
+        category,
+        sport: finalSport ?? undefined,
+        oddsData: liveOddsData,
+        oddsBySport,
+        userContext,
+        limit: limit - cards.length
+      });
+      cards.push(...additionalCards);
+      console.log(`${LOG_PREFIXES.API} ✓ Added ${additionalCards.length} cards from odds`);
     }
 
-    // Generate cards based on category and available data
-    const cards = await generateDynamicCards({
-      category,
-      sport,
-      oddsData: liveOddsData,
-      userContext,
-      limit
-    });
+    console.log(`${LOG_PREFIXES.API} ✓ Total cards after generation: ${cards.length}`);
+    
+    // Enrich cards with weather data for NFL/MLB games
+    if (cards.length > 0 && (sport?.includes('nfl') || sport?.includes('mlb'))) {
+      console.log(`${LOG_PREFIXES.API} → Enriching cards with weather data...`);
+      try {
+        const enrichedCards = await enrichCardsWithWeather(cards);
+        if (enrichedCards.length > cards.length) {
+          console.log(`${LOG_PREFIXES.API} ✓ Added ${enrichedCards.length - cards.length} weather cards`);
+          cards = enrichedCards;
+        }
+      } catch (error) {
+        console.error(`${LOG_PREFIXES.API} Weather enrichment failed:`, error);
+      }
+    }
+    
+    if (cards.length === 0) {
+      console.log(`${LOG_PREFIXES.API} ⚠ WARNING: Zero cards generated!`);
+      console.log(`${LOG_PREFIXES.API} Possible causes:`);
+      console.log(`${LOG_PREFIXES.API} 1. No odds data available (had ${liveOddsData?.length || 0} events)`);
+      console.log(`${LOG_PREFIXES.API} 2. Sport not recognized: ${sport}`);
+      console.log(`${LOG_PREFIXES.API} 3. Category filtering too strict: ${category}`);
+      console.log(`${LOG_PREFIXES.API} 4. generateDynamicCards logic issue`);
+    } else {
+      console.log(`${LOG_PREFIXES.API} Card summary:`);
+      cards.forEach((card, idx) => {
+        console.log(`${LOG_PREFIXES.API}   ${idx + 1}. ${card.type} - ${card.title} [${card.category}]`);
+      });
+    }
 
-    return NextResponse.json({
+    // Track actual data sources (start with unified service sources)
+    const dataSources: string[] = [...unifiedResult.dataSources];
+    
+    // Add weather data source for outdoor sports
+    const outdoorSports = ['nfl', 'mlb', 'ncaaf'];
+    if (outdoorSports.includes(finalSport || '')) {
+      dataSources.push('Open-Meteo Weather API (live conditions & forecasts)');
+      console.log(`${LOG_PREFIXES.API} Weather data relevant for ${finalSport} - marked as source`);
+    }
+    
+    // Add fallback sources if no real data
+    if (dataSources.length === 0) {
+      dataSources.push('Grok 4 Fast AI (xAI)');
+      dataSources.push('Statistical Models & Historical Data');
+    }
+    
+    // Fallback to Supabase if no live odds and we need more cards
+    if (cards.length < 3 && finalSport) {
+      console.log(`${LOG_PREFIXES.API} ⚠ Only ${cards.length} cards, trying Supabase fallback`);
+      try {
+        const { fetchUpcomingGames } = await import('@/lib/supabase-data-service');
+        const dbResult = await fetchUpcomingGames(finalSport, 48);
+        
+        if (dbResult.ok && dbResult.value.data.length > 0) {
+          console.log(`${LOG_PREFIXES.API} ✓ Found ${dbResult.value.data.length} games in Supabase`);
+          dataSources.push('Supabase Database (cached odds data)');
+          
+          // Convert DB records to card format
+          const dbCards = dbResult.value.data.slice(0, 3 - cards.length).map(record => ({
+            type: CARD_TYPES.LIVE_ODDS,
+            title: `${record.home_team} vs ${record.away_team}`,
+            icon: 'Database',
+            category: record.sport.toUpperCase(),
+            subcategory: 'Cached Data',
+            gradient: 'from-blue-500 to-purple-600',
+            data: {
+              matchup: `${record.home_team} vs ${record.away_team}`,
+              gameTime: new Date(record.commence_time).toLocaleString(),
+              source: 'Database',
+              cached: true
+            },
+            status: CARD_STATUS.VALUE,
+            realData: true
+          }));
+          
+          cards.push(...dbCards);
+        }
+      } catch (error) {
+        console.error(`${LOG_PREFIXES.API} Supabase fallback failed:`, error);
+      }
+    }
+    
+    // Final fallback to contextual cards
+    if (cards.length < 3) {
+      console.log(`${LOG_PREFIXES.API} ⚠ Only ${cards.length} cards, generating contextual cards`);
+      const { generateContextualCards } = await import('@/lib/cards-generator');
+      const additionalCards = await generateContextualCards(
+        category, 
+        finalSport, 
+        3 - cards.length,
+        !finalSport // Use multi-sport if no specific sport
+      );
+      cards.push(...additionalCards);
+    }
+    console.log(`${LOG_PREFIXES.API} ✓ Final card count: ${cards.length}`);
+    
+    const response = {
       success: true,
-      cards,
-      dataSource: oddsApiKey ? 'live' : 'simulated',
+      cards: cards.slice(0, limit),
+      dataSources,
+      dataSource: oddsApiKey ? DATA_SOURCES.LIVE : DATA_SOURCES.SIMULATED,
+      sportValidation: validationResult,
       timestamp: new Date().toISOString()
-    });
+    };
+    
+    console.log(`${LOG_PREFIXES.API} ← Sending ${response.cards.length} cards`);
+    console.log(`${LOG_PREFIXES.API} Sources: ${dataSources.join(', ')}`);
+    console.log(`${LOG_PREFIXES.API} ========================================`);
+    
+    return NextResponse.json(response);
 
   } catch (error: any) {
-    console.error('[API] Error in cards route:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log(`${LOG_PREFIXES.API} Error in cards route:`, errorMessage);
     return NextResponse.json({
       success: false,
-      error: error.message,
+      error: errorMessage,
       cards: [] // Return empty array on error
     });
   }
 }
 
-function mapSportToApiKey(sport: string): string {
-  const sportMap: Record<string, string> = {
-    'nba': 'basketball_nba',
-    'nfl': 'americanfootball_nfl',
-    'mlb': 'baseball_mlb',
-    'nhl': 'icehockey_nhl',
-    'ncaab': 'basketball_ncaab',
-    'ncaaf': 'americanfootball_ncaaf',
-  };
-  return sportMap[sport?.toLowerCase()] || 'upcoming';
+// Sport validation is now handled by sports-validator.ts
+
+/**
+ * Creates a card from a transformed odds event
+ * Prioritizes spread, then moneyline, then totals
+ */
+function createCardFromEvent(transformed: TransformedOdds, preferredSport?: string): any | null {
+  const event = transformed.event;
+  
+  // Prioritize spread cards (most popular bet type)
+  if (transformed.bestSpread) {
+    const spread = transformed.bestSpread;
+    const edge = spread.edge;
+    const confidence = Math.round((1 - spread.impliedProbability) * 100);
+    
+    return {
+      type: CARD_TYPES.LIVE_ODDS,
+      title: 'Live Spread Analysis',
+      icon: 'Zap',
+      category: event.sport_title.toUpperCase(),
+      subcategory: 'Point Spread',
+      gradient: edge > 3 ? 'from-orange-500 to-red-600' : 'from-blue-500 to-indigo-600',
+      data: {
+        matchup: `${event.home_team} vs ${event.away_team}`,
+        bestLine: `${spread.outcome.name} ${spread.outcome.point && spread.outcome.point > 0 ? '+' : ''}${spread.outcome.point || ''} (${formatAmericanOdds(spread.outcome.price)})`,
+        book: spread.bookmaker,
+        edge: `${edge > 0 ? '+' : ''}${edge.toFixed(1)}%`,
+        movement: transformed.lineMovement,
+        confidence: confidence,
+        gameTime: new Date(event.commence_time).toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        }),
+        marketEfficiency: `${transformed.marketEfficiency.toFixed(1)}% inefficiency`
+      },
+      status: edge > 3 ? CARD_STATUS.HOT : CARD_STATUS.VALUE,
+      realData: true
+    };
+  }
+  
+  // Fall back to moneyline
+  if (transformed.bestMoneyline) {
+    const ml = transformed.bestMoneyline;
+    const impliedWin = (ml.impliedProbability * 100).toFixed(1);
+    
+    return {
+      type: CARD_TYPES.MONEYLINE_VALUE,
+      title: 'Moneyline Opportunity',
+      icon: 'Target',
+      category: event.sport_title.toUpperCase(),
+      subcategory: 'Moneyline',
+      gradient: 'from-purple-500 to-pink-600',
+      data: {
+        matchup: `${event.home_team} vs ${event.away_team}`,
+        team: ml.outcome.name,
+        line: formatAmericanOdds(ml.outcome.price),
+        impliedWin: `${impliedWin}%`,
+        book: ml.bookmaker,
+        recommendation: ml.outcome.price < -200 
+          ? 'Heavy favorite - consider parlay' 
+          : ml.outcome.price > 150 
+          ? 'Underdog value opportunity'
+          : 'Competitive matchup',
+        gameTime: new Date(event.commence_time).toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        })
+      },
+      status: CARD_STATUS.VALUE,
+      realData: true
+    };
+  }
+  
+  // Last option: totals
+  if (transformed.bestTotal) {
+    const total = transformed.bestTotal;
+    
+    return {
+      type: CARD_TYPES.TOTALS_VALUE,
+      title: 'Total Points Analysis',
+      icon: 'BarChart3',
+      category: event.sport_title.toUpperCase(),
+      subcategory: 'Over/Under',
+      gradient: 'from-green-500 to-emerald-600',
+      data: {
+        matchup: `${event.home_team} vs ${event.away_team}`,
+        line: `${total.outcome.name} ${total.outcome.point}`,
+        odds: formatAmericanOdds(total.outcome.price),
+        book: total.bookmaker,
+        impliedProb: `${(total.impliedProbability * 100).toFixed(1)}%`,
+        recommendation: 'Check team pace and defensive ratings',
+        gameTime: new Date(event.commence_time).toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        })
+      },
+      status: CARD_STATUS.VALUE,
+      realData: true
+    };
+  }
+  
+  return null;
 }
 
 async function generateDynamicCards(params: {
   category?: string;
   sport?: string;
   oddsData?: any;
+  oddsBySport?: Record<string, any[]>;
   userContext?: any;
   limit: number;
 }) {
-  const { category, sport, oddsData, limit } = params;
+  // Destructure parameters FIRST before using them
+  const { category, sport, oddsData, oddsBySport = {}, limit } = params;
   const cards: any[] = [];
+  
+  console.log(`${LOG_PREFIXES.API} ----------------------------------------`);
+  console.log(`${LOG_PREFIXES.API} generateDynamicCards() called`);
+  console.log(`${LOG_PREFIXES.API} Input parameters:`, {
+    category,
+    sport,
+    hasOddsData: !!oddsData,
+    oddsDataIsArray: Array.isArray(oddsData),
+    oddsDataLength: oddsData?.length || 0,
+    oddsBySportCount: Object.keys(oddsBySport).length,
+    oddsBySportBreakdown: Object.keys(oddsBySport).map(s => `${s}: ${oddsBySport[s].length}`).join(', '),
+    limit
+  });
 
-  // Generate betting cards from live odds
+  // Generate betting cards from live odds using transformer
   if (oddsData && Array.isArray(oddsData) && oddsData.length > 0) {
-    const events = oddsData.slice(0, limit);
+    console.log(`${LOG_PREFIXES.API} ✓ Odds data validation passed`);
+    console.log(`${LOG_PREFIXES.API} Processing ${oddsData.length} live odds events`);
     
-    for (const event of events) {
-      if (!event.bookmakers || event.bookmakers.length === 0) continue;
-
-      const bookmaker = event.bookmakers[0];
-      const markets = bookmaker.markets || [];
-
-      // Find spread and h2h markets
-      const spreadMarket = markets.find((m: any) => m.key === 'spreads');
-      const h2hMarket = markets.find((m: any) => m.key === 'h2h');
+    // If we have multiple sports, distribute cards across them
+    const sportsWithData = Object.keys(oddsBySport);
+    const shouldDistribute = sportsWithData.length > 1;
+    
+    if (shouldDistribute) {
+      console.log(`${LOG_PREFIXES.API} → Multi-sport mode: distributing cards across ${sportsWithData.length} sports`);
       
-      if (spreadMarket && spreadMarket.outcomes && spreadMarket.outcomes.length >= 2) {
-        const outcome = spreadMarket.outcomes[0];
-        const homeTeam = event.home_team;
-        const awayTeam = event.away_team;
+      // Calculate cards per sport (aim for even distribution)
+      const cardsPerSport = Math.ceil(limit / sportsWithData.length);
+      console.log(`${LOG_PREFIXES.API}   Target: ${cardsPerSport} card(s) per sport`);
+      
+      // Process each sport independently
+      for (const sportKey of sportsWithData) {
+        if (cards.length >= limit) break;
         
-        // Calculate edge based on implied probability differences
-        const impliedProb = calculateImpliedProbability(outcome.price);
-        const marketEfficiency = calculateMarketEfficiency(event.bookmakers);
-        const edge = marketEfficiency > 0 ? `+${marketEfficiency.toFixed(1)}%` : `${marketEfficiency.toFixed(1)}%`;
+        const sportEvents = oddsBySport[sportKey];
+        console.log(`${LOG_PREFIXES.API}   Processing ${sportKey}: ${sportEvents.length} events`);
         
-        cards.push({
-          type: 'live-odds',
-          title: 'Live Odds Analysis',
-          icon: 'Zap',
-          category: sport?.toUpperCase() || 'BETTING',
-          subcategory: 'Live Market',
-          gradient: 'from-orange-500 to-red-600',
-          data: {
-            matchup: `${homeTeam} vs ${awayTeam}`,
-            bestLine: `${outcome.name} ${outcome.point > 0 ? '+' : ''}${outcome.point} (${outcome.price > 0 ? '+' : ''}${outcome.price})`,
-            book: bookmaker.title,
-            edge: edge,
-            movement: detectLineMovement(event),
-            confidence: Math.round(impliedProb * 100),
-            gameTime: event.commence_time
-          },
-          status: marketEfficiency > 2 ? 'hot' : 'value',
-          realData: true
-        });
+        const filteredEvents = filterEventsByTimeRange(sportEvents, 48);
+        const transformedOdds = transformOddsEvents(filteredEvents);
+        const sortedByValue = sortEventsByValue(transformedOdds);
+        
+        // Take best event from this sport
+        const topEvent = sortedByValue[0];
+        if (topEvent) {
+          console.log(`${LOG_PREFIXES.API}     Adding card from ${sportKey}`);
+          const card = createCardFromEvent(topEvent, sportKey);
+          if (card) cards.push(card);
+        }
       }
-
-      // Add player prop if H2H market exists
-      if (h2hMarket && h2hMarket.outcomes && h2hMarket.outcomes.length >= 2) {
-        const favoriteOutcome = h2hMarket.outcomes.reduce((prev: any, current: any) => 
-          current.price < prev.price ? current : prev
-        );
+      
+      console.log(`${LOG_PREFIXES.API} ✓ Generated ${cards.length} cards distributed across ${sportsWithData.length} sports`);
+    } else {
+      // Single sport mode - use original logic
+      console.log(`${LOG_PREFIXES.API} → Single-sport mode: generating cards from ${oddsData.length} events`);
+      
+      // Transform and enhance the odds data
+      console.log(`${LOG_PREFIXES.API} → Step 1: Filtering events by time range (48 hours)...`);
+      const filteredEvents = filterEventsByTimeRange(oddsData, 48);
+      console.log(`${LOG_PREFIXES.API}   Filtered to ${filteredEvents.length} upcoming events`);
+      
+      console.log(`${LOG_PREFIXES.API} → Step 2: Transforming odds events...`);
+      const transformedOdds = transformOddsEvents(filteredEvents);
+      console.log(`${LOG_PREFIXES.API}   Transformed ${transformedOdds.length} events`);
+      
+      console.log(`${LOG_PREFIXES.API} → Step 3: Sorting by value...`);
+      const sortedByValue = sortEventsByValue(transformedOdds);
+      console.log(`${LOG_PREFIXES.API}   Sorted ${sortedByValue.length} events by market value`);
+      
+      // Take top events by value
+      const topEvents = sortedByValue.slice(0, limit * 2); // Get more to filter
+      console.log(`${LOG_PREFIXES.API} → Step 4: Selected top ${topEvents.length} events for card generation`)
+      
+      console.log(`${LOG_PREFIXES.API} → Step 5: Generating cards from top events...`);
+      
+      for (const transformed of topEvents) {
+        if (cards.length >= limit) break;
         
-        cards.push({
-          type: 'moneyline-value',
-          title: 'Moneyline Opportunity',
-          icon: 'Target',
-          category: sport?.toUpperCase() || 'BETTING',
-          subcategory: 'Moneyline',
-          gradient: 'from-purple-500 to-pink-600',
-          data: {
-            team: favoriteOutcome.name,
-            line: `${favoriteOutcome.price > 0 ? '+' : ''}${favoriteOutcome.price}`,
-            impliedWin: `${(calculateImpliedProbability(favoriteOutcome.price) * 100).toFixed(1)}%`,
-            book: bookmaker.title,
-            recommendation: favoriteOutcome.price < -200 ? 'Strong favorite' : 'Competitive matchup'
-          },
-          status: 'value',
-          realData: true
-        });
+        const card = createCardFromEvent(transformed, sport);
+        if (card) cards.push(card);
       }
+      
+      console.log(`${LOG_PREFIXES.API} ✓ Generated ${cards.length} cards from live odds data`);
     }
+  } else {
+    console.log(`${LOG_PREFIXES.API} ⚠ No odds data available for card generation`);
+    console.log(`${LOG_PREFIXES.API} Reasons: oddsData=${!!oddsData}, isArray=${Array.isArray(oddsData)}, length=${oddsData?.length || 0}`);
   }
 
   // If no live data or need more cards, generate contextual recommendations
   if (cards.length < limit) {
-    cards.push(...generateContextualCards(category, sport, limit - cards.length));
+    const contextualCount = limit - cards.length;
+    console.log(`${LOG_PREFIXES.API} → Step 6: Need ${contextualCount} more cards, generating contextual cards...`);
+    const { generateContextualCards: genCards } = await import('@/lib/cards-generator');
+    const contextualCards = await genCards(category, sport, contextualCount, !sport);
+    console.log(`${LOG_PREFIXES.API}   Generated ${contextualCards.length} contextual cards`);
+    cards.push(...contextualCards);
   }
 
+  console.log(`${LOG_PREFIXES.API} �� Final result: ${cards.length} total cards`);
+  console.log(`${LOG_PREFIXES.API} ----------------------------------------`);
   return cards.slice(0, limit);
 }
 
-function calculateImpliedProbability(americanOdds: number): number {
-  if (americanOdds > 0) {
-    return 100 / (americanOdds + 100);
-  } else {
-    return Math.abs(americanOdds) / (Math.abs(americanOdds) + 100);
-  }
-}
-
-function calculateMarketEfficiency(bookmakers: any[]): number {
-  if (bookmakers.length < 2) return 0;
-  
-  // Compare odds across bookmakers to find inefficiencies
-  const allOdds = bookmakers.flatMap(b => 
-    b.markets?.flatMap((m: any) => 
-      m.outcomes?.map((o: any) => o.price) || []
-    ) || []
-  );
-  
-  if (allOdds.length === 0) return 0;
-  
-  const variance = calculateVariance(allOdds);
-  // Higher variance = more inefficiency = more edge opportunity
-  return variance * 2; // Scale to percentage
-}
-
-function calculateVariance(numbers: number[]): number {
-  const mean = numbers.reduce((a, b) => a + b, 0) / numbers.length;
-  const squaredDiffs = numbers.map(n => Math.pow(n - mean, 2));
-  return Math.sqrt(squaredDiffs.reduce((a, b) => a + b, 0) / numbers.length);
-}
-
-function detectLineMovement(event: any): string {
-  // In a real implementation, we'd compare with historical data
-  // For now, provide a placeholder that encourages real data integration
-  const bookmakers = event.bookmakers || [];
-  if (bookmakers.length > 1) {
-    return '→ Stable across books';
-  }
-  return '→ Monitor for movement';
-}
-
-function generateContextualCards(category?: string, sport?: string, count: number = 3): any[] {
-  const cards: any[] = [];
-  
-  // DFS contextual card
-  if (category === 'dfs' || !category) {
-    cards.push({
-      type: 'dfs-strategy',
-      title: 'DFS Strategy Insight',
-      icon: 'Award',
-      category: sport?.toUpperCase() || 'DFS',
-      subcategory: 'Lineup Building',
-      gradient: 'from-green-500 to-emerald-600',
-      data: {
-        focus: 'Value identification in today\'s slate',
-        approach: 'Target game environments with high totals',
-        strategy: 'Leverage ownership discrepancies',
-        recommendation: 'Stack correlated plays in GPPs'
-      },
-      status: 'optimal',
-      realData: false
-    });
-  }
-
-  // Fantasy contextual card
-  if (category === 'fantasy' || !category) {
-    cards.push({
-      type: 'fantasy-insight',
-      title: 'Draft Strategy',
-      icon: 'TrendingUp',
-      category: 'FANTASY',
-      subcategory: 'Value Targets',
-      gradient: 'from-green-600 to-teal-600',
-      data: {
-        focus: 'ADP inefficiencies in current market',
-        approach: 'Target players with usage trajectory',
-        timing: 'Mid-rounds offer best value',
-        recommendation: 'Monitor news for injury replacements'
-      },
-      status: 'target',
-      realData: false
-    });
-  }
-
-  // Kalshi contextual card
-  if (category === 'kalshi' || !category) {
-    cards.push({
-      type: 'kalshi-insight',
-      title: 'Prediction Market Analysis',
-      icon: 'BarChart3',
-      category: 'KALSHI',
-      subcategory: 'Market Opportunities',
-      gradient: 'from-cyan-500 to-blue-600',
-      data: {
-        focus: 'Event-based market inefficiencies',
-        approach: 'Cross-reference with betting markets',
-        edge: 'Arbitrage opportunities available',
-        recommendation: 'Monitor for pricing discrepancies'
-      },
-      status: 'opportunity',
-      realData: false
-    });
-  }
-
-  return cards.slice(0, count);
-}
+// Helper functions moved to odds-transformer.ts and cards-generator.ts for reusability

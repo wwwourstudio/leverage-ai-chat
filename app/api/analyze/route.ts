@@ -1,10 +1,31 @@
+// Analyze API - Grok 4 Fast integration
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { generateText } from 'ai';
+import { randomUUID } from 'crypto';
+import {
+  AI_CONFIG,
+  SYSTEM_PROMPT,
+  ERROR_MESSAGES,
+  LOG_PREFIXES,
+  ATTACHMENT_TYPES,
+  ENV_KEYS,
+  DEFAULT_SOURCES
+} from '@/lib/constants';
+import { APP_TABLES } from '@/lib/supabase-validator';
+import { getLeveragedAI } from '@/lib/leveraged-ai';
+import { 
+  fetchPlayerProjections, 
+  formatProjectionSummary,
+  extractPlayerName,
+  isPlayerProjectionQuery
+} from '@/lib/player-projections';
 
 // Grok AI integration for sports analysis
-// Using xAI's Grok model through the AI SDK
+// Using xAI through Vercel AI Gateway (AI SDK 6)
 
-export const runtime = 'edge';
+// Note: NOT using 'edge' runtime as AI SDK 6 doesn't require it
+
+type AttachmentType = typeof ATTACHMENT_TYPES[keyof typeof ATTACHMENT_TYPES];
 
 interface AnalysisRequest {
   query: string;
@@ -14,59 +35,331 @@ interface AnalysisRequest {
     oddsData?: any;
   };
   attachments?: Array<{
-    type: 'image' | 'csv';
+    type: AttachmentType;
     data: any;
   }>;
 }
 
+/**
+ * Builds context enhancement string based on query keywords
+ */
+function buildContextEnhancement(
+  query: string, 
+  context?: AnalysisRequest['context']
+): string {
+  const queryLower = query.toLowerCase();
+  const parts: string[] = [];
+  
+  // Detect platform-specific keywords
+  if (queryLower.includes('nfbc') || queryLower.includes('nffc') || 
+      queryLower.includes('nfbkc') || queryLower.includes('fantasy baseball')) {
+    parts.push('Context: Fantasy baseball (NFBC/NFFC). Focus on 2026 projections and draft strategy.');
+  } else if (queryLower.includes('dfs') || queryLower.includes('draftkings') || 
+             queryLower.includes('fanduel')) {
+    parts.push('Context: DFS. Focus on optimal lineups and value plays.');
+  } else if (queryLower.includes('kalshi')) {
+    parts.push('Context: Kalshi prediction markets.');
+  }
+  
+  // Add sport-specific context
+  if (context?.sport) {
+    parts.push(`Sport: ${context.sport}`);
+  }
+  
+  return parts.length > 0 ? '\n' + parts.join('\n') : '';
+}
+
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+  const MAX_PROCESSING_TIME = 25000; // 25 seconds max
+  
   try {
     const body = await req.json();
     const query = body.query || body.userMessage; // Support both field names
     const context = body.context;
     const attachments = body.attachments;
+    
+    console.log(`[v0] [${Date.now() - startTime}ms] Request received`);
+    console.log(`[v0] Query:`, query);
+    console.log('[v0] Context received:', {
+      sport: context?.sport,
+      marketType: context?.marketType,
+      hasOddsData: !!context?.oddsData,
+      oddsEventsCount: context?.oddsData?.events?.length || 0
+    });
 
-    // Get environment variables securely
-    const grokApiKey = process.env.XAI_API_KEY || process.env.GROK_API_KEY;
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!grokApiKey) {
-      console.error('[API] Grok API key not configured - using fallback mode');
-      // Return fallback response instead of error
+    // Verify Grok AI is configured
+    const xaiApiKey = process.env[ENV_KEYS.XAI_API_KEY];
+    if (!xaiApiKey) {
+      console.error(`${LOG_PREFIXES.API} XAI_API_KEY not configured!`);
       return NextResponse.json({
         success: false,
-        error: 'AI service not configured',
-        useFallback: true,
-        message: 'Please configure XAI_API_KEY in environment variables for full functionality'
-      });
+        error: 'Grok AI not configured. Please add XAI_API_KEY to environment variables.',
+        text: 'AI service unavailable. Please contact support to enable Grok 4 Fast.',
+        useFallback: true
+      }, { status: 503 });
     }
 
-    console.log('[API] Processing analysis request:', query.substring(0, 50));
+    // Get environment variables securely
+    const supabaseUrl = process.env[ENV_KEYS.SUPABASE_URL];
+    const supabaseAnonKey = process.env[ENV_KEYS.SUPABASE_ANON_KEY];
 
-    // Build the prompt with context
-    let systemPrompt = `You are Leverage AI, an expert sports betting, fantasy sports, and prediction market analyst.
-You provide data-driven insights backed by statistical analysis, market trends, and historical patterns.
+    console.log(`${LOG_PREFIXES.API} Processing analysis with Grok 4 Fast (xAI)`);
 
-Your expertise spans:
-- Sports Betting (NFL, NBA, MLB) - odds analysis, line movements, value detection
-- Fantasy Sports (NFBC, NFFC, NFBKC) - draft strategy, ADP analysis, player valuations
-- DFS (DraftKings, FanDuel) - optimal lineup construction, leverage plays, ownership projections
-- Kalshi Markets - financial prediction markets, weather markets, arbitrage opportunities
+    // Detect if this is a player projection query and fetch real data
+    let playerProjections = null;
+    let playerName: string | null = null;
+    
+    if (isPlayerProjectionQuery(query)) {
+      playerName = extractPlayerName(query);
+      
+      if (playerName) {
+        console.log(`${LOG_PREFIXES.API} Fetching player projections for: ${playerName}`);
+        try {
+          playerProjections = await fetchPlayerProjections(
+            playerName, 
+            context?.sport || 'baseball_mlb'
+          );
+          console.log(
+            `${LOG_PREFIXES.API} Player projections: ${playerProjections.success ? 'Found' : 'Not found'}`
+          );
+        } catch (err) {
+          console.error(`${LOG_PREFIXES.API} Player projection error:`, err);
+        }
+      }
+    }
 
-Always provide:
-1. Clear, confident recommendations with reasoning
-2. Specific numbers and probabilities where applicable
-3. Risk assessment and position sizing guidance
-4. Cross-platform correlation insights when relevant
+    // ALWAYS fetch live odds data for sports queries
+    let fetchedOddsData: any[] = [];
+    const queryLower = query.toLowerCase();
+    const isSportsQuery = queryLower.includes('odds') || 
+                          queryLower.includes('bet') ||
+                          queryLower.includes('prop') ||
+                          queryLower.includes('spread') ||
+                          queryLower.includes('moneyline') ||
+                          queryLower.includes('nba') ||
+                          queryLower.includes('nfl') ||
+                          queryLower.includes('mlb') ||
+                          queryLower.includes('nhl') ||
+                          queryLower.includes('game') ||
+                          queryLower.includes('player') ||
+                          queryLower.includes('tonight') ||
+                          queryLower.includes('value') ||
+                          queryLower.includes('arbitrage') ||
+                          context?.sport;
+    
+    if (isSportsQuery && (!context?.oddsData || !context?.oddsData?.events?.length)) {
+      console.log('[v0] [API] Sports query detected - fetching odds data from API');
+      try {
+        const { getOddsWithCache } = await import('@/lib/unified-odds-fetcher');
+        
+        // Determine which sport(s) to fetch
+        const sportKey = context?.sport || 
+          (queryLower.includes('nba') ? 'basketball_nba' :
+           queryLower.includes('nfl') ? 'americanfootball_nfl' :
+           queryLower.includes('mlb') ? 'baseball_mlb' :
+           queryLower.includes('nhl') ? 'icehockey_nhl' : 'basketball_nba');
+        
+        fetchedOddsData = await getOddsWithCache(sportKey, { useCache: true, storeResults: true });
+        console.log(`[v0] [API] Fetched ${fetchedOddsData.length} games for ${sportKey}`);
+      } catch (err) {
+        console.error('[v0] [API] Odds fetch error:', err);
+      }
+    }
 
-Format responses with clear structure using markdown.`;
+    // Detect if this is a Kalshi query and fetch REAL market data
+    let kalshiMarkets = null;
+    const isKalshiQuery = queryLower.includes('kalshi') || 
+                          queryLower.includes('election') || 
+                          queryLower.includes('prediction market') ||
+                          queryLower.includes('h2h') ||
+                          queryLower.includes('trump') ||
+                          queryLower.includes('harris');
+    
+    if (isKalshiQuery) {
+      console.log('[v0] [API] Kalshi query detected - fetching REAL market data from Kalshi API');
+      try {
+        const { fetchKalshiMarketsWithRetry } = await import('@/lib/kalshi-client');
+        
+        // Fetch ALL markets from Kalshi
+        kalshiMarkets = await fetchKalshiMarketsWithRetry({
+          status: 'open',
+          limit: 50,
+          maxRetries: 3
+        });
+        
+        console.log(`[v0] [API] Kalshi markets fetched: ${kalshiMarkets.length} markets`);
+        
+        if (kalshiMarkets.length > 0) {
+          console.log('[v0] [API] Kalshi categories:', [...new Set(kalshiMarkets.map((m: any) => m.category))].join(', '));
+        }
+      } catch (err) {
+        console.error('[v0] [API] Kalshi fetch error:', err);
+        kalshiMarkets = [];
+      }
+    }
 
-    let userPrompt = query;
+    // Build context enhancement string based on query keywords
+    const contextEnhancement = buildContextEnhancement(query, context);
+
+    // Build the prompt with context and CRITICAL current date information
+    const currentDate = new Date();
+    const dateStr = currentDate.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.toLocaleDateString('en-US', { month: 'long' });
+    
+    const dateWarning = `\n\n🚨 CRITICAL INSTRUCTIONS:\n- TODAY: ${dateStr}\n- YEAR: ${currentYear}\n- Provide ONLY ${currentYear} season data\n- Keep response under 150 words\n- Be concise and actionable`;
+    
+    const systemPrompt = SYSTEM_PROMPT + contextEnhancement + dateWarning;
+    let userPrompt = `${query}\n\nIMPORTANT: Respond in 3-4 short sentences maximum (under 150 words total). Be direct and specific.`;
+
+    // Add REAL player projection data if available
+    if (playerProjections?.success && playerProjections.projections && playerProjections.projections.length > 0) {
+      const projectionSummary = formatProjectionSummary(playerProjections);
+      userPrompt += `\n\n📊 REAL MARKET DATA (The Odds API):\n${projectionSummary}\n\nIMPORTANT: Use ONLY this verified data. Do not fabricate additional statistics. If asked about stats not provided above, clearly state "Data not available."`;
+      console.log('[v0] Added real player projection data to prompt');
+    } else if (playerProjections && !playerProjections.success) {
+      // Player was searched but no data found
+      userPrompt += `\n\n⚠️ IMPORTANT: No active market data found for ${playerName}. The player may not be in today's games, may be on a different team, or the name spelling may differ. Acknowledge this limitation in your response and DO NOT fabricate statistics.`;
+      console.log('[v0] No player projections found, instructed AI not to fabricate');
+    }
 
     // Add context from odds data if available
-    if (context?.oddsData) {
-      userPrompt += `\n\nCurrent Market Data:\n${JSON.stringify(context.oddsData, null, 2)}`;
+    if (context?.oddsData && context.oddsData.events && context.oddsData.events.length > 0) {
+      console.log(`[v0] Processing ${context.oddsData.events.length} live odds events for analysis`);
+      
+      // Fetch weather data for outdoor sports (NFL, MLB)
+      const isOutdoorSport = context?.sport === 'americanfootball_nfl' || 
+                            context?.sport === 'baseball_mlb' ||
+                            context?.sport === 'nfl' ||
+                            context?.sport === 'mlb';
+      
+      let weatherData: string | null = null;
+      
+      if (isOutdoorSport && context.oddsData.events.length > 0) {
+        console.log('[v0] Outdoor sport detected - fetching weather data');
+        try {
+          const { generateWeatherCard } = await import('@/lib/weather-service');
+          const firstGame = context.oddsData.events[0];
+          const weatherCard = await generateWeatherCard(
+            firstGame.home_team,
+            firstGame.away_team,
+            new Date(firstGame.commence_time)
+          );
+          
+          if (weatherCard) {
+            console.log('[v0] Weather data fetched successfully');
+            weatherData = `\n\n🌤️ WEATHER CONDITIONS (${weatherCard.data.location}):\n` +
+                         `Temperature: ${weatherCard.data.temperature}\n` +
+                         `Condition: ${weatherCard.data.condition}\n` +
+                         `Wind: ${weatherCard.data.wind}\n` +
+                         `Precipitation: ${weatherCard.data.precipitation}\n` +
+                         `Game Impact: ${weatherCard.data.gameImpact}`;
+          } else {
+            console.log('[v0] Weather data not available for this location');
+          }
+        } catch (error) {
+          console.error('[v0] Weather fetch error:', error instanceof Error ? error.message : String(error));
+        }
+      }
+      
+      // Format odds data in a readable way for Grok
+      const oddsEvents = context.oddsData.events.map((event: any, idx: number) => {
+        const homeTeam = event.home_team;
+        const awayTeam = event.away_team;
+        const gameTime = event.commence_time;
+        
+        let oddsText = `Game ${idx + 1}: ${awayTeam} @ ${homeTeam} (${new Date(gameTime).toLocaleString()})`;
+        
+        if (event.bookmakers && event.bookmakers.length > 0) {
+          oddsText += '\n  Sportsbook Odds:';
+          event.bookmakers.forEach((book: any) => {
+            oddsText += `\n    ${book.title}:`;
+            if (book.markets && book.markets.length > 0) {
+              book.markets.forEach((market: any) => {
+                if (market.key === 'h2h' && market.outcomes) {
+                  market.outcomes.forEach((outcome: any) => {
+                    oddsText += ` ${outcome.name} ${outcome.price > 0 ? '+' : ''}${outcome.price}`;
+                  });
+                }
+              });
+            }
+          });
+        }
+        
+        return oddsText;
+      }).join('\n\n');
+      
+      // Add weather data to odds context if available
+      const fullOddsContext = weatherData ? `${oddsEvents}${weatherData}` : oddsEvents;
+      
+      userPrompt += `\n\n📊 LIVE ODDS DATA FROM THE ODDS API (${context.oddsData.events.length} games):\n${oddsEvents}\n\nIMPORTANT: Use this REAL data to analyze opportunities. Compare odds across sportsbooks to identify arbitrage or value. Be specific about which sportsbooks and which lines.`;
+      console.log('[v0] ✓ Formatted live odds data for Grok analysis');
+    } else if (fetchedOddsData.length > 0) {
+      // Use the odds data we fetched directly
+      console.log(`[v0] Using directly fetched odds data: ${fetchedOddsData.length} games`);
+      
+      const oddsText = fetchedOddsData.slice(0, 10).map((game: any, idx: number) => {
+        let line = `${idx + 1}. ${game.away_team} @ ${game.home_team} (${new Date(game.commence_time).toLocaleString()})`;
+        
+        if (game.completed && game.scores) {
+          const homeScore = game.scores?.find((s: any) => s.name === game.home_team);
+          const awayScore = game.scores?.find((s: any) => s.name === game.away_team);
+          line += ` FINAL: ${game.away_team} ${awayScore?.score || '?'} - ${homeScore?.score || '?'} ${game.home_team}`;
+        } else if (game.bookmakers?.length > 0) {
+          const book = game.bookmakers[0];
+          const h2h = book.markets?.find((m: any) => m.key === 'h2h');
+          if (h2h?.outcomes) {
+            h2h.outcomes.forEach((o: any) => {
+              line += ` | ${o.name}: ${o.price > 0 ? '+' : ''}${o.price}`;
+            });
+          }
+          const spread = book.markets?.find((m: any) => m.key === 'spreads');
+          if (spread?.outcomes) {
+            line += ` | Spread:`;
+            spread.outcomes.forEach((o: any) => {
+              line += ` ${o.name} ${o.point > 0 ? '+' : ''}${o.point}`;
+            });
+          }
+        }
+        
+        return line;
+      }).join('\n');
+      
+      userPrompt += `\n\n📊 REAL GAME DATA (The Odds API - ${fetchedOddsData.length} games):\n${oddsText}\n\nUse this REAL data. Be specific with numbers and matchups.`;
+    } else if (context?.oddsData) {
+      console.log('[v0] Odds data present but no events found');
+      userPrompt += `\n\nNo live games currently available for this sport.`;
+    }
+
+    // Add REAL Kalshi market data if available
+    if (kalshiMarkets && kalshiMarkets.length > 0) {
+      console.log('[v0] Adding Kalshi market data to prompt');
+      
+      // Format top markets for the AI
+      const topMarkets = kalshiMarkets.slice(0, 20);
+      const kalshiData = topMarkets.map((market: any, idx: number) => {
+        return `${idx + 1}. ${market.title}\n` +
+               `   Category: ${market.category}\n` +
+               `   Yes: ${market.yesPrice}¢ | No: ${market.noPrice}¢\n` +
+               `   Volume: $${market.volume} | Open Interest: ${market.openInterest}`;
+      }).join('\n\n');
+      
+      userPrompt += `\n\n📊 REAL KALSHI PREDICTION MARKETS (Live Data):\n\n${kalshiData}\n\n` +
+                   `Total Markets Available: ${kalshiMarkets.length}\n` +
+                   `Categories: ${[...new Set(kalshiMarkets.map((m: any) => m.category))].slice(0, 10).join(', ')}\n\n` +
+                   `IMPORTANT: Use this REAL Kalshi data to analyze prediction market opportunities. ` +
+                   `Prices are in cents (¢). Calculate implied probabilities and identify mispriced markets.`;
+      
+      console.log('[v0] ✓ Added Kalshi market data to AI prompt');
+    } else if (isKalshiQuery) {
+      console.log('[v0] ⚠️ Kalshi query detected but no markets found');
+      userPrompt += `\n\n⚠️ NOTE: Attempted to fetch Kalshi markets but none are currently available. This may be due to API connectivity issues or no active markets. Check https://kalshi.com directly for live markets.`;
     }
 
     // Add sport/market context
@@ -123,14 +416,10 @@ Format responses with clear structure using markdown.`;
       console.error('[API] Grok API error:', grokResponse.status, errorData);
       return NextResponse.json({
         success: false,
-        error: grokResponse.status === 401 ? 'Invalid API key' : 'AI service unavailable',
-        useFallback: true,
-        details: errorData
+        error: 'AI service returned empty response',
+        useFallback: true
       });
     }
-
-    const grokData = await grokResponse.json();
-    const aiResponse = grokData.choices[0]?.message?.content || 'No response generated';
 
     console.log('[API] Grok response generated:', aiResponse.substring(0, 100));
 
@@ -154,36 +443,175 @@ Format responses with clear structure using markdown.`;
           flags: trustMetrics.flags || [],
           created_at: new Date().toISOString(),
         });
+      }, 1500)) // Faster fallback: 1.5 seconds
+    ]) as any;
 
-        console.log('[API] Trust metrics stored in Supabase');
-      } catch (dbError) {
-        console.error('[API] Failed to store trust metrics:', dbError);
-        // Continue anyway - this is non-critical
+    // Store analysis in Supabase using LeveragedAI (non-blocking, AI-validated)
+    Promise.resolve().then(() => {
+      storeAnalysisMetricsWithAI(trustMetrics, context).catch(err => {
+        console.log(`${LOG_PREFIXES.API} Background metrics storage failed:`, err.message);
+      });
+    });
+
+    // Generate insight cards using utility function
+    console.log('[v0] Generating insight cards for response...');
+    let insightCards: any[] = [];
+    
+    try {
+      // Import from utility module (not route file)
+      const { generateContextualCards } = await import('@/lib/cards-generator');
+      
+      // Determine category based on platform and query context
+      let cardCategory = 'betting'; // default
+      if (context?.platform === 'kalshi') {
+        cardCategory = 'kalshi';
+      } else if (context?.platform === 'dfs') {
+        cardCategory = 'dfs';
+      } else if (context?.platform === 'fantasy') {
+        cardCategory = 'fantasy';
       }
+      
+      // Determine if we should use multi-sport mode
+      const useMultiSport = !context?.sport || context?.sport === null;
+      
+      console.log('[v0] Calling generateContextualCards with:', { 
+        cardCategory, 
+        sport: context?.sport, 
+        multiSport: useMultiSport 
+      });
+      
+      // Generate cards with multi-sport support
+      insightCards = await generateContextualCards(
+        cardCategory, 
+        context?.sport, 
+        3,
+        useMultiSport // Enable multi-sport if no specific sport detected
+      );
+      
+      console.log(`[v0] ✓ Cards generated: ${insightCards.length}`);
+    } catch (error) {
+      console.error('[v0] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('[v0] ❌ CARDS GENERATION FAILED');
+      console.error('[v0] Error:', error);
+      console.error('[v0] Error message:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('[v0] Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error('[v0] Context:', { cardCategory, sport: context?.sport, useMultiSport });
+      console.error('[v0] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      // Fallback: create a single default card with error details
+      insightCards = [{
+        type: 'INFO',
+        title: '⚠️ Cards Generation Error',
+        icon: 'AlertTriangle',
+        category: 'SYSTEM',
+        subcategory: 'Error',
+        gradient: 'from-amber-600 to-orange-700',
+        data: { 
+          message: 'Failed to generate insight cards. Check server logs.',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString()
+        }
+      }];
     }
+
+    // Build sources array with real data indicator
+    const sources = [
+      DEFAULT_SOURCES.GROK_AI,
+      playerProjections?.success 
+        ? DEFAULT_SOURCES.ODDS_API
+        : context?.oddsData
+          ? DEFAULT_SOURCES.LIVE_MARKET
+          : DEFAULT_SOURCES.LIVE_MARKET
+    ];
 
     return NextResponse.json({
       success: true,
       text: aiResponse,
-      response: aiResponse, // Keep for backwards compatibility
+      response: aiResponse,
       trustMetrics,
       model: 'grok-3',
       confidence: trustMetrics.finalConfidence,
-      sources: [
-        { name: 'Grok AI', type: 'model', reliability: 94 },
-        { name: 'Live Market Data', type: 'api', reliability: context?.oddsData ? 96 : 85 }
-      ],
-      processingTime: grokData.usage?.total_tokens ? Math.round(grokData.usage.total_tokens * 0.5) : 1200,
+      sources,
+      cards: insightCards, // Add cards to response
+      playerData: playerProjections?.success ? {
+        player: playerProjections.player,
+        projectionsCount: playerProjections.projections?.length || 0,
+        source: 'The Odds API'
+      } : undefined,
+      processingTime: Math.round(aiResponse.length * 2),
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error('[API] Error in analyze route:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    if (error.name === 'AbortError') {
+      console.log(`${LOG_PREFIXES.API} Request timeout in analyze route`);
+      return NextResponse.json({
+        success: false,
+        error: 'Analysis request timed out. Please try again with a simpler query.',
+        useFallback: true,
+        details: 'Request exceeded maximum execution time'
+      }, { status: 408 });
+    }
+    
+    console.log(`${LOG_PREFIXES.API} Error in analyze route:`, errorMessage);
     return NextResponse.json({
       success: false,
-      error: 'Internal server error',
+      error: ERROR_MESSAGES.INTERNAL_ERROR,
       useFallback: true,
-      details: error.message
-    });
+      details: errorMessage
+    }, { status: 500 });
+  }
+}
+
+// Non-blocking helper to store analysis metrics using LeveragedAI
+async function storeAnalysisMetricsWithAI(
+  trustMetrics: any,
+  context: any
+) {
+  try {
+    const leveragedAI = getLeveragedAI();
+    
+    if (!leveragedAI.isReady()) {
+      console.log(`${LOG_PREFIXES.API} LeveragedAI not ready, skipping metrics storage`);
+      return;
+    }
+
+    // Generate proper response ID format
+    const responseId = `resp-${Date.now()}-${randomUUID().split('-')[0]}`;
+    
+    const metricsData = {
+      response_id: responseId,
+      model_id: AI_CONFIG.MODEL_NAME,
+      sport: context?.sport || 'general',
+      market_type: context?.marketType || 'analysis',
+      benford_score: Math.round(trustMetrics.benfordIntegrity || 0),
+      odds_alignment_score: Math.round(trustMetrics.oddsAlignment || 0),
+      consensus_score: Math.round(trustMetrics.marketConsensus || 0),
+      historical_accuracy_score: Math.round(trustMetrics.historicalAccuracy || 0),
+      final_confidence: Math.round(trustMetrics.finalConfidence || 0),
+      flags: trustMetrics.flags || [],
+      created_at: new Date().toISOString(),
+    };
+
+    // Use LeveragedAI for AI-validated insertion
+    const result = await leveragedAI.insertWithAIValidation(
+      APP_TABLES.AI_RESPONSE_TRUST,
+      metricsData,
+      'Trust metrics for sports betting AI analysis'
+    );
+
+    if (result.success) {
+      console.log(`${LOG_PREFIXES.API} ��� Trust metrics stored via LeveragedAI`);
+      if (result.aiValidation) {
+        console.log(`${LOG_PREFIXES.API} AI validation:`, result.aiValidation);
+      }
+    } else {
+      console.log(`${LOG_PREFIXES.API} Failed to store metrics:`, result.error);
+    }
+  } catch (dbError) {
+    const dbErrorMessage = dbError instanceof Error ? dbError.message : String(dbError);
+    console.log(`${LOG_PREFIXES.API} Exception storing trust metrics:`, dbErrorMessage);
   }
 }
 
@@ -208,7 +636,7 @@ async function calculateTrustMetrics(
   // Market consensus (would need external data source)
   const marketConsensus = 85;
 
-  // Historical accuracy (would query from Supabase if available)
+  // Historical accuracy using LeveragedAI with AI-enhanced insights
   let historicalAccuracy = 85;
   if (supabaseUrl && supabaseAnonKey) {
     try {
@@ -220,14 +648,22 @@ async function calculateTrustMetrics(
         .order('created_at', { ascending: false })
         .limit(20);
       
-      if (data && data.length > 0) {
-        historicalAccuracy = Math.round(
-          data.reduce((sum, row) => sum + row.final_confidence, 0) / data.length
+      if (queryResult.success && queryResult.data.length > 0) {
+        const validData = queryResult.data.filter(
+          (row: any) => typeof row.final_confidence === 'number'
         );
+        
+        if (validData.length > 0) {
+          historicalAccuracy = Math.round(
+            validData.reduce((sum: number, row: any) => sum + row.final_confidence, 0) / validData.length
+          );
+          console.log(`${LOG_PREFIXES.API} Historical accuracy from LeveragedAI: ${historicalAccuracy}% (${validData.length} records)`);
+        }
       }
-    } catch (error) {
-      console.error('[API] Error fetching historical accuracy:', error);
     }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log(`${LOG_PREFIXES.API} Could not fetch historical accuracy:`, errorMessage);
   }
 
   const finalConfidence = Math.round(

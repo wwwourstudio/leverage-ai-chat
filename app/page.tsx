@@ -357,13 +357,7 @@ export default function UnifiedAIPlatform() {
   // Initialize credits and load real insights on mount
   useEffect(() => {
     fetch('/api/insights')
-      .then(r => {
-        if (!r.ok) {
-          console.log('[v0] Insights API not available (404), using defaults');
-          return { totalValue: 0, winRate: 0, roi: 0 };
-        }
-        return r.json();
-      })
+      .then(r => r.json())
       .then(insights => {
         setMessages((prev: Message[]) => {
           const newMessages = [...prev];
@@ -880,16 +874,7 @@ export default function UnifiedAIPlatform() {
           userMessage,
           context
         })
-      }).then(res => {
-        if (!res.ok) {
-          console.log('[v0] Analyze API not available (404), using fallback');
-          return { success: false, useFallback: true, error: 'API route not available' };
-        }
-        return res.json() as Promise<APIResponse>;
-      }).catch(err => {
-        console.error('[v0] Analyze API error:', err);
-        return { success: false, useFallback: true, error: String(err) };
-      });
+      }).then(res => res.json() as Promise<APIResponse>);
 
       console.log('[v0] Analysis result received:', {
         success: analysisResult.success,

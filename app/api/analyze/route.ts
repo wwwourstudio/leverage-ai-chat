@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { generateText } from 'ai';
 import { randomUUID } from 'crypto';
+import { validateBenford } from '@/lib/benford-validator';
 import {
   AI_CONFIG,
   SYSTEM_PROMPT,
@@ -133,7 +134,7 @@ export async function POST(req: NextRequest) {
     // ALWAYS fetch live odds data for sports queries
     let fetchedOddsData: any[] = [];
     const queryLower = query.toLowerCase();
-    const isSportsQuery = queryLower.includes('odds') || 
+    const isSportsQuery = queryLower.includes('odds') ||
                           queryLower.includes('bet') ||
                           queryLower.includes('prop') ||
                           queryLower.includes('spread') ||
@@ -142,6 +143,18 @@ export async function POST(req: NextRequest) {
                           queryLower.includes('nfl') ||
                           queryLower.includes('mlb') ||
                           queryLower.includes('nhl') ||
+                          queryLower.includes('ncaab') ||
+                          queryLower.includes('ncaaf') ||
+                          queryLower.includes('college basketball') ||
+                          queryLower.includes('college football') ||
+                          queryLower.includes('epl') ||
+                          queryLower.includes('premier league') ||
+                          queryLower.includes('mls') ||
+                          queryLower.includes('soccer') ||
+                          queryLower.includes('wnba') ||
+                          queryLower.includes('mma') ||
+                          queryLower.includes('ufc') ||
+                          queryLower.includes('boxing') ||
                           queryLower.includes('game') ||
                           queryLower.includes('player') ||
                           queryLower.includes('tonight') ||
@@ -155,11 +168,20 @@ export async function POST(req: NextRequest) {
         const { getOddsWithCache } = await import('@/lib/unified-odds-fetcher');
         
         // Determine which sport(s) to fetch
-        const sportKey = context?.sport || 
+        const sportKey = context?.sport ||
           (queryLower.includes('nba') ? 'basketball_nba' :
            queryLower.includes('nfl') ? 'americanfootball_nfl' :
            queryLower.includes('mlb') ? 'baseball_mlb' :
-           queryLower.includes('nhl') ? 'icehockey_nhl' : 'basketball_nba');
+           queryLower.includes('nhl') ? 'icehockey_nhl' :
+           queryLower.includes('ncaab') || queryLower.includes('college basketball') ? 'basketball_ncaab' :
+           queryLower.includes('ncaaf') || queryLower.includes('college football') ? 'americanfootball_ncaaf' :
+           queryLower.includes('epl') || queryLower.includes('premier league') ? 'soccer_epl' :
+           queryLower.includes('mls') || (queryLower.includes('soccer') && queryLower.includes('us')) ? 'soccer_usa_mls' :
+           queryLower.includes('soccer') ? 'soccer_epl' :
+           queryLower.includes('wnba') ? 'basketball_wnba' :
+           queryLower.includes('mma') || queryLower.includes('ufc') ? 'mma_mixed_martial_arts' :
+           queryLower.includes('boxing') ? 'boxing_boxing' :
+           'basketball_nba');
         
         fetchedOddsData = await getOddsWithCache(sportKey, { useCache: true, storeResults: true });
         console.log(`[v0] [API] Fetched ${fetchedOddsData.length} games for ${sportKey}`);
@@ -630,8 +652,8 @@ async function calculateTrustMetrics(
 ) {
   // Extract numbers from AI response for Benford analysis
   const numbers = extractNumbers(aiResponse);
-  const benfordIntegrity = numbers.length >= 10 
-    ? calculateBenfordScore(numbers) 
+  const benfordIntegrity = numbers.length >= 10
+    ? Math.round(validateBenford(numbers).score * 100)
     : 85; // Default if insufficient data
 
   // Calculate odds alignment if odds data available
@@ -724,30 +746,6 @@ function extractNumbers(text: string): number[] {
   const regex = /\b\d+\.?\d*\b/g;
   const matches = text.match(regex);
   return matches ? matches.map(m => parseFloat(m)) : [];
-}
-
-function calculateBenfordScore(numbers: number[]): number {
-  // Simplified Benford's Law check
-  const firstDigits = numbers
-    .filter(n => n >= 1)
-    .map(n => parseInt(n.toString()[0]));
-
-  if (firstDigits.length < 10) return 85;
-
-  const distribution = new Array(10).fill(0);
-  firstDigits.forEach(d => distribution[d]++);
-
-  // Expected Benford distribution for first digit
-  const benfordExpected = [0, 0.301, 0.176, 0.125, 0.097, 0.079, 0.067, 0.058, 0.051, 0.046];
-
-  let deviation = 0;
-  for (let i = 1; i <= 9; i++) {
-    const observed = distribution[i] / firstDigits.length;
-    deviation += Math.abs(observed - benfordExpected[i]);
-  }
-
-  // Convert deviation to score (lower deviation = higher score)
-  return Math.max(50, Math.min(100, 100 - (deviation * 100)));
 }
 
 function calculateOddsAlignment(aiResponse: string, oddsData: any): number {

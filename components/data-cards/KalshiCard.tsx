@@ -58,21 +58,21 @@ export function KalshiCard({
         )}
         {d.ticker && !d.subtitle && <DataRow label="Ticker" value={d.ticker} highlight />}
 
-        {/* Prices */}
+        {/* Prices — values already formatted by kalshiMarketToCard (e.g. "50¢") */}
         {(d.yesPrice !== undefined || d.noPrice !== undefined) && (
           <DataRow
             label="Yes / No"
-            value={`${d.yesPrice !== undefined ? d.yesPrice + '¢' : '—'} / ${d.noPrice !== undefined ? d.noPrice + '¢' : '—'}`}
+            value={`${d.yesPrice ?? '—'} / ${d.noPrice ?? '—'}`}
             highlight
           />
         )}
         {d.impliedProbability !== undefined && (
-          <DataRow label="Implied Prob" value={`${d.impliedProbability}%`} />
+          <DataRow label="Implied Prob" value={String(d.impliedProbability)} />
         )}
 
-        {/* Market depth */}
-        {d.volume !== undefined && <DataRow label="Volume" value={`$${d.volume}`} />}
-        {d.openInterest !== undefined && <DataRow label="Open Interest" value={`$${d.openInterest}`} />}
+        {/* Market depth — volume/openInterest are already locale-formatted numbers */}
+        {d.volume !== undefined && <DataRow label="Volume" value={String(d.volume)} />}
+        {d.openInterest !== undefined && <DataRow label="Open Interest" value={String(d.openInterest)} />}
 
         {/* Timing */}
         {d.closeTime && <DataRow label="Closes" value={d.closeTime} />}

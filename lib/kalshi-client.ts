@@ -118,7 +118,8 @@ export async function fetchKalshiMarkets(params?: {
   }
   
   try {
-    const baseUrl = 'https://api.elections.kalshi.com/trade-api/v2';
+    // Use the main Kalshi trading API; fall back to elections endpoint if unavailable
+    const baseUrl = 'https://trading-api.kalshi.com/trade-api/v2';
     const queryParams = new URLSearchParams({
       limit: limit.toString(),
       status,
@@ -164,17 +165,35 @@ export async function fetchKalshiMarkets(params?: {
     console.log('[v0] [KALSHI] Params:', { category: finalCategory, status, limit, search });
     console.log('[v0] [KALSHI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
-    const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'LeverageAI/1.0'
-      },
-      // Add timeout to prevent hanging
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      'User-Agent': 'LeverageAI/1.0',
+    };
+    // Attach API key if configured
+    const kalshiApiKey = process.env.KALSHI_API_KEY;
+    if (kalshiApiKey) {
+      headers['Authorization'] = `Bearer ${kalshiApiKey}`;
+    }
+
+    let response = await fetch(url, {
+      headers,
       signal: AbortSignal.timeout(10000),
     });
-    
+
     console.log('[v0] [KALSHI] Response status:', response.status, response.statusText);
-    
+
+    // If main API rejects (requires auth we don't have), fall back to the elections endpoint
+    if (!response.ok) {
+      const fallbackBase = 'https://api.elections.kalshi.com/trade-api/v2';
+      const fallbackUrl = `${fallbackBase}/markets?${queryParams}`;
+      console.log('[v0] [KALSHI] Main API unavailable, trying elections fallback:', fallbackUrl);
+      response = await fetch(fallbackUrl, {
+        headers: { 'Accept': 'application/json', 'User-Agent': 'LeverageAI/1.0' },
+        signal: AbortSignal.timeout(10000),
+      });
+      console.log('[v0] [KALSHI] Fallback response status:', response.status, response.statusText);
+    }
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[v0] [KALSHI] ❌ API Error Response:', errorText.substring(0, 500));
@@ -383,7 +402,7 @@ export async function fetchElectionMarkets(options?: {
  */
 export async function getMarketByTicker(ticker: string): Promise<KalshiMarket | null> {
   try {
-    const baseUrl = 'https://api.elections.kalshi.com/trade-api/v2';
+    const baseUrl = 'https://trading-api.kalshi.com/trade-api/v2';
     const url = `${baseUrl}/markets/${ticker}`;
     
     const response = await fetch(url, {

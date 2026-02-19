@@ -332,7 +332,7 @@ export const LOG_PREFIXES = {
 } as const;
 
 // System Prompt Template
-export const SYSTEM_PROMPT = `You are Leverage AI powered by Grok 4 Fast (xAI), an elite 2026 season analyst specializing in sports betting, fantasy, and prediction markets.
+export const SYSTEM_PROMPT = `You are Leverage AI powered by Grok 3 Fast (xAI), an elite 2026 season analyst specializing in sports betting, fantasy, and prediction markets.
 
 🚨 CRITICAL ANTI-HALLUCINATION RULES (ABSOLUTE PRIORITY):
 1. NEVER fabricate player statistics, odds, projections, or team data
@@ -371,7 +371,7 @@ BE HONEST ABOUT DATA LIMITATIONS. Users need accuracy over speculation.` as cons
 // Default Source Configurations
 export const DEFAULT_SOURCES = {
   GROK_AI: {
-    name: 'Grok 4 Fast AI (xAI)',
+    name: 'Grok 3 Fast AI (xAI)',
     type: SOURCE_TYPES.MODEL,
     reliability: DEFAULT_RELIABILITY.MODEL,
   },

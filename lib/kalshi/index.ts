@@ -6,7 +6,6 @@
  * API Documentation: https://trading-api.readme.io/reference/getting-started
  */
 
-const KALSHI_API_BASE_URL = 'https://api.elections.kalshi.com/trade-api/v2';
 const KALSHI_TRADING_URL = 'https://trading-api.kalshi.com/trade-api/v2';
 
 export interface KalshiMarket {
@@ -114,22 +113,16 @@ function parseMarket(m: any): KalshiMarket {
  * Returns parsed markets and the next cursor (null when done).
  */
 async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage> {
-  let response = await fetch(`${KALSHI_TRADING_URL}/markets?${queryParams}`, {
+  const response = await fetch(`${KALSHI_TRADING_URL}/markets?${queryParams}`, {
     headers: buildHeaders(),
     signal: AbortSignal.timeout(10000),
   });
 
   if (!response.ok) {
-    console.log('[KALSHI] Main API failed, trying elections fallback');
-    response = await fetch(`${KALSHI_API_BASE_URL}/markets?${queryParams}`, {
-      headers: { 'Accept': 'application/json', 'User-Agent': 'LeverageAI/1.0' },
-      signal: AbortSignal.timeout(10000),
-    });
-  }
-
-  if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Kalshi API error: ${response.status} ${response.statusText} — ${errorText.substring(0, 200)}`);
+    const hasKey = !!process.env.KALSHI_API_KEY;
+    console.error(`[KALSHI] API error ${response.status} ${response.statusText} (KALSHI_API_KEY set: ${hasKey}) — ${errorText.substring(0, 200)}`);
+    throw new Error(`Kalshi API error: ${response.status} ${response.statusText}`);
   }
 
   const data = await response.json();

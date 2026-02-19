@@ -236,7 +236,7 @@ ${options.summarize ? 'Provide a concise summary of the data trends and importan
 Be concise and focus on actionable insights.
       `.trim();
 
-      // Use Vercel AI Gateway for Grok 4
+      // Use Vercel AI Gateway for Grok 3
       const result = await generateText({
         model: 'xai/grok-3-fast',
         prompt,

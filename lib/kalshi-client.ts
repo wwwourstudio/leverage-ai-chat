@@ -83,14 +83,93 @@ export interface KalshiSeries {
   markets: KalshiMarket[];
 }
 
+/** Internal: one page of Kalshi markets plus the cursor for the next page */
+interface KalshiPage {
+  markets: KalshiMarket[];
+  cursor: string | null;
+}
+
+/** Build Authorization headers, attaching the API key when available */
+function kalshiHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Accept': 'application/json',
+    'User-Agent': 'LeverageAI/1.0',
+  };
+  const key = process.env.KALSHI_API_KEY;
+  if (key) headers['Authorization'] = `Bearer ${key}`;
+  return headers;
+}
+
+/** Parse a raw Kalshi market object into a typed KalshiMarket */
+function parseMarket(m: any): KalshiMarket {
+  return {
+    ticker: m.ticker || '',
+    title: m.title || m.event_title || m.yes_sub_title || m.subtitle || '',
+    category: m.category || m.series_ticker || m.event_ticker || '',
+    subtitle: m.subtitle || m.yes_sub_title || '',
+    yesPrice: m.yes_bid ?? m.yes_ask ?? m.last_price ?? m.floor_strike ?? 0,
+    noPrice: m.no_bid ?? m.no_ask ?? (m.last_price ? (100 - m.last_price) : 100),
+    volume: m.volume ?? m.volume_24h ?? 0,
+    openInterest: m.open_interest ?? 0,
+    closeTime: m.close_time || m.expiration_time || m.end_date || '',
+    status: m.status || 'active',
+  };
+}
+
+/**
+ * Fetch a single page of markets from the Kalshi trading API.
+ * Falls back to the elections endpoint if the main API rejects the request.
+ * Returns the parsed markets and the cursor for the next page (null when done).
+ */
+async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage> {
+  const baseUrl = 'https://trading-api.kalshi.com/trade-api/v2';
+  const url = `${baseUrl}/markets?${queryParams}`;
+
+  let response = await fetch(url, {
+    headers: kalshiHeaders(),
+    signal: AbortSignal.timeout(10000),
+  });
+
+  // Fall back to the elections mirror if the main endpoint rejects us
+  if (!response.ok) {
+    const fallbackUrl = `https://api.elections.kalshi.com/trade-api/v2/markets?${queryParams}`;
+    console.log('[v0] [KALSHI] Main API failed, trying elections fallback');
+    response = await fetch(fallbackUrl, {
+      headers: { 'Accept': 'application/json', 'User-Agent': 'LeverageAI/1.0' },
+      signal: AbortSignal.timeout(10000),
+    });
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Kalshi API error: ${response.status} ${response.statusText} — ${errorText.substring(0, 200)}`);
+  }
+
+  const data = await response.json();
+
+  if (!data.markets || !Array.isArray(data.markets)) {
+    console.warn('[v0] [KALSHI] Unexpected response format, keys:', Object.keys(data).join(', '));
+    return { markets: [], cursor: null };
+  }
+
+  const markets = data.markets
+    .map(parseMarket)
+    .filter((m: KalshiMarket) => m.title && m.title.length > 5);
+
+  // The API returns an empty string cursor (not null) when there are no more pages
+  const cursor = data.cursor && data.cursor !== '' ? data.cursor : null;
+
+  return { markets, cursor };
+}
+
 /**
  * Fetch active markets from Kalshi
- * 
+ *
  * Important: For election markets (2026 H2H, etc.), use category mappings:
  * - 'election' → searches for election-related markets
  * - 'politics' → searches political markets
  * - '2026' → searches 2026 election markets
- * 
+ *
  * For sports markets, use standard abbreviations:
  * - 'NFL', 'NBA', 'MLB', 'NHL'
  */
@@ -99,163 +178,146 @@ export async function fetchKalshiMarkets(params?: {
   status?: 'open' | 'closed';
   limit?: number;
   search?: string;
+  cursor?: string;
   useCache?: boolean;
   cacheTtlMs?: number;
 }): Promise<KalshiMarket[]> {
-  const { category, status = 'open', limit = 20, search, useCache = true, cacheTtlMs = 60000 } = params || {};
-  
-  // Check cache first
-  if (useCache) {
+  const { category, status = 'open', limit = 200, search, cursor, useCache = true, cacheTtlMs = 60000 } = params || {};
+
+  // Check cache first (only when not mid-pagination)
+  if (useCache && !cursor) {
     const cacheKey = getCacheKey({ category, status, limit, search });
     const cached = getCachedMarkets(cacheKey);
-    
+
     if (cached) {
       console.log('[v0] [KALSHI] Returning cached markets');
       return cached;
     }
-    
+
     console.log('[v0] [KALSHI] Cache miss, fetching from API...');
   }
-  
+
   try {
-    // Use the main Kalshi trading API; fall back to elections endpoint if unavailable
-    const baseUrl = 'https://trading-api.kalshi.com/trade-api/v2';
     const queryParams = new URLSearchParams({
-      limit: limit.toString(),
+      limit: Math.min(limit, 1000).toString(),
       status,
     });
-    
-    // Map common keywords to Kalshi categories
-    const categoryMap: Record<string, string> = {
-      'election': 'Elections',
-      'elections': 'Elections',
-      'politics': 'Politics',
-      'political': 'Politics',
-      '2026': 'Elections',
-      'president': 'Elections',
-      'presidential': 'Elections',
+
+    // Keyword → title search mapping (Kalshi doesn't expose category filter directly;
+    // series_ticker expects exact series IDs like "KXBT", not human-readable names)
+    const categorySearchMap: Record<string, string> = {
+      'election': 'election',
+      'elections': 'election',
+      'politics': 'senate',
+      'political': 'senate',
+      '2026': '2026',
+      'president': 'president',
+      'presidential': 'president',
     };
-    
-    // Try to map category to Kalshi's category system
-    let finalCategory = category;
-    if (category && categoryMap[category.toLowerCase()]) {
-      finalCategory = categoryMap[category.toLowerCase()];
+
+    // Use title keyword search when a category is specified
+    if (category) {
+      const titleSearch = categorySearchMap[category.toLowerCase()] ?? category;
+      queryParams.append('title', titleSearch);
     }
-    
-    // Use cursor-based pagination and category filter
-    if (finalCategory) {
-      queryParams.append('series_ticker', finalCategory);
-    }
-    
-    // Add search query if provided - Kalshi uses 'title' param
+
     if (search) {
-      queryParams.append('title', search);
-    }
-    
-    // Add event_ticker for more targeted searches
-    if (category && !finalCategory) {
-      queryParams.append('title', category);
-    }
-    
-    const url = `${baseUrl}/markets?${queryParams}`;
-    
-    console.log('[v0] [KALSHI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('[v0] [KALSHI] Fetching markets from Kalshi API');
-    console.log('[v0] [KALSHI] URL:', url);
-    console.log('[v0] [KALSHI] Params:', { category: finalCategory, status, limit, search });
-    console.log('[v0] [KALSHI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
-    const headers: Record<string, string> = {
-      'Accept': 'application/json',
-      'User-Agent': 'LeverageAI/1.0',
-    };
-    // Attach API key if configured
-    const kalshiApiKey = process.env.KALSHI_API_KEY;
-    if (kalshiApiKey) {
-      headers['Authorization'] = `Bearer ${kalshiApiKey}`;
+      // If category already added a title param, search overrides it
+      queryParams.set('title', search);
     }
 
-    let response = await fetch(url, {
-      headers,
-      signal: AbortSignal.timeout(10000),
-    });
-
-    console.log('[v0] [KALSHI] Response status:', response.status, response.statusText);
-
-    // If main API rejects (requires auth we don't have), fall back to the elections endpoint
-    if (!response.ok) {
-      const fallbackBase = 'https://api.elections.kalshi.com/trade-api/v2';
-      const fallbackUrl = `${fallbackBase}/markets?${queryParams}`;
-      console.log('[v0] [KALSHI] Main API unavailable, trying elections fallback:', fallbackUrl);
-      response = await fetch(fallbackUrl, {
-        headers: { 'Accept': 'application/json', 'User-Agent': 'LeverageAI/1.0' },
-        signal: AbortSignal.timeout(10000),
-      });
-      console.log('[v0] [KALSHI] Fallback response status:', response.status, response.statusText);
+    if (cursor) {
+      queryParams.append('cursor', cursor);
     }
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[v0] [KALSHI] ❌ API Error Response:', errorText.substring(0, 500));
-      throw new Error(`Kalshi API error: ${response.status} ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    console.log('[v0] [KALSHI] ✓ Response received, parsing data...');
-    
-    // Check if we got valid data
-    if (!data.markets || !Array.isArray(data.markets)) {
-      console.error('[v0] [KALSHI] ❌ Unexpected response format');
-      console.error('[v0] [KALSHI] Response keys:', Object.keys(data));
-      console.error('[v0] [KALSHI] Response sample:', JSON.stringify(data).substring(0, 500));
-      return [];
-    }
-    
-    console.log(`[v0] [KALSHI] Raw markets count: ${data.markets.length}`);
-    
-    // Log raw field names from first market for debugging
-    if (data.markets.length > 0) {
-      const sampleKeys = Object.keys(data.markets[0]);
-      console.log('[v0] [KALSHI] Raw market fields:', sampleKeys.join(', '));
-    }
-    
-    const markets: KalshiMarket[] = data.markets.map((m: any) => ({
-      ticker: m.ticker || '',
-      title: m.title || m.event_title || m.yes_sub_title || m.subtitle || '',
-      category: m.category || m.series_ticker || m.event_ticker || '',
-      subtitle: m.subtitle || m.yes_sub_title || '',
-      yesPrice: m.yes_bid ?? m.yes_ask ?? m.last_price ?? m.floor_strike ?? 0,
-      noPrice: m.no_bid ?? m.no_ask ?? (m.last_price ? (100 - m.last_price) : 100),
-      volume: m.volume ?? m.volume_24h ?? 0,
-      openInterest: m.open_interest ?? 0,
-      closeTime: m.close_time || m.expiration_time || m.end_date || '',
-      status: m.status || 'active',
-    }));
-    
-    // Filter out markets with no meaningful data
-    const meaningfulMarkets = markets.filter(m => m.title && m.title.length > 5);
-    
-    console.log(`[v0] [KALSHI] Fetched ${markets.length} raw, ${meaningfulMarkets.length} meaningful markets`);
+    console.log('[v0] [KALSHI] Fetching markets — params:', { category, status, limit, search, cursor: !!cursor });
+
+    const { markets: meaningfulMarkets, cursor: _cursor } = await fetchKalshiPage(queryParams);
+
+    console.log(`[v0] [KALSHI] Fetched ${meaningfulMarkets.length} meaningful markets`);
     console.log('[v0] [KALSHI] Categories:', [...new Set(meaningfulMarkets.map(m => m.category))].filter(Boolean).slice(0, 10).join(', '));
     meaningfulMarkets.slice(0, 3).forEach(m => console.log(`[v0] [KALSHI]   - ${m.title.substring(0, 80)} (${m.category})`));
-    
-    // Store in cache if enabled
-    if (useCache && meaningfulMarkets.length > 0) {
+
+    // Store in cache if enabled (only first page)
+    if (useCache && !cursor && meaningfulMarkets.length > 0) {
       const cacheKey = getCacheKey({ category, status, limit, search });
       cacheMarkets(cacheKey, meaningfulMarkets, cacheTtlMs);
     }
-    
+
     return meaningfulMarkets;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      console.error('[v0] [KALSHI] ❌ Request timeout after 10s - API may be slow or unavailable');
-    } else if (error instanceof Error) {
-      console.error('[v0] [KALSHI] ❌ Failed to fetch markets:', error.message);
+      console.error('[v0] [KALSHI] ❌ Request timeout after 10s');
     } else {
-      console.error('[v0] [KALSHI] ❌ Unknown error:', error);
+      console.error('[v0] [KALSHI] ❌ Failed to fetch markets:', error instanceof Error ? error.message : error);
     }
     return [];
   }
+}
+
+/**
+ * Fetch ALL open Kalshi markets across every category using cursor-based pagination.
+ * Streams through pages until the API returns no more results or maxMarkets is reached.
+ * Default cap: 2000 markets to avoid runaway fetches.
+ */
+export async function fetchAllKalshiMarkets(options?: {
+  maxMarkets?: number;
+  status?: 'open' | 'closed';
+  useCache?: boolean;
+}): Promise<KalshiMarket[]> {
+  const { maxMarkets = 2000, status = 'open', useCache = true } = options || {};
+
+  const cacheKey = `kalshi:all:${status}:${maxMarkets}`;
+  if (useCache) {
+    const cached = getCachedMarkets(cacheKey);
+    if (cached) {
+      console.log(`[v0] [KALSHI] All-markets cache hit: ${cached.length} markets`);
+      return cached;
+    }
+  }
+
+  console.log(`[v0] [KALSHI] Fetching ALL markets (cap: ${maxMarkets})...`);
+
+  const all: KalshiMarket[] = [];
+  const seen = new Set<string>();
+  let cursor: string | null = null;
+  let page = 0;
+
+  do {
+    page++;
+    const queryParams = new URLSearchParams({
+      limit: '1000',
+      status,
+    });
+    if (cursor) queryParams.append('cursor', cursor);
+
+    try {
+      const { markets, cursor: nextCursor } = await fetchKalshiPage(queryParams);
+
+      for (const m of markets) {
+        if (!seen.has(m.ticker)) {
+          seen.add(m.ticker);
+          all.push(m);
+        }
+      }
+
+      cursor = nextCursor;
+      console.log(`[v0] [KALSHI] Page ${page}: +${markets.length} markets (total: ${all.length}), nextCursor: ${cursor ? 'yes' : 'done'}`);
+    } catch (err) {
+      console.error(`[v0] [KALSHI] Pagination error on page ${page}:`, err instanceof Error ? err.message : err);
+      break;
+    }
+  } while (cursor && all.length < maxMarkets);
+
+  console.log(`[v0] [KALSHI] Done — ${all.length} total markets across ${page} pages`);
+  const categories = [...new Set(all.map(m => m.category))].filter(Boolean);
+  console.log(`[v0] [KALSHI] Categories (${categories.length}):`, categories.slice(0, 20).join(', '));
+
+  if (useCache && all.length > 0) {
+    cacheMarkets(cacheKey, all, 120000); // 2-minute cache for full fetch
+  }
+
+  return all;
 }
 
 /**
@@ -308,24 +370,85 @@ export async function fetchKalshiMarketsWithRetry(params?: {
 }
 
 /**
- * Fetch sports-related markets from Kalshi
+ * Fetch sports-related markets from Kalshi.
+ * Searches across all supported sports using keyword title searches and deduplicates by ticker.
  */
 export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
-  try {
-    // Fetch markets from various sports categories
-    const categories = ['NFL', 'NBA', 'MLB', 'NHL'];
-    const allMarkets: KalshiMarket[] = [];
-    
-    for (const category of categories) {
-      const markets = await fetchKalshiMarkets({ category, limit: 10 });
-      allMarkets.push(...markets);
+  // These are keyword searches sent as the `title` param to Kalshi's markets endpoint.
+  // Each entry fetches up to 100 markets matching that keyword.
+  const sportSearches = [
+    // American football
+    { search: 'NFL', label: 'NFL' },
+    { search: 'Super Bowl', label: 'Super Bowl' },
+    { search: 'NCAAF', label: 'NCAAF' },
+    // Basketball
+    { search: 'NBA', label: 'NBA' },
+    { search: 'NCAAB', label: 'NCAAB' },
+    { search: 'March Madness', label: 'March Madness' },
+    // Baseball
+    { search: 'MLB', label: 'MLB' },
+    { search: 'World Series', label: 'World Series' },
+    // Hockey
+    { search: 'NHL', label: 'NHL' },
+    { search: 'Stanley Cup', label: 'Stanley Cup' },
+    // Soccer
+    { search: 'Premier League', label: 'EPL' },
+    { search: 'Champions League', label: 'UCL' },
+    { search: 'World Cup', label: 'World Cup' },
+    { search: 'MLS', label: 'MLS' },
+    { search: 'La Liga', label: 'La Liga' },
+    { search: 'Bundesliga', label: 'Bundesliga' },
+    // Tennis
+    { search: 'US Open tennis', label: 'Tennis US Open' },
+    { search: 'Wimbledon', label: 'Wimbledon' },
+    { search: 'French Open', label: 'French Open' },
+    { search: 'Australian Open', label: 'Australian Open' },
+    // Combat sports
+    { search: 'UFC', label: 'UFC' },
+    { search: 'boxing', label: 'Boxing' },
+    // Golf
+    { search: 'Masters', label: 'Masters' },
+    { search: 'PGA', label: 'PGA' },
+    // Racing
+    { search: 'Formula 1', label: 'F1' },
+    { search: 'NASCAR', label: 'NASCAR' },
+    // Other
+    { search: 'WNBA', label: 'WNBA' },
+    { search: 'college football', label: 'CFB' },
+    { search: 'college basketball', label: 'CBB' },
+  ];
+
+  const seen = new Set<string>();
+  const allMarkets: KalshiMarket[] = [];
+
+  console.log(`[v0] [KALSHI] Fetching sports markets across ${sportSearches.length} categories...`);
+
+  // Batch into groups of 5 concurrent requests to avoid hammering the API
+  const batchSize = 5;
+  for (let i = 0; i < sportSearches.length; i += batchSize) {
+    const batch = sportSearches.slice(i, i + batchSize);
+    const results = await Promise.allSettled(
+      batch.map(({ search }) => fetchKalshiMarkets({ search, limit: 100, useCache: true }))
+    );
+
+    for (let j = 0; j < results.length; j++) {
+      const result = results[j];
+      if (result.status === 'fulfilled') {
+        for (const market of result.value) {
+          if (!seen.has(market.ticker)) {
+            seen.add(market.ticker);
+            allMarkets.push(market);
+          }
+        }
+        console.log(`[v0] [KALSHI] ${batch[j].label}: ${result.value.length} markets`);
+      } else {
+        console.warn(`[v0] [KALSHI] ${batch[j].label} failed:`, result.reason);
+      }
     }
-    
-    return allMarkets;
-  } catch (error) {
-    console.error('[v0] [KALSHI] Failed to fetch sports markets:', error);
-    return [];
   }
+
+  console.log(`[v0] [KALSHI] Sports markets total: ${allMarkets.length} (deduplicated)`);
+  return allMarkets;
 }
 
 /**
@@ -526,27 +649,60 @@ export function analyzeKalshiVolatility(
 }
 
 /**
- * Fetch Kalshi cards for a specific sport
+ * Fetch Kalshi cards for a specific sport.
+ * Uses title keyword search so any sport with a recognisable name will work.
  */
 export async function getKalshiCardsForSport(sport: string, limit: number = 3): Promise<any[]> {
-  const sportCategoryMap: Record<string, string> = {
+  // Map Odds-API style sport keys to human-readable Kalshi search terms
+  const sportSearchMap: Record<string, string> = {
+    // American football
     nfl: 'NFL',
-    nba: 'NBA',
-    mlb: 'MLB',
-    nhl: 'NHL',
     americanfootball_nfl: 'NFL',
+    ncaaf: 'NCAAF',
+    americanfootball_ncaaf: 'college football',
+    // Basketball
+    nba: 'NBA',
     basketball_nba: 'NBA',
+    ncaab: 'NCAAB',
+    basketball_ncaab: 'college basketball',
+    basketball_euroleague: 'Euroleague',
+    basketball_nbl: 'NBL',
+    wnba: 'WNBA',
+    basketball_wnba: 'WNBA',
+    // Baseball
+    mlb: 'MLB',
     baseball_mlb: 'MLB',
+    // Hockey
+    nhl: 'NHL',
     icehockey_nhl: 'NHL',
+    // Soccer
+    soccer_epl: 'Premier League',
+    epl: 'Premier League',
+    soccer_spain_la_liga: 'La Liga',
+    soccer_germany_bundesliga: 'Bundesliga',
+    soccer_italy_serie_a: 'Serie A',
+    soccer_france_ligue_one: 'Ligue 1',
+    soccer_uefa_champs_league: 'Champions League',
+    soccer_usa_mls: 'MLS',
+    mls: 'MLS',
+    // Tennis
+    tennis_atp: 'tennis',
+    tennis_wta: 'tennis',
+    // Combat
+    mma_mixed_martial_arts: 'UFC',
+    mma: 'UFC',
+    boxing_boxing: 'boxing',
+    boxing: 'boxing',
+    // Golf
+    golf_pga_championship: 'PGA',
+    golf: 'PGA',
+    // Racing
+    f1: 'Formula 1',
+    nascar: 'NASCAR',
   };
-  
-  const category = sportCategoryMap[sport.toLowerCase()];
-  
-  if (!category) {
-    console.log(`[v0] [KALSHI] No category mapping for sport: ${sport}`);
-    return [];
-  }
-  
-  const markets = await fetchKalshiMarkets({ category, limit });
+
+  const search = sportSearchMap[sport.toLowerCase()] ?? sport;
+
+  const markets = await fetchKalshiMarkets({ search, limit });
   return markets.map(kalshiMarketToCard);
 }

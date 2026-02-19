@@ -192,27 +192,27 @@ export async function POST(req: NextRequest) {
 
     // Detect if this is a Kalshi query and fetch REAL market data
     let kalshiMarkets: any[] | null = null;
-    const isKalshiQuery = queryLower.includes('kalshi') || 
-                          queryLower.includes('election') || 
+    const isKalshiQuery = queryLower.includes('kalshi') ||
+                          queryLower.includes('election') ||
                           queryLower.includes('prediction market') ||
                           queryLower.includes('h2h') ||
                           queryLower.includes('trump') ||
                           queryLower.includes('harris');
-    
+
     if (isKalshiQuery) {
-      console.log('[v0] [API] Kalshi query detected - fetching REAL market data from Kalshi API');
+      console.log('[v0] [API] Kalshi query detected - fetching ALL available markets from Kalshi API');
       try {
-        const { fetchKalshiMarketsWithRetry } = await import('@/lib/kalshi-client');
-        
-        // Fetch ALL markets from Kalshi
-        kalshiMarkets = await fetchKalshiMarketsWithRetry({
+        const { fetchAllKalshiMarkets } = await import('@/lib/kalshi-client');
+
+        // Fetch ALL open Kalshi markets across every category using pagination
+        kalshiMarkets = await fetchAllKalshiMarkets({
           status: 'open',
-          limit: 50,
-          maxRetries: 3
+          maxMarkets: 2000,
+          useCache: true,
         });
-        
+
         console.log(`[v0] [API] Kalshi markets fetched: ${kalshiMarkets.length} markets`);
-        
+
         if (kalshiMarkets.length > 0) {
           console.log('[v0] [API] Kalshi categories:', [...new Set(kalshiMarkets.map((m: any) => m.category))].join(', '));
         }
@@ -363,22 +363,36 @@ export async function POST(req: NextRequest) {
     // Add REAL Kalshi market data if available
     if (kalshiMarkets && kalshiMarkets.length > 0) {
       console.log('[v0] Adding Kalshi market data to prompt');
-      
-      // Format top markets for the AI
-      const topMarkets = kalshiMarkets.slice(0, 20);
-      const kalshiData = topMarkets.map((market: any, idx: number) => {
-        return `${idx + 1}. ${market.title}\n` +
-               `   Category: ${market.category}\n` +
-               `   Yes: ${market.yesPrice}¢ | No: ${market.noPrice}¢\n` +
-               `   Volume: $${market.volume} | Open Interest: ${market.openInterest}`;
-      }).join('\n\n');
-      
-      userPrompt += `\n\n📊 REAL KALSHI PREDICTION MARKETS (Live Data):\n\n${kalshiData}\n\n` +
-                   `Total Markets Available: ${kalshiMarkets.length}\n` +
-                   `Categories: ${[...new Set(kalshiMarkets.map((m: any) => m.category))].slice(0, 10).join(', ')}\n\n` +
+
+      // Group markets by category so the AI can reason across all types
+      const byCategory: Record<string, any[]> = {};
+      for (const m of kalshiMarkets) {
+        const cat = m.category || 'Other';
+        if (!byCategory[cat]) byCategory[cat] = [];
+        byCategory[cat].push(m);
+      }
+
+      // Include up to 50 markets in the prompt (up from 20), sorted by volume descending
+      const sorted = [...kalshiMarkets].sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0));
+      const topMarkets = sorted.slice(0, 50);
+
+      const kalshiData = topMarkets.map((market: any, idx: number) =>
+        `${idx + 1}. ${market.title}\n` +
+        `   Category: ${market.category}\n` +
+        `   Yes: ${market.yesPrice}¢ | No: ${market.noPrice}¢\n` +
+        `   Volume: $${(market.volume ?? 0).toLocaleString()} | Open Interest: ${(market.openInterest ?? 0).toLocaleString()}`
+      ).join('\n\n');
+
+      const allCategories = Object.keys(byCategory).sort();
+
+      userPrompt += `\n\n📊 REAL KALSHI PREDICTION MARKETS (Live Data — ALL available markets):\n\n` +
+                   `Total Markets: ${kalshiMarkets.length} across ${allCategories.length} categories\n` +
+                   `Categories: ${allCategories.join(', ')}\n\n` +
+                   `Top 50 by Volume:\n\n${kalshiData}\n\n` +
                    `IMPORTANT: Use this REAL Kalshi data to analyze prediction market opportunities. ` +
-                   `Prices are in cents (¢). Calculate implied probabilities and identify mispriced markets.`;
-      
+                   `Prices are in cents (¢). Implied probability = yesPrice / 100. ` +
+                   `Identify mispriced markets, surface edges, and compare across categories.`;
+
       console.log('[v0] ✓ Added Kalshi market data to AI prompt');
     } else if (isKalshiQuery) {
       console.log('[v0] ⚠️ Kalshi query detected but no markets found');

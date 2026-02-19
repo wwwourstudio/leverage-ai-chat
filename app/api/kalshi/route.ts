@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { fetchKalshiMarkets, fetchSportsMarkets, fetchElectionMarkets, getMarketByTicker, kalshiMarketToCard } from '@/lib/kalshi-client';
+import { fetchKalshiMarkets, fetchAllKalshiMarkets, fetchSportsMarkets, fetchElectionMarkets, getMarketByTicker, kalshiMarketToCard } from '@/lib/kalshi-client';
 
 export const runtime = 'edge';
 
@@ -89,15 +89,20 @@ export async function GET(request: Request) {
       finalCategory = sportCategoryMap[sport.toLowerCase()];
     }
     
-    // Fetch markets based on category or all sports
+    // Fetch markets based on type/category requested
     let markets;
-    if (type === 'sports' || finalCategory) {
-      markets = finalCategory 
+    if (type === 'all') {
+      // Paginate through every available Kalshi market
+      markets = await fetchAllKalshiMarkets({ status: 'open', maxMarkets: 2000 });
+    } else if (type === 'sports') {
+      markets = finalCategory
         ? await fetchKalshiMarkets({ category: finalCategory, limit })
         : await fetchSportsMarkets();
+    } else if (finalCategory) {
+      markets = await fetchKalshiMarkets({ category: finalCategory, limit });
     } else {
-      // Fetch all available markets
-      markets = await fetchKalshiMarkets({ limit });
+      // Default: paginate through all markets (same as type=all but respects limit)
+      markets = await fetchAllKalshiMarkets({ status: 'open', maxMarkets: limit > 200 ? limit : 2000 });
     }
     
     console.log(`[v0] [API] [KALSHI] ✓ Returning ${markets.length} markets`);

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { generateText } from 'ai';
 import { xai } from '@ai-sdk/xai';
 import {

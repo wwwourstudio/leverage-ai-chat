@@ -1,16 +1,19 @@
 /**
- * Server Component Wrapper for Main Chat Interface
- *
- * Fetches initial data server-side for better performance and SEO.
- * Passes pre-fetched data to client component for hydration.
- *
- * @module app/page-wrapper
+ * Main Chat Interface
+ * 
+ * Production-ready AI sports betting assistant with real-time data integration.
+ * Features:
+ * - Real-time player projections from The Odds API
+ * - Trust metrics and confidence scoring
+ * - Context-aware suggestions
+ * - File attachments (images, CSV)
+ * - Chat history with edit/regenerate
+ * - Mobile-optimized UI
+ * 
+ * @module app/page
  */
 
-import { Suspense } from 'react';
-import { loadServerData, type ServerDataResult } from '@/lib/server-data-loader';
-import { logEnvValidation, validateServerEnv } from '@/lib/env-validator';
-import UnifiedAIPlatform from './page-client';
+'use client';
 
 import { useState, useRef, useEffect } from 'react';
 import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data-service';
@@ -35,13 +38,10 @@ interface FileAttachment {
   type: 'image' | 'csv';
   url: string;
   size: number;
-  data?: {
-    headers: string[];
-    rows: string[][];
-  };
+  data?: any; // For CSV parsed data
 }
 
-interface APIResponse<T = unknown> {
+interface APIResponse<T = any> {
   success: boolean;
   error?: string;
   data?: T;
@@ -62,17 +62,12 @@ interface APIResponse<T = unknown> {
   errorType?: string; // Type of error that occurred
 }
 
-interface OddsMarket {
-  key: string;
-  outcomes: Array<{ name: string; price: number; point?: number }>;
-}
-
 interface OddsEvent {
   sport_title: string;
   bookmakers?: Array<{
     key: string;
     title: string;
-    markets: OddsMarket[];
+    markets: any[];
   }>;
 }
 
@@ -136,7 +131,7 @@ interface Chat {
 interface InsightCard {
   type: string;
   title: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: any;
   category: string;
   subcategory: string;
   gradient: string;
@@ -144,34 +139,154 @@ interface InsightCard {
   status: string;
 }
 
-async function fetchInitialServerData(): Promise<ServerDataProps> {
-  console.log('[v0] Server: === Page Load - Fetching All Data ===');
-
-  // Log environment validation for debugging
-  const envValidation = validateServerEnv();
-  logEnvValidation(envValidation, 'server');
-
-  // Use enhanced data loader with parallel fetching and comprehensive error handling
-  const serverData = await loadServerData({
-    category: 'all',
-    limit: 12,
-    includeKalshi: true,
-    includeOdds: true,
-  });
-
-  // Log data fetch results
-  console.log('[v0] Server: Data fetch summary:');
-  console.log('  - Cards:', serverData.initialCards.length);
-  console.log('  - Session:', serverData.userSession ? 'authenticated' : 'anonymous');
-  console.log('  - Sources:', serverData.dataSourcesUsed.join(', '));
-  console.log('  - Missing Keys:', serverData.missingKeys.length);
-  console.log('  - Errors:', serverData.fetchErrors.length);
-
-  return serverData;
+export interface ServerDataProps {
+  initialCards: any[];
+  initialInsights: any;
+  userSession: any;
+  serverTime: string;
+  missingKeys: string[];
+  envErrors: string[];
+  dataSourcesUsed: string[];
+  fetchErrors: string[];
 }
 
-export default async function Page() {
-  const serverData = await fetchInitialServerData();
+interface UnifiedAIPlatformProps {
+  serverData?: ServerDataProps;
+}
+
+export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps) {
+  // Dynamic welcome message based on time, category, and sport season
+  const getWelcomeMessage = (category: string) => {
+    // Use server time to prevent hydration mismatch
+    const now = serverData?.serverTime ? new Date(serverData.serverTime) : new Date();
+    const hour = now.getHours();
+    const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    
+    const categoryMessages: Record<string, string> = {
+      betting: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is scanning live odds across all major sportsbooks. Ask me about tonight's lines, player props, sharp money, or arbitrage opportunities.`,
+      fantasy: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is ready for fantasy analysis. Ask about draft strategy, waiver targets, trade values, or bestball stacking for NFBC/NFFC.`,
+      dfs: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is optimizing DFS lineups. Ask about optimal builds, ownership leverage, captain picks, or correlation stacks for DraftKings and FanDuel.`,
+      kalshi: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is monitoring Kalshi prediction markets in real-time. Ask about election contracts, weather markets, economic events, or cross-market arbitrage.`,
+      all: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** - Powered by Grok AI\n\nI'm connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.`
+    };
+    
+    return categoryMessages[category] || categoryMessages.all;
+  };
+
+  const [messages, setMessages] = useState<Message[]>([
+    {
+  role: 'assistant',
+  content: getWelcomeMessage('all'),
+  timestamp: serverData?.serverTime ? new Date(serverData.serverTime) : new Date(),
+  isWelcome: true,
+  cards: [],
+  insights: {
+  totalValue: 0,
+  winRate: 0,
+        roi: 0,
+        activeContests: 0,
+        totalInvested: 0
+      }
+    }
+  ]);
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeChat, setActiveChat] = useState('chat-1');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [editingChatId, setEditingChatId] = useState<string | null>(null);
+  const [editingChatTitle, setEditingChatTitle] = useState('');
+  const [showLimitNotification, setShowLimitNotification] = useState(false);
+  const [chatsRemaining, setChatsRemaining] = useState(5);
+  const [creditsRemaining, setCreditsRemaining] = useState(15);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showSignupModal, setShowSignupModal] = useState(false);
+  const [purchaseAmount, setPurchaseAmount] = useState('');
+  const [isLoggedIn, setIsLoggedIn] = useState(!!serverData?.userSession);
+  const [user, setUser] = useState<{ name: string; email: string; avatar?: string } | null>(
+    serverData?.userSession ? {
+      name: serverData.userSession.user.name,
+      email: serverData.userSession.user.email,
+    } : null
+  );
+  const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
+  const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string }>>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Pre-load initial cards from server-side data
+  useEffect(() => {
+    if (serverData?.initialCards && serverData.initialCards.length > 0) {
+      console.log('[v0] Client: Pre-loading', serverData.initialCards.length, 'server-fetched cards');
+      console.log('[v0] Client: Data sources used:', serverData.dataSourcesUsed?.join(', ') || 'none');
+      
+      if (serverData.fetchErrors && serverData.fetchErrors.length > 0) {
+        console.warn('[v0] Client: Data fetch had errors:', serverData.fetchErrors);
+      }
+      
+      if (serverData.missingKeys && serverData.missingKeys.length > 0) {
+        console.warn('[v0] Client: Missing API keys:', serverData.missingKeys.join(', '));
+      }
+      
+      setMessages(prev => {
+        const welcomeMsg = prev[0];
+        return [{
+          ...welcomeMsg,
+          cards: serverData.initialCards as any[]
+        }];
+      });
+    } else {
+      console.log('[v0] Client: No server-fetched cards available, will fetch dynamically');
+    }
+  }, [serverData?.initialCards, serverData?.fetchErrors, serverData?.missingKeys, serverData?.dataSourcesUsed]);
+  
+  // Credit system utilities
+  const MESSAGE_LIMIT = 15;
+  const CHAT_LIMIT = 10;
+  const LIMIT_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+  const getCreditData = () => {
+    if (typeof window === 'undefined') return { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
+    const data = localStorage.getItem('userCredits');
+    if (!data) {
+      const initial = { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
+      localStorage.setItem('userCredits', JSON.stringify(initial));
+      return initial;
+    }
+    const parsed = JSON.parse(data);
+    // Check if reset time has passed
+    if (Date.now() > parsed.resetTime) {
+      const reset = { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
+      localStorage.setItem('userCredits', JSON.stringify(reset));
+      return reset;
+    }
+    return parsed;
+  };
+
+  const consumeCredit = () => {
+    const data = getCreditData();
+    if (data.credits <= 0) {
+      setShowPurchaseModal(true);
+      return false;
+    }
+    const updated = { ...data, credits: data.credits - 1 };
+    localStorage.setItem('userCredits', JSON.stringify(updated));
+    setCreditsRemaining(updated.credits);
+    return true;
+  };
+
+  const addCredits = (amount: number): void => {
+    const data = getCreditData();
+    const updated = { ...data, credits: data.credits + amount };
+    localStorage.setItem('userCredits', JSON.stringify(updated));
+    setCreditsRemaining(updated.credits);
+  };
 
   const getRateLimitData = () => {
     if (typeof window === 'undefined') return { count: 0, resetTime: Date.now() + LIMIT_DURATION };
@@ -206,24 +321,24 @@ export default async function Page() {
   // Check Supabase auth session on mount
   useEffect(() => {
     (async () => {
-      try {
-        const supabase = createClient();
+  try {
+  const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
           setIsLoggedIn(true);
           setUser({
-            name: (session.user.user_metadata?.full_name as string) || session.user.email?.split('@')[0] || 'User',
+            name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
             email: session.user.email || ''
           });
         }
         
         // Listen for auth changes (OAuth redirect, signout, etc.)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: unknown, session: { user: { user_metadata?: Record<string, unknown>; email?: string } } | null) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
           if (session?.user) {
             setIsLoggedIn(true);
             setUser({
-              name: (session.user.user_metadata?.full_name as string) || session.user.email?.split('@')[0] || 'User',
+              name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
               email: session.user.email || ''
             });
             setShowLoginModal(false);
@@ -237,7 +352,6 @@ export default async function Page() {
         return () => subscription.unsubscribe();
       } catch (err) {
         console.error('[v0] Auth check failed:', err);
-        return undefined;
       }
     })();
   }, []);
@@ -245,14 +359,8 @@ export default async function Page() {
   // Initialize credits and load real insights on mount
   useEffect(() => {
     fetch('/api/insights')
-      .then(r => {
-        if (!r.ok) throw new Error(`Insights API returned ${r.status}`);
-        const ct = r.headers.get('content-type') || '';
-        if (!ct.includes('application/json')) throw new Error('Non-JSON response from insights');
-        return r.json();
-      })
-      .then(result => {
-        const insights = result?.insights ?? result;
+      .then(r => r.json())
+      .then(insights => {
         setMessages((prev: Message[]) => {
           const newMessages = [...prev];
           if (newMessages[0]?.isWelcome) {
@@ -275,21 +383,12 @@ export default async function Page() {
       id: 'chat-1',
       title: 'New Chat',
       preview: 'Start a conversation to get real-time sports betting insights...',
-      timestamp: new Date(0),
+      timestamp: new Date(),
       starred: false,
       category: 'all',
       tags: []
     }
   ]);
-
-  // Hydrate chat timestamp client-side
-  useEffect(() => {
-    setChats(prev => prev.map(chat =>
-      chat.id === 'chat-1' && chat.timestamp.getTime() === 0
-        ? { ...chat, timestamp: new Date() }
-        : chat
-    ));
-  }, []);
 
   const categories = [
     { id: 'all', name: 'All', icon: Layers, color: 'text-blue-400', desc: 'Everything' },
@@ -342,13 +441,13 @@ export default async function Page() {
 
   const generateContextualSuggestions = (userMessage: string, responseCards: InsightCard[]) => {
     const msgLower = userMessage.toLowerCase();
-    const suggestions: Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }> = [];
+    const suggestions: Array<{ label: string; icon: any; category: string }> = [];
     
     console.log('[v0] ==========================================');
       console.log('[v0] GENERATING CONTEXTUAL SUGGESTIONS');
       console.log('[v0] User message:', userMessage);
       console.log('[v0] Response cards received:', responseCards.length);
-      console.log('[v0] Card details:', responseCards.map((c: InsightCard) => ({ type: c.type, category: c.category })));
+      console.log('[v0] Card details:', responseCards.map((c: any) => ({ type: c.type, category: c.category })));
     
     // Analyze the AI's response cards to understand what was provided
     const cardTypes = responseCards.map(card => card.type);
@@ -541,7 +640,7 @@ export default async function Page() {
     return uniqueSuggestions.slice(0, 7);
   };
 
-  const handleFollowUp = (action: 'correlated' | 'metrics', _cardData?: InsightCard) => {
+  const handleFollowUp = (action: 'correlated' | 'metrics', cardData?: any) => {
     console.log('[v0] Generating follow-up response:', action);
     
     // Check if user has credits
@@ -633,15 +732,15 @@ export default async function Page() {
       // Override isPoliticalMarket if platform is kalshi
       const finalIsPoliticalMarket = isPoliticalMarket || detectedPlatform === 'kalshi';
       
-    const context: QueryContext = {
-      sport: detectedSport,
-      marketType: extractMarketType(userMessage),
-      platform: detectedPlatform,
-      isSportsQuery,
-      isPoliticalMarket: finalIsPoliticalMarket,
-      hasBettingIntent,
-      previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }))
-    };
+      const context: any = {
+        sport: detectedSport,
+        marketType: extractMarketType(userMessage),
+        platform: detectedPlatform,
+        isSportsQuery,
+        isPoliticalMarket: finalIsPoliticalMarket,
+        hasBettingIntent,
+        previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }))
+      };
 
       if (isDev) {
         console.log('[v0] Extracted context:', context);
@@ -687,7 +786,8 @@ export default async function Page() {
               if (oddsResult?.events?.length > 0) {
                 const sportName = sportKey.replace('_', ' ').toUpperCase();
                 if (isDev) console.log(`[v0] ✅ Found ${oddsResult.events.length} live games in ${sportName}`);
-                context.oddsData = { ...oddsResult, sport: sportKey };
+                context.oddsData = oddsResult;
+                context.oddsData.sport = sportKey;
               } else {
                 if (isDev) console.log('[NO GAMES FOUND]', context.sport);
                 // NO fallback - return status indicating no games
@@ -731,7 +831,8 @@ export default async function Page() {
                 if (oddsResult?.events?.length > 0) {
                   const sportName = sportKey.replace('_', ' ').toUpperCase();
                   if (isDev) console.log(`[v0] ✅ Fallback success - Found ${oddsResult.events.length} games in ${sportName}`);
-                  context.oddsData = { ...oddsResult, sport: sportKey };
+                  context.oddsData = oddsResult;
+                  context.oddsData.sport = sportKey;
                   foundData = true;
                   break;
                 }
@@ -755,25 +856,20 @@ export default async function Page() {
           fetched: context.oddsData.sport
         });
         // Clear contaminated data
-        context.oddsData = undefined;
+        context.oddsData = undefined as any;
         context.crossSportError = true;
         }
       }
       
       // Fetch real data from our API routes
-      const analysisRes = await fetch('/api/analyze', {
+      const analysisResult = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userMessage, context })
-      });
-
-      let analysisResult: APIResponse;
-      const ct = analysisRes.headers.get('content-type') || '';
-      if (!ct.includes('application/json')) {
-        analysisResult = { success: false, error: `Unexpected response (${analysisRes.status})` };
-      } else {
-        analysisResult = await analysisRes.json();
-      }
+        body: JSON.stringify({
+          userMessage,
+          context
+        })
+      }).then(res => res.json() as Promise<APIResponse>);
       
       console.log('[v0] Analysis result received:', {
         success: analysisResult.success,
@@ -959,7 +1055,7 @@ export default async function Page() {
     return null;
   };
 
-  const selectRelevantCards = async (userMessage: string, context?: QueryContext): Promise<InsightCard[]> => {
+  const selectRelevantCards = async (userMessage: string, context?: any): Promise<InsightCard[]> => {
     const msgLower = userMessage.toLowerCase();
     
     // Extract sport and category from message
@@ -1030,7 +1126,7 @@ export default async function Page() {
     }
     
     // Map icon string to actual icon component
-    const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+    const iconMap: Record<string, any> = {
       'Zap': Zap,
       'Target': Target,
       'Award': Award,
@@ -1112,11 +1208,7 @@ export default async function Page() {
         const text = await file.text();
         const delimiter = file.name.endsWith('.tsv') || fileType === 'text/tab-separated-values' ? '\t' : ',';
         const parsed = parseDelimitedFile(text, delimiter);
-        // Store the parsed data with headers and rows
-        attachment.data = {
-          headers: parsed.headers,
-          rows: parsed.rows
-        };
+        attachment.data = parsed;
       }
 
       newAttachments.push(attachment);
@@ -1309,9 +1401,285 @@ export default async function Page() {
     setMessages(newMessages);
     generateRealResponse(editingContent);
   }
+  }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageIndex(null);
+    setEditingContent('');
+  };
+
+  const handleCopyMessage = (content: string) => {
+    navigator.clipboard.writeText(content);
+    console.log('[v0] Message copied to clipboard');
+  };
+
+  const handleRegenerateResponse = (index: number) => {
+    if (index > 0 && messages[index - 1].role === 'user') {
+      const userMessage = messages[index - 1].content;
+      const newMessages = messages.slice(0, index);
+      setMessages(newMessages);
+      generateRealResponse(userMessage);
+    }
+  };
+
+  const handleVote = (index: number, direction: 'up' | 'down') => {
+    // Placeholder for vote handling logic
+    console.log(`Vote ${direction} on message ${index}`);
+  };
+
+  const handleEditChatTitle = (chatId: string, currentTitle: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingChatId(chatId);
+    setEditingChatTitle(currentTitle);
+  };
+
+  const handleSaveChatTitle = (chatId: string) => {
+    if (editingChatTitle.trim()) {
+      setChats(chats.map(chat =>
+        chat.id === chatId ? { ...chat, title: editingChatTitle.trim() } : chat
+      ));
+    }
+    setEditingChatId(null);
+    setEditingChatTitle('');
+  };
+
+  const handleCancelChatTitleEdit = () => {
+    setEditingChatId(null);
+    setEditingChatTitle('');
+  };
+
+  const handleKeyDownChatTitle = (e: React.KeyboardEvent, chatId: string) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSaveChatTitle(chatId);
+    } else if (e.key === 'Escape') {
+      handleCancelChatTitleEdit();
+    }
+  };
+
+  const adjustTextareaHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e as any);
+    }
+  };
+
+  const formatTimestamp = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const getStatusBadge = (status: string) => {
+    const badges: Record<string, any> = {
+      hot: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30', icon: Flame, label: 'HOT' },
+      value: { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/30', icon: DollarSign, label: 'VALUE' },
+      optimal: { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/30', icon: Award, label: 'OPTIMAL' },
+      strong: { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/30', icon: CheckCircle, label: 'STRONG' },
+      target: { bg: 'bg-teal-500/20', text: 'text-teal-400', border: 'border-teal-500/30', icon: Target, label: 'TARGET' },
+      elite: { bg: 'bg-purple-600/20', text: 'text-purple-300', border: 'border-purple-600/30', icon: Medal, label: 'ELITE' },
+      sleeper: { bg: 'bg-indigo-500/20', text: 'text-indigo-400', border: 'border-indigo-500/30', icon: Zap, label: 'SLEEPER' },
+      opportunity: { bg: 'bg-cyan-500/20', text: 'text-cyan-400', border: 'border-cyan-500/30', icon: BarChart3, label: 'OPPORTUNITY' },
+      edge: { bg: 'bg-orange-500/20', text: 'text-orange-400', border: 'border-orange-500/30', icon: TrendingUp, label: 'EDGE' },
+      synergy: { bg: 'bg-violet-500/20', text: 'text-violet-400', border: 'border-violet-500/30', icon: Sparkles, label: 'SYNERGY' }
+    };
+    return badges[status] || badges.value;
+  };
+
+  const _renderInsightCard = (card: InsightCard, index: number) => {
+    // Validate card data before rendering
+    if (!card || typeof card !== 'object') {
+      return null;
+    }
+    
+    // Ensure required fields exist with fallbacks
+    const safeCard = {
+      icon: card.icon || Zap,
+      status: card.status || 'active',
+      gradient: card.gradient || 'from-blue-500 to-purple-500',
+      category: card.category || 'General',
+      subcategory: card.subcategory || 'Info',
+      title: card.title || 'Untitled Card',
+      data: card.data && typeof card.data === 'object' ? card.data : {},
+      type: card.type || 'default'
+    };
+    
+    const Icon = safeCard.icon;
+    const badge = getStatusBadge(safeCard.status);
+    const BadgeIcon = badge.icon;
+    const dataEntries = Object.entries(safeCard.data);
+    
+    // Enhanced visual design with glassmorphism and better data presentation
+    return (
+      <div
+        key={`card-${index}-${safeCard.type}`}
+        className="group relative bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/60 hover:border-gray-500/80 transition-all duration-500 shadow-2xl hover:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] hover:scale-[1.02] overflow-hidden"
+      >
+        {/* Animated gradient overlay */}
+        <div className={`absolute inset-0 bg-gradient-to-br ${safeCard.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-700`}></div>
+        
+        {/* Accent line on left */}
+        <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${safeCard.gradient} opacity-60 group-hover:opacity-100 transition-opacity`}></div>
+        
+        {/* Header section with icon and title */}
+        <div className="relative flex items-start justify-between mb-5">
+          <div className="flex items-start gap-4 flex-1">
+            <div className={`p-3 rounded-xl bg-gradient-to-br ${safeCard.gradient} shadow-lg ring-4 ring-gray-800/50 group-hover:ring-gray-700/50 transition-all`}>
+              <Icon className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{safeCard.category}</span>
+                <span className="text-gray-600">•</span>
+                <span className="text-xs font-medium text-gray-500">{safeCard.subcategory}</span>
+              </div>
+              <h3 className="text-base font-bold text-white leading-tight mb-1">{safeCard.title}</h3>
+              <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${badge.bg} ${badge.border}`}>
+                <BadgeIcon className={`w-3.5 h-3.5 ${badge.text}`} />
+                <span className={`text-xs font-bold ${badge.text} uppercase tracking-wide`}>{badge.label}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Enhanced data grid with better visual hierarchy */}
+        <div className="relative space-y-2">
+          {dataEntries.length > 0 ? (
+            dataEntries.map(([key, value], i) => {
+              const formattedKey = key
+                .replace(/([A-Z])/g, ' $1')
+                .replace(/^./, str => str.toUpperCase())
+                .trim();
+              
+              // Enhanced metric detection
+              const valueStr = String(value);
+              const isPercentage = valueStr.includes('%');
+              const isDollar = valueStr.includes('$');
+              const isUpTrend = valueStr.includes('↑') || valueStr.toLowerCase().includes('up');
+              const isDownTrend = valueStr.includes('↓') || valueStr.toLowerCase().includes('down');
+              const isHighValue = valueStr.includes('elite') || valueStr.includes('optimal');
+              
+              // Assign colors based on context
+              let valueColor = 'text-gray-300';
+              if (isUpTrend) valueColor = 'text-green-400';
+              else if (isDownTrend) valueColor = 'text-red-400';
+              else if (isHighValue) valueColor = 'text-purple-400';
+              else if (isDollar || isPercentage) valueColor = 'text-blue-400';
+              
+              return (
+                <div key={i} className="group/item relative">
+                  <div className="flex items-center justify-between py-2.5 px-3.5 rounded-lg bg-gradient-to-r from-gray-800/40 to-gray-800/20 hover:from-gray-800/60 hover:to-gray-800/40 transition-all duration-200 border border-gray-700/30 hover:border-gray-600/50">
+                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest flex-shrink-0 mr-4">
+                      {formattedKey}
+                    </span>
+                    <span className={`text-sm font-extrabold text-right ${valueColor} group-hover/item:scale-105 transition-transform flex items-center gap-1.5`}>
+                      {isUpTrend && <TrendingUp className="w-3.5 h-3.5" />}
+                      {isDownTrend && <TrendingDown className="w-3.5 h-3.5" />}
+                      {valueStr || 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-center py-6 text-gray-500 text-sm font-medium">
+              No data available
+            </div>
+          )}
+        </div>
+
+        <div className="relative mt-4 pt-4 border-t border-gray-700/50">
+          <button 
+            onClick={() => generateDetailedAnalysis(card)}
+            className="w-full flex items-center justify-center gap-2 text-xs font-bold text-gray-400 hover:text-white transition-colors group/btn"
+          >
+            <span>View Full Analysis</span>
+            <ChevronRight className="w-3.5 h-3.5 group-hover/btn:translate-x-1 transition-transform" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const filteredChats = selectedCategory === 'all'
+  ? chats
+      : chats.filter((chat: Chat) => chat.category === selectedCategory);
+  
+  // Platform-specific AI-powered prompt suggestions
+  const platformPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }>> = {
+    all: [
+      { label: 'Cross-platform arbitrage opportunities', icon: Sparkles, category: 'all' },
+      { label: 'Today\'s best value plays across all platforms', icon: TrendingUp, category: 'all' },
+      { label: 'Correlated bets: DFS + betting + Kalshi', icon: Layers, category: 'all' },
+      { label: 'AI model predictions for tonight\'s games', icon: Activity, category: 'all' }
+    ],
+    betting: [
+      { label: 'NBA picks with best odds tonight', icon: TrendingUp, category: 'betting' },
+      { label: 'Live arbitrage alerts across sportsbooks', icon: Zap, category: 'betting' },
+      { label: 'Player props with edge (MLB/NBA/NFL)', icon: Target, category: 'betting' },
+      { label: 'Sharp money movement analysis', icon: Activity, category: 'betting' },
+      { label: 'Parlay builder with EV+ legs', icon: Medal, category: 'betting' }
+    ],
+    fantasy: [
+      { label: 'NFBC draft strategy for my pick position', icon: Trophy, category: 'fantasy' },
+      { label: 'Auction value targets and sleepers', icon: ShoppingCart, category: 'fantasy' },
+      { label: 'Best ball stacking strategy for NFFC', icon: Award, category: 'fantasy' },
+      { label: 'ADP risers and fallers this week', icon: TrendingUp, category: 'fantasy' },
+      { label: 'Salary cap week optimization', icon: DollarSign, category: 'fantasy' }
+    ],
+    dfs: [
+      { label: 'DFS NFL optimal lineups for DraftKings', icon: Award, category: 'dfs' },
+      { label: 'FanDuel NBA value plays under $5K', icon: DollarSign, category: 'dfs' },
+      { label: 'Showdown captain picks with leverage', icon: Medal, category: 'dfs' },
+      { label: 'Low ownership tournament stacks', icon: Users, category: 'dfs' },
+      { label: 'MLB pitcher-stacks correlation builder', icon: Layers, category: 'dfs' }
+    ],
+    kalshi: [
+      { label: 'Kalshi election market analysis and edge', icon: BarChart3, category: 'kalshi' },
+      { label: 'Weather markets for NFL game totals', icon: Activity, category: 'kalshi' },
+      { label: 'Economic event predictions with value', icon: TrendingUp, category: 'kalshi' },
+      { label: 'Cross-market arbitrage: Kalshi + betting', icon: Sparkles, category: 'kalshi' },
+      { label: 'High-volume markets with mispricing', icon: Target, category: 'kalshi' }
+    ]
+  };
+
+  // Get dynamic prompts based on selected platform
+  const quickActions = platformPrompts[selectedCategory] || platformPrompts.all;
 
   return (
     <div className="flex h-screen bg-black text-white overflow-hidden font-sans">
+      {/* Environment Variable Warning Banner */}
+      {serverData?.missingKeys && serverData.missingKeys.length > 0 && (
+        <div className="absolute top-0 left-0 right-0 bg-amber-600/90 backdrop-blur-sm border-b border-amber-500/50 px-4 py-2 z-50 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-white flex-shrink-0" />
+          <div className="flex-1 text-sm">
+            <span className="font-semibold">Missing API Keys:</span> {serverData.missingKeys.join(', ')}. Some features may not work properly.
+          </div>
+          <a 
+            href="/admin/setup" 
+            className="text-xs font-semibold bg-white/20 hover:bg-white/30 px-3 py-1 rounded-md transition-colors whitespace-nowrap"
+          >
+            Configure →
+          </a>
+        </div>
+      )}
+      
       {/* Sidebar */}
       <div
         className={`${
@@ -1390,12 +1758,12 @@ export default async function Page() {
                             <input
                               type="text"
                               value={editingChatTitle}
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingChatTitle(e.target.value)}
-                              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => handleKeyDownChatTitle(e, chat.id)}
+                              onChange={(e) => setEditingChatTitle(e.target.value)}
+                              onKeyDown={(e) => handleKeyDownChatTitle(e, chat.id)}
                               onBlur={() => handleSaveChatTitle(chat.id)}
                               className="flex-1 bg-gray-800/80 border border-blue-500/50 rounded-md px-2 py-1 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                               autoFocus
-                              onClick={(e: React.MouseEvent<HTMLInputElement>) => e.stopPropagation()}
+                              onClick={(e) => e.stopPropagation()}
                             />
                             <button
                               onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
@@ -1433,18 +1801,18 @@ export default async function Page() {
                             </span>
                           ))}
                         </div>
-                        <span className="text-[10px] font-medium text-gray-600" suppressHydrationWarning>{formatTimestamp(chat.timestamp)}</span>
+                        <span className="text-[10px] font-medium text-gray-600">{formatTimestamp(chat.timestamp)}</span>
                       </div>
                     </div>
                     <div className="flex flex-col gap-1">
                       <button
-                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleStarChat(chat.id, e)}
+                        onClick={(e: React.MouseEvent) => handleStarChat(chat.id, e)}
                         className="p-1 rounded-md hover:bg-gray-700/50 transition-all opacity-100"
                       >
                         <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
                       </button>
                       <button
-                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleDeleteChat(chat.id, e)}
+                        onClick={(e: React.MouseEvent) => handleDeleteChat(chat.id, e)}
                         className="p-1 rounded-md hover:bg-gray-700/50 opacity-0 group-hover:opacity-100 transition-all"
                       >
                         <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
@@ -1485,15 +1853,15 @@ export default async function Page() {
                         <input
                           type="text"
                           value={editingChatTitle}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingChatTitle(e.target.value)}
-                          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => handleKeyDownChatTitle(e, chat.id)}
+                          onChange={(e) => setEditingChatTitle(e.target.value)}
+                          onKeyDown={(e) => handleKeyDownChatTitle(e, chat.id)}
                           onBlur={() => handleSaveChatTitle(chat.id)}
                           className="flex-1 bg-gray-800/80 border border-blue-500/50 rounded-md px-2 py-1 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                           autoFocus
-                          onClick={(e: React.MouseEvent<HTMLInputElement>) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
                         />
                         <button
-                          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                          onClick={(e) => {
                             e.stopPropagation();
                             handleSaveChatTitle(chat.id);
                           }}
@@ -1509,7 +1877,7 @@ export default async function Page() {
                           {chat.title}
                         </h3>
                         <button
-                          onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleEditChatTitle(chat.id, chat.title, e)}
+                          onClick={(e: React.MouseEvent) => handleEditChatTitle(chat.id, chat.title, e)}
                           className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-gray-700/50 rounded transition-all flex-shrink-0"
                           title="Edit title"
                         >
@@ -1528,12 +1896,12 @@ export default async function Page() {
                         </span>
                       ))}
                     </div>
-                    <span className="text-[10px] font-medium text-gray-600" suppressHydrationWarning>{formatTimestamp(chat.timestamp)}</span>
+                    <span className="text-[10px] font-medium text-gray-600">{formatTimestamp(chat.timestamp)}</span>
                   </div>
                 </div>
                 <div className="flex flex-col gap-1">
                   <button
-                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleStarChat(chat.id, e)}
+                    onClick={(e: React.MouseEvent) => handleStarChat(chat.id, e)}
                     className={`p-1 rounded-md hover:bg-gray-700/50 transition-all ${
                       chat.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                     }`}
@@ -1545,7 +1913,7 @@ export default async function Page() {
                     />
                   </button>
                   <button
-                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleDeleteChat(chat.id, e)}
+                    onClick={(e: React.MouseEvent) => handleDeleteChat(chat.id, e)}
                     className="p-1 rounded-md hover:bg-gray-700/50 opacity-0 group-hover:opacity-100 transition-all"
                   >
                     <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
@@ -1672,7 +2040,7 @@ export default async function Page() {
                 
                 return (
                   <div
-                    key={`message-${index}`}
+                    key={`message-${index}-${message.timestamp.getTime()}`}
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn ${isGrouped ? 'mt-2' : 'mt-6'}`}
                   >
                 <div className={`max-w-4xl ${message.role === 'user' ? 'w-auto' : 'w-full'}`}>
@@ -1734,7 +2102,7 @@ export default async function Page() {
               <textarea
                 ref={textareaRef}
                 value={input}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                onChange={(e) => {
                   setInput(e.target.value);
                   adjustTextareaHeight();
                 }}
@@ -1999,7 +2367,7 @@ export default async function Page() {
                               if (paragraph.includes('**')) {
                                 const parts = paragraph.split('**');
                                 return (
-                                  <p key={pIdx} suppressHydrationWarning>
+                                  <p key={pIdx}>
                                     {parts.map((part, partIdx) => {
                                       if (partIdx % 2 === 1) {
                                         return <span key={partIdx} className="font-black text-white">{part}</span>;
@@ -2010,7 +2378,7 @@ export default async function Page() {
                                 );
                               }
                               
-                              return <p key={pIdx} suppressHydrationWarning>{paragraph}</p>;
+                              return <p key={pIdx}>{paragraph}</p>;
                             })}
                           </div>
                         )}
@@ -2105,18 +2473,14 @@ export default async function Page() {
                     <div className="mt-5">
                       {message.cards && message.cards.length > 0 && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                          {message.cards.map((card, cardIndex) => {
-                            const { icon: _icon, ...cardData } = card;
-                            return (
-                              <div key={`${card.type}-${cardIndex}`}>
-                                <DynamicCardRenderer
-                                  card={cardData}
-                                  index={cardIndex}
-                                  onAnalyze={() => generateDetailedAnalysis(card)}
-                                />
-                              </div>
-                            );
-                          })}
+                          {message.cards.map((card, cardIndex) => (
+                            <DynamicCardRenderer
+                              key={`${card.type}-${cardIndex}`}
+                              card={card}
+                              index={cardIndex}
+                              onAnalyze={() => generateDetailedAnalysis(card)}
+                            />
+                          ))}
                         </div>
                       )}
                     </div>
@@ -2332,7 +2696,7 @@ export default async function Page() {
                       </button>
                       <div className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-gray-900/50 rounded-lg border border-gray-800/50">
                         <Clock className="w-3.5 h-3.5 text-gray-600" />
-                        <span className="text-xs font-medium text-gray-500 tabular-nums" suppressHydrationWarning>{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="text-xs font-medium text-gray-500 tabular-nums">{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     </div>
                   )}
@@ -2501,8 +2865,8 @@ export default async function Page() {
                 <input
                   type="text"
                   value={input}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
-                  onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
                       handleSubmit(e as React.FormEvent<HTMLInputElement>);
@@ -2539,22 +2903,36 @@ export default async function Page() {
               </button>
             </form>
 
-function PageSkeleton() {
-  return (
-    <div className="flex h-screen bg-gray-950 text-white animate-pulse">
-      <div className="flex-1 flex flex-col">
-        <div className="h-16 bg-gray-900/50 border-b border-gray-800/50" />
-        <div className="flex-1 p-6 space-y-4">
-          <div className="h-20 bg-gray-900/30 rounded-lg" />
-          <div className="h-20 bg-gray-900/30 rounded-lg" />
-          <div className="h-20 bg-gray-900/30 rounded-lg" />
+            <div className="flex items-center justify-between mt-4 px-1">
+              <p className="text-[11px] font-bold text-gray-600">
+                Betting • Fantasy (NFBC/NFFC/NFBKC) • DFS • Kalshi • Real-time AI Analysis
+              </p>
+              <div className="flex items-center gap-3">
+                <div className={`flex items-center gap-2 text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all ${
+                  creditsRemaining <= 3 
+                    ? 'text-orange-400 bg-orange-500/10 border-orange-500/30' 
+                    : 'text-gray-500 bg-gray-900/30 border-gray-800'
+                }`}>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{creditsRemaining} {creditsRemaining === 1 ? 'credit' : 'credits'} remaining</span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] font-bold text-gray-600">
+                  <div className="relative flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-lg shadow-green-500/50"></div>
+                    <div className="absolute inset-0 bg-green-400 rounded-full animate-ping"></div>
+                  </div>
+                  <span>All systems operational</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Purchase Credits Modal */}
       {showPurchaseModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowPurchaseModal(false)}>
-          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}>
+          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setShowPurchaseModal(false)}
               className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
@@ -2580,7 +2958,7 @@ function PageSkeleton() {
                       type="number"
                       min="10"
                       value={purchaseAmount}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPurchaseAmount(e.target.value)}
+                      onChange={(e) => setPurchaseAmount(e.target.value)}
                       placeholder="10"
                       className="w-full pl-8 pr-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                     />
@@ -2644,7 +3022,7 @@ function PageSkeleton() {
       {/* Subscription Modal */}
       {showSubscriptionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowSubscriptionModal(false)}>
-          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}>
+          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setShowSubscriptionModal(false)}
               className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"

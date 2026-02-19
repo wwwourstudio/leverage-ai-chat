@@ -1,18 +1,40 @@
-import { createClient } from '@/lib/supabase/client';
-
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Safely get Supabase client. Returns null when env vars are missing
+ * instead of throwing at module initialisation time.
+ */
+function getSupabase() {
+  try {
+    // Only import in browser / when env is present
+    if (
+      !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    ) {
+      return null;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { createClient } = require('@/lib/supabase/client');
+    return createClient();
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Unified Supabase Odds Service
  * Handles all odds data fetching, caching, and storage
  */
 export class SupabaseOddsService {
-  private supabase = createClient();
+  private get supabase() {
+    return getSupabase();
+  }
 
   /**
    * Fetch cached odds for a sport
    */
   async getCachedOdds(sport: string) {
+    if (!this.supabase) return [];
     const { data, error } = await this.supabase
       .from('live_odds_cache')
       .select('*')
@@ -33,6 +55,7 @@ export class SupabaseOddsService {
    * Store odds in cache
    */
   async storeOdds(sport: string, sportKey: string, games: any[]) {
+    if (!this.supabase) return false;
     const records = games.map((game: any) => ({
       sport,
       sport_key: sportKey,
@@ -63,6 +86,7 @@ export class SupabaseOddsService {
    * Store odds in sport-specific table
    */
   async storeSportOdds(sport: string, games: any[]) {
+    if (!this.supabase) return false;
     const tableName = `${sport}_odds`;
     
     const records = games.map((game: any) => {
@@ -100,6 +124,7 @@ export class SupabaseOddsService {
    * Fetch edge opportunities
    */
   async getEdgeOpportunities(sport?: string) {
+    if (!this.supabase) return [];
     let query = this.supabase
       .from('edge_opportunities')
       .select('*')
@@ -133,6 +158,7 @@ export class SupabaseOddsService {
     confidence_score: number;
     expires_at: string;
   }) {
+    if (!this.supabase) return false;
     const { error } = await this.supabase
       .from('edge_opportunities')
       .insert(opportunity);
@@ -150,6 +176,7 @@ export class SupabaseOddsService {
    * Fetch arbitrage opportunities
    */
   async getArbitrageOpportunities(sport?: string) {
+    if (!this.supabase) return [];
     let query = this.supabase
       .from('arbitrage_opportunities')
       .select('*')
@@ -188,6 +215,7 @@ export class SupabaseOddsService {
     total_implied_prob: number;
     expires_at: string;
   }) {
+    if (!this.supabase) return false;
     const { error } = await this.supabase
       .from('arbitrage_opportunities')
       .insert(arb);
@@ -205,6 +233,7 @@ export class SupabaseOddsService {
    * Get active capital state
    */
   async getActiveCapitalState() {
+    if (!this.supabase) return null;
     const { data, error } = await this.supabase
       .from('capital_state')
       .select('*')
@@ -234,6 +263,7 @@ export class SupabaseOddsService {
     allocated_capital: number;
     confidence_score: number;
   }) {
+    if (!this.supabase) return false;
     const { error } = await this.supabase
       .from('bet_allocations')
       .insert(allocation);
@@ -257,6 +287,7 @@ export class SupabaseOddsService {
     consensus_score: number;
     data_sources: any;
   }) {
+    if (!this.supabase) return false;
     const { error } = await this.supabase
       .from('ai_response_trust')
       .insert(response);

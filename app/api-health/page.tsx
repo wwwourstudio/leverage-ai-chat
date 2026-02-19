@@ -1,243 +1,224 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCw, CheckCircle2, XCircle, AlertCircle, Clock } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Activity,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  RefreshCw,
+  ArrowLeft,
+  Zap,
+  Database,
+  BarChart3,
+  Shield,
+} from 'lucide-react';
+import Link from 'next/link';
 
-interface SportResult {
-  sport: string;
-  apiKey: string;
-  status: 'success' | 'no_games' | 'error';
-  eventCount?: number;
-  httpStatus?: number;
-  apiUrl?: string;
-  error?: string;
+interface ServiceCheck {
+  name: string;
+  endpoint: string;
+  status: 'checking' | 'healthy' | 'degraded' | 'unhealthy';
+  latency: number | null;
+  message: string;
+  icon: React.ElementType;
 }
 
-interface DiagnosticsResponse {
-  configured: boolean;
-  apiKeyPrefix?: string;
-  timestamp: string;
-  summary: {
-    total: number;
-    success: number;
-    noGames: number;
-    errors: number;
-  };
-  results: SportResult[];
-  recommendations: string[];
+const SERVICES: Omit<ServiceCheck, 'status' | 'latency' | 'message'>[] = [
+  { name: 'AI Analysis (Grok)', endpoint: '/api/analyze', icon: Zap },
+  { name: 'Insights API', endpoint: '/api/insights', icon: Database },
+  { name: 'Cards Generator', endpoint: '/api/cards', icon: BarChart3 },
+  { name: 'Live Odds API', endpoint: '/api/odds', icon: Activity },
+];
+
+function StatusIcon({ status }: { status: ServiceCheck['status'] }) {
+  switch (status) {
+    case 'healthy':
+      return <CheckCircle className="h-5 w-5 text-emerald-400" />;
+    case 'degraded':
+      return <AlertTriangle className="h-5 w-5 text-amber-400" />;
+    case 'unhealthy':
+      return <XCircle className="h-5 w-5 text-red-400" />;
+    default:
+      return <RefreshCw className="h-5 w-5 text-muted-foreground animate-spin" />;
+  }
 }
 
-function deriveOverallHealth(summary: DiagnosticsResponse['summary']): string {
-  if (summary.errors === summary.total) return 'critical';
-  if (summary.errors > 0 || summary.success === 0) return 'degraded';
-  return 'healthy';
-}
+export default function APIHealthPage() {
+  const [services, setServices] = useState<ServiceCheck[]>(
+    SERVICES.map((s) => ({ ...s, status: 'checking', latency: null, message: 'Checking...' }))
+  );
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-export default function APIHealthDashboard() {
-  const [diagnostics, setDiagnostics] = useState<DiagnosticsResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [lastRun, setLastRun] = useState<string | null>(null);
+  const checkService = useCallback(
+    async (service: (typeof SERVICES)[number]): Promise<ServiceCheck> => {
+      const start = performance.now();
+      try {
+        const isPost = service.endpoint === '/api/analyze' || service.endpoint === '/api/cards' || service.endpoint === '/api/odds';
 
-  const runDiagnostics = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/odds/test');
-      const data = await response.json();
-      setDiagnostics(data);
-      setLastRun(new Date().toLocaleTimeString());
-    } catch (error) {
-      console.error('Diagnostics error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        const res = await fetch(service.endpoint, {
+          method: isPost ? 'POST' : 'GET',
+          headers: isPost ? { 'Content-Type': 'application/json' } : undefined,
+          body: isPost
+            ? JSON.stringify(
+                service.endpoint === '/api/analyze'
+                  ? { userMessage: 'health check', context: {} }
+                  : service.endpoint === '/api/cards'
+                    ? { category: 'betting', limit: 1 }
+                    : { sport: 'basketball_nba', marketType: 'h2h' }
+              )
+            : undefined,
+          signal: AbortSignal.timeout(15000),
+        });
+
+        const latency = Math.round(performance.now() - start);
+        const ct = res.headers.get('content-type') || '';
+
+        if (!res.ok) {
+          const body = ct.includes('application/json') ? await res.json().catch(() => null) : null;
+          const msg = body?.error || body?.message || `HTTP ${res.status}`;
+          return { ...service, status: 'degraded', latency, message: msg };
+        }
+
+        if (!ct.includes('application/json')) {
+          return { ...service, status: 'degraded', latency, message: 'Non-JSON response' };
+        }
+
+        const data = await res.json();
+        if (data.success === false && data.error) {
+          return { ...service, status: 'degraded', latency, message: data.error };
+        }
+
+        return { ...service, status: 'healthy', latency, message: 'Operational' };
+      } catch (err) {
+        const latency = Math.round(performance.now() - start);
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        return { ...service, status: 'unhealthy', latency, message };
+      }
+    },
+    []
+  );
+
+  const runChecks = useCallback(async () => {
+    setIsRefreshing(true);
+    setServices(SERVICES.map((s) => ({ ...s, status: 'checking', latency: null, message: 'Checking...' })));
+
+    const results = await Promise.all(SERVICES.map(checkService));
+    setServices(results);
+    setLastChecked(new Date());
+    setIsRefreshing(false);
+  }, [checkService]);
 
   useEffect(() => {
-    runDiagnostics();
-  }, []);
+    runChecks();
+  }, [runChecks]);
 
-  const getHealthBadge = (health: string) => {
-    switch (health) {
-      case 'healthy':
-        return <Badge className="bg-green-600">Healthy</Badge>;
-      case 'degraded':
-        return <Badge className="bg-yellow-600">Degraded</Badge>;
-      case 'critical':
-        return <Badge className="bg-red-600">Critical</Badge>;
-      default:
-        return <Badge variant="secondary">Unknown</Badge>;
-    }
-  };
+  const overallStatus = services.every((s) => s.status === 'healthy')
+    ? 'healthy'
+    : services.some((s) => s.status === 'unhealthy')
+      ? 'unhealthy'
+      : services.some((s) => s.status === 'degraded')
+        ? 'degraded'
+        : 'checking';
 
-  const getStatusIcon = (status: string, eventCount?: number) => {
-    if (status === 'error') {
-      return <XCircle className="h-5 w-5 text-red-500" />;
-    }
-    if (status === 'no_games' || eventCount === 0) {
-      return <AlertCircle className="h-5 w-5 text-yellow-500" />;
-    }
-    return <CheckCircle2 className="h-5 w-5 text-green-500" />;
-  };
+  const overallLabel =
+    overallStatus === 'healthy'
+      ? 'All Systems Operational'
+      : overallStatus === 'degraded'
+        ? 'Partial Degradation'
+        : overallStatus === 'unhealthy'
+          ? 'Service Disruption'
+          : 'Checking...';
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-balance">Sports API Health Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Monitor connectivity and availability across all sports APIs
-          </p>
-        </div>
-        <Button
-          onClick={runDiagnostics}
-          disabled={loading}
-          className="flex items-center gap-2"
-        >
-          {loading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
-          Run Diagnostics
-        </Button>
-      </div>
-
-      {lastRun && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
-          <Clock className="h-4 w-4" />
-          Last run: {lastRun}
-        </div>
-      )}
-
-      {loading && !diagnostics && (
-        <div className="flex flex-col items-center justify-center py-20">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-          <p className="text-muted-foreground">Running comprehensive diagnostics...</p>
-        </div>
-      )}
-
-      {diagnostics && (
-        <>
-          {/* Overall Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Overall Health</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2">
-                  {getHealthBadge(deriveOverallHealth(diagnostics.summary))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Sports Online</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {diagnostics.summary.success} / {diagnostics.summary.total}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Total Games</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {diagnostics.results.reduce((sum, r) => sum + (r.eventCount || 0), 0)}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Off-Season</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {diagnostics.summary.noGames} sport{diagnostics.summary.noGames !== 1 ? 's' : ''}
-                </div>
-              </CardContent>
-            </Card>
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border">
+        <div className="mx-auto flex max-w-3xl items-center gap-4 px-6 py-4">
+          <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="h-5 w-5" />
+            <span className="sr-only">Back to home</span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-primary" />
+            <h1 className="text-lg font-semibold text-foreground">API Health</h1>
           </div>
+          <button
+            onClick={runChecks}
+            disabled={isRefreshing}
+            className="ml-auto flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      </header>
 
-          {/* Recommendations */}
-          {diagnostics.recommendations.length > 0 && (
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle>Recommendations</CardTitle>
-                <CardDescription>Actions to improve API health</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {diagnostics.recommendations.map((rec, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-sm">
-                      <span className="text-primary mt-0.5">{'•'}</span>
-                      <span>{rec}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
+      <main className="mx-auto max-w-3xl px-6 py-8 space-y-8">
+        {/* Overall Status Banner */}
+        <div
+          className={`flex items-center gap-4 rounded-2xl border p-6 ${
+            overallStatus === 'healthy'
+              ? 'border-emerald-500/30 bg-emerald-500/5'
+              : overallStatus === 'degraded'
+                ? 'border-amber-500/30 bg-amber-500/5'
+                : overallStatus === 'unhealthy'
+                  ? 'border-red-500/30 bg-red-500/5'
+                  : 'border-border bg-card'
+          }`}
+        >
+          <StatusIcon status={overallStatus} />
+          <div>
+            <p className="font-medium text-foreground">{overallLabel}</p>
+            {lastChecked && (
+              <p className="text-xs text-muted-foreground">
+                Last checked {lastChecked.toLocaleTimeString()}
+              </p>
+            )}
+          </div>
+        </div>
 
-          {/* Sport Status Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {diagnostics.results.map((result) => (
-              <Card key={result.apiKey} className="relative">
-                <CardHeader className="pb-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-base">{result.sport}</CardTitle>
-                      <CardDescription className="text-xs mt-1">
-                        {result.apiKey}
-                      </CardDescription>
-                    </div>
-                    {getStatusIcon(result.status, result.eventCount)}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <p className="text-muted-foreground text-xs">Games Available</p>
-                      <p className="font-semibold text-lg">{result.eventCount ?? 0}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">HTTP Status</p>
-                      <p className="font-semibold text-lg">{result.httpStatus ?? '--'}</p>
-                    </div>
-                  </div>
+        {/* Service List */}
+        <div className="space-y-3">
+          {services.map((service) => (
+            <div
+              key={service.name}
+              className="flex items-center gap-4 rounded-xl border border-border bg-card p-4"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
+                <service.icon className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-foreground text-sm">{service.name}</p>
+                <p className="text-xs text-muted-foreground truncate">{service.message}</p>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                {service.latency !== null && (
+                  <span className="text-xs font-mono text-muted-foreground">
+                    {service.latency}ms
+                  </span>
+                )}
+                <StatusIcon status={service.status} />
+              </div>
+            </div>
+          ))}
+        </div>
 
-                  {result.status === 'no_games' && (
-                    <div className="pt-3 border-t">
-                      <p className="text-xs text-yellow-600 font-medium">No Games</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        This sport may be out of season or have no scheduled games right now.
-                      </p>
-                    </div>
-                  )}
-
-                  {result.error && (
-                    <div className="pt-3 border-t">
-                      <p className="text-xs text-red-500 font-medium">Error</p>
-                      <p className="text-xs text-muted-foreground mt-1 text-pretty">
-                        {result.error}
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+        {/* Endpoint Reference */}
+        <div className="rounded-xl border border-border bg-card p-6 space-y-3">
+          <h2 className="text-sm font-medium text-foreground">Endpoint Reference</h2>
+          <div className="space-y-2">
+            {SERVICES.map((s) => (
+              <div key={s.endpoint} className="flex items-center gap-3 text-xs">
+                <code className="rounded bg-secondary px-2 py-1 font-mono text-muted-foreground">
+                  {s.endpoint}
+                </code>
+                <span className="text-muted-foreground">{s.name}</span>
+              </div>
             ))}
           </div>
-        </>
-      )}
+        </div>
+      </main>
     </div>
   );
 }

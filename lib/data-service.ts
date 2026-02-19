@@ -101,6 +101,7 @@ async function safeJsonParse(response: Response): Promise<any> {
 
 /**
  * Fetch dynamic cards based on context
+ * CLIENT-SIDE ONLY - Do not call from server components
  */
 export async function fetchDynamicCards(params: {
   sport?: string;
@@ -108,6 +109,12 @@ export async function fetchDynamicCards(params: {
   userContext?: any;
   limit?: number;
 }): Promise<DynamicCard[]> {
+  // Skip if running on server
+  if (typeof window === 'undefined') {
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Skipping fetchDynamicCards on server`);
+    return [];
+  }
+
   console.log(`${LOG_PREFIXES.DATA_SERVICE} ========================================`);
   console.log(`${LOG_PREFIXES.DATA_SERVICE} FETCHING DYNAMIC CARDS`);
   console.log(`${LOG_PREFIXES.DATA_SERVICE} Parameters:`, JSON.stringify(params, null, 2));
@@ -186,8 +193,23 @@ export async function fetchDynamicCards(params: {
 
 /**
  * Fetch user insights from Supabase
+ * CLIENT-SIDE ONLY - Do not call from server components
  */
 export async function fetchUserInsights(): Promise<UserInsights> {
+  // Skip if running on server
+  if (typeof window === 'undefined') {
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Skipping fetchUserInsights on server`);
+    return {
+      totalValue: 0,
+      winRate: 0,
+      roi: 0,
+      activeContests: 0,
+      totalInvested: 0,
+      dataSource: DATA_SOURCES.DEFAULT,
+      message: 'Loading...'
+    };
+  }
+
   const cacheKey = 'insights:user';
   const cached = cache.get(cacheKey);
 
@@ -247,8 +269,20 @@ export async function fetchUserInsights(): Promise<UserInsights> {
 
 /**
  * Fetch live odds data
+ * CLIENT-SIDE ONLY - Do not call from server components
  */
 export async function fetchLiveOdds(sport: string, marketType: string = 'h2h') {
+  // Skip if running on server
+  if (typeof window === 'undefined') {
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Skipping fetchLiveOdds on server`);
+    return { 
+      success: false, 
+      error: 'Server-side fetch not supported',
+      events: [],
+      timestamp: new Date().toISOString()
+    };
+  }
+
   const cacheKey = `odds:${sport}:${marketType}`;
   const cached = cache.get(cacheKey);
 

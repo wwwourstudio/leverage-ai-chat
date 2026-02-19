@@ -27,22 +27,46 @@ export function InsightsDashboard({ userId }: InsightsDashboardProps) {
       const [insightsRes, historicalRes, profileRes] = await Promise.all([
         fetch('/api/insights', {
           headers: userId ? { 'x-user-id': userId } : {}
+        }).catch(err => {
+          console.warn('[v0] Failed to fetch insights:', err);
+          return null;
         }),
-        fetch('/api/metrics/historical?days=30'),
+        fetch('/api/metrics/historical?days=30').catch(err => {
+          console.warn('[v0] Failed to fetch historical metrics:', err);
+          return null;
+        }),
         userId ? fetch('/api/user/profile', {
           headers: { 'x-user-id': userId }
+        }).catch(err => {
+          console.warn('[v0] Failed to fetch profile:', err);
+          return null;
         }) : Promise.resolve(null)
       ]);
 
-      const insightsData = await insightsRes.json();
-      const historicalData = await historicalRes.json();
-      const profileData = profileRes ? await profileRes.json() : null;
+      const insightsData = insightsRes && insightsRes.ok ? await insightsRes.json() : { insights: null };
+      const historicalData = historicalRes && historicalRes.ok ? await historicalRes.json() : { metrics: null };
+      const profileData = profileRes && profileRes.ok ? await profileRes.json() : { profile: null };
 
-      setInsights(insightsData.insights);
+      setInsights(insightsData.insights || {
+        totalValue: 0,
+        winRate: 0,
+        roi: 0,
+        activeContests: 0,
+        totalInvested: 0
+      });
       setHistorical(historicalData.metrics);
       setProfile(profileData?.profile);
     } catch (err) {
+      console.error('[v0] Error in fetchAllData:', err);
       setError(err instanceof Error ? err.message : 'Failed to load data');
+      // Set default values on error
+      setInsights({
+        totalValue: 0,
+        winRate: 0,
+        roi: 0,
+        activeContests: 0,
+        totalInvested: 0
+      });
     } finally {
       setLoading(false);
     }

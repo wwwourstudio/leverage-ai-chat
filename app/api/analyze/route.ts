@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     if (xaiApiKey) {
       try {
         const result = await generateText({
-          model: xai('grok-4-fast', { apiKey: xaiApiKey }),
+          model: xai('grok-3-fast', { apiKey: xaiApiKey }),
           system: SYSTEM_PROMPT,
           prompt: enrichedPrompt,
           temperature: AI_CONFIG.DEFAULT_TEMPERATURE,

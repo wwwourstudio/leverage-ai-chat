@@ -36,8 +36,8 @@ export function FantasyCard({
 }: FantasyCardProps) {
   const statusBadge = statusMap[status] || statusMap.value;
 
-  // Extract focus and other structured data
-  const { focus, targetPlayers, targetPosition, ...remainingData } = data as any;
+  // Extract known structured fields; remainder shown via DataGrid
+  const { focus, targetPlayers, targetPosition, description, tips, platforms, ...remainingData } = data as any;
 
   return (
     <BaseCard
@@ -52,14 +52,14 @@ export function FantasyCard({
       error={error}
     >
       <div className="space-y-3.5">
-        {/* Focus section */}
-        {focus && (
+        {/* Focus / description */}
+        {(focus || description) && (
           <div className="pb-3.5 border-b border-gray-700/30">
             <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2.5 opacity-90">Focus</div>
-            <div className="text-sm font-medium text-gray-200 leading-relaxed">{focus}</div>
+            <div className="text-sm font-medium text-gray-200 leading-relaxed">{focus || description}</div>
           </div>
         )}
-        
+
         {/* Target sections */}
         {targetPlayers && (
           <div className="pb-2.5">
@@ -67,18 +67,38 @@ export function FantasyCard({
             <div className="text-[13px] font-semibold text-white leading-snug">{targetPlayers}</div>
           </div>
         )}
-        
+
         {targetPosition && (
           <div className="pb-2.5">
             <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 opacity-90">Target position</div>
             <div className="text-[13px] font-semibold text-white leading-snug">{targetPosition}</div>
           </div>
         )}
-        
+
+        {/* Tips */}
+        {tips && (
+          <div className="pb-2.5">
+            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 opacity-90">Tips</div>
+            <div className="text-[13px] text-gray-300 leading-snug">
+              {Array.isArray(tips) ? tips.join(' · ') : tips}
+            </div>
+          </div>
+        )}
+
+        {/* Platforms */}
+        {platforms && (
+          <div className="pb-2.5">
+            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 opacity-90">Platforms</div>
+            <div className="text-[13px] font-semibold text-white leading-snug">
+              {Array.isArray(platforms) ? platforms.join(', ') : platforms}
+            </div>
+          </div>
+        )}
+
         {/* Remaining data */}
-        {Object.keys(remainingData).length > 0 && (
+        {Object.keys(remainingData).filter(k => !['realData', 'status'].includes(k)).length > 0 && (
           <div className="pt-2">
-            <DataGrid data={remainingData} empty="" />
+            <DataGrid data={Object.fromEntries(Object.entries(remainingData).filter(([k]) => !['realData', 'status'].includes(k))) as Record<string, string | number>} empty="" />
           </div>
         )}
       </div>

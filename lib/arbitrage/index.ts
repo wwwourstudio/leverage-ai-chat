@@ -363,3 +363,55 @@ export function arbitrageToCard(opp: ArbitrageOpportunity): any {
     }
   };
 }
+
+/**
+ * Detect arbitrage opportunities from live odds, formatted as insight cards.
+ * Replaces the deleted lib/arbitrage-detector.ts module.
+ */
+export async function detectArbitrageFromContext(sport?: string): Promise<any[]> {
+  try {
+    const oddsKey = process.env.ODDS_API_KEY;
+    if (!oddsKey) {
+      return [];
+    }
+
+    const sportKey = sport || 'americanfootball_nfl';
+    const url = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${oddsKey}&regions=us&markets=h2h&bookmakers=draftkings,fanduel,betmgm,caesars,pointsbetus`;
+
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    if (!Array.isArray(data) || data.length === 0) return [];
+
+    const opportunities = detectArbitrageOpportunities(data);
+    if (opportunities.length > 0) {
+      return opportunities.slice(0, 3).map(arbitrageToCard);
+    }
+
+    // No arbitrage found — return live odds cards as fallback
+    return data.slice(0, 3).map((event: any) => {
+      const book = event.bookmakers?.[0];
+      const h2h = book?.markets?.find((m: any) => m.key === 'h2h');
+      const home = h2h?.outcomes?.find((o: any) => o.name === event.home_team);
+      const away = h2h?.outcomes?.find((o: any) => o.name === event.away_team);
+      return {
+        type: 'live-odds',
+        title: `${event.away_team} @ ${event.home_team}`,
+        icon: 'TrendingUp',
+        category: 'LIVE ODDS',
+        subcategory: sportKey.split('_').pop()?.toUpperCase() ?? 'SPORTS',
+        gradient: 'from-blue-600 to-cyan-700',
+        status: 'active',
+        data: {
+          homeOdds: home?.price > 0 ? `+${home.price}` : `${home?.price ?? 'N/A'}`,
+          awayOdds: away?.price > 0 ? `+${away.price}` : `${away?.price ?? 'N/A'}`,
+          bookmaker: book?.title ?? 'N/A',
+          commenceTime: new Date(event.commence_time).toLocaleString(),
+        },
+      };
+    });
+  } catch {
+    return [];
+  }
+}

@@ -210,6 +210,8 @@ function getSportGradient(sport: string): string {
   if (sport.includes('football')) return 'from-green-600 to-emerald-700';
   if (sport.includes('hockey')) return 'from-blue-600 to-cyan-700';
   if (sport.includes('baseball')) return 'from-indigo-600 to-purple-700';
+  if (sport.includes('soccer')) return 'from-green-500 to-teal-600';
+  if (sport.includes('mma') || sport.includes('boxing')) return 'from-red-600 to-rose-700';
   return 'from-slate-600 to-gray-700';
 }
 
@@ -259,6 +261,10 @@ export async function generateContextualCards(
       SPORT_KEYS.NBA.API,      // basketball_nba
       SPORT_KEYS.MLB.API,      // baseball_mlb
       SPORT_KEYS.NHL.API,      // icehockey_nhl
+      SPORT_KEYS.NCAAB.API,   // basketball_ncaab
+      SPORT_KEYS.NCAAF.API,   // americanfootball_ncaaf
+      SPORT_KEYS.EPL.API,     // soccer_epl
+      SPORT_KEYS.MLS.API,     // soccer_usa_mls
     ];
     
     // If user specified a sport, prioritize it first
@@ -443,7 +449,7 @@ export async function generateContextualCards(
     // Try to detect real arbitrage opportunities
     console.log('[v0] [CARDS GENERATOR] Checking for arbitrage opportunities');
     try {
-      const { detectArbitrageFromContext } = await import('@/lib/arbitrage-detector');
+      const { detectArbitrageFromContext } = await import('@/lib/arbitrage');
       const arbitrageCards = await detectArbitrageFromContext(normalizedSport);
       
       console.log('[v0] [CARDS GENERATOR] Arbitrage cards returned:', {

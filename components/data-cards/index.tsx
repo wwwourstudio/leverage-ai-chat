@@ -9,6 +9,8 @@ export { FantasyCard } from './FantasyCard';
 export { KalshiCard } from './KalshiCard';
 export { WeatherCard } from './WeatherCard';
 export { DynamicCardRenderer, CardList } from './DynamicCardRenderer';
+export { ArbitrageCard } from './ArbitrageCard';
+export { PropHitRateCard } from './PropHitRateCard';
 export { StatsSummary } from './StatsSummary';
 export { EmptyState } from './EmptyState';
 export { NoDataCard } from './NoDataCard';

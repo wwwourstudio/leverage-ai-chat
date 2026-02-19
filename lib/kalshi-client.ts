@@ -4,6 +4,7 @@
  */
 export {
   fetchKalshiMarkets,
+  fetchAllKalshiMarkets,
   fetchKalshiMarketsWithRetry,
   fetchElectionMarkets,
   fetchSportsMarkets,

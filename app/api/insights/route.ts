@@ -25,9 +25,9 @@ export async function GET(request: NextRequest) {
     // If Supabase is configured, try to fetch real insights
     if (isSupabaseConfigured()) {
       try {
-        // Dynamic import to avoid build errors when Supabase is not available
-        const { createClient } = await import('@/lib/supabase/client');
-        const supabase = createClient();
+        // Use server-side Supabase client for API routes
+        const { createClient } = await import('@/lib/supabase/server');
+        const supabase = await createClient();
 
         const userId = request.headers.get('x-user-id');
 

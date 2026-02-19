@@ -22,6 +22,32 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'test-anon-key';
 
 // ============================================================================
+// Mock Next.js server-only modules that crash outside the runtime
+// ============================================================================
+
+vi.mock('next/headers', () => ({
+  cookies: vi.fn().mockReturnValue({
+    getAll: vi.fn().mockReturnValue([]),
+    set: vi.fn(),
+    get: vi.fn(),
+    delete: vi.fn(),
+  }),
+  headers: vi.fn().mockReturnValue(new Headers()),
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: vi.fn().mockReturnValue({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+    prefetch: vi.fn(),
+    refresh: vi.fn(),
+  }),
+  usePathname: vi.fn().mockReturnValue('/'),
+  useSearchParams: vi.fn().mockReturnValue(new URLSearchParams()),
+}));
+
+// ============================================================================
 // Cleanup between tests
 // ============================================================================
 

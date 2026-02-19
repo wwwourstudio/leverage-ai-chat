@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
+import { xai } from '@ai-sdk/xai';
 import {
   AI_CONFIG,
   SYSTEM_PROMPT,
@@ -87,11 +88,11 @@ export async function POST(request: NextRequest) {
     if (xaiApiKey) {
       try {
         const result = await generateText({
-          model: AI_CONFIG.MODEL_NAME as any,
+          model: xai('grok-4-fast', { apiKey: xaiApiKey }),
           system: SYSTEM_PROMPT,
           prompt: enrichedPrompt,
           temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-          maxTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
+          maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
           maxRetries: 2,
         });
 

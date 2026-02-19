@@ -449,7 +449,7 @@ export async function generateContextualCards(
     // Try to detect real arbitrage opportunities
     console.log('[v0] [CARDS GENERATOR] Checking for arbitrage opportunities');
     try {
-      const { detectArbitrageFromContext } = await import('@/lib/arbitrage-detector');
+      const { detectArbitrageFromContext } = await import('@/lib/arbitrage');
       const arbitrageCards = await detectArbitrageFromContext(normalizedSport);
       
       console.log('[v0] [CARDS GENERATOR] Arbitrage cards returned:', {

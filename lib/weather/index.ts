@@ -5,7 +5,51 @@
  */
 
 import { EXTERNAL_APIS, CARD_TYPES, CARD_STATUS, LOG_PREFIXES } from '@/lib/constants';
-import { Stadium, getStadiumByTeam } from '@/lib/stadium-database';
+
+// Minimal stadium data inlined (lib/stadium-database was removed in refactor)
+interface Stadium {
+  team: string;
+  latitude: number;
+  longitude: number;
+  timezone: string;
+  roofType: 'open' | 'dome' | 'retractable';
+}
+
+const STADIUM_DATABASE: Stadium[] = [
+  { team: 'Green Bay Packers', latitude: 44.5013, longitude: -88.0622, timezone: 'America/Chicago', roofType: 'open' },
+  { team: 'Kansas City Chiefs', latitude: 39.0489, longitude: -94.4839, timezone: 'America/Chicago', roofType: 'open' },
+  { team: 'Buffalo Bills', latitude: 42.7738, longitude: -78.7870, timezone: 'America/New_York', roofType: 'open' },
+  { team: 'Chicago Bears', latitude: 41.8623, longitude: -87.6167, timezone: 'America/Chicago', roofType: 'open' },
+  { team: 'New York Giants', latitude: 40.8136, longitude: -74.0745, timezone: 'America/New_York', roofType: 'open' },
+  { team: 'New York Jets', latitude: 40.8136, longitude: -74.0745, timezone: 'America/New_York', roofType: 'open' },
+  { team: 'Denver Broncos', latitude: 39.7439, longitude: -105.0201, timezone: 'America/Denver', roofType: 'open' },
+  { team: 'Seattle Seahawks', latitude: 47.5952, longitude: -122.3316, timezone: 'America/Los_Angeles', roofType: 'open' },
+  { team: 'San Francisco 49ers', latitude: 37.4033, longitude: -121.9694, timezone: 'America/Los_Angeles', roofType: 'open' },
+  { team: 'New England Patriots', latitude: 42.0909, longitude: -71.2643, timezone: 'America/New_York', roofType: 'open' },
+  { team: 'Pittsburgh Steelers', latitude: 40.4468, longitude: -80.0158, timezone: 'America/New_York', roofType: 'open' },
+  { team: 'Cleveland Browns', latitude: 41.5061, longitude: -81.6995, timezone: 'America/New_York', roofType: 'open' },
+  { team: 'Baltimore Ravens', latitude: 39.2779, longitude: -76.6227, timezone: 'America/New_York', roofType: 'open' },
+  { team: 'Cincinnati Bengals', latitude: 39.0954, longitude: -84.5160, timezone: 'America/New_York', roofType: 'open' },
+  { team: 'Miami Dolphins', latitude: 25.9580, longitude: -80.2389, timezone: 'America/New_York', roofType: 'open' },
+  { team: 'Los Angeles Rams', latitude: 33.9535, longitude: -118.3392, timezone: 'America/Los_Angeles', roofType: 'dome' },
+  { team: 'Los Angeles Chargers', latitude: 33.9535, longitude: -118.3392, timezone: 'America/Los_Angeles', roofType: 'dome' },
+  // MLB outdoor stadiums
+  { team: 'Chicago Cubs', latitude: 41.9484, longitude: -87.6554, timezone: 'America/Chicago', roofType: 'open' },
+  { team: 'Boston Red Sox', latitude: 42.3467, longitude: -71.0972, timezone: 'America/New_York', roofType: 'open' },
+  { team: 'New York Yankees', latitude: 40.8296, longitude: -73.9262, timezone: 'America/New_York', roofType: 'open' },
+  { team: 'New York Mets', latitude: 40.7571, longitude: -73.8458, timezone: 'America/New_York', roofType: 'open' },
+  { team: 'San Francisco Giants', latitude: 37.7786, longitude: -122.3893, timezone: 'America/Los_Angeles', roofType: 'open' },
+  { team: 'Los Angeles Dodgers', latitude: 34.0739, longitude: -118.2400, timezone: 'America/Los_Angeles', roofType: 'open' },
+  { team: 'Pittsburgh Pirates', latitude: 40.4469, longitude: -80.0057, timezone: 'America/New_York', roofType: 'open' },
+];
+
+function getStadiumByTeam(teamName: string): Stadium | undefined {
+  const normalized = teamName.toLowerCase();
+  return STADIUM_DATABASE.find(stadium =>
+    stadium.team.toLowerCase().includes(normalized) ||
+    normalized.includes(stadium.team.toLowerCase())
+  );
+}
 
 // ============================================
 // Types

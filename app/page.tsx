@@ -7,6 +7,8 @@
  * @module app/page-wrapper
  */
 
+export const dynamic = 'force-dynamic';
+
 import { Suspense } from 'react';
 import { loadServerData, type ServerDataResult } from '@/lib/server-data-loader';
 import { logEnvValidation, validateServerEnv } from '@/lib/env-validator';

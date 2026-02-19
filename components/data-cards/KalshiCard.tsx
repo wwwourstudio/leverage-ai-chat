@@ -2,7 +2,7 @@
 
 import { BarChart3, Activity, Sparkles } from 'lucide-react';
 import { BaseCard } from './BaseCard';
-import { DataGrid } from './DataRow';
+import { DataRow } from './DataRow';
 
 interface KalshiCardProps {
   type: string;
@@ -35,9 +35,7 @@ export function KalshiCard({
   error
 }: KalshiCardProps) {
   const statusBadge = statusMap[status] || statusMap.opportunity;
-
-  // Extract focus and other structured data
-  const { focus, targetMarket, inefficiencies, ...remainingData } = data as any;
+  const d = data as any;
 
   return (
     <BaseCard
@@ -51,36 +49,46 @@ export function KalshiCard({
       isLoading={isLoading}
       error={error}
     >
-      <div className="space-y-3.5">
-        {/* Focus section */}
-        {focus && (
-          <div className="pb-3.5 border-b border-gray-700/30">
-            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2.5 opacity-90">Focus</div>
-            <div className="text-sm font-medium text-gray-200 leading-relaxed">{focus}</div>
+      <div className="space-y-2.5">
+        {/* Subtitle / ticker */}
+        {d.subtitle && (
+          <div className="pb-2.5 border-b border-gray-700/30">
+            <div className="text-sm font-medium text-gray-200 leading-relaxed">{d.subtitle}</div>
           </div>
         )}
-        
-        {/* Target sections */}
-        {targetMarket && (
-          <div className="pb-2.5">
-            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 opacity-90">Target market</div>
-            <div className="text-[13px] font-semibold text-white leading-snug">{targetMarket}</div>
+        {d.ticker && !d.subtitle && <DataRow label="Ticker" value={d.ticker} highlight />}
+
+        {/* Prices */}
+        {(d.yesPrice !== undefined || d.noPrice !== undefined) && (
+          <DataRow
+            label="Yes / No"
+            value={`${d.yesPrice !== undefined ? d.yesPrice + '¢' : '—'} / ${d.noPrice !== undefined ? d.noPrice + '¢' : '—'}`}
+            highlight
+          />
+        )}
+        {d.impliedProbability !== undefined && (
+          <DataRow label="Implied Prob" value={`${d.impliedProbability}%`} />
+        )}
+
+        {/* Market depth */}
+        {d.volume !== undefined && <DataRow label="Volume" value={`$${d.volume}`} />}
+        {d.openInterest !== undefined && <DataRow label="Open Interest" value={`$${d.openInterest}`} />}
+
+        {/* Timing */}
+        {d.closeTime && <DataRow label="Closes" value={d.closeTime} />}
+
+        {/* Recommendation */}
+        {d.recommendation && (
+          <div className="pt-2 mt-1 border-t border-gray-700/40">
+            <DataRow label="Signal" value={d.recommendation} highlight />
           </div>
         )}
-        
-        {inefficiencies && (
-          <div className="pb-2.5">
-            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 opacity-90">Market inefficiencies</div>
-            <div className="text-[13px] font-semibold text-white leading-snug">{inefficiencies}</div>
-          </div>
+
+        {/* Fallback description */}
+        {d.description && !d.subtitle && (
+          <div className="text-sm text-gray-400 leading-relaxed">{d.description}</div>
         )}
-        
-        {/* Remaining data */}
-        {Object.keys(remainingData).length > 0 && (
-          <div className="pt-2">
-            <DataGrid data={remainingData} empty="" />
-          </div>
-        )}
+        {d.note && <DataRow label="Note" value={d.note} />}
       </div>
     </BaseCard>
   );

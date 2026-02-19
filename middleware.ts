@@ -13,9 +13,20 @@ export async function middleware(request: NextRequest) {
     request: { headers: request.headers },
   });
 
+  // Check if Supabase is configured before attempting auth
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    // Supabase not configured - skip auth checks, allow all requests
+    // Protected routes will handle missing auth gracefully
+    return response;
+  }
+
+  // Supabase is configured - proceed with auth middleware
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         get(name: string) {

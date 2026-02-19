@@ -1,415 +1,253 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { runTradingEngine } from '@/lib/engine/runTradingEngine';
-import type { TradingInput, TradingEngineResult } from '@/lib/engine/runTradingEngine';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  AlertTriangle, 
-  CheckCircle2, 
-  DollarSign, 
-  Activity, 
-  Target, 
-  Zap,
-  BarChart3,
-  ArrowUpRight,
-  ArrowDownRight,
-  Info,
+import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
+import {
+  ArrowLeft,
+  TrendingUp,
+  TrendingDown,
+  RefreshCw,
+  Activity,
   Clock,
-  RefreshCw
+  ChevronRight,
 } from 'lucide-react';
 
-export default function TradingEngineDashboard() {
-  const [results, setResults] = useState<TradingEngineResult | null>(null);
-  const [isRunning, setIsRunning] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+interface OddsEvent {
+  id: string;
+  sport_title: string;
+  home_team: string;
+  away_team: string;
+  commence_time: string;
+  bookmakers: Array<{
+    key: string;
+    title: string;
+    markets: Array<{
+      key: string;
+      outcomes: Array<{ name: string; price: number; point?: number }>;
+    }>;
+  }>;
+}
 
-  // Demo inputs - replace with real API data
-  const demoInputs: TradingInput = {
-    odds: [
-      {
-        book: 'DraftKings',
-        market: 'h2h',
-        outcome: 'Lakers',
-        price: -110
-      },
-      {
-        book: 'FanDuel',
-        market: 'h2h',
-        outcome: 'Lakers',
-        price: 105
-      },
-      {
-        book: 'BetMGM',
-        market: 'h2h',
-        outcome: 'Lakers',
-        price: -105
-      }
-    ],
-    tickets: [
-      { side: 'Lakers', count: 3500, handle: 125000 },
-      { side: 'Warriors', count: 4200, handle: 98000 }
-    ],
-    lines: [
-      { time: new Date(Date.now() - 3600000), price: -108, bookmaker: 'consensus' },
-      { time: new Date(Date.now() - 1800000), price: -110, bookmaker: 'consensus' },
-      { time: new Date(), price: -110, bookmaker: 'consensus' }
-    ],
-    kalshiMarket: {
-      yesPrice: 54,
-      noPrice: 46,
-      volume: 125000,
-      historicalPrices: [52, 53, 54, 54, 54]
-    },
-    modelProbability: 0.58,
-    bankroll: 10000
-  };
+const SPORTS = [
+  { key: 'basketball_nba', label: 'NBA' },
+  { key: 'americanfootball_nfl', label: 'NFL' },
+  { key: 'baseball_mlb', label: 'MLB' },
+  { key: 'icehockey_nhl', label: 'NHL' },
+] as const;
 
-  const runEngine = async () => {
-    setIsRunning(true);
+function formatOdds(price: number): string {
+  return price > 0 ? `+${price}` : `${price}`;
+}
+
+function OddsCell({ price }: { price: number }) {
+  const isFavorite = price < 0;
+  return (
+    <span
+      className={`font-mono text-sm font-medium ${
+        isFavorite ? 'text-emerald-400' : 'text-amber-400'
+      }`}
+    >
+      {formatOdds(price)}
+    </span>
+  );
+}
+
+export default function TradingPage() {
+  const [selectedSport, setSelectedSport] = useState(SPORTS[0].key);
+  const [events, setEvents] = useState<OddsEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const fetchOdds = useCallback(async (sport: string) => {
+    setLoading(true);
+    setError(null);
+
     try {
-      const engineResults = runTradingEngine(demoInputs);
-      setResults(engineResults);
-      setLastUpdate(new Date());
-    } catch (error) {
-      console.error('[v0] Trading engine error:', error);
-    } finally {
-      setIsRunning(false);
-    }
-  };
+      const res = await fetch('/api/odds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sport, marketType: 'h2h' }),
+      });
 
-  useEffect(() => {
-    runEngine();
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        throw new Error(`Unexpected response (${res.status})`);
+      }
+
+      const data = await res.json();
+
+      if (!data.success) {
+        setError(data.error || 'Failed to load odds');
+        setEvents([]);
+      } else {
+        setEvents(Array.isArray(data.events) ? data.events : []);
+        setLastUpdated(new Date());
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Network error');
+      setEvents([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const formatCurrency = (value: number) => `$${value.toFixed(2)}`;
-  const formatPercent = (value: number) => `${(value * 100).toFixed(2)}%`;
-  const formatOdds = (decimal: number) => {
-    const american = decimal >= 2.0 
-      ? `+${Math.round((decimal - 1) * 100)}`
-      : `-${Math.round(100 / (decimal - 1))}`;
-    return american;
-  };
+  useEffect(() => {
+    fetchOdds(selectedSport);
+  }, [selectedSport, fetchOdds]);
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Trading Engine</h1>
-            <p className="text-muted-foreground mt-1">
-              Real-time arbitrage, sharp money, and Kelly sizing analysis
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border">
+        <div className="mx-auto flex max-w-4xl items-center gap-4 px-6 py-4">
+          <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="h-5 w-5" />
+            <span className="sr-only">Back to home</span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <Activity className="h-5 w-5 text-primary" />
+            <h1 className="text-lg font-semibold text-foreground">Live Odds</h1>
+          </div>
+          <button
+            onClick={() => fetchOdds(selectedSport)}
+            disabled={loading}
+            className="ml-auto flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-4xl px-6 py-6 space-y-6">
+        {/* Sport selector */}
+        <nav className="flex gap-2 overflow-x-auto pb-1" aria-label="Sport selector">
+          {SPORTS.map((sport) => (
+            <button
+              key={sport.key}
+              onClick={() => setSelectedSport(sport.key)}
+              className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                selectedSport === sport.key
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {sport.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Status bar */}
+        {lastUpdated && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            <span>Updated {lastUpdated.toLocaleTimeString()}</span>
+            <span className="mx-1">-</span>
+            <span>{events.length} games</span>
+          </div>
+        )}
+
+        {/* Error state */}
+        {error && (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
+        {/* Loading state */}
+        {loading && (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="animate-pulse rounded-xl border border-border bg-card p-5 space-y-3"
+              >
+                <div className="h-4 w-48 rounded bg-secondary" />
+                <div className="flex gap-4">
+                  <div className="h-3 w-24 rounded bg-secondary" />
+                  <div className="h-3 w-16 rounded bg-secondary" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Events list */}
+        {!loading && events.length === 0 && !error && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Activity className="h-10 w-10 text-muted-foreground mb-3" />
+            <p className="text-sm text-muted-foreground">
+              No live games scheduled for{' '}
+              {SPORTS.find((s) => s.key === selectedSport)?.label || 'this sport'}.
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Games typically appear 24-48 hours before start time.
             </p>
           </div>
-          <div className="flex items-center gap-4">
-            {lastUpdate && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="w-4 h-4" />
-                <span>Last updated: {lastUpdate.toLocaleTimeString()}</span>
-              </div>
-            )}
-            <button
-              onClick={runEngine}
-              disabled={isRunning}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
-            >
-              <RefreshCw className={`w-4 h-4 ${isRunning ? 'animate-spin' : ''}`} />
-              {isRunning ? 'Running...' : 'Run Analysis'}
-            </button>
-          </div>
-        </div>
+        )}
 
-        {results && (
-          <>
-            {/* Arbitrage Opportunities */}
-            {results.arbitrage && results.arbitrage.length > 0 && (() => {
-              const arb = results.arbitrage![0];
+        {!loading && events.length > 0 && (
+          <div className="space-y-3">
+            {events.map((event) => {
+              const firstBook = event.bookmakers?.[0];
+              const h2h = firstBook?.markets?.find((m) => m.key === 'h2h');
+              const homeOutcome = h2h?.outcomes?.find((o) => o.name === event.home_team);
+              const awayOutcome = h2h?.outcomes?.find((o) => o.name === event.away_team);
+              const gameTime = new Date(event.commence_time);
+              const isUpcoming = gameTime > new Date();
+
               return (
-              <div className="bg-card border border-border rounded-2xl p-6 shadow-lg">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-3 bg-[var(--success)]/10 rounded-xl">
-                    <Zap className="w-6 h-6 text-[var(--success)]" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-foreground">Arbitrage Opportunity</h2>
-                    <p className="text-sm text-muted-foreground">Risk-free profit detected</p>
-                  </div>
-                </div>
+                <div
+                  key={event.id}
+                  className="group rounded-xl border border-border bg-card p-5 hover:border-primary/30 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Clock className="h-3.5 w-3.5" />
+                        <time dateTime={event.commence_time}>
+                          {isUpcoming
+                            ? gameTime.toLocaleString(undefined, {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              })
+                            : 'Live'}
+                        </time>
+                        {firstBook && (
+                          <>
+                            <span className="mx-1">-</span>
+                            <span>{firstBook.title}</span>
+                          </>
+                        )}
+                      </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Total Implied Prob</div>
-                    <div className="text-2xl font-bold text-foreground">
-                      {formatPercent(arb.totalImpliedProbability)}
-                    </div>
-                  </div>
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Profit Margin</div>
-                    <div className="text-2xl font-bold text-[var(--success)]">
-                      {formatPercent(arb.profitMargin)}
-                    </div>
-                  </div>
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Expected Return</div>
-                    <div className="text-2xl font-bold text-[var(--success)]">
-                      {formatCurrency(arb.expectedReturn ?? 0)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="text-sm font-semibold text-foreground mb-2">Optimal Bet Allocation</div>
-                  {(arb.bets ?? []).map((bet: { outcome: string; bookmaker: string; stake: number; odds: number }, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between bg-background/50 rounded-xl p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                          <DollarSign className="w-6 h-6 text-primary" />
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-medium text-foreground">
+                            {event.away_team}
+                          </span>
+                          {awayOutcome && <OddsCell price={awayOutcome.price} />}
                         </div>
-                        <div>
-                          <div className="font-semibold text-foreground">{bet.outcome}</div>
-                          <div className="text-sm text-muted-foreground">{bet.bookmaker}</div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-medium text-foreground">
+                            {event.home_team}
+                          </span>
+                          {homeOutcome && <OddsCell price={homeOutcome.price} />}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-bold text-foreground">{formatCurrency(bet.stake)}</div>
-                        <div className="text-sm text-muted-foreground">@ {formatOdds(bet.odds)}</div>
-                      </div>
                     </div>
-                  ))}
+
+                    <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity mt-1 shrink-0" />
+                  </div>
                 </div>
-              </div>
               );
-            })()}
-
-            {/* Sharp Money Detection */}
-            {results.sharp && (
-              <div className="bg-card border border-border rounded-2xl p-6 shadow-lg">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-3 bg-[var(--warning)]/10 rounded-xl">
-                    <Activity className="w-6 h-6 text-[var(--warning)]" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-foreground">Sharp Money Analysis</h2>
-                    <p className="text-sm text-muted-foreground">Reverse line movement detected</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Public Side</div>
-                    <div className="text-xl font-bold text-foreground">{results.sharp.publicSide}</div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {formatPercent(results.sharp.publicPercentage ?? 0)} tickets
-                    </div>
-                  </div>
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Sharp Side</div>
-                    <div className="text-xl font-bold text-[var(--warning)]">{results.sharp.sharpSide}</div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      Reverse movement
-                    </div>
-                  </div>
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Money % (Sharp)</div>
-                    <div className="text-xl font-bold text-foreground">
-                      {formatPercent(results.sharp.moneyPercentage ?? 0)}
-                    </div>
-                  </div>
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Confidence</div>
-                    <div className="text-xl font-bold text-[var(--success)]">
-                      {results.sharpSignal?.isReverseLineMovement ? 'High' : 'Medium'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Kelly Criterion */}
-            {results.kelly && (
-              <div className="bg-card border border-border rounded-2xl p-6 shadow-lg">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-3 bg-[var(--info)]/10 rounded-xl">
-                    <Target className="w-6 h-6 text-[var(--info)]" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-foreground">Kelly Criterion Sizing</h2>
-                    <p className="text-sm text-muted-foreground">Optimal bankroll allocation</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Your Edge</div>
-                    <div className="text-2xl font-bold text-[var(--success)]">
-                      {formatPercent(results.kelly.edge ?? 0)}
-                    </div>
-                  </div>
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Full Kelly</div>
-                    <div className="text-2xl font-bold text-foreground">
-                      {formatCurrency(results.kelly.fullKellyStake)}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {formatPercent(results.kelly.fullKellyPercent ?? 0)} of bankroll
-                    </div>
-                  </div>
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Half Kelly</div>
-                    <div className="text-2xl font-bold text-[var(--info)]">
-                      {formatCurrency(results.kelly.halfKellyStake ?? 0)}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {formatPercent(results.kelly.halfKellyPercent ?? 0)} of bankroll
-                    </div>
-                  </div>
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Expected Value</div>
-                    <div className="text-2xl font-bold text-[var(--success)]">
-                      {formatCurrency(results.kelly.expectedValue ?? 0)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-[var(--info)]/5 border border-[var(--info)]/20 rounded-xl p-4 flex items-start gap-3">
-                  <Info className="w-5 h-5 text-[var(--info)] mt-0.5 flex-shrink-0" />
-                  <div className="text-sm text-foreground">
-                    <span className="font-semibold">Recommendation:</span> Use half-Kelly for conservative bankroll growth. 
-                    Full Kelly maximizes long-term growth but increases variance significantly.
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Line Movement */}
-            {results.lineMovement && (
-              <div className="bg-card border border-border rounded-2xl p-6 shadow-lg">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-3 bg-primary/10 rounded-xl">
-                    {results.lineMovement.direction === 'up' ? (
-                      <TrendingUp className="w-6 h-6 text-primary" />
-                    ) : (
-                      <TrendingDown className="w-6 h-6 text-destructive" />
-                    )}
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-foreground">Line Movement Analysis</h2>
-                    <p className="text-sm text-muted-foreground">Opening to current price tracking</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Opening Line</div>
-                    <div className="text-xl font-bold text-foreground">
-                      {formatOdds(results.lineMovement.openingPrice)}
-                    </div>
-                  </div>
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Current Line</div>
-                    <div className="text-xl font-bold text-foreground">
-                      {formatOdds(results.lineMovement.currentPrice)}
-                    </div>
-                  </div>
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Movement</div>
-                    <div className={`text-xl font-bold flex items-center gap-1 ${
-                      results.lineMovement.direction === 'up' ? 'text-[var(--success)]' : 'text-destructive'
-                    }`}>
-                      {results.lineMovement.direction === 'up' ? (
-                        <ArrowUpRight className="w-5 h-5" />
-                      ) : (
-                        <ArrowDownRight className="w-5 h-5" />
-                      )}
-                      {formatPercent(Math.abs(results.lineMovement.percentChange))}
-                    </div>
-                  </div>
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Strength</div>
-                    <div className="text-xl font-bold text-foreground capitalize">
-                      {results.lineMovement.strength}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Kalshi Analysis */}
-            {results.kalshi && (
-              <div className="bg-card border border-border rounded-2xl p-6 shadow-lg">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-3 bg-primary/10 rounded-xl">
-                    <BarChart3 className="w-6 h-6 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-foreground">Kalshi Market Analysis</h2>
-                    <p className="text-sm text-muted-foreground">Prediction market volatility & edge</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Current Price</div>
-                    <div className="text-2xl font-bold text-foreground">
-                      {formatPercent(results.kalshi.currentPrice ?? 0)}
-                    </div>
-                  </div>
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Volatility</div>
-                    <div className="text-2xl font-bold text-[var(--warning)]">
-                      {results.kalshi.volatility.toFixed(3)}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {results.kalshi.isVolatile ? 'High' : 'Low'}
-                    </div>
-                  </div>
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">Model Edge</div>
-                    <div className={`text-2xl font-bold ${
-                      (results.kalshi.edgeVsModel ?? 0) > 0 ? 'text-[var(--success)]' : 'text-destructive'
-                    }`}>
-                      {(results.kalshi.edgeVsModel ?? 0) > 0 ? '+' : ''}{formatPercent(results.kalshi.edgeVsModel ?? 0)}
-                    </div>
-                  </div>
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="text-sm text-muted-foreground mb-1">24h Volume</div>
-                    <div className="text-2xl font-bold text-foreground">
-                      {(results.kalshi.volume24h ?? 0).toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Engine Metadata */}
-            <div className="bg-muted/30 border border-border rounded-xl p-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <CheckCircle2 className="w-4 h-4 text-[var(--success)]" />
-                <span>
-                  Analysis complete • {results.metadata?.modulesRun?.length ?? 0} modules executed •
-                  Timestamp: {new Date(results.metadata?.timestamp ?? Date.now()).toLocaleString()}
-                </span>
-              </div>
-            </div>
-          </>
-        )}
-
-        {!results && !isRunning && (
-          <div className="bg-card border border-border rounded-2xl p-12 text-center">
-            <div className="max-w-md mx-auto">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Activity className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="text-xl font-bold text-foreground mb-2">No Analysis Yet</h3>
-              <p className="text-muted-foreground mb-6">
-                Click "Run Analysis" to start the trading engine and detect opportunities
-              </p>
-            </div>
+            })}
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

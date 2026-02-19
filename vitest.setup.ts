@@ -1,24 +1,56 @@
-import { beforeAll, afterEach, vi } from 'vitest';
+import '@testing-library/jest-dom/vitest';
+import { vi, afterEach } from 'vitest';
 
-// Setup test environment variables before all tests
-beforeAll(() => {
-  (process.env as Record<string, string>).NODE_ENV = 'test';
-  
-  // Supabase
-  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
-  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-key';
-  
-  // API Keys
-  process.env.XAI_API_KEY = 'test-xai-key';
-  process.env.ODDS_API_KEY = 'test-odds-key';
-  process.env.WEATHER_API_KEY = 'test-weather-key';
-  process.env.KALSHI_API_KEY = 'test-kalshi-key';
-  process.env.KALSHI_SECRET = 'test-kalshi-secret';
-});
+// ============================================================================
+// Global mocks for Node / browser APIs used throughout the app
+// ============================================================================
 
-// Clean up after each test
+// Provide a minimal fetch mock so tests that import modules with top-level
+// fetch calls don't fail at import time.  Tests should override via
+// vi.spyOn(globalThis, 'fetch') when they need specific responses.
+if (!globalThis.fetch) {
+  globalThis.fetch = vi.fn().mockResolvedValue(
+    new Response(JSON.stringify({}), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  );
+}
+
+// Stub Next.js environment variables commonly referenced at module scope
+process.env.NEXT_PUBLIC_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:54321';
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'test-anon-key';
+
+// ============================================================================
+// Mock Next.js server-only modules that crash outside the runtime
+// ============================================================================
+
+vi.mock('next/headers', () => ({
+  cookies: vi.fn().mockReturnValue({
+    getAll: vi.fn().mockReturnValue([]),
+    set: vi.fn(),
+    get: vi.fn(),
+    delete: vi.fn(),
+  }),
+  headers: vi.fn().mockReturnValue(new Headers()),
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: vi.fn().mockReturnValue({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+    prefetch: vi.fn(),
+    refresh: vi.fn(),
+  }),
+  usePathname: vi.fn().mockReturnValue('/'),
+  useSearchParams: vi.fn().mockReturnValue(new URLSearchParams()),
+}));
+
+// ============================================================================
+// Cleanup between tests
+// ============================================================================
+
 afterEach(() => {
-  // Clear any mocks or timers if needed
-  vi.clearAllMocks();
+  vi.restoreAllMocks();
 });

@@ -1,365 +1,82 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOddsApiKey, isOddsApiConfigured } from '@/lib/config';
 import {
-  EXTERNAL_APIS,
-  LOG_PREFIXES,
-  ERROR_MESSAGES,
-  HTTP_STATUS,
-  MARKET_TYPES,
-} from '@/lib/constants';
-import { validateSportKey, getSportInfo, isValidSport } from '@/lib/sports-validator';
-import { storeOddsData, getRecentOdds } from '@/lib/odds-persistence';
+  fetchLiveOdds,
+  validateSportKey,
+  ODDS_MARKETS,
+  BETTING_REGIONS,
+} from '@/lib/odds/index';
+import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/lib/constants';
 
-// Sports Odds API integration
-// Documentation: https://the-odds-api.com/
+// ============================================================================
+// POST /api/odds
+// ============================================================================
 
-export const runtime = 'edge';
-
-interface OddsRequest {
-  sport: string;
-  marketType?: string;
-  eventId?: string;
-}
-
-// Simple in-memory cache for odds data
-const oddsCache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_TTL = 60000; // 1 minute cache
-
-function getCachedOdds(key: string): any | null {
-  const cached = oddsCache.get(key);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    console.log(`[v0] Cache HIT for ${key}`);
-    return cached.data;
-  }
-  if (cached) {
-    oddsCache.delete(key); // Remove stale cache
-  }
-  return null;
-}
-
-function setCachedOdds(key: string, data: any): void {
-  oddsCache.set(key, { data, timestamp: Date.now() });
-  
-  // Limit cache size to prevent memory issues
-  if (oddsCache.size > 100) {
-    const oldestKey = Array.from(oddsCache.entries())
-      .sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0];
-    oddsCache.delete(oldestKey);
-  }
-}
-
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const { sport, marketType, eventId }: OddsRequest = await req.json();
+    const body = await request.json();
+    const { sport, marketType = 'h2h' } = body;
 
-    // Check if Odds API is configured
-    if (!isOddsApiConfigured()) {
-      console.log(`${LOG_PREFIXES.API} ODDS_API_KEY is not configured`);
+    if (!sport) {
       return NextResponse.json(
-        { 
-          error: ERROR_MESSAGES.ODDS_NOT_CONFIGURED, 
-          message: 'Please add ODDS_API_KEY to environment variables.',
-          documentation: 'See ENV_CONFIGURATION.md for setup instructions',
-          events: [],
-          timestamp: new Date().toISOString()
-        },
-        { status: HTTP_STATUS.SERVICE_UNAVAILABLE }
+        { success: false, error: 'Missing required field: sport', events: [] },
+        { status: HTTP_STATUS.BAD_REQUEST }
       );
     }
 
-    const oddsApiKey = getOddsApiKey();
-    console.log(`[v0] ODDS_API_KEY configured: ${oddsApiKey ? `${oddsApiKey.substring(0, 8)}...` : 'MISSING'}`);
-
-    // Validate and normalize the sport key
-    const sportValidation = validateSportKey(sport);
-    const normalizedSport = sportValidation.normalizedKey;
-    const sportInfo = getSportInfo(normalizedSport);
-    
-    // Log validation results
-    if (!sportValidation.isValid) {
-      console.log(`${LOG_PREFIXES.API} Sport validation:`, sportValidation.error, sportValidation.suggestion);
-    }
-    
-    console.log(`${LOG_PREFIXES.API} Fetching odds for ${sportInfo.name} (${sportInfo.apiKey}), market: ${marketType || MARKET_TYPES.H2H}`);
-
-    // Check cache first
-    const cacheKey = `${normalizedSport}:${marketType || MARKET_TYPES.H2H}:${eventId || 'all'}`;
-    const cachedData = getCachedOdds(cacheKey);
-    
-    if (cachedData) {
-      return NextResponse.json({
-        ...cachedData,
-        cached: true,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // Build API URL based on request parameters
-    const baseUrl = `${EXTERNAL_APIS.ODDS_API.BASE_URL}/sports`;
-    
-    // If eventId is provided, fetch specific event odds
-    let apiUrl: string;
-    if (eventId) {
-      apiUrl = `${baseUrl}/${normalizedSport}/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}&markets=${marketType || MARKET_TYPES.H2H}`;
-    } else {
-      // Fetch odds for all upcoming events
-      apiUrl = `${baseUrl}/${normalizedSport}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}&markets=${marketType || MARKET_TYPES.H2H}`;
-    }
-
-    console.log(`[v0] === ODDS API REQUEST DEBUG ===`);
-    console.log(`[v0] Sport: ${normalizedSport} (${sportInfo.name})`);
-    console.log(`[v0] Market: ${marketType || MARKET_TYPES.H2H}`);
-    console.log(`[v0] URL: ${apiUrl.replace(oddsApiKey || '', 'REDACTED')}`);
-    console.log(`[v0] API Key configured: ${oddsApiKey ? 'YES' : 'NO'}`);
-    console.log(`[v0] ==============================`);
-    
-    // Retry logic with exponential backoff
-    let response: Response | null = null;
-    let lastError: Error | null = null;
-    const maxRetries = 3;
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`[v0] Odds API attempt ${attempt}/${maxRetries}...`);
-        
-        response = await fetch(apiUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-          },
-          signal: AbortSignal.timeout(10000) // 10 second timeout
-        });
-        
-        if (response.ok) {
-          break; // Success, exit retry loop
-        }
-        
-        // Don't retry on 4xx errors (client errors)
-        if (response.status >= 400 && response.status < 500) {
-          console.log(`[v0] Client error ${response.status}, not retrying`);
-          break;
-        }
-        
-        // Retry on 5xx errors (server errors)
-        console.log(`[v0] Server error ${response.status}, will retry...`);
-        lastError = new Error(`HTTP ${response.status}`);
-        
-        if (attempt < maxRetries) {
-          const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-          console.log(`[v0] Waiting ${backoffMs}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, backoffMs));
-        }
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        console.error(`[v0] Fetch attempt ${attempt} failed:`, lastError.message);
-        
-        if (attempt < maxRetries) {
-          const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-          await new Promise(resolve => setTimeout(resolve, backoffMs));
-        }
-      }
-    }
-    
-    if (!response) {
-      throw lastError || new Error('Failed to fetch odds after retries');
-    }
-
-    console.log(`[v0] Odds API response status: ${response.status}`);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.log(`${LOG_PREFIXES.API} Odds API error:`, response.status, errorText.substring(0, 200));
-      console.log(`[v0] Full error response:`, errorText);
+    // Validate and normalize sport key
+    const validation = validateSportKey(sport);
+    if (!validation.isValid || !validation.normalizedKey) {
       return NextResponse.json(
-        { 
-          error: 'Failed to fetch odds data',
-          details: response.status === HTTP_STATUS.UNAUTHORIZED ? ERROR_MESSAGES.INVALID_API_KEY : errorText.substring(0, 100) 
-        },
-        { status: response.status }
+        { success: false, error: validation.error || `Unknown sport: ${sport}`, events: [] },
+        { status: HTTP_STATUS.BAD_REQUEST }
       );
     }
 
-    const data = await response.json();
-
-    console.log(`[v0] === ODDS API RESPONSE DEBUG ===`);
-    console.log(`[v0] HTTP Status: ${response.status}`);
-    console.log(`[v0] Events returned: ${Array.isArray(data) ? data.length : 1}`);
-    console.log(`[v0] Is Array: ${Array.isArray(data)}`);
-    console.log(`[v0] Data type: ${typeof data}`);
-    console.log(`[v0] API Remaining: ${response.headers.get('x-requests-remaining')}`);
-    console.log(`[v0] API Used: ${response.headers.get('x-requests-used')}`);
-    
-    if (Array.isArray(data) && data.length > 0) {
-      console.log(`[v0] Sample event:`, {
-        id: data[0].id,
-        home: data[0].home_team,
-        away: data[0].away_team,
-        commence: data[0].commence_time,
-        bookmakers: data[0].bookmakers?.length || 0
-      });
-    } else if (Array.isArray(data) && data.length === 0) {
-      console.log(`[v0] EMPTY ARRAY - No upcoming games for ${sportInfo.name}, trying scores endpoint...`);
-      
-      // FALLBACK: Fetch recent scores when no upcoming games exist
-      try {
-        const scoresUrl = `${EXTERNAL_APIS.ODDS_API.BASE_URL}/sports/${normalizedSport}/scores/?apiKey=${oddsApiKey}&daysFrom=3`;
-        console.log(`[v0] Fetching recent scores: ${scoresUrl.replace(oddsApiKey || '', 'REDACTED')}`);
-        
-        const scoresResponse = await fetch(scoresUrl, {
-          headers: { 'Accept': 'application/json' },
-          signal: AbortSignal.timeout(10000)
-        });
-        
-        if (scoresResponse.ok) {
-          const scoresData = await scoresResponse.json();
-          console.log(`[v0] Scores endpoint returned ${scoresData?.length || 0} games`);
-          
-          if (Array.isArray(scoresData) && scoresData.length > 0) {
-            // Replace empty data with scores data
-            data.push(...scoresData);
-            console.log(`[v0] Added ${scoresData.length} recent/upcoming games from scores endpoint`);
-          }
-        }
-      } catch (scoresError) {
-        console.error('[v0] Scores fallback error:', scoresError);
-      }
-    }
-    console.log(`[v0] ===============================`);
-
-    // Transform the data into a consistent format
-    const transformedData = {
-      sport: normalizedSport,
-      sportInfo,
-      sportValidation,
-      marketType: marketType || MARKET_TYPES.H2H,
-      events: Array.isArray(data) ? data : [data],
-      timestamp: new Date().toISOString(),
-      remainingRequests: response.headers.get('x-requests-remaining'),
-      usedRequests: response.headers.get('x-requests-used'),
-      cached: false
-    };
-
-    // Calculate implied probabilities from odds
-    transformedData.events = transformedData.events.map((event: any) => {
-      if (event.bookmakers && event.bookmakers.length > 0) {
-        const markets = event.bookmakers[0].markets || [];
-        const oddsWithProbabilities = markets.map((market: any) => {
-          const outcomes = market.outcomes.map((outcome: any) => {
-            // Convert American odds to implied probability
-            const impliedProb = outcome.price > 0
-              ? 100 / (outcome.price + 100)
-              : Math.abs(outcome.price) / (Math.abs(outcome.price) + 100);
-            
-            return {
-              ...outcome,
-              impliedProbability: impliedProb,
-            };
-          });
-          
-          return {
-            ...market,
-            outcomes,
-          };
-        });
-
-        return {
-          ...event,
-          bookmakers: [
-            {
-              ...event.bookmakers[0],
-              markets: oddsWithProbabilities,
-            },
-            ...event.bookmakers.slice(1),
-          ],
-        };
-      }
-      return event;
-    });
-
-    // Cache the transformed data
-    setCachedOdds(cacheKey, transformedData);
-
-    // Store in database (fire and forget - don't block response)
-    storeOddsData(normalizedSport, transformedData.events, {
-      remainingRequests: transformedData.remainingRequests || undefined,
-      usedRequests: transformedData.usedRequests || undefined,
-    })
-      .then((result) => {
-        if (result.success) {
-          console.log(`[v0] ✅ Stored ${result.stored} odds records in database`);
-        } else {
-          console.error(`[v0] ❌ Failed to store odds:`, result.errors);
-        }
-      })
-      .catch((err) => {
-        console.error(`[v0] ❌ Database storage error:`, err);
-      });
-
-    return NextResponse.json(transformedData);
-  } catch (error: any) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.log(`${LOG_PREFIXES.API} Error in odds route:`, errorMessage);
-    return NextResponse.json(
-      { error: ERROR_MESSAGES.INTERNAL_ERROR, details: errorMessage },
-      { status: HTTP_STATUS.INTERNAL_ERROR }
-    );
-  }
-}
-
-// GET endpoint for quick odds lookup
-export async function GET(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const sport = searchParams.get('sport') || 'upcoming';
-
-    if (!isOddsApiConfigured()) {
+    const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+    if (!apiKey) {
       return NextResponse.json(
-        { 
+        {
+          success: false,
           error: ERROR_MESSAGES.ODDS_NOT_CONFIGURED,
-          message: 'See ENV_CONFIGURATION.md for setup',
           events: [],
-          timestamp: new Date().toISOString()
+          message: 'Set ODDS_API_KEY in environment variables to enable live odds.',
         },
         { status: HTTP_STATUS.SERVICE_UNAVAILABLE }
       );
     }
 
-    const oddsApiKey = getOddsApiKey();
+    // Map marketType string to valid array
+    const marketsMap: Record<string, string[]> = {
+      h2h: [ODDS_MARKETS.H2H],
+      spreads: [ODDS_MARKETS.SPREADS],
+      totals: [ODDS_MARKETS.TOTALS],
+      all: [ODDS_MARKETS.H2H, ODDS_MARKETS.SPREADS, ODDS_MARKETS.TOTALS],
+    };
+    const markets = marketsMap[marketType] || [ODDS_MARKETS.H2H];
 
-    // Validate and normalize sport
-    const sportValidation = validateSportKey(sport);
-    const normalizedSport = sportValidation.normalizedKey;
-    const sportInfo = getSportInfo(normalizedSport);
-
-    const apiUrl = `${EXTERNAL_APIS.ODDS_API.BASE_URL}/sports/${normalizedSport}/odds?apiKey=${oddsApiKey}&regions=${EXTERNAL_APIS.ODDS_API.REGIONS}`;
-
-    const response = await fetch(apiUrl);
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { 
-          error: 'Failed to fetch odds',
-          sportValidation,
-          details: `API returned ${response.status} for ${sportInfo.name}`
-        },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
+    const events = await fetchLiveOdds(validation.normalizedKey, {
+      apiKey,
+      markets,
+      regions: [BETTING_REGIONS.US],
+      oddsFormat: 'american',
+    });
 
     return NextResponse.json({
-      sport: normalizedSport,
-      sportInfo,
-      sportValidation,
-      events: data,
+      success: true,
+      events: Array.isArray(events) ? events : [],
+      sport: validation.normalizedKey,
       timestamp: new Date().toISOString(),
+      message: SUCCESS_MESSAGES.ODDS_FETCHED,
     });
-  } catch (error: any) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.log(`${LOG_PREFIXES.API} Error in GET odds route:`, errorMessage);
+  } catch (error) {
+    console.error('[API/odds] Error:', error);
     return NextResponse.json(
-      { error: ERROR_MESSAGES.INTERNAL_ERROR, details: errorMessage },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
+        events: [],
+        timestamp: new Date().toISOString(),
+      },
       { status: HTTP_STATUS.INTERNAL_ERROR }
     );
   }

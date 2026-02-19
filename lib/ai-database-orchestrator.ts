@@ -11,7 +11,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
-import { generateText, generateObject } from 'ai';
+import { generateText, Output } from 'ai';
 import { z } from 'zod';
 import { LOG_PREFIXES } from '@/lib/constants';
 import { getLeveragedAI } from '@/lib/leveraged-ai';
@@ -195,9 +195,9 @@ class AIInsightsGenerator {
         confidence: z.number().min(0).max(100).describe('Confidence in analysis'),
       });
 
-      const result = await generateObject({
+      const result = await generateText({
         model: 'xai/grok-4-fast',
-        schema,
+        output: Output.object({ schema }),
         prompt: `
 Analyze this dataset and provide structured insights:
 
@@ -214,7 +214,7 @@ Provide:
         temperature: 0.7,
       });
 
-      return result.object;
+      return result.output;
     } catch (error) {
       console.error('[v0] AI insights generation failed:', error);
       return null;

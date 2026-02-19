@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { generateText } from 'ai';
-import { xai } from '@ai-sdk/xai';
+import { createXai } from '@ai-sdk/xai';
 import {
   AI_CONFIG,
   SYSTEM_PROMPT,
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     if (xaiApiKey) {
       try {
         const result = await generateText({
-          model: xai('grok-3-fast', { apiKey: xaiApiKey }),
+          model: createXai({ apiKey: xaiApiKey })('grok-3-fast'),
           system: SYSTEM_PROMPT,
           prompt: enrichedPrompt,
           temperature: AI_CONFIG.DEFAULT_TEMPERATURE,

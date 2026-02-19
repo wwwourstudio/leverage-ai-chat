@@ -359,8 +359,14 @@ export default function UnifiedAIPlatform() {
   // Initialize credits and load real insights on mount
   useEffect(() => {
     fetch('/api/insights')
-      .then(r => r.json())
-      .then(insights => {
+      .then(r => {
+        if (!r.ok) throw new Error(`Insights API returned ${r.status}`);
+        const ct = r.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) throw new Error('Non-JSON response from insights');
+        return r.json();
+      })
+      .then(result => {
+        const insights = result?.insights ?? result;
         setMessages((prev: Message[]) => {
           const newMessages = [...prev];
           if (newMessages[0]?.isWelcome) {
@@ -869,14 +875,19 @@ export default function UnifiedAIPlatform() {
       }
       
       // Fetch real data from our API routes
-      const analysisResult = await fetch('/api/analyze', {
+      const analysisRes = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userMessage,
-          context
-        })
-      }).then(res => res.json() as Promise<APIResponse>);
+        body: JSON.stringify({ userMessage, context })
+      });
+
+      let analysisResult: APIResponse;
+      const ct = analysisRes.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        analysisResult = { success: false, error: `Unexpected response (${analysisRes.status})` };
+      } else {
+        analysisResult = await analysisRes.json();
+      }
       
       console.log('[v0] Analysis result received:', {
         success: analysisResult.success,

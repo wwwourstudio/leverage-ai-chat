@@ -69,8 +69,11 @@ export function BettingCard({
     >
       <div className="space-y-2.5">
         {data.matchup && <DataRow label="Matchup" value={data.matchup} highlight />}
+        {data.game && !data.matchup && <DataRow label="Game" value={data.game} highlight />}
+        {data.player && <DataRow label="Player" value={data.player} highlight />}
         {data.team && <DataRow label="Team" value={data.team} highlight />}
         {data.finalScore && <DataRow label="Final" value={data.finalScore} highlight />}
+        {data.stat && <DataRow label="Stat" value={data.stat} />}
         {data.homeOdds && data.awayOdds && (
           <DataRow label="Moneyline" value={`Home ${data.homeOdds} / Away ${data.awayOdds}`} />
         )}
@@ -82,6 +85,8 @@ export function BettingCard({
         )}
         {data.bestLine && <DataRow label="Best Line" value={data.bestLine} />}
         {data.line && <DataRow label="Line" value={data.line} />}
+        {data.over && <DataRow label="Over" value={data.over} />}
+        {data.under && <DataRow label="Under" value={data.under} />}
         {data.odds && <DataRow label="Odds" value={data.odds} />}
         {data.book && <DataRow label="Book" value={data.book} />}
         {data.bookmaker && !data.book && <DataRow label="Book" value={data.bookmaker} />}
@@ -89,7 +94,7 @@ export function BettingCard({
         {data.impliedWin && <DataRow label="Implied Win" value={data.impliedWin} />}
         {data.impliedProb && <DataRow label="Implied Prob" value={data.impliedProb} />}
         {data.movement && <DataRow label="Line Movement" value={data.movement} />}
-        {data.confidence !== undefined && <DataRow label="Confidence" value={`${data.confidence}%`} />}
+        {data.confidence !== undefined && typeof data.confidence === 'number' && <DataRow label="Confidence" value={`${data.confidence}%`} />}
         {data.marketEfficiency && <DataRow label="Market Efficiency" value={data.marketEfficiency} />}
         {data.recommendation && <DataRow label="Recommendation" value={data.recommendation} />}
         {data.gameTime && <DataRow label="Game Time" value={data.gameTime} />}

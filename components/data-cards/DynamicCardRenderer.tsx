@@ -5,6 +5,7 @@ import { DFSCard } from './DFSCard';
 import { FantasyCard } from './FantasyCard';
 import { KalshiCard } from './KalshiCard';
 import { WeatherCard } from './WeatherCard';
+import { ArbitrageCard } from './ArbitrageCard';
 import { CardSkeleton } from './CardSkeleton';
 
 interface CardData {
@@ -151,6 +152,16 @@ export function DynamicCardRenderer({
         status={safeCard.status}
         onAnalyze={handleAnalyze}
         error={error}
+      />
+    );
+  }
+
+  // Arbitrage cards
+  if (cardType.includes('arbitrage')) {
+    return (
+      <ArbitrageCard
+        data={safeCard.data as any}
+        gradient={safeCard.gradient}
       />
     );
   }

@@ -148,22 +148,26 @@ CREATE INDEX IF NOT EXISTS idx_arb_profit ON arbitrage_opportunities(profit_marg
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS player_props_markets (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  game_id VARCHAR(255) NOT NULL,
+  id TEXT PRIMARY KEY,          -- composite string: "{eventId}-{playerName}-{marketKey}"
   sport VARCHAR(50) NOT NULL,
+  game_id VARCHAR(255) NOT NULL,
   player_name VARCHAR(255) NOT NULL,
-  prop_type VARCHAR(100) NOT NULL,
+  stat_type VARCHAR(100) NOT NULL,
   line NUMERIC,
   over_odds INTEGER,
   under_odds INTEGER,
   bookmaker VARCHAR(100) NOT NULL,
-  cached_at TIMESTAMPTZ DEFAULT NOW(),
-  expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '5 minutes'
+  game_time TIMESTAMPTZ,
+  home_team VARCHAR(255),
+  away_team VARCHAR(255),
+  fetched_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_player_props_game_id ON player_props_markets(game_id);
 CREATE INDEX IF NOT EXISTS idx_player_props_player ON player_props_markets(player_name);
-CREATE INDEX IF NOT EXISTS idx_player_props_type ON player_props_markets(prop_type);
+CREATE INDEX IF NOT EXISTS idx_player_props_type ON player_props_markets(stat_type);
+CREATE INDEX IF NOT EXISTS idx_player_props_sport ON player_props_markets(sport);
+CREATE INDEX IF NOT EXISTS idx_player_props_fetched ON player_props_markets(fetched_at DESC);
 
 -- ============================================================================
 -- 6. KALSHI PREDICTION MARKETS

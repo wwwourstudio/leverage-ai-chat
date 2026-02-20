@@ -120,27 +120,96 @@ export function validateSportKey(sport: string): {
 // Core Fetching Functions
 // ============================================
 
+// Circuit breaker state management
+const circuitBreakerState = new Map<string, {
+  failures: number;
+  lastFailureTime: number;
+  isOpen: boolean;
+}>();
+
+const CIRCUIT_BREAKER_THRESHOLD = 3; // Open circuit after 3 failures
+const CIRCUIT_BREAKER_TIMEOUT = 60000; // 1 minute
+const CIRCUIT_BREAKER_RESET_TIMEOUT = 300000; // 5 minutes
+
+function getCircuitBreakerState(key: string) {
+  const state = circuitBreakerState.get(key);
+  if (!state) {
+    const newState = { failures: 0, lastFailureTime: 0, isOpen: false };
+    circuitBreakerState.set(key, newState);
+    return newState;
+  }
+  
+  // Auto-reset if enough time has passed
+  if (state.isOpen && Date.now() - state.lastFailureTime > CIRCUIT_BREAKER_RESET_TIMEOUT) {
+    console.log(`${LOG_PREFIXES.API} Circuit breaker reset for ${key}`);
+    state.failures = 0;
+    state.isOpen = false;
+  }
+  
+  return state;
+}
+
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
+  operationKey: string,
   maxRetries: number = 3,
   initialDelay: number = 1000
 ): Promise<T> {
+  const circuitState = getCircuitBreakerState(operationKey);
+  
+  // Check circuit breaker
+  if (circuitState.isOpen) {
+    const timeSinceFailure = Date.now() - circuitState.lastFailureTime;
+    if (timeSinceFailure < CIRCUIT_BREAKER_TIMEOUT) {
+      const waitTime = Math.ceil((CIRCUIT_BREAKER_TIMEOUT - timeSinceFailure) / 1000);
+      const error: any = new Error(`Circuit breaker open for ${operationKey}. Try again in ${waitTime}s`);
+      error.isCircuitBreakerOpen = true;
+      throw error;
+    } else {
+      // Allow one retry attempt
+      console.log(`${LOG_PREFIXES.API} Circuit breaker half-open, attempting request for ${operationKey}`);
+    }
+  }
+  
   let lastError: Error | null = null;
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      return await fn();
+      const result = await fn();
+      
+      // Success - reset circuit breaker
+      if (circuitState.failures > 0) {
+        console.log(`${LOG_PREFIXES.API} Circuit breaker cleared for ${operationKey}`);
+        circuitState.failures = 0;
+        circuitState.isOpen = false;
+      }
+      
+      return result;
     } catch (error) {
       lastError = error as Error;
       const status = (error as any).status;
       
+      // Don't retry on client errors (except rate limiting)
       if (status && status >= 400 && status < 500 && status !== 429) {
+        console.error(`${LOG_PREFIXES.API} Non-retryable error ${status} for ${operationKey}`);
         throw error;
       }
       
+      // Increment circuit breaker failures
+      circuitState.failures++;
+      circuitState.lastFailureTime = Date.now();
+      
+      if (circuitState.failures >= CIRCUIT_BREAKER_THRESHOLD) {
+        circuitState.isOpen = true;
+        console.error(`${LOG_PREFIXES.API} Circuit breaker opened for ${operationKey} after ${circuitState.failures} failures`);
+      }
+      
       if (attempt < maxRetries - 1) {
-        const delay = initialDelay * Math.pow(2, attempt);
-        console.log(`${LOG_PREFIXES.API} Retry ${attempt + 1}/${maxRetries} after ${delay}ms`);
+        // Exponential backoff with jitter
+        const jitter = Math.random() * 500; // 0-500ms random jitter
+        const delay = (initialDelay * Math.pow(2, attempt)) + jitter;
+        const statusMsg = status === 429 ? 'Rate limited' : `Error ${status || 'unknown'}`;
+        console.log(`${LOG_PREFIXES.API} ${statusMsg} - Retry ${attempt + 1}/${maxRetries} after ${Math.round(delay)}ms`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -200,7 +269,7 @@ export async function fetchLiveOdds(
     const data = await response.json();
     requestCache.set(cacheKey, { data, timestamp: Date.now() });
     return data;
-  });
+  }, `odds:${sportKey}`, 3, 1000);
 
   if (!skipCache) {
     requestCache.set(cacheKey, {

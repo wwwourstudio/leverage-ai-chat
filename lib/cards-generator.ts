@@ -10,6 +10,7 @@
  */
 
 import { CARD_TYPES, SPORT_KEYS, sportToApi, apiToSport } from '@/lib/constants';
+import { generateNoDataMessage } from '@/lib/seasonal-context';
 
 /**
  * Generate sport-specific cards with REAL odds data
@@ -152,47 +153,40 @@ async function generateSportSpecificCards(
       console.error(`[v0] [CARDS-GEN] ❌ EXCEPTION in unified service for ${displaySport}:`);
       console.error(error);
       console.error(`[v0] [CARDS-GEN] Stack trace:`, (error as Error).stack);
+      
+      // Detect specific error types
+      const errorMsg = (error as Error).message || '';
+      const isCircuitBreakerOpen = (error as any).isCircuitBreakerOpen === true;
+      const isRateLimited = errorMsg.includes('429') || errorMsg.toLowerCase().includes('rate limit');
+      
+      if (isCircuitBreakerOpen) {
+        console.error(`[v0] [CARDS-GEN] Circuit breaker is open - too many recent failures`);
+      } else if (isRateLimited) {
+        console.error(`[v0] [CARDS-GEN] Rate limited - API quota exceeded`);
+      }
     }
   }
   
   // Fallback: Add informative card if no real data
   if (cards.length < count) {
-    console.log(`[v0] [CARDS-GEN] FALLBACK: No real data for ${displaySport}, creating informative placeholder`);
+    console.log(`[v0] [CARDS-GEN] FALLBACK: No real data for ${displaySport}, creating context-aware placeholder`);
     
-    // Determine why there's no data based on sport and date
-    const now = new Date();
-    const month = now.getMonth() + 1; // 1-12
-    const isNFLOffseason = month < 9 || month === 12; // Sept-Feb season
-    const isMLBOffseason = month < 4 || month > 10; // Apr-Oct season
-    
-    let reason = 'No games scheduled today';
-    let details = 'Games typically appear 24-48 hours before start time';
-    
-    if (displaySport === 'NFL' && isNFLOffseason) {
-      reason = 'NFL Offseason';
-      details = 'NFL season runs September through February';
-    } else if (displaySport === 'MLB' && isMLBOffseason) {
-      reason = 'MLB Offseason';
-      details = 'MLB season runs April through October';
-    } else if (displaySport === 'NBA') {
-      details = 'NBA games typically scheduled afternoon/evening EST';
-    } else if (displaySport === 'NHL') {
-      details = 'NHL games typically scheduled evening EST';
-    }
+    // Get seasonal context for smart messaging
+    const noDataMessage = generateNoDataMessage(sport);
     
     cards.push({
       type: CARD_TYPES.LIVE_ODDS,
-      title: `${displaySport} - ${reason}`,
+      title: `${displaySport} - ${noDataMessage.title}`,
       icon: 'Calendar',
       category: displaySport,
       subcategory: 'No Games Available',
       gradient: getSportGradient(sport),
       data: {
-        description: reason,
-        note: details,
+        description: noDataMessage.description,
+        note: noDataMessage.suggestion,
         sport: sport,
         apiResponse: 'API returned 0 games for this sport',
-        suggestion: 'Try asking for a different sport or check back later',
+        suggestion: 'Try a different sport or check back during the season',
         status: 'NO_DATA',
         realData: false
       }

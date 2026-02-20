@@ -74,7 +74,10 @@ export class SupabaseOddsService {
       .upsert(records, { onConflict: 'game_id' });
 
     if (error) {
-      console.error('[Supabase] Error storing odds:', error);
+      // PGRST205 = table doesn't exist yet; skip silently
+      if ((error as any).code !== 'PGRST205') {
+        console.error('[Supabase] Error storing odds:', error);
+      }
       return false;
     }
 
@@ -112,7 +115,10 @@ export class SupabaseOddsService {
       .upsert(records, { onConflict: 'game_id' });
 
     if (error) {
-      console.error(`[Supabase] Error storing ${sport} odds:`, error);
+      // PGRST205 = table doesn't exist yet; skip silently
+      if ((error as any).code !== 'PGRST205') {
+        console.error(`[Supabase] Error storing ${sport} odds:`, error);
+      }
       return false;
     }
 

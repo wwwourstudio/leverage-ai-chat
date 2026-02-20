@@ -5,14 +5,14 @@
 
 // AI Model Configuration
 export const AI_CONFIG = {
-  MODEL_NAME: 'xai/grok-4-fast',
-  MODEL_DISPLAY_NAME: 'Grok 4 Fast',
+  MODEL_NAME: 'grok-3-fast',
+  MODEL_DISPLAY_NAME: 'Grok 3 Fast',
   PROVIDER: 'xAI',
   API_ENDPOINT: 'https://api.x.ai/v1/chat/completions',
   DEFAULT_TEMPERATURE: 0.3, // Lower temperature for more factual responses
   DEFAULT_MAX_TOKENS: 200, // Limit tokens to prevent long fabricated responses
   DEFAULT_PROCESSING_TIME: 950,
-  FALLBACK_MODEL: 'Grok 4 Fast',
+  FALLBACK_MODEL: 'Grok 3 Fast',
 } as const;
 
 // API Endpoints
@@ -332,7 +332,7 @@ export const LOG_PREFIXES = {
 } as const;
 
 // System Prompt Template
-export const SYSTEM_PROMPT = `You are Leverage AI powered by Grok 4 Fast (xAI), an elite 2026 season analyst specializing in sports betting, fantasy, and prediction markets.
+export const SYSTEM_PROMPT = `You are Leverage AI powered by Grok 3 Fast (xAI), an elite 2026 season analyst specializing in sports betting, fantasy, and prediction markets.
 
 🚨 CRITICAL ANTI-HALLUCINATION RULES (ABSOLUTE PRIORITY):
 1. NEVER fabricate player statistics, odds, projections, or team data
@@ -371,7 +371,7 @@ BE HONEST ABOUT DATA LIMITATIONS. Users need accuracy over speculation.` as cons
 // Default Source Configurations
 export const DEFAULT_SOURCES = {
   GROK_AI: {
-    name: 'Grok 4 Fast AI (xAI)',
+    name: 'Grok 3 Fast AI (xAI)',
     type: SOURCE_TYPES.MODEL,
     reliability: DEFAULT_RELIABILITY.MODEL,
   },

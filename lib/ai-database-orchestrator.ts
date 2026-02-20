@@ -196,7 +196,7 @@ class AIInsightsGenerator {
       });
 
       const result = await generateText({
-        model: 'xai/grok-4-fast',
+        model: 'xai/grok-3-fast',
         output: Output.object({ schema }),
         prompt: `
 Analyze this dataset and provide structured insights:
@@ -285,7 +285,7 @@ class AIDataEnricher {
     return this.enrichRecords(records, async (record) => {
       try {
         const result = await generateText({
-          model: 'xai/grok-4-fast',
+          model: 'xai/grok-3-fast',
           prompt: `
 Analyze this ${tableName} record and add 2-3 relevant insights:
 
@@ -352,7 +352,7 @@ class AIValidator {
   ): Promise<{ passed: boolean; reason?: string }> {
     try {
       const result = await generateText({
-        model: 'xai/grok-4-fast',
+        model: 'xai/grok-3-fast',
         prompt: `
 Validate this data for insertion into database:
 

@@ -13,6 +13,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { validateServerEnv, getMissingAPIKeys } from '@/lib/env-validator';
+import { generateContextualCards } from '@/lib/cards-generator';
 
 export interface ServerDataResult {
   initialCards: any[];
@@ -34,58 +35,25 @@ interface FetchOptions {
 }
 
 /**
- * Fetch initial cards from unified data service
+ * Fetch initial cards by calling the generator directly (no HTTP round-trip).
+ * This avoids the NEXT_PUBLIC_SITE_URL / localhost:3000 problem in serverless.
  */
 async function fetchInitialCards(options: FetchOptions = {}): Promise<{
   cards: any[];
   sources: string[];
   errors: string[];
 }> {
-  const {
-    category = 'all',
-    sport,
-    limit = 12,
-    includeKalshi = true,
-    includeOdds = true,
-  } = options;
-
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-  const params = new URLSearchParams({
-    category,
-    limit: limit.toString(),
-  });
-
-  if (sport) params.append('sport', sport);
+  const { category = 'all', sport, limit = 12 } = options;
 
   try {
-    console.log('[v0] Server: Fetching cards from /api/cards...');
-    const response = await fetch(`${baseUrl}/api/cards?${params}`, {
-      cache: 'no-store',
-      headers: { 'Content-Type': 'application/json' },
-      next: { revalidate: 0 }, // Always fetch fresh data
-    });
-
-    if (!response.ok) {
-      throw new Error(`Cards API returned ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log('[v0] Server: ✓ Fetched', data.cards?.length || 0, 'cards');
-    
-    return {
-      cards: data.cards || [],
-      sources: data.dataSources || [],
-      errors: [],
-    };
+    console.log('[v0] Server: Generating cards directly (category:', category, ', sport:', sport ?? 'any', ')');
+    const cards = await generateContextualCards(category, sport, Math.min(limit, 12));
+    console.log('[v0] Server: ✓ Generated', cards.length, 'cards');
+    return { cards, sources: ['cards-generator'], errors: [] };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('[v0] Server: ✗ Error fetching cards:', errorMessage);
-    
-    return {
-      cards: [],
-      sources: [],
-      errors: [errorMessage],
-    };
+    console.error('[v0] Server: ✗ Error generating cards:', errorMessage);
+    return { cards: [], sources: [], errors: [errorMessage] };
   }
 }
 

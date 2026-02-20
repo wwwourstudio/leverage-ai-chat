@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
 
     const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
     if (!apiKey) {
+      console.error('[API/odds] ODDS_API_KEY is not configured — set it in Vercel environment variables');
       return NextResponse.json(
         {
           success: false,

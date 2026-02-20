@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { generateText } from 'ai';
-import { xai } from '@ai-sdk/xai';
+import { createXai } from '@ai-sdk/xai';
 import {
   AI_CONFIG,
   SYSTEM_PROMPT,
@@ -82,6 +82,14 @@ export async function POST(request: NextRequest) {
 
     // Attempt AI generation via Vercel AI Gateway
     const xaiApiKey = process.env.XAI_API_KEY;
+    const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+    const kalshiApiKey = process.env.KALSHI_API_KEY;
+    console.log('[API/analyze] Keys configured:', {
+      XAI_API_KEY: !!xaiApiKey,
+      ODDS_API_KEY: !!oddsApiKey,
+      KALSHI_API_KEY: !!kalshiApiKey,
+      hasOddsData: !!(context.oddsData?.events?.length),
+    });
     let aiText: string;
     let modelUsed = AI_CONFIG.MODEL_DISPLAY_NAME;
     let usedFallback = false;
@@ -89,7 +97,7 @@ export async function POST(request: NextRequest) {
     if (xaiApiKey) {
       try {
         const result = await generateText({
-          model: xai('grok-4-fast', { apiKey: xaiApiKey }),
+          model: createXai({ apiKey: xaiApiKey })('grok-3-fast'),
           system: SYSTEM_PROMPT,
           prompt: enrichedPrompt,
           temperature: AI_CONFIG.DEFAULT_TEMPERATURE,

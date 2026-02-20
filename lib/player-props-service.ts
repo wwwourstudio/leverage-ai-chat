@@ -1,9 +1,11 @@
 /**
  * Player Props Service
  * Fetches and caches player prop betting markets from The Odds API
+ * with sport-specific market validation and rate limiting
  */
 
 import { createClient } from '@/lib/supabase/client';
+import { playerPropsQueue } from '@/lib/api-request-manager';
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -81,32 +83,90 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
   
   try {
     const baseUrl = 'https://api.the-odds-api.com/v4';
-    const playerPropMarkets = [
-      'player_points',
-      'player_rebounds', 
-      'player_assists',
-      'player_threes',
-      'player_pass_tds',
-      'player_pass_yds',
-      'player_rush_yds',
-      'player_receptions'
-    ];
+    
+    // Sport-specific player prop markets to prevent HTTP 422 errors
+    const sportPropMarkets: Record<string, string[]> = {
+      // Basketball sports
+      'basketball_nba': ['player_points', 'player_rebounds', 'player_assists', 'player_threes'],
+      'basketball_ncaab': ['player_points', 'player_rebounds', 'player_assists', 'player_threes'],
+      
+      // American Football sports
+      'americanfootball_nfl': ['player_pass_tds', 'player_pass_yds', 'player_rush_yds', 'player_receptions'],
+      'americanfootball_ncaaf': ['player_pass_tds', 'player_pass_yds', 'player_rush_yds', 'player_receptions'],
+      
+      // Baseball sports
+      'baseball_mlb': ['player_home_runs', 'player_hits', 'player_strikeouts', 'player_rbis'],
+      
+      // Hockey sports
+      'icehockey_nhl': ['player_points', 'player_assists', 'player_shots_on_goal'],
+      
+      // Soccer/football sports (limited props)
+      'soccer_epl': ['player_anytime_goalscorer', 'player_shots_on_target'],
+      'soccer_usa_mls': ['player_anytime_goalscorer', 'player_shots_on_target'],
+    };
+    
+    const playerPropMarkets = sportPropMarkets[sport] || [];
+    
+    if (playerPropMarkets.length === 0) {
+      console.log(`[v0] [PLAYER-PROPS] No prop markets configured for ${sport}`);
+      return [];
+    }
+    
+    console.log(`[v0] [PLAYER-PROPS] Using ${playerPropMarkets.length} valid markets for ${sport}: ${playerPropMarkets.join(', ')}`);
     
     const allProps: PlayerProp[] = [];
     
-    // Fetch each player prop market
-    for (const market of playerPropMarkets) {
-      const url = `${baseUrl}/sports/${sport}/odds?apiKey=${apiKey}&regions=us&markets=${market}&oddsFormat=american`;
-      
-      console.log(`[v0] [PLAYER-PROPS] Fetching ${market}...`);
-      
-      const response = await fetch(url);
-      if (!response.ok) {
-        console.error(`[v0] [PLAYER-PROPS] API error for ${market}: ${response.status}`);
+    console.log(`[v0] [PLAYER-PROPS] Queue status: ${playerPropsQueue.getQueueLength()} pending, ${playerPropsQueue.getActiveRequests()} active`);
+    
+    // Fetch each player prop market using request queue (automatic rate limiting)
+    const fetchPromises = playerPropMarkets.map((market, i) => {
+      return playerPropsQueue.enqueue(async () => {
+        const url = `${baseUrl}/sports/${sport}/odds?apiKey=${apiKey}&regions=us&markets=${market}&oddsFormat=american`;
+        
+        console.log(`[v0] [PLAYER-PROPS] Fetching ${market} (${i + 1}/${playerPropMarkets.length})...`);
+        
+        try {
+          const response = await fetch(url);
+          
+          if (!response.ok) {
+            if (response.status === 429) {
+              console.error(`[v0] [PLAYER-PROPS] Rate limited on ${market} (HTTP 429)`);
+              return []; // Return empty array, don't throw
+            } else if (response.status === 422) {
+              console.error(`[v0] [PLAYER-PROPS] Invalid market ${market} for ${sport} (HTTP 422)`);
+              return []; // Return empty array for invalid markets
+            }
+            console.error(`[v0] [PLAYER-PROPS] API error for ${market}: ${response.status}`);
+            return [];
+          }
+          
+          const games = await response.json();
+          return { market, games };
+        } catch (fetchError) {
+          console.error(`[v0] [PLAYER-PROPS] Fetch exception for ${market}:`, fetchError);
+          return [];
+        }
+      }, 0); // Priority 0 (normal)
+    });
+    
+    // Wait for all requests to complete
+    const results = await Promise.allSettled(fetchPromises);
+    
+    // Process successful results
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        console.error('[v0] [PLAYER-PROPS] Request failed:', result.reason);
         continue;
       }
       
-      const games = await response.json();
+      const data = result.value;
+      if (!data || Array.isArray(data) && data.length === 0) {
+        continue;
+      }
+      
+      const { market, games } = data as { market: string; games: any[] };
+      
+      console.log(`[v0] [PLAYER-PROPS] ${market}: ${games.length} games returned`);
       
       // Parse props from each game
       for (const game of games) {
@@ -159,7 +219,7 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
       }
     }
     
-    console.log(`[v0] [PLAYER-PROPS] Fetched ${allProps.length} total props`);
+    console.log(`[v0] [PLAYER-PROPS] Successfully fetched ${allProps.length} total props from ${playerPropMarkets.length} markets`);
     
     // Store in Supabase
     if (storeResults && allProps.length > 0) {

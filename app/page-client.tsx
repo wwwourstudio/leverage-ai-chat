@@ -174,10 +174,15 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     return categoryMessages[category] || categoryMessages.all;
   };
 
+  // Static welcome used for initial SSR render to avoid timezone-based hydration mismatch.
+  // getWelcomeMessage() calls getHours()/toLocaleDateString() which differ between the
+  // UTC server and the user's local-timezone browser, causing React error #418.
+  const STATIC_WELCOME = `**Leverage AI** - Powered by Grok AI\n\nI'm connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.`;
+
   const [messages, setMessages] = useState<Message[]>([
     {
   role: 'assistant',
-  content: getWelcomeMessage('all'),
+  content: STATIC_WELCOME,
   timestamp: serverData?.serverTime ? new Date(serverData.serverTime) : new Date(),
   isWelcome: true,
   cards: [],
@@ -220,6 +225,19 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
+  // Personalize the welcome message client-side after hydration.
+  // This runs only in the browser, so getWelcomeMessage()'s timezone-sensitive
+  // date/time calls are safe here (no server/client mismatch).
+  useEffect(() => {
+    setMessages(prev => {
+      if (prev[0]?.isWelcome) {
+        return [{ ...prev[0], content: getWelcomeMessage('all') }, ...prev.slice(1)];
+      }
+      return prev;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Pre-load initial cards from server-side data
   useEffect(() => {
     if (serverData?.initialCards && serverData.initialCards.length > 0) {
@@ -2696,7 +2714,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
                       </button>
                       <div className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-gray-900/50 rounded-lg border border-gray-800/50">
                         <Clock className="w-3.5 h-3.5 text-gray-600" />
-                        <span className="text-xs font-medium text-gray-500 tabular-nums">{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        {/* suppressHydrationWarning: toLocaleTimeString() is timezone-dependent;
+                            server renders UTC, browser renders local time — mismatch is expected. */}
+                        <span suppressHydrationWarning className="text-xs font-medium text-gray-500 tabular-nums">{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     </div>
                   )}

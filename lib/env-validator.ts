@@ -25,7 +25,6 @@ const REQUIRED_ENV_VARS = {
   
   // Sports Data APIs
   ODDS_API_KEY: 'The Odds API key for sports betting data',
-  KALSHI_API_KEY: 'Kalshi API key for prediction markets',
 } as const;
 
 const OPTIONAL_ENV_VARS = {
@@ -33,6 +32,7 @@ const OPTIONAL_ENV_VARS = {
   WEATHER_API_KEY: 'Weather API key for outdoor sports',
   STRIPE_SECRET_KEY: 'Stripe secret key for payments',
   STRIPE_PUBLISHABLE_KEY: 'Stripe publishable key for payments',
+  KALSHI_API_KEY: 'Kalshi API key for prediction markets',
 } as const;
 
 /**

@@ -83,142 +83,141 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
   
   try {
     const baseUrl = 'https://api.the-odds-api.com/v4';
-    
-    // Sport-specific player prop markets to prevent HTTP 422 errors
+
+    // Sport-specific player prop markets.
+    // Player props require the event-level endpoint and are only valid when
+    // there are upcoming events for the sport.
     const sportPropMarkets: Record<string, string[]> = {
-      // Basketball sports
       'basketball_nba': ['player_points', 'player_rebounds', 'player_assists', 'player_threes'],
       'basketball_ncaab': ['player_points', 'player_rebounds', 'player_assists', 'player_threes'],
-      
-      // American Football sports
       'americanfootball_nfl': ['player_pass_tds', 'player_pass_yds', 'player_rush_yds', 'player_receptions'],
       'americanfootball_ncaaf': ['player_pass_tds', 'player_pass_yds', 'player_rush_yds', 'player_receptions'],
-      
-      // Baseball sports
       'baseball_mlb': ['player_home_runs', 'player_hits', 'player_strikeouts', 'player_rbis'],
-      
-      // Hockey sports
       'icehockey_nhl': ['player_points', 'player_assists', 'player_shots_on_goal'],
-      
-      // Soccer/football sports (limited props)
       'soccer_epl': ['player_anytime_goalscorer', 'player_shots_on_target'],
       'soccer_usa_mls': ['player_anytime_goalscorer', 'player_shots_on_target'],
     };
-    
+
     const playerPropMarkets = sportPropMarkets[sport] || [];
-    
+
     if (playerPropMarkets.length === 0) {
       console.log(`[v0] [PLAYER-PROPS] No prop markets configured for ${sport}`);
       return [];
     }
-    
+
     console.log(`[v0] [PLAYER-PROPS] Using ${playerPropMarkets.length} valid markets for ${sport}: ${playerPropMarkets.join(', ')}`);
-    
+
+    // Step 1: fetch upcoming events for this sport so we have event IDs.
+    // Player props are only available via the event-level endpoint:
+    //   GET /v4/sports/{sport}/events/{eventId}/odds?markets={market}
+    // Calling the game odds endpoint with player prop markets returns HTTP 422.
+    let events: any[] = [];
+    try {
+      const eventsUrl = `${baseUrl}/sports/${sport}/events?apiKey=${apiKey}`;
+      const eventsResp = await fetch(eventsUrl);
+      if (eventsResp.ok) {
+        events = await eventsResp.json();
+        console.log(`[v0] [PLAYER-PROPS] Found ${events.length} upcoming events for ${sport}`);
+      } else if (eventsResp.status === 404) {
+        console.log(`[v0] [PLAYER-PROPS] No active season for ${sport}, skipping props`);
+        return [];
+      } else {
+        console.error(`[v0] [PLAYER-PROPS] Events fetch failed for ${sport}: HTTP ${eventsResp.status}`);
+        return [];
+      }
+    } catch (eventsError) {
+      console.error(`[v0] [PLAYER-PROPS] Events fetch exception for ${sport}:`, eventsError);
+      return [];
+    }
+
+    if (events.length === 0) {
+      console.log(`[v0] [PLAYER-PROPS] No upcoming events for ${sport}, skipping props`);
+      return [];
+    }
+
     const allProps: PlayerProp[] = [];
-    
+    const marketsParam = playerPropMarkets.join(',');
+
     console.log(`[v0] [PLAYER-PROPS] Queue status: ${playerPropsQueue.getQueueLength()} pending, ${playerPropsQueue.getActiveRequests()} active`);
-    
-    // Fetch each player prop market using request queue (automatic rate limiting)
-    const fetchPromises = playerPropMarkets.map((market, i) => {
+
+    // Step 2: For each event, fetch all prop markets in one request.
+    // Limit to first 3 events to avoid burning too many API credits.
+    const eventsToFetch = events.slice(0, 3);
+    const fetchPromises = eventsToFetch.map((event: any, i: number) => {
       return playerPropsQueue.enqueue(async () => {
-        const url = `${baseUrl}/sports/${sport}/odds?apiKey=${apiKey}&regions=us&markets=${market}&oddsFormat=american`;
-        
-        console.log(`[v0] [PLAYER-PROPS] Fetching ${market} (${i + 1}/${playerPropMarkets.length})...`);
-        
+        const url = `${baseUrl}/sports/${sport}/events/${event.id}/odds?apiKey=${apiKey}&regions=us&markets=${marketsParam}&oddsFormat=american`;
+
+        console.log(`[v0] [PLAYER-PROPS] Fetching props for event ${i + 1}/${eventsToFetch.length}: ${event.home_team} vs ${event.away_team}`);
+
         try {
           const response = await fetch(url);
-          
+
           if (!response.ok) {
             if (response.status === 429) {
-              console.error(`[v0] [PLAYER-PROPS] Rate limited on ${market} (HTTP 429)`);
-              return []; // Return empty array, don't throw
+              console.error(`[v0] [PLAYER-PROPS] Rate limited on event ${event.id} (HTTP 429)`);
+              return null;
             } else if (response.status === 422) {
-              console.error(`[v0] [PLAYER-PROPS] Invalid market ${market} for ${sport} (HTTP 422)`);
-              return []; // Return empty array for invalid markets
+              console.error(`[v0] [PLAYER-PROPS] No player prop markets available for event ${event.id} (HTTP 422) - event may not have props yet`);
+              return null;
             }
-            console.error(`[v0] [PLAYER-PROPS] API error for ${market}: ${response.status}`);
-            return [];
+            console.error(`[v0] [PLAYER-PROPS] API error for event ${event.id}: ${response.status}`);
+            return null;
           }
-          
-          const games = await response.json();
-          return { market, games };
+
+          const data = await response.json();
+          return { event, data };
         } catch (fetchError) {
-          console.error(`[v0] [PLAYER-PROPS] Fetch exception for ${market}:`, fetchError);
-          return [];
+          console.error(`[v0] [PLAYER-PROPS] Fetch exception for event ${event.id}:`, fetchError);
+          return null;
         }
-      }, 0); // Priority 0 (normal)
+      }, 0);
     });
-    
+
     // Wait for all requests to complete
     const results = await Promise.allSettled(fetchPromises);
-    
-    // Process successful results
+
+    // Process results
     for (const result of results) {
-      if (result.status === 'rejected') {
-        console.error('[v0] [PLAYER-PROPS] Request failed:', result.reason);
-        continue;
-      }
-      
-      const data = result.value;
-      if (!data || Array.isArray(data) && data.length === 0) {
-        continue;
-      }
-      
-      const { market, games } = data as { market: string; games: any[] };
-      
-      console.log(`[v0] [PLAYER-PROPS] ${market}: ${games.length} games returned`);
-      
-      // Parse props from each game
-      for (const game of games) {
-        if (!game.bookmakers || game.bookmakers.length === 0) continue;
-        
-        for (const bookmaker of game.bookmakers) {
-          const propsMarket = bookmaker.markets?.find((m: any) => m.key === market);
-          if (!propsMarket) continue;
-          
+      if (result.status === 'rejected' || !result.value) continue;
+
+      const { event, data } = result.value as { event: any; data: any };
+      if (!data.bookmakers || data.bookmakers.length === 0) continue;
+
+      for (const bookmaker of data.bookmakers) {
+        for (const market of (bookmaker.markets || [])) {
           // Group outcomes by player
           const playerProps: Record<string, any> = {};
-          for (const outcome of propsMarket.outcomes) {
+          for (const outcome of market.outcomes || []) {
             const playerName = outcome.description || outcome.name;
             if (!playerProps[playerName]) {
-              playerProps[playerName] = {
-                player: playerName,
-                line: outcome.point,
-                over: null,
-                under: null,
-              };
+              playerProps[playerName] = { player: playerName, line: outcome.point, over: null, under: null };
             }
-            
-            if (outcome.name === 'Over') {
-              playerProps[playerName].over = outcome.price;
-            } else if (outcome.name === 'Under') {
-              playerProps[playerName].under = outcome.price;
-            }
+            if (outcome.name === 'Over') playerProps[playerName].over = outcome.price;
+            else if (outcome.name === 'Under') playerProps[playerName].under = outcome.price;
           }
-          
-          // Create prop objects
+
           for (const [playerName, propData] of Object.entries(playerProps)) {
-            if (propData.over && propData.under) {
+            if ((propData as any).over && (propData as any).under) {
               allProps.push({
-                id: `${game.id}-${playerName}-${market}`,
+                id: `${event.id}-${playerName}-${market.key}`,
                 sport,
-                gameId: game.id,
+                gameId: event.id,
                 playerName,
-                statType: market.replace('player_', ''),
-                line: propData.line,
-                overOdds: propData.over,
-                underOdds: propData.under,
+                statType: market.key.replace('player_', ''),
+                line: (propData as any).line,
+                overOdds: (propData as any).over,
+                underOdds: (propData as any).under,
                 bookmaker: bookmaker.title,
-                gameTime: game.commence_time,
-                homeTeam: game.home_team,
-                awayTeam: game.away_team,
+                gameTime: event.commence_time,
+                homeTeam: event.home_team,
+                awayTeam: event.away_team,
               });
             }
           }
         }
       }
     }
-    
+
     console.log(`[v0] [PLAYER-PROPS] Successfully fetched ${allProps.length} total props from ${playerPropMarkets.length} markets`);
     
     // Store in Supabase

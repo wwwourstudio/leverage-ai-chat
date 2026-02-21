@@ -31,6 +31,9 @@ import { AIProgressIndicator } from '@/components/ai-progress-indicator';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { DataFallback } from '@/components/data-fallback';
 import { ChatMessage } from '@/components/chat-message';
+import { SettingsLightbox } from '@/components/SettingsLightbox';
+import { AlertsLightbox } from '@/components/AlertsLightbox';
+import { StripeLightbox } from '@/components/StripeLightbox';
 
 interface FileAttachment {
   id: string;
@@ -211,6 +214,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
+  const [showSettingsLightbox, setShowSettingsLightbox] = useState(false);
+  const [showAlertsLightbox, setShowAlertsLightbox] = useState(false);
+  const [showStripeLightbox, setShowStripeLightbox] = useState(false);
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(!!serverData?.userSession);
   const [user, setUser] = useState<{ name: string; email: string; avatar?: string } | null>(
@@ -264,10 +270,12 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     }
   }, [serverData?.initialCards, serverData?.fetchErrors, serverData?.missingKeys, serverData?.dataSourcesUsed]);
   
-  // Credit system utilities
+  // Credit system utilities — syncs with Supabase user_profiles when logged in,
+  // falls back to localStorage for anonymous users.
   const MESSAGE_LIMIT = 15;
   const CHAT_LIMIT = 10;
   const LIMIT_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+  const [supabaseProfileId, setSupabaseProfileId] = useState<string | null>(null);
 
   const getCreditData = () => {
     if (typeof window === 'undefined') return { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
@@ -278,7 +286,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       return initial;
     }
     const parsed = JSON.parse(data);
-    // Check if reset time has passed
     if (Date.now() > parsed.resetTime) {
       const reset = { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
       localStorage.setItem('userCredits', JSON.stringify(reset));
@@ -287,23 +294,76 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     return parsed;
   };
 
+  // Sync credits to Supabase (fire-and-forget)
+  const syncCreditsToSupabase = async (newCredits: number, transactionType: string, amount: number) => {
+    if (!supabaseProfileId) return;
+    try {
+      const supabase = createClient();
+      // Update profile balance
+      await supabase
+        .from('profiles')
+        .update({ credits: newCredits, updated_at: new Date().toISOString() })
+        .eq('id', supabaseProfileId);
+      // Log transaction
+      await supabase
+        .from('credit_transactions')
+        .insert({
+          user_id: supabaseProfileId,
+          amount,
+          balance_after: newCredits,
+          transaction_type: transactionType,
+        });
+    } catch (err) {
+      console.error('[Credits] Supabase sync failed:', err);
+    }
+  };
+
+  // Load credits from Supabase on login
+  const loadCreditsFromSupabase = async (authId: string) => {
+    try {
+      const supabase = createClient();
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, credits')
+        .eq('auth_id', authId)
+        .single();
+
+      if (profile) {
+        setSupabaseProfileId(profile.id);
+        const dbCredits = profile.credits ?? MESSAGE_LIMIT;
+        setCreditsRemaining(dbCredits);
+        // Sync to localStorage
+        const creditData = getCreditData();
+        localStorage.setItem('userCredits', JSON.stringify({ ...creditData, credits: dbCredits }));
+        return dbCredits;
+      }
+    } catch (err) {
+      console.error('[Credits] Failed to load from Supabase:', err);
+    }
+    return null;
+  };
+
   const consumeCredit = () => {
     const data = getCreditData();
     if (data.credits <= 0) {
-      setShowPurchaseModal(true);
+      setShowStripeLightbox(true);
       return false;
     }
-    const updated = { ...data, credits: data.credits - 1 };
+    const newCredits = data.credits - 1;
+    const updated = { ...data, credits: newCredits };
     localStorage.setItem('userCredits', JSON.stringify(updated));
-    setCreditsRemaining(updated.credits);
+    setCreditsRemaining(newCredits);
+    syncCreditsToSupabase(newCredits, 'consume', -1);
     return true;
   };
 
   const addCredits = (amount: number): void => {
     const data = getCreditData();
-    const updated = { ...data, credits: data.credits + amount };
+    const newCredits = data.credits + amount;
+    const updated = { ...data, credits: newCredits };
     localStorage.setItem('userCredits', JSON.stringify(updated));
-    setCreditsRemaining(updated.credits);
+    setCreditsRemaining(newCredits);
+    syncCreditsToSupabase(newCredits, 'purchase', amount);
   };
 
   const getRateLimitData = () => {
@@ -315,7 +375,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       return initial;
     }
     const parsed = JSON.parse(data);
-    // Check if reset time has passed
     if (Date.now() > parsed.resetTime) {
       const reset = { count: 0, resetTime: Date.now() + LIMIT_DURATION };
       localStorage.setItem('chatRateLimit', JSON.stringify(reset));
@@ -336,21 +395,23 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     return updated;
   };
 
-  // Check Supabase auth session on mount
+  // Check Supabase auth session on mount and sync credits
   useEffect(() => {
     (async () => {
-  try {
-  const supabase = createClient();
+      try {
+        const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         if (session?.user) {
           setIsLoggedIn(true);
           setUser({
             name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
             email: session.user.email || ''
           });
+          // Load credits from Supabase
+          loadCreditsFromSupabase(session.user.id);
         }
-        
+
         // Listen for auth changes (OAuth redirect, signout, etc.)
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
           if (session?.user) {
@@ -361,17 +422,39 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             });
             setShowLoginModal(false);
             setShowSignupModal(false);
+            // Load credits from Supabase on auth change
+            loadCreditsFromSupabase(session.user.id);
           } else {
             setIsLoggedIn(false);
             setUser(null);
+            setSupabaseProfileId(null);
           }
         });
-        
+
         return () => subscription.unsubscribe();
       } catch (err) {
         console.error('[v0] Auth check failed:', err);
       }
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Handle Stripe checkout success: add credits from URL params on return
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session_id');
+    const creditsPurchased = params.get('credits');
+    if (sessionId && creditsPurchased) {
+      const amount = parseInt(creditsPurchased, 10);
+      if (amount > 0) {
+        addCredits(amount);
+        console.log(`[Stripe] Added ${amount} credits from checkout session ${sessionId}`);
+      }
+      // Clean up URL params
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Initialize credits and load real insights on mount
@@ -1999,11 +2082,17 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
                   </div>
 
                   {/* Notifications and Settings for logged-in users */}
-                  <button className="relative p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 border border-gray-800 hover:border-gray-700 hover:shadow-lg group active:scale-95 border-none bg-transparent">
+                  <button
+                    onClick={() => setShowAlertsLightbox(true)}
+                    className="relative p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 border border-gray-800 hover:border-gray-700 hover:shadow-lg group active:scale-95 border-none bg-transparent"
+                  >
                     <Bell className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" />
                     <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-gray-950 shadow-lg shadow-red-500/50 animate-pulse"></div>
                   </button>
-                  <button className="p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 border border-gray-800 hover:border-gray-700 hover:shadow-lg group active:scale-95 border-none bg-transparent">
+                  <button
+                    onClick={() => setShowSettingsLightbox(true)}
+                    className="p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 border border-gray-800 hover:border-gray-700 hover:shadow-lg group active:scale-95 border-none bg-transparent"
+                  >
                     <Settings className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors group-hover:rotate-90 transition-transform" />
                   </button>
                 </>
@@ -2928,14 +3017,16 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
                 Betting • Fantasy (NFBC/NFFC/NFBKC) • DFS • Kalshi • Real-time AI Analysis
               </p>
               <div className="flex items-center gap-3">
-                <div className={`flex items-center gap-2 text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all ${
-                  creditsRemaining <= 3 
-                    ? 'text-orange-400 bg-orange-500/10 border-orange-500/30' 
+                <button
+                  onClick={() => setShowStripeLightbox(true)}
+                  className={`flex items-center gap-2 text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all cursor-pointer hover:opacity-80 ${
+                  creditsRemaining <= 3
+                    ? 'text-orange-400 bg-orange-500/10 border-orange-500/30'
                     : 'text-gray-500 bg-gray-900/30 border-gray-800'
                 }`}>
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>{creditsRemaining} {creditsRemaining === 1 ? 'credit' : 'credits'} remaining</span>
-                </div>
+                </button>
                 <div className="flex items-center gap-2 text-[11px] font-bold text-gray-600">
                   <div className="relative flex items-center justify-center">
                     <div className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-lg shadow-green-500/50"></div>
@@ -2999,16 +3090,10 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
                 <button
                   onClick={() => {
-                    const amount = parseInt(purchaseAmount) || 20;
-                    if (amount >= 10) {
-                      // Calculate credits: $1 = 1 credit
-                      addCredits(amount);
-                      setShowPurchaseModal(false);
-                      setPurchaseAmount('');
-                    }
+                    setShowPurchaseModal(false);
+                    setShowStripeLightbox(true);
                   }}
-                  disabled={!purchaseAmount || parseInt(purchaseAmount) < 10}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all"
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all"
                 >
                   Purchase Credits
                 </button>
@@ -3017,7 +3102,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
                   <button
                     onClick={() => {
                       setShowPurchaseModal(false);
-                      setShowSubscriptionModal(true);
+                      setShowStripeLightbox(true);
                     }}
                     className="text-sm text-blue-400 hover:text-blue-300 font-semibold transition-colors"
                   >
@@ -3086,9 +3171,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
               <button
                 onClick={() => {
-                  // Mock subscription - in production this would integrate with Stripe
-                  addCredits(20);
                   setShowSubscriptionModal(false);
+                  setShowStripeLightbox(true);
                 }}
                 className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition-all mb-3"
               >
@@ -3098,7 +3182,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
               <button
                 onClick={() => {
                   setShowSubscriptionModal(false);
-                  setShowPurchaseModal(true);
+                  setShowStripeLightbox(true);
                 }}
                 className="w-full py-3 text-sm text-gray-400 hover:text-gray-300 font-semibold transition-colors"
               >
@@ -3119,7 +3203,27 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         setUser={setUser}
       />
 
+      {/* Settings Lightbox */}
+      <SettingsLightbox
+        isOpen={showSettingsLightbox}
+        onClose={() => setShowSettingsLightbox(false)}
+        user={user}
+        onUserUpdate={setUser}
+      />
 
+      {/* Alerts Lightbox */}
+      <AlertsLightbox
+        isOpen={showAlertsLightbox}
+        onClose={() => setShowAlertsLightbox(false)}
+      />
+
+      {/* Stripe Purchase Lightbox */}
+      <StripeLightbox
+        isOpen={showStripeLightbox}
+        onClose={() => setShowStripeLightbox(false)}
+        onCreditsAdded={addCredits}
+        creditsRemaining={creditsRemaining}
+      />
 
       <style>
         {`

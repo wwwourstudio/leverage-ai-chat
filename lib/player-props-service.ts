@@ -88,14 +88,35 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
     // Player props require the event-level endpoint and are only valid when
     // there are upcoming events for the sport.
     const sportPropMarkets: Record<string, string[]> = {
-      'basketball_nba': ['player_points', 'player_rebounds', 'player_assists', 'player_threes'],
-      'basketball_ncaab': ['player_points', 'player_rebounds', 'player_assists', 'player_threes'],
-      'americanfootball_nfl': ['player_pass_tds', 'player_pass_yds', 'player_rush_yds', 'player_receptions'],
-      'americanfootball_ncaaf': ['player_pass_tds', 'player_pass_yds', 'player_rush_yds', 'player_receptions'],
-      'baseball_mlb': ['player_home_runs', 'player_hits', 'player_strikeouts', 'player_rbis'],
-      'icehockey_nhl': ['player_points', 'player_assists', 'player_shots_on_goal'],
-      'soccer_epl': ['player_anytime_goalscorer', 'player_shots_on_target'],
-      'soccer_usa_mls': ['player_anytime_goalscorer', 'player_shots_on_target'],
+      // Basketball
+      'basketball_nba': ['player_points', 'player_rebounds', 'player_assists', 'player_threes', 'player_blocks', 'player_steals', 'player_turnovers', 'player_points_rebounds_assists', 'player_points_rebounds', 'player_points_assists', 'player_rebounds_assists', 'player_double_double', 'player_first_basket'],
+      'basketball_ncaab': ['player_points', 'player_rebounds', 'player_assists', 'player_threes', 'player_blocks', 'player_steals'],
+      'basketball_wnba': ['player_points', 'player_rebounds', 'player_assists', 'player_threes', 'player_blocks', 'player_steals'],
+      // American Football
+      'americanfootball_nfl': ['player_pass_tds', 'player_pass_yds', 'player_pass_completions', 'player_pass_attempts', 'player_pass_interceptions', 'player_rush_yds', 'player_rush_attempts', 'player_receptions', 'player_reception_yds', 'player_anytime_td', 'player_first_td', 'player_kicking_points', 'player_field_goals'],
+      'americanfootball_ncaaf': ['player_pass_tds', 'player_pass_yds', 'player_rush_yds', 'player_receptions', 'player_reception_yds', 'player_anytime_td'],
+      // Baseball
+      'baseball_mlb': ['player_home_runs', 'player_hits', 'player_total_bases', 'player_rbis', 'player_runs', 'player_stolen_bases', 'player_hits_runs_rbis', 'player_singles', 'player_doubles', 'player_walks', 'player_strikeouts', 'pitcher_strikeouts', 'pitcher_hits_allowed', 'pitcher_walks', 'pitcher_earned_runs', 'pitcher_outs'],
+      // Hockey
+      'icehockey_nhl': ['player_points', 'player_goals', 'player_assists', 'player_shots_on_goal', 'player_blocked_shots', 'player_power_play_points', 'goalie_saves'],
+      // Soccer
+      'soccer_epl': ['player_anytime_goalscorer', 'player_first_goalscorer', 'player_last_goalscorer', 'player_shots_on_target', 'player_shots', 'player_assists'],
+      'soccer_usa_mls': ['player_anytime_goalscorer', 'player_first_goalscorer', 'player_shots_on_target', 'player_shots', 'player_assists'],
+      'soccer_spain_la_liga': ['player_anytime_goalscorer', 'player_first_goalscorer', 'player_shots_on_target'],
+      'soccer_germany_bundesliga': ['player_anytime_goalscorer', 'player_first_goalscorer', 'player_shots_on_target'],
+      'soccer_italy_serie_a': ['player_anytime_goalscorer', 'player_first_goalscorer', 'player_shots_on_target'],
+      'soccer_france_ligue_one': ['player_anytime_goalscorer', 'player_first_goalscorer', 'player_shots_on_target'],
+      'soccer_uefa_champs_league': ['player_anytime_goalscorer', 'player_first_goalscorer', 'player_shots_on_target'],
+      // MMA / UFC
+      'mma_mixed_martial_arts': ['player_method_of_victory', 'player_round_betting', 'player_fight_duration'],
+      // Tennis
+      'tennis_atp_french_open': ['player_total_games', 'player_sets'],
+      'tennis_atp_us_open': ['player_total_games', 'player_sets'],
+      'tennis_atp_wimbledon': ['player_total_games', 'player_sets'],
+      'tennis_atp_australian_open': ['player_total_games', 'player_sets'],
+      // Golf
+      'golf_pga': ['player_top_5', 'player_top_10', 'player_top_20', 'player_make_cut'],
+      'golf_masters': ['player_top_5', 'player_top_10', 'player_top_20'],
     };
 
     const playerPropMarkets = sportPropMarkets[sport] || [];
@@ -300,14 +321,41 @@ export async function getPlayerProps(playerName: string, sport: string): Promise
  */
 export function playerPropToCard(prop: PlayerProp): any {
   const statTypeDisplay: Record<string, string> = {
-    points: 'Points',
-    rebounds: 'Rebounds',
-    assists: 'Assists',
-    threes: '3-Pointers',
-    pass_tds: 'Pass TDs',
-    pass_yds: 'Pass Yards',
-    rush_yds: 'Rush Yards',
-    receptions: 'Receptions',
+    // Basketball
+    points: 'Points', rebounds: 'Rebounds', assists: 'Assists', threes: '3-Pointers',
+    blocks: 'Blocks', steals: 'Steals', turnovers: 'Turnovers',
+    points_rebounds_assists: 'Pts+Reb+Ast', points_rebounds: 'Pts+Reb',
+    points_assists: 'Pts+Ast', rebounds_assists: 'Reb+Ast',
+    double_double: 'Double-Double', first_basket: 'First Basket',
+    // Football
+    pass_tds: 'Pass TDs', pass_yds: 'Pass Yards', pass_completions: 'Completions',
+    pass_attempts: 'Pass Attempts', pass_interceptions: 'Interceptions',
+    rush_yds: 'Rush Yards', rush_attempts: 'Rush Attempts',
+    receptions: 'Receptions', reception_yds: 'Receiving Yards',
+    anytime_td: 'Anytime TD', first_td: 'First TD',
+    kicking_points: 'Kicking Points', field_goals: 'Field Goals',
+    // Baseball
+    home_runs: 'Home Runs', hits: 'Hits', total_bases: 'Total Bases',
+    rbis: 'RBIs', runs: 'Runs', stolen_bases: 'Stolen Bases',
+    hits_runs_rbis: 'H+R+RBI', singles: 'Singles', doubles: 'Doubles',
+    walks: 'Walks', strikeouts: 'Strikeouts',
+    // Pitcher stats
+    pitcher_strikeouts: 'K (Pitcher)', pitcher_hits_allowed: 'Hits Allowed',
+    pitcher_walks: 'BB (Pitcher)', pitcher_earned_runs: 'Earned Runs', pitcher_outs: 'Outs',
+    // Hockey
+    goals: 'Goals', shots_on_goal: 'Shots on Goal', blocked_shots: 'Blocked Shots',
+    power_play_points: 'Power Play Points', goalie_saves: 'Saves',
+    // Soccer
+    anytime_goalscorer: 'Anytime Goal', first_goalscorer: 'First Goal',
+    last_goalscorer: 'Last Goal', shots_on_target: 'Shots on Target', shots: 'Shots',
+    // MMA
+    method_of_victory: 'Method of Victory', round_betting: 'Round',
+    fight_duration: 'Fight Duration',
+    // Tennis
+    total_games: 'Total Games', sets: 'Sets',
+    // Golf
+    top_5: 'Top 5 Finish', top_10: 'Top 10 Finish', top_20: 'Top 20 Finish',
+    make_cut: 'Make Cut',
   };
   
   const statLabel = statTypeDisplay[prop.statType] || prop.statType;

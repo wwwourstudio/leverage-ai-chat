@@ -261,22 +261,30 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
     // Store in Supabase
     if (storeResults && allProps.length > 0) {
       try {
-        const rows = allProps.map(prop => ({
-          id: prop.id,
-          sport: prop.sport,
-          game_id: prop.gameId,
-          player_name: prop.playerName,
-          stat_type: prop.statType,
-          line: prop.line,
-          over_odds: prop.overOdds,
-          under_odds: prop.underOdds,
-          bookmaker: prop.bookmaker,
-          game_time: prop.gameTime,
-          home_team: prop.homeTeam,
-          away_team: prop.awayTeam,
-          fetched_at: new Date().toISOString(),
-        }));
-        
+        // Deduplicate by id within the batch — same player+market can appear
+        // from multiple bookmakers generating identical ids, which causes
+        // PostgreSQL error 21000 ("ON CONFLICT DO UPDATE cannot affect row
+        // a second time") when two rows in the same upsert share a PK.
+        const seenIds = new Map<string, object>();
+        for (const prop of allProps) {
+          seenIds.set(prop.id, {
+            id: prop.id,
+            sport: prop.sport,
+            game_id: prop.gameId,
+            player_name: prop.playerName,
+            stat_type: prop.statType,
+            line: prop.line,
+            over_odds: prop.overOdds,
+            under_odds: prop.underOdds,
+            bookmaker: prop.bookmaker,
+            game_time: prop.gameTime,
+            home_team: prop.homeTeam,
+            away_team: prop.awayTeam,
+            fetched_at: new Date().toISOString(),
+          });
+        }
+        const rows = Array.from(seenIds.values());
+
         const { error } = await supabase
           .from('player_props_markets')
           .upsert(rows, { onConflict: 'id' });

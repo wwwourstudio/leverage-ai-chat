@@ -280,10 +280,10 @@ export async function batchRequests<T, R>(
  */
 export const oddsApiQueue = new RequestQueue(
   {
-    requestsPerSecond: 4, // Conservative limit for free tier
-    burstSize: 10, // Allow small bursts
+    requestsPerSecond: 2, // Conservative limit for free tier (avoid 429s)
+    burstSize: 4, // Small burst to prevent thundering herd
   },
-  5 // Max 5 concurrent requests
+  2 // Max 2 concurrent requests — prevents rate-limit cascading
 );
 
 export const playerPropsQueue = new RequestQueue(

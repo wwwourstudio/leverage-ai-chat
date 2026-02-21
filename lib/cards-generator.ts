@@ -157,15 +157,39 @@ async function generateSportSpecificCards(
       console.error(error);
       console.error(`[v0] [CARDS-GEN] Stack trace:`, (error as Error).stack);
       
-      // Detect specific error types
+      // Detect specific error types and provide context-aware fallback reason
       const errorMsg = (error as Error).message || '';
       const isCircuitBreakerOpen = (error as any).isCircuitBreakerOpen === true;
       const isRateLimited = errorMsg.includes('429') || errorMsg.toLowerCase().includes('rate limit');
       
+      let fallbackReason: string | undefined;
       if (isCircuitBreakerOpen) {
         console.error(`[v0] [CARDS-GEN] Circuit breaker is open - too many recent failures`);
+        fallbackReason = 'api_error';
       } else if (isRateLimited) {
         console.error(`[v0] [CARDS-GEN] Rate limited - API quota exceeded`);
+        fallbackReason = 'rate_limited';
+      }
+      
+      // Generate a context-aware fallback card with the specific error reason
+      if (fallbackReason) {
+        const noDataMessage = generateNoDataMessage(sport, fallbackReason);
+        cards.push({
+          type: CARD_TYPES.LIVE_ODDS,
+          title: `${displaySport} - ${noDataMessage.title}`,
+          icon: 'AlertTriangle',
+          category: displaySport,
+          subcategory: fallbackReason === 'rate_limited' ? 'Rate Limited' : 'Temporarily Unavailable',
+          gradient: getSportGradient(sport),
+          data: {
+            description: noDataMessage.description,
+            note: noDataMessage.suggestion,
+            sport: sport,
+            status: 'ERROR_FALLBACK',
+            realData: false
+          }
+        });
+        return cards;
       }
     }
   }
@@ -278,21 +302,41 @@ export async function generateContextualCards(
       return `${apiToSport(s).toUpperCase()}${inSeason ? '' : '(off-season)'}`;
     }).join(', '));
     
-    // Fetch from ALL sports in parallel for speed
-    console.log('[v0] [MULTI-SPORT] Fetching odds from all sports in PARALLEL...');
-    const allSportCards = await Promise.all(
-      orderedSports.map(async (sportKey) => {
-        console.log(`[v0] [MULTI-SPORT] Starting fetch for ${apiToSport(sportKey).toUpperCase()}`);
-        try {
-          const sportCards = await generateSportSpecificCards(sportKey, 5, category);
-          console.log(`[v0] [MULTI-SPORT] ✓ ${apiToSport(sportKey).toUpperCase()}: ${sportCards.length} cards`);
-          return { sport: sportKey, cards: sportCards };
-        } catch (error) {
-          console.error(`[v0] [MULTI-SPORT] ✗ ${apiToSport(sportKey).toUpperCase()} failed:`, error);
-          return { sport: sportKey, cards: [] };
-        }
-      })
-    );
+    // Fetch in small sequential batches (2 at a time) to avoid thundering herd
+    // Early-terminate once we have enough cards — skip off-season sports when possible
+    const BATCH_SIZE = 2;
+    const allSportCards: { sport: string; cards: InsightCard[] }[] = [];
+    
+    console.log(`[v0] [MULTI-SPORT] Fetching odds in batches of ${BATCH_SIZE} with early termination...`);
+    
+    for (let i = 0; i < orderedSports.length; i += BATCH_SIZE) {
+      // Early termination: stop fetching if we already have enough cards
+      const collectedSoFar = allSportCards.reduce((sum, r) => sum + r.cards.filter(c => c.data?.realData).length, 0);
+      if (collectedSoFar >= count) {
+        const remaining = orderedSports.slice(i).map(s => apiToSport(s).toUpperCase());
+        console.log(`[v0] [MULTI-SPORT] Early termination — ${collectedSoFar} cards collected, skipping: ${remaining.join(', ')}`);
+        break;
+      }
+      
+      const batch = orderedSports.slice(i, i + BATCH_SIZE);
+      console.log(`[v0] [MULTI-SPORT] Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${batch.map(s => apiToSport(s).toUpperCase()).join(', ')}`);
+      
+      const batchResults = await Promise.all(
+        batch.map(async (sportKey) => {
+          console.log(`[v0] [MULTI-SPORT] Starting fetch for ${apiToSport(sportKey).toUpperCase()}`);
+          try {
+            const sportCards = await generateSportSpecificCards(sportKey, 5, category);
+            console.log(`[v0] [MULTI-SPORT] Done ${apiToSport(sportKey).toUpperCase()}: ${sportCards.length} cards`);
+            return { sport: sportKey, cards: sportCards };
+          } catch (error) {
+            console.error(`[v0] [MULTI-SPORT] Failed ${apiToSport(sportKey).toUpperCase()}:`, error);
+            return { sport: sportKey, cards: [] };
+          }
+        })
+      );
+      
+      allSportCards.push(...batchResults);
+    }
     
     console.log('[v0] [MULTI-SPORT] All fetches complete');
     

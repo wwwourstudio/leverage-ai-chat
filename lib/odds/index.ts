@@ -6,6 +6,7 @@
 
 import { ENV_KEYS, LOG_PREFIXES, EXTERNAL_APIS } from '@/lib/constants';
 import { supabaseOddsService } from '@/lib/supabase-odds-service';
+import { oddsApiQueue } from '@/lib/api-request-manager';
 
 // ============================================
 // Types & Constants
@@ -254,21 +255,24 @@ export async function fetchLiveOdds(
   }
 
   const fetchPromise = retryWithBackoff(async () => {
-    const response = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(10000)
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      const error: any = new Error(`Odds API error (${response.status}): ${errorText}`);
-      error.status = response.status;
-      throw error;
-    }
+    // Route through the global rate-limited queue to prevent thundering herd
+    return oddsApiQueue.enqueue(async () => {
+      const response = await fetch(url, {
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(10000)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        const error: any = new Error(`Odds API error (${response.status}): ${errorText}`);
+        error.status = response.status;
+        throw error;
+      }
 
-    const data = await response.json();
-    requestCache.set(cacheKey, { data, timestamp: Date.now() });
-    return data;
+      const data = await response.json();
+      requestCache.set(cacheKey, { data, timestamp: Date.now() });
+      return data;
+    }, 1); // priority 1 (normal)
   }, `odds:${sportKey}`, 3, 1000);
 
   if (!skipCache) {
@@ -308,6 +312,20 @@ export async function getOddsWithCache(
   }
 
   try {
+    // Check if circuit breaker is open before even attempting the fetch
+    const circuitState = getCircuitBreakerState(`odds:${sport}`);
+    if (circuitState.isOpen) {
+      const timeSinceFailure = Date.now() - circuitState.lastFailureTime;
+      if (timeSinceFailure < CIRCUIT_BREAKER_TIMEOUT) {
+        console.log(`${LOG_PREFIXES.API} Circuit breaker open for ${sport}, serving stale cache`);
+        const staleCached = await supabaseOddsService.getCachedOdds(sport);
+        if (staleCached && staleCached.length > 0) {
+          return staleCached;
+        }
+        return [];
+      }
+    }
+
     const oddsData = await fetchLiveOdds(sport, {
       apiKey,
       markets: ['h2h', 'spreads', 'totals'],
@@ -317,10 +335,11 @@ export async function getOddsWithCache(
     });
 
     if (storeResults && oddsData.length > 0) {
-      await Promise.all([
+      // Store results async -- don't block the response
+      Promise.all([
         supabaseOddsService.storeOdds(sport, sport, oddsData),
         supabaseOddsService.storeSportOdds(sport.split('_')[0], oddsData)
-      ]);
+      ]).catch(err => console.error(`${LOG_PREFIXES.API} Store error for ${sport}:`, err));
     }
 
     return oddsData;

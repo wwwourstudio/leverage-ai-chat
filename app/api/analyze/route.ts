@@ -9,7 +9,7 @@ import {
   HTTP_STATUS,
   ERROR_MESSAGES,
 } from '@/lib/constants';
-import { generateContextualCards, type InsightCard } from '@/lib/cards-generator';
+import { generateContextualCards, getCachedCards, type InsightCard } from '@/lib/cards-generator';
 import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-detector';
 
 // ============================================================================
@@ -188,18 +188,30 @@ export async function POST(request: NextRequest) {
       usedFallback = true;
     }
 
-    // Always generate contextual cards with real odds data.
-    // The cards generator fetches live data independently from the odds-api,
-    // so even when the client doesn't pass oddsData, the server can still provide cards.
+    // Serve contextual cards with real odds data.
+    // Strategy: use the in-memory cache first (populated by SSR page load),
+    // only fetch fresh if cache is empty. Apply a 5s timeout to prevent hanging.
     let cards: InsightCard[] = [];
     if (!usedFallback) {
       try {
-        cards = await generateContextualCards(
-          category,
-          context.sport ?? undefined,
-          3
-        );
-        console.log(`[API/analyze] Generated ${cards.length} contextual cards (category: ${category}, sport: ${context.sport || 'multi'})`);
+        // 1. Try cache first (instant, no API calls)
+        const cached = getCachedCards(category, context.sport ?? undefined, 3);
+        if (cached && cached.length > 0) {
+          cards = cached;
+          console.log(`[API/analyze] Served ${cards.length} cards from cache (category: ${category})`);
+        } else {
+          // 2. Cache miss -- fetch fresh with a timeout
+          const cardPromise = generateContextualCards(
+            category,
+            context.sport ?? undefined,
+            3
+          );
+          const timeoutPromise = new Promise<InsightCard[]>((resolve) =>
+            setTimeout(() => resolve([]), 8000) // 8s timeout
+          );
+          cards = await Promise.race([cardPromise, timeoutPromise]);
+          console.log(`[API/analyze] Generated ${cards.length} fresh cards (category: ${category}, sport: ${context.sport || 'multi'})`);
+        }
       } catch (cardError) {
         console.error('[API/analyze] Card generation failed:', cardError);
       }

@@ -12,6 +12,48 @@
 import { CARD_TYPES, SPORT_KEYS, sportToApi, apiToSport } from '@/lib/constants';
 import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
 
+// ============================================================================
+// In-memory card cache (shared between SSR page load and /api/analyze)
+// Prevents duplicate API calls when the analyze endpoint needs cards that
+// were already fetched during SSR.
+// ============================================================================
+interface CachedCards {
+  cards: InsightCard[];
+  timestamp: number;
+  category: string;
+}
+
+const CARD_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+let cachedCards: CachedCards | null = null;
+
+/** Retrieve cached cards if still fresh, filtered by category/sport */
+export function getCachedCards(category?: string, sport?: string, count: number = 3): InsightCard[] | null {
+  if (!cachedCards) return null;
+  if (Date.now() - cachedCards.timestamp > CARD_CACHE_TTL) {
+    cachedCards = null;
+    return null;
+  }
+
+  let filtered = cachedCards.cards;
+
+  // Filter by sport if specified
+  if (sport) {
+    const normalized = sportToApi(sport);
+    const sportFiltered = filtered.filter(c => {
+      const cardSport = c.data?.sport as string;
+      return cardSport && (cardSport === normalized || cardSport === sport);
+    });
+    if (sportFiltered.length > 0) filtered = sportFiltered;
+  }
+
+  return filtered.slice(0, count);
+}
+
+/** Store cards in the in-memory cache */
+function setCachedCards(cards: InsightCard[], category: string): void {
+  cachedCards = { cards, timestamp: Date.now(), category };
+}
+
 /**
  * Generate sport-specific cards with REAL odds data
  */
@@ -55,9 +97,7 @@ async function generateSportSpecificCards(
         storeResults: true // Store in Supabase for realtime sync
       });
       
-      console.log(`[v0] [CARDS-GEN] ✓ Unified service returned ${oddsData?.length || 0} games`);
-      console.log(`[v0] [CARDS-GEN] Data is array: ${Array.isArray(oddsData)}`);
-      console.log(`[v0] [CARDS-GEN] Data is null/undefined: ${oddsData == null}`);
+      console.log(`[v0] [CARDS-GEN] Unified service: ${oddsData?.length || 0} games for ${displaySport}`);
       
       if (oddsData && oddsData.length > 0) {
         console.log(`[v0] [CARDS-GEN] SUCCESS: Found ${oddsData.length} games for ${displaySport}`);
@@ -260,9 +300,17 @@ export async function generateContextualCards(
   count: number = 3,
   multiSport: boolean = !sport // DEFAULT TO TRUE WHEN NO SPORT SPECIFIED
 ): Promise<InsightCard[]> {
+  // Check in-memory cache first to avoid redundant API calls
+  // (SSR page load populates this, /api/analyze reuses it)
+  const cached = getCachedCards(category, sport, count);
+  if (cached && cached.length > 0) {
+    console.log(`[v0] [CARDS-GEN] Cache HIT: returning ${cached.length} cached cards`);
+    return cached;
+  }
+
   const cards: InsightCard[] = [];
   
-  console.log(`[v0] [CARDS-GEN] Starting with multiSport=${multiSport}, sport=${sport}, category=${category}`);
+  console.log(`[v0] [CARDS-GEN] Cache MISS: fetching fresh data (multiSport=${multiSport}, sport=${sport}, category=${category})`);
 
   // Normalize sport to API format, then get display name
   const normalizedSport = sport ? sportToApi(sport) : undefined;
@@ -908,8 +956,13 @@ export async function generateContextualCards(
     });
   }
   
-  console.log('[v0] [CARDS GENERATOR] ✓ Generated', cards.length, 'cards (before weather enrichment)');
+  console.log('[v0] [CARDS GENERATOR] Generated', cards.length, 'cards (before weather enrichment)');
   console.log('[v0] [CARDS GENERATOR] Card titles:', cards.map((c: InsightCard) => c.title).join(', '));
+
+  // Populate the in-memory cache so subsequent calls (e.g. /api/analyze) reuse these
+  if (cards.length > 0) {
+    setCachedCards(cards, category || 'all');
+  }
 
   // Add weather cards for outdoor sports if betting category
   if ((category === 'betting' || !category) && normalizedSport) {

@@ -139,7 +139,7 @@ interface InsightCard {
   category: string;
   subcategory: string;
   gradient: string;
-  data: Record<string, string | number>;
+  data: Record<string, any>;
   status: string;
 }
 
@@ -1118,13 +1118,13 @@ No preamble. Start directly with section 1.`;
       console.log('[v0] Analysis result received:', {
         success: analysisResult.success,
         hasText: !!analysisResult.text,
-        hasCards: !!analysisResult.cards,
+        cardCount: analysisResult.cards?.length ?? 0,
         hasTrustMetrics: !!analysisResult.trustMetrics,
         finalConfidence: analysisResult.trustMetrics?.finalConfidence,
         error: analysisResult.error,
         useFallback: analysisResult.useFallback,
-        details: analysisResult.details,
-        hadOddsData: !!context.oddsData
+        hadClientOddsData: !!context.oddsData,
+        serverGeneratedCards: (analysisResult.cards?.length ?? 0) > 0,
       });
 
       // Handle API errors with smart fallback
@@ -2456,7 +2456,7 @@ No preamble. Start directly with section 1.`;
                                       }`}>{card.status}</span>
                                     </div>
                                     <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">
-                                      {card.category} • {card.subcategory}
+                                      {card.category} �� {card.subcategory}
                                     </p>
                                   </div>
                                 </div>

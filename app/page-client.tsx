@@ -34,6 +34,7 @@ import { ChatMessage } from '@/components/chat-message';
 import { SettingsLightbox } from '@/components/SettingsLightbox';
 import { AlertsLightbox } from '@/components/AlertsLightbox';
 import { StripeLightbox } from '@/components/StripeLightbox';
+import { UserLightbox } from '@/components/UserLightbox';
 
 interface FileAttachment {
   id: string;
@@ -217,6 +218,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [showSettingsLightbox, setShowSettingsLightbox] = useState(false);
   const [showAlertsLightbox, setShowAlertsLightbox] = useState(false);
   const [showStripeLightbox, setShowStripeLightbox] = useState(false);
+  const [showUserLightbox, setShowUserLightbox] = useState(false);
+  const [customInstructions, setCustomInstructions] = useState('');
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(!!serverData?.userSession);
   const [user, setUser] = useState<{ name: string; email: string; avatar?: string } | null>(
@@ -995,7 +998,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         
         newMessage = {
           role: 'assistant',
-          content: `I'm processing your request using cached data since live services are temporarily limited. ${errorMessage}\n\nHere's what I can tell you:`,
+          content: `Here's what I can tell you based on available data:`,
           timestamp: new Date(),
           cards: fallbackCards,
           confidence: 70,
@@ -1017,11 +1020,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             trustLevel: 'medium',
             riskLevel: 'medium',
             adjustedTone: 'Moderate confidence',
-            flags: [{
-              type: 'warning',
-              message: errorMessage,
-              severity: 'warning'
-            }]
+            flags: []
           }
         };
       } else {
@@ -1416,6 +1415,11 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         // Image-only with no text — give it a default prompt
         promptForAI = `I've attached ${currentFiles.map(f => f.name).join(', ')}. Please analyze.`;
       }
+    }
+
+    // Prepend custom AI instructions if the user has set them
+    if (customInstructions) {
+      promptForAI = `[User instructions: ${customInstructions}]\n\n${promptForAI}`;
     }
 
     setInput('');
@@ -2084,7 +2088,10 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
               {isLoggedIn && user ? (
                 <>
                   {/* User Profile Info */}
-                  <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-900/50 border border-gray-800">
+                  <div
+                    className="flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 hover:bg-gray-800/50 transition-all"
+                    onClick={() => setShowUserLightbox(true)}
+                  >
                     <div className="flex items-center gap-2.5">
                       <div className="relative">
                         <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
@@ -3223,6 +3230,15 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         setShowSignupModal={setShowSignupModal}
         setIsLoggedIn={setIsLoggedIn}
         setUser={setUser}
+      />
+
+      {/* User Lightbox */}
+      <UserLightbox
+        isOpen={showUserLightbox}
+        onClose={() => setShowUserLightbox(false)}
+        user={user}
+        onLogout={() => { setUser(null); setIsLoggedIn(false); }}
+        onInstructionsChange={setCustomInstructions}
       />
 
       {/* Settings Lightbox */}

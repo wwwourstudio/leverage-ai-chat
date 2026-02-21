@@ -201,6 +201,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [verifyStage, setVerifyStage] = useState<'analyzing' | 'reverifying'>('analyzing');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeChat, setActiveChat] = useState('chat-1');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -943,20 +944,40 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       }
       
       // Fetch real data from our API routes
-      const analysisResult = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userMessage,
-          context
-        })
-      }).then(res => res.json() as Promise<APIResponse>);
-      
+      const fetchAnalysis = () =>
+        fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userMessage, context }),
+        }).then((res) => res.json() as Promise<APIResponse>);
+
+      setVerifyStage('analyzing');
+      let analysisResult = await fetchAnalysis();
+
+      // Client-side final-safety retry: if the server couldn't lift integrity above 40
+      // even after its own server-side retries, try once more from the client side.
+      const CLIENT_RETRY_THRESHOLD = 40;
+      if (
+        analysisResult.success &&
+        !analysisResult.useFallback &&
+        (analysisResult.trustMetrics?.finalConfidence ?? 100) < CLIENT_RETRY_THRESHOLD
+      ) {
+        console.warn(
+          '[v0] Integrity below client threshold (' +
+            analysisResult.trustMetrics?.finalConfidence +
+            '%) — client-side re-verify',
+        );
+        setVerifyStage('reverifying');
+        analysisResult = await fetchAnalysis();
+        setVerifyStage('analyzing');
+      }
+
       console.log('[v0] Analysis result received:', {
         success: analysisResult.success,
         hasText: !!analysisResult.text,
         hasCards: !!analysisResult.cards,
         hasTrustMetrics: !!analysisResult.trustMetrics,
+        finalConfidence: analysisResult.trustMetrics?.finalConfidence,
         error: analysisResult.error,
         useFallback: analysisResult.useFallback,
         details: analysisResult.details,
@@ -2751,7 +2772,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           </div>
           <div className="flex-1 space-y-3">
             <div className="bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl px-5 py-4 border border-gray-700/60 shadow-2xl">
-              <AIProgressIndicator />
+              <AIProgressIndicator stage={verifyStage} />
             </div>
           </div>
         </div>

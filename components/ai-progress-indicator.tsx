@@ -5,7 +5,7 @@ import { Clock, Zap, AlertCircle } from 'lucide-react';
 
 interface AIProgressIndicatorProps {
   startTime?: number;
-  stage?: 'analyzing' | 'processing' | 'finalizing' | 'slow';
+  stage?: 'analyzing' | 'processing' | 'finalizing' | 'slow' | 'reverifying';
 }
 
 export function AIProgressIndicator({ startTime, stage = 'analyzing' }: AIProgressIndicatorProps) {
@@ -13,6 +13,11 @@ export function AIProgressIndicator({ startTime, stage = 'analyzing' }: AIProgre
   const [status, setStatus] = useState(stage);
 
   useEffect(() => {
+    // If an explicit stage is forced (e.g. reverifying), respect it
+    if (stage === 'reverifying') {
+      setStatus('reverifying');
+      return;
+    }
     const start = startTime || Date.now();
     const interval = setInterval(() => {
       const ms = Date.now() - start;
@@ -26,7 +31,7 @@ export function AIProgressIndicator({ startTime, stage = 'analyzing' }: AIProgre
     }, 100);
 
     return () => clearInterval(interval);
-  }, [startTime]);
+  }, [startTime, stage]);
 
   const getStatusMessage = () => {
     switch (status) {
@@ -38,12 +43,15 @@ export function AIProgressIndicator({ startTime, stage = 'analyzing' }: AIProgre
         return 'Generating insights...';
       case 'slow':
         return 'Heavy analysis in progress...';
+      case 'reverifying':
+        return 'Re-verifying response integrity...';
       default:
         return 'Working on it...';
     }
   };
 
   const getIcon = () => {
+    if (status === 'reverifying') return <AlertCircle className="w-4 h-4 text-amber-400" />;
     if (status === 'slow') return <AlertCircle className="w-4 h-4 text-orange-400" />;
     if (elapsed > 5000) return <Clock className="w-4 h-4 text-blue-400" />;
     return <Zap className="w-4 h-4 text-purple-400" />;
@@ -55,6 +63,7 @@ export function AIProgressIndicator({ startTime, stage = 'analyzing' }: AIProgre
   };
 
   const getProgressColor = () => {
+    if (status === 'reverifying') return 'bg-amber-400';
     if (elapsed < 3000) return 'bg-blue-400';
     if (elapsed < 8000) return 'bg-purple-400';
     if (elapsed < 15000) return 'bg-orange-400';

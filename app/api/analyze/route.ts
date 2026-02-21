@@ -5,12 +5,12 @@ import { createXai } from '@ai-sdk/xai';
 import {
   AI_CONFIG,
   SYSTEM_PROMPT,
-  DEFAULT_TRUST_METRICS,
   DEFAULT_SOURCES,
   HTTP_STATUS,
   ERROR_MESSAGES,
 } from '@/lib/constants';
 import { generateContextualCards, type InsightCard } from '@/lib/cards-generator';
+import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-detector';
 
 // ============================================================================
 // Types
@@ -117,8 +117,11 @@ export async function POST(request: NextRequest) {
     let modelUsed = AI_CONFIG.MODEL_DISPLAY_NAME;
     let usedFallback = false;
 
+    const MAX_HALLUCINATION_RETRIES = 2;
+
     if (xaiApiKey) {
       try {
+        // Initial generation
         const result = await generateText({
           model: createXai({ apiKey: xaiApiKey })('grok-3-fast'),
           system: SYSTEM_PROMPT,
@@ -127,8 +130,49 @@ export async function POST(request: NextRequest) {
           maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
           maxRetries: 2,
         });
-
         aiText = result.text;
+
+        // Hallucination-detection retry loop
+        let detection = detectHallucinations(aiText, userMessage, context.oddsData);
+        let retryAttempt = 0;
+
+        while (detection.shouldRetry && retryAttempt < MAX_HALLUCINATION_RETRIES) {
+          retryAttempt++;
+          console.warn(
+            `[API/analyze] Hallucination detected (attempt ${retryAttempt}/${MAX_HALLUCINATION_RETRIES}):`,
+            detection.retryReason,
+          );
+
+          const retryPrompt = buildRetryPrompt(
+            enrichedPrompt,
+            detection,
+            retryAttempt,
+            (context.oddsData?.events?.length ?? 0) > 0,
+          );
+
+          try {
+            const retryResult = await generateText({
+              model: createXai({ apiKey: xaiApiKey })('grok-3-fast'),
+              system: SYSTEM_PROMPT,
+              prompt: retryPrompt,
+              // Lower temperature on retries to reduce hallucination likelihood
+              temperature: Math.max(0.1, (AI_CONFIG.DEFAULT_TEMPERATURE ?? 0.7) - retryAttempt * 0.2),
+              maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
+              maxRetries: 1,
+            });
+            aiText = retryResult.text;
+            detection = detectHallucinations(aiText, userMessage, context.oddsData);
+          } catch (retryError) {
+            console.error(`[API/analyze] Retry ${retryAttempt} failed:`, retryError);
+            break;
+          }
+        }
+
+        if (retryAttempt > 0) {
+          console.log(
+            `[API/analyze] Final integrity after ${retryAttempt} retry(ies): ${detection.finalConfidence}%`,
+          );
+        }
       } catch (aiError) {
         console.error('[API/analyze] AI generation failed:', aiError);
         aiText = generateFallbackResponse(userMessage, context);
@@ -159,11 +203,26 @@ export async function POST(request: NextRequest) {
 
     const processingTime = Date.now() - startTime;
 
+    // Compute real trust metrics from the final AI text
+    const trustMetrics = usedFallback
+      ? {
+          benfordIntegrity: 70,
+          oddsAlignment: 70,
+          marketConsensus: 70,
+          historicalAccuracy: 70,
+          finalConfidence: 70,
+          trustLevel: 'medium' as const,
+          riskLevel: 'medium' as const,
+          adjustedTone: 'Limited data',
+          flags: [{ type: 'info', message: 'Using fallback mode — AI unavailable', severity: 'info' as const }],
+        }
+      : detectHallucinations(aiText, userMessage, context.oddsData);
+
     return NextResponse.json({
       success: true,
       text: aiText,
       cards,
-      confidence: usedFallback ? 70 : 88,
+      confidence: trustMetrics.finalConfidence,
       sources: [
         usedFallback
           ? { name: 'Cached Data', type: 'cache', reliability: 70 }
@@ -171,17 +230,7 @@ export async function POST(request: NextRequest) {
         ...(context.oddsData ? [DEFAULT_SOURCES.ODDS_API] : []),
       ],
       modelUsed,
-      trustMetrics: usedFallback
-        ? {
-            ...DEFAULT_TRUST_METRICS,
-            finalConfidence: 70,
-            confidence: 70,
-            trustLevel: 'medium',
-            riskLevel: 'medium',
-            adjustedTone: 'Limited data',
-            flags: [{ type: 'info', message: 'Using fallback mode', severity: 'info' }],
-          }
-        : DEFAULT_TRUST_METRICS,
+      trustMetrics,
       processingTime,
       useFallback: usedFallback,
     });

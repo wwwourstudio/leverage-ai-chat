@@ -51,9 +51,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine analysis category from context
+    // Sports queries (even without explicit betting keywords like "MLB Offseason")
+    // should use 'betting' so generateContextualCards fetches real game/odds cards.
     const category = context.isPoliticalMarket
       ? 'kalshi'
-      : context.hasBettingIntent
+      : (context.hasBettingIntent || context.isSportsQuery)
         ? 'betting'
         : 'all';
 

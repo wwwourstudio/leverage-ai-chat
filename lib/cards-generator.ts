@@ -811,19 +811,45 @@ export async function generateContextualCards(
     });
   }
 
-  // Add general sports odds card if we have fewer than requested
+  // If we have a sport and still need cards, try fetching sport-specific data
+  // (handles category='all' with a specific sport, e.g. "MLB Offseason" query)
+  if (cards.length < count && normalizedSport) {
+    console.log(`[v0] [CARDS-GEN] Still need cards, attempting sport-specific fetch for ${displaySport}`);
+    try {
+      const sportCards = await generateSportSpecificCards(normalizedSport, count - cards.length, 'betting');
+      // Only add cards with real data (not placeholders) to avoid duplicates
+      const realCards = sportCards.filter(c => c.data?.realData === true);
+      if (realCards.length > 0) {
+        cards.push(...realCards.slice(0, count - cards.length));
+        console.log(`[v0] [CARDS-GEN] Added ${realCards.length} real ${displaySport} cards`);
+      }
+    } catch (err) {
+      console.error(`[v0] [CARDS-GEN] Sport-specific fallback failed:`, err);
+    }
+  }
+
+  // Final fallback: add informative placeholder cards (deduplicated by index)
+  const fallbackLabels = [
+    `${displaySport} Futures Markets`,
+    `${displaySport} Line Movement`,
+    `${displaySport} Schedule`,
+  ];
+  let fallbackIdx = 0;
   while (cards.length < count) {
+    const label = fallbackLabels[fallbackIdx % fallbackLabels.length];
+    fallbackIdx++;
     cards.push({
       type: CARD_TYPES.LIVE_ODDS,
-      title: `📈 ${displaySport} Odds Analysis`,
+      title: `📈 ${label}`,
       icon: 'LineChart',
       category: displaySport,
-      subcategory: 'Live Odds',
-      gradient: 'from-slate-600 to-gray-700',
+      subcategory: 'Market Overview',
+      gradient: getSportGradient(normalizedSport || 'default'),
       data: {
-        description: 'Real-time odds and line movements',
+        description: `${displaySport} markets — no live games currently scheduled`,
         sport: normalizedSport,
-        note: 'Connect to The Odds API for live data'
+        note: 'Odds post 24–48 hours before game time. Futures markets available year-round.',
+        status: 'OFFSEASON'
       }
     });
   }

@@ -9,22 +9,30 @@ function oddsToImpliedProb(americanOdds: number): number {
 }
 
 /**
- * Safely get Supabase client. Returns null when env vars are missing
- * instead of throwing at module initialisation time.
+ * Safely get Supabase client. Uses createBrowserClient on client,
+ * and a direct @supabase/supabase-js client on server to avoid
+ * dependency on cookies()/headers().
+ * Returns null when env vars are missing.
  */
 function getSupabase() {
   try {
-    // Only import in browser / when env is present
-    if (
-      !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-      !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    ) {
-      return null;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return null;
+
+    if (typeof window !== 'undefined') {
+      // Browser: use the singleton browser client
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { createClient } = require('@/lib/supabase/client');
+      return createClient();
     }
+
+    // Server: create a lightweight client without cookies dependency
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { createClient } = require('@/lib/supabase/client');
-    return createClient();
-  } catch {
+    const { createClient } = require('@supabase/supabase-js');
+    return createClient(url, key, { db: { schema: 'api' } });
+  } catch (err) {
+    console.error('[SupabaseOddsService] Failed to create Supabase client:', err);
     return null;
   }
 }

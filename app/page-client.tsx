@@ -183,16 +183,28 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // UTC server and the user's local-timezone browser, causing React error #418.
   const STATIC_WELCOME = `**Leverage AI** - Powered by Grok AI\n\nI'm connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.`;
 
+  // Hydrate server-generated cards into the welcome message so real odds data displays on load
+  const serverCards: InsightCard[] = (serverData?.initialCards || []).map((card: any) => ({
+    type: card.type || 'live-odds',
+    title: card.title || '',
+    icon: card.icon || 'TrendingUp',
+    category: card.category || 'Sports',
+    subcategory: card.subcategory || '',
+    gradient: card.gradient || 'from-blue-500 to-cyan-500',
+    data: card.data || {},
+    status: card.status || 'live',
+  }));
+
   const [messages, setMessages] = useState<Message[]>([
     {
-  role: 'assistant',
-  content: STATIC_WELCOME,
-  timestamp: serverData?.serverTime ? new Date(serverData.serverTime) : new Date(),
-  isWelcome: true,
-  cards: [],
-  insights: {
-  totalValue: 0,
-  winRate: 0,
+      role: 'assistant',
+      content: STATIC_WELCOME,
+      timestamp: serverData?.serverTime ? new Date(serverData.serverTime) : new Date(),
+      isWelcome: true,
+      cards: serverCards,
+      insights: {
+        totalValue: 0,
+        winRate: 0,
         roi: 0,
         activeContests: 0,
         totalInvested: 0
@@ -966,9 +978,9 @@ No preamble. Start directly with section 1.`;
         if (isDev) console.log('[POLITICAL MARKET DETECTED] Skipping sports odds fetch');
         // Route directly to Kalshi analysis without attempting sports odds
         // Note: The /api/analyze endpoint will handle Kalshi market analysis
-      } else if (context.hasBettingIntent && context.isSportsQuery) {
-        // Only fetch sports odds if this is explicitly a sports betting query
-        if (isDev) console.log('[ODDS FETCH ATTEMPT] Sports betting query detected');
+      } else if (context.hasBettingIntent || context.isSportsQuery) {
+        // Fetch sports odds for any betting-related query OR explicit sports query
+        if (isDev) console.log('[ODDS FETCH ATTEMPT] Betting intent or sports query detected');
         if (isDev) console.log('[v0] === ODDS FETCH STARTING ===');
         
         // Import SPORT_KEYS for consistent API format

@@ -107,11 +107,14 @@ export async function POST(request: NextRequest) {
     const xaiApiKey = process.env.XAI_API_KEY;
     const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
     const kalshiApiKey = process.env.KALSHI_API_KEY;
+    const hasClientOddsData = !!(context.oddsData?.events?.length);
     console.log('[API/analyze] Keys configured:', {
       XAI_API_KEY: !!xaiApiKey,
       ODDS_API_KEY: !!oddsApiKey,
       KALSHI_API_KEY: !!kalshiApiKey,
-      hasOddsData: !!(context.oddsData?.events?.length),
+      hasOddsData: hasClientOddsData,
+      category,
+      sport: context.sport || 'none',
     });
     let aiText: string;
     let modelUsed = AI_CONFIG.MODEL_DISPLAY_NAME;
@@ -185,17 +188,18 @@ export async function POST(request: NextRequest) {
       usedFallback = true;
     }
 
-    // Only generate insight cards when we have real live odds data to show.
-    // Skip for fallback responses, general questions, or when no specific sport/data is available.
+    // Always generate contextual cards with real odds data.
+    // The cards generator fetches live data independently from the odds-api,
+    // so even when the client doesn't pass oddsData, the server can still provide cards.
     let cards: InsightCard[] = [];
-    const hasRealOddsData = (context.oddsData?.events?.length ?? 0) > 0;
-    if (!usedFallback && hasRealOddsData && context.sport) {
+    if (!usedFallback) {
       try {
         cards = await generateContextualCards(
           category,
           context.sport ?? undefined,
           3
         );
+        console.log(`[API/analyze] Generated ${cards.length} contextual cards (category: ${category}, sport: ${context.sport || 'multi'})`);
       } catch (cardError) {
         console.error('[API/analyze] Card generation failed:', cardError);
       }

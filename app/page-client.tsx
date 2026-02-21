@@ -1356,16 +1356,19 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       return;
     }
 
+    // Capture files before clearing — generateRealResponse needs the content
+    const currentFiles = [...uploadedFiles];
+
     const userMessage: Message = {
       role: 'user',
       content: input || '📎 Attached files',
       timestamp: new Date(),
-      attachments: uploadedFiles.length > 0 ? [...uploadedFiles] : undefined
+      attachments: currentFiles.length > 0 ? currentFiles : undefined
     };
 
     setMessages((prev: Message[]) => [...prev, userMessage]);
     setUploadedFiles([]);
-    
+
     // Update chat preview and title based on first user message
     setChats((prevChats: Chat[]) => prevChats.map((chat: Chat) => {
       if (chat.id === activeChat) {
@@ -1373,13 +1376,13 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         // Update preview with user's message
         updatedChat.preview = input.slice(0, 50) + (input.length > 50 ? '...' : '');
         updatedChat.timestamp = new Date();
-        
+
         // Auto-generate title from first message if still default
         if (chat.title === 'New Analysis' && input.length > 0) {
           const words = input.split(' ').slice(0, 5).join(' ');
           updatedChat.title = words + (input.split(' ').length > 5 ? '...' : '');
         }
-        
+
         // Auto-tag based on message content
         const contentLower = input.toLowerCase();
         const newTags = [...chat.tags];
@@ -1390,14 +1393,33 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         if (contentLower.includes('draft') || contentLower.includes('adp')) newTags.push('draft');
         if (contentLower.includes('bet') || contentLower.includes('odds')) newTags.push('live');
         updatedChat.tags = [...new Set(newTags)].slice(0, 3);
-        
+
         return updatedChat;
       }
       return chat;
     }));
-    
+
+    // Build the prompt that actually reaches the AI — append CSV/TSV data as text
+    // so the model can analyse the file content directly.
+    let promptForAI = input;
+    if (currentFiles.length > 0) {
+      const fileSections = currentFiles
+        .filter(f => f.data?.headers && f.data?.rows)
+        .map(f => {
+          const headers = f.data!.headers.join('\t');
+          const rows = f.data!.rows.slice(0, 200).map((r: string[]) => r.join('\t')).join('\n');
+          return `[File: ${f.name}]\n${headers}\n${rows}`;
+        });
+      if (fileSections.length > 0) {
+        promptForAI = (input ? input + '\n\n' : 'Analyze this data:\n\n') + fileSections.join('\n\n');
+      } else if (!input) {
+        // Image-only with no text — give it a default prompt
+        promptForAI = `I've attached ${currentFiles.map(f => f.name).join(', ')}. Please analyze.`;
+      }
+    }
+
     setInput('');
-    generateRealResponse(input);
+    generateRealResponse(promptForAI);
   };
 
   const handleNewChat = () => {
@@ -3209,6 +3231,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         onClose={() => setShowSettingsLightbox(false)}
         user={user}
         onUserUpdate={setUser}
+        onOpenStripe={() => setShowStripeLightbox(true)}
       />
 
       {/* Alerts Lightbox */}

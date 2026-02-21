@@ -30,7 +30,7 @@ async function generateSportSpecificCards(
   console.log(`[v0] [SPORT CARDS] Display sport: ${displaySport}`);
   
   // Fetch real live odds for this sport using unified service
-  if (category === 'betting' || !category) {
+  if (category === 'betting' || category === 'all' || !category) {
     console.log(`[v0] [CARDS-GEN] ===== FETCHING ODDS FOR ${displaySport} =====`);
     console.log(`[v0] [CARDS-GEN] Sport key: ${sport}`);
     console.log(`[v0] [CARDS-GEN] Category: ${category || 'default (betting)'}`);

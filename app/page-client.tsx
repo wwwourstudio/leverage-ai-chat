@@ -2662,89 +2662,13 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
                               message.trustMetrics.trustLevel === 'medium' ? 'bg-blue-600/20 text-blue-500' :
                               'bg-orange-600/20 text-orange-500'
                             }`}>
-                              {message.trustMetrics.finalConfidence}% {message.trustMetrics.trustLevel === 'high' ? 'High' : message.trustMetrics.trustLevel === 'medium' ? 'Med' : 'Low'} Trust
+                              {message.trustMetrics.finalConfidence}%&nbsp;
+                              {message.trustMetrics.trustLevel === 'high' ? 'High' : message.trustMetrics.trustLevel === 'medium' ? 'Med' : 'Low'} Trust
                             </span>
                             <ChevronRight className="w-3 h-3 group-open/trust:rotate-90 transition-transform" />
                           </summary>
-                          <div className="mt-3 space-y-3 pl-5">
-                            {/* Trust Metrics Grid */}
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
-                                <span className="text-[10px] text-gray-600 font-semibold">Benford Market</span>
-                                <span className={`text-[11px] font-bold tabular-nums ${
-                                  message.trustMetrics.benfordIntegrity >= 80 ? 'text-green-500' :
-                                  message.trustMetrics.benfordIntegrity >= 60 ? 'text-yellow-500' : 'text-red-500'
-                                }`}>
-                                  {message.trustMetrics.benfordIntegrity}%
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
-                                <span className="text-[10px] text-gray-600 font-semibold">Odds Alignment</span>
-                                <span className={`text-[11px] font-bold tabular-nums ${
-                                  message.trustMetrics.oddsAlignment >= 80 ? 'text-green-500' :
-                                  message.trustMetrics.oddsAlignment >= 60 ? 'text-yellow-500' : 'text-red-500'
-                                }`}>
-                                  {message.trustMetrics.oddsAlignment}%
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
-                                <span className="text-[10px] text-gray-600 font-semibold">Market Consensus</span>
-                                <span className={`text-[11px] font-bold tabular-nums ${
-                                  message.trustMetrics.marketConsensus >= 80 ? 'text-green-500' :
-                                  message.trustMetrics.marketConsensus >= 60 ? 'text-yellow-500' : 'text-red-500'
-                                }`}>
-                                  {message.trustMetrics.marketConsensus}%
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
-                                <span className="text-[10px] text-gray-600 font-semibold">Historical Accuracy</span>
-                                <span className={`text-[11px] font-bold tabular-nums ${
-                                  message.trustMetrics.historicalAccuracy >= 80 ? 'text-green-500' :
-                                  message.trustMetrics.historicalAccuracy >= 60 ? 'text-yellow-500' : 'text-red-500'
-                                }`}>
-                                  {message.trustMetrics.historicalAccuracy}%
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Risk Assessment */}
-                            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
-                              <span className="text-[10px] text-gray-600 font-semibold">Risk Level:</span>
-                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${
-                                message.trustMetrics.riskLevel === 'low' ? 'bg-green-600/20 text-green-500' :
-                                message.trustMetrics.riskLevel === 'medium' ? 'bg-yellow-600/20 text-yellow-500' :
-                                'bg-red-600/20 text-red-500'
-                              }`}>
-                                {message.trustMetrics.riskLevel.charAt(0).toUpperCase() + message.trustMetrics.riskLevel.slice(1)} Risk
-                              </span>
-                              <span className="text-[10px] text-gray-700">• {message.trustMetrics.adjustedTone}</span>
-                            </div>
-
-                            {/* Flags if present */}
-                            {message.trustMetrics.flags && message.trustMetrics.flags.length > 0 && (
-                              <details className="group/flags">
-                                <summary className="cursor-pointer list-none flex items-center gap-1.5 text-[10px] text-orange-600 hover:text-orange-500 transition-colors">
-                                  <AlertCircle className="w-3 h-3" />
-                                  <span className="font-semibold">{message.trustMetrics.flags.length} issue{message.trustMetrics.flags.length !== 1 ? 's' : ''} flagged</span>
-                                  <ChevronRight className="w-2.5 h-2.5 group-open/flags:rotate-90 transition-transform" />
-                                </summary>
-                                <div className="mt-2 space-y-1.5">
-                                  {message.trustMetrics.flags.map((flag, idx) => (
-                                    <div 
-                                      key={idx}
-                                      className={`px-2.5 py-1.5 rounded-lg border text-[10px] ${
-                                        flag.severity === 'error' ? 'bg-red-600/10 border-red-600/20 text-red-500' :
-                                        flag.severity === 'warning' ? 'bg-yellow-600/10 border-yellow-600/20 text-yellow-500' :
-                                        'bg-blue-600/10 border-blue-600/20 text-blue-500'
-                                      }`}
-                                    >
-                                      <div className="font-bold mb-0.5">{flag.type.charAt(0).toUpperCase() + flag.type.slice(1)} Check</div>
-                                      <div className="text-gray-600">{flag.message}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </details>
-                            )}
+                          <div className="mt-3 pl-5">
+                            <TrustMetricsDisplay metrics={message.trustMetrics} />
                           </div>
                         </details>
                       )}

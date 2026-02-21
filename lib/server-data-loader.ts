@@ -145,9 +145,11 @@ export async function loadServerData(options: FetchOptions = {}): Promise<Server
     console.warn('[v0] Server: ⚠ Missing API keys:', missingKeys.join(', '));
   }
 
-  // Fetch all data in parallel for optimal performance
-  const [cardsResult, sessionResult] = await Promise.all([
-    fetchInitialCards(options),
+  // Cards are no longer pre-loaded on the welcome screen.
+  // They are only generated on-demand for actual AI responses.
+  // This saves ~4 Odds API calls per page load.
+  const cardsResult = { cards: [] as any[], sources: [] as string[], errors: [] as string[] };
+  const [sessionResult] = await Promise.all([
     fetchUserSession(),
   ]);
 

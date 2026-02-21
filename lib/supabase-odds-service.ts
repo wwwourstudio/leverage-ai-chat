@@ -27,10 +27,11 @@ function getSupabase() {
       return createClient();
     }
 
-    // Server: create a lightweight client without cookies dependency
+    // Server: create a lightweight client without cookies dependency.
+    // Use the default public schema where all odds tables live.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { createClient } = require('@supabase/supabase-js');
-    return createClient(url, key, { db: { schema: 'api' } });
+    return createClient(url, key);
   } catch (err) {
     console.error('[SupabaseOddsService] Failed to create Supabase client:', err);
     return null;
@@ -51,20 +52,24 @@ export class SupabaseOddsService {
    */
   async getCachedOdds(sport: string) {
     if (!this.supabase) return [];
-    const { data, error } = await this.supabase
-      .from('live_odds_cache')
-      .select('*')
-      .eq('sport', sport)
-      .gt('expires_at', new Date().toISOString())
-      .order('fetched_at', { ascending: false });
+    try {
+      const { data, error } = await this.supabase
+        .from('live_odds_cache')
+        .select('*')
+        .eq('sport', sport)
+        .gt('expires_at', new Date().toISOString())
+        .order('fetched_at', { ascending: false })
+        .limit(50);
 
-    if (error) {
-      console.error('[Supabase] Error fetching cached odds:', error);
+      if (error) {
+        // Silently handle 404 / missing table errors
+        return [];
+      }
+
+      return data || [];
+    } catch {
       return [];
     }
-
-    console.log(`[Supabase] Found ${data?.length || 0} cached games for ${sport}`);
-    return data || [];
   }
 
   /**
@@ -100,18 +105,30 @@ export class SupabaseOddsService {
 
     if (records.length === 0) return false;
 
+    // Delete stale entries for this sport, then insert fresh data.
+    // This avoids upsert conflict issues since there's no unique constraint
+    // on (event_id, market_type, sportsbook).
+    try {
+      await this.supabase
+        .from('live_odds_cache')
+        .delete()
+        .eq('sport', sportKey)
+        .lt('expires_at', new Date().toISOString());
+    } catch (_) {
+      // Non-critical cleanup; continue with insert
+    }
+
     const { error } = await this.supabase
       .from('live_odds_cache')
-      .upsert(records, { onConflict: 'event_id,market_type,sportsbook' });
+      .insert(records);
 
     if (error) {
-      if ((error as any).code !== 'PGRST205' && (error as any).code !== '42P10') {
+      // Silently ignore duplicate key or constraint violations
+      if (!['23505', 'PGRST205', '42P10'].includes((error as any).code)) {
         console.error('[Supabase] Error storing odds:', error);
       }
       return false;
     }
-
-    console.log(`[Supabase] Stored ${records.length} odds records for ${sport}`);
     return true;
   }
 
@@ -185,18 +202,23 @@ export class SupabaseOddsService {
       };
     });
 
-    const { error } = await this.supabase
-      .from(tableName)
-      .upsert(records, { onConflict: 'event_id' });
+    try {
+      const { error } = await this.supabase
+        .from(tableName)
+        .upsert(records, { onConflict: 'event_id' });
 
-    if (error) {
-      if ((error as any).code !== 'PGRST205' && (error as any).code !== '42P10') {
-        console.error(`[Supabase] Error storing ${sport} odds in ${tableName}:`, error);
+      if (error) {
+        // Silently ignore permission / constraint errors -- sport tables may lack RLS policies for anon writes
+        const code = (error as any).code;
+        if (!['PGRST205', '42P10', '42501', '23505'].includes(code) && (error as any).message?.indexOf('policy') === -1) {
+          console.error(`[Supabase] Sport odds store error (${tableName}):`, (error as any).message || error);
+        }
+        return false;
       }
+    } catch (err) {
+      // Network or other transient error -- non-blocking
       return false;
     }
-
-    console.log(`[Supabase] Stored ${records.length} games in ${tableName}`);
     return true;
   }
 

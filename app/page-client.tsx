@@ -183,19 +183,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // UTC server and the user's local-timezone browser, causing React error #418.
   const STATIC_WELCOME = `**Leverage AI** - Powered by Grok AI\n\nI'm connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.`;
 
-  // Hydrate server-generated cards into the welcome message so real odds data displays on load
-  const serverCards: InsightCard[] = (serverData?.initialCards || []).map((card: any) => ({
-    type: card.type || 'live-odds',
-    title: card.title || '',
-    icon: card.icon || 'TrendingUp',
-    category: card.category || 'Sports',
-    subcategory: card.subcategory || '',
-    gradient: card.gradient || 'from-blue-500 to-cyan-500',
-    data: card.data || {},
-    status: card.status || 'live',
-  }));
-
-  console.log('[v0] SSR cards:', serverCards.length);
+  // Cards are generated on-demand by /api/analyze for betting/sports queries.
+  // They are never shown on the welcome screen -- only on AI responses.
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -203,7 +192,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       content: STATIC_WELCOME,
       timestamp: serverData?.serverTime ? new Date(serverData.serverTime) : new Date(),
       isWelcome: true,
-      cards: serverCards,
+      cards: [],
       insights: {
         totalValue: 0,
         winRate: 0,
@@ -263,39 +252,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fallback: if SSR cards didn't survive serialization, fetch client-side.
-  // This only fires if the welcome message has 0 cards after hydration.
-  useEffect(() => {
-    if (serverCards.length > 0) {
-      console.log('[v0] SSR cards hydrated:', serverCards.length);
-      return;
-    }
 
-    console.log('[v0] No SSR cards — fetching client-side via /api/cards');
-    let cancelled = false;
-    fetch('/api/cards', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category: 'all', count: 12 }),
-    })
-      .then(res => res.ok ? res.json() : Promise.reject(res.status))
-      .then(data => {
-        const cards: InsightCard[] = data.cards || [];
-        console.log('[v0] Client card fetch:', cards.length, 'cards');
-        if (!cancelled && cards.length > 0) {
-          setMessages(prev => {
-            if (prev[0]?.isWelcome) {
-              return [{ ...prev[0], cards }, ...prev.slice(1)];
-            }
-            return prev;
-          });
-        }
-      })
-      .catch(err => console.error('[v0] Client card fetch failed:', err));
-
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   
   // Credit system utilities — syncs with Supabase user_profiles when logged in,
   // falls back to localStorage for anonymous users.
@@ -2727,19 +2684,10 @@ No preamble. Start directly with section 1.`;
 
 
 
-                  {/* Dynamic Cards Section with stagger animation */}
-                  {message.role === 'assistant' && message.cards && message.cards.length > 0 && (
+                  {/* Dynamic Cards Section -- only on non-welcome AI responses */}
+                  {message.role === 'assistant' && !message.isWelcome && message.cards && message.cards.length > 0 && (
                     <div className="mt-6">
-                      {/* Section header */}
-                      <div className="flex items-center gap-2 mb-4">
-                        <Sparkles className="w-3.5 h-3.5 text-purple-400/80" />
-                        <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">
-                          {message.cards.length} Live Signal{message.cards.length !== 1 ? 's' : ''} Detected
-                        </span>
-                        <div className="flex-1 h-px bg-gray-800/60 ml-1" />
-                      </div>
-
-                      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                      <div className="flex flex-col gap-4 w-full">
                         {message.cards.map((card, cardIndex) => {
                           const cardKey = `${index}-${cardIndex}`;
                           const analysis = cardAnalysisMap[cardKey];

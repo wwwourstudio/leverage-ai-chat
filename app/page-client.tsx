@@ -201,6 +201,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [verifyStage, setVerifyStage] = useState<'analyzing' | 'reverifying'>('analyzing');
+  const [cardAnalysisMap, setCardAnalysisMap] = useState<Record<string, { loading: boolean; content: string | null; error: string | null }>>({});
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeChat, setActiveChat] = useState('chat-1');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -774,12 +776,142 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     }, 1000);
   };
 
-  // Generate detailed analysis for a card by querying AI
-  const generateDetailedAnalysis = (card: InsightCard) => {
-    console.log('[v0] Generating detailed analysis for card:', card);
-    const analysisPrompt = `Provide a comprehensive analysis for ${card.title} in ${card.category}. Include: 1) Specific data points supporting this opportunity, 2) Risk assessment and potential downsides, 3) Recommended position sizing, 4) Historical performance of similar scenarios.`;
-    setInput(analysisPrompt);
-    generateRealResponse(analysisPrompt);
+  // Generate inline card-type-specific analysis without adding a new chat message
+  const generateCardAnalysis = async (card: InsightCard, cardKey: string) => {
+    // Toggle: collapse if already open
+    if (cardAnalysisMap[cardKey]?.content || cardAnalysisMap[cardKey]?.error) {
+      setCardAnalysisMap(prev => { const n = { ...prev }; delete n[cardKey]; return n; });
+      return;
+    }
+
+    setCardAnalysisMap(prev => ({ ...prev, [cardKey]: { loading: true, content: null, error: null } }));
+
+    const d = card.data as any;
+    const cardType = (card.type ?? '').toLowerCase();
+
+    // Card-type-specific prompts
+    let prompt = '';
+    if (cardType === 'kalshi' || cardType === 'prediction') {
+      const yesPct = d.yesPct ?? 50;
+      const noPct  = d.noPct  ?? (100 - yesPct);
+      prompt = `Analyze this Kalshi prediction market contract. Be concise and actionable.
+
+Market: "${card.title}"
+Category: ${card.subcategory || card.category}
+YES price: ${yesPct}¢ (${yesPct}% implied probability)
+NO price: ${noPct}¢${d.volume ? `\nVolume: ${d.volume}` : ''}${d.expiresLabel ? `\nExpires: ${d.expiresLabel}` : ''}${d.ticker ? `\nTicker: ${d.ticker}` : ''}
+
+Provide exactly these 5 sections:
+**1. Market Assessment** – Is this price efficient or mispriced? What does ${yesPct}% imply about the event?
+**2. Key Drivers** – 3 bullet points of the most important factors influencing this market
+**3. Edge Analysis** – Where does edge exist (if any)? Lean YES or NO and why?
+**4. Risk Factors** – What could move this market significantly?
+**5. Recommendation** – Clear YES / NO / PASS with confidence level (Low/Medium/High)
+
+No preamble. Start directly with section 1.`;
+    } else if (['betting', 'odds', 'moneyline', 'spread', 'totals'].includes(cardType)) {
+      prompt = `Analyze this sports betting opportunity as a sharp bettor. Be concise.
+
+Market: "${card.title}"
+Category: ${card.subcategory || card.category}${d.homeTeam ? `\nHome: ${d.homeTeam}` : ''}${d.awayTeam ? `\nAway: ${d.awayTeam}` : ''}${d.homeOdds || d.odds ? `\nOdds: ${d.homeOdds ?? d.odds}` : ''}${d.spread ? `\nSpread: ${d.spread}` : ''}${d.total ? `\nTotal: ${d.total}` : ''}
+
+Provide exactly these 5 sections:
+**1. Line Analysis** – Is this line sharp or public? Any steam or reverse line movement?
+**2. Key Angles** – 3 bullet points of the strongest betting factors
+**3. Kelly Sizing** – Suggested bet size as % of bankroll and why
+**4. Sharp Signal** – Where is sharp money leaning?
+**5. Pick** – Clear recommendation with one-line reasoning
+
+No preamble. Start directly with section 1.`;
+    } else if (cardType === 'arbitrage') {
+      prompt = `Analyze this sports betting arbitrage opportunity. Be precise.
+
+Opportunity: "${card.title}"${d.profit ? `\nProfit margin: ${d.profit}` : ''}${d.bookmaker1 ? `\nBook 1: ${d.bookmaker1}` : ''}${d.bookmaker2 ? `\nBook 2: ${d.bookmaker2}` : ''}
+
+Provide exactly these 5 sections:
+**1. Opportunity Assessment** – Is this a genuine arb or key-number variance play?
+**2. Execution Risk** – Account limits, line movement risk, timing window
+**3. Profit Calculation** – Example stakes and profit with a $1,000 bankroll
+**4. Execution Steps** – Step-by-step to lock in the profit
+**5. Verdict** – Execute immediately / Proceed with caution / Avoid
+
+No preamble. Start directly with section 1.`;
+    } else if (cardType === 'dfs' || cardType === 'lineup') {
+      prompt = `Analyze this DFS opportunity as a lineup optimizer. Be concise.
+
+Player/Stack: "${card.title}"
+Contest type: ${card.subcategory || card.category}${d.salary ? `\nSalary: ${d.salary}` : ''}${d.projection ? `\nProjection: ${d.projection}` : ''}${d.ownership ? `\nProjected ownership: ${d.ownership}` : ''}
+
+Provide exactly these 5 sections:
+**1. Value Assessment** – Is this good value at the salary? Salary efficiency score
+**2. Ceiling Scenario** – What does a top-score game look like?
+**3. Correlation Stacks** – Best teammates to pair for maximum upside
+**4. Ownership Leverage** – GPP leverage potential (low/medium/high ownership)
+**5. Recommendation** – Use in Cash / GPP / Both / Fade
+
+No preamble. Start directly with section 1.`;
+    } else if (cardType === 'fantasy' || cardType === 'draft') {
+      prompt = `Analyze this fantasy sports opportunity. Be concise and actionable.
+
+Player: "${card.title}"
+Context: ${card.subcategory || card.category}${d.adp ? `\nADP: ${d.adp}` : ''}${d.value ? `\nValue: ${d.value}` : ''}
+
+Provide exactly these 5 sections:
+**1. Upside/Floor** – Best and worst realistic outcomes this season/week
+**2. Key Factors** – 3 most important things to know right now
+**3. Roster Decision** – Start / Sit / Trade for / Trade away / Waiver pickup
+**4. Matchup Context** – Injury news, usage, schedule notes
+**5. Verdict** – Clear action with confidence level
+
+No preamble. Start directly with section 1.`;
+    } else if (cardType === 'weather' || cardType === 'climate') {
+      prompt = `Analyze this weather prediction market or weather-impacted game. Be concise.
+
+Event: "${card.title}"${card.subcategory ? `\nType: ${card.subcategory}` : ''}
+
+Provide exactly these 5 sections:
+**1. Forecast Confidence** – How reliable is the current forecast for this event?
+**2. Betting Implications** – How does weather impact totals, spreads, and specific props?
+**3. Historical Context** – What typically happens to lines in these conditions?
+**4. Key Thresholds** – Weather metrics that would trigger significant line movement
+**5. Recommendation** – Actionable play (e.g., Under / Over / Fade game total)
+
+No preamble. Start directly with section 1.`;
+    } else {
+      prompt = `Provide a focused analysis for this opportunity. Be concise and actionable.
+
+Opportunity: "${card.title}"
+Category: ${card.subcategory || card.category}
+
+Provide exactly these 4 sections:
+**1. Key Data Points** – Most important metrics supporting this opportunity
+**2. Risk Assessment** – Potential downsides and how to mitigate them
+**3. Recommended Action** – Clear action with one-line reasoning
+**4. Position Sizing** – How much to allocate (% of bankroll)
+
+No preamble. Start directly with section 1.`;
+    }
+
+    const context: any = {
+      isPoliticalMarket: cardType === 'kalshi' || cardType === 'prediction',
+      hasBettingIntent: ['betting', 'odds', 'moneyline', 'spread', 'totals', 'arbitrage'].includes(cardType),
+    };
+
+    try {
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userMessage: prompt, context }),
+      });
+      const result: APIResponse = await res.json();
+      if (!res.ok || !result.success) {
+        setCardAnalysisMap(prev => ({ ...prev, [cardKey]: { loading: false, content: null, error: result.error ?? 'Analysis failed' } }));
+        return;
+      }
+      setCardAnalysisMap(prev => ({ ...prev, [cardKey]: { loading: false, content: result.text ?? null, error: null } }));
+    } catch {
+      setCardAnalysisMap(prev => ({ ...prev, [cardKey]: { loading: false, content: null, error: 'Network error — please try again' } }));
+    }
   };
   
   const generateRealResponse = async (userMessage: string) => {
@@ -943,20 +1075,40 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       }
       
       // Fetch real data from our API routes
-      const analysisResult = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userMessage,
-          context
-        })
-      }).then(res => res.json() as Promise<APIResponse>);
-      
+      const fetchAnalysis = () =>
+        fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userMessage, context }),
+        }).then((res) => res.json() as Promise<APIResponse>);
+
+      setVerifyStage('analyzing');
+      let analysisResult = await fetchAnalysis();
+
+      // Client-side final-safety retry: if the server couldn't lift integrity above 40
+      // even after its own server-side retries, try once more from the client side.
+      const CLIENT_RETRY_THRESHOLD = 40;
+      if (
+        analysisResult.success &&
+        !analysisResult.useFallback &&
+        (analysisResult.trustMetrics?.finalConfidence ?? 100) < CLIENT_RETRY_THRESHOLD
+      ) {
+        console.warn(
+          '[v0] Integrity below client threshold (' +
+            analysisResult.trustMetrics?.finalConfidence +
+            '%) — client-side re-verify',
+        );
+        setVerifyStage('reverifying');
+        analysisResult = await fetchAnalysis();
+        setVerifyStage('analyzing');
+      }
+
       console.log('[v0] Analysis result received:', {
         success: analysisResult.success,
         hasText: !!analysisResult.text,
         hasCards: !!analysisResult.cards,
         hasTrustMetrics: !!analysisResult.trustMetrics,
+        finalConfidence: analysisResult.trustMetrics?.finalConfidence,
         error: analysisResult.error,
         useFallback: analysisResult.useFallback,
         details: analysisResult.details,
@@ -2580,21 +2732,96 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
 
 
-                  {/* Dynamic Cards Section with Enhanced UX */}
-                  {message.role === 'assistant' && (
-                    <div className="mt-5">
-                      {message.cards && message.cards.length > 0 && (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                          {message.cards.map((card, cardIndex) => (
-                            <DynamicCardRenderer
+                  {/* Dynamic Cards Section with stagger animation */}
+                  {message.role === 'assistant' && message.cards && message.cards.length > 0 && (
+                    <div className="mt-6">
+                      {/* Section header */}
+                      <div className="flex items-center gap-2 mb-4">
+                        <Sparkles className="w-3.5 h-3.5 text-purple-400/80" />
+                        <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">
+                          {message.cards.length} Live Signal{message.cards.length !== 1 ? 's' : ''} Detected
+                        </span>
+                        <div className="flex-1 h-px bg-gray-800/60 ml-1" />
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {message.cards.map((card, cardIndex) => {
+                          const cardKey = `${index}-${cardIndex}`;
+                          const analysis = cardAnalysisMap[cardKey];
+                          const isOpen = analysis?.loading || !!analysis?.content || !!analysis?.error;
+
+                          return (
+                            <div
                               key={`${card.type}-${cardIndex}`}
-                              card={card}
-                              index={cardIndex}
-                              onAnalyze={() => generateDetailedAnalysis(card)}
-                            />
-                          ))}
-                        </div>
-                      )}
+                              className="flex flex-col gap-2 animate-fadeIn"
+                              style={{ animationDelay: `${cardIndex * 80}ms` }}
+                            >
+                              <DynamicCardRenderer
+                                card={card}
+                                index={cardIndex}
+                                onAnalyze={() => generateCardAnalysis(card, cardKey)}
+                              />
+
+                              {/* Inline analysis panel */}
+                              {isOpen && (
+                                <div className="rounded-xl border border-gray-700/40 bg-gray-900/80 overflow-hidden">
+                                  {analysis.loading ? (
+                                    <div className="p-4 space-y-2">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                        <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                        <span className="text-[11px] text-gray-500 ml-1">Analyzing {card.type === 'kalshi' ? 'prediction market' : 'opportunity'}...</span>
+                                      </div>
+                                      <div className="h-2 bg-gray-800/60 rounded-full animate-pulse w-full" />
+                                      <div className="h-2 bg-gray-800/60 rounded-full animate-pulse w-5/6" />
+                                      <div className="h-2 bg-gray-800/60 rounded-full animate-pulse w-3/5" />
+                                    </div>
+                                  ) : analysis.error ? (
+                                    <div className="p-4 flex items-center gap-2 text-xs text-red-400">
+                                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                                      <span>{analysis.error}</span>
+                                    </div>
+                                  ) : (
+                                    <div className="p-4">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-1.5">
+                                          <BarChart3 className="w-3 h-3 text-purple-400/70" />
+                                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Analysis</span>
+                                        </div>
+                                        <button
+                                          onClick={() => setCardAnalysisMap(prev => { const n = { ...prev }; delete n[cardKey]; return n; })}
+                                          className="text-gray-600 hover:text-gray-400 transition-colors"
+                                          aria-label="Close analysis"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                      <div className="text-xs text-gray-300 leading-relaxed space-y-2.5">
+                                        {(analysis.content ?? '').split('\n\n').map((para, pIdx) => {
+                                          if (para.includes('**')) {
+                                            const parts = para.split('**');
+                                            return (
+                                              <p key={pIdx}>
+                                                {parts.map((part, partIdx) =>
+                                                  partIdx % 2 === 1
+                                                    ? <span key={partIdx} className="font-bold text-white">{part}</span>
+                                                    : <span key={partIdx}>{part}</span>
+                                                )}
+                                              </p>
+                                            );
+                                          }
+                                          return <p key={pIdx}>{para}</p>;
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
@@ -2662,89 +2889,13 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
                               message.trustMetrics.trustLevel === 'medium' ? 'bg-blue-600/20 text-blue-500' :
                               'bg-orange-600/20 text-orange-500'
                             }`}>
-                              {message.trustMetrics.finalConfidence}% {message.trustMetrics.trustLevel === 'high' ? 'High' : message.trustMetrics.trustLevel === 'medium' ? 'Med' : 'Low'} Trust
+                              {message.trustMetrics.finalConfidence}%&nbsp;
+                              {message.trustMetrics.trustLevel === 'high' ? 'High' : message.trustMetrics.trustLevel === 'medium' ? 'Med' : 'Low'} Trust
                             </span>
                             <ChevronRight className="w-3 h-3 group-open/trust:rotate-90 transition-transform" />
                           </summary>
-                          <div className="mt-3 space-y-3 pl-5">
-                            {/* Trust Metrics Grid */}
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
-                                <span className="text-[10px] text-gray-600 font-semibold">Benford Market</span>
-                                <span className={`text-[11px] font-bold tabular-nums ${
-                                  message.trustMetrics.benfordIntegrity >= 80 ? 'text-green-500' :
-                                  message.trustMetrics.benfordIntegrity >= 60 ? 'text-yellow-500' : 'text-red-500'
-                                }`}>
-                                  {message.trustMetrics.benfordIntegrity}%
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
-                                <span className="text-[10px] text-gray-600 font-semibold">Odds Alignment</span>
-                                <span className={`text-[11px] font-bold tabular-nums ${
-                                  message.trustMetrics.oddsAlignment >= 80 ? 'text-green-500' :
-                                  message.trustMetrics.oddsAlignment >= 60 ? 'text-yellow-500' : 'text-red-500'
-                                }`}>
-                                  {message.trustMetrics.oddsAlignment}%
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
-                                <span className="text-[10px] text-gray-600 font-semibold">Market Consensus</span>
-                                <span className={`text-[11px] font-bold tabular-nums ${
-                                  message.trustMetrics.marketConsensus >= 80 ? 'text-green-500' :
-                                  message.trustMetrics.marketConsensus >= 60 ? 'text-yellow-500' : 'text-red-500'
-                                }`}>
-                                  {message.trustMetrics.marketConsensus}%
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
-                                <span className="text-[10px] text-gray-600 font-semibold">Historical Accuracy</span>
-                                <span className={`text-[11px] font-bold tabular-nums ${
-                                  message.trustMetrics.historicalAccuracy >= 80 ? 'text-green-500' :
-                                  message.trustMetrics.historicalAccuracy >= 60 ? 'text-yellow-500' : 'text-red-500'
-                                }`}>
-                                  {message.trustMetrics.historicalAccuracy}%
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Risk Assessment */}
-                            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-gray-900/30 border border-gray-800/50">
-                              <span className="text-[10px] text-gray-600 font-semibold">Risk Level:</span>
-                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${
-                                message.trustMetrics.riskLevel === 'low' ? 'bg-green-600/20 text-green-500' :
-                                message.trustMetrics.riskLevel === 'medium' ? 'bg-yellow-600/20 text-yellow-500' :
-                                'bg-red-600/20 text-red-500'
-                              }`}>
-                                {message.trustMetrics.riskLevel.charAt(0).toUpperCase() + message.trustMetrics.riskLevel.slice(1)} Risk
-                              </span>
-                              <span className="text-[10px] text-gray-700">• {message.trustMetrics.adjustedTone}</span>
-                            </div>
-
-                            {/* Flags if present */}
-                            {message.trustMetrics.flags && message.trustMetrics.flags.length > 0 && (
-                              <details className="group/flags">
-                                <summary className="cursor-pointer list-none flex items-center gap-1.5 text-[10px] text-orange-600 hover:text-orange-500 transition-colors">
-                                  <AlertCircle className="w-3 h-3" />
-                                  <span className="font-semibold">{message.trustMetrics.flags.length} issue{message.trustMetrics.flags.length !== 1 ? 's' : ''} flagged</span>
-                                  <ChevronRight className="w-2.5 h-2.5 group-open/flags:rotate-90 transition-transform" />
-                                </summary>
-                                <div className="mt-2 space-y-1.5">
-                                  {message.trustMetrics.flags.map((flag, idx) => (
-                                    <div 
-                                      key={idx}
-                                      className={`px-2.5 py-1.5 rounded-lg border text-[10px] ${
-                                        flag.severity === 'error' ? 'bg-red-600/10 border-red-600/20 text-red-500' :
-                                        flag.severity === 'warning' ? 'bg-yellow-600/10 border-yellow-600/20 text-yellow-500' :
-                                        'bg-blue-600/10 border-blue-600/20 text-blue-500'
-                                      }`}
-                                    >
-                                      <div className="font-bold mb-0.5">{flag.type.charAt(0).toUpperCase() + flag.type.slice(1)} Check</div>
-                                      <div className="text-gray-600">{flag.message}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </details>
-                            )}
+                          <div className="mt-3 pl-5">
+                            <TrustMetricsDisplay metrics={message.trustMetrics} />
                           </div>
                         </details>
                       )}
@@ -2827,7 +2978,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           </div>
           <div className="flex-1 space-y-3">
             <div className="bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl px-5 py-4 border border-gray-700/60 shadow-2xl">
-              <AIProgressIndicator />
+              <AIProgressIndicator stage={verifyStage} />
             </div>
           </div>
         </div>

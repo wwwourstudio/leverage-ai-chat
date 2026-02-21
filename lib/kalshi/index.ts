@@ -581,8 +581,9 @@ export async function fetchAllCategoryMarkets(): Promise<Record<string, KalshiMa
  */
 export async function getMarketByTicker(ticker: string): Promise<KalshiMarket | null> {
   try {
-    const response = await fetch(`${KALSHI_API_BASE_URL}/markets/${ticker}`, {
-      headers: { 'Accept': 'application/json' },
+    const response = await fetch(`${KALSHI_TRADING_URL}/markets/${ticker}`, {
+      headers: buildHeaders(),
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) throw new Error(`Kalshi API error: ${response.status}`);
@@ -650,32 +651,100 @@ export function generateKalshiCards(markets: KalshiMarket[]): any[] {
 }
 
 /**
- * Convert Kalshi market to insight card format
+ * Derive a gradient and icon label based on Kalshi market category
+ */
+function kalshiCategoryMeta(category: string): { gradient: string; iconLabel: string } {
+  const cat = (category || '').toLowerCase();
+  if (cat.includes('election') || cat.includes('politic') || cat.includes('senate') || cat.includes('president') || cat.includes('congress')) {
+    return { gradient: 'from-blue-600 to-indigo-700', iconLabel: 'election' };
+  }
+  if (cat.includes('nfl') || cat.includes('nba') || cat.includes('mlb') || cat.includes('nhl') || cat.includes('sport') || cat.includes('game') || cat.includes('ufc') || cat.includes('soccer') || cat.includes('golf') || cat.includes('tennis')) {
+    return { gradient: 'from-green-600 to-emerald-700', iconLabel: 'sports' };
+  }
+  if (cat.includes('weather') || cat.includes('temp') || cat.includes('hurricane') || cat.includes('tornado') || cat.includes('snow') || cat.includes('rain')) {
+    return { gradient: 'from-sky-600 to-cyan-700', iconLabel: 'weather' };
+  }
+  if (cat.includes('stock') || cat.includes('crypto') || cat.includes('bitcoin') || cat.includes('rate') || cat.includes('inflation') || cat.includes('gdp') || cat.includes('nasdaq') || cat.includes('sp500') || cat.includes('fed')) {
+    return { gradient: 'from-amber-600 to-orange-700', iconLabel: 'finance' };
+  }
+  if (cat.includes('oscar') || cat.includes('grammy') || cat.includes('emmy') || cat.includes('award') || cat.includes('box office')) {
+    return { gradient: 'from-fuchsia-600 to-pink-700', iconLabel: 'entertainment' };
+  }
+  if (cat.includes('tech') || cat.includes('ai') || cat.includes('space') || cat.includes('nasa') || cat.includes('spacex')) {
+    return { gradient: 'from-violet-600 to-purple-700', iconLabel: 'tech' };
+  }
+  return { gradient: 'from-purple-600 to-indigo-700', iconLabel: 'market' };
+}
+
+/**
+ * Convert Kalshi market to insight card format (enhanced)
  */
 export function kalshiMarketToCard(market: KalshiMarket): any {
-  const impliedProbability = market.yesPrice / 100;
+  const yesPct = Math.min(100, Math.max(0, market.yesPrice));  // 0-100 cents = 0-100%
+  const noPct = Math.min(100, Math.max(0, market.noPrice));
+  const { gradient, iconLabel } = kalshiCategoryMeta(market.category);
+
+  // Edge score: how far from 50/50 (0 = efficient, 100 = max edge)
+  const edgeScore = Math.round(Math.abs(yesPct - 50) * 2);
+
+  // Recommendation based on probability
+  const signal =
+    yesPct >= 75 ? 'Strong YES signal'
+    : yesPct >= 60 ? 'Lean YES'
+    : yesPct <= 25 ? 'Strong NO signal'
+    : yesPct <= 40 ? 'Lean NO'
+    : 'Market is efficient (near 50/50)';
+
+  // Time to close
+  let expiresLabel = '';
+  if (market.closeTime) {
+    const ms = new Date(market.closeTime).getTime() - Date.now();
+    const days = Math.floor(ms / 86400000);
+    expiresLabel = days > 1 ? `${days}d` : days === 1 ? '1d' : ms > 0 ? '<24h' : 'Closed';
+  }
+
+  // Volume tier
+  const volumeTier =
+    market.volume >= 1_000_000 ? 'Deep'
+    : market.volume >= 100_000 ? 'Active'
+    : market.volume >= 10_000 ? 'Moderate'
+    : 'Thin';
 
   return {
     type: 'kalshi-market',
     title: market.title,
     icon: 'TrendingUp',
     category: 'KALSHI',
-    subcategory: market.category,
-    gradient: 'from-purple-600 to-pink-700',
+    subcategory: market.category || 'Prediction Market',
+    gradient,
     data: {
       ticker: market.ticker,
       subtitle: market.subtitle,
-      yesPrice: `${market.yesPrice}¢`,
-      noPrice: `${market.noPrice}¢`,
-      impliedProbability: `${(impliedProbability * 100).toFixed(1)}%`,
-      volume: market.volume.toLocaleString(),
-      openInterest: market.openInterest.toLocaleString(),
-      closeTime: new Date(market.closeTime).toLocaleDateString(),
-      recommendation: impliedProbability > 0.7
-        ? 'Strong YES position'
-        : impliedProbability < 0.3
-        ? 'Strong NO position'
-        : 'Market appears efficient',
+      iconLabel,
+      // Raw numbers for gauge rendering
+      yesPct,
+      noPct,
+      edgeScore,
+      // Formatted display strings
+      yesPrice: `${yesPct}¢`,
+      noPrice: `${noPct}¢`,
+      impliedProbability: `${yesPct.toFixed(1)}%`,
+      volume: market.volume >= 1_000_000
+        ? `$${(market.volume / 1_000_000).toFixed(1)}M`
+        : market.volume >= 1_000
+        ? `$${(market.volume / 1_000).toFixed(0)}K`
+        : `$${market.volume}`,
+      openInterest: market.openInterest >= 1_000_000
+        ? `$${(market.openInterest / 1_000_000).toFixed(1)}M`
+        : market.openInterest >= 1_000
+        ? `$${(market.openInterest / 1_000).toFixed(0)}K`
+        : `$${market.openInterest}`,
+      closeTime: market.closeTime
+        ? new Date(market.closeTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : 'TBD',
+      expiresLabel,
+      volumeTier,
+      recommendation: signal,
     },
     status: market.status === 'open' ? 'active' : 'closed',
     realData: true,

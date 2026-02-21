@@ -52,7 +52,13 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
         .order('game_time', { ascending: true })
         .limit(50);
       
-      if (!error && cached && cached.length > 0) {
+      if (error) {
+        if (error.code === 'PGRST205') {
+          console.warn('[v0] [PLAYER-PROPS] player_props_markets table missing — run scripts/003-player-props-table.sql in Supabase');
+        } else {
+          console.error('[v0] [PLAYER-PROPS] Cache read error:', error);
+        }
+      } else if (cached && cached.length > 0) {
         console.log(`[v0] [PLAYER-PROPS] Cache hit: ${cached.length} props from Supabase`);
         return cached.map((row: any) => ({
           id: row.id,
@@ -70,7 +76,7 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
         }));
       }
     } catch (error) {
-      console.error('[v0] [PLAYER-PROPS] Cache read error:', error);
+      console.error('[v0] [PLAYER-PROPS] Cache read exception:', error);
     }
   }
   
@@ -135,15 +141,20 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
     let events: any[] = [];
     try {
       const eventsUrl = `${baseUrl}/sports/${sport}/events?apiKey=${apiKey}`;
-      const eventsResp = await fetch(eventsUrl);
+      // Route through the queue so parallel sport fetches don't all hit the
+      // events endpoint simultaneously and trigger HTTP 429 rate limits.
+      const eventsResp = await playerPropsQueue.enqueue(() => fetch(eventsUrl), 1);
       if (eventsResp.ok) {
         events = await eventsResp.json();
         console.log(`[v0] [PLAYER-PROPS] Found ${events.length} upcoming events for ${sport}`);
       } else if (eventsResp.status === 404) {
         console.log(`[v0] [PLAYER-PROPS] No active season for ${sport}, skipping props`);
         return [];
+      } else if (eventsResp.status === 429) {
+        console.warn(`[v0] [PLAYER-PROPS] Rate limited fetching events for ${sport}, skipping`);
+        return [];
       } else {
-        console.error(`[v0] [PLAYER-PROPS] Events fetch failed for ${sport}: HTTP ${eventsResp.status}`);
+        console.warn(`[v0] [PLAYER-PROPS] Events fetch failed for ${sport}: HTTP ${eventsResp.status}`);
         return [];
       }
     } catch (eventsError) {
@@ -175,10 +186,10 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
 
           if (!response.ok) {
             if (response.status === 429) {
-              console.error(`[v0] [PLAYER-PROPS] Rate limited on event ${event.id} (HTTP 429)`);
+              console.warn(`[v0] [PLAYER-PROPS] Rate limited on event ${event.id} (HTTP 429)`);
               return null;
             } else if (response.status === 422) {
-              console.error(`[v0] [PLAYER-PROPS] No player prop markets available for event ${event.id} (HTTP 422) - event may not have props yet`);
+              console.log(`[v0] [PLAYER-PROPS] No player prop markets for event ${event.id} (HTTP 422) - props not yet available`);
               return null;
             }
             console.error(`[v0] [PLAYER-PROPS] API error for event ${event.id}: ${response.status}`);
@@ -265,7 +276,11 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
           .upsert(rows, { onConflict: 'id' });
         
         if (error) {
-          console.error('[v0] [PLAYER-PROPS] Storage error:', error);
+          if (error.code === 'PGRST205') {
+            console.warn('[v0] [PLAYER-PROPS] player_props_markets table missing — run scripts/003-player-props-table.sql in Supabase to enable caching');
+          } else {
+            console.error('[v0] [PLAYER-PROPS] Storage error:', error);
+          }
         } else {
           console.log(`[v0] [PLAYER-PROPS] Stored ${rows.length} props in Supabase`);
         }

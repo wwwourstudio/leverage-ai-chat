@@ -109,19 +109,24 @@ export function validateClientEnv(): EnvValidationResult {
 /**
  * Log environment validation results
  */
+let envLogged = false;
+
 export function logEnvValidation(result: EnvValidationResult, context: 'server' | 'client') {
-  console.log(`[v0] ${context.toUpperCase()}: Environment validation ${result.isValid ? '✓ PASSED' : '✗ FAILED'}`);
-  
+  // Errors always log (required vars missing = broken app)
   if (result.missing.length > 0) {
-    console.error(`[v0] Missing environment variables:`, result.missing);
+    console.error(`[v0] ${context.toUpperCase()}: Missing required env vars:`, result.missing);
   }
-  
-  if (result.warnings.length > 0) {
-    console.warn(`[v0] Environment warnings:`, result.warnings);
-  }
-  
   if (result.errors.length > 0) {
-    console.error(`[v0] Environment errors:`, result.errors);
+    console.error(`[v0] ${context.toUpperCase()}: Environment errors:`, result.errors);
+  }
+
+  // Warnings (optional vars) only log once per process to avoid per-request spam
+  if (!envLogged) {
+    envLogged = true;
+    console.log(`[v0] ${context.toUpperCase()}: Environment validation ${result.isValid ? '✓ PASSED' : '✗ FAILED'}`);
+    if (result.warnings.length > 0) {
+      console.warn(`[v0] Environment warnings (will not repeat):`, result.warnings);
+    }
   }
 }
 

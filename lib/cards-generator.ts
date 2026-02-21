@@ -10,7 +10,7 @@
  */
 
 import { CARD_TYPES, SPORT_KEYS, sportToApi, apiToSport } from '@/lib/constants';
-import { generateNoDataMessage } from '@/lib/seasonal-context';
+import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
 
 /**
  * Generate sport-specific cards with REAL odds data
@@ -142,12 +142,15 @@ async function generateSportSpecificCards(
         console.log(`[v0] [CARDS-GEN] Created ${cards.length} cards with real data`);
         return cards;
       } else {
-        console.error(`[v0] [CARDS-GEN] ❌ API returned NO GAMES for ${displaySport}`);
-        console.error(`[v0] [CARDS-GEN] This means either:`);
-        console.error(`[v0] [CARDS-GEN] 1. No games are currently live/scheduled`);
-        console.error(`[v0] [CARDS-GEN] 2. API key is invalid/expired`);
-        console.error(`[v0] [CARDS-GEN] 3. API endpoint returned error`);
-        console.error(`[v0] [CARDS-GEN] 4. Sport key "${sport}" is incorrect`);
+        const seasonInfo = getSeasonInfo(sport);
+        if (!seasonInfo.isInSeason) {
+          console.log(`[v0] [CARDS-GEN] ⏸ ${displaySport} is off-season — 0 games expected. ${seasonInfo.context}`);
+        } else {
+          console.warn(`[v0] [CARDS-GEN] ⚠ API returned 0 games for ${displaySport}. Possible causes:`);
+          console.warn(`[v0] [CARDS-GEN]   1. No games currently live/scheduled (normal for off-days)`);
+          console.warn(`[v0] [CARDS-GEN]   2. API key invalid or quota exceeded`);
+          console.warn(`[v0] [CARDS-GEN]   3. Transient API error`);
+        }
       }
     } catch (error) {
       console.error(`[v0] [CARDS-GEN] ❌ EXCEPTION in unified service for ${displaySport}:`);
@@ -261,12 +264,19 @@ export async function generateContextualCards(
       SPORT_KEYS.MLS.API,     // soccer_usa_mls
     ];
     
-    // If user specified a sport, prioritize it first
-    const orderedSports = normalizedSport 
+    // Sort: in-season sports first, off-season sports last (to avoid wasting API quota)
+    const baseSports = normalizedSport
       ? [normalizedSport, ...allMajorSports.filter(s => s !== normalizedSport)]
       : allMajorSports;
-    
-    console.log('[v0] [CARDS GENERATOR] Will query sports in order:', orderedSports.map(s => apiToSport(s).toUpperCase()).join(', '));
+    const orderedSports = [
+      ...baseSports.filter(s => getSeasonInfo(s).isInSeason),
+      ...baseSports.filter(s => !getSeasonInfo(s).isInSeason),
+    ];
+
+    console.log('[v0] [CARDS GENERATOR] Will query sports in order:', orderedSports.map(s => {
+      const inSeason = getSeasonInfo(s).isInSeason;
+      return `${apiToSport(s).toUpperCase()}${inSeason ? '' : '(off-season)'}`;
+    }).join(', '));
     
     // Fetch from ALL sports in parallel for speed
     console.log('[v0] [MULTI-SPORT] Fetching odds from all sports in PARALLEL...');

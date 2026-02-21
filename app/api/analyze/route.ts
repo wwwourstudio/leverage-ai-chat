@@ -9,7 +9,7 @@ import {
   HTTP_STATUS,
   ERROR_MESSAGES,
 } from '@/lib/constants';
-import { generateContextualCards, getCachedCards, type InsightCard } from '@/lib/cards-generator';
+import type { InsightCard } from '@/lib/cards-generator';
 import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-detector';
 
 // ============================================================================
@@ -18,6 +18,7 @@ import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-dete
 
 interface AnalyzeRequestBody {
   userMessage: string;
+  existingCards?: InsightCard[];
   context?: {
     sport?: string | null;
     marketType?: string | null;
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: AnalyzeRequestBody = await request.json();
-    const { userMessage, context = {} } = body;
+    const { userMessage, existingCards = [], context = {} } = body;
 
     if (!userMessage || typeof userMessage !== 'string') {
       return NextResponse.json(
@@ -188,34 +189,12 @@ export async function POST(request: NextRequest) {
       usedFallback = true;
     }
 
-    // Serve contextual cards with real odds data.
-    // Strategy: use the in-memory cache first (populated by SSR page load),
-    // only fetch fresh if cache is empty. Apply a 5s timeout to prevent hanging.
-    let cards: InsightCard[] = [];
-    if (!usedFallback) {
-      try {
-        // 1. Try cache first (instant, no API calls)
-        const cached = getCachedCards(category, context.sport ?? undefined, 3);
-        if (cached && cached.length > 0) {
-          cards = cached;
-          console.log(`[API/analyze] Served ${cards.length} cards from cache (category: ${category})`);
-        } else {
-          // 2. Cache miss -- fetch fresh with a timeout
-          const cardPromise = generateContextualCards(
-            category,
-            context.sport ?? undefined,
-            3
-          );
-          const timeoutPromise = new Promise<InsightCard[]>((resolve) =>
-            setTimeout(() => resolve([]), 8000) // 8s timeout
-          );
-          cards = await Promise.race([cardPromise, timeoutPromise]);
-          console.log(`[API/analyze] Generated ${cards.length} fresh cards (category: ${category}, sport: ${context.sport || 'multi'})`);
-        }
-      } catch (cardError) {
-        console.error('[API/analyze] Card generation failed:', cardError);
-      }
-    }
+    // Cards are generated server-side during SSR (page.tsx) and passed from
+    // the client. This avoids redundant API calls that would collide with
+    // the SSR fetch for rate limits. The client sends its available cards
+    // (from the welcome message or previous responses) in `existingCards`.
+    const cards: InsightCard[] = Array.isArray(existingCards) ? existingCards.slice(0, 6) : [];
+    console.log(`[API/analyze] Using ${cards.length} cards passed from client`);
 
     const processingTime = Date.now() - startTime;
 

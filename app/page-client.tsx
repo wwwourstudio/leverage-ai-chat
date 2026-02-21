@@ -195,6 +195,11 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     status: card.status || 'live',
   }));
 
+  console.log("[v0] serverCards hydrated:", serverCards.length, "cards from serverData.initialCards:", serverData?.initialCards?.length ?? 0);
+  if (serverCards.length > 0) {
+    console.log("[v0] First card sample:", JSON.stringify({ type: serverCards[0].type, title: serverCards[0].title, hasData: !!serverCards[0].data?.realData }));
+  }
+
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
@@ -261,8 +266,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cards are not pre-loaded on the welcome screen.
-  // They are only shown after an AI response when there is real live data to display.
+  // Cards are pre-loaded from SSR via serverData.initialCards on the welcome message.
+  // They are also shown after AI responses using available cards from the session.
   
   // Credit system utilities — syncs with Supabase user_profiles when logged in,
   // falls back to localStorage for anonymous users.
@@ -1086,12 +1091,19 @@ No preamble. Start directly with section 1.`;
         }
       }
       
+      // Collect any existing cards from previous messages (SSR welcome + prior responses)
+      // to pass to the analyze endpoint so it can return them without re-fetching.
+      const availableCards = messages
+        .flatMap((m: Message) => m.cards || [])
+        .filter((c: InsightCard) => c.data?.realData !== false)
+        .slice(0, 6);
+
       // Fetch real data from our API routes
       const fetchAnalysis = () =>
         fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userMessage, context }),
+          body: JSON.stringify({ userMessage, existingCards: availableCards, context }),
         }).then((res) => res.json() as Promise<APIResponse>);
 
       setVerifyStage('analyzing');
@@ -1132,9 +1144,10 @@ No preamble. Start directly with section 1.`;
       let newMessage: Message;
       
       if (!analysisResult.success) {
-        console.log('[v0] API call failed, using contextual cards');
+        console.log('[v0] API call failed, using available cards as fallback');
         
-        const fallbackCards = await selectRelevantCards(userMessage, context);
+        // Use already-loaded cards rather than making another server call
+        const fallbackCards = availableCards.length > 0 ? availableCards : await selectRelevantCards(userMessage, context);
         const errorMessage = analysisResult.error || 'API temporarily unavailable';
         
         newMessage = {
@@ -1165,12 +1178,18 @@ No preamble. Start directly with section 1.`;
           }
         };
       } else {
-        // Success path - process the analysis result
+        // Success path - process the analysis result.
+        // If the server returns cards, use them. Otherwise fall back to
+        // the cards we already have from the SSR welcome message.
+        const responseCards = (analysisResult.cards && analysisResult.cards.length > 0)
+          ? analysisResult.cards
+          : availableCards;
+
         newMessage = {
           role: 'assistant',
           content: analysisResult.text || 'Analysis complete.',
           timestamp: new Date(),
-          cards: analysisResult.cards || [],
+          cards: responseCards,
           confidence: analysisResult.confidence || 85,
           sources: analysisResult.sources || [],
           modelUsed: analysisResult.modelUsed || 'Grok',

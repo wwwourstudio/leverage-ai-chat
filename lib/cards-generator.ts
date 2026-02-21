@@ -65,39 +65,26 @@ async function generateSportSpecificCards(
 ): Promise<InsightCard[]> {
   // FORCE MINIMUM 3 CARDS - OVERRIDE ANY COUNT PARAMETER
   const actualCount = Math.max(count, 3);
-  console.log(`[v0] [CARDS-GEN] ENTRY: sport=${sport} requestedCount=${count} OVERRIDING TO actualCount=${actualCount}`);
-  
   const cards: InsightCard[] = [];
   const displaySport = apiToSport(sport).toUpperCase();
-  console.log(`[v0] [SPORT CARDS] Display sport: ${displaySport}`);
+  console.log(`[v0] [CARDS-GEN] ${displaySport}: generating ${actualCount} cards (category: ${category || 'all'})`);
   
   // Fetch real live odds for this sport using unified service
   if (category === 'betting' || category === 'all' || !category) {
-    console.log(`[v0] [CARDS-GEN] ===== FETCHING ODDS FOR ${displaySport} =====`);
-    console.log(`[v0] [CARDS-GEN] Sport key: ${sport}`);
-    console.log(`[v0] [CARDS-GEN] Category: ${category || 'default (betting)'}`);
-    console.log(`[v0] [CARDS-GEN] Requested count: ${count}, Actual count: ${actualCount}`);
-    
     try {
       const { getOddsWithCache } = await import('@/lib/unified-odds-fetcher');
       
-      // Check API key availability
       const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
-      console.log(`[v0] [CARDS-GEN] API Key present: ${!!apiKey}`);
-      
       if (!apiKey) {
-        console.error(`[v0] [CARDS-GEN] ❌ CRITICAL: No ODDS_API_KEY found in environment!`);
         throw new Error('ODDS_API_KEY not configured');
       }
       
-      // Use unified service - automatically handles API + Supabase caching + storage
-      console.log(`[v0] [CARDS-GEN] Calling getOddsWithCache...`);
       const oddsData = await getOddsWithCache(sport, {
-        useCache: false, // Skip cache to get fresh data with all markets
-        storeResults: true // Store in Supabase for realtime sync
+        useCache: false,
+        storeResults: true
       });
       
-      console.log(`[v0] [CARDS-GEN] Unified service: ${oddsData?.length || 0} games for ${displaySport}`);
+      console.log(`[v0] [CARDS-GEN] ${displaySport}: ${oddsData?.length || 0} games from API`);
       
       if (oddsData && oddsData.length > 0) {
         console.log(`[v0] [CARDS-GEN] SUCCESS: Found ${oddsData.length} games for ${displaySport}`);
@@ -345,48 +332,38 @@ export async function generateContextualCards(
       ...baseSports.filter(s => !getSeasonInfo(s).isInSeason),
     ];
 
-    console.log('[v0] [CARDS GENERATOR] Will query sports in order:', orderedSports.map(s => {
-      const inSeason = getSeasonInfo(s).isInSeason;
-      return `${apiToSport(s).toUpperCase()}${inSeason ? '' : '(off-season)'}`;
-    }).join(', '));
+    const inSeasonSports = orderedSports.filter(s => getSeasonInfo(s).isInSeason);
+    console.log(`[v0] [MULTI-SPORT] Querying ${orderedSports.length} sports (${inSeasonSports.length} in-season), need ${count} cards`);
     
     // Fetch in small sequential batches (2 at a time) to avoid thundering herd
-    // Early-terminate once we have enough cards — skip off-season sports when possible
+    // Early-terminate once we have enough cards
     const BATCH_SIZE = 2;
     const allSportCards: { sport: string; cards: InsightCard[] }[] = [];
     
-    console.log(`[v0] [MULTI-SPORT] Fetching odds in batches of ${BATCH_SIZE} with early termination...`);
-    
     for (let i = 0; i < orderedSports.length; i += BATCH_SIZE) {
-      // Early termination: stop fetching if we already have enough cards
       const collectedSoFar = allSportCards.reduce((sum, r) => sum + r.cards.filter(c => c.data?.realData).length, 0);
       if (collectedSoFar >= count) {
-        const remaining = orderedSports.slice(i).map(s => apiToSport(s).toUpperCase());
-        console.log(`[v0] [MULTI-SPORT] Early termination — ${collectedSoFar} cards collected, skipping: ${remaining.join(', ')}`);
+        console.log(`[v0] [MULTI-SPORT] Early exit: ${collectedSoFar} cards collected`);
         break;
       }
       
       const batch = orderedSports.slice(i, i + BATCH_SIZE);
-      console.log(`[v0] [MULTI-SPORT] Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${batch.map(s => apiToSport(s).toUpperCase()).join(', ')}`);
-      
       const batchResults = await Promise.all(
         batch.map(async (sportKey) => {
-          console.log(`[v0] [MULTI-SPORT] Starting fetch for ${apiToSport(sportKey).toUpperCase()}`);
           try {
             const sportCards = await generateSportSpecificCards(sportKey, 5, category);
-            console.log(`[v0] [MULTI-SPORT] Done ${apiToSport(sportKey).toUpperCase()}: ${sportCards.length} cards`);
             return { sport: sportKey, cards: sportCards };
           } catch (error) {
-            console.error(`[v0] [MULTI-SPORT] Failed ${apiToSport(sportKey).toUpperCase()}:`, error);
+            console.error(`[v0] [MULTI-SPORT] ${apiToSport(sportKey).toUpperCase()} failed:`, error);
             return { sport: sportKey, cards: [] };
           }
         })
       );
       
       allSportCards.push(...batchResults);
+      const batchCardCount = batchResults.reduce((s, r) => s + r.cards.length, 0);
+      console.log(`[v0] [MULTI-SPORT] Batch ${Math.floor(i / BATCH_SIZE) + 1} (${batch.map(s => apiToSport(s).toUpperCase()).join('/')}): ${batchCardCount} cards`);
     }
-    
-    console.log('[v0] [MULTI-SPORT] All fetches complete');
     
     // Collect cards from sports that returned data
     for (const { sport: sportKey, cards: sportCards } of allSportCards) {

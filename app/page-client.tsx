@@ -195,10 +195,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     status: card.status || 'live',
   }));
 
-  console.log("[v0] serverCards hydrated:", serverCards.length, "cards from serverData.initialCards:", serverData?.initialCards?.length ?? 0);
-  if (serverCards.length > 0) {
-    console.log("[v0] First card sample:", JSON.stringify({ type: serverCards[0].type, title: serverCards[0].title, hasData: !!serverCards[0].data?.realData }));
-  }
+  console.log('[v0] SSR cards:', serverCards.length);
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -266,8 +263,39 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cards are pre-loaded from SSR via serverData.initialCards on the welcome message.
-  // They are also shown after AI responses using available cards from the session.
+  // Fallback: if SSR cards didn't survive serialization, fetch client-side.
+  // This only fires if the welcome message has 0 cards after hydration.
+  useEffect(() => {
+    if (serverCards.length > 0) {
+      console.log('[v0] SSR cards hydrated:', serverCards.length);
+      return;
+    }
+
+    console.log('[v0] No SSR cards — fetching client-side via /api/cards');
+    let cancelled = false;
+    fetch('/api/cards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: 'all', count: 12 }),
+    })
+      .then(res => res.ok ? res.json() : Promise.reject(res.status))
+      .then(data => {
+        const cards: InsightCard[] = data.cards || [];
+        console.log('[v0] Client card fetch:', cards.length, 'cards');
+        if (!cancelled && cards.length > 0) {
+          setMessages(prev => {
+            if (prev[0]?.isWelcome) {
+              return [{ ...prev[0], cards }, ...prev.slice(1)];
+            }
+            return prev;
+          });
+        }
+      })
+      .catch(err => console.error('[v0] Client card fetch failed:', err));
+
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   // Credit system utilities — syncs with Supabase user_profiles when logged in,
   // falls back to localStorage for anonymous users.
@@ -543,11 +571,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     const msgLower = userMessage.toLowerCase();
     const suggestions: Array<{ label: string; icon: any; category: string }> = [];
     
-    console.log('[v0] ==========================================');
-      console.log('[v0] GENERATING CONTEXTUAL SUGGESTIONS');
-      console.log('[v0] User message:', userMessage);
-      console.log('[v0] Response cards received:', responseCards.length);
-      console.log('[v0] Card details:', responseCards.map((c: any) => ({ type: c.type, category: c.category })));
+    console.log('[v0] Suggestions: generating for', responseCards.length, 'cards');
     
     // Analyze the AI's response cards to understand what was provided
     const cardTypes = responseCards.map(card => card.type);
@@ -559,7 +583,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     const hasCrossPlatform = cardTypes.includes('cross-platform');
     const hasPlayerProps = cardTypes.includes('player-prop');
     
-    console.log('[v0] Detected card types:', { hasLiveOdds, hasDFSLineup, hasFantasy, hasKalshi, hasCrossPlatform, hasPlayerProps });
+
     
     // Analyze user message context for deeper understanding
     const isBetting = msgLower.includes('bet') || msgLower.includes('odds') || msgLower.includes('line');
@@ -731,10 +755,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       index === self.findIndex((s) => s.label === suggestion.label)
     );
     
-    console.log('[v0] Generated', suggestions.length, 'total suggestions');
-    console.log('[v0] Filtered to', uniqueSuggestions.length, 'unique suggestions');
-    console.log('[v0] Suggestion labels:', uniqueSuggestions.map(s => s.label));
-    console.log('[v0] ==========================================');
+    console.log('[v0] Suggestions:', uniqueSuggestions.length, 'generated');
     
     // Return 5-7 unique suggestions for optimal UX
     return uniqueSuggestions.slice(0, 7);
@@ -973,9 +994,7 @@ No preamble. Start directly with section 1.`;
       };
 
       if (isDev) {
-        console.log('[v0] Extracted context:', context);
-        console.log('[SPORT DETECTED]', detectedSport || 'none');
-        console.log('[POLITICAL MARKET DETECTED]', finalIsPoliticalMarket);
+        console.log('[v0] Context:', { sport: detectedSport || 'none', betting: hasBettingIntent, sports: isSportsQuery, political: finalIsPoliticalMarket });
       }
       
       // HARD STOP: Political markets NEVER fetch sports odds
@@ -1031,53 +1050,13 @@ No preamble. Start directly with section 1.`;
             context.oddsErrorMessage = `Unable to fetch ${context.sport.toUpperCase()} odds. This may be a temporary API issue.`;
           }
         } else {
-          // ONLY ALLOW FALLBACK IF NO SPORT DETECTED
-          if (isDev) console.log('[v0] No specific sport detected - attempting fallback rotation');
-          
-          const fallbackSports = [
-            SPORT_KEYS.NBA.API,
-            SPORT_KEYS.NFL.API,
-            SPORT_KEYS.NHL.API,
-            SPORT_KEYS.MLB.API
-          ];
-          
-          let foundData = false;
-          
-          for (const sportKey of fallbackSports) {
-            if (foundData) break;
-            
-            if (isDev) console.log(`[v0] Trying fallback sport: ${sportKey}`);
-            
-            try {
-              const oddsResponse = await fetch('/api/odds', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sport: sportKey, marketType: 'h2h' })
-              });
-              
-              if (oddsResponse.ok) {
-                const oddsResult = await oddsResponse.json();
-                
-                if (oddsResult?.events?.length > 0) {
-                  const sportName = sportKey.replace('_', ' ').toUpperCase();
-                  if (isDev) console.log(`[v0] ✅ Fallback success - Found ${oddsResult.events.length} games in ${sportName}`);
-                  context.oddsData = oddsResult;
-                  context.oddsData.sport = sportKey;
-                  foundData = true;
-                  break;
-                }
-              }
-            } catch (err) {
-              if (isDev) console.error(`[v0] Exception fetching ${sportKey}:`, err);
-            }
-          }
-          
-          if (!foundData && isDev) {
-            console.warn('[v0] ⚠️ ODDS FETCH FAILED - No live games found across all sports');
-          }
+          // No specific sport detected. Don't burn API calls with fallback rotation --
+          // the client already has real cards from SSR/initial load. Those cards will be
+          // passed to /api/analyze via existingCards and displayed in the response.
+          if (isDev) console.log('[v0] No sport detected — using available cards instead of fallback rotation');
         }
         
-        if (isDev) console.log('[v0] === ODDS FETCH COMPLETE ===');
+
         
         // HARD CROSS-SPORT CONTAMINATION GUARD
         if (context.sport && context.oddsData?.sport && context.oddsData.sport !== sportToApi(context.sport)) {
@@ -1127,16 +1106,12 @@ No preamble. Start directly with section 1.`;
         setVerifyStage('analyzing');
       }
 
-      console.log('[v0] Analysis result received:', {
-        success: analysisResult.success,
-        hasText: !!analysisResult.text,
-        cardCount: analysisResult.cards?.length ?? 0,
-        hasTrustMetrics: !!analysisResult.trustMetrics,
-        finalConfidence: analysisResult.trustMetrics?.finalConfidence,
-        error: analysisResult.error,
-        useFallback: analysisResult.useFallback,
-        hadClientOddsData: !!context.oddsData,
-        serverGeneratedCards: (analysisResult.cards?.length ?? 0) > 0,
+      console.log('[v0] Analysis:', {
+        ok: analysisResult.success,
+        cards: analysisResult.cards?.length ?? 0,
+        confidence: analysisResult.trustMetrics?.finalConfidence,
+        fallback: analysisResult.useFallback,
+        clientCards: availableCards.length,
       });
 
       // Handle API errors with smart fallback
@@ -1214,7 +1189,7 @@ No preamble. Start directly with section 1.`;
       // Generate contextual suggestions
       const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);
       setSuggestedPrompts(contextualSuggestions);
-      console.log('[v0] Generated contextual suggestions:', contextualSuggestions.length);
+
     } catch (error) {
       console.error('[v0] Error generating real response:', error);
       

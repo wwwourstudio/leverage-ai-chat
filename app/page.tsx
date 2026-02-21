@@ -41,7 +41,9 @@ async function fetchInitialServerData(): Promise<ServerDataProps> {
   console.log('  - Missing Keys:', serverData.missingKeys.length);
   console.log('  - Errors:', serverData.fetchErrors.length);
 
-  return serverData;
+  // Ensure all data is JSON-serializable for the RSC -> Client Component boundary.
+  // Complex objects (Dates, undefined, functions) get stripped during serialization.
+  return JSON.parse(JSON.stringify(serverData));
 }
 
 export default async function Page() {

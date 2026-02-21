@@ -57,7 +57,7 @@ function setCachedCards(cards: InsightCard[], category: string): void {
 /**
  * Generate sport-specific cards with REAL odds data
  */
-// FORCE REFRESH: 2026-02-15-03:00
+// FORCE REFRESH: 2026-02-21-v5
 async function generateSportSpecificCards(
   sport: string,
   count: number,

@@ -336,9 +336,11 @@ export async function getOddsWithCache(
 
     if (storeResults && oddsData.length > 0) {
       // Store results async -- don't block the response
+      // Pass the full sport key (e.g. basketball_nba) for both calls;
+      // storeSportOdds handles the table name mapping internally
       Promise.all([
         supabaseOddsService.storeOdds(sport, sport, oddsData),
-        supabaseOddsService.storeSportOdds(sport.split('_')[0], oddsData)
+        supabaseOddsService.storeSportOdds(sport, oddsData)
       ]).catch(err => console.error(`${LOG_PREFIXES.API} Store error for ${sport}:`, err));
     }
 

@@ -1,5 +1,13 @@
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+/** Convert American odds to implied probability (0-1) */
+function oddsToImpliedProb(americanOdds: number): number {
+  if (americanOdds > 0) {
+    return 100 / (americanOdds + 100);
+  }
+  return Math.abs(americanOdds) / (Math.abs(americanOdds) + 100);
+}
+
 /**
  * Safely get Supabase client. Returns null when env vars are missing
  * instead of throwing at module initialisation time.
@@ -38,9 +46,9 @@ export class SupabaseOddsService {
     const { data, error } = await this.supabase
       .from('live_odds_cache')
       .select('*')
-      .eq('sport_key', sport)
+      .eq('sport', sport)
       .gt('expires_at', new Date().toISOString())
-      .order('cached_at', { ascending: false });
+      .order('fetched_at', { ascending: false });
 
     if (error) {
       console.error('[Supabase] Error fetching cached odds:', error);
@@ -56,32 +64,46 @@ export class SupabaseOddsService {
    */
   async storeOdds(sport: string, sportKey: string, games: any[]) {
     if (!this.supabase) return false;
-    const records = games.map((game: any) => ({
-      sport,
-      sport_key: sportKey,
-      game_id: game.id,
-      home_team: game.home_team,
-      away_team: game.away_team,
-      commence_time: game.commence_time,
-      bookmakers: game.bookmakers,
-      markets: game.bookmakers?.[0]?.markets || [],
-      cached_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + CACHE_TTL).toISOString()
-    }));
+
+    // Map API response to actual live_odds_cache schema:
+    // event_id, event_name, sport, sportsbook, market_type, odds_data,
+    // commence_time, implied_probability, fetched_at, expires_at, source
+    const records: any[] = [];
+    for (const game of games) {
+      const firstBook = game.bookmakers?.[0];
+      if (!firstBook) continue;
+
+      for (const market of firstBook.markets || []) {
+        records.push({
+          event_id: game.id,
+          event_name: `${game.away_team} @ ${game.home_team}`,
+          sport: sportKey,
+          sportsbook: firstBook.key || firstBook.title,
+          market_type: market.key, // h2h, spreads, totals
+          odds_data: { outcomes: market.outcomes, bookmakers: game.bookmakers },
+          commence_time: game.commence_time,
+          implied_probability: null,
+          fetched_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + CACHE_TTL).toISOString(),
+          source: 'the-odds-api',
+        });
+      }
+    }
+
+    if (records.length === 0) return false;
 
     const { error } = await this.supabase
       .from('live_odds_cache')
-      .upsert(records, { onConflict: 'game_id' });
+      .upsert(records, { onConflict: 'event_id,market_type,sportsbook' });
 
     if (error) {
-      // PGRST205 = table doesn't exist yet; skip silently
-      if ((error as any).code !== 'PGRST205') {
+      if ((error as any).code !== 'PGRST205' && (error as any).code !== '42P10') {
         console.error('[Supabase] Error storing odds:', error);
       }
       return false;
     }
 
-    console.log(`[Supabase] Stored ${records.length} games for ${sport}`);
+    console.log(`[Supabase] Stored ${records.length} odds records for ${sport}`);
     return true;
   }
 
@@ -90,34 +112,78 @@ export class SupabaseOddsService {
    */
   async storeSportOdds(sport: string, games: any[]) {
     if (!this.supabase) return false;
-    const tableName = `${sport}_odds`;
-    
+
+    // Map sport API keys to actual table names in Supabase
+    const SPORT_TABLE_MAP: Record<string, string> = {
+      basketball_nba: 'nba_odds',
+      basketball_ncaab: 'ncaab_odds',
+      americanfootball_nfl: 'nfl_odds',
+      americanfootball_ncaaf: 'ncaaf_odds',
+      baseball_mlb: 'mlb_odds',
+      icehockey_nhl: 'nhl_odds',
+      // Soccer and others fall back to live_odds_cache only
+    };
+
+    const tableName = SPORT_TABLE_MAP[sport];
+    if (!tableName) {
+      // No dedicated table for this sport; silently skip
+      return false;
+    }
+
+    // Map API data to the actual sport table schema:
+    // event_id, event_name, home_team, away_team, commence_time,
+    // home_odds, away_odds, home_implied_prob, away_implied_prob,
+    // home_spread, home_spread_odds, away_spread, away_spread_odds,
+    // over_total, over_odds, under_total, under_odds,
+    // sportsbook, market_type, source, raw_odds_data,
+    // api_requests_remaining, fetched_at, expires_at
     const records = games.map((game: any) => {
       const firstBook = game.bookmakers?.[0];
-      const h2hMarket = firstBook?.markets?.find((m: any) => m.key === 'h2h');
-      const spreadsMarket = firstBook?.markets?.find((m: any) => m.key === 'spreads');
-      const totalsMarket = firstBook?.markets?.find((m: any) => m.key === 'totals');
+      const h2h = firstBook?.markets?.find((m: any) => m.key === 'h2h');
+      const spreads = firstBook?.markets?.find((m: any) => m.key === 'spreads');
+      const totals = firstBook?.markets?.find((m: any) => m.key === 'totals');
+
+      const homeH2h = h2h?.outcomes?.find((o: any) => o.name === game.home_team);
+      const awayH2h = h2h?.outcomes?.find((o: any) => o.name === game.away_team);
+      const homeSpread = spreads?.outcomes?.find((o: any) => o.name === game.home_team);
+      const awaySpread = spreads?.outcomes?.find((o: any) => o.name === game.away_team);
+      const overTotal = totals?.outcomes?.find((o: any) => o.name === 'Over');
+      const underTotal = totals?.outcomes?.find((o: any) => o.name === 'Under');
 
       return {
-        game_id: game.id,
+        event_id: game.id,
+        event_name: `${game.away_team} @ ${game.home_team}`,
         home_team: game.home_team,
         away_team: game.away_team,
         commence_time: game.commence_time,
-        h2h_odds: h2hMarket?.outcomes || null,
-        spreads: spreadsMarket?.outcomes || null,
-        totals: totalsMarket?.outcomes || null,
-        cached_at: new Date().toISOString()
+        home_odds: homeH2h?.price ?? null,
+        away_odds: awayH2h?.price ?? null,
+        home_implied_prob: homeH2h?.price ? oddsToImpliedProb(homeH2h.price) : null,
+        away_implied_prob: awayH2h?.price ? oddsToImpliedProb(awayH2h.price) : null,
+        home_spread: homeSpread?.point ?? null,
+        home_spread_odds: homeSpread?.price ?? null,
+        away_spread: awaySpread?.point ?? null,
+        away_spread_odds: awaySpread?.price ?? null,
+        over_total: overTotal?.point ?? null,
+        over_odds: overTotal?.price ?? null,
+        under_total: underTotal?.point ?? null,
+        under_odds: underTotal?.price ?? null,
+        sportsbook: firstBook?.key || firstBook?.title || 'unknown',
+        market_type: 'h2h', // primary market type
+        source: 'the-odds-api',
+        raw_odds_data: { bookmakers: game.bookmakers },
+        fetched_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + CACHE_TTL).toISOString(),
       };
     });
 
     const { error } = await this.supabase
       .from(tableName)
-      .upsert(records, { onConflict: 'game_id' });
+      .upsert(records, { onConflict: 'event_id' });
 
     if (error) {
-      // PGRST205 = table doesn't exist yet; skip silently
-      if ((error as any).code !== 'PGRST205') {
-        console.error(`[Supabase] Error storing ${sport} odds:`, error);
+      if ((error as any).code !== 'PGRST205' && (error as any).code !== '42P10') {
+        console.error(`[Supabase] Error storing ${sport} odds in ${tableName}:`, error);
       }
       return false;
     }

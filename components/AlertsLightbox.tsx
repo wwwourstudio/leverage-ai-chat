@@ -72,21 +72,23 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
         return;
       }
 
-      // Get profile ID
+      // Get profile ID from user_profiles
       const { data: profile } = await supabase
-        .from('profiles')
+        .from('user_profiles')
         .select('id')
-        .eq('auth_id', session.user.id)
+        .eq('user_id', session.user.id)
         .single();
 
       if (profile) {
         setProfileId(profile.id);
 
+        // user_predictions serves as an activity/alerts feed
         const { data: alertsData } = await supabase
-          .from('user_alerts')
+          .from('user_predictions')
           .select('*')
           .eq('user_id', profile.id)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .limit(20);
 
         setAlerts(alertsData || []);
       }

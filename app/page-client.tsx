@@ -322,24 +322,14 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   };
 
   // Sync credits to Supabase (fire-and-forget)
-  const syncCreditsToSupabase = async (newCredits: number, transactionType: string, amount: number) => {
+  const syncCreditsToSupabase = async (newCredits: number, _transactionType: string, _amount: number) => {
     if (!supabaseProfileId) return;
     try {
       const supabase = createClient();
-      // Update profile balance
       await supabase
-        .from('profiles')
-        .update({ credits: newCredits, updated_at: new Date().toISOString() })
+        .from('user_profiles')
+        .update({ credits_remaining: newCredits, updated_at: new Date().toISOString() })
         .eq('id', supabaseProfileId);
-      // Log transaction
-      await supabase
-        .from('credit_transactions')
-        .insert({
-          user_id: supabaseProfileId,
-          amount,
-          balance_after: newCredits,
-          transaction_type: transactionType,
-        });
     } catch (err) {
       console.error('[Credits] Supabase sync failed:', err);
     }
@@ -350,16 +340,15 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     try {
       const supabase = createClient();
       const { data: profile } = await supabase
-        .from('profiles')
-        .select('id, credits')
-        .eq('auth_id', authId)
+        .from('user_profiles')
+        .select('id, credits_remaining')
+        .eq('user_id', authId)
         .single();
 
       if (profile) {
         setSupabaseProfileId(profile.id);
-        const dbCredits = profile.credits ?? MESSAGE_LIMIT;
+        const dbCredits = profile.credits_remaining ?? MESSAGE_LIMIT;
         setCreditsRemaining(dbCredits);
-        // Sync to localStorage
         const creditData = getCreditData();
         localStorage.setItem('userCredits', JSON.stringify({ ...creditData, credits: dbCredits }));
         return dbCredits;

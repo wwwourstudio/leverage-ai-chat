@@ -9,6 +9,7 @@ interface SettingsLightboxProps {
   onClose: () => void;
   user: { name: string; email: string; avatar?: string } | null;
   onUserUpdate?: (user: { name: string; email: string; avatar?: string }) => void;
+  onOpenStripe?: () => void;
 }
 
 interface UserProfile {
@@ -42,11 +43,12 @@ const SPORTSBOOKS = ['DraftKings', 'FanDuel', 'BetMGM', 'Caesars', 'PointsBet', 
 const SPORTS = ['NBA', 'NFL', 'MLB', 'NHL', 'NCAAB', 'NCAAF', 'EPL', 'MLS', 'UFC', 'Tennis'];
 const RISK_LEVELS = ['conservative', 'medium', 'aggressive'];
 
-export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate }: SettingsLightboxProps) {
+export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenStripe }: SettingsLightboxProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [settings, setSettings] = useState<UserSettings>({
     preferred_books: [],
@@ -121,16 +123,26 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate }: Settin
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
+
       if (!session?.user || !profile) {
+        // Guest: persist to localStorage so preferences survive page reload
+        const guestPrefs = { fullName, notificationPrefs, settings };
+        localStorage.setItem('leverage_guest_prefs', JSON.stringify(guestPrefs));
+        if (onUserUpdate && fullName) {
+          onUserUpdate({ name: fullName, email: user?.email || '', avatar: user?.avatar });
+        }
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
         setSaving(false);
         return;
       }
 
-      // Update profile
-      await supabase
+      // Authenticated: persist to Supabase
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({
           full_name: fullName,
@@ -139,8 +151,9 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate }: Settin
         })
         .eq('id', profile.id);
 
-      // Upsert settings
-      await supabase
+      if (profileError) throw profileError;
+
+      const { error: settingsError } = await supabase
         .from('user_settings')
         .upsert({
           id: profile.id,
@@ -154,15 +167,17 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate }: Settin
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' });
 
-      // Update parent state
+      if (settingsError) throw settingsError;
+
       if (onUserUpdate) {
         onUserUpdate({ name: fullName, email: user?.email || '', avatar: user?.avatar });
       }
 
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('[Settings] Failed to save:', err);
+      setSaveError(err?.message || 'Failed to save. Please try again.');
     }
     setSaving(false);
   };
@@ -257,20 +272,33 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate }: Settin
                       <p className="text-sm font-semibold text-white">Credits Balance</p>
                       <p className="text-xs text-gray-500">Current available credits</p>
                     </div>
-                    <span className="text-2xl font-black text-blue-400">{profile?.credits ?? 0}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl font-black text-blue-400">{profile?.credits ?? 0}</span>
+                      <button
+                        onClick={() => { onClose(); onOpenStripe?.(); }}
+                        className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors"
+                      >
+                        Buy Credits
+                      </button>
+                    </div>
                   </div>
                   <div className="flex items-center justify-between p-4 bg-gray-800/30 rounded-xl border border-gray-800">
                     <div>
                       <p className="text-sm font-semibold text-white">Subscription</p>
-                      <p className="text-xs text-gray-500">{profile?.subscription_tier === 'premium' ? 'Active premium plan' : 'Free tier'}</p>
+                      <p className="text-xs text-gray-500">{profile?.subscription_tier === 'premium' ? 'Active premium plan' : 'Free tier — upgrade for unlimited access'}</p>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      profile?.subscription_tier === 'premium'
-                        ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                        : 'bg-gray-800 text-gray-400 border border-gray-700'
-                    }`}>
-                      {profile?.subscription_tier === 'premium' ? 'Premium' : 'Free'}
-                    </span>
+                    {profile?.subscription_tier === 'premium' ? (
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                        Premium
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => { onClose(); onOpenStripe?.(); }}
+                        className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-xs font-bold transition-all"
+                      >
+                        Upgrade
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -388,12 +416,17 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate }: Settin
 
         {/* Footer */}
         <div className="flex items-center justify-between p-6 border-t border-gray-800">
-          <button
-            onClick={onClose}
-            className="px-6 py-2.5 rounded-xl border border-gray-700 text-gray-400 hover:text-gray-300 hover:border-gray-600 text-sm font-semibold transition-all"
-          >
-            Cancel
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              className="px-6 py-2.5 rounded-xl border border-gray-700 text-gray-400 hover:text-gray-300 hover:border-gray-600 text-sm font-semibold transition-all"
+            >
+              Cancel
+            </button>
+            {saveError && (
+              <span className="text-xs text-red-400">{saveError}</span>
+            )}
+          </div>
           <button
             onClick={handleSave}
             disabled={saving}

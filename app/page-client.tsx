@@ -3209,6 +3209,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         onClose={() => setShowSettingsLightbox(false)}
         user={user}
         onUserUpdate={setUser}
+        onOpenStripe={() => setShowStripeLightbox(true)}
       />
 
       {/* Alerts Lightbox */}

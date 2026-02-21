@@ -28,10 +28,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Dynamic import of Stripe to avoid build errors when not installed
+    // Dynamic import with webpackIgnore so Next.js doesn't try to bundle
+    // the stripe package at build time (it may not be installed).
     let Stripe: any;
     try {
-      Stripe = (await import('stripe')).default;
+      Stripe = (await import(/* webpackIgnore: true */ 'stripe')).default;
     } catch {
       console.log('[Stripe] stripe package not installed, using mock mode');
       return NextResponse.json({

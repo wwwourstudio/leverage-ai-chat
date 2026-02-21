@@ -57,27 +57,48 @@ export async function POST(request: NextRequest) {
         ? 'betting'
         : 'all';
 
-    // Build the enriched prompt with any real odds data
+    // Build the enriched prompt with any real odds data or contextual info
     let enrichedPrompt = userMessage;
 
     if (context.oddsData?.events?.length > 0) {
       const oddsPreview = context.oddsData.events
-        .slice(0, 5)
+        .slice(0, 8)
         .map((e: any) => {
-          const book = e.bookmakers?.[0];
-          const h2h = book?.markets?.find((m: any) => m.key === 'h2h');
-          const outcomes = h2h?.outcomes || [];
-          const home = outcomes.find((o: any) => o.name === e.home_team);
-          const away = outcomes.find((o: any) => o.name === e.away_team);
-          return `${e.away_team} @ ${e.home_team} | ${away?.price ?? 'N/A'} / ${home?.price ?? 'N/A'} (${book?.title ?? 'N/A'})`;
+          const lines: string[] = [`${e.away_team} @ ${e.home_team}`];
+          for (const book of (e.bookmakers || []).slice(0, 2)) {
+            const h2h = book.markets?.find((m: any) => m.key === 'h2h');
+            const spread = book.markets?.find((m: any) => m.key === 'spreads');
+            const total = book.markets?.find((m: any) => m.key === 'totals');
+            if (h2h) {
+              const home = h2h.outcomes?.find((o: any) => o.name === e.home_team);
+              const away = h2h.outcomes?.find((o: any) => o.name === e.away_team);
+              lines.push(`  ML (${book.title}): ${e.away_team} ${away?.price > 0 ? '+' : ''}${away?.price ?? 'N/A'} | ${e.home_team} ${home?.price > 0 ? '+' : ''}${home?.price ?? 'N/A'}`);
+            }
+            if (spread) {
+              const home = spread.outcomes?.find((o: any) => o.name === e.home_team);
+              const away = spread.outcomes?.find((o: any) => o.name === e.away_team);
+              lines.push(`  Spread (${book.title}): ${e.away_team} ${away?.point > 0 ? '+' : ''}${away?.point ?? ''} (${away?.price > 0 ? '+' : ''}${away?.price ?? 'N/A'}) | ${e.home_team} ${home?.point > 0 ? '+' : ''}${home?.point ?? ''} (${home?.price > 0 ? '+' : ''}${home?.price ?? 'N/A'})`);
+            }
+            if (total) {
+              const over = total.outcomes?.find((o: any) => o.name === 'Over');
+              const under = total.outcomes?.find((o: any) => o.name === 'Under');
+              lines.push(`  Total (${book.title}): O${over?.point ?? ''} (${over?.price > 0 ? '+' : ''}${over?.price ?? 'N/A'}) | U${under?.point ?? ''} (${under?.price > 0 ? '+' : ''}${under?.price ?? 'N/A'})`);
+            }
+          }
+          return lines.join('\n');
         })
-        .join('\n');
+        .join('\n\n');
 
-      enrichedPrompt += `\n\n--- REAL LIVE ODDS DATA (use ONLY this data) ---\nSport: ${context.oddsData.sport}\n${oddsPreview}\n--- END ODDS DATA ---`;
-    }
-
-    if (context.noGamesAvailable) {
-      enrichedPrompt += `\n\nNote: ${context.noGamesMessage}`;
+      enrichedPrompt += `\n\n--- REAL LIVE ODDS DATA (use ONLY these numbers for odds/lines) ---\nSport: ${context.oddsData.sport}\n\n${oddsPreview}\n--- END ODDS DATA ---`;
+    } else if (context.noGamesAvailable) {
+      // No live games but let the AI give knowledge-based analysis
+      enrichedPrompt += `\n\n[Context: No live ${context.sport?.toUpperCase() || 'sports'} games are currently scheduled (offseason or between games). Provide expert analysis, offseason insights, betting strategy, and relevant market knowledge instead of live odds.]`;
+    } else if (!context.hasBettingIntent && context.sport) {
+      // Sports question without betting intent — give expert analysis
+      enrichedPrompt += `\n\n[Context: User is asking about ${context.sport.toUpperCase()} — provide expert analysis using your knowledge. No live odds needed for this question.]`;
+    } else if (!context.hasBettingIntent && !context.sport && !context.isPoliticalMarket) {
+      // General question — answer from knowledge
+      enrichedPrompt += `\n\n[Context: General question — answer with your full expert knowledge about sports betting, fantasy, DFS, or prediction markets as appropriate.]`;
     }
 
     // Attempt AI generation via Vercel AI Gateway
@@ -181,22 +202,45 @@ function generateFallbackResponse(
 ): string {
   const lowerMsg = userMessage.toLowerCase();
 
-  if (context?.isPoliticalMarket) {
-    return 'Prediction market analysis requires a configured AI service. Please ensure XAI_API_KEY is set to enable Kalshi and prediction market insights.';
-  }
-
-  if (context?.noGamesAvailable) {
-    return context.noGamesMessage || 'No live games are currently scheduled for this sport.';
-  }
-
+  // With live odds data, summarize what we found
   if (context?.oddsData?.events?.length) {
     const count = context.oddsData.events.length;
-    return `Found ${count} live games with odds data. Configure XAI_API_KEY for detailed AI-powered analysis of these matchups.`;
+    const sport = context.oddsData.sport?.replace('_', ' ').toUpperCase() || 'sports';
+    const sample = context.oddsData.events.slice(0, 3).map((e: any) => {
+      const book = e.bookmakers?.[0];
+      const h2h = book?.markets?.find((m: any) => m.key === 'h2h');
+      const home = h2h?.outcomes?.find((o: any) => o.name === e.home_team);
+      const away = h2h?.outcomes?.find((o: any) => o.name === e.away_team);
+      return `• ${e.away_team} @ ${e.home_team}: ${e.away_team} ${away?.price > 0 ? '+' : ''}${away?.price ?? 'N/A'} / ${e.home_team} ${home?.price > 0 ? '+' : ''}${home?.price ?? 'N/A'}`;
+    }).join('\n');
+    return `**Live ${sport} Games (${count} available)**\n\nHere are the current moneylines:\n${sample}\n\n• To unlock AI-powered sharp money analysis, configure XAI_API_KEY in your environment.`;
   }
 
-  if (context?.hasBettingIntent) {
-    return 'Sports betting analysis is available when the AI service is configured. Set up XAI_API_KEY for real-time odds analysis, arbitrage detection, and betting recommendations.';
+  // No live games — give a useful knowledge-based response
+  if (context?.noGamesAvailable || (context?.sport && !context?.oddsData)) {
+    const sport = context.sport?.toUpperCase() || 'sports';
+    if (lowerMsg.includes('offseason') || lowerMsg.includes('trade') || lowerMsg.includes('free agent')) {
+      return `**${sport} Offseason Analysis**\n\n• No live games are scheduled right now, but there's plenty of betting value to track in the offseason.\n• Monitor futures markets — championship odds often offer the best value before spring/summer public betting shifts prices.\n• Track free agency signings and trades: roster changes are the #1 driver of futures line movement.\n• Win totals are set early in the offseason and tend to close toward public perception — sharp bettors target the opening numbers.\n• Configure XAI_API_KEY for AI-powered offseason intelligence.`;
+    }
+    return `**${sport} Analysis**\n\n• No live games are currently scheduled. ${sport} season games typically post odds 24–48 hours before tip/kickoff.\n• In the meantime, futures markets (division winner, championship odds) are open year-round.\n• This is a great time to research team trends, injury reports, and schedule strength ahead of the season.\n• Configure XAI_API_KEY for full AI-powered analysis.`;
   }
 
-  return 'AI analysis is currently unavailable. Please configure XAI_API_KEY to enable Grok-powered insights. In the meantime, you can browse the live data cards below.';
+  // General betting/strategy question
+  if (lowerMsg.includes('arbitrage') || lowerMsg.includes('arb')) {
+    return `**Arbitrage Betting**\n\n• Arbitrage occurs when odds discrepancies between sportsbooks guarantee profit regardless of outcome.\n• Example: Book A has Team A at +105, Book B has Team B at -100 — you can cover both sides for guaranteed profit.\n• Typical arb margins: 1–3%. Higher margins are rare and close quickly.\n• Best found on: player props, alternative lines, early morning odds before sharp action.\n• Use the live data cards above to find current arbitrage opportunities across books.`;
+  }
+
+  if (lowerMsg.includes('kelly') || lowerMsg.includes('bankroll')) {
+    return `**Bankroll Management (Kelly Criterion)**\n\n• Kelly Formula: f = (bp - q) / b, where b = decimal odds-1, p = win probability, q = 1-p.\n• Most pros use "quarter Kelly" (25% of full Kelly) to reduce variance.\n• Rule of thumb: never bet more than 3–5% of bankroll on a single play.\n• Flat betting (1–2 units per game) is more sustainable for recreational bettors.\n• Track ROI per sport/bet type to find your real edges over time.`;
+  }
+
+  if (lowerMsg.includes('dfs') || lowerMsg.includes('draftkings') || lowerMsg.includes('fanduel')) {
+    return `**DFS Strategy**\n\n• Cash games: target high-floor players (consistent producers, good matchups, safe volume).\n• GPP tournaments: need leverage — rostering underowned players at premium positions.\n• Correlation stacking: QB + WR + opposing pass catcher is the most proven NFL GPP stack.\n• Ownership matters: in large field GPPs, a 70% owned chalk player who scores 30 pts barely moves the needle.\n• Target salary inefficiencies: players priced down due to one bad game but with strong underlying metrics.`;
+  }
+
+  if (context?.isPoliticalMarket || lowerMsg.includes('kalshi') || lowerMsg.includes('prediction market')) {
+    return `**Kalshi Prediction Markets**\n\n• Kalshi markets are CFTC-regulated event contracts that pay $1 if the event occurs, $0 if not.\n• Prices represent implied probability — 65¢ YES = 65% market probability of that outcome.\n• Look for: markets trading significantly away from your probability estimate.\n• Key categories: elections, economic indicators (CPI, unemployment, Fed rate), weather events, sports championships.\n• Strategy: compare Kalshi prices to Polymarket/PredictIt for cross-market arbitrage.\n• Configure XAI_API_KEY for live Kalshi market intelligence.`;
+  }
+
+  return `**Leverage AI — Expert Sports Analysis**\n\n• I'm ready to analyze betting lines, DFS, fantasy, Kalshi markets, and more.\n• Ask me about specific games, offseason moves, betting strategy, or prediction markets.\n• Live odds data cards are loading below — click any card for detailed analysis.\n• Configure XAI_API_KEY in your environment for full AI-powered responses.`;
 }

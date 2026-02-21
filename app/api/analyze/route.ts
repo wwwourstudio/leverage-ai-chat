@@ -141,16 +141,20 @@ export async function POST(request: NextRequest) {
       usedFallback = true;
     }
 
-    // Generate contextual insight cards
+    // Only generate insight cards when we have real live odds data to show.
+    // Skip for fallback responses, general questions, or when no specific sport/data is available.
     let cards: InsightCard[] = [];
-    try {
-      cards = await generateContextualCards(
-        category,
-        context.sport ?? undefined,
-        3
-      );
-    } catch (cardError) {
-      console.error('[API/analyze] Card generation failed:', cardError);
+    const hasRealOddsData = (context.oddsData?.events?.length ?? 0) > 0;
+    if (!usedFallback && hasRealOddsData && context.sport) {
+      try {
+        cards = await generateContextualCards(
+          category,
+          context.sport ?? undefined,
+          3
+        );
+      } catch (cardError) {
+        console.error('[API/analyze] Card generation failed:', cardError);
+      }
     }
 
     const processingTime = Date.now() - startTime;

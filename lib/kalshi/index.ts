@@ -178,13 +178,35 @@ export async function fetchKalshiMarkets(params?: {
 
     // Use title keyword search (series_ticker expects exact IDs like "KXBT", not names)
     const categorySearchMap: Record<string, string> = {
-      'election': 'election',
-      'elections': 'election',
-      'politics': 'senate',
-      'political': 'senate',
-      '2026': '2026',
-      'president': 'president',
-      'presidential': 'president',
+      // Elections & Politics
+      'election': 'election', 'elections': 'election', 'politics': 'senate',
+      'political': 'senate', '2026': '2026', 'president': 'president',
+      'presidential': 'president', 'congress': 'congress', 'senate': 'senate',
+      'house': 'house representatives', 'governor': 'governor',
+      // Finance & Economics
+      'finance': 'stock', 'financial': 'stock market', 'stocks': 'stock',
+      'crypto': 'bitcoin', 'bitcoin': 'bitcoin', 'ethereum': 'ethereum',
+      'interest_rate': 'interest rate', 'fed': 'federal reserve',
+      'inflation': 'inflation', 'gdp': 'GDP', 'recession': 'recession',
+      'unemployment': 'unemployment', 'sp500': 'S&P', 'nasdaq': 'NASDAQ',
+      'economy': 'economic',
+      // Weather & Climate
+      'weather': 'temperature', 'climate': 'climate', 'hurricane': 'hurricane',
+      'tornado': 'tornado', 'temperature': 'temperature', 'snow': 'snow',
+      'rain': 'rainfall', 'wildfire': 'wildfire', 'earthquake': 'earthquake',
+      // Sports
+      'sports': 'game', 'nfl': 'NFL', 'nba': 'NBA', 'mlb': 'MLB',
+      'nhl': 'NHL', 'soccer': 'soccer', 'mma': 'UFC', 'boxing': 'boxing',
+      'golf': 'golf', 'tennis': 'tennis', 'f1': 'Formula',
+      // Entertainment & Culture
+      'entertainment': 'award', 'oscars': 'Oscar', 'grammys': 'Grammy',
+      'emmys': 'Emmy', 'movies': 'box office', 'tv': 'ratings',
+      // Tech & Science
+      'tech': 'technology', 'ai': 'artificial intelligence', 'spacex': 'SpaceX',
+      'space': 'space', 'nasa': 'NASA',
+      // Global Events
+      'war': 'conflict', 'global': 'global', 'china': 'China', 'russia': 'Russia',
+      'ukraine': 'Ukraine', 'trade': 'trade', 'tariff': 'tariff',
     };
 
     if (category) {
@@ -455,6 +477,103 @@ export async function fetchElectionMarkets(options?: {
 
   console.log(`[KALSHI] Found ${electionMarkets.length} election markets for ${year}`);
   return electionMarkets.slice(0, limit);
+}
+
+/**
+ * Fetch weather-related markets from Kalshi
+ */
+export async function fetchWeatherMarkets(limit: number = 50): Promise<KalshiMarket[]> {
+  const weatherSearches = [
+    'temperature', 'hurricane', 'tornado', 'snow', 'rainfall',
+    'wildfire', 'earthquake', 'climate', 'weather',
+  ];
+
+  const seen = new Set<string>();
+  const all: KalshiMarket[] = [];
+
+  console.log('[KALSHI] Fetching weather markets...');
+
+  const results = await Promise.allSettled(
+    weatherSearches.map(search => fetchKalshiMarkets({ search, limit: 50, useCache: true }))
+  );
+
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      for (const market of result.value) {
+        if (!seen.has(market.ticker)) {
+          seen.add(market.ticker);
+          all.push(market);
+        }
+      }
+    }
+  }
+
+  console.log(`[KALSHI] Weather markets total: ${all.length}`);
+  return all.slice(0, limit);
+}
+
+/**
+ * Fetch finance/economics markets from Kalshi
+ */
+export async function fetchFinanceMarkets(limit: number = 50): Promise<KalshiMarket[]> {
+  const financeSearches = [
+    'stock', 'S&P', 'NASDAQ', 'bitcoin', 'ethereum', 'crypto',
+    'interest rate', 'federal reserve', 'inflation', 'GDP',
+    'recession', 'unemployment', 'economic', 'treasury',
+  ];
+
+  const seen = new Set<string>();
+  const all: KalshiMarket[] = [];
+
+  console.log('[KALSHI] Fetching finance markets...');
+
+  const batchSize = 5;
+  for (let i = 0; i < financeSearches.length; i += batchSize) {
+    const batch = financeSearches.slice(i, i + batchSize);
+    const results = await Promise.allSettled(
+      batch.map(search => fetchKalshiMarkets({ search, limit: 50, useCache: true }))
+    );
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        for (const market of result.value) {
+          if (!seen.has(market.ticker)) {
+            seen.add(market.ticker);
+            all.push(market);
+          }
+        }
+      }
+    }
+  }
+
+  console.log(`[KALSHI] Finance markets total: ${all.length}`);
+  return all.slice(0, limit);
+}
+
+/**
+ * Fetch all markets across all categories. Returns categorized results.
+ */
+export async function fetchAllCategoryMarkets(): Promise<Record<string, KalshiMarket[]>> {
+  console.log('[KALSHI] Fetching all category markets...');
+
+  const [sports, elections, weather, finance] = await Promise.allSettled([
+    fetchSportsMarkets(),
+    fetchElectionMarkets({ limit: 50 }),
+    fetchWeatherMarkets(),
+    fetchFinanceMarkets(),
+  ]);
+
+  const result: Record<string, KalshiMarket[]> = {
+    sports: sports.status === 'fulfilled' ? sports.value : [],
+    elections: elections.status === 'fulfilled' ? elections.value : [],
+    weather: weather.status === 'fulfilled' ? weather.value : [],
+    finance: finance.status === 'fulfilled' ? finance.value : [],
+  };
+
+  const total = Object.values(result).reduce((sum, arr) => sum + arr.length, 0);
+  console.log(`[KALSHI] All categories total: ${total} markets`);
+
+  return result;
 }
 
 /**

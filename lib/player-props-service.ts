@@ -9,6 +9,9 @@ import { playerPropsQueue } from '@/lib/api-request-manager';
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+// Warn about missing table only once per process lifetime to avoid log spam
+let tableWarnedMissing = false;
+
 export interface PlayerProp {
   id: string;
   sport: string;
@@ -54,7 +57,10 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
       
       if (error) {
         if (error.code === 'PGRST205') {
-          console.warn('[v0] [PLAYER-PROPS] player_props_markets table missing — run scripts/003-player-props-table.sql in Supabase');
+          if (!tableWarnedMissing) {
+            tableWarnedMissing = true;
+            console.warn('[v0] [PLAYER-PROPS] player_props_markets table missing — POST /api/admin/migrate or run scripts/003-player-props-table.sql in Supabase (this warning will not repeat)');
+          }
         } else {
           console.error('[v0] [PLAYER-PROPS] Cache read error:', error);
         }
@@ -277,7 +283,10 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
         
         if (error) {
           if (error.code === 'PGRST205') {
-            console.warn('[v0] [PLAYER-PROPS] player_props_markets table missing — run scripts/003-player-props-table.sql in Supabase to enable caching');
+            if (!tableWarnedMissing) {
+              tableWarnedMissing = true;
+              console.warn('[v0] [PLAYER-PROPS] player_props_markets table missing — POST /api/admin/migrate or run scripts/003-player-props-table.sql in Supabase (this warning will not repeat)');
+            }
           } else {
             console.error('[v0] [PLAYER-PROPS] Storage error:', error);
           }

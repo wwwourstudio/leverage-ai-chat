@@ -1,6 +1,26 @@
 import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/next'
+import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
+
+// Optimized font loading with display swap and subset for performance
+const geistSans = Geist({
+  subsets: ['latin'],
+  display: 'swap', // Prevents FOIT (Flash of Invisible Text)
+  variable: '--font-geist-sans',
+  preload: true,
+  fallback: ['system-ui', '-apple-system', 'sans-serif'],
+  adjustFontFallback: true, // Minimizes layout shift
+})
+
+const geistMono = Geist_Mono({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-geist-mono',
+  preload: true,
+  fallback: ['Menlo', 'Monaco', 'Courier New', 'monospace'],
+  adjustFontFallback: true,
+})
 
 export const metadata: Metadata = {
   title: 'Unified AI Platform - Sports Betting • Fantasy • DFS • Kalshi',
@@ -23,6 +43,10 @@ export const metadata: Metadata = {
     ],
     apple: '/apple-icon.png',
   },
+  // Performance optimization: fonts are automatically optimized by Next.js
+  other: {
+    'font-optimization': 'display=swap, preload, subset=latin, adjustFontFallback',
+  },
 }
 
 export default function RootLayout({
@@ -31,8 +55,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={`font-sans antialiased`}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body className="font-sans antialiased">
         {children}
         <Analytics />
       </body>

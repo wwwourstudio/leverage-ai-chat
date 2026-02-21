@@ -115,35 +115,21 @@ export async function fetchDynamicCards(params: {
     return [];
   }
 
-  console.log(`${LOG_PREFIXES.DATA_SERVICE} ========================================`);
-  console.log(`${LOG_PREFIXES.DATA_SERVICE} FETCHING DYNAMIC CARDS`);
-  console.log(`${LOG_PREFIXES.DATA_SERVICE} Parameters:`, JSON.stringify(params, null, 2));
+  console.log(`${LOG_PREFIXES.DATA_SERVICE} Fetching cards:`, JSON.stringify(params));
   
   const cacheKey = `cards:${JSON.stringify(params)}`;
   const cached = cache.get(cacheKey);
 
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION.CARDS) {
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} ✓ Returning ${cached.data.length} cached cards`);
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Cache age: ${Math.round((Date.now() - cached.timestamp) / 1000)}s`);
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} ========================================`);
     return cached.data;
   }
 
-  console.log(`${LOG_PREFIXES.DATA_SERVICE} Cache miss or expired - fetching fresh data`);
-  console.log(`${LOG_PREFIXES.DATA_SERVICE} API Endpoint: ${API_ENDPOINTS.CARDS}`);
-
   try {
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} → Making POST request...`);
-    const requestBody = JSON.stringify(params);
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Request body: ${requestBody}`);
-    
     const response = await fetch(API_ENDPOINTS.CARDS, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: requestBody
+      body: JSON.stringify(params)
     });
-
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} ← Response status: ${response.status} ${response.statusText}`);
 
     if (!response.ok) {
       const errorText = await response.text();

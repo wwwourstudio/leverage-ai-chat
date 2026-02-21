@@ -14,7 +14,7 @@ interface CardData {
   category: string;
   subcategory: string;
   gradient: string;
-  data: Record<string, string | number>;
+  data: Record<string, any>;
   status: string;
   realData?: boolean;
 }

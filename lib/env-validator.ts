@@ -120,12 +120,18 @@ export function logEnvValidation(result: EnvValidationResult, context: 'server' 
     console.error(`[v0] ${context.toUpperCase()}: Environment errors:`, result.errors);
   }
 
-  // Warnings (optional vars) only log once per process to avoid per-request spam
+  // Only log once per process to avoid per-request spam
   if (!envLogged) {
     envLogged = true;
     console.log(`[v0] ${context.toUpperCase()}: Environment validation ${result.isValid ? '✓ PASSED' : '✗ FAILED'}`);
-    if (result.warnings.length > 0) {
-      console.warn(`[v0] Environment warnings (will not repeat):`, result.warnings);
+    // Optional env vars are informational only — suppress from console in production
+    // to avoid noisy logs that look like errors
+    if (result.warnings.length > 0 && process.env.NODE_ENV === 'development') {
+      console.log(`[v0] Environment info (optional vars not set):`, 
+        result.warnings.filter(w => !w.startsWith('Optional:')).length > 0
+          ? result.warnings
+          : `${result.warnings.length} optional vars not configured (non-critical)`
+      );
     }
   }
 }

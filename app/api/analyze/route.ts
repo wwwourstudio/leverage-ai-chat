@@ -9,7 +9,7 @@ import {
   HTTP_STATUS,
   ERROR_MESSAGES,
 } from '@/lib/constants';
-import { generateContextualCards, type InsightCard } from '@/lib/cards-generator';
+import type { InsightCard } from '@/lib/cards-generator';
 import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-detector';
 
 // ============================================================================
@@ -18,6 +18,7 @@ import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-dete
 
 interface AnalyzeRequestBody {
   userMessage: string;
+  existingCards?: InsightCard[];
   context?: {
     sport?: string | null;
     marketType?: string | null;
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: AnalyzeRequestBody = await request.json();
-    const { userMessage, context = {} } = body;
+    const { userMessage, existingCards = [], context = {} } = body;
 
     if (!userMessage || typeof userMessage !== 'string') {
       return NextResponse.json(
@@ -107,11 +108,14 @@ export async function POST(request: NextRequest) {
     const xaiApiKey = process.env.XAI_API_KEY;
     const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
     const kalshiApiKey = process.env.KALSHI_API_KEY;
+    const hasClientOddsData = !!(context.oddsData?.events?.length);
     console.log('[API/analyze] Keys configured:', {
       XAI_API_KEY: !!xaiApiKey,
       ODDS_API_KEY: !!oddsApiKey,
       KALSHI_API_KEY: !!kalshiApiKey,
-      hasOddsData: !!(context.oddsData?.events?.length),
+      hasOddsData: hasClientOddsData,
+      category,
+      sport: context.sport || 'none',
     });
     let aiText: string;
     let modelUsed = AI_CONFIG.MODEL_DISPLAY_NAME;
@@ -185,21 +189,12 @@ export async function POST(request: NextRequest) {
       usedFallback = true;
     }
 
-    // Only generate insight cards when we have real live odds data to show.
-    // Skip for fallback responses, general questions, or when no specific sport/data is available.
-    let cards: InsightCard[] = [];
-    const hasRealOddsData = (context.oddsData?.events?.length ?? 0) > 0;
-    if (!usedFallback && hasRealOddsData && context.sport) {
-      try {
-        cards = await generateContextualCards(
-          category,
-          context.sport ?? undefined,
-          3
-        );
-      } catch (cardError) {
-        console.error('[API/analyze] Card generation failed:', cardError);
-      }
-    }
+    // Cards are generated server-side during SSR (page.tsx) and passed from
+    // the client. This avoids redundant API calls that would collide with
+    // the SSR fetch for rate limits. The client sends its available cards
+    // (from the welcome message or previous responses) in `existingCards`.
+    const cards: InsightCard[] = Array.isArray(existingCards) ? existingCards.slice(0, 6) : [];
+    console.log(`[API/analyze] Using ${cards.length} cards passed from client`);
 
     const processingTime = Date.now() - startTime;
 

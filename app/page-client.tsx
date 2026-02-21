@@ -247,31 +247,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pre-load initial cards from server-side data
-  useEffect(() => {
-    if (serverData?.initialCards && serverData.initialCards.length > 0) {
-      console.log('[v0] Client: Pre-loading', serverData.initialCards.length, 'server-fetched cards');
-      console.log('[v0] Client: Data sources used:', serverData.dataSourcesUsed?.join(', ') || 'none');
-      
-      if (serverData.fetchErrors && serverData.fetchErrors.length > 0) {
-        console.warn('[v0] Client: Data fetch had errors:', serverData.fetchErrors);
-      }
-      
-      if (serverData.missingKeys && serverData.missingKeys.length > 0) {
-        console.warn('[v0] Client: Missing API keys:', serverData.missingKeys.join(', '));
-      }
-      
-      setMessages(prev => {
-        const welcomeMsg = prev[0];
-        return [{
-          ...welcomeMsg,
-          cards: serverData.initialCards as any[]
-        }];
-      });
-    } else {
-      console.log('[v0] Client: No server-fetched cards available, will fetch dynamically');
-    }
-  }, [serverData?.initialCards, serverData?.fetchErrors, serverData?.missingKeys, serverData?.dataSourcesUsed]);
+  // Cards are not pre-loaded on the welcome screen.
+  // They are only shown after an AI response when there is real live data to display.
   
   // Credit system utilities — syncs with Supabase user_profiles when logged in,
   // falls back to localStorage for anonymous users.
@@ -1058,13 +1035,12 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     } catch (error) {
       console.error('[v0] Error generating real response:', error);
       
-      // Fallback to basic response with error indication
-      const fallbackCards = await selectRelevantCards(userMessage);
+      // Fallback to basic response with error indication — no random cards
       setMessages((prev: Message[]) => [...prev, {
         role: 'assistant',
         content: `I'm currently experiencing connectivity issues with live data sources. Here's an analysis based on available information:\n\n**Note:** Some real-time data may be limited. ${error instanceof Error ? `(${error.message})` : ''}`,
         timestamp: new Date(),
-        cards: fallbackCards,
+        cards: [],
         confidence: 70,
         sources: [
           { name: 'Cached Data', type: 'cache', reliability: 75 }
@@ -1088,7 +1064,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         }
       }]);
 
-      setSuggestedPrompts(generateContextualSuggestions(userMessage, fallbackCards));
+      setSuggestedPrompts(generateContextualSuggestions(userMessage, []));
     } finally {
       setIsTyping(false);
     }

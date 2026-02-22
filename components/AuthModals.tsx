@@ -94,7 +94,7 @@ export function AuthModals({
       const supabase = createClient();
       await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: window.location.origin },
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
       });
     } catch (err: any) {
       alert(err.message || 'Google auth failed');

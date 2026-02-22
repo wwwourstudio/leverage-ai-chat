@@ -2,7 +2,7 @@
 
 import {
   TrendingUp, Vote, Trophy, CloudRain, TrendingDown,
-  Cpu, Film, Globe, BarChart3, Clock, Layers, ChevronRight,
+  Cpu, Film, Globe, BarChart3, Clock, ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -19,84 +19,17 @@ interface KalshiCardProps {
   error?: string;
 }
 
-// Category → icon mapping
 function CategoryIcon({ label, className }: { label?: string; className?: string }) {
-  const cls = cn('w-5 h-5', className);
+  const cls = cn('w-4 h-4', className);
   switch (label) {
-    case 'election': return <Vote className={cls} />;
-    case 'sports':   return <Trophy className={cls} />;
-    case 'weather':  return <CloudRain className={cls} />;
-    case 'finance':  return <TrendingDown className={cls} />;
-    case 'tech':     return <Cpu className={cls} />;
+    case 'election':      return <Vote className={cls} />;
+    case 'sports':        return <Trophy className={cls} />;
+    case 'weather':       return <CloudRain className={cls} />;
+    case 'finance':       return <TrendingDown className={cls} />;
+    case 'tech':          return <Cpu className={cls} />;
     case 'entertainment': return <Film className={cls} />;
-    default:         return <Globe className={cls} />;
+    default:              return <Globe className={cls} />;
   }
-}
-
-// YES/NO probability gauge bar
-function ProbabilityGauge({ yesPct, noPct }: { yesPct: number; noPct: number }) {
-  const yes = Math.max(0, Math.min(100, yesPct));
-  const no  = Math.max(0, Math.min(100, noPct));
-
-  const yesColor =
-    yes >= 70 ? 'bg-emerald-500' :
-    yes >= 55 ? 'bg-green-500'   :
-    yes >= 45 ? 'bg-slate-500'   :
-    yes >= 30 ? 'bg-orange-500'  : 'bg-red-500';
-
-  return (
-    <div className="space-y-2">
-      {/* Label row */}
-      <div className="flex items-center justify-between text-xs font-bold">
-        <span className="text-emerald-400">YES  {yes}¢</span>
-        <span className="text-gray-500 text-[10px] font-normal">implied probability</span>
-        <span className="text-red-400">NO  {no}¢</span>
-      </div>
-
-      {/* Bicolor bar */}
-      <div className="relative h-3 rounded-full bg-gray-800 overflow-hidden">
-        <div
-          className={cn('absolute left-0 top-0 h-full rounded-l-full transition-all duration-700', yesColor)}
-          style={{ width: `${yes}%` }}
-        />
-        <div
-          className="absolute right-0 top-0 h-full bg-red-500/60 rounded-r-full transition-all duration-700"
-          style={{ width: `${no}%` }}
-        />
-        {/* 50% tick */}
-        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gray-600/80" />
-      </div>
-
-      {/* Pct labels */}
-      <div className="flex items-center justify-between">
-        <div className="text-center">
-          <div className={cn('text-lg font-black tabular-nums', yes >= 50 ? 'text-emerald-400' : 'text-gray-500')}>
-            {yes}%
-          </div>
-          <div className="text-[9px] text-gray-600 uppercase tracking-widest">Yes</div>
-        </div>
-        <div className="text-[9px] text-gray-700 text-center px-2">vs</div>
-        <div className="text-center">
-          <div className={cn('text-lg font-black tabular-nums', no >= 50 ? 'text-red-400' : 'text-gray-500')}>
-            {no}%
-          </div>
-          <div className="text-[9px] text-gray-600 uppercase tracking-widest">No</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Compact stat pill
-function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div className="flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-lg bg-gray-900/50 border border-gray-800/60">
-      <span className={cn('text-xs font-bold tabular-nums', accent ? 'text-white' : 'text-gray-300')}>
-        {value}
-      </span>
-      <span className="text-[9px] text-gray-600 uppercase tracking-wide">{label}</span>
-    </div>
-  );
 }
 
 export function KalshiCard({
@@ -107,152 +40,147 @@ export function KalshiCard({
   data,
   status,
   onAnalyze,
-  isLoading,
-  error,
 }: KalshiCardProps) {
-  const d = data as any;
-
-  // Numeric probability (from enhanced kalshiMarketToCard)
+  const d = data;
   const yesPct: number = typeof d.yesPct === 'number' ? d.yesPct : parseFloat(d.yesPrice) || 50;
-  const noPct: number  = typeof d.noPct  === 'number' ? d.noPct  : 100 - yesPct;
-  const edgeScore: number = typeof d.edgeScore === 'number' ? d.edgeScore : Math.round(Math.abs(yesPct - 50) * 2);
+  const noPct: number = typeof d.noPct === 'number' ? d.noPct : 100 - yesPct;
+  const isActive = status === 'active' || status === 'open' || status === 'live';
 
-  const edgeBadgeColor =
-    edgeScore >= 50 ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/25' :
-    edgeScore >= 25 ? 'bg-amber-500/20 text-amber-400 border-amber-500/25' :
-    'bg-gray-700/40 text-gray-500 border-gray-700/50';
-
-  const isActive = status === 'active' || status === 'open';
+  const yesBarColor =
+    yesPct >= 70 ? 'bg-emerald-500' :
+    yesPct >= 55 ? 'bg-green-500' :
+    yesPct >= 45 ? 'bg-[oklch(0.50_0.01_280)]' :
+    yesPct >= 30 ? 'bg-orange-500' : 'bg-red-500';
 
   return (
-    <article
-      className={cn(
-        'group relative rounded-2xl overflow-hidden border shadow-xl',
-        'bg-gradient-to-br from-gray-900/98 via-gray-900/98 to-gray-950/98',
-        'border-gray-700/40 hover:border-gray-500/60',
-        'transition-all duration-300 hover:shadow-2xl hover:shadow-gray-950/60',
-      )}
-    >
-      {/* Gradient accent top bar */}
-      <div className={cn('h-1 w-full bg-gradient-to-r', gradient)} />
+    <article className="group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.11_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200">
+      {/* Double-sided accent: top + bottom bars for market-style feel */}
+      <div className={cn('absolute left-0 top-0 right-0 h-px bg-gradient-to-r', gradient)} aria-hidden="true" />
+      <div className={cn('absolute left-0 bottom-0 right-0 h-px bg-gradient-to-r opacity-30', gradient)} aria-hidden="true" />
 
-      {/* Hover glow overlay */}
-      <div
-        className={cn('absolute inset-0 opacity-0 group-hover:opacity-[0.06] transition-opacity duration-700 bg-gradient-to-br pointer-events-none', gradient)}
-      />
-
-      <div className="relative p-5 space-y-4">
-        {/* ── Header ── */}
-        <div className="flex items-start gap-3">
-          {/* Category icon */}
-          <div className={cn('p-2.5 rounded-xl bg-gradient-to-br flex-shrink-0 shadow-lg', gradient)}>
-            <CategoryIcon label={d.iconLabel} className="text-white" />
+      <div className="px-4 py-4 sm:px-5 sm:py-5">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 mb-2.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <CategoryIcon label={d.iconLabel} className="text-[oklch(0.55_0.01_280)] shrink-0" />
+            <span className="text-[11px] font-black uppercase tracking-widest text-[oklch(0.55_0.01_280)]">KALSHI</span>
+            <span className="text-[oklch(0.3_0.01_280)]" aria-hidden="true">/</span>
+            <span className="text-[11px] font-medium text-[oklch(0.45_0.01_280)] truncate">{subcategory || category}</span>
           </div>
-
-          <div className="flex-1 min-w-0 space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">KALSHI</span>
-              <span className="text-gray-700">•</span>
-              <span className="text-[10px] text-gray-600 truncate">{subcategory || category}</span>
-            </div>
-            <h3 className="text-sm font-bold text-white leading-snug line-clamp-2" title={title}>
-              {title}
-            </h3>
-          </div>
-
-          {/* Status pill */}
-          <div className={cn(
-            'flex-shrink-0 px-2 py-0.5 rounded-full border text-[9px] font-bold uppercase tracking-wide',
-            isActive
-              ? 'bg-green-500/15 text-green-400 border-green-500/25'
-              : 'bg-gray-700/40 text-gray-500 border-gray-700/50'
-          )}>
-            {isActive ? 'LIVE' : 'CLOSED'}
+          <div className="flex items-center gap-1.5 shrink-0" role="status">
+            <span className={cn('w-1.5 h-1.5 rounded-full', isActive ? 'bg-emerald-400 animate-pulse' : 'bg-[oklch(0.40_0.01_280)]')} />
+            <span className={cn('text-[10px] font-bold uppercase tracking-wider', isActive ? 'text-emerald-400' : 'text-[oklch(0.45_0.01_280)]')}>
+              {isActive ? 'LIVE' : 'CLOSED'}
+            </span>
           </div>
         </div>
 
-        {/* ── Subtitle (question detail) ── */}
+        <h3 className="text-base sm:text-lg font-bold text-[oklch(0.95_0.005_85)] leading-snug text-balance mb-1">{title}</h3>
+
         {d.subtitle && d.subtitle !== title && (
-          <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">{d.subtitle}</p>
+          <p className="text-sm text-[oklch(0.50_0.01_280)] leading-relaxed mb-3 line-clamp-2">{d.subtitle}</p>
         )}
 
-        {/* ── Probability gauge ── */}
-        <ProbabilityGauge yesPct={yesPct} noPct={noPct} />
+        {/* Probability gauge - market-style */}
+        <div className="mt-3 rounded-xl bg-[oklch(0.09_0.01_280)] border border-[oklch(0.18_0.015_280)] p-3 space-y-3">
+          <div className="flex items-center justify-between text-[10px] font-semibold text-[oklch(0.45_0.01_280)] uppercase tracking-wider">
+            <span>Market Probability</span>
+            <span>implied</span>
+          </div>
 
-        {/* ── Stats row ── */}
-        <div className="flex items-center gap-2">
-          {d.volume     && <Stat label="Volume" value={d.volume} accent />}
-          {d.openInterest && <Stat label="OI" value={d.openInterest} />}
-          {d.expiresLabel && (
-            <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-gray-900/50 border border-gray-800/60 ml-auto flex-shrink-0">
-              <Clock className="w-3 h-3 text-gray-600" />
-              <span className="text-[10px] text-gray-500">{d.expiresLabel}</span>
+          <div className="flex items-center gap-3">
+            {/* Yes side */}
+            <div className="flex-1 text-center">
+              <div className={cn('text-2xl font-black tabular-nums leading-none', yesPct >= 50 ? 'text-[oklch(0.92_0.005_85)]' : 'text-[oklch(0.45_0.01_280)]')}>
+                {yesPct}<span className="text-sm">%</span>
+              </div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/80 mt-1">YES</div>
             </div>
-          )}
+
+            {/* Gauge bar */}
+            <div className="flex-[2] space-y-1">
+              <div className="relative h-3 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+                <div
+                  className={cn('absolute left-0 top-0 h-full rounded-l-full transition-all duration-700', yesBarColor)}
+                  style={{ width: `${yesPct}%` }}
+                />
+                <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[oklch(0.25_0.01_280)]" />
+              </div>
+              <div className="flex justify-between text-[8px] text-[oklch(0.30_0.01_280)] tabular-nums px-0.5">
+                <span>0</span>
+                <span>50</span>
+                <span>100</span>
+              </div>
+            </div>
+
+            {/* No side */}
+            <div className="flex-1 text-center">
+              <div className={cn('text-2xl font-black tabular-nums leading-none', noPct >= 50 ? 'text-[oklch(0.92_0.005_85)]' : 'text-[oklch(0.45_0.01_280)]')}>
+                {noPct}<span className="text-sm">%</span>
+              </div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-red-400/80 mt-1">NO</div>
+            </div>
+          </div>
         </div>
 
-        {/* ── Market depth indicator ── */}
-        {d.volumeTier && (
-          <div className="flex items-center gap-2">
-            <Layers className="w-3 h-3 text-gray-700" />
-            <span className="text-[10px] text-gray-600">
-              Liquidity: <span className="text-gray-500 font-semibold">{d.volumeTier}</span>
-            </span>
-            {edgeScore > 0 && (
-              <div className={cn('ml-auto px-2 py-0.5 rounded-md border text-[10px] font-bold', edgeBadgeColor)}>
-                {edgeScore}% Edge
-              </div>
+        {/* Stats row */}
+        {(d.volume || d.openInterest || d.expiresLabel) && (
+          <div className="flex flex-wrap items-center gap-2 mt-3 text-xs">
+            {d.volume && (
+              <span className="px-2 py-0.5 rounded-md bg-[oklch(0.16_0.02_280)] text-[11px] font-medium text-[oklch(0.60_0.01_280)]">
+                Vol: {d.volume}
+              </span>
+            )}
+            {d.openInterest && (
+              <span className="px-2 py-0.5 rounded-md bg-[oklch(0.16_0.02_280)] text-[11px] font-medium text-[oklch(0.60_0.01_280)]">
+                OI: {d.openInterest}
+              </span>
+            )}
+            {d.expiresLabel && (
+              <span className="inline-flex items-center gap-1 ml-auto text-[oklch(0.45_0.01_280)]">
+                <Clock className="w-3 h-3" aria-hidden="true" />
+                {d.expiresLabel}
+              </span>
             )}
           </div>
         )}
 
-        {/* ── Signal / recommendation ── */}
+        {/* Recommendation */}
         {d.recommendation && (
           <div className={cn(
-            'flex items-center gap-2 px-3 py-2 rounded-xl border',
+            'flex items-center gap-2 mt-3 px-3 py-2 rounded-xl border',
             yesPct >= 60 ? 'bg-emerald-500/10 border-emerald-500/20' :
             yesPct <= 40 ? 'bg-red-500/10 border-red-500/20' :
-            'bg-gray-800/40 border-gray-700/40',
+            'bg-[oklch(0.14_0.015_280)] border-[oklch(0.22_0.02_280)]',
           )}>
-            <BarChart3 className={cn(
-              'w-3.5 h-3.5 flex-shrink-0',
-              yesPct >= 60 ? 'text-emerald-400' :
-              yesPct <= 40 ? 'text-red-400' : 'text-gray-500'
+            <BarChart3 className={cn('w-3.5 h-3.5 shrink-0',
+              yesPct >= 60 ? 'text-emerald-400' : yesPct <= 40 ? 'text-red-400' : 'text-[oklch(0.50_0.01_280)]'
             )} />
-            <span className={cn(
-              'text-xs font-semibold',
-              yesPct >= 60 ? 'text-emerald-400' :
-              yesPct <= 40 ? 'text-red-400' : 'text-gray-500'
+            <span className={cn('text-xs font-semibold',
+              yesPct >= 60 ? 'text-emerald-400' : yesPct <= 40 ? 'text-red-400' : 'text-[oklch(0.60_0.01_280)]'
             )}>
               {d.recommendation}
             </span>
           </div>
         )}
 
-        {/* Ticker & close date small print */}
-        <div className="flex items-center justify-between text-[9px] text-gray-700">
-          {d.ticker && <span className="font-mono">{d.ticker}</span>}
-          {d.closeTime && <span>Closes {d.closeTime}</span>}
-        </div>
-
-        {/* ── Analyze button ── */}
-        {onAnalyze && (
-          <div className="pt-3 border-t border-gray-800/60">
-            <button
-              onClick={onAnalyze}
-              className={cn(
-                'w-full flex items-center justify-center gap-2 py-2.5 rounded-xl',
-                'text-xs font-bold text-gray-400 hover:text-white',
-                'bg-gray-800/40 hover:bg-gray-700/50 border border-gray-700/40 hover:border-gray-600/60',
-                'transition-all duration-200',
-                'focus:outline-none focus:ring-2 focus:ring-purple-500/40',
-              )}
-              aria-label="View analysis for this market"
-            >
-              <span>View Analysis</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+        {/* Footer */}
+        {(d.ticker || d.closeTime) && (
+          <div className="flex items-center justify-between mt-2 text-[9px] text-[oklch(0.35_0.01_280)]">
+            {d.ticker && <span className="font-mono">{d.ticker}</span>}
+            {d.closeTime && <span>Closes {d.closeTime}</span>}
           </div>
+        )}
+
+        {onAnalyze && (
+          <button
+            onClick={onAnalyze}
+            className="flex items-center justify-center gap-1.5 w-full mt-4 py-2.5 rounded-xl bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.015_280)] text-xs font-semibold text-[oklch(0.50_0.01_280)] hover:text-[oklch(0.85_0.005_85)] hover:bg-[oklch(0.14_0.01_280)] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={`Analyze ${title}`}
+          >
+            View Analysis
+            <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+          </button>
         )}
       </div>
     </article>

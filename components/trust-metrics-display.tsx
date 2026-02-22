@@ -58,29 +58,35 @@ const METRIC_DEFS: Array<{
 ];
 
 function scoreColor(v: number) {
-  if (v >= 80) return 'text-emerald-400';
-  if (v >= 60) return 'text-amber-400';
-  return 'text-red-400';
+  if (v >= 80) return 'text-[oklch(0.92_0.005_85)]';
+  if (v >= 60) return 'text-[oklch(0.70_0.005_85)]';
+  return 'text-[oklch(0.50_0.005_85)]';
 }
 
 function barFill(v: number) {
-  if (v >= 80) return 'bg-emerald-500';
-  if (v >= 60) return 'bg-amber-500';
-  return 'bg-red-500';
+  if (v >= 80) return 'bg-[oklch(0.85_0.005_85)]';
+  if (v >= 60) return 'bg-[oklch(0.55_0.005_85)]';
+  return 'bg-[oklch(0.35_0.005_85)]';
+}
+
+function scoreLabel(v: number) {
+  if (v >= 90) return 'Excellent';
+  if (v >= 80) return 'Strong';
+  if (v >= 60) return 'Fair';
+  return 'Weak';
 }
 
 export function TrustMetricsDisplay({ metrics, compact = false, showDetails = true }: TrustMetricsDisplayProps) {
   if (compact) {
-    const TrustIcon = metrics.trustLevel === 'high' ? CheckCircle2 : metrics.trustLevel === 'medium' ? Info : AlertTriangle;
     return (
       <div className="flex items-center gap-3 text-sm">
         <div className={`flex items-center gap-1.5 ${scoreColor(metrics.finalConfidence)}`}>
-          <TrustIcon className="w-4 h-4" />
+          <Shield className="w-4 h-4" />
           <span className="font-medium capitalize">{metrics.trustLevel} Trust</span>
         </div>
-        <div className="flex items-center gap-1.5 text-slate-400">
+        <div className="flex items-center gap-1.5 text-[oklch(0.50_0.005_85)]">
           <Activity className="w-4 h-4" />
-          <span>{metrics.finalConfidence}% Confidence</span>
+          <span className="tabular-nums">{metrics.finalConfidence}%</span>
         </div>
       </div>
     );
@@ -88,55 +94,59 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
 
   const riskStyle =
     metrics.riskLevel === 'low'
-      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25'
+      ? 'bg-[oklch(0.18_0.005_85)] text-[oklch(0.80_0.005_85)] border-[oklch(0.25_0.005_85)]'
       : metrics.riskLevel === 'medium'
-      ? 'bg-amber-500/15 text-amber-400 border-amber-500/25'
-      : 'bg-red-500/15 text-red-400 border-red-500/25';
+      ? 'bg-[oklch(0.15_0.005_85)] text-[oklch(0.65_0.005_85)] border-[oklch(0.22_0.005_85)]'
+      : 'bg-[oklch(0.12_0.005_85)] text-[oklch(0.50_0.005_85)] border-[oklch(0.20_0.005_85)]';
 
   return (
     <div className="space-y-2.5">
-      {/* Composite integrity bar */}
-      <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-900/50 border border-gray-800/60">
+      {/* Composite integrity score */}
+      <div className="flex items-center gap-4 px-4 py-3 rounded-xl bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.015_280)]">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Integrity Score</span>
-            <span className={`text-[13px] font-black tabular-nums ${scoreColor(metrics.finalConfidence)}`}>
-              {metrics.finalConfidence}%
-            </span>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-bold text-[oklch(0.45_0.01_280)] uppercase tracking-widest">Integrity Score</span>
+            <div className="flex items-baseline gap-1.5">
+              <span className={`text-xl font-black tabular-nums ${scoreColor(metrics.finalConfidence)}`}>
+                {metrics.finalConfidence}%
+              </span>
+              <span className="text-[10px] text-[oklch(0.40_0.01_280)]">{scoreLabel(metrics.finalConfidence)}</span>
+            </div>
           </div>
-          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+          <div className="h-1 bg-[oklch(0.16_0.01_280)] rounded-full overflow-hidden">
             <div
               className={`h-full ${barFill(metrics.finalConfidence)} transition-all duration-700 rounded-full`}
               style={{ width: `${metrics.finalConfidence}%` }}
             />
           </div>
         </div>
-        <div className={`shrink-0 px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wide ${riskStyle}`}>
-          {metrics.riskLevel} risk
+        <div className={`shrink-0 px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wide ${riskStyle}`}>
+          {metrics.riskLevel}
         </div>
       </div>
 
-      {/* Per-metric rows with mini progress bars */}
+      {/* Per-metric rows */}
       {showDetails && (
-        <div className="space-y-1.5">
+        <div className="grid grid-cols-2 gap-2">
           {METRIC_DEFS.map(({ key, label, icon: Icon, description }) => {
             const val = metrics[key];
             return (
               <div
                 key={key}
-                className="px-2.5 py-2 rounded-lg bg-gray-900/30 border border-gray-800/40"
+                className="px-3 py-2.5 rounded-xl bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)]"
                 title={description}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1.5">
-                    <Icon className="w-3 h-3 text-gray-600" />
-                    <span className="text-[10px] text-gray-500 font-semibold">{label}</span>
-                  </div>
-                  <span className={`text-[11px] font-bold tabular-nums ${scoreColor(val)}`}>{val}%</span>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Icon className="w-3 h-3 text-[oklch(0.40_0.01_280)]" />
+                  <span className="text-[10px] text-[oklch(0.45_0.01_280)] font-semibold">{label}</span>
                 </div>
-                <div className="h-[3px] bg-gray-800 rounded-full overflow-hidden">
+                <div className="flex items-baseline gap-1.5 mb-1.5">
+                  <span className={`text-lg font-black tabular-nums ${scoreColor(val)}`}>{val}%</span>
+                  <span className="text-[9px] text-[oklch(0.40_0.01_280)]">{scoreLabel(val)}</span>
+                </div>
+                <div className="h-[3px] bg-[oklch(0.16_0.01_280)] rounded-full overflow-hidden">
                   <div
-                    className={`h-full ${barFill(val)} transition-all duration-500`}
+                    className={`h-full ${barFill(val)} transition-all duration-500 rounded-full`}
                     style={{ width: `${val}%` }}
                   />
                 </div>
@@ -156,7 +166,7 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
       {/* Flags */}
       {metrics.flags && metrics.flags.length > 0 && (
         <div className="space-y-1.5">
-          <div className="text-[10px] font-bold text-gray-600 uppercase tracking-wide">
+          <div className="text-[10px] font-bold text-[oklch(0.40_0.01_280)] uppercase tracking-wide">
             {metrics.flags.length} issue{metrics.flags.length !== 1 ? 's' : ''} flagged
           </div>
           {metrics.flags.map((flag, i) => (
@@ -164,16 +174,16 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
               key={i}
               className={`flex items-start gap-2 px-2.5 py-1.5 rounded-lg border text-[10px] ${
                 flag.severity === 'error'
-                  ? 'bg-red-600/10 border-red-600/20 text-red-400'
+                  ? 'bg-[oklch(0.12_0.01_280)] border-[oklch(0.22_0.01_280)] text-[oklch(0.60_0.005_85)]'
                   : flag.severity === 'warning'
-                  ? 'bg-amber-600/10 border-amber-600/20 text-amber-400'
-                  : 'bg-blue-600/10 border-blue-600/20 text-blue-400'
+                  ? 'bg-[oklch(0.12_0.01_280)] border-[oklch(0.20_0.01_280)] text-[oklch(0.55_0.005_85)]'
+                  : 'bg-[oklch(0.12_0.01_280)] border-[oklch(0.20_0.01_280)] text-[oklch(0.50_0.005_85)]'
               }`}
             >
               <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
               <div>
                 <div className="font-bold capitalize">{flag.type}</div>
-                <div className="text-gray-500 mt-0.5">{flag.message}</div>
+                <div className="text-[oklch(0.40_0.01_280)] mt-0.5">{flag.message}</div>
               </div>
             </div>
           ))}
@@ -181,9 +191,9 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
       )}
 
       {/* Attribution */}
-      <div className="flex items-center gap-1.5 pt-2 border-t border-gray-800/60">
-        <Shield className="w-3 h-3 text-gray-700" />
-        <span className="text-[10px] text-gray-700">
+      <div className="flex items-center gap-1.5 pt-2 border-t border-[oklch(0.18_0.01_280)]">
+        <Shield className="w-3 h-3 text-[oklch(0.30_0.01_280)]" />
+        <span className="text-[10px] text-[oklch(0.35_0.01_280)]">
           Validated by Grok AI · Live odds data · Benford&apos;s Law analysis
         </span>
       </div>
@@ -192,18 +202,18 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
 }
 
 export function TrustMetricsBadge({ metrics }: { metrics: TrustMetrics }) {
-  const colors: Record<string, string> = {
-    high: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    medium: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-    low: 'bg-red-500/20 text-red-400 border-red-500/30',
+  const intensity: Record<string, string> = {
+    high: 'bg-[oklch(0.16_0.005_85)] text-[oklch(0.85_0.005_85)] border-[oklch(0.25_0.005_85)]',
+    medium: 'bg-[oklch(0.14_0.005_85)] text-[oklch(0.65_0.005_85)] border-[oklch(0.22_0.005_85)]',
+    low: 'bg-[oklch(0.12_0.005_85)] text-[oklch(0.50_0.005_85)] border-[oklch(0.20_0.005_85)]',
   };
 
   return (
-    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium ${colors[metrics.trustLevel] ?? 'bg-slate-500/20 text-slate-400 border-slate-500/30'}`}>
+    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium ${intensity[metrics.trustLevel] ?? intensity.medium}`}>
       <Shield className="w-3 h-3" />
       <span>{metrics.trustLevel.toUpperCase()}</span>
-      <span className="opacity-60">•</span>
-      <span>{metrics.finalConfidence}%</span>
+      <span className="opacity-40">|</span>
+      <span className="tabular-nums">{metrics.finalConfidence}%</span>
     </div>
   );
 }

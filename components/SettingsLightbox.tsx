@@ -83,36 +83,39 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
         return;
       }
 
-      // Load profile
+      // Load profile from user_profiles
       const { data: profileData } = await supabase
-        .from('profiles')
+        .from('user_profiles')
         .select('*')
-        .eq('auth_id', session.user.id)
+        .eq('user_id', session.user.id)
         .single();
 
       if (profileData) {
         setProfile(profileData);
-        setFullName(profileData.full_name || '');
-        if (profileData.notification_preferences) {
-          setNotificationPrefs(profileData.notification_preferences);
-        }
+        setFullName(profileData.display_name || '');
       }
 
-      // Load settings
-      const { data: settingsData } = await supabase
-        .from('user_settings')
+      // Load preferences from user_preferences
+      const { data: prefsData } = await supabase
+        .from('user_preferences')
         .select('*')
-        .eq('user_id', profileData?.id)
+        .eq('user_id', session.user.id)
         .single();
 
-      if (settingsData) {
+      if (prefsData) {
+        if (prefsData.email_notifications !== undefined || prefsData.push_notifications !== undefined) {
+          setNotificationPrefs({
+            email_notifications: prefsData.email_notifications ?? true,
+            push_notifications: prefsData.push_notifications ?? false,
+          });
+        }
         setSettings({
-          preferred_books: settingsData.preferred_books || [],
-          preferred_sports: settingsData.preferred_sports || ['NBA', 'NFL'],
-          bankroll: settingsData.bankroll || 0,
-          risk_tolerance: settingsData.risk_tolerance || 'medium',
-          notifications_enabled: settingsData.notifications_enabled ?? true,
-          dark_mode: settingsData.dark_mode ?? true,
+          preferred_books: [],
+          preferred_sports: prefsData.tracked_sports || ['NBA', 'NFL'],
+          bankroll: 0,
+          risk_tolerance: 'medium',
+          notifications_enabled: prefsData.email_notifications ?? true,
+          dark_mode: prefsData.theme === 'dark',
         });
       }
     } catch (err) {
@@ -143,10 +146,9 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
 
       // Authenticated: persist to Supabase
       const { error: profileError } = await supabase
-        .from('profiles')
+        .from('user_profiles')
         .update({
-          full_name: fullName,
-          notification_preferences: notificationPrefs,
+          display_name: fullName,
           updated_at: new Date().toISOString(),
         })
         .eq('id', profile.id);
@@ -154,16 +156,13 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
       if (profileError) throw profileError;
 
       const { error: settingsError } = await supabase
-        .from('user_settings')
+        .from('user_preferences')
         .upsert({
-          id: profile.id,
-          user_id: profile.id,
-          preferred_books: settings.preferred_books,
-          preferred_sports: settings.preferred_sports,
-          bankroll: settings.bankroll,
-          risk_tolerance: settings.risk_tolerance,
-          notifications_enabled: settings.notifications_enabled,
-          dark_mode: settings.dark_mode,
+          user_id: profile.user_id || session.user.id,
+          tracked_sports: settings.preferred_sports,
+          email_notifications: settings.notifications_enabled,
+          theme: settings.dark_mode ? 'dark' : 'light',
+          default_sport: settings.preferred_sports?.[0] || 'NBA',
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' });
 

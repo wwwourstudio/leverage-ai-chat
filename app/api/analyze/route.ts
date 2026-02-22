@@ -9,7 +9,7 @@ import {
   HTTP_STATUS,
   ERROR_MESSAGES,
 } from '@/lib/constants';
-import type { InsightCard } from '@/lib/cards-generator';
+import { generateContextualCards, type InsightCard } from '@/lib/cards-generator';
 import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-detector';
 
 // ============================================================================
@@ -189,12 +189,26 @@ export async function POST(request: NextRequest) {
       usedFallback = true;
     }
 
-    // Cards are generated server-side during SSR (page.tsx) and passed from
-    // the client. This avoids redundant API calls that would collide with
-    // the SSR fetch for rate limits. The client sends its available cards
-    // (from the welcome message or previous responses) in `existingCards`.
-    const cards: InsightCard[] = Array.isArray(existingCards) ? existingCards.slice(0, 6) : [];
-    console.log(`[API/analyze] Using ${cards.length} cards passed from client`);
+    // Generate cards on-demand for betting/sports queries.
+    // If the client already has relevant cards, use those to avoid duplicate API calls.
+    let cards: InsightCard[] = [];
+    const hasExistingCards = Array.isArray(existingCards) && existingCards.length > 0;
+
+    if (hasExistingCards) {
+      cards = existingCards;
+    } else if (!usedFallback && (context.isSportsQuery || context.hasBettingIntent)) {
+      try {
+        const sportKey = context.sport || undefined;
+        const cardPromise = generateContextualCards('betting', sportKey, 6);
+        const timeoutPromise = new Promise<InsightCard[]>((resolve) =>
+          setTimeout(() => resolve([]), 6000)
+        );
+        cards = await Promise.race([cardPromise, timeoutPromise]);
+      } catch (err) {
+        console.error('[API/analyze] Card generation failed:', err);
+      }
+    }
+    console.log(`[API/analyze] Returning ${cards.length} cards`);
 
     const processingTime = Date.now() - startTime;
 

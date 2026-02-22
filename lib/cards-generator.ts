@@ -27,7 +27,7 @@ const CARD_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
 let cachedCards: CachedCards | null = null;
 
 /** Retrieve cached cards if still fresh, filtered by category/sport */
-export function getCachedCards(category?: string, sport?: string, count: number = 3): InsightCard[] | null {
+export function getCachedCards(category?: string, sport?: string, count: number = 6): InsightCard[] | null {
   if (!cachedCards) return null;
   if (Date.now() - cachedCards.timestamp > CARD_CACHE_TTL) {
     cachedCards = null;

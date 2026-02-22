@@ -38,9 +38,9 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         await supabase
-          .from('profiles')
-          .update({ custom_instructions: instructions, updated_at: new Date().toISOString() })
-          .eq('auth_id', session.user.id);
+          .from('user_profiles')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('user_id', session.user.id);
       }
     } catch {
       // localStorage is the primary store — Supabase save is best-effort

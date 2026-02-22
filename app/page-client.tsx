@@ -2398,20 +2398,6 @@ No preamble. Start directly with section 1.`;
                                     </p>
                                   </div>
                                 </div>
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-3 mb-2">
-                                      <h2 className="text-xl font-black text-white">{card.title}</h2>
-                                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide ${
-                                        card.status === 'hot' || card.status === 'elite' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                                        card.status === 'strong' || card.status === 'optimal' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
-                                        'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                                      }`}>{card.status}</span>
-                                    </div>
-                                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">
-                                      {card.category} �� {card.subcategory}
-                                    </p>
-                                  </div>
-                                </div>
 
                                 {/* Overview */}
                                 <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-4">

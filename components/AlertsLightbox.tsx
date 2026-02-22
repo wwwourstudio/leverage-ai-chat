@@ -11,6 +11,7 @@ interface AlertsLightboxProps {
 
 interface UserAlert {
   id: string;
+  user_id: string;
   alert_type: string;
   sport: string | null;
   team: string | null;
@@ -18,14 +19,13 @@ interface UserAlert {
   condition: Record<string, any>;
   threshold: number | null;
   is_active: boolean;
-  is_triggered: boolean;
-  triggered_at: string | null;
   trigger_count: number;
   max_triggers: number;
-  expires_at: string | null;
+  last_triggered_at: string | null;
   title: string;
   description: string | null;
   created_at: string;
+  updated_at: string | null;
 }
 
 const ALERT_TYPES = [
@@ -44,7 +44,7 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [profileId, setProfileId] = useState<string | null>(null);
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
 
   // New alert form state
   const [newAlert, setNewAlert] = useState({
@@ -72,26 +72,21 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
         return;
       }
 
-      // Get profile ID from user_profiles
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('id')
+      setAuthUserId(session.user.id);
+
+      // Load alerts from user_alerts table (RLS uses auth.uid())
+      const { data: alertsData, error: alertsError } = await supabase
+        .from('user_alerts')
+        .select('*')
         .eq('user_id', session.user.id)
-        .single();
+        .order('created_at', { ascending: false })
+        .limit(20);
 
-      if (profile) {
-        setProfileId(profile.id);
-
-        // user_predictions serves as an activity/alerts feed
-        const { data: alertsData } = await supabase
-          .from('user_predictions')
-          .select('*')
-          .eq('user_id', profile.id)
-          .order('created_at', { ascending: false })
-          .limit(20);
-
-        setAlerts(alertsData || []);
+      if (alertsError) {
+        console.error('[Alerts] Failed to load alerts:', alertsError);
       }
+
+      setAlerts(alertsData || []);
     } catch (err) {
       console.error('[Alerts] Failed to load:', err);
     }
@@ -99,14 +94,14 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
   };
 
   const handleCreateAlert = async () => {
-    if (!profileId || !newAlert.title) return;
+    if (!authUserId || !newAlert.title) return;
     setSaving(true);
     try {
       const supabase = createClient();
       const { error } = await supabase
         .from('user_alerts')
         .insert({
-          user_id: profileId,
+          user_id: authUserId,
           alert_type: newAlert.alert_type,
           sport: newAlert.sport || null,
           team: newAlert.team || null,
@@ -119,7 +114,9 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
           is_active: true,
         });
 
-      if (!error) {
+      if (error) {
+        console.error('[Alerts] Failed to create alert:', error);
+      } else {
         setShowCreateForm(false);
         setNewAlert({
           alert_type: 'odds_change',
@@ -342,7 +339,7 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
                       {alert.sport && (
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-800 text-gray-400">{alert.sport}</span>
                       )}
-                      {alert.is_triggered && (
+                      {alert.trigger_count > 0 && (
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-500/20 text-green-400">Triggered</span>
                       )}
                     </div>

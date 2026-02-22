@@ -42,14 +42,19 @@ export function FantasyCard({
   ].filter(Boolean) as { label: string; value: string }[];
 
   return (
-    <article className="group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200">
+    <article className="group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.12_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200">
+      {/* Left accent bar with gradient */}
       <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)} aria-hidden="true" />
+      {/* Subtle top-right glow */}
+      <div className="absolute right-0 top-0 w-24 h-24 rounded-full bg-[oklch(0.20_0.02_280)] blur-3xl opacity-20" aria-hidden="true" />
 
-      <div className="pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5">
+      <div className="pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5 relative">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 mb-2.5">
           <div className="flex items-center gap-2 min-w-0">
-            <Trophy className="w-4 h-4 text-[oklch(0.55_0.01_280)] shrink-0" aria-hidden="true" />
+            <div className="w-5 h-5 rounded-full bg-[oklch(0.18_0.02_280)] flex items-center justify-center shrink-0">
+              <Trophy className="w-3 h-3 text-[oklch(0.60_0.01_280)]" aria-hidden="true" />
+            </div>
             <span className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.55_0.01_280)]">{category}</span>
             <span className="text-[oklch(0.3_0.01_280)]" aria-hidden="true">/</span>
             <span className="text-[11px] font-medium text-[oklch(0.45_0.01_280)] truncate">{subcategory}</span>
@@ -66,17 +71,15 @@ export function FantasyCard({
           <p className="text-sm text-[oklch(0.55_0.01_280)] leading-relaxed mb-3">{focus || description}</p>
         )}
 
-        {/* Stats */}
+        {/* Stats - horizontal row */}
         {statItems.length > 0 && (
-          <div className="mt-3 rounded-xl bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.015_280)] overflow-hidden">
-            <div className={cn('grid divide-x divide-[oklch(0.20_0.015_280)]', statItems.length <= 2 ? 'grid-cols-2' : 'grid-cols-3')}>
-              {statItems.map(s => (
-                <div key={s.label} className="flex flex-col items-center justify-center gap-0.5 px-2 py-3 text-center min-w-0">
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-[oklch(0.45_0.01_280)]">{s.label}</span>
-                  <span className="text-base font-bold tabular-nums text-[oklch(0.92_0.005_85)]">{String(s.value)}</span>
-                </div>
-              ))}
-            </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {statItems.map(s => (
+              <div key={s.label} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)]">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[oklch(0.45_0.01_280)]">{s.label}</span>
+                <span className="text-sm font-black tabular-nums text-[oklch(0.92_0.005_85)]">{String(s.value)}</span>
+              </div>
+            ))}
           </div>
         )}
 
@@ -126,7 +129,7 @@ export function FantasyCard({
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[oklch(0.20_0.015_280)] text-xs font-semibold text-[oklch(0.50_0.01_280)] hover:text-[oklch(0.85_0.005_85)] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-1.5 w-full mt-4 py-2.5 rounded-xl bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.015_280)] text-xs font-semibold text-[oklch(0.50_0.01_280)] hover:text-[oklch(0.85_0.005_85)] hover:bg-[oklch(0.14_0.01_280)] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label={`Analyze ${title}`}
           >
             View Full Analysis

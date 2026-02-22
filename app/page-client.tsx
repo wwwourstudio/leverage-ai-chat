@@ -2382,12 +2382,22 @@ No preamble. Start directly with section 1.`;
                             const CardIcon = getCardIcon(card.type);
                             
                             return (
-                              <div className="space-y-6">
+                              <div className="space-y-5">
                                 {/* Header Section */}
-                                <div className="flex items-start gap-4">
-                                  <div className={`p-3 rounded-xl bg-gradient-to-br ${card.gradient} shadow-lg flex-shrink-0`}>
-                                    <CardIcon className="w-6 h-6 text-white" />
+                                <div className="flex items-start gap-3">
+                                  <div className="p-2.5 rounded-xl bg-[oklch(0.16_0.02_280)] flex-shrink-0">
+                                    <CardIcon className="w-5 h-5 text-[oklch(0.70_0.005_85)]" />
                                   </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <h2 className="text-lg font-black text-[oklch(0.95_0.005_85)] truncate">{card.title}</h2>
+                                      <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wide bg-[oklch(0.16_0.02_280)] text-[oklch(0.70_0.005_85)] border border-[oklch(0.22_0.02_280)]">{card.status}</span>
+                                    </div>
+                                    <p className="text-[11px] text-[oklch(0.45_0.01_280)] font-semibold uppercase tracking-wide">
+                                      {card.category} / {card.subcategory}
+                                    </p>
+                                  </div>
+                                </div>
                                   <div className="flex-1">
                                     <div className="flex items-center gap-3 mb-2">
                                       <h2 className="text-xl font-black text-white">{card.title}</h2>
@@ -2404,84 +2414,84 @@ No preamble. Start directly with section 1.`;
                                 </div>
 
                                 {/* Overview */}
-                                <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 border border-gray-700/50 rounded-xl p-4">
-                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-2">
-                                    <Info className="w-3.5 h-3.5" />
+                                <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-4">
+                                  <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-2 flex items-center gap-2">
+                                    <Info className="w-3 h-3" />
                                     Overview
                                   </h3>
-                                  <p className="text-sm text-gray-200 leading-relaxed">{overview}</p>
+                                  <p className="text-sm text-[oklch(0.80_0.005_85)] leading-relaxed">{overview}</p>
                                 </div>
 
                                 {/* Key Metrics Grid */}
                                 <div>
-                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <BarChart className="w-3.5 h-3.5" />
+                                  <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <BarChart className="w-3 h-3" />
                                     Key Metrics
                                   </h3>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  <div className="grid grid-cols-2 gap-2">
                                     {metrics.map((metric: { label: string; value: string }, idx: number) => (
                                       <div 
                                         key={idx}
-                                        className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 rounded-xl p-3.5 hover:border-gray-600/50 transition-colors"
+                                        className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-3 hover:border-[oklch(0.25_0.02_280)] transition-colors"
                                       >
-                                        <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">{metric.label}</div>
-                                        <div className="text-base font-black text-white">{metric.value}</div>
+                                        <div className="text-[9px] font-bold text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-1">{metric.label}</div>
+                                        <div className="text-base font-black text-[oklch(0.92_0.005_85)]">{metric.value}</div>
                                       </div>
                                     ))}
                                   </div>
                                 </div>
 
                                 {/* Market Context */}
-                                <div className="bg-gradient-to-br from-blue-900/20 to-indigo-900/20 border border-blue-700/30 rounded-xl p-4">
-                                  <h3 className="text-xs font-black text-blue-400 uppercase tracking-wide mb-2 flex items-center gap-2">
-                                    <TrendingUp className="w-3.5 h-3.5" />
+                                <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-4">
+                                  <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-2 flex items-center gap-2">
+                                    <TrendingUp className="w-3 h-3" />
                                     Market Context & Edge
                                   </h3>
-                                  <p className="text-sm text-gray-200 leading-relaxed">{marketContext}</p>
+                                  <p className="text-sm text-[oklch(0.80_0.005_85)] leading-relaxed">{marketContext}</p>
                                 </div>
 
                                 {/* Risk Assessment */}
                                 <div>
-                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <Shield className="w-3.5 h-3.5" />
+                                  <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <Shield className="w-3 h-3" />
                                     Risk Assessment
                                   </h3>
-                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-700/30 rounded-xl p-4">
-                                      <div className="text-[10px] font-bold text-green-500 uppercase tracking-wide mb-1.5">Conviction Level</div>
-                                      <div className="text-lg font-black text-green-400">{riskAssessment.convictionLevel}</div>
+                                  <div className="grid grid-cols-3 gap-2">
+                                    <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-3">
+                                      <div className="text-[9px] font-bold text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-1">Conviction</div>
+                                      <div className="text-lg font-black text-[oklch(0.92_0.005_85)]">{riskAssessment.convictionLevel}</div>
                                     </div>
-                                    <div className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border border-yellow-700/30 rounded-xl p-4">
-                                      <div className="text-[10px] font-bold text-yellow-500 uppercase tracking-wide mb-1.5">Risk Category</div>
-                                      <div className="text-sm font-black text-yellow-400">{riskAssessment.riskCategory}</div>
+                                    <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-3">
+                                      <div className="text-[9px] font-bold text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-1">Risk</div>
+                                      <div className="text-sm font-black text-[oklch(0.85_0.005_85)]">{riskAssessment.riskCategory}</div>
                                     </div>
-                                    <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-700/30 rounded-xl p-4">
-                                      <div className="text-[10px] font-bold text-purple-500 uppercase tracking-wide mb-1.5">Position Sizing</div>
-                                      <div className="text-lg font-black text-purple-400">{riskAssessment.positionSize}</div>
-                                      <div className="text-[10px] text-gray-500 mt-1">of bankroll</div>
+                                    <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-3">
+                                      <div className="text-[9px] font-bold text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-1">Position</div>
+                                      <div className="text-lg font-black text-[oklch(0.92_0.005_85)]">{riskAssessment.positionSize}</div>
+                                      <div className="text-[9px] text-[oklch(0.35_0.01_280)] mt-0.5">of bankroll</div>
                                     </div>
                                   </div>
                                 </div>
 
                                 {/* Strategic Recommendations */}
                                 <div>
-                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <Target className="w-3.5 h-3.5" />
+                                  <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <Target className="w-3 h-3" />
                                     Strategic Recommendations
                                   </h3>
-                                  <div className="space-y-2.5">
+                                  <div className="space-y-2">
                                     {recommendations.map((rec: { label: string; value: string }, idx: number) => (
                                       <div 
                                         key={idx}
-                                        className="bg-gradient-to-r from-gray-800/40 to-gray-900/40 border border-gray-700/50 rounded-xl p-4 hover:border-gray-600/50 transition-colors"
+                                        className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-3.5 hover:border-[oklch(0.25_0.02_280)] transition-colors"
                                       >
                                         <div className="flex items-start gap-3">
-                                          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                            <span className="text-white text-xs font-black">{idx + 1}</span>
+                                          <div className="w-5 h-5 rounded-md bg-[oklch(0.18_0.02_280)] flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            <span className="text-[oklch(0.70_0.005_85)] text-[10px] font-black">{idx + 1}</span>
                                           </div>
-                                          <div className="flex-1">
-                                            <div className="text-xs font-black text-gray-300 mb-1">{rec.label}</div>
-                                            <div className="text-sm text-gray-400 leading-relaxed">{rec.value}</div>
+                                          <div className="flex-1 min-w-0">
+                                            <div className="text-xs font-black text-[oklch(0.80_0.005_85)] mb-0.5">{rec.label}</div>
+                                            <div className="text-sm text-[oklch(0.55_0.01_280)] leading-relaxed">{rec.value}</div>
                                           </div>
                                         </div>
                                       </div>
@@ -2490,10 +2500,10 @@ No preamble. Start directly with section 1.`;
                                 </div>
 
                                 {/* Next Steps CTA */}
-                                <div className="bg-gradient-to-r from-indigo-900/30 via-purple-900/30 to-pink-900/30 border border-indigo-600/30 rounded-xl p-5">
-                                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                                    <p className="text-sm text-gray-300 leading-relaxed">
-                                      <span className="font-bold text-white">Next Steps:</span> Would you like me to show correlated opportunities or dive deeper into any specific metric?
+                                <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.015_280)] rounded-xl p-4">
+                                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                    <p className="text-sm text-[oklch(0.60_0.01_280)] leading-relaxed">
+                                      <span className="font-bold text-[oklch(0.90_0.005_85)]">Next Steps:</span> Show correlated opportunities or dive deeper into any metric?
                                     </p>
                                     <button
                                       onClick={() => {
@@ -2501,7 +2511,7 @@ No preamble. Start directly with section 1.`;
                                         handleFollowUp('correlated', card);
                                       }}
                                       disabled={isTyping}
-                                      className="group relative flex items-center justify-center gap-2.5 px-8 py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-600 disabled:via-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-black text-base rounded-xl transition-all duration-300 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:shadow-xl hover:scale-105 active:scale-95 min-w-[140px] flex-shrink-0"
+                                      className="group relative flex items-center justify-center gap-2 px-6 py-3 bg-[oklch(0.20_0.02_280)] hover:bg-[oklch(0.25_0.02_280)] disabled:bg-[oklch(0.14_0.01_280)] disabled:cursor-not-allowed text-[oklch(0.92_0.005_85)] font-bold text-sm rounded-xl border border-[oklch(0.28_0.02_280)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] min-w-[120px] flex-shrink-0"
                                     >
                                       {isTyping ? (
                                         <>

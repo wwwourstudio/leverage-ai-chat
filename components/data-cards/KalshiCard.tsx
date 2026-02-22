@@ -53,15 +53,17 @@ export function KalshiCard({
     yesPct >= 30 ? 'bg-orange-500' : 'bg-red-500';
 
   return (
-    <article className="group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200">
-      <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)} aria-hidden="true" />
+    <article className="group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.11_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200">
+      {/* Double-sided accent: top + bottom bars for market-style feel */}
+      <div className={cn('absolute left-0 top-0 right-0 h-px bg-gradient-to-r', gradient)} aria-hidden="true" />
+      <div className={cn('absolute left-0 bottom-0 right-0 h-px bg-gradient-to-r opacity-30', gradient)} aria-hidden="true" />
 
-      <div className="pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5">
+      <div className="px-4 py-4 sm:px-5 sm:py-5">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 mb-2.5">
           <div className="flex items-center gap-2 min-w-0">
             <CategoryIcon label={d.iconLabel} className="text-[oklch(0.55_0.01_280)] shrink-0" />
-            <span className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.55_0.01_280)]">KALSHI</span>
+            <span className="text-[11px] font-black uppercase tracking-widest text-[oklch(0.55_0.01_280)]">KALSHI</span>
             <span className="text-[oklch(0.3_0.01_280)]" aria-hidden="true">/</span>
             <span className="text-[11px] font-medium text-[oklch(0.45_0.01_280)] truncate">{subcategory || category}</span>
           </div>
@@ -79,39 +81,44 @@ export function KalshiCard({
           <p className="text-sm text-[oklch(0.50_0.01_280)] leading-relaxed mb-3 line-clamp-2">{d.subtitle}</p>
         )}
 
-        {/* Probability gauge */}
-        <div className="mt-3 space-y-2">
-          <div className="flex items-center justify-between text-xs font-bold">
-            <span className="text-emerald-400">YES {yesPct}c</span>
-            <span className="text-[10px] font-normal text-[oklch(0.40_0.01_280)]">implied probability</span>
-            <span className="text-red-400">NO {noPct}c</span>
+        {/* Probability gauge - market-style */}
+        <div className="mt-3 rounded-xl bg-[oklch(0.09_0.01_280)] border border-[oklch(0.18_0.015_280)] p-3 space-y-3">
+          <div className="flex items-center justify-between text-[10px] font-semibold text-[oklch(0.45_0.01_280)] uppercase tracking-wider">
+            <span>Market Probability</span>
+            <span>implied</span>
           </div>
 
-          <div className="relative h-2.5 rounded-full bg-[oklch(0.10_0.01_280)] overflow-hidden">
-            <div
-              className={cn('absolute left-0 top-0 h-full rounded-l-full transition-all duration-700', yesBarColor)}
-              style={{ width: `${yesPct}%` }}
-            />
-            <div
-              className="absolute right-0 top-0 h-full bg-red-500/50 rounded-r-full transition-all duration-700"
-              style={{ width: `${noPct}%` }}
-            />
-            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[oklch(0.25_0.01_280)]" />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="text-center">
-              <div className={cn('text-lg font-black tabular-nums', yesPct >= 50 ? 'text-emerald-400' : 'text-[oklch(0.45_0.01_280)]')}>
-                {yesPct}%
+          <div className="flex items-center gap-3">
+            {/* Yes side */}
+            <div className="flex-1 text-center">
+              <div className={cn('text-2xl font-black tabular-nums leading-none', yesPct >= 50 ? 'text-[oklch(0.92_0.005_85)]' : 'text-[oklch(0.45_0.01_280)]')}>
+                {yesPct}<span className="text-sm">%</span>
               </div>
-              <div className="text-[9px] text-[oklch(0.40_0.01_280)] uppercase tracking-widest">Yes</div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/80 mt-1">YES</div>
             </div>
-            <div className="text-[9px] text-[oklch(0.30_0.01_280)] px-2">vs</div>
-            <div className="text-center">
-              <div className={cn('text-lg font-black tabular-nums', noPct >= 50 ? 'text-red-400' : 'text-[oklch(0.45_0.01_280)]')}>
-                {noPct}%
+
+            {/* Gauge bar */}
+            <div className="flex-[2] space-y-1">
+              <div className="relative h-3 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+                <div
+                  className={cn('absolute left-0 top-0 h-full rounded-l-full transition-all duration-700', yesBarColor)}
+                  style={{ width: `${yesPct}%` }}
+                />
+                <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[oklch(0.25_0.01_280)]" />
               </div>
-              <div className="text-[9px] text-[oklch(0.40_0.01_280)] uppercase tracking-widest">No</div>
+              <div className="flex justify-between text-[8px] text-[oklch(0.30_0.01_280)] tabular-nums px-0.5">
+                <span>0</span>
+                <span>50</span>
+                <span>100</span>
+              </div>
+            </div>
+
+            {/* No side */}
+            <div className="flex-1 text-center">
+              <div className={cn('text-2xl font-black tabular-nums leading-none', noPct >= 50 ? 'text-[oklch(0.92_0.005_85)]' : 'text-[oklch(0.45_0.01_280)]')}>
+                {noPct}<span className="text-sm">%</span>
+              </div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-red-400/80 mt-1">NO</div>
             </div>
           </div>
         </div>
@@ -168,7 +175,7 @@ export function KalshiCard({
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[oklch(0.20_0.015_280)] text-xs font-semibold text-[oklch(0.50_0.01_280)] hover:text-[oklch(0.85_0.005_85)] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-1.5 w-full mt-4 py-2.5 rounded-xl bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.015_280)] text-xs font-semibold text-[oklch(0.50_0.01_280)] hover:text-[oklch(0.85_0.005_85)] hover:bg-[oklch(0.14_0.01_280)] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label={`Analyze ${title}`}
           >
             View Analysis

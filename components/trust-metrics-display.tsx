@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Shield, AlertTriangle, CheckCircle2, TrendingUp, Activity, BarChart3, Info } from 'lucide-react';
+import { Shield, AlertTriangle, CheckCircle2, TrendingUp, Activity, BarChart3, Cpu, Database, Zap, Globe } from 'lucide-react';
 
 export interface TrustMetrics {
   benfordIntegrity: number;
@@ -10,13 +10,19 @@ export interface TrustMetrics {
   historicalAccuracy: number;
   finalConfidence: number;
   trustLevel: 'high' | 'medium' | 'low';
+  riskLevel: 'low' | 'medium' | 'high';
   flags?: Array<{
     type: string;
     message: string;
     severity: 'info' | 'warning' | 'error';
   }>;
-  riskLevel: 'low' | 'medium' | 'high';
   adjustedTone?: string;
+  // Optional enriched metadata forwarded from the message
+  modelUsed?: string;
+  sources?: Array<{ name: string; type: string; reliability: number }>;
+  processingTime?: number;
+  hasLiveOdds?: boolean;
+  hasKalshi?: boolean;
 }
 
 interface TrustMetricsDisplayProps {
@@ -25,128 +31,169 @@ interface TrustMetricsDisplayProps {
   showDetails?: boolean;
 }
 
-const METRIC_DEFS: Array<{
-  key: keyof Pick<TrustMetrics, 'benfordIntegrity' | 'oddsAlignment' | 'marketConsensus' | 'historicalAccuracy'>;
-  label: string;
-  icon: React.ElementType;
-  description: string;
-}> = [
+const METRIC_DEFS = [
   {
-    key: 'benfordIntegrity',
-    label: "Benford Integrity",
+    key: 'benfordIntegrity' as const,
+    label: 'Benford Integrity',
     icon: BarChart3,
-    description: "Benford's Law digit-distribution test — flags artificially generated or manipulated odds patterns",
+    description: "Benford's Law digit-distribution test — flags manipulated or hallucinated odds",
   },
   {
-    key: 'oddsAlignment',
+    key: 'oddsAlignment' as const,
     label: 'Odds Alignment',
     icon: TrendingUp,
-    description: 'Consistency of odds across multiple sportsbooks',
+    description: 'Cross-book odds consistency across multiple sportsbooks',
   },
   {
-    key: 'marketConsensus',
+    key: 'marketConsensus' as const,
     label: 'Market Consensus',
     icon: Activity,
-    description: 'Degree of agreement between bookmakers on the current line',
+    description: 'Agreement level between bookmakers on the current line',
   },
   {
-    key: 'historicalAccuracy',
+    key: 'historicalAccuracy' as const,
     label: 'Historical Accuracy',
     icon: CheckCircle2,
-    description: "Model's track record against prior similar predictions",
+    description: 'Grok 4 track record on prior similar predictions',
   },
 ];
 
 function scoreColor(v: number) {
-  if (v >= 80) return 'text-[oklch(0.92_0.005_85)]';
-  if (v >= 60) return 'text-[oklch(0.70_0.005_85)]';
-  return 'text-[oklch(0.50_0.005_85)]';
+  if (v >= 85) return 'text-emerald-400';
+  if (v >= 70) return 'text-blue-400';
+  if (v >= 55) return 'text-yellow-400';
+  return 'text-red-400';
 }
 
 function barFill(v: number) {
-  if (v >= 80) return 'bg-[oklch(0.85_0.005_85)]';
-  if (v >= 60) return 'bg-[oklch(0.55_0.005_85)]';
-  return 'bg-[oklch(0.35_0.005_85)]';
+  if (v >= 85) return 'bg-emerald-500';
+  if (v >= 70) return 'bg-blue-500';
+  if (v >= 55) return 'bg-yellow-500';
+  return 'bg-red-500';
 }
 
 function scoreLabel(v: number) {
-  if (v >= 90) return 'Excellent';
-  if (v >= 80) return 'Strong';
-  if (v >= 60) return 'Fair';
-  return 'Weak';
+  if (v >= 92) return 'Excellent';
+  if (v >= 82) return 'Strong';
+  if (v >= 68) return 'Fair';
+  if (v >= 50) return 'Weak';
+  return 'Low';
 }
+
+function trustBadgeStyle(level: 'high' | 'medium' | 'low') {
+  if (level === 'high') return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400';
+  if (level === 'medium') return 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400';
+  return 'bg-red-500/10 border-red-500/30 text-red-400';
+}
+
+function riskBadgeStyle(level: 'low' | 'medium' | 'high') {
+  if (level === 'low') return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+  if (level === 'medium') return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+  return 'bg-red-500/10 text-red-400 border-red-500/20';
+}
+
+function sourceIcon(type: string) {
+  switch (type) {
+    case 'model': return Cpu;
+    case 'database': return Database;
+    case 'api': return Globe;
+    default: return Zap;
+  }
+}
+
+// ─── Compact badge ────────────────────────────────────────────────────────────
+
+export function TrustMetricsBadge({ metrics }: { metrics: TrustMetrics }) {
+  return (
+    <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-semibold ${trustBadgeStyle(metrics.trustLevel)}`}>
+      <Shield className="w-3 h-3" />
+      <span>{metrics.trustLevel.toUpperCase()}</span>
+      <span className="opacity-40">·</span>
+      <span className="tabular-nums">{metrics.finalConfidence}%</span>
+    </div>
+  );
+}
+
+// ─── Full display ─────────────────────────────────────────────────────────────
 
 export function TrustMetricsDisplay({ metrics, compact = false, showDetails = true }: TrustMetricsDisplayProps) {
   if (compact) {
     return (
-      <div className="flex items-center gap-3 text-sm">
+      <div className="flex items-center gap-3 text-xs">
         <div className={`flex items-center gap-1.5 ${scoreColor(metrics.finalConfidence)}`}>
-          <Shield className="w-4 h-4" />
-          <span className="font-medium capitalize">{metrics.trustLevel} Trust</span>
+          <Shield className="w-3.5 h-3.5" />
+          <span className="font-semibold">{metrics.trustLevel.toUpperCase()} TRUST</span>
         </div>
-        <div className="flex items-center gap-1.5 text-[oklch(0.50_0.005_85)]">
-          <Activity className="w-4 h-4" />
-          <span className="tabular-nums">{metrics.finalConfidence}%</span>
-        </div>
+        <span className="text-gray-700">·</span>
+        <span className="tabular-nums text-gray-400">{metrics.finalConfidence}%</span>
+        {metrics.adjustedTone && (
+          <>
+            <span className="text-gray-700">·</span>
+            <span className="text-gray-500">{metrics.adjustedTone}</span>
+          </>
+        )}
       </div>
     );
   }
 
-  const riskStyle =
-    metrics.riskLevel === 'low'
-      ? 'bg-[oklch(0.18_0.005_85)] text-[oklch(0.80_0.005_85)] border-[oklch(0.25_0.005_85)]'
-      : metrics.riskLevel === 'medium'
-      ? 'bg-[oklch(0.15_0.005_85)] text-[oklch(0.65_0.005_85)] border-[oklch(0.22_0.005_85)]'
-      : 'bg-[oklch(0.12_0.005_85)] text-[oklch(0.50_0.005_85)] border-[oklch(0.20_0.005_85)]';
-
   return (
-    <div className="space-y-2.5">
-      {/* Composite integrity score */}
-      <div className="flex items-center gap-4 px-4 py-3 rounded-xl bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.015_280)]">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-[oklch(0.45_0.01_280)] uppercase tracking-widest">Integrity Score</span>
-            <div className="flex items-baseline gap-1.5">
-              <span className={`text-xl font-black tabular-nums ${scoreColor(metrics.finalConfidence)}`}>
+    <div className="space-y-3">
+      {/* ── Headline row: confidence + risk ─────────────────── */}
+      <div className="flex items-stretch gap-2">
+        <div className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-3.5 py-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5">
+              <Shield className={`w-3.5 h-3.5 ${scoreColor(metrics.finalConfidence)}`} />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Integrity Score</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className={`text-2xl font-black tabular-nums leading-none ${scoreColor(metrics.finalConfidence)}`}>
                 {metrics.finalConfidence}%
               </span>
-              <span className="text-[10px] text-[oklch(0.40_0.01_280)]">{scoreLabel(metrics.finalConfidence)}</span>
+              <span className={`text-[10px] font-semibold ${scoreColor(metrics.finalConfidence)}`}>
+                {scoreLabel(metrics.finalConfidence)}
+              </span>
             </div>
           </div>
-          <div className="h-1 bg-[oklch(0.16_0.01_280)] rounded-full overflow-hidden">
+          <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
             <div
-              className={`h-full ${barFill(metrics.finalConfidence)} transition-all duration-700 rounded-full`}
+              className={`h-full ${barFill(metrics.finalConfidence)} transition-all duration-500`}
               style={{ width: `${metrics.finalConfidence}%` }}
             />
           </div>
+          {metrics.adjustedTone && (
+            <p className="mt-1.5 text-[10px] text-gray-500 font-medium">{metrics.adjustedTone}</p>
+          )}
         </div>
-        <div className={`shrink-0 px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wide ${riskStyle}`}>
-          {metrics.riskLevel}
+
+        <div className={`flex-shrink-0 flex flex-col items-center justify-center px-3 rounded-xl border text-[10px] font-bold uppercase tracking-wider min-w-[56px] ${riskBadgeStyle(metrics.riskLevel)}`}>
+          <span className="text-[8px] opacity-60 mb-0.5">RISK</span>
+          <span>{metrics.riskLevel}</span>
         </div>
       </div>
 
-      {/* Per-metric rows */}
+      {/* ── 4 metric grid ────────────────────────────────────── */}
       {showDetails && (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-1.5">
           {METRIC_DEFS.map(({ key, label, icon: Icon, description }) => {
-            const val = metrics[key];
+            const val = metrics[key] as number;
             return (
               <div
                 key={key}
-                className="px-3 py-2.5 rounded-xl bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)]"
                 title={description}
+                className="bg-gray-950 border border-gray-800/70 rounded-xl px-3 py-2.5 hover:border-gray-700 transition-colors"
               >
                 <div className="flex items-center gap-1.5 mb-1.5">
-                  <Icon className="w-3 h-3 text-[oklch(0.40_0.01_280)]" />
-                  <span className="text-[10px] text-[oklch(0.45_0.01_280)] font-semibold">{label}</span>
+                  <Icon className={`w-3 h-3 ${scoreColor(val)}`} />
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">{label}</span>
                 </div>
-                <div className="flex items-baseline gap-1.5 mb-1.5">
-                  <span className={`text-lg font-black tabular-nums ${scoreColor(val)}`}>{val}%</span>
-                  <span className="text-[9px] text-[oklch(0.40_0.01_280)]">{scoreLabel(val)}</span>
+                <div className="flex items-baseline gap-1 mb-1.5">
+                  <span className={`text-lg font-black tabular-nums leading-none ${scoreColor(val)}`}>{val}%</span>
+                  <span className={`text-[9px] font-semibold ${scoreColor(val)}`}>{scoreLabel(val)}</span>
                 </div>
-                <div className="h-[3px] bg-[oklch(0.16_0.01_280)] rounded-full overflow-hidden">
+                <div className="h-[2px] bg-gray-800 rounded-full overflow-hidden">
                   <div
-                    className={`h-full ${barFill(val)} transition-all duration-500 rounded-full`}
+                    className={`h-full ${barFill(val)} transition-all duration-500`}
                     style={{ width: `${val}%` }}
                   />
                 </div>
@@ -156,64 +203,80 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
         </div>
       )}
 
-      {/* Adjusted tone */}
-      {metrics.adjustedTone && (
-        <div className="text-[10px] text-gray-600 px-1">
-          Analysis tone: <span className="text-gray-500 font-semibold">{metrics.adjustedTone}</span>
-        </div>
-      )}
-
-      {/* Flags */}
-      {metrics.flags && metrics.flags.length > 0 && (
-        <div className="space-y-1.5">
-          <div className="text-[10px] font-bold text-[oklch(0.40_0.01_280)] uppercase tracking-wide">
-            {metrics.flags.length} issue{metrics.flags.length !== 1 ? 's' : ''} flagged
-          </div>
-          {metrics.flags.map((flag, i) => (
-            <div
-              key={i}
-              className={`flex items-start gap-2 px-2.5 py-1.5 rounded-lg border text-[10px] ${
-                flag.severity === 'error'
-                  ? 'bg-[oklch(0.12_0.01_280)] border-[oklch(0.22_0.01_280)] text-[oklch(0.60_0.005_85)]'
-                  : flag.severity === 'warning'
-                  ? 'bg-[oklch(0.12_0.01_280)] border-[oklch(0.20_0.01_280)] text-[oklch(0.55_0.005_85)]'
-                  : 'bg-[oklch(0.12_0.01_280)] border-[oklch(0.20_0.01_280)] text-[oklch(0.50_0.005_85)]'
-              }`}
-            >
-              <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
-              <div>
-                <div className="font-bold capitalize">{flag.type}</div>
-                <div className="text-[oklch(0.40_0.01_280)] mt-0.5">{flag.message}</div>
+      {/* ── Sources ──────────────────────────────────────────── */}
+      {metrics.sources && metrics.sources.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {metrics.sources.map((src, i) => {
+            const Icon = sourceIcon(src.type);
+            const reliColor = src.reliability >= 95
+              ? 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5'
+              : src.reliability >= 88
+                ? 'text-blue-400 border-blue-500/20 bg-blue-500/5'
+                : 'text-yellow-400 border-yellow-500/20 bg-yellow-500/5';
+            return (
+              <div key={i} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[10px] font-medium ${reliColor}`}>
+                <Icon className="w-2.5 h-2.5" />
+                <span>{src.name}</span>
+                <span className="font-bold tabular-nums opacity-70">{src.reliability}%</span>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {/* Attribution */}
-      <div className="flex items-center gap-1.5 pt-2 border-t border-[oklch(0.18_0.01_280)]">
-        <Shield className="w-3 h-3 text-[oklch(0.30_0.01_280)]" />
-        <span className="text-[10px] text-[oklch(0.35_0.01_280)]">
-          Validated by Grok AI · Live odds data · Benford&apos;s Law analysis
+      {/* ── Verification tags ────────────────────────────────── */}
+      <div className="flex flex-wrap gap-1.5">
+        {metrics.hasLiveOdds && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-bold text-emerald-400">
+            <CheckCircle2 className="w-2.5 h-2.5" /> LIVE ODDS VERIFIED
+          </span>
+        )}
+        {metrics.hasKalshi && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-[9px] font-bold text-cyan-400">
+            <Globe className="w-2.5 h-2.5" /> KALSHI DATA
+          </span>
+        )}
+        {metrics.processingTime && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-800 border border-gray-700/50 text-[9px] text-gray-500 font-mono">
+            <Zap className="w-2.5 h-2.5" /> {metrics.processingTime}ms
+          </span>
+        )}
+        {metrics.modelUsed && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20 text-[9px] font-bold text-purple-400">
+            <Cpu className="w-2.5 h-2.5" /> {metrics.modelUsed}
+          </span>
+        )}
+      </div>
+
+      {/* ── Flags ────────────────────────────────────────────── */}
+      {metrics.flags && metrics.flags.length > 0 && (
+        <div className="space-y-1">
+          {metrics.flags.map((flag, i) => {
+            const fc = flag.severity === 'error'
+              ? 'bg-red-500/10 border-red-500/30 text-red-400'
+              : flag.severity === 'warning'
+                ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
+                : 'bg-blue-500/10 border-blue-500/30 text-blue-400';
+            return (
+              <div key={i} className={`flex items-start gap-2 px-2.5 py-1.5 rounded-lg border text-[10px] ${fc}`}>
+                <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold capitalize">{flag.type}: </span>
+                  <span>{flag.message}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Attribution ──────────────────────────────────────── */}
+      <div className="flex items-center gap-1.5 pt-1 border-t border-gray-800/50">
+        <Shield className="w-2.5 h-2.5 text-gray-700" />
+        <span className="text-[9px] text-gray-700 font-medium">
+          Validated by Grok 4 · Benford's Law · {metrics.hasLiveOdds ? 'Live odds data verified' : 'Knowledge-based analysis'}
         </span>
       </div>
-    </div>
-  );
-}
-
-export function TrustMetricsBadge({ metrics }: { metrics: TrustMetrics }) {
-  const intensity: Record<string, string> = {
-    high: 'bg-[oklch(0.16_0.005_85)] text-[oklch(0.85_0.005_85)] border-[oklch(0.25_0.005_85)]',
-    medium: 'bg-[oklch(0.14_0.005_85)] text-[oklch(0.65_0.005_85)] border-[oklch(0.22_0.005_85)]',
-    low: 'bg-[oklch(0.12_0.005_85)] text-[oklch(0.50_0.005_85)] border-[oklch(0.20_0.005_85)]',
-  };
-
-  return (
-    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium ${intensity[metrics.trustLevel] ?? intensity.medium}`}>
-      <Shield className="w-3 h-3" />
-      <span>{metrics.trustLevel.toUpperCase()}</span>
-      <span className="opacity-40">|</span>
-      <span className="tabular-nums">{metrics.finalConfidence}%</span>
     </div>
   );
 }

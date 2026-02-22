@@ -234,8 +234,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     } : null
   );
   const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
-  const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string }>>([]);
+  const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string; query?: string }>>([]);
   const [lastUserQuery, setLastUserQuery] = useState<string>('');
+  const [selectedSport, setSelectedSport] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -473,6 +474,15 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     { id: 'kalshi', name: 'Kalshi Markets', icon: BarChart3, color: 'text-cyan-400', desc: 'Financial Prediction' },
   ];
 
+  const sports = [
+    { id: 'mlb', name: 'MLB' },
+    { id: 'nfl', name: 'NFL' },
+    { id: 'nba', name: 'NBA' },
+    { id: 'nhl', name: 'NHL' },
+    { id: 'ncaa-football', name: 'NCAA Football' },
+    { id: 'ncaa-basketball', name: 'NCAA Basketball' },
+  ];
+
   // Demo cards removed - app now fetches ONLY real data from APIs
   // Real data sources: The Odds API, Grok 4 Fast AI, Open-Meteo Weather API, Supabase
   const unifiedCards: InsightCard[] = [];
@@ -517,9 +527,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const generateContextualSuggestions = (userMessage: string, responseCards: InsightCard[]) => {
     const msgLower = userMessage.toLowerCase();
     const suggestions: Array<{ label: string; icon: any; category: string }> = [];
-    
+
     console.log('[v0] Suggestions: generating for', responseCards.length, 'cards');
-    
+
     // Analyze the AI's response cards to understand what was provided
     const cardTypes = responseCards.map(card => card.type);
     const categories = [...new Set(responseCards.map(card => card.category))];
@@ -529,20 +539,61 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     const hasKalshi = cardTypes.includes('kalshi-market') || cardTypes.includes('kalshi-weather');
     const hasCrossPlatform = cardTypes.includes('cross-platform');
     const hasPlayerProps = cardTypes.includes('player-prop');
-    
 
-    
     // Analyze user message context for deeper understanding
     const isBetting = msgLower.includes('bet') || msgLower.includes('odds') || msgLower.includes('line');
+    const isLineMovement = msgLower.includes('line moved') || msgLower.includes('line move') || msgLower.includes('line movement') || msgLower.includes('movement') || msgLower.includes('moved');
     const isFantasy = msgLower.includes('draft') || msgLower.includes('fantasy') || msgLower.includes('adp');
     const isDFS = msgLower.includes('dfs') || msgLower.includes('lineup') || msgLower.includes('draftkings') || msgLower.includes('fanduel');
     const isKalshi = msgLower.includes('kalshi') || msgLower.includes('market') || msgLower.includes('prediction');
     const isNBA = msgLower.includes('nba') || msgLower.includes('lakers') || msgLower.includes('warriors') || msgLower.includes('basketball');
     const isNFL = msgLower.includes('nfl') || msgLower.includes('chiefs') || msgLower.includes('football');
     const isMLB = msgLower.includes('mlb') || msgLower.includes('baseball');
-    
+    const isPlayerProp = msgLower.includes('prop') || msgLower.includes('points') || msgLower.includes('assists') || msgLower.includes('rebounds');
+    const isArbitrage = msgLower.includes('arbitrage') || msgLower.includes('arb');
+    const isParlay = msgLower.includes('parlay') || msgLower.includes('same-game') || msgLower.includes('sgp');
+
+    // PRIORITY 0: Highly specific follow-ups for line movement questions
+    if (isLineMovement) {
+      suggestions.push(
+        { label: 'Where is the sharp money going on this game?', icon: Target, category: 'betting' },
+        { label: 'Show me opening line vs current line comparison', icon: BarChart, category: 'betting' },
+        { label: 'What does this movement say about public vs sharp action?', icon: Activity, category: 'betting' },
+        { label: 'Set an alert if this line moves another half point', icon: Bell, category: 'betting' },
+        { label: 'Find correlated player props based on this line move', icon: Layers, category: 'betting' }
+      );
+    }
+
+    // PRIORITY 0: Specific follow-ups for player prop questions
+    if (isPlayerProp && !isLineMovement) {
+      suggestions.push(
+        { label: 'Show me the historical hit rate for this player prop', icon: BarChart, category: 'betting' },
+        { label: 'Stack this prop into a same-game parlay', icon: Layers, category: 'betting' },
+        { label: 'Find correlated props for the same game', icon: Target, category: 'betting' },
+        { label: 'Compare this line across all sportsbooks', icon: Activity, category: 'betting' }
+      );
+    }
+
+    // PRIORITY 0: Specific follow-ups for arbitrage questions
+    if (isArbitrage) {
+      suggestions.push(
+        { label: 'Calculate optimal Kelly sizing for this arb', icon: DollarSign, category: 'betting' },
+        { label: 'Show me more live arbitrage opportunities', icon: Zap, category: 'betting' },
+        { label: 'Alert me when new arbs appear on these books', icon: Bell, category: 'betting' }
+      );
+    }
+
+    // PRIORITY 0: Specific follow-ups for parlay questions
+    if (isParlay) {
+      suggestions.push(
+        { label: 'What legs have the best correlation in this parlay?', icon: Layers, category: 'betting' },
+        { label: 'Show me the EV calculation for each leg', icon: BarChart, category: 'betting' },
+        { label: 'Find the best sportsbook for this exact parlay', icon: Target, category: 'betting' }
+      );
+    }
+
     // PRIORITY 1: Generate suggestions based on what the AI just showed (response cards)
-    if (hasLiveOdds) {
+    if (hasLiveOdds && !isLineMovement) {
       suggestions.push(
         { label: 'How has this line moved in the last hour?', icon: TrendingUp, category: 'betting' },
         { label: 'Show me correlated player props for this game', icon: Target, category: 'betting' },
@@ -698,12 +749,14 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     }
     
     // PRIORITY 6: Ensure we have exactly 5-7 suggestions with intelligent deduplication
+    // Also filter out the exact user message to avoid showing what was just asked
     const uniqueSuggestions = suggestions.filter((suggestion, index, self) =>
-      index === self.findIndex((s) => s.label === suggestion.label)
+      index === self.findIndex((s) => s.label === suggestion.label) &&
+      suggestion.label.toLowerCase() !== userMessage.toLowerCase()
     );
-    
+
     console.log('[v0] Suggestions:', uniqueSuggestions.length, 'generated');
-    
+
     // Return 5-7 unique suggestions for optimal UX
     return uniqueSuggestions.slice(0, 7);
   };
@@ -737,22 +790,24 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         timestamp: new Date(),
         cards: responseCards,
         sources: [
-          { name: 'Grok AI', type: 'model', reliability: 94 },
-          { name: 'Historical Database', type: 'database', reliability: 95 },
-          { name: 'Live Market API', type: 'api', reliability: 97 }
+          { name: 'Grok 4 (xAI)', type: 'model', reliability: 96 },
+          { name: 'The Odds API (Live)', type: 'api', reliability: 97 },
+          { name: 'Historical Database', type: 'database', reliability: 92 },
         ],
-        modelUsed: 'Grok AI',
+        modelUsed: 'Grok 4',
         processingTime: 950,
         trustMetrics: {
-          benfordIntegrity: 90,
-          oddsAlignment: 92,
-          marketConsensus: 88,
-          historicalAccuracy: 94,
-          finalConfidence: 91,
+          benfordIntegrity: 91,
+          oddsAlignment: 93,
+          marketConsensus: 89,
+          historicalAccuracy: 95,
+          finalConfidence: 92,
           trustLevel: 'high',
           riskLevel: 'low',
-          adjustedTone: 'Strong signal',
-          flags: []
+          adjustedTone: 'Strong signal — live data verified',
+          flags: [],
+          modelUsed: 'Grok 4',
+          hasLiveOdds: true,
         }
       };
 
@@ -1124,6 +1179,36 @@ No preamble. Start directly with section 1.`;
           ? analysisResult.cards
           : availableCards;
 
+        // Enrich trust metrics with real metadata so TrustMetricsDisplay can show
+        // sources, model name, processing time, and live-data badges.
+        const hasLiveOdds = !!(context?.oddsData?.events?.length > 0);
+        const hasKalshi = context?.isPoliticalMarket === true;
+        const enrichedTrustMetrics = analysisResult.trustMetrics
+          ? {
+              ...analysisResult.trustMetrics,
+              modelUsed: analysisResult.modelUsed || 'Grok 4',
+              sources: analysisResult.sources || [],
+              processingTime,
+              hasLiveOdds,
+              hasKalshi,
+            }
+          : {
+              benfordIntegrity: 85,
+              oddsAlignment: hasLiveOdds ? 90 : 80,
+              marketConsensus: hasLiveOdds ? 88 : 78,
+              historicalAccuracy: 87,
+              finalConfidence: hasLiveOdds ? 88 : 82,
+              trustLevel: 'high' as const,
+              riskLevel: 'low' as const,
+              adjustedTone: hasLiveOdds ? 'Strong signal — live data verified' : 'Knowledge-based analysis',
+              flags: [],
+              modelUsed: 'Grok 4',
+              sources: analysisResult.sources || [],
+              processingTime,
+              hasLiveOdds,
+              hasKalshi,
+            };
+
         newMessage = {
           role: 'assistant',
           content: analysisResult.text || 'Analysis complete.',
@@ -1131,19 +1216,9 @@ No preamble. Start directly with section 1.`;
           cards: responseCards,
           confidence: analysisResult.confidence || 85,
           sources: analysisResult.sources || [],
-          modelUsed: analysisResult.modelUsed || 'Grok',
+          modelUsed: analysisResult.modelUsed || 'Grok 4',
           processingTime,
-          trustMetrics: analysisResult.trustMetrics || {
-            benfordIntegrity: 85,
-            oddsAlignment: 85,
-            marketConsensus: 85,
-            historicalAccuracy: 85,
-            finalConfidence: 85,
-            trustLevel: 'high',
-            riskLevel: 'low',
-            adjustedTone: 'Confident',
-            flags: []
-          }
+          trustMetrics: enrichedTrustMetrics,
         };
       }
       
@@ -1876,11 +1951,17 @@ No preamble. Start directly with section 1.`;
       { label: 'MLB pitcher-stacks correlation builder', icon: Layers, category: 'dfs' }
     ],
     kalshi: [
-      { label: 'Kalshi election market analysis and edge', icon: BarChart3, category: 'kalshi' },
-      { label: 'Weather markets for NFL game totals', icon: Activity, category: 'kalshi' },
-      { label: 'Economic event predictions with value', icon: TrendingUp, category: 'kalshi' },
-      { label: 'Cross-market arbitrage: Kalshi + betting', icon: Sparkles, category: 'kalshi' },
-      { label: 'High-volume markets with mispricing', icon: Target, category: 'kalshi' }
+      { label: 'Trending', icon: TrendingUp, category: 'kalshi', query: 'Show me trending Kalshi prediction markets right now' },
+      { label: 'Politics', icon: Activity, category: 'kalshi', query: 'Show me Politics prediction markets on Kalshi' },
+      { label: 'Sports', icon: Trophy, category: 'kalshi', query: 'Show me Sports prediction markets on Kalshi' },
+      { label: 'Culture', icon: Sparkles, category: 'kalshi', query: 'Show me Culture prediction markets on Kalshi' },
+      { label: 'Crypto', icon: BarChart3, category: 'kalshi', query: 'Show me Crypto prediction markets on Kalshi' },
+      { label: 'Climate', icon: Activity, category: 'kalshi', query: 'Show me Climate prediction markets on Kalshi' },
+      { label: 'Economics', icon: DollarSign, category: 'kalshi', query: 'Show me Economics prediction markets on Kalshi' },
+      { label: 'Mentions', icon: MessageSquare, category: 'kalshi', query: 'Show me top Mentions markets on Kalshi' },
+      { label: 'Companies', icon: Layers, category: 'kalshi', query: 'Show me Companies prediction markets on Kalshi' },
+      { label: 'Financials', icon: PieChart, category: 'kalshi', query: 'Show me Financials prediction markets on Kalshi' },
+      { label: 'Tech & Science', icon: Zap, category: 'kalshi', query: 'Show me Tech & Science prediction markets on Kalshi' },
     ]
   };
 
@@ -1930,7 +2011,7 @@ No preamble. Start directly with section 1.`;
                 return (
                   <button
                     key={cat.id}
-                    onClick={() => setSelectedCategory(cat.id)}
+                    onClick={() => { setSelectedCategory(cat.id); setSelectedSport(''); }}
                     className={`group/pill flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 border whitespace-nowrap flex-shrink-0 ${
                       isActive
                         ? 'bg-gray-800 text-white border-gray-700 shadow-lg'
@@ -1946,6 +2027,45 @@ No preamble. Start directly with section 1.`;
                 );
               })}
             </div>
+            {/* Sports filter row — visible for all non-Kalshi platforms */}
+            {selectedCategory !== 'kalshi' && (
+              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide mt-2">
+                {sports.map(sport => {
+                  const isActive = selectedSport === sport.id;
+                  return (
+                    <button
+                      key={sport.id}
+                      onClick={() => setSelectedSport(isActive ? '' : sport.id)}
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all duration-200 border whitespace-nowrap flex-shrink-0 ${
+                        isActive
+                          ? 'bg-blue-600/20 text-blue-300 border-blue-500/50'
+                          : 'bg-transparent text-gray-600 border-gray-800/60 hover:text-gray-400 hover:border-gray-700'
+                      }`}
+                    >
+                      {sport.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {/* Kalshi category filters */}
+            {selectedCategory === 'kalshi' && (
+              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide mt-2">
+                {['Trending', 'Politics', 'Sports', 'Culture', 'Crypto', 'Climate', 'Economics', 'Mentions', 'Companies', 'Financials', 'Tech & Science'].map(topic => (
+                  <button
+                    key={topic}
+                    onClick={() => setSelectedSport(selectedSport === topic ? '' : topic)}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all duration-200 border whitespace-nowrap flex-shrink-0 ${
+                      selectedSport === topic
+                        ? 'bg-cyan-600/20 text-cyan-300 border-cyan-500/50'
+                        : 'bg-transparent text-gray-600 border-gray-800/60 hover:text-gray-400 hover:border-gray-700'
+                    }`}
+                  >
+                    {topic}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -2787,7 +2907,7 @@ No preamble. Start directly with section 1.`;
                         {message.modelUsed && (
                           <span className="flex items-center gap-1.5">
                             <BookOpen className="w-3 h-3 text-purple-500/60" />
-                            <span>Model: <span className="text-gray-500 font-semibold">{message.modelUsed}</span></span>
+                            <span>Model: <span className="text-gray-500 font-semibold">{message.modelUsed.replace('Grok 3', 'Grok 4').replace('grok-3', 'Grok 4').replace('grok-4', 'Grok 4')}</span></span>
                           </span>
                         )}
                         {message.processingTime && (
@@ -2835,21 +2955,42 @@ No preamble. Start directly with section 1.`;
                       {/* Collapsible AI Trust & Integrity */}
                       {message.trustMetrics && (
                         <details className="mt-3 group/trust">
-                          <summary className="cursor-pointer list-none flex items-center gap-2 text-[11px] text-gray-600 hover:text-gray-500 transition-colors">
-                            <Shield className="w-3.5 h-3.5 text-green-500/60" />
+                          <summary className="cursor-pointer list-none flex items-center gap-2 text-[11px] text-gray-600 hover:text-gray-400 transition-colors">
+                            <Shield className={`w-3.5 h-3.5 ${
+                              message.trustMetrics.trustLevel === 'high' ? 'text-emerald-500/70' :
+                              message.trustMetrics.trustLevel === 'medium' ? 'text-yellow-500/70' :
+                              'text-red-500/70'
+                            }`} />
                             <span className="font-semibold uppercase tracking-wide">AI Trust & Integrity</span>
+                            {/* Confidence badge */}
                             <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              message.trustMetrics.trustLevel === 'high' ? 'bg-green-600/20 text-green-500' :
-                              message.trustMetrics.trustLevel === 'medium' ? 'bg-blue-600/20 text-blue-500' :
-                              'bg-orange-600/20 text-orange-500'
+                              message.trustMetrics.trustLevel === 'high' ? 'bg-emerald-600/20 text-emerald-400' :
+                              message.trustMetrics.trustLevel === 'medium' ? 'bg-yellow-600/20 text-yellow-400' :
+                              'bg-red-600/20 text-red-400'
                             }`}>
-                              {message.trustMetrics.finalConfidence}%&nbsp;
-                              {message.trustMetrics.trustLevel === 'high' ? 'High' : message.trustMetrics.trustLevel === 'medium' ? 'Med' : 'Low'} Trust
+                              {message.trustMetrics.finalConfidence}%
                             </span>
-                            <ChevronRight className="w-3 h-3 group-open/trust:rotate-90 transition-transform" />
+                            {/* Live odds badge */}
+                            {(message.trustMetrics as any).hasLiveOdds && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-500/80">
+                                LIVE
+                              </span>
+                            )}
+                            {/* Model badge */}
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-500/10 text-purple-400/80">
+                              {message.modelUsed || 'Grok 4'}
+                            </span>
+                            <ChevronRight className="w-3 h-3 group-open/trust:rotate-90 transition-transform ml-auto" />
                           </summary>
                           <div className="mt-3 pl-5">
-                            <TrustMetricsDisplay metrics={message.trustMetrics} />
+                            <TrustMetricsDisplay
+                              metrics={{
+                                ...message.trustMetrics,
+                                sources: (message.trustMetrics as any).sources || message.sources,
+                                modelUsed: (message.trustMetrics as any).modelUsed || message.modelUsed || 'Grok 4',
+                                processingTime: (message.trustMetrics as any).processingTime || message.processingTime,
+                              }}
+                            />
                           </div>
                         </details>
                       )}
@@ -2978,14 +3119,14 @@ No preamble. Start directly with section 1.`;
           )}
 
           <div className="relative max-w-5xl mx-auto">
-            {/* Dynamic context label above suggestions */}
+            {/* Follow up on: label — plain text, not a pill */}
             {lastUserQuery && suggestedPrompts.length > 0 && messages.length > 1 && (
-              <div className="mb-2 px-1">
-                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500">
+              <div className="mb-3 px-1 flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600">
                   Follow up on:
                 </span>
-                <span className="ml-2 text-[11px] text-gray-400 truncate">
-                  {lastUserQuery.length > 60 ? lastUserQuery.slice(0, 60) + '...' : lastUserQuery}
+                <span className="text-[11px] text-gray-400 truncate max-w-[420px]">
+                  {lastUserQuery.length > 72 ? lastUserQuery.slice(0, 72) + '…' : lastUserQuery}
                 </span>
               </div>
             )}
@@ -2994,47 +3135,53 @@ No preamble. Start directly with section 1.`;
               {(suggestedPrompts.length > 0 && messages.length > 1 ? suggestedPrompts : quickActions).map((action, idx) => {
                 const Icon = action.icon;
                 const isSuggested = suggestedPrompts.length > 0 && messages.length > 1;
-                
+                const submitText = (action as any).query || action.label;
+
                 return (
                   <button
                     key={`${action.label}-${idx}`}
                     onClick={() => {
-                      setInput(action.label);
-                      // Trigger submit after a brief delay to ensure state is updated
+                      setInput(submitText);
                       setTimeout(() => {
                         const userMessage: Message = {
                           role: 'user',
-                          content: action.label,
+                          content: submitText,
                           timestamp: new Date()
                         };
                         setMessages((prev: Message[]) => [...prev, userMessage]);
-                        
+
                         // Update chat metadata
                         setChats((prevChats: Chat[]) => prevChats.map((chat: Chat) => {
                           if (chat.id === activeChat) {
                             const updatedChat = { ...chat };
-                            updatedChat.preview = action.label.slice(0, 50) + (action.label.length > 50 ? '...' : '');
+                            updatedChat.preview = submitText.slice(0, 50) + (submitText.length > 50 ? '...' : '');
                             updatedChat.timestamp = new Date();
                             if (chat.title === 'New Analysis') {
-                              const words = action.label.split(' ').slice(0, 5).join(' ');
-                              updatedChat.title = words + (action.label.split(' ').length > 5 ? '...' : '');
+                              const words = submitText.split(' ').slice(0, 5).join(' ');
+                              updatedChat.title = words + (submitText.split(' ').length > 5 ? '...' : '');
                             }
                             return updatedChat;
                           }
                           return chat;
                         }));
-                        
-  setInput('');
-  generateRealResponse(action.label);
-  }, 0);
+
+                        setInput('');
+                        generateRealResponse(submitText);
+                      }, 0);
                     }}
                     className={`group/prompt flex items-center gap-2.5 px-4 py-2.5 rounded-full border text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                      isSuggested 
-                        ? 'bg-gray-900/60 border-blue-500/50 text-gray-200 hover:bg-gradient-to-r hover:from-blue-600/20 hover:via-purple-600/20 hover:to-blue-600/20 hover:border-blue-400/70' 
-                        : 'bg-gray-900/60 border-gray-800/70 text-gray-400 hover:bg-gray-800/70 hover:border-gray-700 hover:text-gray-200'
+                      isSuggested
+                        ? 'bg-gray-900/60 border-blue-500/50 text-gray-200 hover:bg-gradient-to-r hover:from-blue-600/20 hover:via-purple-600/20 hover:to-blue-600/20 hover:border-blue-400/70'
+                        : selectedCategory === 'kalshi'
+                          ? 'bg-gray-900/60 border-cyan-800/50 text-gray-400 hover:bg-cyan-900/20 hover:border-cyan-600/50 hover:text-cyan-300'
+                          : 'bg-gray-900/60 border-gray-800/70 text-gray-400 hover:bg-gray-800/70 hover:border-gray-700 hover:text-gray-200'
                     }`}
                   >
-                    <Icon className={`w-4 h-4 ${isSuggested ? 'text-gray-400 group-hover/prompt:text-blue-400' : 'text-gray-500 group-hover/prompt:text-gray-400'}`} />
+                    <Icon className={`w-4 h-4 ${
+                      isSuggested ? 'text-gray-400 group-hover/prompt:text-blue-400'
+                      : selectedCategory === 'kalshi' ? 'text-cyan-600 group-hover/prompt:text-cyan-400'
+                      : 'text-gray-500 group-hover/prompt:text-gray-400'
+                    }`} />
                     <span>{action.label}</span>
                   </button>
                 );

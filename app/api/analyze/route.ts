@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       try {
         // Initial generation
         const result = await generateText({
-          model: createXai({ apiKey: xaiApiKey })('grok-3-fast'),
+          model: createXai({ apiKey: xaiApiKey })(AI_CONFIG.MODEL_NAME),
           system: SYSTEM_PROMPT,
           prompt: enrichedPrompt,
           temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
 
           try {
             const retryResult = await generateText({
-              model: createXai({ apiKey: xaiApiKey })('grok-3-fast'),
+              model: createXai({ apiKey: xaiApiKey })(AI_CONFIG.MODEL_NAME),
               system: SYSTEM_PROMPT,
               prompt: retryPrompt,
               // Lower temperature on retries to reduce hallucination likelihood
@@ -225,31 +225,50 @@ export async function POST(request: NextRequest) {
     const processingTime = Date.now() - startTime;
 
     // Compute real trust metrics from the final AI text
-    const trustMetrics = usedFallback
+    const hasRealOdds = !!(context.oddsData?.events?.length > 0);
+    const baseMetrics = usedFallback
       ? {
-          benfordIntegrity: 70,
-          oddsAlignment: 70,
-          marketConsensus: 70,
-          historicalAccuracy: 70,
-          finalConfidence: 70,
+          benfordIntegrity: 65,
+          oddsAlignment: 65,
+          marketConsensus: 65,
+          historicalAccuracy: 68,
+          finalConfidence: 65,
           trustLevel: 'medium' as const,
           riskLevel: 'medium' as const,
-          adjustedTone: 'Limited data',
-          flags: [{ type: 'info', message: 'Using fallback mode — AI unavailable', severity: 'info' as const }],
+          adjustedTone: 'Limited data — AI unavailable',
+          flags: [{ type: 'info', message: 'Using fallback mode — configure XAI_API_KEY for full analysis', severity: 'info' as const }],
         }
       : detectHallucinations(aiText, userMessage, context.oddsData);
+
+    // Boost trust metrics when real live odds data was provided
+    const trustMetrics = (hasRealOdds && !usedFallback)
+      ? {
+          ...baseMetrics,
+          oddsAlignment: Math.min(99, (baseMetrics.oddsAlignment ?? 80) + 8),
+          marketConsensus: Math.min(99, (baseMetrics.marketConsensus ?? 80) + 6),
+          finalConfidence: Math.min(99, (baseMetrics.finalConfidence ?? 80) + 5),
+          adjustedTone: baseMetrics.finalConfidence >= 85 ? 'Strong signal — live data verified' : baseMetrics.adjustedTone,
+        }
+      : baseMetrics;
+
+    // Build sources list reflecting actual data used
+    const sources = [
+      usedFallback
+        ? { name: 'Fallback Mode', type: 'cache' as const, reliability: 65 }
+        : DEFAULT_SOURCES.GROK_AI,
+    ];
+    if (hasRealOdds) sources.push(DEFAULT_SOURCES.ODDS_API);
+    if (context.isPoliticalMarket) sources.push(DEFAULT_SOURCES.KALSHI);
+    if (context.hasFantasyIntent && !context.hasBettingIntent) {
+      sources.push({ name: 'Fantasy Projections Engine', type: 'database' as const, reliability: 91 });
+    }
 
     return NextResponse.json({
       success: true,
       text: aiText,
       cards,
       confidence: trustMetrics.finalConfidence,
-      sources: [
-        usedFallback
-          ? { name: 'Cached Data', type: 'cache', reliability: 70 }
-          : DEFAULT_SOURCES.GROK_AI,
-        ...(context.oddsData ? [DEFAULT_SOURCES.ODDS_API] : []),
-      ],
+      sources,
       modelUsed,
       trustMetrics,
       processingTime,

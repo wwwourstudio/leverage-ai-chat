@@ -5,14 +5,14 @@
 
 // AI Model Configuration
 export const AI_CONFIG = {
-  MODEL_NAME: 'grok-3-fast',
-  MODEL_DISPLAY_NAME: 'Grok 3 Fast',
+  MODEL_NAME: 'grok-4',
+  MODEL_DISPLAY_NAME: 'Grok 4',
   PROVIDER: 'xAI',
   API_ENDPOINT: 'https://api.x.ai/v1/chat/completions',
   DEFAULT_TEMPERATURE: 0.4, // Balanced between factual accuracy and useful responses
-  DEFAULT_MAX_TOKENS: 700, // Enough for thorough analysis with bullet points and context
+  DEFAULT_MAX_TOKENS: 900, // Expanded for richer Grok 4 analysis
   DEFAULT_PROCESSING_TIME: 950,
-  FALLBACK_MODEL: 'Grok 3 Fast',
+  FALLBACK_MODEL: 'Grok 4',
 } as const;
 
 // API Endpoints
@@ -439,9 +439,14 @@ NEVER say "I cannot provide analysis" or "real-time data not available" for gene
 // Default Source Configurations
 export const DEFAULT_SOURCES = {
   GROK_AI: {
-    name: 'Grok 3 Fast AI (xAI)',
+    name: 'Grok 4 (xAI)',
     type: SOURCE_TYPES.MODEL,
     reliability: DEFAULT_RELIABILITY.MODEL,
+  },
+  KALSHI: {
+    name: 'Kalshi Prediction Markets',
+    type: SOURCE_TYPES.API,
+    reliability: 96,
   },
   LIVE_MARKET: {
     name: 'Live Market Data',

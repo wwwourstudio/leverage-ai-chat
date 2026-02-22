@@ -144,8 +144,11 @@ export class RequestQueue {
 
       this.activeRequests++;
       
-      // Execute request without blocking queue processing
-      item.execute().finally(() => {
+      // Execute request without blocking queue processing.
+      // .catch() suppresses the re-throw from inside execute() — the error is
+      // already forwarded to the caller via reject(), so leaving it unhandled
+      // here causes a spurious unhandled-rejection crash in Node 15+.
+      item.execute().catch(() => { /* handled via reject() */ }).finally(() => {
         this.activeRequests--;
       });
     }

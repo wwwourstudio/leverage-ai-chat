@@ -921,16 +921,20 @@ No preamble. Start directly with section 1.`;
       // Betting intent keywords
       const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'arbitrage', 'arb', 'h2h', 'value', 'sportsbook', 'draftkings', 'fanduel', 'moneyline', 'prop', 'parlay'];
       const hasBettingIntent = bettingKeywords.some(k => lowerMsg.includes(k));
-      
+
       // Sports query detection (not political)
       const sportsKeywords = ['nba', 'nfl', 'nhl', 'mlb', 'basketball', 'football', 'hockey', 'baseball', 'ncaa'];
       const isSportsQuery = sportsKeywords.some(k => lowerMsg.includes(k)) && !isPoliticalMarket;
-      
+
+      // Fantasy intent detection
+      const fantasyKeywords = ['fantasy', 'draft', 'waiver', 'faab', 'adp', 'vbd', 'tier cliff', 'bestball', 'best ball', 'start sit', 'trade value', 'who should i pick', 'who do i start', 'sleeper', 'rankings', 'projections', 'auction value'];
+      const hasFantasyIntent = fantasyKeywords.some(k => lowerMsg.includes(k)) && !isPoliticalMarket;
+
       const detectedPlatform = extractPlatform(userMessage);
-      
+
       // Override isPoliticalMarket if platform is kalshi
       const finalIsPoliticalMarket = isPoliticalMarket || detectedPlatform === 'kalshi';
-      
+
       const context: any = {
         sport: detectedSport,
         marketType: extractMarketType(userMessage),
@@ -938,18 +942,30 @@ No preamble. Start directly with section 1.`;
         isSportsQuery,
         isPoliticalMarket: finalIsPoliticalMarket,
         hasBettingIntent,
+        hasFantasyIntent,
         previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }))
       };
 
       if (isDev) {
-        console.log('[v0] Context:', { sport: detectedSport || 'none', betting: hasBettingIntent, sports: isSportsQuery, political: finalIsPoliticalMarket });
+        console.log('[v0] Context:', { sport: detectedSport || 'none', betting: hasBettingIntent, sports: isSportsQuery, political: finalIsPoliticalMarket, fantasy: hasFantasyIntent });
       }
-      
+
       // HARD STOP: Political markets NEVER fetch sports odds
       if (context.isPoliticalMarket) {
         if (isDev) console.log('[POLITICAL MARKET DETECTED] Skipping sports odds fetch');
         // Route directly to Kalshi analysis without attempting sports odds
         // Note: The /api/analyze endpoint will handle Kalshi market analysis
+      } else if (context.hasFantasyIntent && !context.hasBettingIntent) {
+        // Fantasy intent — generate fantasy cards client-side immediately so they
+        // appear before the AI response comes back.
+        if (isDev) console.log('[FANTASY INTENT] Generating fantasy cards');
+        try {
+          const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
+          const fantasyCards = generateFantasyCards(userMessage, 3);
+          context.existingCards = fantasyCards;
+        } catch (err) {
+          if (isDev) console.error('[FANTASY INTENT] Card generation failed:', err);
+        }
       } else if (context.hasBettingIntent || context.isSportsQuery) {
         // Fetch sports odds for any betting-related query OR explicit sports query
         if (isDev) console.log('[ODDS FETCH ATTEMPT] Betting intent or sports query detected');

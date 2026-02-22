@@ -25,6 +25,7 @@ interface AnalyzeRequestBody {
     platform?: string | null;
     isSportsQuery?: boolean;
     isPoliticalMarket?: boolean;
+    hasFantasyIntent?: boolean;
     hasBettingIntent?: boolean;
     oddsData?: any;
     noGamesAvailable?: boolean;
@@ -56,9 +57,11 @@ export async function POST(request: NextRequest) {
     // should use 'betting' so generateContextualCards fetches real game/odds cards.
     const category = context.isPoliticalMarket
       ? 'kalshi'
-      : (context.hasBettingIntent || context.isSportsQuery)
-        ? 'betting'
-        : 'all';
+      : context.hasFantasyIntent && !context.hasBettingIntent
+        ? 'fantasy'
+        : (context.hasBettingIntent || context.isSportsQuery)
+          ? 'betting'
+          : 'all';
 
     // Build the enriched prompt with any real odds data or contextual info
     let enrichedPrompt = userMessage;
@@ -196,6 +199,15 @@ export async function POST(request: NextRequest) {
 
     if (hasExistingCards) {
       cards = existingCards;
+    } else if (!usedFallback && context.hasFantasyIntent && !context.hasBettingIntent) {
+      // Fantasy query — generate fantasy cards with message context
+      try {
+        const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
+        cards = generateFantasyCards(userMessage, 3);
+      } catch (err) {
+        console.error('[API/analyze] Fantasy card generation failed:', err);
+        cards = await generateContextualCards('fantasy', undefined, 3).catch(() => []);
+      }
     } else if (!usedFallback && (context.isSportsQuery || context.hasBettingIntent)) {
       try {
         const sportKey = context.sport || undefined;

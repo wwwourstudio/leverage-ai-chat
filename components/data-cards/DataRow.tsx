@@ -1,5 +1,7 @@
 'use client';
 
+import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
+
 interface DataRowProps {
   label: string;
   value: string | number;
@@ -8,36 +10,23 @@ interface DataRowProps {
 }
 
 export function DataRow({ label, value, highlight, trend }: DataRowProps) {
-  const isMetric = typeof value === 'string' && (
-    value.includes('%') || 
-    value.includes('$') || 
-    value.includes('pts') ||
-    value.includes('↑') ||
-    value.includes('↓')
-  );
-  
-  // Format the label to be more readable
   const formattedLabel = label
     .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, str => str.toUpperCase())
+    .replace(/^./, (str) => str.toUpperCase())
     .trim();
 
-  let trendIcon = null;
-  if (trend === 'up') {
-    trendIcon = <span className="text-green-400">↑</span>;
-  } else if (trend === 'down') {
-    trendIcon = <span className="text-red-400">↓</span>;
-  }
-
   return (
-    <div className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-all duration-200 group/item">
-      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide shrink-0 mr-4">
+    <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors">
+      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide shrink-0 mr-4">
         {formattedLabel}
       </span>
-      <span className={`text-sm font-bold text-right flex items-center gap-1.5 ${
-        highlight || isMetric ? 'text-white' : 'text-gray-300'
-      } group-hover/item:text-blue-300 transition-colors`}>
-        {trendIcon}
+      <span
+        className={`text-sm font-bold text-right flex items-center gap-1 tabular-nums ${
+          highlight ? 'text-card-foreground' : 'text-card-foreground/80'
+        }`}
+      >
+        {trend === 'up' && <ArrowUpRight className="w-3 h-3 text-emerald-400" />}
+        {trend === 'down' && <ArrowDownRight className="w-3 h-3 text-red-400" />}
         {String(value || 'N/A')}
       </span>
     </div>
@@ -54,14 +43,12 @@ export function DataGrid({ data, empty = 'No data available' }: DataGridProps) {
 
   if (entries.length === 0) {
     return (
-      <div className="text-center py-6 text-gray-500 text-sm">
-        {empty}
-      </div>
+      <div className="text-center py-6 text-muted-foreground text-sm">{empty}</div>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {entries.map(([label, value], i) => (
         <DataRow key={i} label={label} value={value} />
       ))}

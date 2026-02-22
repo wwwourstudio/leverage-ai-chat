@@ -192,7 +192,7 @@ interface CardListProps {
 export function CardList({ cards, onAnalyze, isLoading, className = '' }: CardListProps) {
   if (isLoading) {
     return (
-      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${className}`}>
+      <div className={`flex flex-col gap-4 w-full ${className}`}>
         {[1, 2, 3].map((i) => (
           <CardSkeleton key={i} />
         ))}
@@ -202,15 +202,15 @@ export function CardList({ cards, onAnalyze, isLoading, className = '' }: CardLi
 
   if (!cards || cards.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
+      <div className="text-center py-12 text-muted-foreground">
         <p className="text-sm font-medium">No cards available</p>
-        <p className="text-xs text-gray-600 mt-1">Try asking about a specific sport or market</p>
+        <p className="text-xs text-muted-foreground/60 mt-1">Try asking about a specific sport or market</p>
       </div>
     );
   }
 
   return (
-    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${className}`}>
+    <div className={`flex flex-col gap-4 w-full ${className}`}>
       {cards.map((card, index) => (
         <DynamicCardRenderer
           key={`${card.type}-${index}`}

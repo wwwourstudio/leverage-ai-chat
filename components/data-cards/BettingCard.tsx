@@ -1,11 +1,19 @@
 'use client';
 
-import { Zap, TrendingUp, Target, Activity } from 'lucide-react';
-import { BaseCard } from './BaseCard';
-import { DataRow } from './DataRow';
+import { memo } from 'react';
+import {
+  Zap,
+  TrendingUp,
+  Target,
+  Activity,
+  Clock,
+  ChevronRight,
+  ArrowUpRight,
+  ArrowDownRight,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface BettingCardData {
-  // Core betting fields
   matchup?: string;
   game?: string;
   team?: string;
@@ -29,17 +37,14 @@ interface BettingCardData {
   marketEfficiency?: string;
   recommendation?: string;
   gameTime?: string;
-  // Player prop fields
   player?: string;
   stat?: string;
-  // Line movement fields
   lineChange?: string;
   oldLine?: string;
   newLine?: string;
   direction?: string;
   sharpMoney?: string;
   timestamp?: string;
-  // Kelly / portfolio fields
   kellyFraction?: string;
   recommendedStake?: string;
   expectedValue?: string;
@@ -48,7 +53,6 @@ interface BettingCardData {
   available?: string;
   utilizationRate?: string;
   activeBets?: number | string;
-  // Informational / fallback fields
   description?: string;
   note?: string;
   [key: string]: any;
@@ -67,14 +71,30 @@ interface BettingCardProps {
   error?: string;
 }
 
-const statusMap: Record<string, any> = {
-  hot: { icon: Zap, label: 'HOT', bg: 'bg-red-500/20', border: 'border-red-500/30', text: 'text-red-400' },
-  value: { icon: TrendingUp, label: 'VALUE', bg: 'bg-green-500/20', border: 'border-green-500/30', text: 'text-green-400' },
-  optimal: { icon: Target, label: 'OPTIMAL', bg: 'bg-blue-500/20', border: 'border-blue-500/30', text: 'text-blue-400' },
-  edge: { icon: Activity, label: 'EDGE', bg: 'bg-orange-500/20', border: 'border-orange-500/30', text: 'text-orange-400' },
+const statusConfig: Record<string, { icon: typeof Zap; label: string; class: string }> = {
+  hot: { icon: Zap, label: 'HOT', class: 'bg-red-500/15 text-red-400 ring-red-500/20' },
+  value: { icon: TrendingUp, label: 'VALUE', class: 'bg-emerald-500/15 text-emerald-400 ring-emerald-500/20' },
+  optimal: { icon: Target, label: 'OPTIMAL', class: 'bg-sky-500/15 text-sky-400 ring-sky-500/20' },
+  edge: { icon: Activity, label: 'EDGE', class: 'bg-amber-500/15 text-amber-400 ring-amber-500/20' },
 };
 
-export function BettingCard({
+/** Formats a moneyline string to include a + prefix for positive values */
+function formatOdds(val?: string) {
+  if (!val) return null;
+  const num = Number(val);
+  if (isNaN(num)) return val;
+  return num > 0 ? `+${num}` : String(num);
+}
+
+/** Parses team names from "Away @ Home" matchup format */
+function parseTeams(matchup?: string): { away: string; home: string } | null {
+  if (!matchup) return null;
+  const parts = matchup.split(/\s*[@vs.]+\s*/i);
+  if (parts.length < 2) return null;
+  return { away: parts[0].trim(), home: parts[1].trim() };
+}
+
+export const BettingCard = memo(function BettingCard({
   title,
   category,
   subcategory,
@@ -82,98 +102,273 @@ export function BettingCard({
   data,
   status,
   onAnalyze,
-  isLoading,
-  error
 }: BettingCardProps) {
-  const statusBadge = statusMap[status] || statusMap.value;
+  const badge = statusConfig[status] || statusConfig.value;
+  const BadgeIcon = badge.icon;
+  const teams = parseTeams(data.matchup || data.game);
+  const sportsbook = data.bookmaker || data.book || null;
+  const hasSpread = data.homeSpread && data.homeSpread !== 'N/A';
+  const hasTotal = data.overUnder && data.overUnder !== 'N/A';
+  const homeOdds = formatOdds(data.homeOdds);
+  const awayOdds = formatOdds(data.awayOdds);
 
   return (
-    <BaseCard
-      icon={Zap}
-      title={title}
-      category={category}
-      subcategory={subcategory}
-      gradient={gradient}
-      status={statusBadge}
-      onAnalyze={onAnalyze}
-      isLoading={isLoading}
-      error={error}
+    <article
+      className={cn(
+        'group relative w-full rounded-2xl overflow-hidden',
+        'bg-card border border-border/60',
+        'hover:border-border transition-all duration-300',
+        'shadow-sm hover:shadow-md'
+      )}
     >
-      <div className="space-y-2.5">
-        {/* Description / overview for informational cards */}
+      {/* Top accent bar */}
+      <div
+        className={cn('h-1 w-full bg-gradient-to-r', gradient)}
+        aria-hidden="true"
+      />
+
+      <div className="px-5 pt-4 pb-5 space-y-4">
+        {/* -- HEADER ROW -- */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+              {category}
+            </span>
+            <span className="text-muted-foreground/40" aria-hidden="true">
+              /
+            </span>
+            <span className="text-[11px] font-medium text-muted-foreground/70 truncate">
+              {subcategory}
+            </span>
+          </div>
+
+          <div
+            className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1 rounded-full ring-1 ring-inset text-[10px] font-bold uppercase tracking-wider shrink-0',
+              badge.class
+            )}
+            role="status"
+          >
+            <BadgeIcon className="w-3 h-3" aria-hidden="true" />
+            {badge.label}
+          </div>
+        </div>
+
+        {/* -- MATCHUP / TITLE -- */}
+        <h3 className="text-lg font-bold text-card-foreground leading-snug text-balance">
+          {title}
+        </h3>
+
+        {/* Description block */}
         {data.description && (
-          <div className="pb-2.5 border-b border-gray-700/30 text-sm text-gray-300 leading-relaxed">
+          <p className="text-sm text-muted-foreground leading-relaxed">
             {data.description}
+          </p>
+        )}
+
+        {/* -- ODDS GRID -- */}
+        {(homeOdds || awayOdds || hasSpread || hasTotal) && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* Away ML */}
+            {awayOdds && (
+              <OddsPill
+                label={teams?.away || 'Away'}
+                value={awayOdds}
+                sublabel="Moneyline"
+              />
+            )}
+
+            {/* Home ML */}
+            {homeOdds && (
+              <OddsPill
+                label={teams?.home || 'Home'}
+                value={homeOdds}
+                sublabel="Moneyline"
+              />
+            )}
+
+            {/* Spread */}
+            {hasSpread && (
+              <OddsPill
+                label="Spread"
+                value={data.homeSpread!}
+                sublabel="Home"
+              />
+            )}
+
+            {/* Over/Under */}
+            {hasTotal && (
+              <OddsPill
+                label="Total"
+                value={data.overUnder!}
+                sublabel="O/U"
+              />
+            )}
           </div>
         )}
 
-        {/* Core matchup / player */}
-        {data.matchup && <DataRow label="Matchup" value={data.matchup} highlight />}
-        {data.game && !data.matchup && <DataRow label="Game" value={data.game} highlight />}
-        {data.player && <DataRow label="Player" value={data.player} highlight />}
-        {data.team && <DataRow label="Team" value={data.team} highlight />}
-        {data.finalScore && <DataRow label="Final" value={data.finalScore} highlight />}
-        {data.stat && <DataRow label="Stat" value={data.stat} />}
-
-        {/* Betting odds */}
-        {data.homeOdds && data.awayOdds && (
-          <DataRow label="Moneyline" value={`Home ${data.homeOdds} / Away ${data.awayOdds}`} />
-        )}
-        {data.homeSpread && data.homeSpread !== 'N/A' && (
-          <DataRow label="Spread" value={`${data.homeSpread}`} />
-        )}
-        {data.overUnder && data.overUnder !== 'N/A' && (
-          <DataRow label="Total" value={data.overUnder} />
-        )}
-        {data.bestLine && <DataRow label="Best Line" value={data.bestLine} />}
-        {data.line && <DataRow label="Line" value={data.line} />}
-        {data.over && <DataRow label="Over" value={data.over} />}
-        {data.under && <DataRow label="Under" value={data.under} />}
-        {data.odds && <DataRow label="Odds" value={data.odds} />}
-        {data.book && <DataRow label="Book" value={data.book} />}
-        {data.bookmaker && !data.book && <DataRow label="Book" value={data.bookmaker} />}
-        {data.edge && <DataRow label="Edge" value={data.edge} trend="up" />}
-        {data.impliedWin && <DataRow label="Implied Win" value={data.impliedWin} />}
-        {data.impliedProb && <DataRow label="Implied Prob" value={data.impliedProb} />}
-        {data.movement && <DataRow label="Line Movement" value={data.movement} />}
-        {data.confidence !== undefined && (
-          typeof data.confidence === 'number'
-            ? <DataRow label="Confidence" value={`${data.confidence}%`} />
-            : typeof data.confidence === 'string' && data.confidence
-              ? <DataRow label="Confidence" value={data.confidence} />
-              : null
-        )}
-        {data.marketEfficiency && <DataRow label="Market Efficiency" value={data.marketEfficiency} />}
-        {data.recommendation && <DataRow label="Recommendation" value={data.recommendation} />}
-
-        {/* Line movement fields */}
-        {data.lineChange && <DataRow label="Line Change" value={data.lineChange} trend="up" highlight />}
-        {data.oldLine && <DataRow label="Previous Line" value={data.oldLine} />}
-        {data.newLine && <DataRow label="New Line" value={data.newLine} />}
-        {data.direction && <DataRow label="Direction" value={data.direction} />}
-        {data.sharpMoney && <DataRow label="Sharp Money" value={data.sharpMoney} />}
-
-        {/* Kelly / sizing fields */}
-        {data.kellyFraction && <DataRow label="Kelly Fraction" value={data.kellyFraction} highlight />}
-        {data.recommendedStake && <DataRow label="Rec. Stake" value={data.recommendedStake} />}
-        {data.expectedValue && <DataRow label="Expected Value" value={data.expectedValue} trend="up" />}
-
-        {/* Portfolio fields */}
-        {data.totalBankroll && <DataRow label="Bankroll" value={data.totalBankroll} highlight />}
-        {data.deployed && <DataRow label="Deployed" value={data.deployed} />}
-        {data.available && <DataRow label="Available" value={data.available} />}
-        {data.utilizationRate && <DataRow label="Utilization" value={data.utilizationRate} />}
-        {data.activeBets !== undefined && data.activeBets !== null && (
-          <DataRow label="Active Bets" value={String(data.activeBets)} />
+        {/* -- SUPPLEMENTAL DATA -- */}
+        {(sportsbook || data.gameTime || data.edge || data.movement || data.confidence !== undefined || data.recommendation || data.player) && (
+          <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground pt-1">
+            {data.player && (
+              <MetaItem label="Player" value={data.player} />
+            )}
+            {data.stat && (
+              <MetaItem label="Stat" value={data.stat} />
+            )}
+            {sportsbook && (
+              <MetaItem label="Book" value={sportsbook} />
+            )}
+            {data.edge && (
+              <MetaItem label="Edge" value={data.edge} trend="up" />
+            )}
+            {data.movement && (
+              <MetaItem label="Movement" value={data.movement} />
+            )}
+            {data.impliedProb && (
+              <MetaItem label="Implied" value={data.impliedProb} />
+            )}
+            {data.confidence !== undefined && data.confidence !== '' && (
+              <MetaItem
+                label="Confidence"
+                value={typeof data.confidence === 'number' ? `${data.confidence}%` : String(data.confidence)}
+              />
+            )}
+            {data.recommendation && (
+              <MetaItem label="Rec" value={data.recommendation} />
+            )}
+            {data.gameTime && (
+              <span className="inline-flex items-center gap-1.5 text-muted-foreground/60">
+                <Clock className="w-3 h-3" aria-hidden="true" />
+                {data.gameTime}
+              </span>
+            )}
+          </div>
         )}
 
-        {/* Timing */}
-        {data.gameTime && <DataRow label="Game Time" value={data.gameTime} />}
-        {data.timestamp && !data.gameTime && <DataRow label="Updated" value={data.timestamp} />}
+        {/* -- LINE MOVEMENT ROW -- */}
+        {(data.lineChange || data.sharpMoney || data.kellyFraction) && (
+          <div className="flex flex-wrap gap-3">
+            {data.lineChange && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted/50 text-xs font-semibold text-card-foreground">
+                {data.direction === 'up' ? (
+                  <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <ArrowDownRight className="w-3.5 h-3.5 text-red-400" />
+                )}
+                {data.lineChange}
+                {data.oldLine && data.newLine && (
+                  <span className="text-muted-foreground font-normal ml-1">
+                    {data.oldLine} &rarr; {data.newLine}
+                  </span>
+                )}
+              </div>
+            )}
+            {data.sharpMoney && (
+              <div className="px-3 py-1.5 rounded-lg bg-muted/50 text-xs">
+                <span className="text-muted-foreground">Sharp: </span>
+                <span className="font-semibold text-card-foreground">{data.sharpMoney}</span>
+              </div>
+            )}
+            {data.kellyFraction && (
+              <div className="px-3 py-1.5 rounded-lg bg-muted/50 text-xs">
+                <span className="text-muted-foreground">Kelly: </span>
+                <span className="font-semibold text-card-foreground">{data.kellyFraction}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* -- PORTFOLIO ROW -- */}
+        {(data.totalBankroll || data.expectedValue) && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {data.expectedValue && (
+              <OddsPill label="EV" value={data.expectedValue} sublabel="Expected" />
+            )}
+            {data.recommendedStake && (
+              <OddsPill label="Stake" value={data.recommendedStake} sublabel="Rec." />
+            )}
+            {data.totalBankroll && (
+              <OddsPill label="Bankroll" value={data.totalBankroll} sublabel="Total" />
+            )}
+            {data.available && (
+              <OddsPill label="Available" value={data.available} sublabel="Balance" />
+            )}
+          </div>
+        )}
 
         {/* Note */}
-        {data.note && <DataRow label="Note" value={data.note} />}
+        {data.note && (
+          <p className="text-xs text-muted-foreground/70 italic">
+            {data.note}
+          </p>
+        )}
+
+        {/* -- ANALYZE CTA -- */}
+        {onAnalyze && (
+          <button
+            onClick={onAnalyze}
+            className={cn(
+              'flex items-center justify-center gap-2 w-full pt-3 mt-1',
+              'border-t border-border/40',
+              'text-xs font-semibold text-muted-foreground hover:text-card-foreground',
+              'transition-colors duration-200',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2'
+            )}
+            aria-label={`Analyze ${title}`}
+          >
+            View Full Analysis
+            <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+          </button>
+        )}
       </div>
-    </BaseCard>
+    </article>
+  );
+});
+
+/* ------------------------------------------------------------------ */
+/* Sub-components                                                      */
+/* ------------------------------------------------------------------ */
+
+function OddsPill({
+  label,
+  value,
+  sublabel,
+}: {
+  label: string;
+  value: string;
+  sublabel?: string;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-0.5 rounded-xl bg-muted/50 px-4 py-3 text-center">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+        {sublabel || label}
+      </span>
+      <span className="text-base font-bold tabular-nums text-card-foreground leading-none mt-0.5">
+        {value}
+      </span>
+      <span className="text-[11px] font-medium text-muted-foreground mt-0.5 truncate max-w-full">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function MetaItem({
+  label,
+  value,
+  trend,
+}: {
+  label: string;
+  value: string;
+  trend?: 'up' | 'down';
+}) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="text-muted-foreground/50">{label}:</span>
+      {trend === 'up' && <ArrowUpRight className="w-3 h-3 text-emerald-400" />}
+      {trend === 'down' && <ArrowDownRight className="w-3 h-3 text-red-400" />}
+      <span className="font-semibold text-card-foreground">{value}</span>
+    </span>
   );
 }

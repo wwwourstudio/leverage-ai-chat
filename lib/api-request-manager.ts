@@ -144,8 +144,11 @@ export class RequestQueue {
 
       this.activeRequests++;
       
-      // Execute request without blocking queue processing
-      item.execute().finally(() => {
+      // Execute request without blocking queue processing.
+      // .catch() suppresses the re-throw from inside execute() — the error is
+      // already forwarded to the caller via reject(), so leaving it unhandled
+      // here causes a spurious unhandled-rejection crash in Node 15+.
+      item.execute().catch(() => { /* handled via reject() */ }).finally(() => {
         this.activeRequests--;
       });
     }
@@ -280,10 +283,10 @@ export async function batchRequests<T, R>(
  */
 export const oddsApiQueue = new RequestQueue(
   {
-    requestsPerSecond: 4, // Conservative limit for free tier
-    burstSize: 10, // Allow small bursts
+    requestsPerSecond: 2, // Conservative limit for free tier (avoid 429s)
+    burstSize: 4, // Small burst to prevent thundering herd
   },
-  5 // Max 5 concurrent requests
+  2 // Max 2 concurrent requests — prevents rate-limit cascading
 );
 
 export const playerPropsQueue = new RequestQueue(

@@ -18,12 +18,14 @@ import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-dete
 
 interface AnalyzeRequestBody {
   userMessage: string;
+  existingCards?: InsightCard[];
   context?: {
     sport?: string | null;
     marketType?: string | null;
     platform?: string | null;
     isSportsQuery?: boolean;
     isPoliticalMarket?: boolean;
+    hasFantasyIntent?: boolean;
     hasBettingIntent?: boolean;
     oddsData?: any;
     noGamesAvailable?: boolean;
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: AnalyzeRequestBody = await request.json();
-    const { userMessage, context = {} } = body;
+    const { userMessage, existingCards = [], context = {} } = body;
 
     if (!userMessage || typeof userMessage !== 'string') {
       return NextResponse.json(
@@ -55,9 +57,11 @@ export async function POST(request: NextRequest) {
     // should use 'betting' so generateContextualCards fetches real game/odds cards.
     const category = context.isPoliticalMarket
       ? 'kalshi'
-      : (context.hasBettingIntent || context.isSportsQuery)
-        ? 'betting'
-        : 'all';
+      : context.hasFantasyIntent && !context.hasBettingIntent
+        ? 'fantasy'
+        : (context.hasBettingIntent || context.isSportsQuery)
+          ? 'betting'
+          : 'all';
 
     // Build the enriched prompt with any real odds data or contextual info
     let enrichedPrompt = userMessage;
@@ -107,11 +111,14 @@ export async function POST(request: NextRequest) {
     const xaiApiKey = process.env.XAI_API_KEY;
     const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
     const kalshiApiKey = process.env.KALSHI_API_KEY;
+    const hasClientOddsData = !!(context.oddsData?.events?.length);
     console.log('[API/analyze] Keys configured:', {
       XAI_API_KEY: !!xaiApiKey,
       ODDS_API_KEY: !!oddsApiKey,
       KALSHI_API_KEY: !!kalshiApiKey,
-      hasOddsData: !!(context.oddsData?.events?.length),
+      hasOddsData: hasClientOddsData,
+      category,
+      sport: context.sport || 'none',
     });
     let aiText: string;
     let modelUsed = AI_CONFIG.MODEL_DISPLAY_NAME;
@@ -185,21 +192,35 @@ export async function POST(request: NextRequest) {
       usedFallback = true;
     }
 
-    // Only generate insight cards when we have real live odds data to show.
-    // Skip for fallback responses, general questions, or when no specific sport/data is available.
+    // Generate cards on-demand for betting/sports queries.
+    // If the client already has relevant cards, use those to avoid duplicate API calls.
     let cards: InsightCard[] = [];
-    const hasRealOddsData = (context.oddsData?.events?.length ?? 0) > 0;
-    if (!usedFallback && hasRealOddsData && context.sport) {
+    const hasExistingCards = Array.isArray(existingCards) && existingCards.length > 0;
+
+    if (hasExistingCards) {
+      cards = existingCards;
+    } else if (!usedFallback && context.hasFantasyIntent && !context.hasBettingIntent) {
+      // Fantasy query — generate fantasy cards with message context
       try {
-        cards = await generateContextualCards(
-          category,
-          context.sport ?? undefined,
-          3
+        const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
+        cards = generateFantasyCards(userMessage, 3);
+      } catch (err) {
+        console.error('[API/analyze] Fantasy card generation failed:', err);
+        cards = await generateContextualCards('fantasy', undefined, 3).catch(() => []);
+      }
+    } else if (!usedFallback && (context.isSportsQuery || context.hasBettingIntent)) {
+      try {
+        const sportKey = context.sport || undefined;
+        const cardPromise = generateContextualCards('betting', sportKey, 6);
+        const timeoutPromise = new Promise<InsightCard[]>((resolve) =>
+          setTimeout(() => resolve([]), 6000)
         );
-      } catch (cardError) {
-        console.error('[API/analyze] Card generation failed:', cardError);
+        cards = await Promise.race([cardPromise, timeoutPromise]);
+      } catch (err) {
+        console.error('[API/analyze] Card generation failed:', err);
       }
     }
+    console.log(`[API/analyze] Returning ${cards.length} cards`);
 
     const processingTime = Date.now() - startTime;
 

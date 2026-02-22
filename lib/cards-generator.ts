@@ -12,10 +12,52 @@
 import { CARD_TYPES, SPORT_KEYS, sportToApi, apiToSport } from '@/lib/constants';
 import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
 
+// ============================================================================
+// In-memory card cache (shared between SSR page load and /api/analyze)
+// Prevents duplicate API calls when the analyze endpoint needs cards that
+// were already fetched during SSR.
+// ============================================================================
+interface CachedCards {
+  cards: InsightCard[];
+  timestamp: number;
+  category: string;
+}
+
+const CARD_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+let cachedCards: CachedCards | null = null;
+
+/** Retrieve cached cards if still fresh, filtered by category/sport */
+export function getCachedCards(category?: string, sport?: string, count: number = 6): InsightCard[] | null {
+  if (!cachedCards) return null;
+  if (Date.now() - cachedCards.timestamp > CARD_CACHE_TTL) {
+    cachedCards = null;
+    return null;
+  }
+
+  let filtered = cachedCards.cards;
+
+  // Filter by sport if specified
+  if (sport) {
+    const normalized = sportToApi(sport);
+    const sportFiltered = filtered.filter(c => {
+      const cardSport = c.data?.sport as string;
+      return cardSport && (cardSport === normalized || cardSport === sport);
+    });
+    if (sportFiltered.length > 0) filtered = sportFiltered;
+  }
+
+  return filtered.slice(0, count);
+}
+
+/** Store cards in the in-memory cache */
+function setCachedCards(cards: InsightCard[], category: string): void {
+  cachedCards = { cards, timestamp: Date.now(), category };
+}
+
 /**
  * Generate sport-specific cards with REAL odds data
  */
-// FORCE REFRESH: 2026-02-15-03:00
+// FORCE REFRESH: 2026-02-21-v5
 async function generateSportSpecificCards(
   sport: string,
   count: number,
@@ -23,41 +65,26 @@ async function generateSportSpecificCards(
 ): Promise<InsightCard[]> {
   // FORCE MINIMUM 3 CARDS - OVERRIDE ANY COUNT PARAMETER
   const actualCount = Math.max(count, 3);
-  console.log(`[v0] [CARDS-GEN] ENTRY: sport=${sport} requestedCount=${count} OVERRIDING TO actualCount=${actualCount}`);
-  
   const cards: InsightCard[] = [];
   const displaySport = apiToSport(sport).toUpperCase();
-  console.log(`[v0] [SPORT CARDS] Display sport: ${displaySport}`);
+  console.log(`[v0] [CARDS-GEN] ${displaySport}: generating ${actualCount} cards (category: ${category || 'all'})`);
   
   // Fetch real live odds for this sport using unified service
   if (category === 'betting' || category === 'all' || !category) {
-    console.log(`[v0] [CARDS-GEN] ===== FETCHING ODDS FOR ${displaySport} =====`);
-    console.log(`[v0] [CARDS-GEN] Sport key: ${sport}`);
-    console.log(`[v0] [CARDS-GEN] Category: ${category || 'default (betting)'}`);
-    console.log(`[v0] [CARDS-GEN] Requested count: ${count}, Actual count: ${actualCount}`);
-    
     try {
       const { getOddsWithCache } = await import('@/lib/unified-odds-fetcher');
       
-      // Check API key availability
       const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
-      console.log(`[v0] [CARDS-GEN] API Key present: ${!!apiKey}`);
-      
       if (!apiKey) {
-        console.error(`[v0] [CARDS-GEN] ❌ CRITICAL: No ODDS_API_KEY found in environment!`);
         throw new Error('ODDS_API_KEY not configured');
       }
       
-      // Use unified service - automatically handles API + Supabase caching + storage
-      console.log(`[v0] [CARDS-GEN] Calling getOddsWithCache...`);
       const oddsData = await getOddsWithCache(sport, {
-        useCache: false, // Skip cache to get fresh data with all markets
-        storeResults: true // Store in Supabase for realtime sync
+        useCache: false,
+        storeResults: true
       });
       
-      console.log(`[v0] [CARDS-GEN] ✓ Unified service returned ${oddsData?.length || 0} games`);
-      console.log(`[v0] [CARDS-GEN] Data is array: ${Array.isArray(oddsData)}`);
-      console.log(`[v0] [CARDS-GEN] Data is null/undefined: ${oddsData == null}`);
+      console.log(`[v0] [CARDS-GEN] ${displaySport}: ${oddsData?.length || 0} games from API`);
       
       if (oddsData && oddsData.length > 0) {
         console.log(`[v0] [CARDS-GEN] SUCCESS: Found ${oddsData.length} games for ${displaySport}`);
@@ -157,15 +184,39 @@ async function generateSportSpecificCards(
       console.error(error);
       console.error(`[v0] [CARDS-GEN] Stack trace:`, (error as Error).stack);
       
-      // Detect specific error types
+      // Detect specific error types and provide context-aware fallback reason
       const errorMsg = (error as Error).message || '';
       const isCircuitBreakerOpen = (error as any).isCircuitBreakerOpen === true;
       const isRateLimited = errorMsg.includes('429') || errorMsg.toLowerCase().includes('rate limit');
       
+      let fallbackReason: string | undefined;
       if (isCircuitBreakerOpen) {
         console.error(`[v0] [CARDS-GEN] Circuit breaker is open - too many recent failures`);
+        fallbackReason = 'api_error';
       } else if (isRateLimited) {
         console.error(`[v0] [CARDS-GEN] Rate limited - API quota exceeded`);
+        fallbackReason = 'rate_limited';
+      }
+      
+      // Generate a context-aware fallback card with the specific error reason
+      if (fallbackReason) {
+        const noDataMessage = generateNoDataMessage(sport, fallbackReason);
+        cards.push({
+          type: CARD_TYPES.LIVE_ODDS,
+          title: `${displaySport} - ${noDataMessage.title}`,
+          icon: 'AlertTriangle',
+          category: displaySport,
+          subcategory: fallbackReason === 'rate_limited' ? 'Rate Limited' : 'Temporarily Unavailable',
+          gradient: getSportGradient(sport),
+          data: {
+            description: noDataMessage.description,
+            note: noDataMessage.suggestion,
+            sport: sport,
+            status: 'ERROR_FALLBACK',
+            realData: false
+          }
+        });
+        return cards;
       }
     }
   }
@@ -236,9 +287,17 @@ export async function generateContextualCards(
   count: number = 3,
   multiSport: boolean = !sport // DEFAULT TO TRUE WHEN NO SPORT SPECIFIED
 ): Promise<InsightCard[]> {
+  // Check in-memory cache first to avoid redundant API calls
+  // (SSR page load populates this, /api/analyze reuses it)
+  const cached = getCachedCards(category, sport, count);
+  if (cached && cached.length > 0) {
+    console.log(`[v0] [CARDS-GEN] Cache HIT: returning ${cached.length} cached cards`);
+    return cached;
+  }
+
   const cards: InsightCard[] = [];
   
-  console.log(`[v0] [CARDS-GEN] Starting with multiSport=${multiSport}, sport=${sport}, category=${category}`);
+  console.log(`[v0] [CARDS-GEN] Cache MISS: fetching fresh data (multiSport=${multiSport}, sport=${sport}, category=${category})`);
 
   // Normalize sport to API format, then get display name
   const normalizedSport = sport ? sportToApi(sport) : undefined;
@@ -273,28 +332,38 @@ export async function generateContextualCards(
       ...baseSports.filter(s => !getSeasonInfo(s).isInSeason),
     ];
 
-    console.log('[v0] [CARDS GENERATOR] Will query sports in order:', orderedSports.map(s => {
-      const inSeason = getSeasonInfo(s).isInSeason;
-      return `${apiToSport(s).toUpperCase()}${inSeason ? '' : '(off-season)'}`;
-    }).join(', '));
+    const inSeasonSports = orderedSports.filter(s => getSeasonInfo(s).isInSeason);
+    console.log(`[v0] [MULTI-SPORT] Querying ${orderedSports.length} sports (${inSeasonSports.length} in-season), need ${count} cards`);
     
-    // Fetch from ALL sports in parallel for speed
-    console.log('[v0] [MULTI-SPORT] Fetching odds from all sports in PARALLEL...');
-    const allSportCards = await Promise.all(
-      orderedSports.map(async (sportKey) => {
-        console.log(`[v0] [MULTI-SPORT] Starting fetch for ${apiToSport(sportKey).toUpperCase()}`);
-        try {
-          const sportCards = await generateSportSpecificCards(sportKey, 5, category);
-          console.log(`[v0] [MULTI-SPORT] ✓ ${apiToSport(sportKey).toUpperCase()}: ${sportCards.length} cards`);
-          return { sport: sportKey, cards: sportCards };
-        } catch (error) {
-          console.error(`[v0] [MULTI-SPORT] ✗ ${apiToSport(sportKey).toUpperCase()} failed:`, error);
-          return { sport: sportKey, cards: [] };
-        }
-      })
-    );
+    // Fetch in small sequential batches (2 at a time) to avoid thundering herd
+    // Early-terminate once we have enough cards
+    const BATCH_SIZE = 2;
+    const allSportCards: { sport: string; cards: InsightCard[] }[] = [];
     
-    console.log('[v0] [MULTI-SPORT] All fetches complete');
+    for (let i = 0; i < orderedSports.length; i += BATCH_SIZE) {
+      const collectedSoFar = allSportCards.reduce((sum, r) => sum + r.cards.filter(c => c.data?.realData).length, 0);
+      if (collectedSoFar >= count) {
+        console.log(`[v0] [MULTI-SPORT] Early exit: ${collectedSoFar} cards collected`);
+        break;
+      }
+      
+      const batch = orderedSports.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (sportKey) => {
+          try {
+            const sportCards = await generateSportSpecificCards(sportKey, 5, category);
+            return { sport: sportKey, cards: sportCards };
+          } catch (error) {
+            console.error(`[v0] [MULTI-SPORT] ${apiToSport(sportKey).toUpperCase()} failed:`, error);
+            return { sport: sportKey, cards: [] };
+          }
+        })
+      );
+      
+      allSportCards.push(...batchResults);
+      const batchCardCount = batchResults.reduce((s, r) => s + r.cards.length, 0);
+      console.log(`[v0] [MULTI-SPORT] Batch ${Math.floor(i / BATCH_SIZE) + 1} (${batch.map(s => apiToSport(s).toUpperCase()).join('/')}): ${batchCardCount} cards`);
+    }
     
     // Collect cards from sports that returned data
     for (const { sport: sportKey, cards: sportCards } of allSportCards) {
@@ -805,20 +874,28 @@ export async function generateContextualCards(
     });
   }
 
-  // Fantasy cards
-  if (category === 'fantasy') {
-    cards.push({
-      type: 'FANTASY_ADVICE',
-      title: '🏆 Fantasy Insights',
-      icon: 'Trophy',
-      category: 'FANTASY',
-      subcategory: 'Season-Long',
-      gradient: 'from-blue-600 to-cyan-700',
-      data: {
-        description: 'Trade recommendations and waiver wire targets',
-        tips: ['Start/sit decisions', 'Rest-of-season projections']
-      }
-    });
+  // Fantasy / Draft cards — rich cards from the fantasy card generator
+  if (category === 'fantasy' || category === 'draft' || category === 'waiver') {
+    try {
+      const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
+      const fantasyCards = generateFantasyCards('', count);
+      cards.push(...fantasyCards.slice(0, count));
+    } catch (err) {
+      console.error('[v0] [CARDS-GEN] Fantasy card generation failed:', err);
+      // Fallback placeholder
+      cards.push({
+        type: 'FANTASY_ADVICE',
+        title: 'Fantasy Intelligence',
+        icon: 'Trophy',
+        category: 'FANTASY',
+        subcategory: 'Draft Assistant',
+        gradient: 'from-blue-600 to-cyan-700',
+        data: {
+          description: 'VBD rankings, tier cliff detection, and AI draft recommendations.',
+          tips: ['Ask about VBD rankings', 'Ask about tier cliffs', 'Ask about waiver targets'],
+        },
+      });
+    }
   }
 
   // If we have a sport and still need cards, try fetching sport-specific data
@@ -864,8 +941,13 @@ export async function generateContextualCards(
     });
   }
   
-  console.log('[v0] [CARDS GENERATOR] ✓ Generated', cards.length, 'cards (before weather enrichment)');
+  console.log('[v0] [CARDS GENERATOR] Generated', cards.length, 'cards (before weather enrichment)');
   console.log('[v0] [CARDS GENERATOR] Card titles:', cards.map((c: InsightCard) => c.title).join(', '));
+
+  // Populate the in-memory cache so subsequent calls (e.g. /api/analyze) reuse these
+  if (cards.length > 0) {
+    setCachedCards(cards, category || 'all');
+  }
 
   // Add weather cards for outdoor sports if betting category
   if ((category === 'betting' || !category) && normalizedSport) {

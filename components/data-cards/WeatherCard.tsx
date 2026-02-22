@@ -74,7 +74,7 @@ export function WeatherCard({
         {data.humidity && <DataRow label="Humidity" value={data.humidity} />}
         {data.precipitation && <DataRow label="Precipitation" value={data.precipitation} />}
         {data.gameImpact && (
-          <div className="pt-2 mt-2 border-t border-gray-700/40">
+          <div className="pt-2 mt-2 border-t border-[oklch(0.20_0.015_280)]">
             <DataRow label="Game Impact" value={data.gameImpact} highlight />
           </div>
         )}

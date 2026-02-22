@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { sport, category, limit = 3 } = body;
 
-    const clampedLimit = Math.min(Math.max(Number(limit) || 3, 1), 10);
+    const clampedLimit = Math.min(Math.max(Number(limit) || 3, 1), 15);
 
     const cards = await generateContextualCards(
       category ?? undefined,

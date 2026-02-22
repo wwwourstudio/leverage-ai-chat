@@ -1,5 +1,5 @@
 /**
- * Main Chat Interface
+ * Main Chat Interface - v2 (analysis overlay fixed)
  * 
  * Production-ready AI sports betting assistant with real-time data integration.
  * Features:
@@ -139,7 +139,7 @@ interface InsightCard {
   category: string;
   subcategory: string;
   gradient: string;
-  data: Record<string, string | number>;
+  data: Record<string, any>;
   status: string;
 }
 
@@ -183,16 +183,19 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // UTC server and the user's local-timezone browser, causing React error #418.
   const STATIC_WELCOME = `**Leverage AI** - Powered by Grok AI\n\nI'm connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.`;
 
+  // Cards are generated on-demand by /api/analyze for betting/sports queries.
+  // They are never shown on the welcome screen -- only on AI responses.
+
   const [messages, setMessages] = useState<Message[]>([
     {
-  role: 'assistant',
-  content: STATIC_WELCOME,
-  timestamp: serverData?.serverTime ? new Date(serverData.serverTime) : new Date(),
-  isWelcome: true,
-  cards: [],
-  insights: {
-  totalValue: 0,
-  winRate: 0,
+      role: 'assistant',
+      content: STATIC_WELCOME,
+      timestamp: serverData?.serverTime ? new Date(serverData.serverTime) : new Date(),
+      isWelcome: true,
+      cards: [],
+      insights: {
+        totalValue: 0,
+        winRate: 0,
         roi: 0,
         activeContests: 0,
         totalInvested: 0
@@ -232,6 +235,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   );
   const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
   const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string }>>([]);
+  const [lastUserQuery, setLastUserQuery] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -249,8 +253,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cards are not pre-loaded on the welcome screen.
-  // They are only shown after an AI response when there is real live data to display.
+
   
   // Credit system utilities — syncs with Supabase user_profiles when logged in,
   // falls back to localStorage for anonymous users.
@@ -277,24 +280,14 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   };
 
   // Sync credits to Supabase (fire-and-forget)
-  const syncCreditsToSupabase = async (newCredits: number, transactionType: string, amount: number) => {
+  const syncCreditsToSupabase = async (newCredits: number, _transactionType: string, _amount: number) => {
     if (!supabaseProfileId) return;
     try {
       const supabase = createClient();
-      // Update profile balance
       await supabase
-        .from('profiles')
-        .update({ credits: newCredits, updated_at: new Date().toISOString() })
+        .from('user_profiles')
+        .update({ credits_remaining: newCredits, updated_at: new Date().toISOString() })
         .eq('id', supabaseProfileId);
-      // Log transaction
-      await supabase
-        .from('credit_transactions')
-        .insert({
-          user_id: supabaseProfileId,
-          amount,
-          balance_after: newCredits,
-          transaction_type: transactionType,
-        });
     } catch (err) {
       console.error('[Credits] Supabase sync failed:', err);
     }
@@ -305,16 +298,15 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     try {
       const supabase = createClient();
       const { data: profile } = await supabase
-        .from('profiles')
-        .select('id, credits')
-        .eq('auth_id', authId)
+        .from('user_profiles')
+        .select('id, credits_remaining')
+        .eq('user_id', authId)
         .single();
 
       if (profile) {
         setSupabaseProfileId(profile.id);
-        const dbCredits = profile.credits ?? MESSAGE_LIMIT;
+        const dbCredits = profile.credits_remaining ?? MESSAGE_LIMIT;
         setCreditsRemaining(dbCredits);
-        // Sync to localStorage
         const creditData = getCreditData();
         localStorage.setItem('userCredits', JSON.stringify({ ...creditData, credits: dbCredits }));
         return dbCredits;
@@ -526,11 +518,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     const msgLower = userMessage.toLowerCase();
     const suggestions: Array<{ label: string; icon: any; category: string }> = [];
     
-    console.log('[v0] ==========================================');
-      console.log('[v0] GENERATING CONTEXTUAL SUGGESTIONS');
-      console.log('[v0] User message:', userMessage);
-      console.log('[v0] Response cards received:', responseCards.length);
-      console.log('[v0] Card details:', responseCards.map((c: any) => ({ type: c.type, category: c.category })));
+    console.log('[v0] Suggestions: generating for', responseCards.length, 'cards');
     
     // Analyze the AI's response cards to understand what was provided
     const cardTypes = responseCards.map(card => card.type);
@@ -542,7 +530,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     const hasCrossPlatform = cardTypes.includes('cross-platform');
     const hasPlayerProps = cardTypes.includes('player-prop');
     
-    console.log('[v0] Detected card types:', { hasLiveOdds, hasDFSLineup, hasFantasy, hasKalshi, hasCrossPlatform, hasPlayerProps });
+
     
     // Analyze user message context for deeper understanding
     const isBetting = msgLower.includes('bet') || msgLower.includes('odds') || msgLower.includes('line');
@@ -714,10 +702,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       index === self.findIndex((s) => s.label === suggestion.label)
     );
     
-    console.log('[v0] Generated', suggestions.length, 'total suggestions');
-    console.log('[v0] Filtered to', uniqueSuggestions.length, 'unique suggestions');
-    console.log('[v0] Suggestion labels:', uniqueSuggestions.map(s => s.label));
-    console.log('[v0] ==========================================');
+    console.log('[v0] Suggestions:', uniqueSuggestions.length, 'generated');
     
     // Return 5-7 unique suggestions for optimal UX
     return uniqueSuggestions.slice(0, 7);
@@ -916,6 +901,7 @@ No preamble. Start directly with section 1.`;
   
   const generateRealResponse = async (userMessage: string) => {
     setIsTyping(true);
+    setLastUserQuery(userMessage);
     const startTime = Date.now();
     const isDev = process.env.NODE_ENV !== 'production';
     
@@ -935,16 +921,20 @@ No preamble. Start directly with section 1.`;
       // Betting intent keywords
       const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'arbitrage', 'arb', 'h2h', 'value', 'sportsbook', 'draftkings', 'fanduel', 'moneyline', 'prop', 'parlay'];
       const hasBettingIntent = bettingKeywords.some(k => lowerMsg.includes(k));
-      
+
       // Sports query detection (not political)
       const sportsKeywords = ['nba', 'nfl', 'nhl', 'mlb', 'basketball', 'football', 'hockey', 'baseball', 'ncaa'];
       const isSportsQuery = sportsKeywords.some(k => lowerMsg.includes(k)) && !isPoliticalMarket;
-      
+
+      // Fantasy intent detection
+      const fantasyKeywords = ['fantasy', 'draft', 'waiver', 'faab', 'adp', 'vbd', 'tier cliff', 'bestball', 'best ball', 'start sit', 'trade value', 'who should i pick', 'who do i start', 'sleeper', 'rankings', 'projections', 'auction value'];
+      const hasFantasyIntent = fantasyKeywords.some(k => lowerMsg.includes(k)) && !isPoliticalMarket;
+
       const detectedPlatform = extractPlatform(userMessage);
-      
+
       // Override isPoliticalMarket if platform is kalshi
       const finalIsPoliticalMarket = isPoliticalMarket || detectedPlatform === 'kalshi';
-      
+
       const context: any = {
         sport: detectedSport,
         marketType: extractMarketType(userMessage),
@@ -952,23 +942,33 @@ No preamble. Start directly with section 1.`;
         isSportsQuery,
         isPoliticalMarket: finalIsPoliticalMarket,
         hasBettingIntent,
+        hasFantasyIntent,
         previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }))
       };
 
       if (isDev) {
-        console.log('[v0] Extracted context:', context);
-        console.log('[SPORT DETECTED]', detectedSport || 'none');
-        console.log('[POLITICAL MARKET DETECTED]', finalIsPoliticalMarket);
+        console.log('[v0] Context:', { sport: detectedSport || 'none', betting: hasBettingIntent, sports: isSportsQuery, political: finalIsPoliticalMarket, fantasy: hasFantasyIntent });
       }
-      
+
       // HARD STOP: Political markets NEVER fetch sports odds
       if (context.isPoliticalMarket) {
         if (isDev) console.log('[POLITICAL MARKET DETECTED] Skipping sports odds fetch');
         // Route directly to Kalshi analysis without attempting sports odds
         // Note: The /api/analyze endpoint will handle Kalshi market analysis
-      } else if (context.hasBettingIntent && context.isSportsQuery) {
-        // Only fetch sports odds if this is explicitly a sports betting query
-        if (isDev) console.log('[ODDS FETCH ATTEMPT] Sports betting query detected');
+      } else if (context.hasFantasyIntent && !context.hasBettingIntent) {
+        // Fantasy intent — generate fantasy cards client-side immediately so they
+        // appear before the AI response comes back.
+        if (isDev) console.log('[FANTASY INTENT] Generating fantasy cards');
+        try {
+          const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
+          const fantasyCards = generateFantasyCards(userMessage, 3);
+          context.existingCards = fantasyCards;
+        } catch (err) {
+          if (isDev) console.error('[FANTASY INTENT] Card generation failed:', err);
+        }
+      } else if (context.hasBettingIntent || context.isSportsQuery) {
+        // Fetch sports odds for any betting-related query OR explicit sports query
+        if (isDev) console.log('[ODDS FETCH ATTEMPT] Betting intent or sports query detected');
         if (isDev) console.log('[v0] === ODDS FETCH STARTING ===');
         
         // Import SPORT_KEYS for consistent API format
@@ -1014,53 +1014,13 @@ No preamble. Start directly with section 1.`;
             context.oddsErrorMessage = `Unable to fetch ${context.sport.toUpperCase()} odds. This may be a temporary API issue.`;
           }
         } else {
-          // ONLY ALLOW FALLBACK IF NO SPORT DETECTED
-          if (isDev) console.log('[v0] No specific sport detected - attempting fallback rotation');
-          
-          const fallbackSports = [
-            SPORT_KEYS.NBA.API,
-            SPORT_KEYS.NFL.API,
-            SPORT_KEYS.NHL.API,
-            SPORT_KEYS.MLB.API
-          ];
-          
-          let foundData = false;
-          
-          for (const sportKey of fallbackSports) {
-            if (foundData) break;
-            
-            if (isDev) console.log(`[v0] Trying fallback sport: ${sportKey}`);
-            
-            try {
-              const oddsResponse = await fetch('/api/odds', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sport: sportKey, marketType: 'h2h' })
-              });
-              
-              if (oddsResponse.ok) {
-                const oddsResult = await oddsResponse.json();
-                
-                if (oddsResult?.events?.length > 0) {
-                  const sportName = sportKey.replace('_', ' ').toUpperCase();
-                  if (isDev) console.log(`[v0] ✅ Fallback success - Found ${oddsResult.events.length} games in ${sportName}`);
-                  context.oddsData = oddsResult;
-                  context.oddsData.sport = sportKey;
-                  foundData = true;
-                  break;
-                }
-              }
-            } catch (err) {
-              if (isDev) console.error(`[v0] Exception fetching ${sportKey}:`, err);
-            }
-          }
-          
-          if (!foundData && isDev) {
-            console.warn('[v0] ⚠️ ODDS FETCH FAILED - No live games found across all sports');
-          }
+          // No specific sport detected. Don't burn API calls with fallback rotation --
+          // the client already has real cards from SSR/initial load. Those cards will be
+          // passed to /api/analyze via existingCards and displayed in the response.
+          if (isDev) console.log('[v0] No sport detected — using available cards instead of fallback rotation');
         }
         
-        if (isDev) console.log('[v0] === ODDS FETCH COMPLETE ===');
+
         
         // HARD CROSS-SPORT CONTAMINATION GUARD
         if (context.sport && context.oddsData?.sport && context.oddsData.sport !== sportToApi(context.sport)) {
@@ -1074,12 +1034,19 @@ No preamble. Start directly with section 1.`;
         }
       }
       
+      // Collect any existing cards from previous messages (SSR welcome + prior responses)
+      // to pass to the analyze endpoint so it can return them without re-fetching.
+      const availableCards = messages
+        .flatMap((m: Message) => m.cards || [])
+        .filter((c: InsightCard) => c.data?.realData !== false)
+        .slice(0, 6);
+
       // Fetch real data from our API routes
       const fetchAnalysis = () =>
         fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userMessage, context }),
+          body: JSON.stringify({ userMessage, existingCards: availableCards, context }),
         }).then((res) => res.json() as Promise<APIResponse>);
 
       setVerifyStage('analyzing');
@@ -1103,16 +1070,12 @@ No preamble. Start directly with section 1.`;
         setVerifyStage('analyzing');
       }
 
-      console.log('[v0] Analysis result received:', {
-        success: analysisResult.success,
-        hasText: !!analysisResult.text,
-        hasCards: !!analysisResult.cards,
-        hasTrustMetrics: !!analysisResult.trustMetrics,
-        finalConfidence: analysisResult.trustMetrics?.finalConfidence,
-        error: analysisResult.error,
-        useFallback: analysisResult.useFallback,
-        details: analysisResult.details,
-        hadOddsData: !!context.oddsData
+      console.log('[v0] Analysis:', {
+        ok: analysisResult.success,
+        cards: analysisResult.cards?.length ?? 0,
+        confidence: analysisResult.trustMetrics?.finalConfidence,
+        fallback: analysisResult.useFallback,
+        clientCards: availableCards.length,
       });
 
       // Handle API errors with smart fallback
@@ -1120,9 +1083,10 @@ No preamble. Start directly with section 1.`;
       let newMessage: Message;
       
       if (!analysisResult.success) {
-        console.log('[v0] API call failed, using contextual cards');
+        console.log('[v0] API call failed, using available cards as fallback');
         
-        const fallbackCards = await selectRelevantCards(userMessage, context);
+        // Use already-loaded cards rather than making another server call
+        const fallbackCards = availableCards.length > 0 ? availableCards : await selectRelevantCards(userMessage, context);
         const errorMessage = analysisResult.error || 'API temporarily unavailable';
         
         newMessage = {
@@ -1153,12 +1117,18 @@ No preamble. Start directly with section 1.`;
           }
         };
       } else {
-        // Success path - process the analysis result
+        // Success path - process the analysis result.
+        // If the server returns cards, use them. Otherwise fall back to
+        // the cards we already have from the SSR welcome message.
+        const responseCards = (analysisResult.cards && analysisResult.cards.length > 0)
+          ? analysisResult.cards
+          : availableCards;
+
         newMessage = {
           role: 'assistant',
           content: analysisResult.text || 'Analysis complete.',
           timestamp: new Date(),
-          cards: analysisResult.cards || [],
+          cards: responseCards,
           confidence: analysisResult.confidence || 85,
           sources: analysisResult.sources || [],
           modelUsed: analysisResult.modelUsed || 'Grok',
@@ -1183,7 +1153,7 @@ No preamble. Start directly with section 1.`;
       // Generate contextual suggestions
       const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);
       setSuggestedPrompts(contextualSuggestions);
-      console.log('[v0] Generated contextual suggestions:', contextualSuggestions.length);
+
     } catch (error) {
       console.error('[v0] Error generating real response:', error);
       
@@ -2200,9 +2170,6 @@ No preamble. Start directly with section 1.`;
                   <div className="relative w-12 h-12 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-xl shadow-blue-500/40 group-hover/logo:shadow-blue-500/60 transition-all duration-300">
                     <Sparkles className="w-6 h-6 text-white group-hover/logo:scale-110 transition-transform" />
                   </div>
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-950 shadow-lg shadow-green-500/50 flex items-center justify-center">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-ping"></div>
-                  </div>
                 </div>
                 <div>
                   <h1 className="text-xl font-black bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent tracking-tight">
@@ -2428,106 +2395,102 @@ No preamble. Start directly with section 1.`;
                             const CardIcon = getCardIcon(card.type);
                             
                             return (
-                              <div className="space-y-6">
+                              <div className="space-y-5">
                                 {/* Header Section */}
-                                <div className="flex items-start gap-4">
-                                  <div className={`p-3 rounded-xl bg-gradient-to-br ${card.gradient} shadow-lg flex-shrink-0`}>
-                                    <CardIcon className="w-6 h-6 text-white" />
+                                <div className="flex items-start gap-3">
+                                  <div className="p-2.5 rounded-xl bg-[oklch(0.16_0.02_280)] flex-shrink-0">
+                                    <CardIcon className="w-5 h-5 text-[oklch(0.70_0.005_85)]" />
                                   </div>
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-3 mb-2">
-                                      <h2 className="text-xl font-black text-white">{card.title}</h2>
-                                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide ${
-                                        card.status === 'hot' || card.status === 'elite' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                                        card.status === 'strong' || card.status === 'optimal' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
-                                        'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                                      }`}>{card.status}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <h2 className="text-lg font-black text-[oklch(0.95_0.005_85)] truncate">{card.title}</h2>
+                                      <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wide bg-[oklch(0.16_0.02_280)] text-[oklch(0.70_0.005_85)] border border-[oklch(0.22_0.02_280)]">{card.status}</span>
                                     </div>
-                                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">
-                                      {card.category} • {card.subcategory}
+                                    <p className="text-[11px] text-[oklch(0.45_0.01_280)] font-semibold uppercase tracking-wide">
+                                      {card.category} / {card.subcategory}
                                     </p>
                                   </div>
                                 </div>
 
                                 {/* Overview */}
-                                <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 border border-gray-700/50 rounded-xl p-4">
-                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-2">
-                                    <Info className="w-3.5 h-3.5" />
+                                <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-4">
+                                  <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-2 flex items-center gap-2">
+                                    <Info className="w-3 h-3" />
                                     Overview
                                   </h3>
-                                  <p className="text-sm text-gray-200 leading-relaxed">{overview}</p>
+                                  <p className="text-sm text-[oklch(0.80_0.005_85)] leading-relaxed">{overview}</p>
                                 </div>
 
                                 {/* Key Metrics Grid */}
                                 <div>
-                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <BarChart className="w-3.5 h-3.5" />
+                                  <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <BarChart className="w-3 h-3" />
                                     Key Metrics
                                   </h3>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  <div className="grid grid-cols-2 gap-2">
                                     {metrics.map((metric: { label: string; value: string }, idx: number) => (
                                       <div 
                                         key={idx}
-                                        className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 rounded-xl p-3.5 hover:border-gray-600/50 transition-colors"
+                                        className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-3 hover:border-[oklch(0.25_0.02_280)] transition-colors"
                                       >
-                                        <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">{metric.label}</div>
-                                        <div className="text-base font-black text-white">{metric.value}</div>
+                                        <div className="text-[9px] font-bold text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-1">{metric.label}</div>
+                                        <div className="text-base font-black text-[oklch(0.92_0.005_85)]">{metric.value}</div>
                                       </div>
                                     ))}
                                   </div>
                                 </div>
 
                                 {/* Market Context */}
-                                <div className="bg-gradient-to-br from-blue-900/20 to-indigo-900/20 border border-blue-700/30 rounded-xl p-4">
-                                  <h3 className="text-xs font-black text-blue-400 uppercase tracking-wide mb-2 flex items-center gap-2">
-                                    <TrendingUp className="w-3.5 h-3.5" />
+                                <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-4">
+                                  <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-2 flex items-center gap-2">
+                                    <TrendingUp className="w-3 h-3" />
                                     Market Context & Edge
                                   </h3>
-                                  <p className="text-sm text-gray-200 leading-relaxed">{marketContext}</p>
+                                  <p className="text-sm text-[oklch(0.80_0.005_85)] leading-relaxed">{marketContext}</p>
                                 </div>
 
                                 {/* Risk Assessment */}
                                 <div>
-                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <Shield className="w-3.5 h-3.5" />
+                                  <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <Shield className="w-3 h-3" />
                                     Risk Assessment
                                   </h3>
-                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-700/30 rounded-xl p-4">
-                                      <div className="text-[10px] font-bold text-green-500 uppercase tracking-wide mb-1.5">Conviction Level</div>
-                                      <div className="text-lg font-black text-green-400">{riskAssessment.convictionLevel}</div>
+                                  <div className="grid grid-cols-3 gap-2">
+                                    <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-3">
+                                      <div className="text-[9px] font-bold text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-1">Conviction</div>
+                                      <div className="text-lg font-black text-[oklch(0.92_0.005_85)]">{riskAssessment.convictionLevel}</div>
                                     </div>
-                                    <div className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border border-yellow-700/30 rounded-xl p-4">
-                                      <div className="text-[10px] font-bold text-yellow-500 uppercase tracking-wide mb-1.5">Risk Category</div>
-                                      <div className="text-sm font-black text-yellow-400">{riskAssessment.riskCategory}</div>
+                                    <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-3">
+                                      <div className="text-[9px] font-bold text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-1">Risk</div>
+                                      <div className="text-sm font-black text-[oklch(0.85_0.005_85)]">{riskAssessment.riskCategory}</div>
                                     </div>
-                                    <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-700/30 rounded-xl p-4">
-                                      <div className="text-[10px] font-bold text-purple-500 uppercase tracking-wide mb-1.5">Position Sizing</div>
-                                      <div className="text-lg font-black text-purple-400">{riskAssessment.positionSize}</div>
-                                      <div className="text-[10px] text-gray-500 mt-1">of bankroll</div>
+                                    <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-3">
+                                      <div className="text-[9px] font-bold text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-1">Position</div>
+                                      <div className="text-lg font-black text-[oklch(0.92_0.005_85)]">{riskAssessment.positionSize}</div>
+                                      <div className="text-[9px] text-[oklch(0.35_0.01_280)] mt-0.5">of bankroll</div>
                                     </div>
                                   </div>
                                 </div>
 
                                 {/* Strategic Recommendations */}
                                 <div>
-                                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <Target className="w-3.5 h-3.5" />
+                                  <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <Target className="w-3 h-3" />
                                     Strategic Recommendations
                                   </h3>
-                                  <div className="space-y-2.5">
+                                  <div className="space-y-2">
                                     {recommendations.map((rec: { label: string; value: string }, idx: number) => (
                                       <div 
                                         key={idx}
-                                        className="bg-gradient-to-r from-gray-800/40 to-gray-900/40 border border-gray-700/50 rounded-xl p-4 hover:border-gray-600/50 transition-colors"
+                                        className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-3.5 hover:border-[oklch(0.25_0.02_280)] transition-colors"
                                       >
                                         <div className="flex items-start gap-3">
-                                          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                            <span className="text-white text-xs font-black">{idx + 1}</span>
+                                          <div className="w-5 h-5 rounded-md bg-[oklch(0.18_0.02_280)] flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            <span className="text-[oklch(0.70_0.005_85)] text-[10px] font-black">{idx + 1}</span>
                                           </div>
-                                          <div className="flex-1">
-                                            <div className="text-xs font-black text-gray-300 mb-1">{rec.label}</div>
-                                            <div className="text-sm text-gray-400 leading-relaxed">{rec.value}</div>
+                                          <div className="flex-1 min-w-0">
+                                            <div className="text-xs font-black text-[oklch(0.80_0.005_85)] mb-0.5">{rec.label}</div>
+                                            <div className="text-sm text-[oklch(0.55_0.01_280)] leading-relaxed">{rec.value}</div>
                                           </div>
                                         </div>
                                       </div>
@@ -2535,11 +2498,11 @@ No preamble. Start directly with section 1.`;
                                   </div>
                                 </div>
 
-                                {/* Next Steps CTA */}
-                                <div className="bg-gradient-to-r from-indigo-900/30 via-purple-900/30 to-pink-900/30 border border-indigo-600/30 rounded-xl p-5">
-                                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                                    <p className="text-sm text-gray-300 leading-relaxed">
-                                      <span className="font-bold text-white">Next Steps:</span> Would you like me to show correlated opportunities or dive deeper into any specific metric?
+                                {/* Next Steps CTA  */}
+                                <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.015_280)] rounded-xl p-4">
+                                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                    <p className="text-sm text-[oklch(0.60_0.01_280)] leading-relaxed">
+                                      <span className="font-bold text-[oklch(0.90_0.005_85)]">Next Steps:</span> Show correlated opportunities or dive deeper into any metric?
                                     </p>
                                     <button
                                       onClick={() => {
@@ -2547,7 +2510,7 @@ No preamble. Start directly with section 1.`;
                                         handleFollowUp('correlated', card);
                                       }}
                                       disabled={isTyping}
-                                      className="group relative flex items-center justify-center gap-2.5 px-8 py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-600 disabled:via-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-black text-base rounded-xl transition-all duration-300 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:shadow-xl hover:scale-105 active:scale-95 min-w-[140px] flex-shrink-0"
+                                      className="group relative flex items-center justify-center gap-2 px-6 py-3 bg-[oklch(0.20_0.02_280)] hover:bg-[oklch(0.25_0.02_280)] disabled:bg-[oklch(0.14_0.01_280)] disabled:cursor-not-allowed text-[oklch(0.92_0.005_85)] font-bold text-sm rounded-xl border border-[oklch(0.28_0.02_280)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] min-w-[120px] flex-shrink-0"
                                     >
                                       {isTyping ? (
                                         <>
@@ -2732,19 +2695,10 @@ No preamble. Start directly with section 1.`;
 
 
 
-                  {/* Dynamic Cards Section with stagger animation */}
-                  {message.role === 'assistant' && message.cards && message.cards.length > 0 && (
-                    <div className="mt-6">
-                      {/* Section header */}
-                      <div className="flex items-center gap-2 mb-4">
-                        <Sparkles className="w-3.5 h-3.5 text-purple-400/80" />
-                        <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">
-                          {message.cards.length} Live Signal{message.cards.length !== 1 ? 's' : ''} Detected
-                        </span>
-                        <div className="flex-1 h-px bg-gray-800/60 ml-1" />
-                      </div>
-
-                      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {/* Dynamic Cards Section -- only on non-welcome AI responses */}
+                  {message.role === 'assistant' && !message.isWelcome && message.cards && message.cards.length > 0 && (
+                    <div className="mt-5">
+                      <div className="flex flex-col gap-4 w-full">
                         {message.cards.map((card, cardIndex) => {
                           const cardKey = `${index}-${cardIndex}`;
                           const analysis = cardAnalysisMap[cardKey];
@@ -2764,21 +2718,21 @@ No preamble. Start directly with section 1.`;
 
                               {/* Inline analysis panel */}
                               {isOpen && (
-                                <div className="rounded-xl border border-gray-700/40 bg-gray-900/80 overflow-hidden">
+                                <div className="rounded-xl border border-border/40 bg-card overflow-hidden">
                                   {analysis.loading ? (
                                     <div className="p-4 space-y-2">
                                       <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                        <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                                        <span className="text-[11px] text-gray-500 ml-1">Analyzing {card.type === 'kalshi' ? 'prediction market' : 'opportunity'}...</span>
+                                        <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                        <div className="w-1.5 h-1.5 bg-info rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                        <div className="w-1.5 h-1.5 bg-primary/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                        <span className="text-[11px] text-muted-foreground ml-1">Analyzing {card.type === 'kalshi' ? 'prediction market' : 'opportunity'}...</span>
                                       </div>
-                                      <div className="h-2 bg-gray-800/60 rounded-full animate-pulse w-full" />
-                                      <div className="h-2 bg-gray-800/60 rounded-full animate-pulse w-5/6" />
-                                      <div className="h-2 bg-gray-800/60 rounded-full animate-pulse w-3/5" />
+                                      <div className="h-2 bg-muted rounded-full animate-pulse w-full" />
+                                      <div className="h-2 bg-muted rounded-full animate-pulse w-5/6" />
+                                      <div className="h-2 bg-muted rounded-full animate-pulse w-3/5" />
                                     </div>
                                   ) : analysis.error ? (
-                                    <div className="p-4 flex items-center gap-2 text-xs text-red-400">
+                                    <div className="p-4 flex items-center gap-2 text-xs text-destructive">
                                       <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
                                       <span>{analysis.error}</span>
                                     </div>
@@ -2786,18 +2740,18 @@ No preamble. Start directly with section 1.`;
                                     <div className="p-4">
                                       <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center gap-1.5">
-                                          <BarChart3 className="w-3 h-3 text-purple-400/70" />
-                                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Analysis</span>
+                                          <BarChart3 className="w-3 h-3 text-muted-foreground" />
+                                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Analysis</span>
                                         </div>
                                         <button
                                           onClick={() => setCardAnalysisMap(prev => { const n = { ...prev }; delete n[cardKey]; return n; })}
-                                          className="text-gray-600 hover:text-gray-400 transition-colors"
+                                          className="text-muted-foreground/50 hover:text-card-foreground transition-colors"
                                           aria-label="Close analysis"
                                         >
                                           <X className="w-3.5 h-3.5" />
                                         </button>
                                       </div>
-                                      <div className="text-xs text-gray-300 leading-relaxed space-y-2.5">
+                                      <div className="text-xs text-card-foreground/80 leading-relaxed space-y-2.5">
                                         {(analysis.content ?? '').split('\n\n').map((para, pIdx) => {
                                           if (para.includes('**')) {
                                             const parts = para.split('**');
@@ -2805,7 +2759,7 @@ No preamble. Start directly with section 1.`;
                                               <p key={pIdx}>
                                                 {parts.map((part, partIdx) =>
                                                   partIdx % 2 === 1
-                                                    ? <span key={partIdx} className="font-bold text-white">{part}</span>
+                                                    ? <span key={partIdx} className="font-bold text-card-foreground">{part}</span>
                                                     : <span key={partIdx}>{part}</span>
                                                 )}
                                               </p>
@@ -3024,6 +2978,17 @@ No preamble. Start directly with section 1.`;
           )}
 
           <div className="relative max-w-5xl mx-auto">
+            {/* Dynamic context label above suggestions */}
+            {lastUserQuery && suggestedPrompts.length > 0 && messages.length > 1 && (
+              <div className="mb-2 px-1">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500">
+                  Follow up on:
+                </span>
+                <span className="ml-2 text-[11px] text-gray-400 truncate">
+                  {lastUserQuery.length > 60 ? lastUserQuery.slice(0, 60) + '...' : lastUserQuery}
+                </span>
+              </div>
+            )}
             {/* Dynamic Contextual Suggestions or Platform Prompts */}
             <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-0 mb-5">
               {(suggestedPrompts.length > 0 && messages.length > 1 ? suggestedPrompts : quickActions).map((action, idx) => {
@@ -3137,7 +3102,11 @@ No preamble. Start directly with section 1.`;
                       handleSubmit(e as React.FormEvent<HTMLInputElement>);
                     }
                   }}
-                  placeholder="Ask about betting odds, fantasy strategy, DFS lineups, or Kalshi markets..."
+                  placeholder={
+                    lastUserQuery
+                      ? `Follow up on your ${lastUserQuery.toLowerCase().includes('nba') ? 'NBA' : lastUserQuery.toLowerCase().includes('nfl') ? 'NFL' : lastUserQuery.toLowerCase().includes('kalshi') ? 'Kalshi' : lastUserQuery.toLowerCase().includes('dfs') ? 'DFS' : lastUserQuery.toLowerCase().includes('fantasy') ? 'fantasy' : 'sports'} analysis or ask something new...`
+                      : 'Ask about betting odds, fantasy strategy, DFS lineups, or Kalshi markets...'
+                  }
                   className="w-full bg-gradient-to-r from-gray-900/80 to-gray-850/80 border border-gray-700/50 hover:border-gray-600/50 focus:border-blue-500/50 rounded-2xl px-6 py-4.5 pr-32 font-medium text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all backdrop-blur-sm shadow-inner text-xs"
                   disabled={isTyping}
                   maxLength={500}

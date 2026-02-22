@@ -71,14 +71,14 @@ interface BettingCardProps {
   error?: string;
 }
 
-const statusConfig: Record<string, { icon: typeof Zap; label: string; class: string }> = {
-  hot: { icon: Zap, label: 'HOT', class: 'bg-red-500/15 text-red-400 ring-red-500/20' },
-  value: { icon: TrendingUp, label: 'VALUE', class: 'bg-emerald-500/15 text-emerald-400 ring-emerald-500/20' },
-  optimal: { icon: Target, label: 'OPTIMAL', class: 'bg-sky-500/15 text-sky-400 ring-sky-500/20' },
-  edge: { icon: Activity, label: 'EDGE', class: 'bg-amber-500/15 text-amber-400 ring-amber-500/20' },
+const statusConfig: Record<string, { icon: typeof Zap; label: string; dotClass: string; textClass: string }> = {
+  hot:     { icon: Zap,        label: 'HOT',     dotClass: 'bg-red-400',     textClass: 'text-red-400' },
+  value:   { icon: TrendingUp, label: 'VALUE',   dotClass: 'bg-emerald-400', textClass: 'text-emerald-400' },
+  optimal: { icon: Target,     label: 'OPTIMAL', dotClass: 'bg-sky-400',     textClass: 'text-sky-400' },
+  edge:    { icon: Activity,   label: 'EDGE',    dotClass: 'bg-amber-400',   textClass: 'text-amber-400' },
+  live:    { icon: Activity,   label: 'LIVE',    dotClass: 'bg-emerald-400', textClass: 'text-emerald-400' },
 };
 
-/** Formats a moneyline string to include a + prefix for positive values */
 function formatOdds(val?: string) {
   if (!val) return null;
   const num = Number(val);
@@ -86,7 +86,6 @@ function formatOdds(val?: string) {
   return num > 0 ? `+${num}` : String(num);
 }
 
-/** Parses team names from "Away @ Home" matchup format */
 function parseTeams(matchup?: string): { away: string; home: string } | null {
   if (!matchup) return null;
   const parts = matchup.split(/\s*[@vs.]+\s*/i);
@@ -104,141 +103,109 @@ export const BettingCard = memo(function BettingCard({
   onAnalyze,
 }: BettingCardProps) {
   const badge = statusConfig[status] || statusConfig.value;
-  const BadgeIcon = badge.icon;
   const teams = parseTeams(data.matchup || data.game);
   const sportsbook = data.bookmaker || data.book || null;
   const hasSpread = data.homeSpread && data.homeSpread !== 'N/A';
   const hasTotal = data.overUnder && data.overUnder !== 'N/A';
   const homeOdds = formatOdds(data.homeOdds);
   const awayOdds = formatOdds(data.awayOdds);
+  const hasOddsData = homeOdds || awayOdds || hasSpread || hasTotal;
 
   return (
     <article
       className={cn(
         'group relative w-full rounded-2xl overflow-hidden',
         'bg-card border border-border/60',
-        'hover:border-border transition-all duration-300',
-        'shadow-sm hover:shadow-md'
+        'hover:border-border/90 transition-all duration-200'
       )}
     >
-      {/* Top accent bar */}
-      <div
-        className={cn('h-1 w-full bg-gradient-to-r', gradient)}
-        aria-hidden="true"
-      />
+      {/* Gradient accent -- left edge */}
+      <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)} aria-hidden="true" />
 
-      <div className="px-5 pt-4 pb-5 space-y-4">
-        {/* -- HEADER ROW -- */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
+      <div className="pl-5 pr-5 py-4 sm:pl-6 sm:pr-6 sm:py-5">
+        {/* -- TOP BAR: category + badge -- */}
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2 min-w-0">
             <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
               {category}
             </span>
-            <span className="text-muted-foreground/40" aria-hidden="true">
-              /
-            </span>
-            <span className="text-[11px] font-medium text-muted-foreground/70 truncate">
+            <span className="text-border" aria-hidden="true">{'/'}</span>
+            <span className="text-[11px] font-medium text-muted-foreground/60 truncate">
               {subcategory}
             </span>
           </div>
-
-          <div
-            className={cn(
-              'flex items-center gap-1.5 px-2.5 py-1 rounded-full ring-1 ring-inset text-[10px] font-bold uppercase tracking-wider shrink-0',
-              badge.class
-            )}
-            role="status"
-          >
-            <BadgeIcon className="w-3 h-3" aria-hidden="true" />
-            {badge.label}
+          <div className="flex items-center gap-1.5 shrink-0" role="status">
+            <span className={cn('w-1.5 h-1.5 rounded-full animate-pulse', badge.dotClass)} />
+            <span className={cn('text-[10px] font-bold uppercase tracking-wider', badge.textClass)}>
+              {badge.label}
+            </span>
           </div>
         </div>
 
-        {/* -- MATCHUP / TITLE -- */}
-        <h3 className="text-lg font-bold text-card-foreground leading-snug text-balance">
+        {/* -- MATCHUP TITLE -- */}
+        <h3 className="text-base sm:text-lg font-bold text-card-foreground leading-snug text-balance mb-1">
           {title}
         </h3>
 
-        {/* Description block */}
+        {/* Description */}
         {data.description && (
-          <p className="text-sm text-muted-foreground leading-relaxed">
+          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
             {data.description}
           </p>
         )}
 
-        {/* -- ODDS GRID -- */}
-        {(homeOdds || awayOdds || hasSpread || hasTotal) && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {/* Away ML */}
-            {awayOdds && (
-              <OddsPill
-                label={teams?.away || 'Away'}
-                value={awayOdds}
-                sublabel="Moneyline"
-              />
-            )}
-
-            {/* Home ML */}
-            {homeOdds && (
-              <OddsPill
-                label={teams?.home || 'Home'}
-                value={homeOdds}
-                sublabel="Moneyline"
-              />
-            )}
-
-            {/* Spread */}
-            {hasSpread && (
-              <OddsPill
-                label="Spread"
-                value={data.homeSpread!}
-                sublabel="Home"
-              />
-            )}
-
-            {/* Over/Under */}
-            {hasTotal && (
-              <OddsPill
-                label="Total"
-                value={data.overUnder!}
-                sublabel="O/U"
-              />
-            )}
+        {/* -- ODDS STRIP: horizontal full-width row -- */}
+        {hasOddsData && (
+          <div className="mt-3 rounded-xl bg-muted/40 border border-border/30 overflow-hidden">
+            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-border/30">
+              {awayOdds && (
+                <OddsCell
+                  label={teams?.away ?? 'Away'}
+                  value={awayOdds}
+                  sublabel="ML"
+                  isPositive={Number(data.awayOdds) > 0}
+                />
+              )}
+              {homeOdds && (
+                <OddsCell
+                  label={teams?.home ?? 'Home'}
+                  value={homeOdds}
+                  sublabel="ML"
+                  isPositive={Number(data.homeOdds) > 0}
+                />
+              )}
+              {hasSpread && (
+                <OddsCell label="Spread" value={data.homeSpread!} sublabel="HM" />
+              )}
+              {hasTotal && (
+                <OddsCell label="O/U" value={data.overUnder!} sublabel="Total" />
+              )}
+            </div>
           </div>
         )}
 
-        {/* -- SUPPLEMENTAL DATA -- */}
-        {(sportsbook || data.gameTime || data.edge || data.movement || data.confidence !== undefined || data.recommendation || data.player) && (
-          <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground pt-1">
-            {data.player && (
-              <MetaItem label="Player" value={data.player} />
-            )}
-            {data.stat && (
-              <MetaItem label="Stat" value={data.stat} />
-            )}
-            {sportsbook && (
-              <MetaItem label="Book" value={sportsbook} />
-            )}
+        {/* -- META ROW: book, time, edge -- */}
+        {(sportsbook || data.gameTime || data.edge || data.movement || data.player || data.confidence !== undefined) && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-xs text-muted-foreground">
+            {data.player && <MetaChip label={data.player} />}
+            {data.stat && <MetaChip label={data.stat} />}
+            {sportsbook && <MetaChip label={sportsbook} />}
             {data.edge && (
-              <MetaItem label="Edge" value={data.edge} trend="up" />
-            )}
-            {data.movement && (
-              <MetaItem label="Movement" value={data.movement} />
-            )}
-            {data.impliedProb && (
-              <MetaItem label="Implied" value={data.impliedProb} />
+              <span className="inline-flex items-center gap-1">
+                <ArrowUpRight className="w-3 h-3 text-emerald-400" aria-hidden="true" />
+                <span className="font-semibold text-emerald-400">{data.edge}</span>
+              </span>
             )}
             {data.confidence !== undefined && data.confidence !== '' && (
-              <MetaItem
-                label="Confidence"
-                value={typeof data.confidence === 'number' ? `${data.confidence}%` : String(data.confidence)}
-              />
+              <span className="font-medium text-muted-foreground/80">
+                {typeof data.confidence === 'number' ? `${data.confidence}%` : data.confidence} conf.
+              </span>
             )}
             {data.recommendation && (
-              <MetaItem label="Rec" value={data.recommendation} />
+              <span className="font-semibold text-card-foreground">{data.recommendation}</span>
             )}
             {data.gameTime && (
-              <span className="inline-flex items-center gap-1.5 text-muted-foreground/60">
+              <span className="inline-flex items-center gap-1 text-muted-foreground/50 ml-auto">
                 <Clock className="w-3 h-3" aria-hidden="true" />
                 {data.gameTime}
               </span>
@@ -246,11 +213,11 @@ export const BettingCard = memo(function BettingCard({
           </div>
         )}
 
-        {/* -- LINE MOVEMENT ROW -- */}
+        {/* -- LINE MOVEMENT -- */}
         {(data.lineChange || data.sharpMoney || data.kellyFraction) && (
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2 mt-3">
             {data.lineChange && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted/50 text-xs font-semibold text-card-foreground">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-muted/50 text-xs font-semibold text-card-foreground">
                 {data.direction === 'up' ? (
                   <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400" />
                 ) : (
@@ -259,60 +226,52 @@ export const BettingCard = memo(function BettingCard({
                 {data.lineChange}
                 {data.oldLine && data.newLine && (
                   <span className="text-muted-foreground font-normal ml-1">
-                    {data.oldLine} &rarr; {data.newLine}
+                    {data.oldLine} {'->'} {data.newLine}
                   </span>
                 )}
-              </div>
+              </span>
             )}
             {data.sharpMoney && (
-              <div className="px-3 py-1.5 rounded-lg bg-muted/50 text-xs">
-                <span className="text-muted-foreground">Sharp: </span>
+              <span className="px-2.5 py-1 rounded-lg bg-muted/50 text-xs">
+                <span className="text-muted-foreground">Sharp </span>
                 <span className="font-semibold text-card-foreground">{data.sharpMoney}</span>
-              </div>
+              </span>
             )}
             {data.kellyFraction && (
-              <div className="px-3 py-1.5 rounded-lg bg-muted/50 text-xs">
-                <span className="text-muted-foreground">Kelly: </span>
+              <span className="px-2.5 py-1 rounded-lg bg-muted/50 text-xs">
+                <span className="text-muted-foreground">Kelly </span>
                 <span className="font-semibold text-card-foreground">{data.kellyFraction}</span>
-              </div>
+              </span>
             )}
           </div>
         )}
 
-        {/* -- PORTFOLIO ROW -- */}
+        {/* -- PORTFOLIO -- */}
         {(data.totalBankroll || data.expectedValue) && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {data.expectedValue && (
-              <OddsPill label="EV" value={data.expectedValue} sublabel="Expected" />
-            )}
-            {data.recommendedStake && (
-              <OddsPill label="Stake" value={data.recommendedStake} sublabel="Rec." />
-            )}
-            {data.totalBankroll && (
-              <OddsPill label="Bankroll" value={data.totalBankroll} sublabel="Total" />
-            )}
-            {data.available && (
-              <OddsPill label="Available" value={data.available} sublabel="Balance" />
-            )}
+          <div className="mt-3 rounded-xl bg-muted/40 border border-border/30 overflow-hidden">
+            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-border/30">
+              {data.expectedValue && <OddsCell label="EV" value={data.expectedValue} sublabel="Expected" />}
+              {data.recommendedStake && <OddsCell label="Stake" value={data.recommendedStake} sublabel="Rec." />}
+              {data.totalBankroll && <OddsCell label="Bankroll" value={data.totalBankroll} sublabel="Total" />}
+              {data.available && <OddsCell label="Available" value={data.available} sublabel="Balance" />}
+            </div>
           </div>
         )}
 
         {/* Note */}
         {data.note && (
-          <p className="text-xs text-muted-foreground/70 italic">
-            {data.note}
-          </p>
+          <p className="mt-3 text-xs text-muted-foreground/60 italic leading-relaxed">{data.note}</p>
         )}
 
-        {/* -- ANALYZE CTA -- */}
+        {/* -- CTA -- */}
         {onAnalyze && (
           <button
             onClick={onAnalyze}
             className={cn(
-              'flex items-center justify-center gap-2 w-full pt-3 mt-1',
-              'border-t border-border/40',
+              'flex items-center justify-center gap-1.5 w-full mt-4 pt-3',
+              'border-t border-border/30',
               'text-xs font-semibold text-muted-foreground hover:text-card-foreground',
-              'transition-colors duration-200',
+              'transition-colors duration-150',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2'
             )}
             aria-label={`Analyze ${title}`}
@@ -330,45 +289,47 @@ export const BettingCard = memo(function BettingCard({
 /* Sub-components                                                      */
 /* ------------------------------------------------------------------ */
 
-function OddsPill({
+/** Full-width cell used inside the odds strip grid */
+function OddsCell({
   label,
   value,
   sublabel,
+  isPositive,
 }: {
   label: string;
   value: string;
   sublabel?: string;
+  isPositive?: boolean;
 }) {
   return (
-    <div className="flex flex-col items-center gap-0.5 rounded-xl bg-muted/50 px-4 py-3 text-center">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-        {sublabel || label}
+    <div className="flex flex-col items-center justify-center gap-0.5 px-3 py-3 text-center">
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+        {sublabel ?? label}
       </span>
-      <span className="text-base font-bold tabular-nums text-card-foreground leading-none mt-0.5">
+      <span
+        className={cn(
+          'text-base sm:text-lg font-bold tabular-nums leading-none',
+          isPositive === true
+            ? 'text-emerald-400'
+            : isPositive === false
+              ? 'text-red-400'
+              : 'text-card-foreground'
+        )}
+      >
         {value}
       </span>
-      <span className="text-[11px] font-medium text-muted-foreground mt-0.5 truncate max-w-full">
+      <span className="text-[11px] font-medium text-muted-foreground/70 truncate max-w-full mt-0.5">
         {label}
       </span>
     </div>
   );
 }
 
-function MetaItem({
-  label,
-  value,
-  trend,
-}: {
-  label: string;
-  value: string;
-  trend?: 'up' | 'down';
-}) {
+/** Compact metadata chip */
+function MetaChip({ label }: { label: string }) {
   return (
-    <span className="inline-flex items-center gap-1">
-      <span className="text-muted-foreground/50">{label}:</span>
-      {trend === 'up' && <ArrowUpRight className="w-3 h-3 text-emerald-400" />}
-      {trend === 'down' && <ArrowDownRight className="w-3 h-3 text-red-400" />}
-      <span className="font-semibold text-card-foreground">{value}</span>
+    <span className="px-2 py-0.5 rounded-md bg-muted/50 text-[11px] font-medium text-muted-foreground">
+      {label}
     </span>
   );
 }

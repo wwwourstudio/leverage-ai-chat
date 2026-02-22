@@ -2686,8 +2686,8 @@ No preamble. Start directly with section 1.`;
 
                   {/* Dynamic Cards Section -- only on non-welcome AI responses */}
                   {message.role === 'assistant' && !message.isWelcome && message.cards && message.cards.length > 0 && (
-                    <div className="mt-6">
-                      <div className="flex flex-col gap-4 w-full">
+                    <div className="mt-5 -mx-1 sm:mx-0">
+                      <div className="flex flex-col gap-3 w-full">
                         {message.cards.map((card, cardIndex) => {
                           const cardKey = `${index}-${cardIndex}`;
                           const analysis = cardAnalysisMap[cardKey];

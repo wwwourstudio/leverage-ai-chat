@@ -1,5 +1,5 @@
 /**
- * Main Chat Interface
+ * Main Chat Interface - v2 (analysis overlay fixed)
  * 
  * Production-ready AI sports betting assistant with real-time data integration.
  * Features:
@@ -2485,7 +2485,7 @@ No preamble. Start directly with section 1.`;
                                   </div>
                                 </div>
 
-                                {/* Next Steps CTA */}
+                                {/* Next Steps CTA  */}
                                 <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.015_280)] rounded-xl p-4">
                                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                     <p className="text-sm text-[oklch(0.60_0.01_280)] leading-relaxed">

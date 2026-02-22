@@ -46,7 +46,7 @@ export function useRealtime<T>(
             'postgres_changes',
             {
               event: '*',
-              schema: 'public',
+              schema: 'api',
       table: table,
       filter: filter ? `${filter.column}=eq.${filter.value}` : undefined
     },

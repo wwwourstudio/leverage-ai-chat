@@ -104,10 +104,11 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
 
       if (prefsData) {
         if (prefsData.email_notifications !== undefined || prefsData.push_notifications !== undefined) {
-          setNotificationPrefs({
-            email_notifications: prefsData.email_notifications ?? true,
-            push_notifications: prefsData.push_notifications ?? false,
-          });
+          setNotificationPrefs(prev => ({
+            ...prev,
+            email: prefsData.email_notifications ?? true,
+            push: prefsData.push_notifications ?? false,
+          }));
         }
         setSettings({
           preferred_books: [],

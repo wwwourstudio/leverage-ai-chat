@@ -2154,9 +2154,6 @@ No preamble. Start directly with section 1.`;
                   <div className="relative w-12 h-12 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-xl shadow-blue-500/40 group-hover/logo:shadow-blue-500/60 transition-all duration-300">
                     <Sparkles className="w-6 h-6 text-white group-hover/logo:scale-110 transition-transform" />
                   </div>
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-950 shadow-lg shadow-green-500/50 flex items-center justify-center">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-ping"></div>
-                  </div>
                 </div>
                 <div>
                   <h1 className="text-xl font-black bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent tracking-tight">

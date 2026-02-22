@@ -195,11 +195,11 @@ export async function POST(request: NextRequest) {
     const hasExistingCards = Array.isArray(existingCards) && existingCards.length > 0;
 
     if (hasExistingCards) {
-      cards = existingCards.slice(0, 6);
+      cards = existingCards;
     } else if (!usedFallback && (context.isSportsQuery || context.hasBettingIntent)) {
       try {
         const sportKey = context.sport || undefined;
-        const cardPromise = generateContextualCards('betting', sportKey, 3);
+        const cardPromise = generateContextualCards('betting', sportKey, 6);
         const timeoutPromise = new Promise<InsightCard[]>((resolve) =>
           setTimeout(() => resolve([]), 6000)
         );

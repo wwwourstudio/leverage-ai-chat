@@ -162,6 +162,7 @@ export function DynamicCardRenderer({
       <ArbitrageCard
         data={safeCard.data as any}
         gradient={safeCard.gradient}
+        onAnalyze={handleAnalyze}
       />
     );
   }

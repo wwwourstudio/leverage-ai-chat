@@ -235,6 +235,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   );
   const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
   const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string }>>([]);
+  const [lastUserQuery, setLastUserQuery] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -900,6 +901,7 @@ No preamble. Start directly with section 1.`;
   
   const generateRealResponse = async (userMessage: string) => {
     setIsTyping(true);
+    setLastUserQuery(userMessage);
     const startTime = Date.now();
     const isDev = process.env.NODE_ENV !== 'production';
     
@@ -2686,8 +2688,8 @@ No preamble. Start directly with section 1.`;
 
                   {/* Dynamic Cards Section -- only on non-welcome AI responses */}
                   {message.role === 'assistant' && !message.isWelcome && message.cards && message.cards.length > 0 && (
-                    <div className="mt-5 -mx-1 sm:mx-0">
-                      <div className="flex flex-col gap-3 w-full">
+                    <div className="mt-5">
+                      <div className="flex flex-col gap-4 w-full">
                         {message.cards.map((card, cardIndex) => {
                           const cardKey = `${index}-${cardIndex}`;
                           const analysis = cardAnalysisMap[cardKey];
@@ -2967,6 +2969,17 @@ No preamble. Start directly with section 1.`;
           )}
 
           <div className="relative max-w-5xl mx-auto">
+            {/* Dynamic context label above suggestions */}
+            {lastUserQuery && suggestedPrompts.length > 0 && messages.length > 1 && (
+              <div className="mb-2 px-1">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500">
+                  Follow up on:
+                </span>
+                <span className="ml-2 text-[11px] text-gray-400 truncate">
+                  {lastUserQuery.length > 60 ? lastUserQuery.slice(0, 60) + '...' : lastUserQuery}
+                </span>
+              </div>
+            )}
             {/* Dynamic Contextual Suggestions or Platform Prompts */}
             <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-0 mb-5">
               {(suggestedPrompts.length > 0 && messages.length > 1 ? suggestedPrompts : quickActions).map((action, idx) => {
@@ -3080,7 +3093,11 @@ No preamble. Start directly with section 1.`;
                       handleSubmit(e as React.FormEvent<HTMLInputElement>);
                     }
                   }}
-                  placeholder="Ask about betting odds, fantasy strategy, DFS lineups, or Kalshi markets..."
+                  placeholder={
+                    lastUserQuery
+                      ? `Follow up on your ${lastUserQuery.toLowerCase().includes('nba') ? 'NBA' : lastUserQuery.toLowerCase().includes('nfl') ? 'NFL' : lastUserQuery.toLowerCase().includes('kalshi') ? 'Kalshi' : lastUserQuery.toLowerCase().includes('dfs') ? 'DFS' : lastUserQuery.toLowerCase().includes('fantasy') ? 'fantasy' : 'sports'} analysis or ask something new...`
+                      : 'Ask about betting odds, fantasy strategy, DFS lineups, or Kalshi markets...'
+                  }
                   className="w-full bg-gradient-to-r from-gray-900/80 to-gray-850/80 border border-gray-700/50 hover:border-gray-600/50 focus:border-blue-500/50 rounded-2xl px-6 py-4.5 pr-32 font-medium text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all backdrop-blur-sm shadow-inner text-xs"
                   disabled={isTyping}
                   maxLength={500}

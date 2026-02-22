@@ -71,21 +71,54 @@ interface BettingCardProps {
   error?: string;
 }
 
-const statusConfig: Record<string, { icon: typeof Zap; label: string; dotClass: string; textClass: string }> = {
-  hot:     { icon: Zap,        label: 'HOT',     dotClass: 'bg-red-400',     textClass: 'text-red-400' },
-  value:   { icon: TrendingUp, label: 'VALUE',   dotClass: 'bg-emerald-400', textClass: 'text-emerald-400' },
-  optimal: { icon: Target,     label: 'OPTIMAL', dotClass: 'bg-sky-400',     textClass: 'text-sky-400' },
-  edge:    { icon: Activity,   label: 'EDGE',    dotClass: 'bg-amber-400',   textClass: 'text-amber-400' },
-  live:    { icon: Activity,   label: 'LIVE',    dotClass: 'bg-emerald-400', textClass: 'text-emerald-400' },
+const statusConfig: Record<string, { label: string; dotClass: string; textClass: string }> = {
+  hot:     { label: 'HOT',     dotClass: 'bg-red-400',     textClass: 'text-red-400' },
+  value:   { label: 'VALUE',   dotClass: 'bg-emerald-400', textClass: 'text-emerald-400' },
+  optimal: { label: 'OPTIMAL', dotClass: 'bg-sky-400',     textClass: 'text-sky-400' },
+  edge:    { label: 'EDGE',    dotClass: 'bg-amber-400',   textClass: 'text-amber-400' },
+  live:    { label: 'LIVE',    dotClass: 'bg-emerald-400', textClass: 'text-emerald-400' },
+  active:  { label: 'LIVE',    dotClass: 'bg-emerald-400', textClass: 'text-emerald-400' },
 };
 
-function formatOdds(val?: string) {
+/** Format moneyline with +/- prefix */
+function fmtOdds(val?: string): string | null {
   if (!val) return null;
-  const num = Number(val);
-  if (isNaN(num)) return val;
-  return num > 0 ? `+${num}` : String(num);
+  const n = Number(val);
+  if (isNaN(n)) return val;
+  return n > 0 ? `+${n}` : String(n);
 }
 
+/**
+ * Parse the overUnder field which may be:
+ *   "238.5"
+ *   "O/U 238.5"
+ *   "O/U 238.5: Over -118 / Under -112"
+ * Returns just the numeric total and optional over/under juice.
+ */
+function parseOU(raw?: string): { total: string; overJuice?: string; underJuice?: string } | null {
+  if (!raw || raw === 'N/A') return null;
+  // Try "O/U 238.5: Over -118 / Under -112"
+  const full = raw.match(/O\/U\s*([\d.]+)(?::\s*Over\s*([+-]?\d+)\s*\/\s*Under\s*([+-]?\d+))?/i);
+  if (full) {
+    return { total: full[1], overJuice: full[2] || undefined, underJuice: full[3] || undefined };
+  }
+  // Try plain number
+  const num = raw.match(/([\d.]+)/);
+  if (num) return { total: num[1] };
+  return { total: raw };
+}
+
+/**
+ * Parse "spread (juice)" e.g. "+10.5 (-136)" or just "+10.5"
+ */
+function parseSpread(raw?: string): { spread: string; juice?: string } | null {
+  if (!raw || raw === 'N/A') return null;
+  const m = raw.match(/([+-]?[\d.]+)\s*(?:\(([^)]+)\))?/);
+  if (m) return { spread: m[1], juice: m[2] || undefined };
+  return { spread: raw };
+}
+
+/** Parse "Away @ Home" or "Away vs Home" */
 function parseTeams(matchup?: string): { away: string; home: string } | null {
   if (!matchup) return null;
   const parts = matchup.split(/\s*[@vs.]+\s*/i);
@@ -105,32 +138,26 @@ export const BettingCard = memo(function BettingCard({
   const badge = statusConfig[status] || statusConfig.value;
   const teams = parseTeams(data.matchup || data.game);
   const sportsbook = data.bookmaker || data.book || null;
-  const hasSpread = data.homeSpread && data.homeSpread !== 'N/A';
-  const hasTotal = data.overUnder && data.overUnder !== 'N/A';
-  const homeOdds = formatOdds(data.homeOdds);
-  const awayOdds = formatOdds(data.awayOdds);
-  const hasOddsData = homeOdds || awayOdds || hasSpread || hasTotal;
+  const spreadInfo = parseSpread(data.homeSpread);
+  const ouInfo = parseOU(data.overUnder);
+  const homeML = fmtOdds(data.homeOdds);
+  const awayML = fmtOdds(data.awayOdds);
+  const hasOddsData = homeML || awayML || spreadInfo || ouInfo;
 
   return (
-    <article
-      className={cn(
-        'group relative w-full rounded-2xl overflow-hidden',
-        'bg-card border border-border/60',
-        'hover:border-border/90 transition-all duration-200'
-      )}
-    >
-      {/* Gradient accent -- left edge */}
+    <article className="group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200">
+      {/* Left accent */}
       <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)} aria-hidden="true" />
 
-      <div className="pl-5 pr-5 py-4 sm:pl-6 sm:pr-6 sm:py-5">
-        {/* -- TOP BAR: category + badge -- */}
-        <div className="flex items-center justify-between gap-3 mb-3">
+      <div className="pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5">
+        {/* Header: category / subcategory + status badge */}
+        <div className="flex items-center justify-between gap-3 mb-2.5">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.55_0.01_280)]">
               {category}
             </span>
-            <span className="text-border" aria-hidden="true">{'/'}</span>
-            <span className="text-[11px] font-medium text-muted-foreground/60 truncate">
+            <span className="text-[oklch(0.3_0.01_280)]" aria-hidden="true">/</span>
+            <span className="text-[11px] font-medium text-[oklch(0.45_0.01_280)] truncate">
               {subcategory}
             </span>
           </div>
@@ -142,70 +169,85 @@ export const BettingCard = memo(function BettingCard({
           </div>
         </div>
 
-        {/* -- MATCHUP TITLE -- */}
-        <h3 className="text-base sm:text-lg font-bold text-card-foreground leading-snug text-balance mb-1">
+        {/* Matchup title */}
+        <h3 className="text-base sm:text-lg font-bold text-[oklch(0.95_0.005_85)] leading-snug text-balance mb-1">
           {title}
         </h3>
 
-        {/* Description */}
         {data.description && (
-          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-            {data.description}
-          </p>
+          <p className="text-sm text-[oklch(0.55_0.01_280)] leading-relaxed mb-3">{data.description}</p>
         )}
 
-        {/* -- ODDS STRIP: horizontal full-width row -- */}
+        {/* Odds strip */}
         {hasOddsData && (
-          <div className="mt-3 rounded-xl bg-muted/40 border border-border/30 overflow-hidden">
-            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-border/30">
-              {awayOdds && (
+          <div className="mt-3 rounded-xl bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.015_280)] overflow-hidden">
+            <div className={cn(
+              'grid divide-x divide-[oklch(0.20_0.015_280)]',
+              // Responsive: 2 cols on small, up to 4 on larger
+              [homeML, awayML, spreadInfo, ouInfo].filter(Boolean).length <= 2
+                ? 'grid-cols-2'
+                : 'grid-cols-2 sm:grid-cols-4'
+            )}>
+              {awayML && (
                 <OddsCell
                   label={teams?.away ?? 'Away'}
-                  value={awayOdds}
+                  value={awayML}
                   sublabel="ML"
                   isPositive={Number(data.awayOdds) > 0}
                 />
               )}
-              {homeOdds && (
+              {homeML && (
                 <OddsCell
                   label={teams?.home ?? 'Home'}
-                  value={homeOdds}
+                  value={homeML}
                   sublabel="ML"
                   isPositive={Number(data.homeOdds) > 0}
                 />
               )}
-              {hasSpread && (
-                <OddsCell label="Spread" value={data.homeSpread!} sublabel="HM" />
+              {spreadInfo && (
+                <OddsCell
+                  label="Spread"
+                  value={spreadInfo.spread}
+                  sublabel={spreadInfo.juice ? `(${spreadInfo.juice})` : 'HM'}
+                />
               )}
-              {hasTotal && (
-                <OddsCell label="O/U" value={data.overUnder!} sublabel="Total" />
+              {ouInfo && (
+                <OddsCell
+                  label="O/U"
+                  value={ouInfo.total}
+                  sublabel={
+                    ouInfo.overJuice && ouInfo.underJuice
+                      ? `O ${ouInfo.overJuice} / U ${ouInfo.underJuice}`
+                      : 'Total'
+                  }
+                />
               )}
             </div>
           </div>
         )}
 
-        {/* -- META ROW: book, time, edge -- */}
-        {(sportsbook || data.gameTime || data.edge || data.movement || data.player || data.confidence !== undefined) && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-xs text-muted-foreground">
-            {data.player && <MetaChip label={data.player} />}
-            {data.stat && <MetaChip label={data.stat} />}
-            {sportsbook && <MetaChip label={sportsbook} />}
+        {/* Meta row */}
+        {(sportsbook || data.gameTime || data.edge || data.player || data.confidence !== undefined) && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-3 text-xs">
+            {data.player && <Chip>{data.player}</Chip>}
+            {data.stat && <Chip>{data.stat}</Chip>}
+            {sportsbook && <Chip>{sportsbook}</Chip>}
             {data.edge && (
-              <span className="inline-flex items-center gap-1">
-                <ArrowUpRight className="w-3 h-3 text-emerald-400" aria-hidden="true" />
-                <span className="font-semibold text-emerald-400">{data.edge}</span>
+              <span className="inline-flex items-center gap-1 font-semibold text-emerald-400">
+                <ArrowUpRight className="w-3 h-3" aria-hidden="true" />
+                {data.edge}
               </span>
             )}
             {data.confidence !== undefined && data.confidence !== '' && (
-              <span className="font-medium text-muted-foreground/80">
+              <span className="font-medium text-[oklch(0.55_0.01_280)]">
                 {typeof data.confidence === 'number' ? `${data.confidence}%` : data.confidence} conf.
               </span>
             )}
             {data.recommendation && (
-              <span className="font-semibold text-card-foreground">{data.recommendation}</span>
+              <span className="font-semibold text-[oklch(0.90_0.005_85)]">{data.recommendation}</span>
             )}
             {data.gameTime && (
-              <span className="inline-flex items-center gap-1 text-muted-foreground/50 ml-auto">
+              <span className="inline-flex items-center gap-1 text-[oklch(0.45_0.01_280)] ml-auto">
                 <Clock className="w-3 h-3" aria-hidden="true" />
                 {data.gameTime}
               </span>
@@ -213,11 +255,11 @@ export const BettingCard = memo(function BettingCard({
           </div>
         )}
 
-        {/* -- LINE MOVEMENT -- */}
+        {/* Line movement */}
         {(data.lineChange || data.sharpMoney || data.kellyFraction) && (
           <div className="flex flex-wrap gap-2 mt-3">
             {data.lineChange && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-muted/50 text-xs font-semibold text-card-foreground">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[oklch(0.16_0.02_280)] text-xs font-semibold text-[oklch(0.90_0.005_85)]">
                 {data.direction === 'up' ? (
                   <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400" />
                 ) : (
@@ -225,31 +267,31 @@ export const BettingCard = memo(function BettingCard({
                 )}
                 {data.lineChange}
                 {data.oldLine && data.newLine && (
-                  <span className="text-muted-foreground font-normal ml-1">
-                    {data.oldLine} {'->'} {data.newLine}
+                  <span className="text-[oklch(0.50_0.01_280)] font-normal ml-1">
+                    {data.oldLine} {'-->'} {data.newLine}
                   </span>
                 )}
               </span>
             )}
             {data.sharpMoney && (
-              <span className="px-2.5 py-1 rounded-lg bg-muted/50 text-xs">
-                <span className="text-muted-foreground">Sharp </span>
-                <span className="font-semibold text-card-foreground">{data.sharpMoney}</span>
+              <span className="px-2.5 py-1 rounded-lg bg-[oklch(0.16_0.02_280)] text-xs">
+                <span className="text-[oklch(0.50_0.01_280)]">Sharp </span>
+                <span className="font-semibold text-[oklch(0.90_0.005_85)]">{data.sharpMoney}</span>
               </span>
             )}
             {data.kellyFraction && (
-              <span className="px-2.5 py-1 rounded-lg bg-muted/50 text-xs">
-                <span className="text-muted-foreground">Kelly </span>
-                <span className="font-semibold text-card-foreground">{data.kellyFraction}</span>
+              <span className="px-2.5 py-1 rounded-lg bg-[oklch(0.16_0.02_280)] text-xs">
+                <span className="text-[oklch(0.50_0.01_280)]">Kelly </span>
+                <span className="font-semibold text-[oklch(0.90_0.005_85)]">{data.kellyFraction}</span>
               </span>
             )}
           </div>
         )}
 
-        {/* -- PORTFOLIO -- */}
+        {/* Portfolio stats */}
         {(data.totalBankroll || data.expectedValue) && (
-          <div className="mt-3 rounded-xl bg-muted/40 border border-border/30 overflow-hidden">
-            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-border/30">
+          <div className="mt-3 rounded-xl bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.015_280)] overflow-hidden">
+            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-[oklch(0.20_0.015_280)]">
               {data.expectedValue && <OddsCell label="EV" value={data.expectedValue} sublabel="Expected" />}
               {data.recommendedStake && <OddsCell label="Stake" value={data.recommendedStake} sublabel="Rec." />}
               {data.totalBankroll && <OddsCell label="Bankroll" value={data.totalBankroll} sublabel="Total" />}
@@ -258,22 +300,15 @@ export const BettingCard = memo(function BettingCard({
           </div>
         )}
 
-        {/* Note */}
         {data.note && (
-          <p className="mt-3 text-xs text-muted-foreground/60 italic leading-relaxed">{data.note}</p>
+          <p className="mt-3 text-xs text-[oklch(0.45_0.01_280)] italic leading-relaxed">{data.note}</p>
         )}
 
-        {/* -- CTA -- */}
+        {/* CTA */}
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className={cn(
-              'flex items-center justify-center gap-1.5 w-full mt-4 pt-3',
-              'border-t border-border/30',
-              'text-xs font-semibold text-muted-foreground hover:text-card-foreground',
-              'transition-colors duration-150',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2'
-            )}
+            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[oklch(0.20_0.015_280)] text-xs font-semibold text-[oklch(0.50_0.01_280)] hover:text-[oklch(0.85_0.005_85)] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
             aria-label={`Analyze ${title}`}
           >
             View Full Analysis
@@ -286,10 +321,9 @@ export const BettingCard = memo(function BettingCard({
 });
 
 /* ------------------------------------------------------------------ */
-/* Sub-components                                                      */
+/*  Sub-components                                                     */
 /* ------------------------------------------------------------------ */
 
-/** Full-width cell used inside the odds strip grid */
 function OddsCell({
   label,
   value,
@@ -302,34 +336,29 @@ function OddsCell({
   isPositive?: boolean;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-0.5 px-3 py-3 text-center">
-      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+    <div className="flex flex-col items-center justify-center gap-0.5 px-2 py-3 text-center min-w-0">
+      <span className="text-[10px] font-medium uppercase tracking-wider text-[oklch(0.45_0.01_280)]">
         {sublabel ?? label}
       </span>
       <span
         className={cn(
           'text-base sm:text-lg font-bold tabular-nums leading-none',
-          isPositive === true
-            ? 'text-emerald-400'
-            : isPositive === false
-              ? 'text-red-400'
-              : 'text-card-foreground'
+          isPositive === true ? 'text-emerald-400' : isPositive === false ? 'text-red-400' : 'text-[oklch(0.92_0.005_85)]'
         )}
       >
         {value}
       </span>
-      <span className="text-[11px] font-medium text-muted-foreground/70 truncate max-w-full mt-0.5">
+      <span className="text-[11px] font-medium text-[oklch(0.50_0.01_280)] truncate max-w-full mt-0.5">
         {label}
       </span>
     </div>
   );
 }
 
-/** Compact metadata chip */
-function MetaChip({ label }: { label: string }) {
+function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="px-2 py-0.5 rounded-md bg-muted/50 text-[11px] font-medium text-muted-foreground">
-      {label}
+    <span className="px-2 py-0.5 rounded-md bg-[oklch(0.16_0.02_280)] text-[11px] font-medium text-[oklch(0.60_0.01_280)]">
+      {children}
     </span>
   );
 }

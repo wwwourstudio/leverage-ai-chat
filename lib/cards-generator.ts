@@ -874,20 +874,28 @@ export async function generateContextualCards(
     });
   }
 
-  // Fantasy cards
-  if (category === 'fantasy') {
-    cards.push({
-      type: 'FANTASY_ADVICE',
-      title: '🏆 Fantasy Insights',
-      icon: 'Trophy',
-      category: 'FANTASY',
-      subcategory: 'Season-Long',
-      gradient: 'from-blue-600 to-cyan-700',
-      data: {
-        description: 'Trade recommendations and waiver wire targets',
-        tips: ['Start/sit decisions', 'Rest-of-season projections']
-      }
-    });
+  // Fantasy / Draft cards — rich cards from the fantasy card generator
+  if (category === 'fantasy' || category === 'draft' || category === 'waiver') {
+    try {
+      const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
+      const fantasyCards = generateFantasyCards('', count);
+      cards.push(...fantasyCards.slice(0, count));
+    } catch (err) {
+      console.error('[v0] [CARDS-GEN] Fantasy card generation failed:', err);
+      // Fallback placeholder
+      cards.push({
+        type: 'FANTASY_ADVICE',
+        title: 'Fantasy Intelligence',
+        icon: 'Trophy',
+        category: 'FANTASY',
+        subcategory: 'Draft Assistant',
+        gradient: 'from-blue-600 to-cyan-700',
+        data: {
+          description: 'VBD rankings, tier cliff detection, and AI draft recommendations.',
+          tips: ['Ask about VBD rankings', 'Ask about tier cliffs', 'Ask about waiver targets'],
+        },
+      });
+    }
   }
 
   // If we have a sport and still need cards, try fetching sport-specific data

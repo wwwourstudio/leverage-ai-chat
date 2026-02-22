@@ -234,6 +234,76 @@ export const ANALYSIS_CATEGORIES = {
   FANTASY: 'fantasy',
   DFS: 'dfs',
   KALSHI: 'kalshi',
+  DRAFT: 'draft',
+} as const;
+
+// Fantasy Platform Configuration
+export const FANTASY_CONFIG = {
+  SIMULATION: {
+    DEFAULT_DRAFT_SIMS: 1000,
+    MAX_DRAFT_SIMS: 5000,
+    DEFAULT_MATCHUP_SIMS: 10000,
+    DEFAULT_SEASON_SIMS: 10000,
+  },
+  DRAFT: {
+    DEFAULT_ROUNDS: 15,
+    DEFAULT_LEAGUE_SIZE: 12,
+    PICK_TIME_SECONDS: 90,
+    TIER_CLIFF_Z_THRESHOLD: 1.5,
+  },
+  WAIVER: {
+    DEFAULT_FAAB_BUDGET: 100,
+    BREAKOUT_Z_THRESHOLD: 1.5,
+    ROLLING_WINDOW_WEEKS: 3,
+  },
+  DFS: {
+    MAX_LINEUPS_FREE: 0,
+    MAX_LINEUPS_BASIC: 3,
+    MAX_LINEUPS_FULL: 150,
+    SALARY_CAP_DK: 50000,
+    SALARY_CAP_FD: 60000,
+  },
+  SUBSCRIPTION: {
+    CORE_PRICE_MONTHLY: 49,
+    PRO_PRICE_MONTHLY: 149,
+    HIGH_STAKES_PRICE_YEARLY: 999,
+  },
+  INJURY_ALERT_DELAY_FREE_MS: 5 * 60 * 1000,
+} as const;
+
+// Default NFL Scoring (PPR)
+export const DEFAULT_SCORING_NFL_PPR = {
+  pass_yards_per_point: 25,
+  pass_td: 4,
+  interception: -2,
+  rush_yards_per_point: 10,
+  rush_td: 6,
+  reception: 1,
+  receiving_yards_per_point: 10,
+  receiving_td: 6,
+  fumble_lost: -2,
+} as const;
+
+// Default NFL Roster Slots
+export const DEFAULT_ROSTER_SLOTS_NFL = {
+  QB: 1,
+  RB: 2,
+  WR: 2,
+  TE: 1,
+  FLEX: 1,
+  K: 1,
+  DEF: 1,
+  BENCH: 6,
+} as const;
+
+// NFL Position Replacement Levels (for 12-team PPR)
+export const NFL_REPLACEMENT_LEVELS = {
+  QB: 12,    // QB13 is replacement level in 1-QB leagues
+  RB: 30,    // RB31 (2 starters + FLEX consideration)
+  WR: 30,    // WR31 (2 starters + FLEX consideration)
+  TE: 12,    // TE13
+  K: 12,     // K13
+  DEF: 12,   // DEF13
 } as const;
 
 // Category Display Names

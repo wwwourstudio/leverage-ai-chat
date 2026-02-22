@@ -181,10 +181,28 @@ export async function POST(request: NextRequest) {
           );
         }
       } catch (aiError) {
-        console.error('[API/analyze] AI generation failed:', aiError);
-        aiText = generateFallbackResponse(userMessage, context);
-        modelUsed = 'Fallback';
-        usedFallback = true;
+        // If grok-4 fails (e.g. API key lacks access), try grok-3-fast before giving up
+        const primaryModel = AI_CONFIG.MODEL_NAME;
+        const fallbackModel = 'grok-3-fast';
+        console.warn(`[API/analyze] ${primaryModel} failed, retrying with ${fallbackModel}:`, aiError instanceof Error ? aiError.message : aiError);
+        try {
+          const fallbackResult = await generateText({
+            model: createXai({ apiKey: xaiApiKey })(fallbackModel),
+            system: SYSTEM_PROMPT,
+            prompt: enrichedPrompt,
+            temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
+            maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
+            maxRetries: 1,
+          });
+          aiText = fallbackResult.text;
+          modelUsed = 'Grok 3 Fast (fallback)';
+          console.log(`[API/analyze] ${fallbackModel} fallback succeeded`);
+        } catch (fallbackError) {
+          console.error('[API/analyze] Fallback model also failed:', fallbackError instanceof Error ? fallbackError.message : fallbackError);
+          aiText = generateFallbackResponse(userMessage, context);
+          modelUsed = 'Fallback';
+          usedFallback = true;
+        }
       }
     } else {
       aiText = generateFallbackResponse(userMessage, context);

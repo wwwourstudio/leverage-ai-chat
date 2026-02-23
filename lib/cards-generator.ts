@@ -499,8 +499,22 @@ export async function generateContextualCards(
     }
     
     console.log(`[v0] [MULTI-SPORT] Final result: ${cards.length} cards from ${[...new Set(cards.map(c => c.category))].join(', ')}`);
-    
+
     return cards.slice(0, count);
+  }
+
+  // Single-sport betting path — user has selected a specific sport (e.g. NBA).
+  // The multi-sport block above is skipped when sport is set, so we must call
+  // generateSportSpecificCards directly here to get real game odds with moneylines,
+  // spreads, and totals instead of falling through to the arbitrage placeholder.
+  if (!multiSport && normalizedSport && (category === 'betting' || category === 'all' || !category)) {
+    console.log(`[v0] [CARDS-GEN] Single-sport mode: fetching ${normalizedSport} odds directly`);
+    const sportCards = await generateSportSpecificCards(normalizedSport, count, category);
+    if (sportCards.length > 0) {
+      setCachedCards(sportCards, category || 'betting');
+      return sportCards;
+    }
+    // Fall through if no games available (off-season etc.)
   }
 
   // Dedicated Arbitrage category - when user explicitly asks for arbitrage

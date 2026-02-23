@@ -43,7 +43,11 @@ export function getCachedCards(category?: string, sport?: string, count: number 
       const cardSport = c.data?.sport as string;
       return cardSport && (cardSport === normalized || cardSport === sport);
     });
-    if (sportFiltered.length > 0) filtered = sportFiltered;
+    if (sportFiltered.length > 0) {
+      filtered = sportFiltered;
+    } else {
+      return null; // No matching sport cards in cache — force a fresh fetch
+    }
   }
 
   return filtered.slice(0, count);
@@ -135,6 +139,7 @@ async function generateSportSpecificCards(
             gradient: getSportGradient(sport),
             data: {
               matchup: `${game.away_team} @ ${game.home_team}`,
+              sport,
               gameTime: new Date(game.commence_time).toLocaleString(),
               finalScore: `${game.away_team} ${awayScore?.score ?? '?'} — ${homeScore?.score ?? '?'} ${game.home_team}`,
               homeScore: homeScore?.score ?? '?',
@@ -184,6 +189,7 @@ async function generateSportSpecificCards(
             gradient: getSportGradient(sport),
             data: {
               matchup: `${game.away_team} @ ${game.home_team}`,
+              sport,
               gameTime: gameTimeStr,
               homeOdds: homeOdds ? (homeOdds.price > 0 ? `+${homeOdds.price}` : `${homeOdds.price}`) : (hasOdds ? 'N/A' : '—'),
               awayOdds: awayOdds ? (awayOdds.price > 0 ? `+${awayOdds.price}` : `${awayOdds.price}`) : (hasOdds ? 'N/A' : '—'),
@@ -217,6 +223,7 @@ async function generateSportSpecificCards(
               gradient: getSportGradient(sport),
               data: {
                 matchup: `${game.away_team} @ ${game.home_team}`,
+                sport,
                 gameTime: gameTimeStr,
                 description: 'Odds not yet posted — check back closer to game time.',
                 realData: true,

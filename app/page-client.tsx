@@ -284,23 +284,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       return prev;
     });
 
-    // Fetch cards matching the current platform/category.
-    // For Kalshi subcategory filters (Culture, Politics, etc.), don't pass them as sport —
-    // the Kalshi card generator doesn't filter by topic; it returns all open markets.
-    const sportParam = selectedCategory !== 'kalshi' && selectedSport ? selectedSport : undefined;
-    fetchDynamicCards({ category: selectedCategory, sport: sportParam, limit: 6 })
-      .then(dynamicCards => {
-        // fetchDynamicCards already returns InsightCard[] — no second conversion needed
-        if (dynamicCards.length > 0) {
-          setMessages(prev => {
-            if (prev[0]?.isWelcome) {
-              return [{ ...prev[0], cards: dynamicCards }, ...prev.slice(1)];
-            }
-            return prev;
-          });
-        }
-      })
-      .catch(() => { /* non-fatal — existing cards remain */ });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, selectedSport]);
 
@@ -3096,83 +3079,83 @@ No preamble. Start directly with section 1.`;
                   {message.role === 'assistant' && message.cards && message.cards.length > 0 && (
                     <div className="mt-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {message.cards.map((card, cardIndex) => {
-                          const cardKey = `${index}-${cardIndex}`;
-                          const analysis = cardAnalysisMap[cardKey];
-                          const isOpen = analysis?.loading || !!analysis?.content || !!analysis?.error;
-
-                          return (
-                            <div
-                              key={`${card.type}-${cardIndex}`}
-                              className="flex flex-col gap-1.5 animate-fadeIn"
-                              style={{ animationDelay: `${cardIndex * 60}ms` }}
-                            >
-                              <DynamicCardRenderer
-                                card={card}
-                                index={cardIndex}
-                                onAnalyze={() => generateCardAnalysis(card, cardKey)}
-                              />
-
-                              {/* Inline analysis panel */}
-                              {isOpen && (
-                                <div className="rounded-xl border border-gray-700/50 bg-gray-900/95 backdrop-blur-xl overflow-hidden">
-                                  {analysis.loading ? (
-                                    <div className="p-4 space-y-3">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                        <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                        <div className="w-1.5 h-1.5 bg-blue-500/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                                        <span className="text-[11px] text-gray-400 ml-1">Analyzing {card.type === 'kalshi' ? 'prediction market' : 'opportunity'}...</span>
-                                      </div>
-                                      <div className="h-2 bg-gray-700/40 rounded-full animate-pulse w-full" />
-                                      <div className="h-2 bg-gray-700/40 rounded-full animate-pulse w-5/6" />
-                                      <div className="h-2 bg-gray-700/40 rounded-full animate-pulse w-3/5" />
-                                    </div>
-                                  ) : analysis.error ? (
-                                    <div className="p-4 flex items-center gap-2 text-xs text-red-400">
-                                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                                      <span>{analysis.error}</span>
-                                    </div>
-                                  ) : (
-                                    <div className="p-4">
-                                      <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center gap-1.5">
-                                          <BarChart3 className="w-3 h-3 text-gray-500" />
-                                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Analysis</span>
-                                        </div>
-                                        <button
-                                          onClick={() => setCardAnalysisMap(prev => { const n = { ...prev }; delete n[cardKey]; return n; })}
-                                          className="text-gray-600 hover:text-gray-300 transition-colors"
-                                          aria-label="Close analysis"
-                                        >
-                                          <X className="w-3.5 h-3.5" />
-                                        </button>
-                                      </div>
-                                      <div className="text-xs text-gray-300 leading-relaxed space-y-2.5">
-                                        {(analysis.content ?? '').split('\n\n').map((para, pIdx) => {
-                                          if (para.includes('**')) {
-                                            const parts = para.split('**');
-                                            return (
-                                              <p key={pIdx}>
-                                                {parts.map((part, partIdx) =>
-                                                  partIdx % 2 === 1
-                                                    ? <span key={partIdx} className="font-bold text-white">{part}</span>
-                                                    : <span key={partIdx}>{part}</span>
-                                                )}
-                                              </p>
-                                            );
-                                          }
-                                          return <p key={pIdx}>{para}</p>;
-                                        })}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                        {message.cards.map((card, cardIndex) => (
+                          <div
+                            key={`${card.type}-${cardIndex}`}
+                            className="animate-fadeIn"
+                            style={{ animationDelay: `${cardIndex * 60}ms` }}
+                          >
+                            <DynamicCardRenderer
+                              card={card}
+                              index={cardIndex}
+                              onAnalyze={() => generateCardAnalysis(card, `${index}-${cardIndex}`)}
+                            />
+                          </div>
+                        ))}
                       </div>
+
+                      {/* Analysis panels — full width below the card grid */}
+                      {message.cards.map((card, cardIndex) => {
+                        const cardKey = `${index}-${cardIndex}`;
+                        const analysis = cardAnalysisMap[cardKey];
+                        const isOpen = analysis?.loading || !!analysis?.content || !!analysis?.error;
+                        if (!isOpen) return null;
+                        return (
+                          <div key={cardKey} className="mt-2 rounded-xl border border-gray-700/50 bg-gray-900/95 backdrop-blur-xl overflow-hidden w-full">
+                            {analysis.loading ? (
+                              <div className="p-4 space-y-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                  <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                  <div className="w-1.5 h-1.5 bg-blue-500/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                  <span className="text-[11px] text-gray-400 ml-1">Analyzing {card.type === 'kalshi' ? 'prediction market' : 'opportunity'}...</span>
+                                </div>
+                                <div className="h-2 bg-gray-700/40 rounded-full animate-pulse w-full" />
+                                <div className="h-2 bg-gray-700/40 rounded-full animate-pulse w-5/6" />
+                                <div className="h-2 bg-gray-700/40 rounded-full animate-pulse w-3/5" />
+                              </div>
+                            ) : analysis.error ? (
+                              <div className="p-4 flex items-center gap-2 text-xs text-red-400">
+                                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                                <span>{analysis.error}</span>
+                              </div>
+                            ) : (
+                              <div className="p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-1.5">
+                                    <BarChart3 className="w-3 h-3 text-gray-500" />
+                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Analysis</span>
+                                  </div>
+                                  <button
+                                    onClick={() => setCardAnalysisMap(prev => { const n = { ...prev }; delete n[cardKey]; return n; })}
+                                    className="text-gray-600 hover:text-gray-300 transition-colors"
+                                    aria-label="Close analysis"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                                <div className="text-xs text-gray-300 leading-relaxed space-y-2.5">
+                                  {(analysis.content ?? '').split('\n\n').map((para, pIdx) => {
+                                    if (para.includes('**')) {
+                                      const parts = para.split('**');
+                                      return (
+                                        <p key={pIdx}>
+                                          {parts.map((part, partIdx) =>
+                                            partIdx % 2 === 1
+                                              ? <span key={partIdx} className="font-bold text-white">{part}</span>
+                                              : <span key={partIdx}>{part}</span>
+                                          )}
+                                        </p>
+                                      );
+                                    }
+                                    return <p key={pIdx}>{para}</p>;
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 

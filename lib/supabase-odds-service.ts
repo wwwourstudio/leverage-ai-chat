@@ -209,8 +209,11 @@ export class SupabaseOddsService {
       if (error) {
         // Silently ignore permission / constraint errors -- sport tables may lack RLS policies for anon writes
         const code = (error as any).code;
-        if (!['PGRST205', '42P10', '42501', '23505'].includes(code) && (error as any).message?.indexOf('policy') === -1) {
-          console.error(`[Supabase] Sport odds store error (${tableName}):`, (error as any).message || error);
+        const msg: string = (error as any).message ?? '';
+        if (!['PGRST205', '42P10', '42501', '23505'].includes(code) &&
+            !msg.includes('policy') &&
+            !msg.includes('fetch failed')) {
+          console.error(`[Supabase] Sport odds store error (${tableName}):`, msg || error);
         }
         return false;
       }

@@ -40,8 +40,14 @@ interface AnalyzeRequestBody {
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
+  const TIMEOUT_MS = 25000; // 25 seconds (Vercel hobby limit is 30s)
 
   try {
+    // Add timeout wrapper
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Request timeout - analysis taking too long')), TIMEOUT_MS);
+    });
+
     const body: AnalyzeRequestBody = await request.json();
     const { userMessage, existingCards = [], context = {} } = body;
 
@@ -132,7 +138,7 @@ export async function POST(request: NextRequest) {
       const sportKey = context.sport || undefined;
       cardPromise = Promise.race([
         generateContextualCards('betting', sportKey, 6),
-        new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 8000)),
+        new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 6000)), // Reduced from 8s to 6s
       ]);
     } else {
       // General query — try to return cached/fresh multi-sport cards so the
@@ -165,22 +171,26 @@ export async function POST(request: NextRequest) {
 
     if (xaiApiKey) {
       try {
-        // Initial generation
-        const result = await generateText({
-          model: createXai({ apiKey: xaiApiKey })(AI_CONFIG.MODEL_NAME),
-          system: SYSTEM_PROMPT,
-          prompt: enrichedPrompt,
-          temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-          maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
-          maxRetries: 2,
-        });
+        // Initial generation with timeout protection
+        const result = await Promise.race([
+          generateText({
+            model: createXai({ apiKey: xaiApiKey })(AI_CONFIG.MODEL_NAME),
+            system: SYSTEM_PROMPT,
+            prompt: enrichedPrompt,
+            temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
+            maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
+            maxRetries: 1, // Reduced retries to prevent timeout
+          }),
+          timeoutPromise
+        ]);
         aiText = result.text;
 
-        // Hallucination-detection retry loop
+        // Hallucination-detection retry loop (with timeout awareness)
         let detection = detectHallucinations(aiText, userMessage, context.oddsData);
         let retryAttempt = 0;
+        const remainingTime = TIMEOUT_MS - (Date.now() - startTime);
 
-        while (detection.shouldRetry && retryAttempt < MAX_HALLUCINATION_RETRIES) {
+        while (detection.shouldRetry && retryAttempt < MAX_HALLUCINATION_RETRIES && remainingTime > 8000) {
           retryAttempt++;
           console.warn(
             `[API/analyze] Hallucination detected (attempt ${retryAttempt}/${MAX_HALLUCINATION_RETRIES}):`,
@@ -195,15 +205,22 @@ export async function POST(request: NextRequest) {
           );
 
           try {
-            const retryResult = await generateText({
-              model: createXai({ apiKey: xaiApiKey })(AI_CONFIG.MODEL_NAME),
-              system: SYSTEM_PROMPT,
-              prompt: retryPrompt,
-              // Lower temperature on retries to reduce hallucination likelihood
-              temperature: Math.max(0.1, (AI_CONFIG.DEFAULT_TEMPERATURE ?? 0.7) - retryAttempt * 0.2),
-              maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
-              maxRetries: 1,
+            const retryTimeoutPromise = new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error('Retry timeout')), 7000); // 7s per retry
             });
+
+            const retryResult = await Promise.race([
+              generateText({
+                model: createXai({ apiKey: xaiApiKey })(AI_CONFIG.MODEL_NAME),
+                system: SYSTEM_PROMPT,
+                prompt: retryPrompt,
+                // Lower temperature on retries to reduce hallucination likelihood
+                temperature: Math.max(0.1, (AI_CONFIG.DEFAULT_TEMPERATURE ?? 0.7) - retryAttempt * 0.2),
+                maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
+                maxRetries: 0, // No retries within retry
+              }),
+              retryTimeoutPromise
+            ]);
             aiText = retryResult.text;
             detection = detectHallucinations(aiText, userMessage, context.oddsData);
           } catch (retryError) {
@@ -223,14 +240,21 @@ export async function POST(request: NextRequest) {
         const fallbackModel = 'grok-3-fast';
         console.warn(`[API/analyze] ${primaryModel} failed, retrying with ${fallbackModel}:`, aiError instanceof Error ? aiError.message : aiError);
         try {
-          const fallbackResult = await generateText({
-            model: createXai({ apiKey: xaiApiKey })(fallbackModel),
-            system: SYSTEM_PROMPT,
-            prompt: enrichedPrompt,
-            temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-            maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
-            maxRetries: 1,
+          const fallbackTimeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Fallback timeout')), 8000); // 8s for fallback
           });
+
+          const fallbackResult = await Promise.race([
+            generateText({
+              model: createXai({ apiKey: xaiApiKey })(fallbackModel),
+              system: SYSTEM_PROMPT,
+              prompt: enrichedPrompt,
+              temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
+              maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
+              maxRetries: 0,
+            }),
+            fallbackTimeoutPromise
+          ]);
           aiText = fallbackResult.text;
           modelUsed = 'Grok 3 Fast (fallback)';
           console.log(`[API/analyze] ${fallbackModel} fallback succeeded`);
@@ -306,6 +330,42 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('[API/analyze] Unhandled error:', error);
+
+    // Check if timeout error
+    if (error instanceof Error && error.message.includes('timeout')) {
+      return NextResponse.json(
+        {
+          success: true, // Return success with fallback to avoid breaking UI
+          text: generateFallbackResponse(
+            'Analysis request',
+            { noGamesAvailable: true, sport: 'sports' }
+          ),
+          cards: [],
+          confidence: 65,
+          sources: [{ name: 'Fallback Mode (timeout)', type: 'cache', reliability: 65 }],
+          modelUsed: 'Fallback (timeout)',
+          trustMetrics: {
+            benfordIntegrity: 65,
+            oddsAlignment: 65,
+            marketConsensus: 65,
+            historicalAccuracy: 68,
+            finalConfidence: 65,
+            trustLevel: 'medium' as const,
+            riskLevel: 'medium' as const,
+            adjustedTone: 'Request timeout — try a simpler query',
+            flags: [{
+              type: 'warning',
+              message: 'Request took too long — consider breaking complex queries into smaller parts',
+              severity: 'warning' as const
+            }],
+          },
+          useFallback: true,
+          processingTime: Date.now() - startTime,
+        },
+        { status: HTTP_STATUS.OK }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,

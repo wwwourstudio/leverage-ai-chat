@@ -498,9 +498,10 @@ export async function generateContextualCards(
       });
     }
     
-    console.log(`[v0] [MULTI-SPORT] Final result: ${cards.length} cards from ${[...new Set(cards.map(c => c.category))].join(', ')}`);
-
-    return cards.slice(0, count);
+    const finalCards = cards.slice(0, count);
+    console.log(`[v0] [MULTI-SPORT] Final result: ${finalCards.length} cards from ${[...new Set(finalCards.map(c => c.category))].join(', ')}`);
+    if (finalCards.length > 0) setCachedCards(finalCards, category || 'all');
+    return finalCards;
   }
 
   // Single-sport betting path — user has selected a specific sport (e.g. NBA).

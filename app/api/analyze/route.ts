@@ -107,6 +107,28 @@ export async function POST(request: NextRequest) {
       enrichedPrompt += `\n\n[Context: General question — answer with your full expert knowledge about sports betting, fantasy, DFS, or prediction markets as appropriate.]`;
     }
 
+    // ── Launch card generation BEFORE AI (they're independent operations) ──────
+    // Starting both in parallel shaves ~6-8 seconds off the total request time
+    // because card generation (Odds API fetch) runs during the AI generation window.
+    const hasExistingCards = Array.isArray(existingCards) && existingCards.length > 0;
+    let cardPromise: Promise<InsightCard[]>;
+    if (hasExistingCards) {
+      cardPromise = Promise.resolve(existingCards as InsightCard[]);
+    } else if (!context.isPoliticalMarket && context.hasFantasyIntent && !context.hasBettingIntent) {
+      cardPromise = import('@/lib/fantasy/cards/fantasy-card-generator')
+        .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 3) as InsightCard[])
+        .catch(() => generateContextualCards('fantasy', undefined, 3).catch(() => []));
+    } else if (!context.isPoliticalMarket && (context.isSportsQuery || context.hasBettingIntent)) {
+      const sportKey = context.sport || undefined;
+      cardPromise = Promise.race([
+        generateContextualCards('betting', sportKey, 6),
+        new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 8000)),
+      ]);
+    } else {
+      cardPromise = Promise.resolve([]);
+    }
+    // ── AI generation starts now (concurrently with card generation above) ──────
+
     // Attempt AI generation via Vercel AI Gateway
     const xaiApiKey = process.env.XAI_API_KEY;
     const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
@@ -210,34 +232,9 @@ export async function POST(request: NextRequest) {
       usedFallback = true;
     }
 
-    // Generate cards on-demand for betting/sports queries.
-    // If the client already has relevant cards, use those to avoid duplicate API calls.
-    let cards: InsightCard[] = [];
-    const hasExistingCards = Array.isArray(existingCards) && existingCards.length > 0;
-
-    if (hasExistingCards) {
-      cards = existingCards;
-    } else if (!usedFallback && context.hasFantasyIntent && !context.hasBettingIntent) {
-      // Fantasy query — generate fantasy cards with message context
-      try {
-        const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
-        cards = generateFantasyCards(userMessage, 3);
-      } catch (err) {
-        console.error('[API/analyze] Fantasy card generation failed:', err);
-        cards = await generateContextualCards('fantasy', undefined, 3).catch(() => []);
-      }
-    } else if (!usedFallback && (context.isSportsQuery || context.hasBettingIntent)) {
-      try {
-        const sportKey = context.sport || undefined;
-        const cardPromise = generateContextualCards('betting', sportKey, 6);
-        const timeoutPromise = new Promise<InsightCard[]>((resolve) =>
-          setTimeout(() => resolve([]), 6000)
-        );
-        cards = await Promise.race([cardPromise, timeoutPromise]);
-      } catch (err) {
-        console.error('[API/analyze] Card generation failed:', err);
-      }
-    }
+    // Cards were launched in parallel with AI above — just await the in-flight promise.
+    // If AI fell back to the static response, skip cards to avoid a mismatch.
+    const cards: InsightCard[] = usedFallback ? [] : await cardPromise.catch(() => []);
     console.log(`[API/analyze] Returning ${cards.length} cards`);
 
     const processingTime = Date.now() - startTime;

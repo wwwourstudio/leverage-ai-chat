@@ -965,15 +965,31 @@ export async function generateContextualCards(
     console.log(`[v0] [CARDS-GEN] Still need cards, attempting sport-specific fetch for ${displaySport}`);
     try {
       const sportCards = await generateSportSpecificCards(normalizedSport, count - cards.length, 'betting');
-      // Only add cards with real data (not placeholders) to avoid duplicates
-      const realCards = sportCards.filter(c => c.data?.realData === true);
-      if (realCards.length > 0) {
-        cards.push(...realCards.slice(0, count - cards.length));
-        console.log(`[v0] [CARDS-GEN] Added ${realCards.length} real ${displaySport} cards`);
+      // Skip cards whose title already exists (avoids duplicates when arbitrage fallback + odds both return same games)
+      const existingTitles = new Set(cards.map(c => (c.title || '').toLowerCase().trim()));
+      const newCards = sportCards.filter(c =>
+        c.data?.realData === true &&
+        !existingTitles.has((c.title || '').toLowerCase().trim())
+      );
+      if (newCards.length > 0) {
+        cards.push(...newCards.slice(0, count - cards.length));
+        console.log(`[v0] [CARDS-GEN] Added ${newCards.length} real ${displaySport} cards`);
       }
     } catch (err) {
       console.error(`[v0] [CARDS-GEN] Sport-specific fallback failed:`, err);
     }
+  }
+
+  // Deduplicate by title across all sources (belt-and-suspenders)
+  {
+    const _seen = new Set<string>();
+    const _deduped: typeof cards = [];
+    for (const c of cards) {
+      const key = (c.title || '').toLowerCase().trim();
+      if (!_seen.has(key)) { _seen.add(key); _deduped.push(c); }
+    }
+    cards.length = 0;
+    cards.push(..._deduped);
   }
 
   // Final fallback: add informative placeholder cards (deduplicated by index)

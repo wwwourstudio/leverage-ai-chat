@@ -159,22 +159,38 @@ interface UnifiedAIPlatformProps {
 }
 
 export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps) {
-  // Dynamic welcome message based on time, category, and sport season
-  const getWelcomeMessage = (category: string) => {
+  // Dynamic welcome message based on time, category, and selected sport
+  const getWelcomeMessage = (category: string, sport?: string) => {
     // Use server time to prevent hydration mismatch
     const now = serverData?.serverTime ? new Date(serverData.serverTime) : new Date();
     const hour = now.getHours();
     const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
     const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-    
-    const categoryMessages: Record<string, string> = {
-      betting: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is scanning live odds across all major sportsbooks. Ask me about tonight's lines, player props, sharp money, or arbitrage opportunities.`,
-      fantasy: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is ready for fantasy analysis. Ask about draft strategy, waiver targets, trade values, or bestball stacking for NFBC/NFFC.`,
-      dfs: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is optimizing DFS lineups. Ask about optimal builds, ownership leverage, captain picks, or correlation stacks for DraftKings and FanDuel.`,
-      kalshi: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is monitoring Kalshi prediction markets in real-time. Ask about election contracts, weather markets, economic events, or cross-market arbitrage.`,
-      all: `${greeting}! It's ${dateStr}.\n\n**Leverage AI** - Powered by Grok AI\n\nI'm connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.`
+
+    const sportNames: Record<string, string> = {
+      nfl: 'NFL', nba: 'NBA', mlb: 'MLB', nhl: 'NHL',
+      'ncaa-football': 'NCAA Football', 'ncaa-basketball': 'NCAA Basketball',
     };
-    
+    const sportLabel = sport ? (sportNames[sport] || sport.toUpperCase()) : null;
+
+    const categoryMessages: Record<string, string> = {
+      betting: sportLabel
+        ? `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is scanning live **${sportLabel}** odds across all major sportsbooks. Ask me about today's lines, player props, sharp money movement, or arbitrage opportunities.`
+        : `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is scanning live odds across all major sportsbooks. Ask me about tonight's lines, player props, sharp money, or arbitrage opportunities.`,
+      fantasy: sportLabel
+        ? `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is ready for **${sportLabel}** fantasy analysis. Ask about waiver pickups, start/sit decisions, trade values, or draft strategy.`
+        : `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is ready for fantasy analysis. Ask about draft strategy, waiver targets, trade values, or bestball stacking for NFBC/NFFC.`,
+      dfs: sportLabel
+        ? `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is optimizing **${sportLabel}** DFS lineups. Ask about optimal builds, ownership leverage, captain picks, or correlation stacks for DraftKings and FanDuel.`
+        : `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is optimizing DFS lineups. Ask about optimal builds, ownership leverage, captain picks, or correlation stacks for DraftKings and FanDuel.`,
+      kalshi: sportLabel
+        ? `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is monitoring **${sportLabel}** prediction markets on Kalshi in real-time. Ask about contract pricing, market inefficiencies, or cross-market arbitrage.`
+        : `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is monitoring Kalshi prediction markets in real-time. Ask about election contracts, weather markets, economic events, or cross-market arbitrage.`,
+      all: sportLabel
+        ? `${greeting}! It's ${dateStr}.\n\n**Leverage AI** - Powered by Grok AI\n\nFiltering for **${sportLabel}**. Ask me about betting odds, player props, DFS lineups, or fantasy strategy for ${sportLabel}.`
+        : `${greeting}! It's ${dateStr}.\n\n**Leverage AI** - Powered by Grok AI\n\nI'm connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.`,
+    };
+
     return categoryMessages[category] || categoryMessages.all;
   };
 
@@ -253,6 +269,17 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Re-personalize when category or sport filter changes (only while welcome is still visible).
+  useEffect(() => {
+    setMessages(prev => {
+      if (prev[0]?.isWelcome) {
+        return [{ ...prev[0], content: getWelcomeMessage(selectedCategory, selectedSport || undefined) }, ...prev.slice(1)];
+      }
+      return prev;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, selectedSport]);
 
 
   
@@ -953,7 +980,14 @@ No preamble. Start directly with section 1.`;
       setCardAnalysisMap(prev => ({ ...prev, [cardKey]: { loading: false, content: null, error: 'Network error — please try again' } }));
     }
   };
-  
+
+  // Wrapper for "View Full Analysis" buttons rendered outside the message-card loop
+  // (e.g. _renderInsightCard). Derives a stable key from the card itself.
+  const generateDetailedAnalysis = (card: InsightCard) => {
+    const cardKey = `insight-${card.type}-${(card.title || '').replace(/\s+/g, '-').toLowerCase().slice(0, 40)}`;
+    generateCardAnalysis(card, cardKey);
+  };
+
   const generateRealResponse = async (userMessage: string) => {
     setIsTyping(true);
     setLastUserQuery(userMessage);
@@ -1965,8 +1999,153 @@ No preamble. Start directly with section 1.`;
     ]
   };
 
-  // Get dynamic prompts based on selected platform
-  const quickActions = platformPrompts[selectedCategory] || platformPrompts.all;
+  // Sport-specific prompt overrides — Betting
+  const sportBettingPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }>> = {
+    nfl: [
+      { label: 'NFL best lines and spreads this week', icon: TrendingUp, category: 'betting' },
+      { label: 'NFL player props with sharp edge', icon: Target, category: 'betting' },
+      { label: 'NFL sharp money movement & steam', icon: Activity, category: 'betting' },
+      { label: 'NFL arbitrage across sportsbooks', icon: Zap, category: 'betting' },
+      { label: 'NFL parlay builder with EV+ legs', icon: Medal, category: 'betting' },
+    ],
+    nba: [
+      { label: 'NBA picks with best odds tonight', icon: TrendingUp, category: 'betting' },
+      { label: 'NBA player props with edge tonight', icon: Target, category: 'betting' },
+      { label: 'NBA live arbitrage alerts', icon: Zap, category: 'betting' },
+      { label: 'NBA sharp money movement analysis', icon: Activity, category: 'betting' },
+      { label: 'NBA parlay builder with EV+ legs', icon: Medal, category: 'betting' },
+    ],
+    mlb: [
+      { label: 'MLB best run lines tonight', icon: TrendingUp, category: 'betting' },
+      { label: 'MLB pitcher props with edge', icon: Target, category: 'betting' },
+      { label: 'MLB first-5 innings sharp plays', icon: Activity, category: 'betting' },
+      { label: 'MLB arbitrage across sportsbooks', icon: Zap, category: 'betting' },
+      { label: 'MLB same-game parlay builder', icon: Medal, category: 'betting' },
+    ],
+    nhl: [
+      { label: 'NHL best moneylines tonight', icon: TrendingUp, category: 'betting' },
+      { label: 'NHL player props with edge', icon: Target, category: 'betting' },
+      { label: 'NHL puck line sharp plays', icon: Activity, category: 'betting' },
+      { label: 'NHL live arbitrage alerts', icon: Zap, category: 'betting' },
+      { label: 'NHL period-by-period betting angles', icon: Medal, category: 'betting' },
+    ],
+    'ncaa-football': [
+      { label: 'College football best lines this week', icon: TrendingUp, category: 'betting' },
+      { label: 'NCAAF player props with edge', icon: Target, category: 'betting' },
+      { label: 'College football sharp line moves', icon: Activity, category: 'betting' },
+      { label: 'NCAAF arbitrage opportunities', icon: Zap, category: 'betting' },
+      { label: 'College football totals with weather edge', icon: Medal, category: 'betting' },
+    ],
+    'ncaa-basketball': [
+      { label: 'College basketball best lines tonight', icon: TrendingUp, category: 'betting' },
+      { label: 'NCAAB player props with edge', icon: Target, category: 'betting' },
+      { label: 'College basketball sharp money plays', icon: Activity, category: 'betting' },
+      { label: 'NCAAB arbitrage across sportsbooks', icon: Zap, category: 'betting' },
+      { label: 'College basketball parlay builder', icon: Medal, category: 'betting' },
+    ],
+  };
+
+  // Sport-specific prompt overrides — Fantasy
+  const sportFantasyPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }>> = {
+    nfl: [
+      { label: 'NFL waiver wire priorities this week', icon: TrendingUp, category: 'fantasy' },
+      { label: 'NFL start/sit decisions this week', icon: Trophy, category: 'fantasy' },
+      { label: 'NFL trade value analysis', icon: ShoppingCart, category: 'fantasy' },
+      { label: 'NFL best ball stacking strategy', icon: Award, category: 'fantasy' },
+      { label: 'NFL ADP risers and fallers', icon: Activity, category: 'fantasy' },
+    ],
+    nba: [
+      { label: 'NBA fantasy pickups this week', icon: TrendingUp, category: 'fantasy' },
+      { label: 'NBA trade value analysis', icon: ShoppingCart, category: 'fantasy' },
+      { label: 'NBA streaming targets by category', icon: Trophy, category: 'fantasy' },
+      { label: 'NBA injury impact on roster', icon: Activity, category: 'fantasy' },
+      { label: 'NBA schedule analysis this week', icon: Award, category: 'fantasy' },
+    ],
+    mlb: [
+      { label: 'MLB waiver wire SP/RP targets', icon: TrendingUp, category: 'fantasy' },
+      { label: 'MLB hitter and pitcher streamers', icon: Trophy, category: 'fantasy' },
+      { label: 'MLB trade value analysis', icon: ShoppingCart, category: 'fantasy' },
+      { label: 'MLB IL pickup opportunities', icon: Activity, category: 'fantasy' },
+      { label: 'MLB matchup-based start/sit', icon: Award, category: 'fantasy' },
+    ],
+    nhl: [
+      { label: 'NHL fantasy pickups this week', icon: TrendingUp, category: 'fantasy' },
+      { label: 'NHL power-play unit streaming targets', icon: Trophy, category: 'fantasy' },
+      { label: 'NHL trade value analysis', icon: ShoppingCart, category: 'fantasy' },
+      { label: 'NHL goalie start/sit decisions', icon: Award, category: 'fantasy' },
+      { label: 'NHL back-to-back schedule impact', icon: Activity, category: 'fantasy' },
+    ],
+    'ncaa-football': [
+      { label: 'NCAAF fantasy waiver wire targets', icon: TrendingUp, category: 'fantasy' },
+      { label: 'College football start/sit decisions', icon: Trophy, category: 'fantasy' },
+      { label: 'NCAAF trade value analysis', icon: ShoppingCart, category: 'fantasy' },
+      { label: 'College football ADP risers/fallers', icon: Activity, category: 'fantasy' },
+      { label: 'NCAAF breakout player targets', icon: Award, category: 'fantasy' },
+    ],
+    'ncaa-basketball': [
+      { label: 'NCAAB fantasy pickups this week', icon: TrendingUp, category: 'fantasy' },
+      { label: 'College basketball streaming targets', icon: Trophy, category: 'fantasy' },
+      { label: 'NCAAB trade value analysis', icon: ShoppingCart, category: 'fantasy' },
+      { label: 'College basketball injury updates', icon: Activity, category: 'fantasy' },
+      { label: 'NCAAB matchup-based start/sit', icon: Award, category: 'fantasy' },
+    ],
+  };
+
+  // Sport-specific prompt overrides — DFS
+  const sportDFSPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }>> = {
+    nfl: [
+      { label: 'NFL DFS optimal lineups for DraftKings', icon: Award, category: 'dfs' },
+      { label: 'NFL FanDuel value plays this week', icon: DollarSign, category: 'dfs' },
+      { label: 'NFL showdown captain picks with leverage', icon: Medal, category: 'dfs' },
+      { label: 'NFL low-ownership GPP stacks', icon: Users, category: 'dfs' },
+      { label: 'NFL QB-receiver correlation stacks', icon: Layers, category: 'dfs' },
+    ],
+    nba: [
+      { label: 'NBA DFS optimal lineups for DraftKings', icon: Award, category: 'dfs' },
+      { label: 'NBA FanDuel value plays under $5K', icon: DollarSign, category: 'dfs' },
+      { label: 'NBA showdown captain picks', icon: Medal, category: 'dfs' },
+      { label: 'NBA pace-up game stacks', icon: Users, category: 'dfs' },
+      { label: 'NBA low-ownership tournament plays', icon: Layers, category: 'dfs' },
+    ],
+    mlb: [
+      { label: 'MLB DFS optimal lineups for DraftKings', icon: Award, category: 'dfs' },
+      { label: 'MLB pitcher stacks correlation builder', icon: Layers, category: 'dfs' },
+      { label: 'MLB FanDuel value plays tonight', icon: DollarSign, category: 'dfs' },
+      { label: 'MLB low-ownership GPP plays', icon: Users, category: 'dfs' },
+      { label: 'MLB weather-impacted lineup adjustments', icon: Medal, category: 'dfs' },
+    ],
+    nhl: [
+      { label: 'NHL DFS optimal lineups for DraftKings', icon: Award, category: 'dfs' },
+      { label: 'NHL power-play unit stacks', icon: Layers, category: 'dfs' },
+      { label: 'NHL FanDuel value plays tonight', icon: DollarSign, category: 'dfs' },
+      { label: 'NHL low-ownership GPP plays', icon: Users, category: 'dfs' },
+      { label: 'NHL goalie plays and fades', icon: Medal, category: 'dfs' },
+    ],
+    'ncaa-football': [
+      { label: 'NCAAF DFS optimal lineups for DraftKings', icon: Award, category: 'dfs' },
+      { label: 'College football FanDuel value plays', icon: DollarSign, category: 'dfs' },
+      { label: 'NCAAF showdown captain picks', icon: Medal, category: 'dfs' },
+      { label: 'College football low-ownership GPP stacks', icon: Users, category: 'dfs' },
+      { label: 'NCAAF QB-receiver correlation stacks', icon: Layers, category: 'dfs' },
+    ],
+    'ncaa-basketball': [
+      { label: 'NCAAB DFS optimal lineups for DraftKings', icon: Award, category: 'dfs' },
+      { label: 'College basketball FanDuel value plays', icon: DollarSign, category: 'dfs' },
+      { label: 'NCAAB showdown captain picks', icon: Medal, category: 'dfs' },
+      { label: 'College basketball low-ownership GPP plays', icon: Users, category: 'dfs' },
+      { label: 'NCAAB pace-up game stacks', icon: Layers, category: 'dfs' },
+    ],
+  };
+
+  // Get dynamic prompts based on selected platform AND sport
+  const quickActions = (() => {
+    if (selectedSport) {
+      if (selectedCategory === 'betting' && sportBettingPrompts[selectedSport]) return sportBettingPrompts[selectedSport];
+      if (selectedCategory === 'fantasy' && sportFantasyPrompts[selectedSport]) return sportFantasyPrompts[selectedSport];
+      if (selectedCategory === 'dfs'     && sportDFSPrompts[selectedSport])     return sportDFSPrompts[selectedSport];
+    }
+    return platformPrompts[selectedCategory] || platformPrompts.all;
+  })();
 
   return (
     <div className="flex h-screen bg-black text-white overflow-hidden font-sans">
@@ -2838,21 +3017,21 @@ No preamble. Start directly with section 1.`;
 
                               {/* Inline analysis panel */}
                               {isOpen && (
-                                <div className="rounded-xl border border-border/40 bg-card overflow-hidden">
+                                <div className="rounded-xl border border-gray-700/50 bg-gray-900/95 backdrop-blur-xl overflow-hidden">
                                   {analysis.loading ? (
-                                    <div className="p-4 space-y-2">
+                                    <div className="p-4 space-y-3">
                                       <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                        <div className="w-1.5 h-1.5 bg-info rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                        <div className="w-1.5 h-1.5 bg-primary/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                                        <span className="text-[11px] text-muted-foreground ml-1">Analyzing {card.type === 'kalshi' ? 'prediction market' : 'opportunity'}...</span>
+                                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                        <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                        <div className="w-1.5 h-1.5 bg-blue-500/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                        <span className="text-[11px] text-gray-400 ml-1">Analyzing {card.type === 'kalshi' ? 'prediction market' : 'opportunity'}...</span>
                                       </div>
-                                      <div className="h-2 bg-muted rounded-full animate-pulse w-full" />
-                                      <div className="h-2 bg-muted rounded-full animate-pulse w-5/6" />
-                                      <div className="h-2 bg-muted rounded-full animate-pulse w-3/5" />
+                                      <div className="h-2 bg-gray-700/40 rounded-full animate-pulse w-full" />
+                                      <div className="h-2 bg-gray-700/40 rounded-full animate-pulse w-5/6" />
+                                      <div className="h-2 bg-gray-700/40 rounded-full animate-pulse w-3/5" />
                                     </div>
                                   ) : analysis.error ? (
-                                    <div className="p-4 flex items-center gap-2 text-xs text-destructive">
+                                    <div className="p-4 flex items-center gap-2 text-xs text-red-400">
                                       <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
                                       <span>{analysis.error}</span>
                                     </div>
@@ -2860,18 +3039,18 @@ No preamble. Start directly with section 1.`;
                                     <div className="p-4">
                                       <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center gap-1.5">
-                                          <BarChart3 className="w-3 h-3 text-muted-foreground" />
-                                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Analysis</span>
+                                          <BarChart3 className="w-3 h-3 text-gray-500" />
+                                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Analysis</span>
                                         </div>
                                         <button
                                           onClick={() => setCardAnalysisMap(prev => { const n = { ...prev }; delete n[cardKey]; return n; })}
-                                          className="text-muted-foreground/50 hover:text-card-foreground transition-colors"
+                                          className="text-gray-600 hover:text-gray-300 transition-colors"
                                           aria-label="Close analysis"
                                         >
                                           <X className="w-3.5 h-3.5" />
                                         </button>
                                       </div>
-                                      <div className="text-xs text-card-foreground/80 leading-relaxed space-y-2.5">
+                                      <div className="text-xs text-gray-300 leading-relaxed space-y-2.5">
                                         {(analysis.content ?? '').split('\n\n').map((para, pIdx) => {
                                           if (para.includes('**')) {
                                             const parts = para.split('**');
@@ -2879,7 +3058,7 @@ No preamble. Start directly with section 1.`;
                                               <p key={pIdx}>
                                                 {parts.map((part, partIdx) =>
                                                   partIdx % 2 === 1
-                                                    ? <span key={partIdx} className="font-bold text-card-foreground">{part}</span>
+                                                    ? <span key={partIdx} className="font-bold text-white">{part}</span>
                                                     : <span key={partIdx}>{part}</span>
                                                 )}
                                               </p>

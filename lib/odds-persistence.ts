@@ -75,7 +75,7 @@ function getSupabaseClient() {
     throw new Error('Supabase not configured. Missing URL or service key.');
   }
 
-  return createClient(supabaseUrl, serviceKey);
+  return createClient(supabaseUrl, serviceKey, { db: { schema: 'api' } });
 }
 
 /**

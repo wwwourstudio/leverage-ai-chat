@@ -1,16 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import {
-  Zap,
-  TrendingUp,
-  Target,
-  Activity,
-  Clock,
-  ChevronRight,
-  ArrowUpRight,
-  ArrowDownRight,
-} from 'lucide-react';
+import { Clock, TrendingUp, TrendingDown, Minus, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BettingCardData {
@@ -21,6 +12,7 @@ interface BettingCardData {
   homeOdds?: string;
   awayOdds?: string;
   homeSpread?: string;
+  awaySpread?: string;
   overUnder?: string;
   bestLine?: string;
   line?: string;
@@ -29,6 +21,7 @@ interface BettingCardData {
   odds?: string;
   book?: string;
   bookmaker?: string;
+  bookmakerCount?: number | string;
   edge?: string;
   impliedWin?: string;
   impliedProb?: string;
@@ -55,6 +48,9 @@ interface BettingCardData {
   activeBets?: number | string;
   description?: string;
   note?: string;
+  sport?: string;
+  status?: string;
+  realData?: boolean;
   [key: string]: any;
 }
 
@@ -71,59 +67,55 @@ interface BettingCardProps {
   error?: string;
 }
 
-const statusConfig: Record<string, { label: string; dotClass: string; textClass: string }> = {
-  hot:     { label: 'HOT',     dotClass: 'bg-red-400',     textClass: 'text-red-400' },
-  value:   { label: 'VALUE',   dotClass: 'bg-emerald-400', textClass: 'text-emerald-400' },
-  optimal: { label: 'OPTIMAL', dotClass: 'bg-sky-400',     textClass: 'text-sky-400' },
-  edge:    { label: 'EDGE',    dotClass: 'bg-amber-400',   textClass: 'text-amber-400' },
-  live:    { label: 'LIVE',    dotClass: 'bg-emerald-400', textClass: 'text-emerald-400' },
-  active:  { label: 'LIVE',    dotClass: 'bg-emerald-400', textClass: 'text-emerald-400' },
-};
-
-/** Format moneyline with +/- prefix */
-function fmtOdds(val?: string): string | null {
-  if (!val) return null;
-  const n = Number(val);
-  if (isNaN(n)) return val;
-  return n > 0 ? `+${n}` : String(n);
-}
-
-/**
- * Parse the overUnder field which may be:
- *   "238.5"
- *   "O/U 238.5"
- *   "O/U 238.5: Over -118 / Under -112"
- * Returns just the numeric total and optional over/under juice.
- */
-function parseOU(raw?: string): { total: string; overJuice?: string; underJuice?: string } | null {
-  if (!raw || raw === 'N/A') return null;
-  // Try "O/U 238.5: Over -118 / Under -112"
-  const full = raw.match(/O\/U\s*([\d.]+)(?::\s*Over\s*([+-]?\d+)\s*\/\s*Under\s*([+-]?\d+))?/i);
-  if (full) {
-    return { total: full[1], overJuice: full[2] || undefined, underJuice: full[3] || undefined };
-  }
-  // Try plain number
-  const num = raw.match(/([\d.]+)/);
-  if (num) return { total: num[1] };
-  return { total: raw };
-}
-
-/**
- * Parse "spread (juice)" e.g. "+10.5 (-136)" or just "+10.5"
- */
-function parseSpread(raw?: string): { spread: string; juice?: string } | null {
-  if (!raw || raw === 'N/A') return null;
-  const m = raw.match(/([+-]?[\d.]+)\s*(?:\(([^)]+)\))?/);
-  if (m) return { spread: m[1], juice: m[2] || undefined };
-  return { spread: raw };
-}
-
-/** Parse "Away @ Home" or "Away vs Home" */
+/** Parse "Away @ Home" */
 function parseTeams(matchup?: string): { away: string; home: string } | null {
   if (!matchup) return null;
   const parts = matchup.split(/\s*[@vs.]+\s*/i);
   if (parts.length < 2) return null;
   return { away: parts[0].trim(), home: parts[1].trim() };
+}
+
+/** Team abbreviation (up to 3 chars) */
+function abbr(name: string): string {
+  const words = name.trim().split(/\s+/);
+  if (words.length === 1) return name.slice(0, 3).toUpperCase();
+  // Use last word for common "City TeamName" patterns
+  return words[words.length - 1].slice(0, 3).toUpperCase();
+}
+
+/** Format moneyline odds with +/- */
+function fmtML(val?: string): { display: string; positive: boolean } | null {
+  if (!val || val === 'N/A' || val === '—') return null;
+  const n = Number(val);
+  if (isNaN(n)) return { display: val, positive: false };
+  return { display: n > 0 ? `+${n}` : String(n), positive: n > 0 };
+}
+
+/** Parse "O/U 238.5: Over -118 / Under -112" */
+function parseOU(raw?: string): { total: string; overJ?: string; underJ?: string } | null {
+  if (!raw || raw === 'N/A') return null;
+  const full = raw.match(/O\/U\s*([\d.]+)(?::\s*Over\s*([+-]?\d+)\s*\/\s*Under\s*([+-]?\d+))?/i);
+  if (full) return { total: full[1], overJ: full[2], underJ: full[3] };
+  const num = raw.match(/([\d.]+)/);
+  return num ? { total: num[1] } : null;
+}
+
+/** Parse "+10.5 (-136)" */
+function parseSpread(raw?: string): { pts: string; juice?: string } | null {
+  if (!raw || raw === 'N/A') return null;
+  const m = raw.match(/([+-]?[\d.]+)\s*(?:\(([^)]+)\))?/);
+  return m ? { pts: m[1], juice: m[2] } : null;
+}
+
+/** Sport-specific team avatar colour */
+function sportColor(sport?: string): string {
+  if (!sport) return 'bg-slate-700';
+  if (sport.includes('basketball')) return 'bg-orange-500/20 text-orange-300 border-orange-500/30';
+  if (sport.includes('hockey')) return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+  if (sport.includes('football')) return 'bg-green-500/20 text-green-300 border-green-500/30';
+  if (sport.includes('baseball')) return 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30';
+  if (sport.includes('soccer')) return 'bg-teal-500/20 text-teal-300 border-teal-500/30';
+  return 'bg-slate-700/40 text-slate-300 border-slate-600/30';
 }
 
 export const BettingCard = memo(function BettingCard({
@@ -135,231 +127,186 @@ export const BettingCard = memo(function BettingCard({
   status,
   onAnalyze,
 }: BettingCardProps) {
-  const badge = statusConfig[status] || statusConfig.value;
   const teams = parseTeams(data.matchup || data.game);
-  const sportsbook = data.bookmaker || data.book || null;
-  const spreadInfo = parseSpread(data.homeSpread);
-  const ouInfo = parseOU(data.overUnder);
-  const homeML = fmtOdds(data.homeOdds);
-  const awayML = fmtOdds(data.awayOdds);
-  const hasOddsData = homeML || awayML || spreadInfo || ouInfo;
+  const homeML = fmtML(data.homeOdds);
+  const awayML = fmtML(data.awayOdds);
+  const spreadHome = parseSpread(data.homeSpread);
+  const spreadAway = parseSpread(data.awaySpread);
+  const ou = parseOU(data.overUnder);
+  const hasOdds = !!(homeML || awayML || spreadHome || ou);
+  const isFinal = data.status === 'FINAL' || !!data.finalScore;
+  const avatarCls = sportColor(data.sport);
 
   return (
-    <article className="group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200">
-      {/* Top accent bar */}
-      <div className={cn('absolute left-0 top-0 right-0 h-0.5 bg-gradient-to-r', gradient)} aria-hidden="true" />
+    <article className="group relative w-full rounded-xl overflow-hidden bg-gray-900/60 border border-gray-800/60 hover:border-gray-700/80 hover:bg-gray-900/80 transition-all duration-150 backdrop-blur-sm">
+      {/* Sport-coloured top bar */}
+      <div className={cn('h-[3px] w-full bg-gradient-to-r', gradient)} />
 
-      <div className="px-4 py-4 sm:px-5 sm:py-5">
-        {/* Header: category / subcategory + status badge */}
-        <div className="flex items-center justify-between gap-3 mb-2.5">
-          <div className="flex items-center gap-2 min-w-0">
-            <Zap className="w-3.5 h-3.5 text-[oklch(0.55_0.01_280)] shrink-0" aria-hidden="true" />
-            <span className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.55_0.01_280)]">
+      <div className="p-3.5">
+        {/* Row 1: sport label + game time */}
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
               {category}
             </span>
-            <span className="text-[oklch(0.3_0.01_280)]" aria-hidden="true">/</span>
-            <span className="text-[11px] font-medium text-[oklch(0.45_0.01_280)] truncate">
-              {subcategory}
-            </span>
+            <span className="text-gray-700">·</span>
+            <span className="text-[10px] text-gray-600 truncate max-w-[120px]">{subcategory}</span>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0" role="status">
-            <span className={cn('w-1.5 h-1.5 rounded-full animate-pulse', badge.dotClass)} />
-            <span className={cn('text-[10px] font-bold uppercase tracking-wider', badge.textClass)}>
-              {badge.label}
+          {data.gameTime && (
+            <span className="flex items-center gap-1 text-[10px] text-gray-600">
+              <Clock className="w-3 h-3" />
+              {data.gameTime}
             </span>
-          </div>
+          )}
         </div>
 
-        {/* Matchup title */}
-        <h3 className="text-base sm:text-lg font-bold text-[oklch(0.95_0.005_85)] leading-snug text-balance mb-1">
-          {title}
-        </h3>
+        {/* Row 2: Team matchup */}
+        {teams ? (
+          <div className="flex items-center gap-3 mb-3">
+            {/* Away team */}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <div className={cn('w-8 h-8 rounded-lg border text-[11px] font-black flex items-center justify-center shrink-0', avatarCls)}>
+                {abbr(teams.away)}
+              </div>
+              <span className="text-xs font-semibold text-gray-200 truncate">{teams.away}</span>
+            </div>
 
-        {data.description && (
-          <p className="text-sm text-[oklch(0.55_0.01_280)] leading-relaxed mb-3">{data.description}</p>
-        )}
+            {/* VS divider */}
+            <span className="text-[10px] text-gray-700 font-bold shrink-0">@</span>
 
-        {/* Odds strip */}
-        {hasOddsData && (
-          <div className="mt-3 rounded-xl bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.015_280)] overflow-hidden">
-            <div className={cn(
-              'grid divide-x divide-[oklch(0.20_0.015_280)]',
-              // Responsive: 2 cols on small, up to 4 on larger
-              [homeML, awayML, spreadInfo, ouInfo].filter(Boolean).length <= 2
-                ? 'grid-cols-2'
-                : 'grid-cols-2 sm:grid-cols-4'
-            )}>
-              {awayML && (
-                <OddsCell
-                  label={teams?.away ?? 'Away'}
-                  value={awayML}
-                  sublabel="ML"
-                  isPositive={Number(data.awayOdds) > 0}
-                />
-              )}
-              {homeML && (
-                <OddsCell
-                  label={teams?.home ?? 'Home'}
-                  value={homeML}
-                  sublabel="ML"
-                  isPositive={Number(data.homeOdds) > 0}
-                />
-              )}
-              {spreadInfo && (
-                <OddsCell
-                  label="Spread"
-                  value={spreadInfo.spread}
-                  sublabel={spreadInfo.juice ? `(${spreadInfo.juice})` : 'HM'}
-                />
-              )}
-              {ouInfo && (
-                <OddsCell
-                  label="O/U"
-                  value={ouInfo.total}
-                  sublabel={
-                    ouInfo.overJuice && ouInfo.underJuice
-                      ? `O ${ouInfo.overJuice} / U ${ouInfo.underJuice}`
-                      : 'Total'
-                  }
-                />
-              )}
+            {/* Home team */}
+            <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+              <span className="text-xs font-semibold text-gray-200 truncate text-right">{teams.home}</span>
+              <div className={cn('w-8 h-8 rounded-lg border text-[11px] font-black flex items-center justify-center shrink-0', avatarCls)}>
+                {abbr(teams.home)}
+              </div>
             </div>
           </div>
+        ) : (
+          <p className="text-sm font-semibold text-gray-200 mb-3 truncate">{title}</p>
         )}
 
-        {/* Meta row */}
-        {(sportsbook || data.gameTime || data.edge || data.player || data.confidence !== undefined) && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-3 text-xs">
-            {data.player && <Chip>{data.player}</Chip>}
-            {data.stat && <Chip>{data.stat}</Chip>}
-            {sportsbook && <Chip>{sportsbook}</Chip>}
-            {data.edge && (
-              <span className="inline-flex items-center gap-1 font-semibold text-emerald-400">
-                <ArrowUpRight className="w-3 h-3" aria-hidden="true" />
-                {data.edge}
-              </span>
-            )}
-            {data.confidence !== undefined && data.confidence !== '' && (
-              <span className="font-medium text-[oklch(0.55_0.01_280)]">
-                {typeof data.confidence === 'number' ? `${data.confidence}%` : data.confidence} conf.
-              </span>
-            )}
-            {data.recommendation && (
-              <span className="font-semibold text-[oklch(0.90_0.005_85)]">{data.recommendation}</span>
-            )}
-            {data.gameTime && (
-              <span className="inline-flex items-center gap-1 text-[oklch(0.45_0.01_280)] ml-auto">
-                <Clock className="w-3 h-3" aria-hidden="true" />
-                {data.gameTime}
-              </span>
-            )}
+        {/* Final score */}
+        {isFinal && data.finalScore && (
+          <div className="mb-2.5 px-3 py-1.5 rounded-lg bg-gray-800/40 text-center">
+            <span className="text-xs font-bold text-emerald-400">FINAL</span>
+            <p className="text-sm font-bold text-white mt-0.5">{data.finalScore}</p>
           </div>
         )}
 
-        {/* Line movement */}
-        {(data.lineChange || data.sharpMoney || data.kellyFraction) && (
-          <div className="flex flex-wrap gap-2 mt-3">
-            {data.lineChange && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[oklch(0.16_0.02_280)] text-xs font-semibold text-[oklch(0.90_0.005_85)]">
-                {data.direction === 'up' ? (
-                  <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400" />
-                ) : (
-                  <ArrowDownRight className="w-3.5 h-3.5 text-red-400" />
-                )}
-                {data.lineChange}
-                {data.oldLine && data.newLine && (
-                  <span className="text-[oklch(0.50_0.01_280)] font-normal ml-1">
-                    {data.oldLine} {'-->'} {data.newLine}
-                  </span>
-                )}
-              </span>
-            )}
-            {data.sharpMoney && (
-              <span className="px-2.5 py-1 rounded-lg bg-[oklch(0.16_0.02_280)] text-xs">
-                <span className="text-[oklch(0.50_0.01_280)]">Sharp </span>
-                <span className="font-semibold text-[oklch(0.90_0.005_85)]">{data.sharpMoney}</span>
-              </span>
-            )}
-            {data.kellyFraction && (
-              <span className="px-2.5 py-1 rounded-lg bg-[oklch(0.16_0.02_280)] text-xs">
-                <span className="text-[oklch(0.50_0.01_280)]">Kelly </span>
-                <span className="font-semibold text-[oklch(0.90_0.005_85)]">{data.kellyFraction}</span>
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Portfolio stats */}
-        {(data.totalBankroll || data.expectedValue) && (
-          <div className="mt-3 rounded-xl bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.015_280)] overflow-hidden">
-            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-[oklch(0.20_0.015_280)]">
-              {data.expectedValue && <OddsCell label="EV" value={data.expectedValue} sublabel="Expected" />}
-              {data.recommendedStake && <OddsCell label="Stake" value={data.recommendedStake} sublabel="Rec." />}
-              {data.totalBankroll && <OddsCell label="Bankroll" value={data.totalBankroll} sublabel="Total" />}
-              {data.available && <OddsCell label="Available" value={data.available} sublabel="Balance" />}
+        {/* Odds grid */}
+        {hasOdds && !isFinal && (
+          <div className="grid grid-cols-3 gap-1.5 mb-2.5">
+            {/* Moneylines */}
+            <div className="col-span-3 grid grid-cols-2 gap-1.5">
+              <OddsBox
+                label={teams ? abbr(teams.away) : 'Away'}
+                value={awayML?.display ?? '—'}
+                positive={awayML?.positive}
+                sub="ML"
+              />
+              <OddsBox
+                label={teams ? abbr(teams.home) : 'Home'}
+                value={homeML?.display ?? '—'}
+                positive={homeML?.positive}
+                sub="ML"
+              />
             </div>
+
+            {/* Spread + O/U */}
+            {(spreadHome || ou) && (
+              <>
+                {spreadHome && (
+                  <OddsBox
+                    label="HM SPD"
+                    value={spreadHome.pts}
+                    sub={spreadHome.juice ? `(${spreadHome.juice})` : undefined}
+                  />
+                )}
+                {spreadAway && !spreadHome && (
+                  <OddsBox
+                    label="AW SPD"
+                    value={spreadAway.pts}
+                    sub={spreadAway.juice ? `(${spreadAway.juice})` : undefined}
+                  />
+                )}
+                {ou && (
+                  <OddsBox
+                    label="O/U"
+                    value={ou.total}
+                    sub={ou.overJ ? `O${ou.overJ} / U${ou.underJ ?? ''}` : 'Total'}
+                    span={spreadHome ? 2 : 3}
+                  />
+                )}
+                {!spreadHome && !ou && <div />}
+              </>
+            )}
           </div>
         )}
 
-        {data.note && (
-          <p className="mt-3 text-xs text-[oklch(0.45_0.01_280)] italic leading-relaxed">{data.note}</p>
+        {/* Description (no-odds fallback) */}
+        {data.description && !hasOdds && (
+          <p className="text-xs text-gray-500 mb-2.5 leading-relaxed">{data.description}</p>
         )}
 
-        {/* CTA */}
-        {onAnalyze && (
-          <button
-            onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 py-2.5 rounded-xl bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.015_280)] text-xs font-semibold text-[oklch(0.50_0.01_280)] hover:text-[oklch(0.85_0.005_85)] hover:bg-[oklch(0.14_0.01_280)] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={`Analyze ${title}`}
-          >
-            View Full Analysis
-            <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-          </button>
-        )}
+        {/* Footer row: bookmaker + book count + analyze */}
+        <div className="flex items-center justify-between pt-2 border-t border-gray-800/60">
+          <div className="flex items-center gap-2">
+            {data.bookmaker && (
+              <span className="text-[10px] font-semibold text-gray-500 bg-gray-800/60 px-2 py-0.5 rounded-md">
+                {data.bookmaker}
+              </span>
+            )}
+            {data.bookmakerCount && Number(data.bookmakerCount) > 1 && (
+              <span className="text-[10px] text-gray-700">+{Number(data.bookmakerCount) - 1} books</span>
+            )}
+          </div>
+
+          {onAnalyze && (
+            <button
+              onClick={onAnalyze}
+              className="flex items-center gap-1 text-[10px] font-semibold text-gray-600 hover:text-blue-400 transition-colors"
+            >
+              Analyze <ExternalLink className="w-2.5 h-2.5" />
+            </button>
+          )}
+        </div>
       </div>
     </article>
   );
 });
 
 /* ------------------------------------------------------------------ */
-/*  Sub-components                                                     */
+/*  OddsBox sub-component                                               */
 /* ------------------------------------------------------------------ */
-
-function OddsCell({
+function OddsBox({
   label,
   value,
-  sublabel,
-  isPositive,
+  sub,
+  positive,
+  span = 1,
 }: {
   label: string;
   value: string;
-  sublabel?: string;
-  isPositive?: boolean;
+  sub?: string;
+  positive?: boolean;
+  span?: number;
 }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-0.5 px-3 py-3 text-center min-w-0">
-      <span className="text-[10px] font-medium uppercase tracking-wider text-[oklch(0.45_0.01_280)]">
-        {sublabel ?? label}
-      </span>
-      <span
-        className={cn(
-          'text-base sm:text-lg font-bold tabular-nums leading-none',
-          isPositive === true ? 'text-emerald-400' : isPositive === false ? 'text-red-400' : 'text-[oklch(0.92_0.005_85)]'
-        )}
-      >
-        {value}
-      </span>
-      <span className="text-[11px] font-medium text-[oklch(0.50_0.01_280)] max-w-full mt-0.5 break-words leading-tight">
-        {label}
-      </span>
-    </div>
-  );
-}
+  const valueColor =
+    positive === true
+      ? 'text-emerald-400'
+      : positive === false
+      ? 'text-red-400'
+      : 'text-gray-200';
 
-function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="px-2 py-0.5 rounded-md bg-[oklch(0.16_0.02_280)] text-[11px] font-medium text-[oklch(0.60_0.01_280)]">
-      {children}
-    </span>
+    <div
+      className="flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-lg bg-gray-800/40 border border-gray-800/40"
+      style={span > 1 ? { gridColumn: `span ${span}` } : undefined}
+    >
+      <span className="text-[9px] font-bold uppercase tracking-wider text-gray-600">{label}</span>
+      <span className={cn('text-sm font-bold tabular-nums', valueColor)}>{value}</span>
+      {sub && <span className="text-[9px] text-gray-600 leading-none">{sub}</span>}
+    </div>
   );
 }

@@ -100,21 +100,27 @@ async function fetchUserSession(): Promise<{
 }> {
   try {
     const supabase = await createClient();
-    const { data: { session }, error } = await supabase.auth.getSession();
+    // Use getUser() instead of getSession() — getUser() authenticates against
+    // the Supabase Auth server so the returned user object is verified.
+    const { data: { user }, error } = await supabase.auth.getUser();
 
     if (error) {
+      // PGRST errors for unauthenticated state are expected — not a real error
+      if (error.message?.includes('Auth session missing')) {
+        return { session: null, errors: [] };
+      }
       console.error('[v0] Server: Auth error:', error.message);
       return { session: null, errors: [error.message] };
     }
 
-    if (session) {
-      console.log('[v0] Server: ✓ User authenticated:', session.user.email);
+    if (user) {
+      console.log('[v0] Server: ✓ User authenticated:', user.email);
       return {
         session: {
           user: {
-            id: session.user.id,
-            email: session.user.email,
-            name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
+            id: user.id,
+            email: user.email,
+            name: user.user_metadata?.full_name || user.email?.split('@')[0],
           }
         },
         errors: [],

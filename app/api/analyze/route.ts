@@ -135,7 +135,12 @@ export async function POST(request: NextRequest) {
         new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 8000)),
       ]);
     } else {
-      cardPromise = Promise.resolve([]);
+      // General query — try to return cached/fresh multi-sport cards so the
+      // response always has data cards rather than falling back to empty.
+      cardPromise = Promise.race([
+        generateContextualCards(category, undefined, 6),
+        new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 5000)),
+      ]).catch(() => []);
     }
     // ── AI generation starts now (concurrently with card generation above) ──────
 

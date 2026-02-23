@@ -117,10 +117,9 @@ async function generateSportSpecificCards(
             const bs = bi === -1 ? 999 : bi;
             return as - bs;
           });
-          // Emit up to 2 bookmakers per game so we don't drown cards in one matchup
-          const perGame = Math.min(2, sorted.length);
-          for (let b = 0; b < perGame; b++) {
-            gameBookPairs.push({ game, book: sorted[b], bookIdx: b });
+          // One card per game — use the top-ranked bookmaker only to avoid duplicates
+          if (sorted.length > 0) {
+            gameBookPairs.push({ game, book: sorted[0], bookIdx: 0 });
           }
         }
 

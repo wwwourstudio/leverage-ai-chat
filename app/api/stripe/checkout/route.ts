@@ -9,11 +9,12 @@ import { NextRequest, NextResponse } from 'next/server';
  * - amount: number (for credits)
  * - credits: number
  * - planId: string (for subscriptions)
+ * - customer_email?: string (pre-fills Stripe Link for returning users)
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { type, amount, credits, planId } = body;
+    const { type, amount, credits, planId, customer_email } = body;
 
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
@@ -66,6 +67,9 @@ export async function POST(request: NextRequest) {
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
         line_items: [{ price: priceId, quantity: 1 }],
+        automatic_payment_methods: { enabled: true }, // enables Stripe Link for returning customers
+        customer_email: customer_email || undefined,
+        allow_promotion_codes: true,
         success_url: `${origin}?session_id={CHECKOUT_SESSION_ID}&credits=${credits}`,
         cancel_url: `${origin}?canceled=true`,
         metadata: { type: 'subscription', planId, credits: String(credits) },
@@ -91,6 +95,9 @@ export async function POST(request: NextRequest) {
             quantity: 1,
           },
         ],
+        automatic_payment_methods: { enabled: true }, // enables Stripe Link for returning customers
+        customer_email: customer_email || undefined,
+        allow_promotion_codes: true,
         success_url: `${origin}?session_id={CHECKOUT_SESSION_ID}&credits=${credits || amount}`,
         cancel_url: `${origin}?canceled=true`,
         metadata: { type: 'credits', credits: String(credits || amount) },

@@ -160,12 +160,13 @@ interface UnifiedAIPlatformProps {
 
 export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps) {
   // Dynamic welcome message based on time, category, and selected sport
-  const getWelcomeMessage = (category: string, sport?: string) => {
+  const getWelcomeMessage = (category: string, sport?: string, userName?: string) => {
     // Use server time to prevent hydration mismatch
     const now = serverData?.serverTime ? new Date(serverData.serverTime) : new Date();
     const hour = now.getHours();
     const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
     const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    const name = userName ? `, ${userName}` : '';
 
     const sportNames: Record<string, string> = {
       nfl: 'NFL', nba: 'NBA', mlb: 'MLB', nhl: 'NHL',
@@ -175,20 +176,20 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
     const categoryMessages: Record<string, string> = {
       betting: sportLabel
-        ? `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is scanning live **${sportLabel}** odds across all major sportsbooks. Ask me about today's lines, player props, sharp money movement, or arbitrage opportunities.`
-        : `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is scanning live odds across all major sportsbooks. Ask me about tonight's lines, player props, sharp money, or arbitrage opportunities.`,
+        ? `${greeting}${name}! It's ${dateStr}.\n\n**Leverage AI** is scanning live **${sportLabel}** odds across all major sportsbooks. Ask me about today's lines, player props, sharp money movement, or arbitrage opportunities.`
+        : `${greeting}${name}! It's ${dateStr}.\n\n**Leverage AI** is scanning live odds across all major sportsbooks. Ask me about tonight's lines, player props, sharp money, or arbitrage opportunities.`,
       fantasy: sportLabel
-        ? `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is ready for **${sportLabel}** fantasy analysis. Ask about waiver pickups, start/sit decisions, trade values, or draft strategy.`
-        : `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is ready for fantasy analysis. Ask about draft strategy, waiver targets, trade values, or bestball stacking for NFBC/NFFC.`,
+        ? `${greeting}${name}! It's ${dateStr}.\n\n**Leverage AI** is ready for **${sportLabel}** fantasy analysis. Ask about waiver pickups, start/sit decisions, trade values, or draft strategy.`
+        : `${greeting}${name}! It's ${dateStr}.\n\n**Leverage AI** is ready for fantasy analysis. Ask about draft strategy, waiver targets, trade values, or bestball stacking for NFBC/NFFC.`,
       dfs: sportLabel
-        ? `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is optimizing **${sportLabel}** DFS lineups. Ask about optimal builds, ownership leverage, captain picks, or correlation stacks for DraftKings and FanDuel.`
-        : `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is optimizing DFS lineups. Ask about optimal builds, ownership leverage, captain picks, or correlation stacks for DraftKings and FanDuel.`,
+        ? `${greeting}${name}! It's ${dateStr}.\n\n**Leverage AI** is optimizing **${sportLabel}** DFS lineups. Ask about optimal builds, ownership leverage, captain picks, or correlation stacks for DraftKings and FanDuel.`
+        : `${greeting}${name}! It's ${dateStr}.\n\n**Leverage AI** is optimizing DFS lineups. Ask about optimal builds, ownership leverage, captain picks, or correlation stacks for DraftKings and FanDuel.`,
       kalshi: sportLabel
-        ? `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is monitoring **${sportLabel}** prediction markets on Kalshi in real-time. Ask about contract pricing, market inefficiencies, or cross-market arbitrage.`
-        : `${greeting}! It's ${dateStr}.\n\n**Leverage AI** is monitoring Kalshi prediction markets in real-time. Ask about election contracts, weather markets, economic events, or cross-market arbitrage.`,
+        ? `${greeting}${name}! It's ${dateStr}.\n\n**Leverage AI** is monitoring **${sportLabel}** prediction markets on Kalshi. Ask about contract pricing, market inefficiencies, or best-value plays in this category.`
+        : `${greeting}${name}! It's ${dateStr}.\n\n**Leverage AI** is monitoring Kalshi prediction markets in real-time. Ask about election contracts, weather markets, economic events, or cross-market arbitrage.`,
       all: sportLabel
-        ? `${greeting}! It's ${dateStr}.\n\n**Leverage AI** - Powered by Grok AI\n\nFiltering for **${sportLabel}**. Ask me about betting odds, player props, DFS lineups, or fantasy strategy for ${sportLabel}.`
-        : `${greeting}! It's ${dateStr}.\n\n**Leverage AI** - Powered by Grok AI\n\nI'm connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.`,
+        ? `${greeting}${name}! It's ${dateStr}.\n\n**Leverage AI** - Powered by Grok AI\n\nFiltering for **${sportLabel}**. Ask me about betting odds, player props, DFS lineups, or fantasy strategy for ${sportLabel}.`
+        : `${greeting}${name}! It's ${dateStr}.\n\n**Leverage AI** - Powered by Grok AI\n\nI'm connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.`,
     };
 
     return categoryMessages[category] || categoryMessages.all;
@@ -257,27 +258,49 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
-  // Personalize the welcome message client-side after hydration.
+  // Personalize the welcome message client-side after hydration (and when user logs in).
   // This runs only in the browser, so getWelcomeMessage()'s timezone-sensitive
   // date/time calls are safe here (no server/client mismatch).
   useEffect(() => {
+    const firstName = user?.name?.split(' ')[0] || undefined;
     setMessages(prev => {
       if (prev[0]?.isWelcome) {
-        return [{ ...prev[0], content: getWelcomeMessage('all') }, ...prev.slice(1)];
+        return [{ ...prev[0], content: getWelcomeMessage('all', undefined, firstName) }, ...prev.slice(1)];
       }
       return prev;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user?.name]);
 
-  // Re-personalize when category or sport filter changes (only while welcome is still visible).
+  // Re-personalize + refresh cards when category or sport filter changes (only while welcome is still visible).
   useEffect(() => {
+    const firstName = user?.name?.split(' ')[0] || undefined;
+
+    // Update message text immediately
     setMessages(prev => {
       if (prev[0]?.isWelcome) {
-        return [{ ...prev[0], content: getWelcomeMessage(selectedCategory, selectedSport || undefined) }, ...prev.slice(1)];
+        return [{ ...prev[0], content: getWelcomeMessage(selectedCategory, selectedSport || undefined, firstName) }, ...prev.slice(1)];
       }
       return prev;
     });
+
+    // Fetch cards matching the current platform/category.
+    // For Kalshi subcategory filters (Culture, Politics, etc.), don't pass them as sport —
+    // the Kalshi card generator doesn't filter by topic; it returns all open markets.
+    const sportParam = selectedCategory !== 'kalshi' && selectedSport ? selectedSport : undefined;
+    fetchDynamicCards({ category: selectedCategory, sport: sportParam, limit: 6 })
+      .then(dynamicCards => {
+        if (dynamicCards.length > 0) {
+          const insightCards = dynamicCards.map(convertToInsightCard);
+          setMessages(prev => {
+            if (prev[0]?.isWelcome) {
+              return [{ ...prev[0], cards: insightCards }, ...prev.slice(1)];
+            }
+            return prev;
+          });
+        }
+      })
+      .catch(() => { /* non-fatal — existing cards remain */ });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, selectedSport]);
 
@@ -2137,8 +2160,81 @@ No preamble. Start directly with section 1.`;
     ],
   };
 
-  // Get dynamic prompts based on selected platform AND sport
+  // Kalshi subcategory-specific prompts — shown when a topic filter is selected
+  const kalshiTopicPrompts: Record<string, Array<{ label: string; icon: any; category: string }>> = {
+    Trending: [
+      { label: 'What trending Kalshi market has the best edge right now?', icon: TrendingUp, category: 'kalshi' },
+      { label: 'Biggest volume moves in the last 24 hours', icon: Activity, category: 'kalshi' },
+      { label: 'Highest liquidity trending contract today', icon: BarChart3, category: 'kalshi' },
+      { label: 'Cross-market arbitrage vs trending Kalshi markets', icon: Zap, category: 'kalshi' },
+    ],
+    Politics: [
+      { label: '2026 midterm election contracts with market inefficiencies', icon: Activity, category: 'kalshi' },
+      { label: 'Best value on Senate seat prediction markets', icon: TrendingUp, category: 'kalshi' },
+      { label: 'Governor race contract pricing analysis', icon: Target, category: 'kalshi' },
+      { label: 'Political market portfolio hedging strategy', icon: Layers, category: 'kalshi' },
+    ],
+    Sports: [
+      { label: 'Best value on sports Kalshi contracts vs sportsbooks', icon: TrendingUp, category: 'kalshi' },
+      { label: 'Championship winner contract pricing analysis', icon: Trophy, category: 'kalshi' },
+      { label: 'MVP award prediction market value', icon: Award, category: 'kalshi' },
+      { label: 'Sports Kalshi vs DraftKings arbitrage opportunities', icon: Zap, category: 'kalshi' },
+    ],
+    Culture: [
+      { label: 'Best value on awards season Kalshi contracts', icon: Sparkles, category: 'kalshi' },
+      { label: 'Oscars / Grammy contract pricing inefficiencies', icon: Award, category: 'kalshi' },
+      { label: 'Celebrity event market analysis right now', icon: Activity, category: 'kalshi' },
+      { label: 'Entertainment prediction market portfolio strategy', icon: Layers, category: 'kalshi' },
+    ],
+    Crypto: [
+      { label: 'Bitcoin price milestone contract analysis', icon: TrendingUp, category: 'kalshi' },
+      { label: 'ETF approval prediction market pricing', icon: BarChart3, category: 'kalshi' },
+      { label: 'Cross-market crypto vs Kalshi arbitrage', icon: Zap, category: 'kalshi' },
+      { label: 'Altcoin milestone contract value opportunities', icon: DollarSign, category: 'kalshi' },
+    ],
+    Climate: [
+      { label: 'Hurricane season contract analysis', icon: Activity, category: 'kalshi' },
+      { label: 'Temperature record market value vs NOAA forecasts', icon: TrendingUp, category: 'kalshi' },
+      { label: 'Climate event prediction market pricing', icon: BarChart3, category: 'kalshi' },
+      { label: 'Best value climate contracts this month', icon: Target, category: 'kalshi' },
+    ],
+    Economics: [
+      { label: 'Fed rate decision contract analysis', icon: DollarSign, category: 'kalshi' },
+      { label: 'CPI / inflation prediction market pricing', icon: TrendingUp, category: 'kalshi' },
+      { label: 'Jobs report contract value opportunities', icon: BarChart3, category: 'kalshi' },
+      { label: 'GDP prediction market edge vs consensus', icon: Activity, category: 'kalshi' },
+    ],
+    Mentions: [
+      { label: 'Top social media mention contract opportunities', icon: Activity, category: 'kalshi' },
+      { label: 'Celebrity brand mention market analysis', icon: Sparkles, category: 'kalshi' },
+      { label: 'News volume prediction market edge', icon: TrendingUp, category: 'kalshi' },
+      { label: 'Best value mentions markets right now', icon: Target, category: 'kalshi' },
+    ],
+    Companies: [
+      { label: 'Earnings announcement contract pricing', icon: DollarSign, category: 'kalshi' },
+      { label: 'M&A announcement prediction market analysis', icon: TrendingUp, category: 'kalshi' },
+      { label: 'CEO departure market probability assessment', icon: Activity, category: 'kalshi' },
+      { label: 'Company milestone contract value opportunities', icon: Target, category: 'kalshi' },
+    ],
+    Financials: [
+      { label: 'S&P 500 milestone prediction market analysis', icon: TrendingUp, category: 'kalshi' },
+      { label: 'Interest rate futures vs Kalshi contract pricing', icon: DollarSign, category: 'kalshi' },
+      { label: 'Treasury yield prediction market value', icon: BarChart3, category: 'kalshi' },
+      { label: 'Stock market milestone contract portfolio strategy', icon: Layers, category: 'kalshi' },
+    ],
+    'Tech & Science': [
+      { label: 'AI company milestone contract analysis', icon: Zap, category: 'kalshi' },
+      { label: 'Tech earnings prediction market value', icon: TrendingUp, category: 'kalshi' },
+      { label: 'Space launch success prediction market pricing', icon: Activity, category: 'kalshi' },
+      { label: 'Scientific breakthrough contract opportunities', icon: Sparkles, category: 'kalshi' },
+    ],
+  };
+
+  // Get dynamic prompts based on selected platform AND sport/topic
   const quickActions = (() => {
+    if (selectedCategory === 'kalshi' && selectedSport && kalshiTopicPrompts[selectedSport]) {
+      return kalshiTopicPrompts[selectedSport];
+    }
     if (selectedSport) {
       if (selectedCategory === 'betting' && sportBettingPrompts[selectedSport]) return sportBettingPrompts[selectedSport];
       if (selectedCategory === 'fantasy' && sportFantasyPrompts[selectedSport]) return sportFantasyPrompts[selectedSport];
@@ -3684,6 +3780,7 @@ No preamble. Start directly with section 1.`;
         onClose={() => setShowStripeLightbox(false)}
         onCreditsAdded={addCredits}
         creditsRemaining={creditsRemaining}
+        userEmail={user?.email}
       />
 
       <style>

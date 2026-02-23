@@ -8,6 +8,7 @@ interface StripeLightboxProps {
   onClose: () => void;
   onCreditsAdded?: (amount: number) => void;
   creditsRemaining: number;
+  userEmail?: string;
 }
 
 type PurchaseTab = 'credits' | 'subscription';
@@ -41,7 +42,7 @@ const SUBSCRIPTION_PLANS = [
   },
 ];
 
-export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaining }: StripeLightboxProps) {
+export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaining, userEmail }: StripeLightboxProps) {
   const [activeTab, setActiveTab] = useState<PurchaseTab>('credits');
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<string>('annual');
@@ -61,6 +62,7 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
           type: 'credits',
           amount,
           credits: amount,
+          customer_email: userEmail,
         }),
       });
 
@@ -101,6 +103,7 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
           type: 'subscription',
           planId: plan.id,
           credits: plan.credits,
+          customer_email: userEmail,
         }),
       });
 

@@ -28,10 +28,9 @@ function getSupabase() {
     }
 
     // Server: create a lightweight client without cookies dependency.
-    // Use the default public schema where all odds tables live.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { createClient } = require('@supabase/supabase-js');
-    return createClient(url, key);
+    return createClient(url, key, { db: { schema: 'api' } });
   } catch (err) {
     console.error('[SupabaseOddsService] Failed to create Supabase client:', err);
     return null;

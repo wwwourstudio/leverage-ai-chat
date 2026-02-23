@@ -1029,14 +1029,24 @@ No preamble. Start directly with section 1.`;
       
       // Sports detection
       const detectedSport = extractSport(userMessage);
-      
+
+      // Normalize the UI-selected sport to the same format extractSport() returns
+      // (e.g. 'ncaa-football' → 'ncaaf', 'ncaa-basketball' → 'ncaab', others unchanged)
+      const selectedSportNormalized = selectedSport === 'ncaa-football' ? 'ncaaf'
+        : selectedSport === 'ncaa-basketball' ? 'ncaab'
+        : selectedSport || null;
+
+      // Fall back to the UI sport filter when the message doesn't name a sport explicitly.
+      // Don't apply the fallback for Kalshi — that platform never fetches sports odds.
+      const effectiveSport = detectedSport || (selectedCategory !== 'kalshi' ? selectedSportNormalized : null);
+
       // Betting intent keywords
       const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'arbitrage', 'arb', 'h2h', 'value', 'sportsbook', 'draftkings', 'fanduel', 'moneyline', 'prop', 'parlay'];
-      const hasBettingIntent = bettingKeywords.some(k => lowerMsg.includes(k));
+      const hasBettingIntent = bettingKeywords.some(k => lowerMsg.includes(k)) || selectedCategory === 'betting';
 
-      // Sports query detection (not political)
+      // Sports query detection (not political, not Kalshi)
       const sportsKeywords = ['nba', 'nfl', 'nhl', 'mlb', 'basketball', 'football', 'hockey', 'baseball', 'ncaa'];
-      const isSportsQuery = sportsKeywords.some(k => lowerMsg.includes(k)) && !isPoliticalMarket;
+      const isSportsQuery = (sportsKeywords.some(k => lowerMsg.includes(k)) || !!effectiveSport) && !isPoliticalMarket && selectedCategory !== 'kalshi';
 
       // Fantasy intent detection
       const fantasyKeywords = ['fantasy', 'draft', 'waiver', 'faab', 'adp', 'vbd', 'tier cliff', 'bestball', 'best ball', 'start sit', 'trade value', 'who should i pick', 'who do i start', 'sleeper', 'rankings', 'projections', 'auction value'];
@@ -1044,11 +1054,15 @@ No preamble. Start directly with section 1.`;
 
       const detectedPlatform = extractPlatform(userMessage);
 
-      // Override isPoliticalMarket if platform is kalshi
-      const finalIsPoliticalMarket = isPoliticalMarket || detectedPlatform === 'kalshi';
+      // Political market guard — respects the UI platform selection:
+      // - Kalshi platform selected → always political (never fetch sports odds)
+      // - Betting platform selected → never political (don't let message keywords override)
+      // - Otherwise → use message-based detection
+      const finalIsPoliticalMarket = selectedCategory === 'kalshi' ||
+        ((isPoliticalMarket || detectedPlatform === 'kalshi') && selectedCategory !== 'betting');
 
       const context: any = {
-        sport: detectedSport,
+        sport: effectiveSport,
         marketType: extractMarketType(userMessage),
         platform: detectedPlatform,
         isSportsQuery,

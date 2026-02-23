@@ -150,11 +150,30 @@ const data = await measureAsync('Fetch odds', () =>
 );
 ```
 
+### Applied Performance Optimizations
+
+**File**: `app/page-client.tsx`
+
+1. **Optimized Textarea Height Adjustment**
+   ```typescript
+   // OLD - Causes forced reflow
+   textareaRef.current.style.height = 'auto';
+   textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+   
+   // NEW - Batched with requestAnimationFrame
+   requestAnimationFrame(() => {
+     textareaRef.current.style.height = 'auto';
+     const newHeight = textareaRef.current.scrollHeight;
+     textareaRef.current.style.height = `${newHeight}px`;
+   });
+   ```
+
 ### Benefits
 - Reduces forced reflows (performance warnings eliminated)
 - Prevents excessive API calls
 - Improves scroll/animation smoothness
 - Better user experience on slower devices
+- Textarea adjustments now run at 60fps max
 
 ---
 

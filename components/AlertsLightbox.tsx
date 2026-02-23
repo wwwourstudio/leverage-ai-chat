@@ -64,16 +64,13 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
     if (!isOpen) return;
     
     const initAuth = async () => {
-      console.log('[v0] AlertsLightbox: Initializing auth...');
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session?.user) {
-        console.log('[v0] AlertsLightbox: Auth ready, user ID:', session.user.id);
         setAuthUserId(session.user.id);
         setAuthReady(true);
       } else {
-        console.log('[v0] AlertsLightbox: No session - user not logged in');
         setAuthReady(true);
         setLoading(false);
       }
@@ -85,14 +82,12 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
   // Load alerts only after auth is ready
   useEffect(() => {
     if (authReady && authUserId) {
-      console.log('[v0] AlertsLightbox: Loading alerts for user:', authUserId);
       loadAlerts();
     }
   }, [authReady, authUserId]);
 
   const loadAlerts = async () => {
     if (!authUserId) {
-      console.log('[v0] AlertsLightbox: Cannot load - no auth user ID');
       setLoading(false);
       return;
     }
@@ -111,8 +106,6 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
 
       if (alertsError) {
         console.error('[Alerts] Failed to load alerts:', alertsError);
-      } else {
-        console.log('[v0] AlertsLightbox: Loaded', alertsData?.length || 0, 'alerts');
       }
 
       setAlerts(alertsData || []);

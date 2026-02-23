@@ -200,8 +200,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // UTC server and the user's local-timezone browser, causing React error #418.
   const STATIC_WELCOME = `**Leverage AI** - Powered by Grok AI\n\nI'm connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.`;
 
-  // Cards are generated on-demand by /api/analyze for betting/sports queries.
-  // They are never shown on the welcome screen -- only on AI responses.
+  // Cards are fetched on page load via /api/cards and shown on the welcome screen.
+  // They are also regenerated on each AI response via /api/analyze.
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -3111,8 +3111,8 @@ No preamble. Start directly with section 1.`;
 
 
 
-                  {/* Dynamic Cards Section -- only on non-welcome AI responses */}
-                  {message.role === 'assistant' && !message.isWelcome && message.cards && message.cards.length > 0 && (
+                  {/* Dynamic Cards Section */}
+                  {message.role === 'assistant' && message.cards && message.cards.length > 0 && (
                     <div className="mt-5">
                       <div className="flex flex-col gap-4 w-full">
                         {message.cards.map((card, cardIndex) => {

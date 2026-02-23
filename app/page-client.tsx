@@ -2580,18 +2580,19 @@ No preamble. Start directly with section 1.`;
               >
                 <Menu className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" />
               </button>
-              <div className="flex items-center gap-3.5">
-                <div className="relative group/logo">
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-xl blur-xl opacity-50 group-hover/logo:opacity-75 transition-opacity"></div>
-                  <div className="relative w-12 h-12 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-xl shadow-blue-500/40 group-hover/logo:shadow-blue-500/60 transition-all duration-300">
-                    <Sparkles className="w-6 h-6 text-white group-hover/logo:scale-110 transition-transform" />
+              <div className="flex items-center gap-3">
+                {/* Logo mark */}
+                <div className="relative">
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 blur-md opacity-40" />
+                  <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <TrendingUp className="w-4.5 h-4.5 text-white" />
                   </div>
                 </div>
-                <div>
-                  <h1 className="text-xl font-black bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent tracking-tight">
-                    Leverage AI 
+                <div className="flex flex-col leading-none gap-0.5">
+                  <h1 className="text-base font-black tracking-tight text-white">
+                    Leverage<span className="text-blue-400"> AI</span>
                   </h1>
-                  <p className="text-[11px] font-bold text-gray-500 tracking-wide">Sports Intelligence </p>
+                  <p className="text-[10px] font-semibold text-gray-600 tracking-widest uppercase">Sports Intelligence</p>
                 </div>
               </div>
             </div>
@@ -2688,60 +2689,40 @@ No preamble. Start directly with section 1.`;
                 return (
                   <div
                     key={`message-${index}-${message.timestamp.getTime()}`}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn ${isGrouped ? 'mt-2' : 'mt-6'}`}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn ${isGrouped ? 'mt-1.5' : 'mt-5'}`}
                   >
-                <div className={`max-w-4xl ${message.role === 'user' ? 'w-auto' : 'w-full'}`}>
+                <div className={message.role === 'user' ? 'max-w-[75%]' : 'w-full max-w-4xl'}>
                   {message.role === 'assistant' && (
-                    <div className="flex items-center gap-3 mb-3 flex-wrap">
-                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30 rounded-full">
-                        <Sparkles className="w-4.5 h-4.5 text-white" />
+                    <div className="flex items-center gap-2.5 mb-2.5 flex-wrap">
+                      {/* Logo mark */}
+                      <div className="relative w-7 h-7 shrink-0">
+                        <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 opacity-20 blur-sm" />
+                        <div className="relative w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-md shadow-blue-500/25">
+                          <TrendingUp className="w-3.5 h-3.5 text-white" />
+                        </div>
                       </div>
-                      <span className="text-sm font-bold bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">Leverage AI</span>
-                      
-                      {/* Data Verification Badge */}
+                      <span className="text-xs font-black tracking-tight text-white">Leverage<span className="text-blue-400"> AI</span></span>
+
+                      {/* Verified badge */}
                       {message.sources && message.sources.length > 0 && !message.isWelcome && (
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-500/10 border border-green-500/30 rounded-full">
-                          <CheckCheck className="w-3 h-3 text-green-400" />
-                          <span className="text-[10px] font-black text-green-400 uppercase tracking-wide">Verified</span>
+                        <div className="flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
+                          <CheckCheck className="w-2.5 h-2.5 text-emerald-400" />
+                          <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">Live Data</span>
                         </div>
                       )}
-                      
-                      {message.confidence && (
-                        <div className="flex items-center gap-2 px-3 py-1 bg-gray-800/50 border border-gray-700/50 rounded-full">
-                          <Activity className="w-3.5 h-3.5 text-green-400" />
-                          <span className="text-xs font-bold text-gray-400">{message.confidence}% confidence</span>
-                        </div>
-                      )}
-                      
-                      {/* Trust Level Indicator */}
-                      {message.trustMetrics && !message.isWelcome && (
-                        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${
-                          message.trustMetrics.trustLevel === 'high' ? 'bg-blue-500/10 border-blue-500/30' :
-                          message.trustMetrics.trustLevel === 'medium' ? 'bg-yellow-500/10 border-yellow-500/30' :
-                          'bg-orange-500/10 border-orange-500/30'
-                        }`}>
-                          <Shield className={`w-3 h-3 ${
-                            message.trustMetrics.trustLevel === 'high' ? 'text-blue-400' :
-                            message.trustMetrics.trustLevel === 'medium' ? 'text-yellow-400' :
-                            'text-orange-400'
-                          }`} />
-                          <span className={`text-[10px] font-black uppercase tracking-wide ${
-                            message.trustMetrics.trustLevel === 'high' ? 'text-blue-400' :
-                            message.trustMetrics.trustLevel === 'medium' ? 'text-yellow-400' :
-                            'text-orange-400'
-                          }`}>
-                            {message.trustMetrics.adjustedTone}
-                          </span>
-                        </div>
+
+                      {/* Confidence */}
+                      {message.confidence && !message.isWelcome && (
+                        <span className="text-[10px] text-gray-600 font-medium">{message.confidence}% conf.</span>
                       )}
                     </div>
                   )}
                   
                   <div
-                    className={`rounded-2xl px-5 py-4 relative group/message ${
+                    className={`relative group/message ${
                       message.role === 'user'
-                        ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xl shadow-blue-500/20'
-                        : 'bg-gradient-to-br from-gray-900/80 via-gray-850/80 to-gray-900/80 text-gray-100 border border-gray-700/50 backdrop-blur-sm'
+                        ? 'rounded-2xl px-4 py-3 bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-lg shadow-blue-500/20 w-fit max-w-[85%] ml-auto'
+                        : 'rounded-xl px-4 py-3 bg-gray-900/50 text-gray-100 border border-gray-800/60'
                     }`}
                   >
                     {editingMessageIndex === index ? (
@@ -3113,8 +3094,8 @@ No preamble. Start directly with section 1.`;
 
                   {/* Dynamic Cards Section */}
                   {message.role === 'assistant' && message.cards && message.cards.length > 0 && (
-                    <div className="mt-5">
-                      <div className="flex flex-col gap-4 w-full">
+                    <div className="mt-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         {message.cards.map((card, cardIndex) => {
                           const cardKey = `${index}-${cardIndex}`;
                           const analysis = cardAnalysisMap[cardKey];
@@ -3123,8 +3104,8 @@ No preamble. Start directly with section 1.`;
                           return (
                             <div
                               key={`${card.type}-${cardIndex}`}
-                              className="flex flex-col gap-2 animate-fadeIn"
-                              style={{ animationDelay: `${cardIndex * 80}ms` }}
+                              className="flex flex-col gap-1.5 animate-fadeIn"
+                              style={{ animationDelay: `${cardIndex * 60}ms` }}
                             >
                               <DynamicCardRenderer
                                 card={card}

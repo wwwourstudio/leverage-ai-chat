@@ -3,8 +3,12 @@ import { NextRequest, NextResponse } from 'next/server';
 /**
  * POST /api/admin/migrate
  *
- * Runs the player_props_markets migration against Supabase using the
+ * Runs all pending database migrations against Supabase using the
  * Supabase Management API.
+ *
+ * Migrations run (in order):
+ *   003 — api.player_props_markets table
+ *   004 — api.user_profiles and api.user_preferences tables
  *
  * Requirements:
  *   NEXT_PUBLIC_SUPABASE_URL    — already required by the app
@@ -17,8 +21,8 @@ import { NextRequest, NextResponse } from 'next/server';
  *        -H "Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>"
  */
 
-// The migration SQL — mirrors scripts/003-player-props-table.sql
-const MIGRATION_SQL = `
+// Migration 003 — mirrors scripts/003-player-props-table.sql
+const MIGRATION_003_SQL = `
 DROP TABLE IF EXISTS public.player_props_markets CASCADE;
 
 CREATE TABLE IF NOT EXISTS api.player_props_markets (
@@ -63,10 +67,143 @@ CREATE POLICY "Service upsert player props"
 GRANT ALL ON api.player_props_markets TO anon, authenticated;
 `;
 
+// Migration 004 — mirrors scripts/004-user-profiles-table.sql
+const MIGRATION_004_SQL = `
+CREATE TABLE IF NOT EXISTS api.user_profiles (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid UNIQUE NOT NULL,
+  email text,
+  display_name text,
+  credits_remaining integer DEFAULT 50,
+  total_predictions integer DEFAULT 0,
+  correct_predictions integer DEFAULT 0,
+  win_rate numeric DEFAULT 0,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS api.user_preferences (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid UNIQUE NOT NULL,
+  email_notifications boolean DEFAULT true,
+  push_notifications boolean DEFAULT false,
+  tracked_sports text[] DEFAULT ARRAY['NBA', 'NFL'],
+  theme text DEFAULT 'dark',
+  default_sport text DEFAULT 'NBA',
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON api.user_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id ON api.user_preferences(user_id);
+
+ALTER TABLE api.user_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE api.user_preferences ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users read own profile" ON api.user_profiles;
+DROP POLICY IF EXISTS "Users update own profile" ON api.user_profiles;
+DROP POLICY IF EXISTS "Service inserts profiles" ON api.user_profiles;
+DROP POLICY IF EXISTS "Users read own preferences" ON api.user_preferences;
+DROP POLICY IF EXISTS "Users upsert own preferences" ON api.user_preferences;
+DROP POLICY IF EXISTS "Service inserts preferences" ON api.user_preferences;
+
+CREATE POLICY "Users read own profile"
+  ON api.user_profiles FOR SELECT
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users update own profile"
+  ON api.user_profiles FOR UPDATE
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Service inserts profiles"
+  ON api.user_profiles FOR INSERT
+  WITH CHECK (true);
+
+CREATE POLICY "Users read own preferences"
+  ON api.user_preferences FOR SELECT
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users upsert own preferences"
+  ON api.user_preferences FOR ALL
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Service inserts preferences"
+  ON api.user_preferences FOR INSERT
+  WITH CHECK (true);
+
+CREATE OR REPLACE FUNCTION api.handle_new_user_profile()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO api.user_profiles (user_id, email, display_name, credits_remaining)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
+    50
+  )
+  ON CONFLICT (user_id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger WHERE tgname = 'on_auth_user_created_profile'
+  ) THEN
+    CREATE TRIGGER on_auth_user_created_profile
+      AFTER INSERT ON auth.users
+      FOR EACH ROW EXECUTE FUNCTION api.handle_new_user_profile();
+  END IF;
+END;
+$$;
+
+INSERT INTO api.user_profiles (user_id, email, display_name, credits_remaining)
+SELECT
+  id,
+  email,
+  COALESCE(raw_user_meta_data->>'full_name', split_part(email, '@', 1)),
+  50
+FROM auth.users
+ON CONFLICT (user_id) DO NOTHING;
+
+GRANT ALL ON api.user_profiles TO anon, authenticated;
+GRANT ALL ON api.user_preferences TO anon, authenticated;
+`;
+
+const MIGRATIONS = [
+  { id: '003', name: 'player_props_markets', sql: MIGRATION_003_SQL },
+  { id: '004', name: 'user_profiles + user_preferences', sql: MIGRATION_004_SQL },
+];
+
 function extractProjectRef(supabaseUrl: string): string | null {
   // https://<project-ref>.supabase.co
   const match = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/);
   return match ? match[1] : null;
+}
+
+async function runMigration(
+  projectRef: string,
+  accessToken: string,
+  migration: { id: string; name: string; sql: string }
+): Promise<{ ok: boolean; detail?: unknown; error?: string }> {
+  const res = await fetch(
+    `https://api.supabase.com/v1/projects/${projectRef}/database/query`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ query: migration.sql }),
+    }
+  );
+  const detail = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { ok: false, error: `HTTP ${res.status}`, detail };
+  }
+  return { ok: true, detail };
 }
 
 export async function POST(request: NextRequest) {
@@ -91,7 +228,7 @@ export async function POST(request: NextRequest) {
       {
         error: 'SUPABASE_ACCESS_TOKEN not configured',
         help: 'Add your personal access token from supabase.com/dashboard → Account → Access Tokens as SUPABASE_ACCESS_TOKEN env var, then redeploy.',
-        fallback: 'Run scripts/003-player-props-table.sql manually in the Supabase SQL Editor.',
+        fallback: 'Run scripts/003-player-props-table.sql and scripts/004-user-profiles-table.sql manually in the Supabase SQL Editor.',
       },
       { status: 500 }
     );
@@ -102,33 +239,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Could not parse project ref from NEXT_PUBLIC_SUPABASE_URL: ${supabaseUrl}` }, { status: 500 });
   }
 
-  console.log(`[v0] [MIGRATE] Running player_props_markets migration on project ${projectRef}`);
+  console.log(`[v0] [MIGRATE] Running ${MIGRATIONS.length} migrations on project ${projectRef}`);
+
+  const results: Record<string, unknown> = {};
 
   try {
-    const mgmtRes = await fetch(
-      `https://api.supabase.com/v1/projects/${projectRef}/database/query`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ query: MIGRATION_SQL }),
+    for (const migration of MIGRATIONS) {
+      console.log(`[v0] [MIGRATE] Running migration ${migration.id}: ${migration.name}`);
+      const result = await runMigration(projectRef, accessToken, migration);
+      results[`migration_${migration.id}`] = result;
+      if (!result.ok) {
+        console.error(`[v0] [MIGRATE] Migration ${migration.id} failed:`, result.error, result.detail);
+        return NextResponse.json(
+          { error: `Migration ${migration.id} (${migration.name}) failed`, detail: result.detail, results },
+          { status: 502 }
+        );
       }
-    );
-
-    const body = await mgmtRes.json().catch(() => ({}));
-
-    if (!mgmtRes.ok) {
-      console.error('[v0] [MIGRATE] Management API error:', mgmtRes.status, body);
-      return NextResponse.json(
-        { error: 'Supabase management API error', status: mgmtRes.status, detail: body },
-        { status: 502 }
-      );
+      console.log(`[v0] [MIGRATE] ✓ Migration ${migration.id} complete: ${migration.name}`);
     }
 
-    console.log('[v0] [MIGRATE] ✓ player_props_markets migration complete');
-    return NextResponse.json({ ok: true, message: 'api.player_props_markets created successfully', detail: body });
+    console.log(`[v0] [MIGRATE] All migrations complete`);
+    return NextResponse.json({
+      ok: true,
+      message: `All ${MIGRATIONS.length} migrations completed successfully`,
+      migrations: MIGRATIONS.map((m) => m.name),
+      results,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[v0] [MIGRATE] Exception:', message);

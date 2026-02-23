@@ -107,6 +107,11 @@ export async function POST(request: NextRequest) {
       enrichedPrompt += `\n\n[Context: General question — answer with your full expert knowledge about sports betting, fantasy, DFS, or prediction markets as appropriate.]`;
     }
 
+    // Regardless of other odds context, tell the AI when the key is missing
+    if (context.oddsKeyMissing) {
+      enrichedPrompt += `\n\n[System: Live odds are unavailable — ODDS_API_KEY is not configured in the server environment. Inform the user they need to add ODDS_API_KEY to their Vercel environment variables to enable live odds.]`;
+    }
+
     // ── Launch card generation BEFORE AI (they're independent operations) ──────
     // Starting both in parallel shaves ~6-8 seconds off the total request time
     // because card generation (Odds API fetch) runs during the AI generation window.

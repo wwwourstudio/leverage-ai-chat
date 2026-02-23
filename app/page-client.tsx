@@ -1117,8 +1117,15 @@ No preamble. Start directly with section 1.`;
             });
             
             if (!oddsResponse.ok) {
-              const errorText = await oddsResponse.text();
-              if (isDev) console.error(`[v0] Odds API error (${oddsResponse.status}):`, errorText.substring(0, 100));
+              const errorBody = await oddsResponse.json().catch(() => ({ error: `HTTP ${oddsResponse.status}` }));
+              if (isDev) console.error(`[v0] Odds API error (${oddsResponse.status}):`, errorBody);
+              if (oddsResponse.status === 503) {
+                context.oddsKeyMissing = true;
+                context.oddsErrorMessage = 'ODDS_API_KEY is not configured. Live odds are unavailable.';
+              } else {
+                context.oddsError = errorBody.error;
+                context.oddsErrorMessage = errorBody.message || `Unable to fetch ${context.sport?.toUpperCase() || ''} odds (${oddsResponse.status}).`;
+              }
             } else {
               const oddsResult = await oddsResponse.json();
               

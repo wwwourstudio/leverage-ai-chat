@@ -115,7 +115,12 @@ export async function POST(request: NextRequest) {
     // ── Launch card generation BEFORE AI (they're independent operations) ──────
     // Starting both in parallel shaves ~6-8 seconds off the total request time
     // because card generation (Odds API fetch) runs during the AI generation window.
-    const hasExistingCards = Array.isArray(existingCards) && existingCards.length > 0;
+    // Don't reuse stale previous-message cards for sport-specific or betting-intent
+    // queries — always generate fresh cards so the response context matches the question.
+    const hasExistingCards = Array.isArray(existingCards) && existingCards.length > 0
+      && !context.sport
+      && !context.isSportsQuery
+      && !context.hasBettingIntent;
     let cardPromise: Promise<InsightCard[]>;
     if (hasExistingCards) {
       cardPromise = Promise.resolve(existingCards as InsightCard[]);

@@ -290,11 +290,11 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     const sportParam = selectedCategory !== 'kalshi' && selectedSport ? selectedSport : undefined;
     fetchDynamicCards({ category: selectedCategory, sport: sportParam, limit: 6 })
       .then(dynamicCards => {
+        // fetchDynamicCards already returns InsightCard[] — no second conversion needed
         if (dynamicCards.length > 0) {
-          const insightCards = dynamicCards.map(convertToInsightCard);
           setMessages(prev => {
             if (prev[0]?.isWelcome) {
-              return [{ ...prev[0], cards: insightCards }, ...prev.slice(1)];
+              return [{ ...prev[0], cards: dynamicCards }, ...prev.slice(1)];
             }
             return prev;
           });

@@ -45,6 +45,7 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   // New alert form state
   const [newAlert, setNewAlert] = useState({
@@ -58,27 +59,48 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
     max_triggers: '1',
   });
 
+  // Wait for auth to initialize before loading alerts
   useEffect(() => {
-    if (isOpen) loadAlerts();
+    if (!isOpen) return;
+    
+    const initAuth = async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        setAuthUserId(session.user.id);
+        setAuthReady(true);
+      } else {
+        setAuthReady(true);
+        setLoading(false);
+      }
+    };
+
+    initAuth();
   }, [isOpen]);
 
+  // Load alerts only after auth is ready
+  useEffect(() => {
+    if (authReady && authUserId) {
+      loadAlerts();
+    }
+  }, [authReady, authUserId]);
+
   const loadAlerts = async () => {
+    if (!authUserId) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
-        setLoading(false);
-        return;
-      }
-
-      setAuthUserId(session.user.id);
 
       // Load alerts from user_alerts table (RLS uses auth.uid())
       const { data: alertsData, error: alertsError } = await supabase
         .from('user_alerts')
         .select('*')
-        .eq('user_id', session.user.id)
+        .eq('user_id', authUserId)
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -302,9 +324,19 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
           )}
 
           {/* Loading */}
-          {loading ? (
-            <div className="flex items-center justify-center h-48">
+          {!authReady || loading ? (
+            <div className="flex flex-col items-center justify-center h-48 gap-3">
               <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+              <p className="text-sm text-gray-500">
+                {!authReady ? 'Initializing...' : 'Loading alerts...'}
+              </p>
+            </div>
+          ) : !authUserId ? (
+            /* Not logged in */
+            <div className="flex flex-col items-center justify-center h-48 text-center">
+              <Bell className="w-12 h-12 text-gray-700 mb-3" />
+              <p className="text-gray-400 font-semibold">Sign in to create alerts</p>
+              <p className="text-xs text-gray-600 mt-1">Get notified about odds changes, line movement, and more</p>
             </div>
           ) : alerts.length === 0 ? (
             /* Empty State */

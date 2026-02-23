@@ -1821,8 +1821,14 @@ No preamble. Start directly with section 1.`;
 
   const adjustTextareaHeight = () => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+      // Use requestAnimationFrame to batch DOM changes and prevent forced reflows
+      requestAnimationFrame(() => {
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          const newHeight = textareaRef.current.scrollHeight;
+          textareaRef.current.style.height = `${newHeight}px`;
+        }
+      });
     }
   };
 

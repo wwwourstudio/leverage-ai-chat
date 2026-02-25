@@ -1010,8 +1010,9 @@ No preamble. Start directly with section 1.`;
       const politicalKeywords = ['kalshi', 'election', 'politics', 'cpi', 'inflation', 'fed', 'approval rating', 'recession', 'polymarket', 'prediction market'];
       const isPoliticalMarket = politicalKeywords.some(k => lowerMsg.includes(k));
       
-      // Sports detection
-      const detectedSport = extractSport(userMessage);
+      // Sports detection - pass conversation history for context
+      const conversationHistory = messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }));
+      const detectedSport = extractSport(userMessage, conversationHistory);
 
       // Normalize the UI-selected sport to the same format extractSport() returns
       // (e.g. 'ncaa-football' → 'ncaaf', 'ncaa-basketball' → 'ncaab', others unchanged)
@@ -1329,7 +1330,7 @@ No preamble. Start directly with section 1.`;
   };
 
   // Helper functions for context extraction
-  const extractSport = (message: string): string | null => {
+  const extractSport = (message: string, conversationHistory?: Array<{ role: string; content: string }>): string | null => {
     const msgLower = message.toLowerCase();
     
     console.log('[v0] Extracting sport from:', message);
@@ -1367,7 +1368,58 @@ No preamble. Start directly with section 1.`;
       return sport;
     }
     
+    // Check for contextual references that indicate user is continuing a conversation
+    const contextualKeywords = [
+      'this game', 'that game', 'the game', 'same game', 
+      'this match', 'that match', 'the match', 'same match',
+      'these props', 'those props', 'these players', 'those players',
+      'this parlay', 'that parlay', 'for this', 'for that',
+      'correlated', 'same-game', 'sgp'
+    ];
+    
+    const hasContextualReference = contextualKeywords.some(keyword => msgLower.includes(keyword));
+    
+    // If no sport found in current message and (conversation history exists OR has contextual keywords), check recent messages
+    if ((conversationHistory && conversationHistory.length > 0) || hasContextualReference) {
+      if (hasContextualReference) {
+        console.log('[v0] Contextual reference detected, checking conversation history...');
+      } else {
+        console.log('[v0] No sport in current message, checking conversation history...');
+      }
+      
+      // Check last 5 messages (newest first) for sport context
+      if (conversationHistory) {
+        for (let i = conversationHistory.length - 1; i >= Math.max(0, conversationHistory.length - 5); i--) {
+          const historicalMsg = conversationHistory[i];
+          if (historicalMsg && historicalMsg.content) {
+            const historicalSport = extractSportFromText(historicalMsg.content);
+            if (historicalSport) {
+              console.log('[v0] Inherited sport from conversation history:', historicalSport);
+              return historicalSport;
+            }
+          }
+        }
+      }
+    }
+    
     console.log('[v0] No specific sport detected');
+    return null;
+  };
+
+  // Helper to extract sport from text without recursion
+  const extractSportFromText = (text: string): string | null => {
+    const textLower = text.toLowerCase();
+    
+    if (textLower.includes('nba') || textLower.includes('basketball')) return 'nba';
+    if (textLower.includes('nfl') || textLower.includes('football')) return 'nfl';
+    if (textLower.includes('mlb') || textLower.includes('baseball') || 
+        textLower.includes('nfbc') || textLower.includes('nffc') || 
+        textLower.includes('nfbkc') || textLower.includes('tgfbi')) return 'mlb';
+    if (textLower.includes('nhl') || textLower.includes('hockey')) return 'nhl';
+    if (textLower.includes('ncaa')) {
+      return textLower.includes('basketball') ? 'ncaab' : 'ncaaf';
+    }
+    
     return null;
   };
 
@@ -1392,8 +1444,9 @@ No preamble. Start directly with section 1.`;
   const selectRelevantCards = async (userMessage: string, context?: any): Promise<InsightCard[]> => {
     const msgLower = userMessage.toLowerCase();
     
-    // Extract sport and category from message
-    const sport = extractSport(userMessage);
+    // Extract sport and category from message - use conversation history from context if available
+    const conversationHistory = context?.previousMessages || messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }));
+    const sport = extractSport(userMessage, conversationHistory);
     let category = 'all';
     
     if (msgLower.includes('bet') || msgLower.includes('odds')) {

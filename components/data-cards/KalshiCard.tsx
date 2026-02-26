@@ -53,7 +53,7 @@ export function KalshiCard({
     yesPct >= 30 ? 'bg-orange-500' : 'bg-red-500';
 
   return (
-    <article className="group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.11_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200">
+    <article className="group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.11_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200 animate-fade-in-up">
       {/* Double-sided accent: top + bottom bars for market-style feel */}
       <div className={cn('absolute left-0 top-0 right-0 h-px bg-gradient-to-r', gradient)} aria-hidden="true" />
       <div className={cn('absolute left-0 bottom-0 right-0 h-px bg-gradient-to-r opacity-30', gradient)} aria-hidden="true" />

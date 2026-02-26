@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { Geist, Geist_Mono } from 'next/font/google'
+import { ToastProvider } from '@/components/toast-provider'
 import './globals.css'
 
 // Optimized font loading with display swap and subset for performance
@@ -57,7 +58,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="font-sans antialiased">
-        {children}
+        <ToastProvider>
+          {children}
+        </ToastProvider>
         <Analytics />
       </body>
     </html>

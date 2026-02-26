@@ -35,6 +35,7 @@ import { SettingsLightbox } from '@/components/SettingsLightbox';
 import { AlertsLightbox } from '@/components/AlertsLightbox';
 import { StripeLightbox } from '@/components/StripeLightbox';
 import { UserLightbox } from '@/components/UserLightbox';
+import { useToast } from '@/components/toast-provider';
 
 interface FileAttachment {
   id: string;
@@ -159,6 +160,8 @@ interface UnifiedAIPlatformProps {
 }
 
 export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps) {
+  const toast = useToast();
+
   // Dynamic welcome message based on time, category, and selected sport
   const getWelcomeMessage = (category: string, sport?: string, userName?: string) => {
     // Use server time to prevent hydration mismatch
@@ -224,6 +227,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [verifyStage, setVerifyStage] = useState<'analyzing' | 'reverifying'>('analyzing');
   const [cardAnalysisMap, setCardAnalysisMap] = useState<Record<string, { loading: boolean; content: string | null; error: string | null }>>({});
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [chatSearch, setChatSearch] = useState('');
   const [activeChat, setActiveChat] = useState('chat-1');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
@@ -552,9 +556,12 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
   const handleStarChat = (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setChats(chats.map((chat: Chat) =>
-      chat.id === chatId ? { ...chat, starred: !chat.starred } : chat
+    const chat = chats.find((c: Chat) => c.id === chatId);
+    const wasStarred = chat?.starred;
+    setChats(chats.map((c: Chat) =>
+      c.id === chatId ? { ...c, starred: !c.starred } : c
     ));
+    toast.success(wasStarred ? 'Removed from starred' : 'Analysis saved');
   };
 
   const generateContextualSuggestions = (userMessage: string, responseCards: InsightCard[]) => {
@@ -1780,6 +1787,7 @@ No preamble. Start directly with section 1.`;
       const remainingChats = chats.filter((chat: Chat) => chat.id !== chatId);
       setActiveChat(remainingChats[0].id);
     }
+    toast.info('Chat deleted');
   };
 
   const handleEditMessage = (index: number) => {
@@ -1825,6 +1833,7 @@ No preamble. Start directly with section 1.`;
 
   const handleCopyMessage = (content: string) => {
     navigator.clipboard.writeText(content);
+    toast.success('Copied to clipboard');
     console.log('[v0] Message copied to clipboard');
   };
 
@@ -2037,9 +2046,13 @@ No preamble. Start directly with section 1.`;
     );
   };
 
-  const filteredChats = selectedCategory === 'all'
-  ? chats
-      : chats.filter((chat: Chat) => chat.category === selectedCategory);
+  const filteredChats = chats
+    .filter((chat: Chat) => selectedCategory === 'all' || chat.category === selectedCategory)
+    .filter((chat: Chat) => {
+      if (!chatSearch.trim()) return true;
+      const q = chatSearch.toLowerCase();
+      return chat.title.toLowerCase().includes(q) || (chat.preview || '').toLowerCase().includes(q);
+    });
   
   // Platform-specific AI-powered prompt suggestions
   const platformPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }>> = {
@@ -2339,6 +2352,17 @@ No preamble. Start directly with section 1.`;
             <Plus className="w-4 h-4 relative z-10 group-hover:rotate-90 transition-transform duration-300" />
             <span className="relative z-10 text-sm">New Analysis</span>
           </button>
+
+          {/* Chat search */}
+          <div className="relative mt-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600 pointer-events-none" />
+            <input
+              value={chatSearch}
+              onChange={e => setChatSearch(e.target.value)}
+              placeholder="Search chats..."
+              className="w-full bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] rounded-lg py-2 pl-8 pr-3 text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 transition-colors"
+            />
+          </div>
 
           <div className="mt-4">
             <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">Platform</div>

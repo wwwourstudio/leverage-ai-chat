@@ -328,10 +328,12 @@ function LegacyCard({ title, category, subcategory, gradient, data, status, onAn
 // ── Main export ───────────────────────────────────────────────────────────────
 export function FantasyCard(props: FantasyCardProps) {
   const t = props.data?.fantasyCardType as string | undefined;
-  if (t === 'vbd_rankings')         return <VBDCard        {...props} />;
-  if (t === 'tier_cliff')           return <CliffCard       {...props} />;
-  if (t === 'draft_recommendation') return <DraftCard       {...props} />;
-  if (t === 'waiver')               return <WaiverCard      {...props} />;
-  if (t === 'projection')           return <ProjectionCard  {...props} />;
-  return <LegacyCard {...props} />;
+  let card;
+  if (t === 'vbd_rankings')         card = <VBDCard        {...props} />;
+  else if (t === 'tier_cliff')      card = <CliffCard       {...props} />;
+  else if (t === 'draft_recommendation') card = <DraftCard  {...props} />;
+  else if (t === 'waiver')          card = <WaiverCard      {...props} />;
+  else if (t === 'projection')      card = <ProjectionCard  {...props} />;
+  else                              card = <LegacyCard      {...props} />;
+  return <div className="animate-fade-in-up">{card}</div>;
 }

@@ -21,16 +21,16 @@ export function MobileChatInput({ onSend, disabled, placeholder = "Ask about bet
   };
 
   return (
-    <div className="border-t border-slate-800 bg-slate-900/95 backdrop-blur-xl p-4">
+    <div className="border-t border-[oklch(0.22_0.02_280)] bg-[oklch(0.10_0.01_280)]/95 backdrop-blur-xl p-4">
       <form onSubmit={handleSubmit} className="flex items-end gap-2">
         <button
           type="button"
-          className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors flex-shrink-0"
+          className="p-3 rounded-xl bg-[oklch(0.16_0.015_280)] hover:bg-[oklch(0.20_0.02_280)] transition-colors flex-shrink-0"
           aria-label="Attach file"
         >
-          <Paperclip className="w-5 h-5 text-slate-400" />
+          <Paperclip className="w-5 h-5 text-gray-400" />
         </button>
-        
+
         <div className="flex-1 relative">
           <textarea
             value={input}
@@ -44,13 +44,13 @@ export function MobileChatInput({ onSend, disabled, placeholder = "Ask about bet
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
-            className="w-full resize-none bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 pr-12 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full resize-none bg-[oklch(0.16_0.015_280)] border border-[oklch(0.22_0.02_280)] rounded-xl px-4 py-3 pr-12 text-gray-100 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             style={{ maxHeight: '120px' }}
           />
-          
+
           <button
             type="button"
-            className="absolute right-2 bottom-2 p-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors"
+            className="absolute right-2 bottom-2 p-2 rounded-lg bg-[oklch(0.20_0.02_280)] hover:bg-[oklch(0.25_0.02_280)] transition-colors"
             aria-label="Voice input"
           >
             <Mic className="w-4 h-4 text-slate-400" />

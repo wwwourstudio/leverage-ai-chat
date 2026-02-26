@@ -31,12 +31,12 @@ export function ChatMessage({ message, onEdit, onCopy }: ChatMessageProps) {
   };
 
   return (
-    <div className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex gap-4 animate-fade-in-up ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-3xl ${message.role === 'user' ? 'order-2' : ''}`}>
         <div className={`rounded-2xl px-5 py-4 ${
-          message.role === 'user' 
-            ? 'bg-linear-to-br from-blue-600 to-indigo-600 text-white'
-            : 'bg-linear-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 border border-gray-700/60'
+          message.role === 'user'
+            ? 'bg-linear-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-900/20'
+            : 'bg-linear-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 border border-[oklch(0.25_0.02_280)] shadow-sm'
         }`}>
           {isEditing ? (
             <div className="space-y-3">
@@ -82,14 +82,16 @@ export function ChatMessage({ message, onEdit, onCopy }: ChatMessageProps) {
                     )}
                     <button
                       onClick={onCopy}
-                      className="ml-auto flex items-center gap-1 hover:text-blue-400 transition"
+                      title="Copy"
+                      className="ml-auto flex items-center gap-1 opacity-50 hover:opacity-100 hover:text-blue-400 transition-opacity"
                     >
                       <Copy className="w-3 h-3" />
                       Copy
                     </button>
                     <button
                       onClick={() => setIsEditing(true)}
-                      className="flex items-center gap-1 hover:text-blue-400 transition"
+                      title="Edit"
+                      className="flex items-center gap-1 opacity-50 hover:opacity-100 hover:text-blue-400 transition-opacity"
                     >
                       <Edit3 className="w-3 h-3" />
                       Edit

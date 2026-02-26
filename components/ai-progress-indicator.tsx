@@ -72,9 +72,13 @@ export function AIProgressIndicator({ startTime, stage = 'analyzing' }: AIProgre
         {/* Thin animated progress bar */}
         <div className="h-[2px] w-full bg-gray-800 rounded-full overflow-hidden">
           <div
-            className={`h-full ${cfg.bar} rounded-full transition-all duration-300 ease-out ${elapsed > 15000 ? 'animate-pulse' : ''}`}
+            className={`relative h-full ${cfg.bar} rounded-full transition-all duration-300 ease-out overflow-hidden ${elapsed > 15000 ? 'animate-pulse' : ''}`}
             style={{ width: `${progressPct}%` }}
-          />
+          >
+            {progressPct < 95 && (
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+            )}
+          </div>
         </div>
         {elapsed > 10000 && (
           <p className="text-[10px] text-gray-600 mt-1">Complex query — high-precision analysis takes a moment</p>

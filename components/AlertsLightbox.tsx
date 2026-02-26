@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Bell, Plus, Trash2, AlertTriangle, TrendingUp, Target, Activity, Zap, Loader2, CheckCircle, ToggleLeft, ToggleRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/toast-provider';
 
 interface AlertsLightboxProps {
   isOpen: boolean;
@@ -40,6 +41,7 @@ const ALERT_TYPES = [
 const SPORTS = ['NBA', 'NFL', 'MLB', 'NHL', 'NCAAB', 'NCAAF', 'EPL', 'MLS', 'UFC'];
 
 export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
+  const toast = useToast();
   const [alerts, setAlerts] = useState<UserAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -150,6 +152,7 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
           threshold: '',
           max_triggers: '1',
         });
+        toast.success('Alert created');
         await loadAlerts();
       }
     } catch (err) {
@@ -186,9 +189,9 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
   const getAlertTypeInfo = (type: string) => ALERT_TYPES.find(t => t.value === type) || ALERT_TYPES[0];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in" onClick={onClose}>
       <div
-        className="relative w-full max-w-2xl max-h-[85vh] mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+        className="relative w-full max-w-2xl max-h-[85vh] mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-fade-in-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

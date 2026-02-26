@@ -31,7 +31,7 @@ export function ArbitrageCard({ data, gradient = 'from-emerald-500 to-green-600'
     'bg-[oklch(0.40_0.01_280)]';
 
   return (
-    <article className="group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200">
+    <article className="group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200 animate-fade-in-up">
       <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)} aria-hidden="true" />
 
       <div className="pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5">

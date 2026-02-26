@@ -1049,7 +1049,7 @@ No preamble. Start directly with section 1.`;
       // Political market guard — respects the UI platform selection:
       // - Kalshi platform selected → always political (never fetch sports odds)
       // - Betting platform selected → never political (don't let message keywords override)
-      // - Otherwise → use message-based detection
+      // - Otherwise ��� use message-based detection
       const finalIsPoliticalMarket = selectedCategory === 'kalshi' ||
         ((isPoliticalMarket || detectedPlatform === 'kalshi') && selectedCategory !== 'betting');
 
@@ -2377,13 +2377,13 @@ No preamble. Start directly with section 1.`;
                     onClick={() => { setSelectedCategory(cat.id); setSelectedSport(''); }}
                     className={`group/pill flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 border whitespace-nowrap flex-shrink-0 ${
                       isActive
-                        ? 'bg-gray-800 text-white border-gray-700 shadow-lg'
+                        ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-500/30'
                         : 'bg-transparent text-gray-500 border-gray-800 hover:text-gray-300 hover:bg-gray-800/50 hover:border-gray-700'
                     }`}
                     title={cat.desc}
                   >
                     <Icon className={`w-3.5 h-3.5 transition-colors duration-300 ${
-                      isActive ? cat.color : 'text-gray-600 group-hover/pill:text-gray-400'
+                      isActive ? 'text-white' : `text-gray-600 group-hover/pill:text-gray-400`
                     }`} />
                     <span>{cat.id === 'all' ? 'ALL' : cat.name.toUpperCase()}</span>
                   </button>
@@ -2401,7 +2401,7 @@ No preamble. Start directly with section 1.`;
                       onClick={() => setSelectedSport(isActive ? '' : sport.id)}
                       className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all duration-200 border whitespace-nowrap flex-shrink-0 ${
                         isActive
-                          ? 'bg-blue-600/20 text-blue-300 border-blue-500/50'
+                          ? 'bg-blue-600/30 text-blue-200 border-blue-500/70 shadow-sm shadow-blue-500/20'
                           : 'bg-transparent text-gray-600 border-gray-800/60 hover:text-gray-400 hover:border-gray-700'
                       }`}
                     >
@@ -2534,6 +2534,12 @@ No preamble. Start directly with section 1.`;
 
           {/* All Chats Section */}
           <div className="space-y-1.5">
+            {/* Divider — only shown when starred section is also visible */}
+            {filteredChats.filter((chat: Chat) => chat.starred).length > 0 && (
+              <div className="flex items-center gap-2 px-2.5 pt-1 pb-0.5">
+                <div className="flex-1 h-px bg-gray-800/80" />
+              </div>
+            )}
             <div className="flex items-center justify-between px-2.5 py-1.5">
               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
                 {selectedCategory === 'all' ? 'All Chats' : categories.find(c => c.id === selectedCategory)?.name || 'Chats'}
@@ -2792,6 +2798,13 @@ No preamble. Start directly with section 1.`;
                         : 'rounded-xl px-4 py-3 bg-gray-900/50 text-gray-100 border border-gray-800/60'
                     }`}
                   >
+                    {/* Timestamp tooltip — appears on hover above the message */}
+                    <div className="absolute -top-6 right-0 opacity-0 group-hover/message:opacity-100 transition-opacity duration-150 pointer-events-none flex items-center gap-1.5 px-2 py-0.5 bg-gray-900 border border-gray-800 rounded-md shadow-lg whitespace-nowrap z-10">
+                      <Clock className="w-3 h-3 text-gray-500" />
+                      <span suppressHydrationWarning className="text-[10px] font-medium text-gray-400 tabular-nums">
+                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
                     {editingMessageIndex === index ? (
                       <div className="space-y-3">
               <textarea
@@ -3390,12 +3403,6 @@ No preamble. Start directly with section 1.`;
                         <Copy className="w-4 h-4 text-gray-500 group-hover/action:text-cyan-400 transition-colors" />
                         <span className="text-xs font-bold text-gray-500 group-hover/action:text-cyan-400">Copy</span>
                       </button>
-                      <div className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-gray-900/50 rounded-lg border border-gray-800/50">
-                        <Clock className="w-3.5 h-3.5 text-gray-600" />
-                        {/* suppressHydrationWarning: toLocaleTimeString() is timezone-dependent;
-                            server renders UTC, browser renders local time — mismatch is expected. */}
-                        <span suppressHydrationWarning className="text-xs font-medium text-gray-500 tabular-nums">{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      </div>
                     </div>
                   )}
                 </div>

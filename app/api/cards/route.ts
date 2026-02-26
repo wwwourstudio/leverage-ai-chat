@@ -3,21 +3,17 @@ import { generateContextualCards } from '@/lib/cards-generator';
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/lib/constants';
 
 // ============================================================================
-// POST /api/cards
+// GET /api/cards?sport=<sport>&category=<category>&limit=<limit>
 // ============================================================================
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { sport, category, limit = 3 } = body;
+    const { searchParams } = new URL(request.url);
+    const sport = searchParams.get('sport') ?? undefined;
+    const category = searchParams.get('category') ?? undefined;
+    const limit = Math.min(Math.max(Number(searchParams.get('limit')) || 3, 1), 15);
 
-    const clampedLimit = Math.min(Math.max(Number(limit) || 3, 1), 15);
-
-    const cards = await generateContextualCards(
-      category ?? undefined,
-      sport ?? undefined,
-      clampedLimit
-    );
+    const cards = await generateContextualCards(category, sport, limit);
 
     return NextResponse.json({
       success: true,

@@ -55,18 +55,20 @@ export default function APIHealthPage() {
     async (service: (typeof SERVICES)[number]): Promise<ServiceCheck> => {
       const start = performance.now();
       try {
-        const isPost = service.endpoint === '/api/analyze' || service.endpoint === '/api/cards' || service.endpoint === '/api/odds';
+        const isPost = service.endpoint === '/api/analyze' || service.endpoint === '/api/odds';
 
-        const res = await fetch(service.endpoint, {
+        const res = await fetch(
+          service.endpoint === '/api/cards'
+            ? `${service.endpoint}?category=betting&limit=1`
+            : service.endpoint,
+          {
           method: isPost ? 'POST' : 'GET',
           headers: isPost ? { 'Content-Type': 'application/json' } : undefined,
           body: isPost
             ? JSON.stringify(
                 service.endpoint === '/api/analyze'
                   ? { userMessage: 'health check', context: {} }
-                  : service.endpoint === '/api/cards'
-                    ? { category: 'betting', limit: 1 }
-                    : { sport: 'basketball_nba', marketType: 'h2h' }
+                  : { sport: 'basketball_nba', marketType: 'h2h' }
               )
             : undefined,
           signal: AbortSignal.timeout(15000),

@@ -235,9 +235,9 @@ export function OpportunitiesFeed() {
                            'Arbitrage'}
                         </span>
                         <span className={`inline-flex items-center gap-1 text-xs ${
-                          opp.confidence === 'high' ? 'text-green-500' :
-                          opp.confidence === 'medium' ? 'text-yellow-500' :
-                          'text-gray-500'
+                          opp.confidence === 'high' ? 'text-emerald-400' :
+                          opp.confidence === 'medium' ? 'text-yellow-400' :
+                          'text-red-400'
                         }`}>
                           <Target className="h-3 w-3" />
                           {opp.confidence.toUpperCase()}

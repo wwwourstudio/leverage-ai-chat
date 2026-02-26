@@ -167,7 +167,7 @@
 }
 
 @utility animate-fade-in-up {
-  animation: fade-in-up 0.35s ease-out both;
+  animation: fade-in-up 0.3s ease-out both;
 }
 
 @utility animate-fade-in {
@@ -179,5 +179,5 @@
 }
 
 @utility animate-shimmer {
-  animation: shimmer 1.8s linear infinite;
+  animation: shimmer 1.2s linear infinite;
 }

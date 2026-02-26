@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Zap, AlertCircle, RotateCcw } from 'lucide-react';
+import { Zap, AlertCircle, RotateCcw, X } from 'lucide-react';
 
 interface AIProgressIndicatorProps {
   startTime?: number;
   stage?: 'analyzing' | 'processing' | 'finalizing' | 'slow' | 'reverifying';
+  onCancel?: () => void;
 }
 
 export function AIProgressIndicator({ startTime, stage = 'analyzing' }: AIProgressIndicatorProps) {

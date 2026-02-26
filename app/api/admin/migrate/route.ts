@@ -21,10 +21,8 @@ import { NextRequest, NextResponse } from 'next/server';
  *        -H "Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>"
  */
 
-// Migration 003 — mirrors scripts/003-player-props-table.sql
+// Migration 003 — aligns with master-schema.sql player_props_markets definition
 const MIGRATION_003_SQL = `
-DROP TABLE IF EXISTS public.player_props_markets CASCADE;
-
 CREATE TABLE IF NOT EXISTS api.player_props_markets (
   id TEXT PRIMARY KEY,
   sport VARCHAR(50) NOT NULL,
@@ -67,14 +65,16 @@ CREATE POLICY "Service upsert player props"
 GRANT ALL ON api.player_props_markets TO anon, authenticated;
 `;
 
-// Migration 004 — mirrors scripts/004-user-profiles-table.sql
+// Migration 004 — aligns with master-schema.sql user_profiles + user_preferences definitions
 const MIGRATION_004_SQL = `
 CREATE TABLE IF NOT EXISTS api.user_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid UNIQUE NOT NULL,
-  email text,
   display_name text,
+  avatar_url text,
+  subscription_tier text DEFAULT 'free' CHECK (subscription_tier IN ('free', 'core', 'pro', 'high_stakes')),
   credits_remaining integer DEFAULT 50,
+  credits_total integer DEFAULT 50,
   total_predictions integer DEFAULT 0,
   correct_predictions integer DEFAULT 0,
   win_rate numeric DEFAULT 0,
@@ -85,11 +85,17 @@ CREATE TABLE IF NOT EXISTS api.user_profiles (
 CREATE TABLE IF NOT EXISTS api.user_preferences (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid UNIQUE NOT NULL,
-  email_notifications boolean DEFAULT true,
-  push_notifications boolean DEFAULT false,
-  tracked_sports text[] DEFAULT ARRAY['NBA', 'NFL'],
+  preferred_books text[] DEFAULT ARRAY[]::text[],
   theme text DEFAULT 'dark',
   default_sport text DEFAULT 'NBA',
+  tracked_sports text[] DEFAULT ARRAY['NBA', 'NFL'],
+  email_notifications boolean DEFAULT true,
+  push_notifications boolean DEFAULT false,
+  odds_alerts boolean DEFAULT true,
+  line_movement_alerts boolean DEFAULT true,
+  arbitrage_alerts boolean DEFAULT true,
+  bankroll numeric DEFAULT 0,
+  risk_tolerance text DEFAULT 'medium' CHECK (risk_tolerance IN ('conservative', 'medium', 'aggressive')),
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
@@ -135,11 +141,11 @@ CREATE POLICY "Service inserts preferences"
 CREATE OR REPLACE FUNCTION api.handle_new_user_profile()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO api.user_profiles (user_id, email, display_name, credits_remaining)
+  INSERT INTO api.user_profiles (user_id, display_name, credits_remaining, credits_total)
   VALUES (
     NEW.id,
-    NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
+    50,
     50
   )
   ON CONFLICT (user_id) DO NOTHING;
@@ -159,11 +165,11 @@ BEGIN
 END;
 $$;
 
-INSERT INTO api.user_profiles (user_id, email, display_name, credits_remaining)
+INSERT INTO api.user_profiles (user_id, display_name, credits_remaining, credits_total)
 SELECT
   id,
-  email,
   COALESCE(raw_user_meta_data->>'full_name', split_part(email, '@', 1)),
+  50,
   50
 FROM auth.users
 ON CONFLICT (user_id) DO NOTHING;

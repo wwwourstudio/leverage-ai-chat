@@ -59,24 +59,21 @@ const METRIC_DEFS = [
 ];
 
 function scoreColor(v: number) {
-  if (v >= 85) return 'text-emerald-400';
-  if (v >= 70) return 'text-blue-400';
-  if (v >= 55) return 'text-yellow-400';
+  if (v >= 75) return 'text-emerald-400';
+  if (v >= 50) return 'text-yellow-400';
   return 'text-red-400';
 }
 
 function barFill(v: number) {
-  if (v >= 85) return 'bg-emerald-500';
-  if (v >= 70) return 'bg-blue-500';
-  if (v >= 55) return 'bg-yellow-500';
+  if (v >= 75) return 'bg-emerald-500';
+  if (v >= 50) return 'bg-yellow-500';
   return 'bg-red-500';
 }
 
 function scoreLabel(v: number) {
-  if (v >= 92) return 'Excellent';
-  if (v >= 82) return 'Strong';
-  if (v >= 68) return 'Fair';
-  if (v >= 50) return 'Weak';
+  if (v >= 90) return 'Excellent';
+  if (v >= 75) return 'Strong';
+  if (v >= 50) return 'Fair';
   return 'Low';
 }
 
@@ -208,11 +205,11 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
         <div className="flex flex-wrap gap-1.5">
           {metrics.sources.map((src, i) => {
             const Icon = sourceIcon(src.type);
-            const reliColor = src.reliability >= 95
+            const reliColor = src.reliability >= 75
               ? 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5'
-              : src.reliability >= 88
-                ? 'text-blue-400 border-blue-500/20 bg-blue-500/5'
-                : 'text-yellow-400 border-yellow-500/20 bg-yellow-500/5';
+              : src.reliability >= 50
+                ? 'text-yellow-400 border-yellow-500/20 bg-yellow-500/5'
+                : 'text-red-400 border-red-500/20 bg-red-500/5';
             return (
               <div key={i} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[10px] font-medium ${reliColor}`}>
                 <Icon className="w-2.5 h-2.5" />

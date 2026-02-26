@@ -43,7 +43,7 @@ export function DFSCard({
   ].filter(Boolean) as { label: string; value: string }[];
 
   return (
-    <article className="group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.12_0.02_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200">
+    <article className="group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.12_0.02_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200 animate-fade-in-up">
       {/* Diagonal corner accent */}
       <div className={cn('absolute right-0 top-0 w-16 h-16 bg-gradient-to-bl opacity-[0.07]', gradient)} aria-hidden="true" />
       <div className={cn('absolute left-0 bottom-0 top-0 w-0.5 bg-gradient-to-b', gradient)} aria-hidden="true" />

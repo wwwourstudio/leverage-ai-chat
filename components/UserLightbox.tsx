@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, LogOut, Save, Loader2, CheckCircle, Bot, User } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/toast-provider';
 
 interface UserLightboxProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface UserLightboxProps {
 const STORAGE_KEY = 'leverage_custom_instructions';
 
 export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsChange }: UserLightboxProps) {
+  const toast = useToast();
   const [instructions, setInstructions] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -47,6 +49,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
     }
 
     setSaved(true);
+    toast.success('Instructions saved');
     setTimeout(() => setSaved(false), 2000);
     setSaving(false);
   };
@@ -70,11 +73,11 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-lg mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+        className="relative w-full max-w-lg mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-fade-in-up"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}

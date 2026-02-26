@@ -138,11 +138,11 @@ export const BettingCard = memo(function BettingCard({
   const avatarCls = sportColor(data.sport);
 
   return (
-    <article className="group relative w-full rounded-xl overflow-hidden bg-gray-900/60 border border-gray-800/60 hover:border-gray-700/80 hover:bg-gray-900/80 transition-all duration-150 backdrop-blur-sm">
-      {/* Sport-coloured top bar */}
-      <div className={cn('h-[3px] w-full bg-gradient-to-r', gradient)} />
+    <article className="group relative w-full rounded-xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-300 backdrop-blur-sm animate-fade-in-up">
+      {/* Left accent bar matching BaseCard */}
+      <div className="absolute left-0 top-0 bottom-0 w-[1px] bg-gradient-to-b from-blue-500/60 via-purple-500/40 to-transparent" />
 
-      <div className="p-3.5">
+      <div className="p-4">
         {/* Row 1: sport label + game time */}
         <div className="flex items-center justify-between mb-2.5">
           <div className="flex items-center gap-1.5">
@@ -188,7 +188,7 @@ export const BettingCard = memo(function BettingCard({
 
         {/* Final score */}
         {isFinal && data.finalScore && (
-          <div className="mb-2.5 px-3 py-1.5 rounded-lg bg-gray-800/40 text-center">
+          <div className="mb-2.5 px-3 py-1.5 rounded-lg bg-[oklch(0.10_0.01_280)] text-center">
             <span className="text-xs font-bold text-emerald-400">FINAL</span>
             <p className="text-sm font-bold text-white mt-0.5">{data.finalScore}</p>
           </div>
@@ -250,10 +250,10 @@ export const BettingCard = memo(function BettingCard({
         )}
 
         {/* Footer row: bookmaker + book count + analyze */}
-        <div className="flex items-center justify-between pt-2 border-t border-gray-800/60">
+        <div className="flex items-center justify-between pt-2 border-t border-[oklch(0.22_0.02_280)]">
           <div className="flex items-center gap-2">
             {data.bookmaker && (
-              <span className="text-[10px] font-semibold text-gray-500 bg-gray-800/60 px-2 py-0.5 rounded-md">
+              <span className="text-[10px] font-semibold text-gray-500 bg-[oklch(0.16_0.015_280)] px-2 py-0.5 rounded-md">
                 {data.bookmaker}
               </span>
             )}
@@ -301,7 +301,7 @@ function OddsBox({
 
   return (
     <div
-      className="flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-lg bg-gray-800/40 border border-gray-800/40"
+      className="flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-lg bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.015_280)]"
       style={span > 1 ? { gridColumn: `span ${span}` } : undefined}
     >
       <span className="text-[9px] font-bold uppercase tracking-wider text-gray-600">{label}</span>

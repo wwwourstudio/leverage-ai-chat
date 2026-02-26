@@ -150,3 +150,34 @@
     transform: translateX(100%);
   }
 }
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@utility animate-fade-in-up {
+  animation: fade-in-up 0.35s ease-out both;
+}
+
+@utility animate-fade-in {
+  animation: fade-in 0.25s ease-out both;
+}
+
+@utility animate-slide-in-left {
+  animation: slide-in-left 0.3s ease-out both;
+}
+
+@utility animate-shimmer {
+  animation: shimmer 1.8s linear infinite;
+}

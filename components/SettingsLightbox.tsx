@@ -3,6 +3,20 @@
 import { useState, useEffect } from 'react';
 import { X, User, Bell, Shield, Palette, Save, Loader2, CheckCircle, ChevronRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/toast-provider';
+
+function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${checked ? 'bg-blue-600' : 'bg-gray-700'}`}
+    >
+      <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
+    </button>
+  );
+}
 
 interface SettingsLightboxProps {
   isOpen: boolean;
@@ -44,6 +58,7 @@ const SPORTS = ['NBA', 'NFL', 'MLB', 'NHL', 'NCAAB', 'NCAAF', 'EPL', 'MLS', 'UFC
 const RISK_LEVELS = ['conservative', 'medium', 'aggressive'];
 
 export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenStripe }: SettingsLightboxProps) {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -140,6 +155,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
           onUserUpdate({ name: fullName, email: user?.email || '', avatar: user?.avatar });
         }
         setSaved(true);
+        toast.success('Settings saved');
         setTimeout(() => setSaved(false), 2000);
         setSaving(false);
         return;
@@ -174,6 +190,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
       }
 
       setSaved(true);
+      toast.success('Settings saved');
       setTimeout(() => setSaved(false), 2000);
     } catch (err: any) {
       console.error('[Settings] Failed to save:', err);
@@ -195,9 +212,9 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in" onClick={onClose}>
       <div
-        className="relative w-full max-w-2xl max-h-[85vh] mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+        className="relative w-full max-w-2xl max-h-[85vh] mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-fade-in-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -220,19 +237,22 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
         </div>
 
         {/* Tab Nav */}
-        <div className="flex border-b border-gray-800">
+        <div className="relative flex border-b border-gray-800">
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition-all border-b-2 ${
+              className={`relative flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition-colors ${
                 activeTab === tab.id
-                  ? 'text-blue-400 border-blue-400 bg-blue-500/5'
-                  : 'text-gray-500 border-transparent hover:text-gray-300 hover:bg-gray-800/50'
+                  ? 'text-white bg-blue-500/5'
+                  : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
               }`}
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
+              {activeTab === tab.id && (
+                <span className="absolute inset-x-0 -bottom-px h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full" />
+              )}
             </button>
           ))}
         </div>
@@ -318,16 +338,10 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                         <p className="text-sm font-semibold text-white">{item.label}</p>
                         <p className="text-xs text-gray-500">{item.desc}</p>
                       </div>
-                      <button
-                        onClick={() => setNotificationPrefs(prev => ({ ...prev, [item.key]: !prev[item.key] }))}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${
-                          notificationPrefs[item.key] ? 'bg-blue-600' : 'bg-gray-700'
-                        }`}
-                      >
-                        <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                          notificationPrefs[item.key] ? 'translate-x-6' : 'translate-x-0.5'
-                        }`} />
-                      </button>
+                      <ToggleSwitch
+                        checked={notificationPrefs[item.key]}
+                        onChange={v => setNotificationPrefs(prev => ({ ...prev, [item.key]: v }))}
+                      />
                     </div>
                   ))}
                 </div>

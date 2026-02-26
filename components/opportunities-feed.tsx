@@ -148,14 +148,14 @@ export function OpportunitiesFeed() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[oklch(0.10_0.01_280)]">
       {/* Header */}
-      <div className="border-b border-border bg-card">
+      <div className="border-b border-[oklch(0.22_0.02_280)] bg-[oklch(0.13_0.015_280)]">
         <div className="mx-auto max-w-7xl px-4 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Live Opportunities</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <h1 className="text-3xl font-bold tracking-tight text-white">Live Opportunities</h1>
+              <p className="mt-1 text-sm text-gray-500">
                 Real-time betting intelligence across all markets
               </p>
             </div>
@@ -213,10 +213,11 @@ export function OpportunitiesFeed() {
                 </p>
               </div>
             ) : (
-              filteredOpportunities.map((opp: any) => (
+              filteredOpportunities.map((opp: any, i: number) => (
                 <div
                   key={opp.id}
-                  className="rounded-xl border border-border bg-card p-6 transition-all hover:border-primary/50 cursor-pointer"
+                  className="rounded-xl border border-[oklch(0.22_0.02_280)] bg-[oklch(0.13_0.015_280)] p-6 transition-all hover:border-blue-500/40 cursor-pointer animate-fade-in-up"
+                  style={{ animationDelay: `${i * 60}ms` }}
                   onClick={() => setSelectedGame(opp.event)}
                 >
                   <div className="flex items-start justify-between">
@@ -248,17 +249,17 @@ export function OpportunitiesFeed() {
                         {opp.awayTeam} @ {opp.homeTeam}
                       </h3>
                       
-                      <p className="mt-2 text-sm text-muted-foreground">
+                      <p className="mt-2 text-sm text-gray-500">
                         {opp.description}
                       </p>
 
                       <div className="mt-3 flex items-center gap-4 text-sm">
-                        <div className="flex items-center gap-1 text-muted-foreground">
+                        <div className="flex items-center gap-1 text-gray-500">
                           <Clock className="h-4 w-4" />
                           {new Date(opp.gameTime).toLocaleString()}
                         </div>
                         {opp.bookmaker && (
-                          <div className="rounded bg-background px-2 py-1 text-xs font-medium">
+                          <div className="rounded bg-[oklch(0.16_0.015_280)] px-2 py-1 text-xs font-medium text-gray-300">
                             {opp.bookmaker}
                           </div>
                         )}
@@ -273,7 +274,7 @@ export function OpportunitiesFeed() {
                             : `${((opp.edge || 0) * 100).toFixed(2)}%`
                           }
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
+                        <p className="mt-1 text-xs text-gray-500">
                           {opp.type === 'arbitrage' ? 'Profit' : 'Edge'}
                         </p>
                       </div>
@@ -287,21 +288,21 @@ export function OpportunitiesFeed() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Stats Card */}
-            <div className="rounded-xl border border-border bg-card p-6">
-              <h3 className="text-lg font-semibold">Today's Summary</h3>
+            <div className="rounded-xl border border-[oklch(0.22_0.02_280)] bg-[oklch(0.13_0.015_280)] p-6">
+              <h3 className="text-lg font-semibold text-white">Today's Summary</h3>
               <div className="mt-4 space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Total Opportunities</span>
+                  <span className="text-sm text-gray-500">Total Opportunities</span>
                   <span className="text-lg font-bold">{filteredOpportunities.length}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Arbitrage</span>
+                  <span className="text-sm text-gray-500">Arbitrage</span>
                   <span className="text-lg font-bold text-green-500">
                     {opportunities.filter(o => o.type === 'arbitrage').length}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Value Bets</span>
+                  <span className="text-sm text-gray-500">Value Bets</span>
                   <span className="text-lg font-bold text-blue-500">
                     {opportunities.filter(o => o.type === 'value_bet').length}
                   </span>

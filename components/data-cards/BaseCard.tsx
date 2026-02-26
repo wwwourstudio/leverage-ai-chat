@@ -74,7 +74,7 @@ export const BaseCard = memo(function BaseCard({
   const StatusIcon = status?.icon;
 
   return (
-    <article className={cn('group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200', className)}>
+    <article className={cn('group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] hover:shadow-[0_0_40px_oklch(0.4_0.12_240/0.12)] transition-all duration-200 animate-fade-in-up', className)}>
       <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)} aria-hidden="true" />
 
       <div className="pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5 space-y-4">

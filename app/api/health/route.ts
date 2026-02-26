@@ -187,9 +187,9 @@ async function checkDatabase(): Promise<ServiceHealth> {
     
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Test basic connectivity with a simple query
+    // Test basic connectivity with a simple query against a known-good cache table
     const { data, error } = await supabase
-      .from('ai_predictions')
+      .from('live_odds_cache')
       .select('count')
       .limit(1)
       .maybeSingle();

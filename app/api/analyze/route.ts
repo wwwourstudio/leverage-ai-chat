@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { generateText } from 'ai';
 import { createXai } from '@ai-sdk/xai';
 import {
@@ -15,6 +14,9 @@ import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-dete
 // ============================================================================
 // Types
 // ============================================================================
+
+// Allow up to 60 seconds for AI inference on Vercel Pro/Hobby plans
+export const maxDuration = 60;
 
 interface AnalyzeRequestBody {
   userMessage: string;

@@ -6,6 +6,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // Prevent bundling of heavy server-only packages that don't need to be compiled
+  serverExternalPackages: ['@supabase/supabase-js'],
   // Allow iframe embedding for v0 preview
   async headers() {
     return [

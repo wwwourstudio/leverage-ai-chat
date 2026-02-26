@@ -24,6 +24,7 @@ interface BaseCardProps {
   isLoading?: boolean;
   error?: string;
   className?: string;
+  isHero?: boolean;
 }
 
 function ErrorState({ error, className }: { error: string; className?: string }) {
@@ -63,6 +64,7 @@ export const BaseCard = memo(function BaseCard({
   isLoading = false,
   error,
   className,
+  isHero = false,
 }: BaseCardProps) {
   if (error) return <ErrorState error={error} className={className} />;
   if (isLoading) return <LoadingState className={className} />;
@@ -74,15 +76,19 @@ export const BaseCard = memo(function BaseCard({
   const StatusIcon = status?.icon;
 
   return (
-    <article className={cn('group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] hover:shadow-[0_0_40px_oklch(0.4_0.12_240/0.12)] transition-all duration-200 animate-fade-in-up', className)}>
-      <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)} aria-hidden="true" />
+    <article className={cn(
+      'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] hover:shadow-[0_0_40px_oklch(0.4_0.12_240/0.12)] transition-all duration-200 animate-fade-in-up',
+      isHero && 'border-[oklch(0.26_0.025_260)] shadow-[0_0_24px_oklch(0.3_0.08_260/0.15)]',
+      className,
+    )}>
+      <div className={cn('absolute left-0 top-0 bottom-0 bg-gradient-to-b', isHero ? 'w-[3px]' : 'w-1', gradient)} aria-hidden="true" />
 
-      <div className="pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5 space-y-4">
+      <div className={cn('pl-5 pr-4 space-y-4', isHero ? 'py-5 sm:pl-7 sm:pr-6 sm:py-6' : 'py-4 sm:pl-6 sm:pr-5 sm:py-5')}>
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className={cn('p-2 rounded-lg bg-gradient-to-br shrink-0', gradient)} aria-hidden="true">
-              <Icon className="w-4 h-4 text-white" />
+            <div className={cn('rounded-lg bg-gradient-to-br shrink-0', isHero ? 'p-2.5' : 'p-2', gradient)} aria-hidden="true">
+              <Icon className={cn('text-white', isHero ? 'w-5 h-5' : 'w-4 h-4')} />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -90,7 +96,7 @@ export const BaseCard = memo(function BaseCard({
                 <span className="text-[oklch(0.3_0.01_280)]" aria-hidden="true">/</span>
                 <span className="text-[11px] font-medium text-[oklch(0.45_0.01_280)] truncate">{subcategory}</span>
               </div>
-              <h3 className="text-base font-bold text-[oklch(0.95_0.005_85)] leading-tight mt-1 text-balance">{title}</h3>
+              <h3 className={cn('font-bold text-[oklch(0.95_0.005_85)] leading-tight mt-1 text-balance', isHero ? 'text-lg' : 'text-base')}>{title}</h3>
             </div>
           </div>
 

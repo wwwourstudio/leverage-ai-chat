@@ -3,6 +3,8 @@
 import { memo } from 'react';
 import { Clock, TrendingUp, TrendingDown, Minus, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PlayerAvatar } from './PlayerAvatar';
+import { getPlayerHeadshotUrl } from '@/lib/constants';
 
 interface BettingCardData {
   matchup?: string;
@@ -65,6 +67,7 @@ interface BettingCardProps {
   onAnalyze?: () => void;
   isLoading?: boolean;
   error?: string;
+  isHero?: boolean;
 }
 
 /** Parse "Away @ Home" */
@@ -126,6 +129,7 @@ export const BettingCard = memo(function BettingCard({
   data,
   status,
   onAnalyze,
+  isHero = false,
 }: BettingCardProps) {
   const teams = parseTeams(data.matchup || data.game);
   const homeML = fmtML(data.homeOdds);
@@ -137,12 +141,23 @@ export const BettingCard = memo(function BettingCard({
   const isFinal = data.status === 'FINAL' || !!data.finalScore;
   const avatarCls = sportColor(data.sport);
 
-  return (
-    <article className="group relative w-full rounded-xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-300 backdrop-blur-sm animate-fade-in-up">
-      {/* Left accent bar matching BaseCard */}
-      <div className="absolute left-0 top-0 bottom-0 w-[1px] bg-gradient-to-b from-blue-500/60 via-purple-500/40 to-transparent" />
+  // Player prop: show player photo if available
+  const isPlayerProp = !!(data.player) || subcategory.toLowerCase().includes('prop');
+  const playerPhotoUrl = isPlayerProp && data.player
+    ? (data.playerPhotoUrl ?? getPlayerHeadshotUrl(data.player))
+    : null;
 
-      <div className="p-4">
+  return (
+    <article className={cn(
+      'group relative w-full rounded-xl overflow-hidden bg-[oklch(0.13_0.015_280)] border transition-all duration-300 backdrop-blur-sm animate-fade-in-up',
+      isHero
+        ? 'border-[oklch(0.26_0.025_260)] shadow-[0_0_20px_oklch(0.3_0.08_260/0.12)]'
+        : 'border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)]',
+    )}>
+      {/* Left accent bar */}
+      <div className={cn('absolute left-0 top-0 bottom-0 bg-gradient-to-b from-blue-500/60 via-purple-500/40 to-transparent', isHero ? 'w-[2px]' : 'w-[1px]')} />
+
+      <div className={cn('p-4', isHero && 'p-5')}>
         {/* Row 1: sport label + game time */}
         <div className="flex items-center justify-between mb-2.5">
           <div className="flex items-center gap-1.5">
@@ -160,15 +175,38 @@ export const BettingCard = memo(function BettingCard({
           )}
         </div>
 
+        {/* Player prop header with photo */}
+        {isPlayerProp && data.player && (
+          <div className="flex items-center gap-3 mb-3 px-2.5 py-2 rounded-lg bg-[oklch(0.10_0.01_280)]">
+            <PlayerAvatar
+              playerName={data.player}
+              photoUrl={playerPhotoUrl}
+              sport={data.sport}
+              size={isHero ? 'lg' : 'md'}
+            />
+            <div className="min-w-0">
+              <p className={cn('font-black text-white truncate', isHero ? 'text-base' : 'text-sm')}>{data.player}</p>
+              {data.stat && (
+                <p className="text-[11px] text-gray-400 truncate">{data.stat}</p>
+              )}
+            </div>
+            {data.odds && (
+              <span className={cn('ml-auto font-black tabular-nums shrink-0', Number(data.odds) > 0 ? 'text-emerald-400' : 'text-red-400', isHero ? 'text-lg' : 'text-sm')}>
+                {Number(data.odds) > 0 ? `+${data.odds}` : data.odds}
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Row 2: Team matchup */}
-        {teams ? (
+        {!isPlayerProp && teams ? (
           <div className="flex items-center gap-3 mb-3">
             {/* Away team */}
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className={cn('w-8 h-8 rounded-lg border text-[11px] font-black flex items-center justify-center shrink-0', avatarCls)}>
+              <div className={cn('rounded-lg border text-[11px] font-black flex items-center justify-center shrink-0', isHero ? 'w-10 h-10' : 'w-8 h-8', avatarCls)}>
                 {abbr(teams.away)}
               </div>
-              <span className="text-xs font-semibold text-gray-200 truncate">{teams.away}</span>
+              <span className={cn('font-semibold text-gray-200 truncate', isHero ? 'text-sm' : 'text-xs')}>{teams.away}</span>
             </div>
 
             {/* VS divider */}
@@ -176,13 +214,13 @@ export const BettingCard = memo(function BettingCard({
 
             {/* Home team */}
             <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-              <span className="text-xs font-semibold text-gray-200 truncate text-right">{teams.home}</span>
-              <div className={cn('w-8 h-8 rounded-lg border text-[11px] font-black flex items-center justify-center shrink-0', avatarCls)}>
+              <span className={cn('font-semibold text-gray-200 truncate text-right', isHero ? 'text-sm' : 'text-xs')}>{teams.home}</span>
+              <div className={cn('rounded-lg border text-[11px] font-black flex items-center justify-center shrink-0', isHero ? 'w-10 h-10' : 'w-8 h-8', avatarCls)}>
                 {abbr(teams.home)}
               </div>
             </div>
           </div>
-        ) : (
+        ) : !isPlayerProp && (
           <p className="text-sm font-semibold text-gray-200 mb-3 truncate">{title}</p>
         )}
 

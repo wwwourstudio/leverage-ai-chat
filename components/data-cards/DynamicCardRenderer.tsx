@@ -25,6 +25,7 @@ interface DynamicCardRendererProps {
   onAnalyze?: (card: CardData) => void;
   isLoading?: boolean;
   error?: string;
+  isHero?: boolean;
 }
 
 export function DynamicCardRenderer({
@@ -32,7 +33,8 @@ export function DynamicCardRenderer({
   index = 0,
   onAnalyze,
   isLoading,
-  error
+  error,
+  isHero = false,
 }: DynamicCardRendererProps) {
   // Loading state
   if (isLoading) {
@@ -81,6 +83,7 @@ export function DynamicCardRenderer({
         status={safeCard.status}
         onAnalyze={handleAnalyze}
         error={error}
+        isHero={isHero}
       />
     );
   }
@@ -98,6 +101,7 @@ export function DynamicCardRenderer({
         status={safeCard.status}
         onAnalyze={handleAnalyze}
         error={error}
+        isHero={isHero}
       />
     );
   }
@@ -119,6 +123,7 @@ export function DynamicCardRenderer({
         status={safeCard.status}
         onAnalyze={handleAnalyze}
         error={error}
+        isHero={isHero}
       />
     );
   }
@@ -136,6 +141,7 @@ export function DynamicCardRenderer({
         status={safeCard.status}
         onAnalyze={handleAnalyze}
         error={error}
+        isHero={isHero}
       />
     );
   }
@@ -152,6 +158,7 @@ export function DynamicCardRenderer({
         status={safeCard.status}
         onAnalyze={handleAnalyze}
         error={error}
+        isHero={isHero}
       />
     );
   }
@@ -163,6 +170,7 @@ export function DynamicCardRenderer({
         data={safeCard.data as any}
         gradient={safeCard.gradient}
         onAnalyze={handleAnalyze}
+        isHero={isHero}
       />
     );
   }
@@ -179,6 +187,7 @@ export function DynamicCardRenderer({
       status={safeCard.status}
       onAnalyze={handleAnalyze}
       error={error}
+      isHero={isHero}
     />
   );
 }

@@ -14,6 +14,7 @@ interface DFSCardProps {
   onAnalyze?: () => void;
   isLoading?: boolean;
   error?: string;
+  isHero?: boolean;
 }
 
 const statusMap: Record<string, { label: string; dotClass: string; textClass: string }> = {
@@ -31,24 +32,39 @@ export function DFSCard({
   data,
   status,
   onAnalyze,
+  isHero = false,
 }: DFSCardProps) {
   const badge = statusMap[status] || statusMap.value;
-  const { focus, targetGame, targetPlayers, description, platforms, tips, salary, projection, ownership, value: dfsValue, ...rest } = data;
+  const { focus, targetGame, targetPlayers, description, platforms, tips, salary, projection, ownership, value: dfsValue, boomCeiling, bustFloor, ...rest } = data;
+
+  // Compute salary efficiency (value score) as proj/salary*1000 if possible
+  const projNum = parseFloat(String(projection || '').replace(/[^0-9.]/g, ''));
+  const salaryNum = parseFloat(String(salary || '').replace(/[^0-9.]/g, ''));
+  const valueScore = projNum > 0 && salaryNum > 0
+    ? (projNum / (salaryNum / 1000)).toFixed(2)
+    : (dfsValue ? String(dfsValue) : null);
 
   const statItems = [
     salary && { label: 'Salary', value: salary },
     projection && { label: 'Proj', value: projection },
     ownership && { label: 'Own%', value: ownership },
-    dfsValue && { label: 'Value', value: dfsValue },
+    valueScore && { label: 'Value', value: valueScore },
+    boomCeiling && { label: 'Ceiling', value: boomCeiling },
+    bustFloor && { label: 'Floor', value: bustFloor },
   ].filter(Boolean) as { label: string; value: string }[];
 
   return (
-    <article className="group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.12_0.02_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200 animate-fade-in-up">
+    <article className={cn(
+      'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.12_0.02_280)] border transition-all duration-200 animate-fade-in-up',
+      isHero
+        ? 'border-[oklch(0.26_0.025_260)] shadow-[0_0_20px_oklch(0.3_0.08_260/0.12)]'
+        : 'border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)]',
+    )}>
       {/* Diagonal corner accent */}
       <div className={cn('absolute right-0 top-0 w-16 h-16 bg-gradient-to-bl opacity-[0.07]', gradient)} aria-hidden="true" />
-      <div className={cn('absolute left-0 bottom-0 top-0 w-0.5 bg-gradient-to-b', gradient)} aria-hidden="true" />
+      <div className={cn('absolute left-0 bottom-0 top-0 bg-gradient-to-b', isHero ? 'w-[3px]' : 'w-0.5', gradient)} aria-hidden="true" />
 
-      <div className="px-4 py-4 sm:px-5 sm:py-5 relative">
+      <div className={cn('px-4 py-4 relative', isHero ? 'sm:px-6 sm:py-5' : 'sm:px-5 sm:py-5')}>
         {/* Header */}
         <div className="flex items-center justify-between gap-3 mb-2.5">
           <div className="flex items-center gap-2 min-w-0">

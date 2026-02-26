@@ -18,9 +18,10 @@ interface ArbitrageCardProps {
   };
   gradient?: string;
   onAnalyze?: () => void;
+  isHero?: boolean;
 }
 
-export function ArbitrageCard({ data, gradient = 'from-emerald-500 to-green-600', onAnalyze }: ArbitrageCardProps) {
+export function ArbitrageCard({ data, gradient = 'from-emerald-500 to-green-600', onAnalyze, isHero }: ArbitrageCardProps) {
   const confColor =
     data.confidence === 'HIGH' ? 'text-emerald-400' :
     data.confidence === 'MEDIUM' ? 'text-sky-400' :

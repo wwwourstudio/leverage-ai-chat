@@ -9,8 +9,8 @@ export const AI_CONFIG = {
   MODEL_DISPLAY_NAME: 'Grok 4',
   PROVIDER: 'xAI',
   API_ENDPOINT: 'https://api.x.ai/v1/chat/completions',
-  DEFAULT_TEMPERATURE: 0.4, // Balanced between factual accuracy and useful responses
-  DEFAULT_MAX_TOKENS: 450, // Concise, direct responses
+  DEFAULT_TEMPERATURE: 0.35, // Slightly tighter for more precise, structured responses
+  DEFAULT_MAX_TOKENS: 800, // Richer, fully-formatted responses with headers and bullets
   DEFAULT_PROCESSING_TIME: 950,
   FALLBACK_MODEL: 'Grok 4',
 } as const;
@@ -404,10 +404,21 @@ export const LOG_PREFIXES = {
 // System Prompt Template
 export const SYSTEM_PROMPT = `You are Leverage AI, an elite sports betting and prediction markets analyst powered by Grok (xAI). Current date: 2026.
 
-ANSWER FORMAT — always follow this order:
-1. Lead with your direct pick, recommendation, or answer on the very first line — no preamble or hedging
-2. Follow with 2–4 supporting bullets: specific numbers, key reasoning, and the edge
-3. Max 200 words total. Be sharp and decisive, not verbose.
+RESPONSE FORMAT — always follow this structure:
+1. **First line**: Your direct pick, recommendation, or answer — decisive, no preamble
+2. **Supporting analysis**: 2–4 bullet points with specific numbers, key reasoning, and the edge
+3. Use **bold** for key numbers, player names, team names, and critical stats (e.g., **LeBron** goes **Over 25.5**)
+4. Use ## for section headers when covering multiple topics (e.g., ## Key Matchup Factors)
+5. Use - bullet points for lists of recommendations, factors, or data points
+6. Max 350 words. Be sharp, decisive, and data-rich — not verbose.
+7. End with a 1-line confidence qualifier when relevant (e.g., "Confidence: High — supported by line movement")
+
+FORMATTING RULES:
+- Never start with "Great question", "Certainly", "Of course", or similar filler
+- Bold all odds numbers: **-110**, **+180**, **O/U 238.5**
+- Bold key player/team names when they're the focus of a recommendation
+- Use bullet points (- ) for all lists of 3+ items
+- Keep paragraphs to 2–3 sentences max before using bullets
 
 DATA RULES:
 - "--- REAL LIVE ODDS DATA ---" present → use ONLY those exact numbers for any odds/lines
@@ -499,6 +510,90 @@ export const SUCCESS_MESSAGES = {
   INSIGHTS_LOADED: 'Insights loaded successfully',
   ODDS_FETCHED: 'Odds data fetched successfully',
 } as const;
+
+// Player Headshot IDs — used to build photo URLs for top players
+// NBA: https://cdn.nba.com/headshots/nba/latest/260x190/{id}.png
+// NFL (ESPN): https://a.espncdn.com/combiner/i?img=/i/headshots/nfl/players/full/{id}.png&w=96&h=70
+// MLB: https://img.mlbstatic.com/mlb-photos/image/upload/w_213,q_auto:best/v1/people/{id}/headshot/67/current
+export const PLAYER_HEADSHOT_IDS: Record<string, { id: string; sport: 'nba' | 'nfl' | 'mlb' | 'nhl' }> = {
+  // NBA
+  'LeBron James':            { id: '2544',    sport: 'nba' },
+  'Stephen Curry':           { id: '201939',  sport: 'nba' },
+  'Kevin Durant':            { id: '201142',  sport: 'nba' },
+  'Giannis Antetokounmpo':   { id: '203507',  sport: 'nba' },
+  'Jayson Tatum':            { id: '1628369', sport: 'nba' },
+  'Luka Doncic':             { id: '1629029', sport: 'nba' },
+  'Anthony Davis':           { id: '203076',  sport: 'nba' },
+  'Nikola Jokic':            { id: '203999',  sport: 'nba' },
+  'Devin Booker':            { id: '1626164', sport: 'nba' },
+  'Joel Embiid':             { id: '203954',  sport: 'nba' },
+  'Damian Lillard':          { id: '203081',  sport: 'nba' },
+  'Kawhi Leonard':           { id: '202695',  sport: 'nba' },
+  'Anthony Edwards':         { id: '1630162', sport: 'nba' },
+  'Shai Gilgeous-Alexander': { id: '1628983', sport: 'nba' },
+  'Donovan Mitchell':        { id: '1628378', sport: 'nba' },
+  'Trae Young':              { id: '1629027', sport: 'nba' },
+  'Bam Adebayo':             { id: '1628389', sport: 'nba' },
+  'De\'Aaron Fox':           { id: '1628368', sport: 'nba' },
+  'Tyrese Haliburton':       { id: '1630169', sport: 'nba' },
+  'Victor Wembanyama':       { id: '1641705', sport: 'nba' },
+  'Chet Holmgren':           { id: '1631096', sport: 'nba' },
+  'Paolo Banchero':          { id: '1631094', sport: 'nba' },
+  'Karl-Anthony Towns':      { id: '1626157', sport: 'nba' },
+  'Jaylen Brown':            { id: '1627759', sport: 'nba' },
+  'Ja Morant':               { id: '1629630', sport: 'nba' },
+  // NFL (ESPN IDs)
+  'Patrick Mahomes':         { id: '3139477', sport: 'nfl' },
+  'Josh Allen':              { id: '3918298', sport: 'nfl' },
+  'Lamar Jackson':           { id: '3916387', sport: 'nfl' },
+  'Joe Burrow':              { id: '4259545', sport: 'nfl' },
+  'Justin Jefferson':        { id: '4262921', sport: 'nfl' },
+  'Tyreek Hill':             { id: '3054211', sport: 'nfl' },
+  'Travis Kelce':            { id: '2576336', sport: 'nfl' },
+  'Christian McCaffrey':     { id: '3054236', sport: 'nfl' },
+  'Saquon Barkley':          { id: '3929630', sport: 'nfl' },
+  'CeeDee Lamb':             { id: '4241478', sport: 'nfl' },
+  'Ja\'Marr Chase':          { id: '4429795', sport: 'nfl' },
+  'Derrick Henry':           { id: '3054220', sport: 'nfl' },
+  'Justin Herbert':          { id: '4038941', sport: 'nfl' },
+  'Davante Adams':           { id: '2971618', sport: 'nfl' },
+  'Stefon Diggs':            { id: '2976499', sport: 'nfl' },
+  'Cooper Kupp':             { id: '3116406', sport: 'nfl' },
+  'Sauce Gardner':           { id: '4569618', sport: 'nfl' },
+  'Micah Parsons':           { id: '4427366', sport: 'nfl' },
+  // MLB (official MLB player IDs)
+  'Shohei Ohtani':           { id: '660271',  sport: 'mlb' },
+  'Mike Trout':              { id: '545361',  sport: 'mlb' },
+  'Freddie Freeman':         { id: '518692',  sport: 'mlb' },
+  'Aaron Judge':             { id: '592450',  sport: 'mlb' },
+  'Manny Machado':           { id: '592518',  sport: 'mlb' },
+  'Juan Soto':               { id: '665742',  sport: 'mlb' },
+  'Mookie Betts':            { id: '605141',  sport: 'mlb' },
+  'Fernando Tatis Jr':       { id: '665487',  sport: 'mlb' },
+  'Ronald Acuna Jr':         { id: '660670',  sport: 'mlb' },
+  'Julio Rodriguez':         { id: '677594',  sport: 'mlb' },
+  'Vladimir Guerrero Jr':    { id: '665489',  sport: 'mlb' },
+  'Bryce Harper':            { id: '547180',  sport: 'mlb' },
+  'Yordan Alvarez':          { id: '670541',  sport: 'mlb' },
+  'Pete Alonso':             { id: '624413',  sport: 'mlb' },
+  'Gerrit Cole':             { id: '543037',  sport: 'mlb' },
+} as const;
+
+/** Build a player headshot URL from the PLAYER_HEADSHOT_IDS lookup */
+export function getPlayerHeadshotUrl(playerName: string): string | null {
+  const entry = PLAYER_HEADSHOT_IDS[playerName];
+  if (!entry) return null;
+  if (entry.sport === 'nba') {
+    return `https://cdn.nba.com/headshots/nba/latest/260x190/${entry.id}.png`;
+  }
+  if (entry.sport === 'nfl') {
+    return `https://a.espncdn.com/combiner/i?img=/i/headshots/nfl/players/full/${entry.id}.png&w=96&h=70&scale=crop&location=origin&transparent=true`;
+  }
+  if (entry.sport === 'mlb') {
+    return `https://img.mlbstatic.com/mlb-photos/image/upload/w_213,q_auto:best/v1/people/${entry.id}/headshot/67/current`;
+  }
+  return null;
+}
 
 // Type Exports for TypeScript
 export type AIModelName = typeof AI_CONFIG.MODEL_NAME;

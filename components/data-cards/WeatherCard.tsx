@@ -23,6 +23,7 @@ interface WeatherCardProps {
   onAnalyze?: () => void;
   isLoading?: boolean;
   error?: string;
+  isHero?: boolean;
 }
 
 const getWeatherIcon = (condition?: string) => {

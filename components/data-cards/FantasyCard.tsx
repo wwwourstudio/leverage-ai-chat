@@ -2,6 +2,8 @@
 
 import { Trophy, Target, Zap, AlertTriangle, User, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PlayerAvatar } from './PlayerAvatar';
+import { getPlayerHeadshotUrl } from '@/lib/constants';
 
 interface FantasyCardProps {
   type: string;
@@ -14,6 +16,7 @@ interface FantasyCardProps {
   onAnalyze?: () => void;
   isLoading?: boolean;
   error?: string;
+  isHero?: boolean;
 }
 
 // ── Position badge ────────────────────────────────────────────────────────────
@@ -55,17 +58,22 @@ const STATUS: Record<string, { label: string; dot: string; text: string }> = {
 // ── Shared card shell ─────────────────────────────────────────────────────────
 function Shell({
   title, category, subcategory, gradient,
-  status, Icon, children, onAnalyze,
+  status, Icon, children, onAnalyze, isHero,
 }: {
   title: string; category: string; subcategory: string; gradient: string;
   status: string; Icon: React.ElementType; children: React.ReactNode;
-  onAnalyze?: () => void;
+  onAnalyze?: () => void; isHero?: boolean;
 }) {
   const s = STATUS[status] ?? STATUS.value;
   return (
-    <article className="group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.12_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200">
-      <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)} />
-      <div className="pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5 relative">
+    <article className={cn(
+      'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.12_0.015_280)] border transition-all duration-200',
+      isHero
+        ? 'border-[oklch(0.26_0.025_260)] shadow-[0_0_20px_oklch(0.3_0.08_260/0.12)]'
+        : 'border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)]',
+    )}>
+      <div className={cn('absolute left-0 top-0 bottom-0 bg-gradient-to-b', isHero ? 'w-[3px]' : 'w-1', gradient)} />
+      <div className={cn('pl-5 pr-4 py-4 relative', isHero ? 'sm:pl-7 sm:pr-6 sm:py-5' : 'sm:pl-6 sm:pr-5 sm:py-5')}>
         {/* header */}
         <div className="flex items-center justify-between gap-3 mb-2.5">
           <div className="flex items-center gap-2 min-w-0">
@@ -81,7 +89,7 @@ function Shell({
             <span className={cn('text-[10px] font-bold uppercase tracking-wider', s.text)}>{s.label}</span>
           </div>
         </div>
-        <h3 className="text-base sm:text-lg font-bold text-[oklch(0.95_0.005_85)] leading-snug mb-3">{title}</h3>
+        <h3 className={cn('font-bold text-[oklch(0.95_0.005_85)] leading-snug mb-3', isHero ? 'text-lg sm:text-xl' : 'text-base sm:text-lg')}>{title}</h3>
         {children}
         {onAnalyze && (
           <button onClick={onAnalyze}
@@ -95,17 +103,20 @@ function Shell({
 }
 
 // ── VBD Rankings ──────────────────────────────────────────────────────────────
-function VBDCard({ data, ...p }: FantasyCardProps) {
+function VBDCard({ data, isHero, ...p }: FantasyCardProps) {
   const { players = [], tierCliff, scoringFormat, leagueSize } = data;
+  const sport = p.category?.toLowerCase();
   return (
     <Shell {...p} status={data.status ?? 'target'} Icon={Trophy}>
       <div className="space-y-1">
-        {players.slice(0, 8).map((pl: any) => {
+        {players.slice(0, isHero ? 8 : 6).map((pl: any) => {
           const isCliff = tierCliff && pl.name === tierCliff.cliffAfterName;
+          const photoUrl = pl.photoUrl ?? getPlayerHeadshotUrl(pl.name);
           return (
             <div key={pl.name}>
               <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[oklch(0.10_0.01_280)] hover:bg-[oklch(0.13_0.01_280)] transition-colors">
                 <span className="text-[11px] font-bold tabular-nums text-[oklch(0.40_0.01_280)] w-4 shrink-0">{pl.rank}</span>
+                <PlayerAvatar playerName={pl.name} photoUrl={photoUrl} sport={sport} size="sm" />
                 <span className="text-xs font-semibold text-[oklch(0.88_0.005_85)] flex-1 truncate min-w-0">
                   {pl.name}
                   <span className="text-[10px] font-normal text-[oklch(0.45_0.01_280)] ml-1">{pl.team}</span>
@@ -210,30 +221,35 @@ function DraftCard({ data, ...p }: FantasyCardProps) {
 }
 
 // ── Waiver Wire ───────────────────────────────────────────────────────────────
-function WaiverCard({ data, ...p }: FantasyCardProps) {
+function WaiverCard({ data, isHero, ...p }: FantasyCardProps) {
   const { targets = [], description, budgetNote } = data;
+  const sport = p.category?.toLowerCase();
   return (
     <Shell {...p} status="hot" Icon={Zap}>
       {description && <p className="text-xs text-[oklch(0.50_0.01_280)] leading-relaxed mb-3">{description}</p>}
       <div className="space-y-2">
-        {targets.slice(0, 4).map((t: any, i: number) => (
-          <div key={i} className="px-2.5 py-2 rounded-lg bg-[oklch(0.10_0.01_280)]">
-            <div className="flex items-center gap-2 mb-0.5">
-              <PosBadge pos={t.pos} />
-              <span className="text-xs font-black text-[oklch(0.92_0.005_85)]">{t.name}</span>
-              <span className="text-[10px] text-[oklch(0.45_0.01_280)]">{t.team}</span>
-              <span className="ml-auto text-[10px] text-[oklch(0.45_0.01_280)]">{t.rostered}% rostered</span>
+        {targets.slice(0, isHero ? 4 : 3).map((t: any, i: number) => {
+          const photoUrl = t.photoUrl ?? getPlayerHeadshotUrl(t.name);
+          return (
+            <div key={i} className="px-2.5 py-2 rounded-lg bg-[oklch(0.10_0.01_280)]">
+              <div className="flex items-center gap-2 mb-0.5">
+                <PlayerAvatar playerName={t.name} photoUrl={photoUrl} sport={sport} size="sm" />
+                <PosBadge pos={t.pos} />
+                <span className="text-xs font-black text-[oklch(0.92_0.005_85)]">{t.name}</span>
+                <span className="text-[10px] text-[oklch(0.45_0.01_280)]">{t.team}</span>
+                <span className="ml-auto text-[10px] text-[oklch(0.45_0.01_280)]">{t.rostered}% rostered</span>
+              </div>
+              <div className="flex items-center gap-3 mb-0.5">
+                <span className="text-[10px] font-bold text-[oklch(0.45_0.01_280)]">FAAB</span>
+                <span className="text-sm font-black text-teal-400">${t.faabBid}</span>
+                <span className="text-[10px] text-[oklch(0.40_0.01_280)]">({t.faabPct}%)</span>
+                <span className="text-[10px] font-bold text-[oklch(0.45_0.01_280)]">BREAKOUT</span>
+                <span className="text-sm font-black text-orange-400">{t.breakoutScore?.toFixed(1)}σ</span>
+              </div>
+              <p className="text-[10px] text-[oklch(0.45_0.01_280)] leading-relaxed">{t.reason}</p>
             </div>
-            <div className="flex items-center gap-3 mb-0.5">
-              <span className="text-[10px] font-bold text-[oklch(0.45_0.01_280)]">FAAB</span>
-              <span className="text-sm font-black text-teal-400">${t.faabBid}</span>
-              <span className="text-[10px] text-[oklch(0.40_0.01_280)]">({t.faabPct}%)</span>
-              <span className="text-[10px] font-bold text-[oklch(0.45_0.01_280)]">BREAKOUT</span>
-              <span className="text-sm font-black text-orange-400">{t.breakoutScore?.toFixed(1)}σ</span>
-            </div>
-            <p className="text-[10px] text-[oklch(0.45_0.01_280)] leading-relaxed">{t.reason}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
       {budgetNote && <p className="mt-2 text-[10px] text-[oklch(0.38_0.01_280)]">{budgetNote}</p>}
     </Shell>
@@ -329,11 +345,11 @@ function LegacyCard({ title, category, subcategory, gradient, data, status, onAn
 export function FantasyCard(props: FantasyCardProps) {
   const t = props.data?.fantasyCardType as string | undefined;
   let card;
-  if (t === 'vbd_rankings')         card = <VBDCard        {...props} />;
-  else if (t === 'tier_cliff')      card = <CliffCard       {...props} />;
-  else if (t === 'draft_recommendation') card = <DraftCard  {...props} />;
-  else if (t === 'waiver')          card = <WaiverCard      {...props} />;
-  else if (t === 'projection')      card = <ProjectionCard  {...props} />;
-  else                              card = <LegacyCard      {...props} />;
+  if (t === 'vbd_rankings')              card = <VBDCard       {...props} />;
+  else if (t === 'tier_cliff')           card = <CliffCard     {...props} />;
+  else if (t === 'draft_recommendation') card = <DraftCard     {...props} />;
+  else if (t === 'waiver')               card = <WaiverCard    {...props} />;
+  else if (t === 'projection')           card = <ProjectionCard {...props} />;
+  else                                   card = <LegacyCard    {...props} />;
   return <div className="animate-fade-in-up">{card}</div>;
 }

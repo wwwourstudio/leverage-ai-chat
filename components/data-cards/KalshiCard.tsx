@@ -17,6 +17,7 @@ interface KalshiCardProps {
   onAnalyze?: () => void;
   isLoading?: boolean;
   error?: string;
+  isHero?: boolean;
 }
 
 function CategoryIcon({ label, className }: { label?: string; className?: string }) {

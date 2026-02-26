@@ -24,6 +24,7 @@ import { MessageList } from '@/components/message-list';
 import { MobileChatInput } from '@/components/mobile-chat-input';
 import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2 } from 'lucide-react';
 import { DynamicCardRenderer, CardList, EmptyState } from '@/components/data-cards';
+import { CardLayout } from '@/components/data-cards/CardLayout';
 import { DatabaseStatusBanner } from '@/components/database-status-banner';
 import { TrustMetricsDisplay, TrustMetricsBadge } from '@/components/trust-metrics-display';
 import { InsightsDashboard } from '@/components/insights-dashboard';
@@ -3158,24 +3159,18 @@ No preamble. Start directly with section 1.`;
 
 
 
-                  {/* Dynamic Cards Section */}
+                  {/* Dynamic Cards Section — Hero + Compact Suggestions layout */}
                   {message.role === 'assistant' && message.cards && message.cards.length > 0 && (
-                    <div className="mt-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {message.cards.map((card, cardIndex) => (
-                          <div
-                            key={`${card.type}-${cardIndex}`}
-                            className="animate-fadeIn"
-                            style={{ animationDelay: `${cardIndex * 60}ms` }}
-                          >
-                            <DynamicCardRenderer
-                              card={card}
-                              index={cardIndex}
-                              onAnalyze={() => generateCardAnalysis(card, `${index}-${cardIndex}`)}
-                            />
-                          </div>
-                        ))}
-                      </div>
+                    <div>
+                      <CardLayout
+                        cards={message.cards}
+                        aiInsight={message.content}
+                        onAnalyze={(card) => {
+                          const cardIndex = message.cards!.indexOf(card);
+                          generateCardAnalysis(card, `${index}-${cardIndex}`);
+                        }}
+                        messageIndex={index}
+                      />
 
                       {/* Analysis panels — full width below the card grid */}
                       {message.cards.map((card, cardIndex) => {

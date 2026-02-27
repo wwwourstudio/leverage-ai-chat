@@ -230,7 +230,7 @@ export class SupabaseOddsService {
   async getEdgeOpportunities(sport?: string) {
     if (!this.supabase) return [];
     let query = this.supabase
-      .from('edge_opportunities')
+      .from('arbitrage_opportunities')
       .select('*')
       .gt('expires_at', new Date().toISOString())
       .order('edge', { ascending: false });
@@ -264,7 +264,7 @@ export class SupabaseOddsService {
   }) {
     if (!this.supabase) return false;
     const { error } = await this.supabase
-      .from('edge_opportunities')
+      .from('arbitrage_opportunities')
       .insert(opportunity);
 
     if (error) {

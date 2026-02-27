@@ -287,6 +287,32 @@ export const BettingCard = memo(function BettingCard({
           <p className="text-xs text-gray-500 mb-2.5 leading-relaxed">{data.description}</p>
         )}
 
+        {/* Line movement indicator */}
+        {(data.lineMove !== undefined || data.movement || data.lineChange) && (
+          <div className="mb-2.5 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)]">
+            {(() => {
+              const raw = data.lineMove ?? data.movement ?? data.lineChange ?? '';
+              const num = parseFloat(String(raw));
+              const up = !isNaN(num) ? num > 0 : String(raw).includes('+') || String(raw).toLowerCase().includes('up');
+              const down = !isNaN(num) ? num < 0 : String(raw).includes('-') || String(raw).toLowerCase().includes('down');
+              return (
+                <>
+                  {up && <TrendingUp className="w-3 h-3 text-emerald-400 shrink-0" />}
+                  {down && <TrendingDown className="w-3 h-3 text-red-400 shrink-0" />}
+                  {!up && !down && <Minus className="w-3 h-3 text-gray-600 shrink-0" />}
+                  <span className="text-[10px] font-semibold text-gray-400">Line move:</span>
+                  <span className={cn('text-[10px] font-bold tabular-nums', up ? 'text-emerald-400' : down ? 'text-red-400' : 'text-gray-500')}>
+                    {!isNaN(num) && num > 0 ? `+${num}` : String(raw) || '—'}
+                  </span>
+                  {data.openLine && (
+                    <span className="text-[9px] text-gray-600 ml-auto">Open: {data.openLine}</span>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        )}
+
         {/* Footer row: bookmaker + book count + analyze */}
         <div className="flex items-center justify-between pt-2 border-t border-[oklch(0.22_0.02_280)]">
           <div className="flex items-center gap-2">

@@ -238,6 +238,20 @@ CREATE TABLE IF NOT EXISTS ai_response_trust (
 CREATE INDEX IF NOT EXISTS idx_ai_trust_hash ON ai_response_trust(query_hash);
 CREATE INDEX IF NOT EXISTS idx_ai_trust_score ON ai_response_trust(trust_score DESC);
 
+-- AI predictions / chat history
+CREATE TABLE IF NOT EXISTS ai_predictions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  prompt TEXT NOT NULL,
+  response TEXT NOT NULL,
+  model VARCHAR(100) DEFAULT 'grok-3-fast',
+  confidence FLOAT8 CHECK (confidence >= 0 AND confidence <= 1),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_predictions_user ON ai_predictions(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_predictions_created ON ai_predictions(created_at DESC);
+
 -- ============================================================================
 -- 9. QUANTITATIVE TRADING ENGINE
 -- ============================================================================
@@ -555,6 +569,7 @@ ALTER TABLE player_props_markets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kalshi_markets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE historical_games ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_response_trust ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_predictions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE capital_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bet_allocations ENABLE ROW LEVEL SECURITY;
 
@@ -601,6 +616,7 @@ ALTER TABLE waiver_transactions  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE draft_rooms          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE draft_picks          ENABLE ROW LEVEL SECURITY;
 
+CREATE POLICY "Own predictions only"  ON ai_predictions     FOR ALL USING (auth.uid() = user_id OR user_id IS NULL);
 CREATE POLICY "Own profile only"      ON user_profiles      FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Own preferences only"  ON user_preferences   FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Own alerts only"       ON user_alerts        FOR ALL USING (auth.uid() = user_id);
@@ -697,10 +713,10 @@ DO $$
 BEGIN
   RAISE NOTICE '✓ Leverage AI database schema created successfully';
   RAISE NOTICE '✓ api schema created and set as search path';
-  RAISE NOTICE '✓ 26 tables created with indexes and constraints:';
+  RAISE NOTICE '✓ 27 tables created with indexes and constraints:';
   RAISE NOTICE '    Core: live_odds_cache, mlb/nfl/nba/nhl_odds, line_movement,';
   RAISE NOTICE '          arbitrage_opportunities, player_props_markets, kalshi_markets,';
-  RAISE NOTICE '          historical_games, ai_response_trust, capital_state, bet_allocations';
+  RAISE NOTICE '          historical_games, ai_response_trust, ai_predictions, capital_state, bet_allocations';
   RAISE NOTICE '    User: user_profiles, user_preferences, user_alerts, user_stats,';
   RAISE NOTICE '          user_insights, subscription_tiers';
   RAISE NOTICE '    Fantasy: fantasy_leagues, fantasy_teams, fantasy_rosters,';

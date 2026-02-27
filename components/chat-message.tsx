@@ -137,6 +137,16 @@ function renderInline(text: string): React.ReactNode {
   return <>{parts}</>;
 }
 
+function formatRelativeTime(date: Date): string {
+  const now = Date.now();
+  const diff = Math.floor((now - date.getTime()) / 1000);
+  if (diff < 5) return 'just now';
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
 export function ChatMessage({ message, onEdit, onCopy }: ChatMessageProps) {
   const [isEditing, setIsEditing] = React.useState(false);
   const [editContent, setEditContent] = React.useState(message.content);
@@ -222,14 +232,14 @@ export function ChatMessage({ message, onEdit, onCopy }: ChatMessageProps) {
                     <button
                       onClick={onCopy}
                       title="Copy response"
-                      className="flex items-center gap-1 opacity-60 hover:opacity-100 hover:text-blue-400 transition-all"
+                      className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 transition-all"
                     >
                       <Copy className="w-3 h-3" />
                     </button>
                     <button
                       onClick={() => setIsEditing(true)}
                       title="Edit"
-                      className="flex items-center gap-1 opacity-60 hover:opacity-100 hover:text-blue-400 transition-all"
+                      className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 transition-all"
                     >
                       <Edit3 className="w-3 h-3" />
                     </button>
@@ -237,7 +247,7 @@ export function ChatMessage({ message, onEdit, onCopy }: ChatMessageProps) {
                       <button
                         onClick={() => setShowTrust(v => !v)}
                         title="Trust metrics"
-                        className="flex items-center gap-1 opacity-60 hover:opacity-100 hover:text-blue-400 transition-all"
+                        className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 transition-all"
                       >
                         <Shield className="w-3 h-3" />
                       </button>
@@ -254,6 +264,15 @@ export function ChatMessage({ message, onEdit, onCopy }: ChatMessageProps) {
             </>
           )}
         </div>
+        {/* Timestamp */}
+        {message.timestamp && (
+          <p className={cn(
+            'text-[10px] mt-1 text-[oklch(0.38_0.008_280)]',
+            isUser ? 'text-right' : 'text-left'
+          )}>
+            {formatRelativeTime(message.timestamp)}
+          </p>
+        )}
       </div>
     </div>
   );

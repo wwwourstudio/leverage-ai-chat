@@ -172,9 +172,36 @@ GRANT ALL ON api.user_profiles TO anon, authenticated;
 GRANT ALL ON api.user_preferences TO anon, authenticated;
 `;
 
+// Migration 005 — ai_predictions table for storing chat history
+const MIGRATION_005_SQL = `
+CREATE TABLE IF NOT EXISTS api.ai_predictions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  prompt TEXT NOT NULL,
+  response TEXT NOT NULL,
+  model VARCHAR(100) DEFAULT 'grok-3-fast',
+  confidence FLOAT8 CHECK (confidence >= 0 AND confidence <= 1),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_predictions_user    ON api.ai_predictions(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_predictions_created ON api.ai_predictions(created_at DESC);
+
+ALTER TABLE api.ai_predictions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Own predictions only" ON api.ai_predictions;
+
+CREATE POLICY "Own predictions only"
+  ON api.ai_predictions FOR ALL
+  USING (auth.uid() = user_id OR user_id IS NULL);
+
+GRANT ALL ON api.ai_predictions TO anon, authenticated;
+`;
+
 const MIGRATIONS = [
   { id: '003', name: 'player_props_markets', sql: MIGRATION_003_SQL },
   { id: '004', name: 'user_profiles + user_preferences', sql: MIGRATION_004_SQL },
+  { id: '005', name: 'ai_predictions', sql: MIGRATION_005_SQL },
 ];
 
 function extractProjectRef(supabaseUrl: string): string | null {
@@ -228,7 +255,7 @@ export async function POST(request: NextRequest) {
       {
         error: 'SUPABASE_ACCESS_TOKEN not configured',
         help: 'Add your personal access token from supabase.com/dashboard → Account → Access Tokens as SUPABASE_ACCESS_TOKEN env var, then redeploy.',
-        fallback: 'Run scripts/003-player-props-table.sql and scripts/004-user-profiles-table.sql manually in the Supabase SQL Editor.',
+        fallback: 'Run scripts/master-schema.sql in the Supabase SQL Editor to create all tables at once.',
       },
       { status: 500 }
     );

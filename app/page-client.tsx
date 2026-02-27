@@ -225,6 +225,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
   const [verifyStage, setVerifyStage] = useState<'analyzing' | 'reverifying'>('analyzing');
   const [cardAnalysisMap, setCardAnalysisMap] = useState<Record<string, { loading: boolean; content: string | null; error: string | null }>>({});
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -1002,7 +1003,17 @@ No preamble. Start directly with section 1.`;
     generateCardAnalysis(card, cardKey);
   };
 
+  const stopGeneration = () => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setIsTyping(false);
+  };
+
   const generateRealResponse = async (userMessage: string) => {
+    // Cancel any in-flight request
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setIsTyping(true);
     setLastUserQuery(userMessage);
     const startTime = Date.now();
@@ -1172,6 +1183,7 @@ No preamble. Start directly with section 1.`;
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userMessage, existingCards: availableCards, context }),
+          signal: controller.signal,
         }).then((res) => res.json() as Promise<APIResponse>);
 
       setVerifyStage('analyzing');
@@ -1300,8 +1312,12 @@ No preamble. Start directly with section 1.`;
       setSuggestedPrompts(contextualSuggestions);
 
     } catch (error) {
+      // Ignore abort errors — user intentionally cancelled
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
       console.error('[v0] Error generating real response:', error);
-      
+
       // Fallback to basic response with error indication — no random cards
       setMessages((prev: Message[]) => [...prev, {
         role: 'assistant',
@@ -3458,6 +3474,44 @@ No preamble. Start directly with section 1.`;
 
           <div className="relative max-w-5xl mx-auto">
             {/* Follow up on: label — plain text, not a pill */}
+            {/* Welcome categorized quick-start grid — shown only on fresh session */}
+            {messages.length === 1 && messages[0]?.isWelcome && suggestedPrompts.length === 0 && (
+              <div className="mb-5">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-3 px-1">
+                  Get started — choose a category
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+                  {[
+                    { label: 'Betting', desc: 'Live odds & arbitrage', icon: TrendingUp, color: 'text-blue-400', bg: 'from-blue-600/10 to-blue-900/5', border: 'border-blue-500/20', sample: 'Live arbitrage alerts across sportsbooks', sampleIcon: Zap },
+                    { label: 'Fantasy', desc: 'Draft & waiver tools', icon: Trophy, color: 'text-purple-400', bg: 'from-purple-600/10 to-purple-900/5', border: 'border-purple-500/20', sample: 'NFBC draft strategy for my pick position', sampleIcon: Award },
+                    { label: 'DFS', desc: 'Optimal lineups', icon: Medal, color: 'text-amber-400', bg: 'from-amber-600/10 to-amber-900/5', border: 'border-amber-500/20', sample: 'DFS NFL optimal lineups for DraftKings', sampleIcon: BarChart3 },
+                    { label: 'Predictions', desc: 'Kalshi markets', icon: Activity, color: 'text-cyan-400', bg: 'from-cyan-600/10 to-cyan-900/5', border: 'border-cyan-500/20', sample: 'Show me trending Kalshi prediction markets right now', sampleIcon: Sparkles },
+                  ].map(({ label, desc, icon: Icon, color, bg, border, sample, sampleIcon: SampleIcon }) => (
+                    <button
+                      key={label}
+                      onClick={() => {
+                        const userMessage: Message = { role: 'user', content: sample, timestamp: new Date() };
+                        setMessages((prev: Message[]) => [...prev, userMessage]);
+                        setInput('');
+                        generateRealResponse(sample);
+                      }}
+                      className={`group/cat flex flex-col items-start gap-1.5 p-3 rounded-xl bg-gradient-to-br ${bg} border ${border} hover:border-opacity-60 transition-all hover:scale-[1.02] active:scale-[0.98] text-left`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Icon className={`w-4 h-4 ${color}`} />
+                        <span className={`text-xs font-bold ${color}`}>{label}</span>
+                      </div>
+                      <p className="text-[10px] text-[oklch(0.45_0.008_280)] leading-tight">{desc}</p>
+                      <div className="flex items-center gap-1 mt-1 opacity-0 group-hover/cat:opacity-100 transition-opacity">
+                        <SampleIcon className="w-3 h-3 text-[oklch(0.45_0.008_280)]" />
+                        <span className="text-[9px] text-[oklch(0.45_0.008_280)] line-clamp-1">{sample}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {lastUserQuery && suggestedPrompts.length > 0 && messages.length > 1 && (
               <div className="mb-3 px-1 flex items-center gap-2">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600">
@@ -3611,15 +3665,26 @@ No preamble. Start directly with section 1.`;
                   </span>
                 </div>
               </div>
-              <button
-                type="submit"
-                disabled={(!input.trim() && uploadedFiles.length === 0) || isTyping}
-                className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-800 disabled:to-gray-900 disabled:cursor-not-allowed text-white rounded-2xl px-8 py-4.5 transition-all duration-300 shadow-xl shadow-blue-500/25 hover:shadow-blue-500/50 hover:shadow-2xl disabled:shadow-none flex items-center gap-2.5 font-bold group overflow-hidden hover:scale-[1.02] active:scale-95 disabled:hover:scale-100"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-                <Send className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
-                <span className="text-sm relative z-10 tracking-wide">Analyze</span>
-              </button>
+              {isTyping ? (
+                <button
+                  type="button"
+                  onClick={stopGeneration}
+                  className="relative bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white rounded-2xl px-8 py-4.5 transition-all duration-300 shadow-xl shadow-red-900/30 flex items-center gap-2.5 font-bold group overflow-hidden hover:scale-[1.02] active:scale-95"
+                >
+                  <X className="w-5 h-5 relative z-10" />
+                  <span className="text-sm relative z-10 tracking-wide">Stop</span>
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={(!input.trim() && uploadedFiles.length === 0)}
+                  className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-800 disabled:to-gray-900 disabled:cursor-not-allowed text-white rounded-2xl px-8 py-4.5 transition-all duration-300 shadow-xl shadow-blue-500/25 hover:shadow-blue-500/50 hover:shadow-2xl disabled:shadow-none flex items-center gap-2.5 font-bold group overflow-hidden hover:scale-[1.02] active:scale-95 disabled:hover:scale-100"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+                  <Send className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
+                  <span className="text-sm relative z-10 tracking-wide">Analyze</span>
+                </button>
+              )}
             </form>
 
             <div className="flex items-center justify-between mt-4 px-1">

@@ -33,7 +33,7 @@ export function OpportunitiesFeed() {
   }, []);
 
   // Subscribe to real-time updates for edge opportunities
-  useRealtimeSubscription('edge_opportunities', (payload: any) => {
+  useRealtimeSubscription('arbitrage_opportunities', (payload: any) => {
     console.log('[OpportunitiesFeed] Edge update:', payload);
     if (payload.eventType === 'INSERT') {
       const newOpp: Opportunity = {
@@ -173,23 +173,38 @@ export function OpportunitiesFeed() {
           <div className="mt-6 flex items-center gap-3">
             <Filter className="h-4 w-4 text-muted-foreground" />
             <div className="flex flex-wrap gap-2">
-              {(['all', 'arbitrage', 'value_bet', 'sharp_move', 'player_prop'] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setFilter(type)}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                    filter === type
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-background text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {type === 'all' ? 'All' : 
-                   type === 'value_bet' ? 'Value Bets' :
-                   type === 'sharp_move' ? 'Sharp Moves' :
-                   type === 'player_prop' ? 'Player Props' :
-                   'Arbitrage'}
-                </button>
-              ))}
+              {([
+                { key: 'all', label: 'All' },
+                { key: 'arbitrage', label: 'Arbitrage' },
+                { key: 'value_bet', label: 'Value Bets' },
+                { key: 'sharp_move', label: 'Sharp Moves' },
+                { key: 'player_prop', label: 'Player Props' },
+              ] as const).map(({ key, label }) => {
+                const count = key === 'all'
+                  ? opportunities.length
+                  : opportunities.filter(o => o.type === key).length;
+                const isActive = filter === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setFilter(key)}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
+                        : 'bg-[oklch(0.16_0.015_280)] text-[oklch(0.55_0.01_280)] hover:bg-[oklch(0.20_0.018_280)] hover:text-white'
+                    }`}
+                  >
+                    {label}
+                    {count > 0 && (
+                      <span className={`inline-flex items-center justify-center rounded-full text-[10px] font-bold w-4 h-4 ${
+                        isActive ? 'bg-white/20 text-white' : 'bg-[oklch(0.22_0.02_280)] text-[oklch(0.6_0.01_280)]'
+                      }`}>
+                        {count > 99 ? '99+' : count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

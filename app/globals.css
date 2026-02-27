@@ -179,5 +179,5 @@
 }
 
 @utility animate-shimmer {
-  animation: shimmer 1.8s linear infinite;
+  animation: shimmer 1.1s linear infinite;
 }

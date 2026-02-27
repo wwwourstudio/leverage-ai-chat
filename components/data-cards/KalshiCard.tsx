@@ -146,6 +146,21 @@ export function KalshiCard({
           </div>
         )}
 
+        {/* Historical accuracy meter */}
+        {d.historicalAccuracy !== undefined && (
+          <div className="flex items-center gap-2 mt-3 px-3 py-2 rounded-xl bg-[oklch(0.09_0.01_280)] border border-[oklch(0.18_0.015_280)]">
+            <TrendingUp className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <span className="text-[10px] font-semibold text-[oklch(0.50_0.01_280)]">Model accuracy:</span>
+            <span className="text-[10px] font-black text-cyan-300 tabular-nums">{d.historicalAccuracy}%</span>
+            <div className="ml-auto flex-1 max-w-[60px] h-1.5 rounded-full bg-[oklch(0.18_0.015_280)] overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-teal-400 transition-all duration-700"
+                style={{ width: `${Math.min(100, Math.max(0, parseFloat(String(d.historicalAccuracy))))}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Recommendation */}
         {d.recommendation && (
           <div className={cn(

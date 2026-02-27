@@ -32,6 +32,7 @@ interface AnalyzeRequestBody {
     noGamesAvailable?: boolean;
     noGamesMessage?: string;
     previousMessages?: Array<{ role: string; content: string }>;
+    kalshiSubcategory?: string;
   };
 }
 
@@ -178,7 +179,7 @@ export async function POST(request: NextRequest) {
       // General query — try to return cached/fresh multi-sport cards so the
       // response always has data cards rather than falling back to empty.
       cardPromise = Promise.race([
-        generateContextualCards(category, undefined, 6),
+        generateContextualCards(category, undefined, 6, false, context.kalshiSubcategory),
         new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 5000)),
       ]).catch(() => []);
     }

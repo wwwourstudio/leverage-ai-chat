@@ -1161,7 +1161,9 @@ No preamble. Start directly with section 1.`;
         isPoliticalMarket: finalIsPoliticalMarket,
         hasBettingIntent,
         hasFantasyIntent,
-        previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }))
+        previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' })),
+        // Pass Kalshi sub-category pill value when in Kalshi mode
+        kalshiSubcategory: selectedCategory === 'kalshi' && selectedSport ? selectedSport : undefined,
       };
 
       if (isDev) {

@@ -15,6 +15,17 @@ export interface KalshiMarket {
   subtitle: string;
   yesPrice: number;
   noPrice: number;
+  // Bid/ask order book data (0-100 cents)
+  yesBid: number;
+  yesAsk: number;
+  noBid: number;
+  noAsk: number;
+  spread: number;       // yesAsk - yesBid
+  lastPrice: number;    // last traded price
+  volume24h: number;    // 24-hour rolling volume
+  eventTicker: string;  // parent event ticker
+  seriesTicker: string; // series/league ticker
+  priceChange: number;  // change vs previous_yes_bid
   volume: number;
   openInterest: number;
   closeTime: string;
@@ -93,13 +104,29 @@ function buildHeaders(): Record<string, string> {
 
 /** Parse a raw Kalshi market response object into a typed KalshiMarket */
 function parseMarket(m: any): KalshiMarket {
+  const yesBid = m.yes_bid ?? 0;
+  const yesAsk = m.yes_ask ?? yesBid;
+  const noBid  = m.no_bid  ?? 0;
+  const noAsk  = m.no_ask  ?? noBid;
+  const lastPrice = m.last_price ?? 0;
+  const prevBid = m.previous_yes_bid ?? yesBid;
   return {
     ticker: m.ticker || '',
     title: m.title || m.event_title || m.yes_sub_title || m.subtitle || '',
     category: m.category || m.series_ticker || m.event_ticker || '',
     subtitle: m.subtitle || m.yes_sub_title || '',
-    yesPrice: m.yes_bid ?? m.yes_ask ?? m.last_price ?? m.floor_strike ?? 0,
-    noPrice: m.no_bid ?? m.no_ask ?? (m.last_price ? (100 - m.last_price) : 100),
+    yesPrice: yesBid || yesAsk || lastPrice || m.floor_strike || 0,
+    noPrice: noBid || noAsk || (lastPrice ? (100 - lastPrice) : 100),
+    yesBid,
+    yesAsk,
+    noBid,
+    noAsk,
+    spread: Math.max(0, yesAsk - yesBid),
+    lastPrice,
+    volume24h: m.volume_24h ?? 0,
+    eventTicker: m.event_ticker || '',
+    seriesTicker: m.series_ticker || '',
+    priceChange: yesBid - prevBid,
     volume: m.volume ?? m.volume_24h ?? 0,
     openInterest: m.open_interest ?? 0,
     closeTime: m.close_time || m.expiration_time || m.end_date || '',
@@ -591,22 +618,116 @@ export async function getMarketByTicker(ticker: string): Promise<KalshiMarket | 
     const data = await response.json();
     const m = data.market;
 
-    return {
-      ticker: m.ticker,
-      title: m.title,
-      category: m.category,
-      subtitle: m.subtitle || '',
-      yesPrice: m.yes_bid || 0,
-      noPrice: m.no_bid || 0,
-      volume: m.volume || 0,
-      openInterest: m.open_interest || 0,
-      closeTime: m.close_time,
-      status: m.status,
-    };
+    return parseMarket(m);
   } catch (error) {
     console.error(`[KALSHI] Failed to fetch market ${ticker}:`, error);
     return null;
   }
+}
+
+/**
+ * Fetch the level-2 order book for a specific market.
+ * Returns yes/no bids and asks at each price level.
+ */
+export async function fetchMarketOrderbook(ticker: string): Promise<{
+  yesBids: Array<{ price: number; quantity: number }>;
+  yesAsks: Array<{ price: number; quantity: number }>;
+  noBids: Array<{ price: number; quantity: number }>;
+  noAsks: Array<{ price: number; quantity: number }>;
+} | null> {
+  try {
+    const response = await fetch(`${KALSHI_TRADING_URL}/markets/${ticker}/orderbook`, {
+      headers: buildHeaders(),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const ob = data.orderbook || {};
+    const toLevel = (arr: any[] = []) => arr.map((l: any) => ({ price: l[0] ?? 0, quantity: l[1] ?? 0 }));
+    return {
+      yesBids: toLevel(ob.yes),
+      yesAsks: toLevel(ob.yes_ask || []),
+      noBids: toLevel(ob.no),
+      noAsks: toLevel(ob.no_ask || []),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch recent trades / candlestick-style price history for a market.
+ * Returns an array of { ts, price, count } entries.
+ */
+export async function fetchMarketTrades(
+  ticker: string,
+  limit: number = 100,
+): Promise<Array<{ ts: string; price: number; count: number }>> {
+  try {
+    const params = new URLSearchParams({ limit: String(limit) });
+    const response = await fetch(`${KALSHI_TRADING_URL}/markets/${ticker}/trades?${params}`, {
+      headers: buildHeaders(),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    const trades: any[] = data.trades || [];
+    return trades.map((t: any) => ({
+      ts: t.created_time || t.ts || '',
+      price: t.yes_price ?? t.price ?? 0,
+      count: t.count ?? 1,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fetch Kalshi events (grouped market containers).
+ * Events wrap multiple binary markets (e.g. "2026 Midterms" → many district markets).
+ */
+export async function fetchKalshiEvents(params?: {
+  status?: string;
+  limit?: number;
+  search?: string;
+  series_ticker?: string;
+}): Promise<Array<{ eventTicker: string; title: string; category: string; markets: number }>> {
+  try {
+    const qp = new URLSearchParams({ limit: String(params?.limit ?? 100) });
+    if (params?.status) qp.set('status', params.status);
+    if (params?.search) qp.set('title', params.search);
+    if (params?.series_ticker) qp.set('series_ticker', params.series_ticker);
+
+    const response = await fetch(`${KALSHI_TRADING_URL}/events?${qp}`, {
+      headers: buildHeaders(),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    const events: any[] = data.events || [];
+    return events.map((e: any) => ({
+      eventTicker: e.event_ticker || e.ticker || '',
+      title: e.title || e.event_title || '',
+      category: e.category || e.series_ticker || '',
+      markets: e.markets?.length ?? e.num_markets ?? 0,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Return the top N Kalshi markets by volume (across all open markets).
+ * Fetches a broader set and sorts client-side.
+ */
+export async function fetchTopMarketsByVolume(
+  n: number = 10,
+  status: 'open' | 'closed' = 'open',
+): Promise<KalshiMarket[]> {
+  const markets = await fetchKalshiMarketsWithRetry({ status, limit: Math.max(n * 5, 200), maxRetries: 2 });
+  return markets
+    .sort((a, b) => (b.volume24h || b.volume) - (a.volume24h || a.volume))
+    .slice(0, n);
 }
 
 /**
@@ -710,6 +831,23 @@ export function kalshiMarketToCard(market: KalshiMarket): any {
     : market.volume >= 10_000 ? 'Moderate'
     : 'Thin';
 
+  // Expiry urgency for color coding
+  const expiryUrgency = (() => {
+    if (!market.closeTime) return 'none';
+    const days = (new Date(market.closeTime).getTime() - Date.now()) / 86400000;
+    return days < 1 ? 'critical' : days < 3 ? 'urgent' : days < 7 ? 'soon' : 'normal';
+  })();
+
+  // Spread label
+  const spreadLabel =
+    market.spread <= 1 ? 'Tight' :
+    market.spread <= 4 ? 'Normal' : 'Wide';
+
+  // Price change direction
+  const priceDirection =
+    market.priceChange > 0 ? 'up' :
+    market.priceChange < 0 ? 'down' : 'flat';
+
   return {
     type: 'kalshi-market',
     title: market.title,
@@ -725,6 +863,17 @@ export function kalshiMarketToCard(market: KalshiMarket): any {
       yesPct,
       noPct,
       edgeScore,
+      // Order book (bid/ask) raw values in cents 0-100
+      yesBid: market.yesBid,
+      yesAsk: market.yesAsk,
+      noBid: market.noBid,
+      noAsk: market.noAsk,
+      spread: market.spread,
+      spreadLabel,
+      // Price movement
+      lastPrice: market.lastPrice,
+      priceChange: market.priceChange,
+      priceDirection,
       // Formatted display strings
       yesPrice: `${yesPct}¢`,
       noPrice: `${noPct}¢`,
@@ -734,6 +883,11 @@ export function kalshiMarketToCard(market: KalshiMarket): any {
         : market.volume >= 1_000
         ? `$${(market.volume / 1_000).toFixed(0)}K`
         : `$${market.volume}`,
+      volume24h: market.volume24h >= 1_000_000
+        ? `$${(market.volume24h / 1_000_000).toFixed(1)}M`
+        : market.volume24h >= 1_000
+        ? `$${(market.volume24h / 1_000).toFixed(0)}K`
+        : market.volume24h > 0 ? `$${market.volume24h}` : '',
       openInterest: market.openInterest >= 1_000_000
         ? `$${(market.openInterest / 1_000_000).toFixed(1)}M`
         : market.openInterest >= 1_000
@@ -743,8 +897,12 @@ export function kalshiMarketToCard(market: KalshiMarket): any {
         ? new Date(market.closeTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
         : 'TBD',
       expiresLabel,
+      expiryUrgency,
       volumeTier,
       recommendation: signal,
+      // Event/series metadata
+      eventTicker: market.eventTicker,
+      seriesTicker: market.seriesTicker,
     },
     status: market.status === 'open' ? 'active' : 'closed',
     realData: true,

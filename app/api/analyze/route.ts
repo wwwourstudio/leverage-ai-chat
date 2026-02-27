@@ -41,7 +41,9 @@ interface AnalyzeRequestBody {
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  const TIMEOUT_MS = 25000; // 25 seconds (Vercel hobby limit is 30s)
+  // Keep well under Vercel's 30s limit.
+  // grok-4 gets 15s; on failure, grok-3-fast fallback gets 10s = 25s total, leaving 5s headroom.
+  const TIMEOUT_MS = 15000;
 
   try {
     // Add timeout wrapper
@@ -273,7 +275,7 @@ export async function POST(request: NextRequest) {
         console.warn(`[API/analyze] ${primaryModel} failed, retrying with ${fallbackModel}:`, aiError instanceof Error ? aiError.message : aiError);
         try {
           const fallbackTimeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('Fallback timeout')), 8000); // 8s for fallback
+            setTimeout(() => reject(new Error('Fallback timeout')), 10000); // 10s for fallback
           });
 
           const fallbackResult = await Promise.race([

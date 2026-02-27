@@ -91,7 +91,41 @@ AND column_name = 'consensus_score';
 
 -- Show all columns in live_odds_cache for verification
 SELECT column_name, data_type, is_nullable
-FROM information_schema.columns 
-WHERE table_schema = 'public' 
+FROM information_schema.columns
+WHERE table_schema = 'public'
 AND table_name = 'live_odds_cache'
 ORDER BY ordinal_position;
+
+-- ==========================================
+-- Fix user_preferences table
+-- ==========================================
+-- Add custom_instructions column if it doesn't exist
+-- (Required by /api/user/instructions route)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'api'
+        AND table_name = 'user_preferences'
+        AND column_name = 'custom_instructions'
+    ) THEN
+        ALTER TABLE api.user_preferences
+        ADD COLUMN custom_instructions TEXT DEFAULT '';
+
+        RAISE NOTICE 'Added custom_instructions column to api.user_preferences';
+    ELSE
+        RAISE NOTICE 'custom_instructions column already exists in api.user_preferences';
+    END IF;
+
+    -- Also ensure updated_at column exists
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'api'
+        AND table_name = 'user_preferences'
+        AND column_name = 'updated_at'
+    ) THEN
+        ALTER TABLE api.user_preferences
+        ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW();
+        RAISE NOTICE 'Added updated_at column to api.user_preferences';
+    END IF;
+END $$;

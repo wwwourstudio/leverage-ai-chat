@@ -19,6 +19,7 @@ import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-dete
 interface AnalyzeRequestBody {
   userMessage: string;
   existingCards?: InsightCard[];
+  customInstructions?: string;
   context?: {
     sport?: string | null;
     marketType?: string | null;
@@ -49,7 +50,12 @@ export async function POST(request: NextRequest) {
     });
 
     const body: AnalyzeRequestBody = await request.json();
-    const { userMessage, existingCards = [], context = {} } = body;
+    const { userMessage, existingCards = [], context = {}, customInstructions } = body;
+
+    // Build dynamic system prompt — inject user instructions at highest priority level
+    const systemPrompt = customInstructions?.trim()
+      ? `${SYSTEM_PROMPT}\n\n## USER PROFILE & BETTING PREFERENCES\n${customInstructions.trim()}`
+      : SYSTEM_PROMPT;
 
     if (!userMessage || typeof userMessage !== 'string') {
       return NextResponse.json(
@@ -175,7 +181,7 @@ export async function POST(request: NextRequest) {
         const result = await Promise.race([
           generateText({
             model: createXai({ apiKey: xaiApiKey })(AI_CONFIG.MODEL_NAME),
-            system: SYSTEM_PROMPT,
+            system: systemPrompt,
             prompt: enrichedPrompt,
             temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
             maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
@@ -212,7 +218,7 @@ export async function POST(request: NextRequest) {
             const retryResult = await Promise.race([
               generateText({
                 model: createXai({ apiKey: xaiApiKey })(AI_CONFIG.MODEL_NAME),
-                system: SYSTEM_PROMPT,
+                system: systemPrompt,
                 prompt: retryPrompt,
                 // Lower temperature on retries to reduce hallucination likelihood
                 temperature: Math.max(0.1, (AI_CONFIG.DEFAULT_TEMPERATURE ?? 0.7) - retryAttempt * 0.2),
@@ -247,7 +253,7 @@ export async function POST(request: NextRequest) {
           const fallbackResult = await Promise.race([
             generateText({
               model: createXai({ apiKey: xaiApiKey })(fallbackModel),
-              system: SYSTEM_PROMPT,
+              system: systemPrompt,
               prompt: enrichedPrompt,
               temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
               maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,

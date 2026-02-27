@@ -333,6 +333,25 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     }
   };
 
+  // Load custom AI instructions — from API if logged in, localStorage otherwise
+  const loadInstructionsFromApi = async () => {
+    try {
+      const res = await fetch('/api/user/instructions');
+      const data = await res.json();
+      if (typeof data.instructions === 'string') {
+        setCustomInstructions(data.instructions);
+        // Keep localStorage in sync as offline fallback
+        localStorage.setItem('leverage_custom_instructions', data.instructions);
+        return;
+      }
+    } catch {
+      // ignore
+    }
+    // Fallback to localStorage
+    const stored = localStorage.getItem('leverage_custom_instructions') || '';
+    setCustomInstructions(stored);
+  };
+
   // Load credits from Supabase on login
   const loadCreditsFromSupabase = async (authId: string) => {
     try {
@@ -427,8 +446,13 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
             email: session.user.email || ''
           });
-          // Load credits from Supabase
+          // Load credits and instructions from Supabase
           loadCreditsFromSupabase(session.user.id);
+          loadInstructionsFromApi();
+        } else {
+          // Not logged in — load instructions from localStorage
+          const stored = localStorage.getItem('leverage_custom_instructions') || '';
+          setCustomInstructions(stored);
         }
 
         // Listen for auth changes (OAuth redirect, signout, etc.)
@@ -441,12 +465,16 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             });
             setShowLoginModal(false);
             setShowSignupModal(false);
-            // Load credits from Supabase on auth change
+            // Load credits and instructions from Supabase on auth change
             loadCreditsFromSupabase(session.user.id);
+            loadInstructionsFromApi();
           } else {
             setIsLoggedIn(false);
             setUser(null);
             setSupabaseProfileId(null);
+            // Revert to localStorage instructions on logout
+            const stored = localStorage.getItem('leverage_custom_instructions') || '';
+            setCustomInstructions(stored);
           }
         });
 
@@ -1205,7 +1233,7 @@ No preamble. Start directly with section 1.`;
         fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userMessage, existingCards: availableCards, context }),
+          body: JSON.stringify({ userMessage, existingCards: availableCards, context, customInstructions: customInstructions || undefined }),
           signal: controller.signal,
         }).then((res) => res.json() as Promise<APIResponse>);
 
@@ -1749,11 +1777,6 @@ No preamble. Start directly with section 1.`;
         // Image-only with no text — give it a default prompt
         promptForAI = `I've attached ${currentFiles.map(f => f.name).join(', ')}. Please analyze.`;
       }
-    }
-
-    // Prepend custom AI instructions if the user has set them
-    if (customInstructions) {
-      promptForAI = `[User instructions: ${customInstructions}]\n\n${promptForAI}`;
     }
 
     setInput('');

@@ -332,6 +332,9 @@ CREATE TABLE IF NOT EXISTS user_preferences (
 
 CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id ON user_preferences(user_id);
 
+-- Add custom_instructions column if it doesn't exist (safe to re-run)
+ALTER TABLE api.user_preferences ADD COLUMN IF NOT EXISTS custom_instructions TEXT NOT NULL DEFAULT '';
+
 CREATE TABLE IF NOT EXISTS user_alerts (
   id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id           UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,

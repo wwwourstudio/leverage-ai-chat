@@ -262,7 +262,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [lastUserQuery, setLastUserQuery] = useState<string>('');
   const [selectedSport, setSelectedSport] = useState<string>('');
 
-  // Fantasy league setup state
+  // Fantasy league setup state — must NOT read localStorage here (causes SSR hydration mismatch #418)
   interface FantasyLeague {
     type: 'season-long' | 'best-ball' | 'dfs-contest' | 'survivor';
     teams: number;
@@ -271,10 +271,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     sport: string;
     setupComplete: boolean;
   }
-  const [fantasyLeague, setFantasyLeague] = useState<FantasyLeague | null>(() => {
-    try { return JSON.parse(localStorage.getItem('leverage_fantasy_league') || 'null'); }
-    catch { return null; }
-  });
+  const [fantasyLeague, setFantasyLeague] = useState<FantasyLeague | null>(null);
   const [fantasySetupStep, setFantasySetupStep] = useState(0);
   const [fantasySetupData, setFantasySetupData] = useState<Partial<FantasyLeague>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -594,6 +591,14 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // Real data sources: The Odds API, Grok 4 Fast AI, Open-Meteo Weather API, Supabase
   const unifiedCards: InsightCard[] = [];
 
+  // Load fantasy league from localStorage after hydration (avoids SSR mismatch #418)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('leverage_fantasy_league');
+      if (saved) setFantasyLeague(JSON.parse(saved));
+    } catch { /* ignore parse errors */ }
+  }, []);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -638,30 +643,35 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     const msgLower = userMessage.toLowerCase();
     const suggestions: Array<{ label: string; icon: any; category: string }> = [];
 
-    console.log('[v0] Suggestions: generating for', responseCards.length, 'cards');
+    // Extract named entities from response cards for hyper-specific follow-ups
+    const matchups = responseCards
+      .map(c => c.data?.matchup as string | undefined)
+      .filter(Boolean) as string[];
+    const firstMatchup = matchups[0]; // e.g. "Los Angeles Lakers @ Golden State Warriors"
+    const teams = firstMatchup
+      ? firstMatchup.split(' @ ').map(t => t.split(' ').slice(-1)[0]) // last word = team name
+      : [];
+    const firstAway = teams[0] ?? '';
+    const firstHome = teams[1] ?? '';
+    const playerName = responseCards.find(c => c.data?.player)?.data?.player as string | undefined;
+    const sport = responseCards[0]?.category ?? '';
 
-    // Analyze the AI's response cards to understand what was provided
+    // Analyze card types in the response
     const cardTypes = responseCards.map(card => card.type);
-    const categories = [...new Set(responseCards.map(card => card.category))];
-    const hasLiveOdds = cardTypes.includes('live-odds');
-    const hasDFSLineup = cardTypes.includes('dfs-lineup') || cardTypes.includes('dfs-value');
-    const hasFantasy = cardTypes.includes('adp-analysis') || cardTypes.includes('bestball-stack') || cardTypes.includes('auction-value');
-    const hasKalshi = cardTypes.includes('kalshi-market') || cardTypes.includes('kalshi-weather');
-    const hasCrossPlatform = cardTypes.includes('cross-platform');
-    const hasPlayerProps = cardTypes.includes('player-prop');
+    const hasLiveOdds = cardTypes.some(t => t.includes('odds') || t.includes('live'));
+    const hasDFSLineup = cardTypes.some(t => t.includes('dfs'));
+    const hasFantasy = cardTypes.some(t => t.includes('fantasy') || t.includes('draft') || t.includes('waiver'));
+    const hasKalshi = cardTypes.some(t => t.includes('kalshi') || t.includes('prediction'));
+    const hasPlayerProps = cardTypes.some(t => t.includes('prop'));
 
-    // Analyze user message context for deeper understanding
-    const isBetting = msgLower.includes('bet') || msgLower.includes('odds') || msgLower.includes('line');
-    const isLineMovement = msgLower.includes('line moved') || msgLower.includes('line move') || msgLower.includes('line movement') || msgLower.includes('movement') || msgLower.includes('moved');
-    const isFantasy = msgLower.includes('draft') || msgLower.includes('fantasy') || msgLower.includes('adp');
-    const isDFS = msgLower.includes('dfs') || msgLower.includes('lineup') || msgLower.includes('draftkings') || msgLower.includes('fanduel');
-    const isKalshi = msgLower.includes('kalshi') || msgLower.includes('market') || msgLower.includes('prediction');
-    const isNBA = msgLower.includes('nba') || msgLower.includes('lakers') || msgLower.includes('warriors') || msgLower.includes('basketball');
-    const isNFL = msgLower.includes('nfl') || msgLower.includes('chiefs') || msgLower.includes('football');
-    const isMLB = msgLower.includes('mlb') || msgLower.includes('baseball');
-    const isPlayerProp = msgLower.includes('prop') || msgLower.includes('points') || msgLower.includes('assists') || msgLower.includes('rebounds');
+    // Analyze user message for topic
+    const isLineMovement = msgLower.includes('line move') || msgLower.includes('movement') || msgLower.includes('steam');
+    const isFantasyQ = msgLower.includes('draft') || msgLower.includes('fantasy') || msgLower.includes('adp') || selectedCategory === 'fantasy';
+    const isDFS = msgLower.includes('dfs') || msgLower.includes('lineup') || selectedCategory === 'dfs';
+    const isKalshi = msgLower.includes('kalshi') || msgLower.includes('prediction') || selectedCategory === 'kalshi';
     const isArbitrage = msgLower.includes('arbitrage') || msgLower.includes('arb');
     const isParlay = msgLower.includes('parlay') || msgLower.includes('same-game') || msgLower.includes('sgp');
+    const isPlayerProp = msgLower.includes('prop') || !!playerName;
 
     // PRIORITY 0: Highly specific follow-ups for line movement questions
     if (isLineMovement) {
@@ -702,93 +712,94 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       );
     }
 
-    // PRIORITY 1: Generate suggestions based on what the AI just showed (response cards)
+    // PRIORITY 1: Hyper-specific prompts using actual teams/players from cards
     if (hasLiveOdds && !isLineMovement) {
+      const gameCtx = firstMatchup ? `for ${firstAway} vs ${firstHome}` : 'on these games';
       suggestions.push(
-        { label: 'How has this line moved in the last hour?', icon: TrendingUp, category: 'betting' },
-        { label: 'Show me correlated player props for this game', icon: Target, category: 'betting' },
-        { label: 'Compare this with sharp money direction', icon: Activity, category: 'betting' }
+        { label: `Show player props ${gameCtx}`, icon: Target, category: 'betting' },
+        { label: `How has the line moved ${gameCtx}?`, icon: TrendingUp, category: 'betting' },
+        { label: `Sharp vs public money split ${gameCtx}`, icon: Activity, category: 'betting' },
       );
     }
-    
+
     if (hasDFSLineup) {
       suggestions.push(
         { label: 'What is the leverage score for this lineup?', icon: Award, category: 'dfs' },
-        { label: 'Build a low-ownership contrarian version', icon: Users, category: 'dfs' },
+        { label: 'Build a contrarian GPP lineup', icon: Users, category: 'dfs' },
         { label: 'Show me the betting lines supporting these picks', icon: TrendingUp, category: 'all' }
       );
     }
-    
+
     if (hasPlayerProps) {
+      const propName = playerName ? `${playerName}'s prop` : 'this player prop';
       suggestions.push(
-        { label: 'Stack this prop with correlated DFS plays', icon: Layers, category: 'all' },
-        { label: 'What is the historical hit rate for this player?', icon: BarChart, category: 'betting' },
-        { label: 'Find similar props across other games', icon: Search, category: 'betting' }
+        { label: `Historical hit rate for ${propName}`, icon: BarChart, category: 'betting' },
+        { label: `Stack ${propName} into a same-game parlay`, icon: Layers, category: 'betting' },
+        { label: 'Find correlated props in the same game', icon: Target, category: 'betting' }
       );
     }
-    
+
     if (hasFantasy) {
       suggestions.push(
-        { label: 'Show me waiver wire adds in this range', icon: Star, category: 'fantasy' },
-        { label: 'What are the trade targets with similar value?', icon: RefreshCw, category: 'fantasy' },
-        { label: 'Compare this to betting market expectations', icon: Layers, category: 'all' }
+        { label: 'Show me waiver wire targets this week', icon: Star, category: 'fantasy' },
+        { label: 'Best trade targets with similar ADP?', icon: RefreshCw, category: 'fantasy' },
+        { label: 'VBD rankings for this position', icon: Trophy, category: 'fantasy' }
       );
     }
-    
+
     if (hasKalshi) {
+      const topTitle = responseCards.find(c => c.type?.includes('kalshi'))?.title;
       suggestions.push(
-        { label: 'How does this correlate with betting markets?', icon: Sparkles, category: 'all' },
-        { label: 'Show me arbitrage between Kalshi and sportsbooks', icon: DollarSign, category: 'kalshi' },
-        { label: 'What other Kalshi markets are related?', icon: BarChart3, category: 'kalshi' }
+        { label: topTitle ? `Deeper analysis on: ${topTitle.slice(0, 45)}` : 'Which Kalshi markets have the best edge?', icon: Sparkles, category: 'kalshi' },
+        { label: 'Cross-market arbitrage: Kalshi vs sportsbooks', icon: DollarSign, category: 'kalshi' },
+        { label: 'Show me weather markets affecting game totals', icon: Activity, category: 'kalshi' }
       );
     }
-    
-    if (hasCrossPlatform) {
+
+    // PRIORITY 2: Sport-specific follow-ups based on card categories
+    const cardCategories = [...new Set(responseCards.map(c => c.category?.toUpperCase()))];
+    if (cardCategories.includes('NBA')) {
       suggestions.push(
-        { label: 'Find more cross-platform correlation plays', icon: Sparkles, category: 'all' },
-        { label: 'Optimize my bankroll across these opportunities', icon: PieChart, category: 'all' }
+        { label: firstMatchup ? `Rest advantage analysis: ${firstAway} vs ${firstHome}` : 'NBA rest-advantage games tonight', icon: AlertCircle, category: 'betting' },
+        { label: 'NBA pace-up games for totals', icon: Zap, category: 'dfs' }
       );
     }
-    
-    // PRIORITY 2: Sport-specific deep dives based on response
-    if (categories.includes('NBA')) {
+    if (cardCategories.includes('NFL') || cardCategories.includes('NFC') || cardCategories.includes('NFC')) {
       suggestions.push(
-        { label: 'Deep dive NBA rest advantage tonight', icon: AlertCircle, category: 'betting' },
-        { label: 'Show me NBA pace-up game environments', icon: Zap, category: 'dfs' }
+        { label: 'Weather impact on these NFL games', icon: Activity, category: 'betting' },
+        { label: 'Correlated TD scorer + game total parlays', icon: Medal, category: 'betting' }
       );
     }
-    
-    if (categories.includes('NFL')) {
+    if (cardCategories.includes('NHL')) {
       suggestions.push(
-        { label: 'Analyze weather impact on these games', icon: Activity, category: 'betting' },
-        { label: 'Show me correlated TD scorer + game total bets', icon: Medal, category: 'betting' }
+        { label: firstMatchup ? `Goalie matchup analysis: ${firstAway} vs ${firstHome}` : 'NHL goalie matchup edges tonight', icon: Target, category: 'betting' },
       );
     }
-    
-    // PRIORITY 3: Generate contextual follow-ups based on user message context
-    if (isBetting && suggestions.length < 5) {
+    if (cardCategories.includes('MLB')) {
       suggestions.push(
-        { label: 'What are the best player props for tonight?', icon: Target, category: 'betting' },
-        { label: 'Show me live arbitrage opportunities', icon: Zap, category: 'betting' },
-        { label: 'Sharp money movement on these games?', icon: Activity, category: 'betting' }
+        { label: 'Starting pitcher edges for today', icon: Target, category: 'betting' },
+        { label: 'Wind and weather impact on totals', icon: Activity, category: 'betting' }
       );
-    } else if (isDFS && suggestions.length < 5) {
+    }
+
+    // PRIORITY 3: Category fallbacks if still not enough
+    if (isDFS && suggestions.length < 5) {
       suggestions.push(
         { label: 'Build a low-ownership tournament stack', icon: Users, category: 'dfs' },
-        { label: 'Find value plays under $5K', icon: DollarSign, category: 'dfs' },
+        { label: 'Find value plays under $5K salary', icon: DollarSign, category: 'dfs' },
         { label: 'Showdown slate captain picks with leverage', icon: Medal, category: 'dfs' }
       );
-    } else if (isFantasy && suggestions.length < 5) {
+    } else if (isFantasyQ && suggestions.length < 5) {
       suggestions.push(
         { label: 'Show me ADP risers this week', icon: TrendingUp, category: 'fantasy' },
-        { label: 'Best ball stacking strategy?', icon: Medal, category: 'fantasy' },
-        { label: 'Auction value targets for this week', icon: ShoppingCart, category: 'fantasy' }
+        { label: 'Best ball stacking strategy', icon: Medal, category: 'fantasy' },
+        { label: 'Auction value targets this week', icon: ShoppingCart, category: 'fantasy' }
       );
     } else if (isKalshi && suggestions.length < 5) {
       suggestions.push(
-        { label: 'Weather markets affecting game totals', icon: Activity, category: 'kalshi' },
-        { label: 'Cross-market arbitrage opportunities', icon: Sparkles, category: 'all' },
-        { label: 'Political markets with sharp edge', icon: TrendingUp, category: 'kalshi' }
+        { label: 'Show trending Kalshi markets', icon: TrendingUp, category: 'kalshi' },
+        { label: 'Political markets with market inefficiency', icon: Activity, category: 'kalshi' },
+        { label: 'Weather + climate prediction markets', icon: Sparkles, category: 'kalshi' }
       );
     }
     
@@ -1111,7 +1122,7 @@ No preamble. Start directly with section 1.`;
       // Don't apply the fallback for Kalshi — that platform never fetches sports odds.
       const effectiveSport = detectedSport || (selectedCategory !== 'kalshi' ? selectedSportNormalized : null);
 
-      // Betting intent keywords
+      // Betting intent keywords — also activates on Betting tab
       const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'arbitrage', 'arb', 'h2h', 'value', 'sportsbook', 'draftkings', 'fanduel', 'moneyline', 'prop', 'parlay'];
       const hasBettingIntent = bettingKeywords.some(k => lowerMsg.includes(k)) || selectedCategory === 'betting';
 
@@ -1119,9 +1130,9 @@ No preamble. Start directly with section 1.`;
       const sportsKeywords = ['nba', 'nfl', 'nhl', 'mlb', 'basketball', 'football', 'hockey', 'baseball', 'ncaa'];
       const isSportsQuery = (sportsKeywords.some(k => lowerMsg.includes(k)) || !!effectiveSport) && !isPoliticalMarket && selectedCategory !== 'kalshi';
 
-      // Fantasy intent detection
+      // Fantasy intent — also activates on Fantasy tab and DFS tab
       const fantasyKeywords = ['fantasy', 'draft', 'waiver', 'faab', 'adp', 'vbd', 'tier cliff', 'bestball', 'best ball', 'start sit', 'trade value', 'who should i pick', 'who do i start', 'sleeper', 'rankings', 'projections', 'auction value'];
-      const hasFantasyIntent = fantasyKeywords.some(k => lowerMsg.includes(k)) && !isPoliticalMarket;
+      const hasFantasyIntent = (fantasyKeywords.some(k => lowerMsg.includes(k)) || selectedCategory === 'fantasy' || selectedCategory === 'dfs') && !isPoliticalMarket;
 
       const detectedPlatform = extractPlatform(userMessage);
 

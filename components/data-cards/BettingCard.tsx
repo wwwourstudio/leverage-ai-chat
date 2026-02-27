@@ -70,19 +70,25 @@ interface BettingCardProps {
   isHero?: boolean;
 }
 
-/** Parse "Away @ Home" */
+/** Parse "Away @ Home" or "Away vs Home" */
 function parseTeams(matchup?: string): { away: string; home: string } | null {
   if (!matchup) return null;
-  const parts = matchup.split(/\s*[@vs.]+\s*/i);
-  if (parts.length < 2) return null;
-  return { away: parts[0].trim(), home: parts[1].trim() };
+  // Only split on " @ " or " vs " — NOT on individual letters s/v/.
+  const atIdx = matchup.indexOf(' @ ');
+  if (atIdx >= 0) return { away: matchup.slice(0, atIdx).trim(), home: matchup.slice(atIdx + 3).trim() };
+  const vsIdx = matchup.search(/\s+vs\.?\s+/i);
+  if (vsIdx >= 0) {
+    const vsMatch = matchup.match(/^(.+?)\s+vs\.?\s+(.+)$/i);
+    if (vsMatch) return { away: vsMatch[1].trim(), home: vsMatch[2].trim() };
+  }
+  return null;
 }
 
-/** Team abbreviation (up to 3 chars) */
+/** Team abbreviation — use last word for "City Name" patterns, first 3 chars */
 function abbr(name: string): string {
   const words = name.trim().split(/\s+/);
   if (words.length === 1) return name.slice(0, 3).toUpperCase();
-  // Use last word for common "City TeamName" patterns
+  // Standard abbreviation: last word up to 3 chars (Lakers→LAK, Warriors→WAR, Cubs→CUB)
   return words[words.length - 1].slice(0, 3).toUpperCase();
 }
 

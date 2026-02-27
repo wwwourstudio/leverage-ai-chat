@@ -352,7 +352,8 @@ export async function generateContextualCards(
   category?: string,
   sport?: string,
   count: number = 3,
-  multiSport: boolean = !sport // DEFAULT TO TRUE WHEN NO SPORT SPECIFIED
+  // Multi-sport mode only makes sense for betting/all — never for kalshi/fantasy/dfs/props etc.
+  multiSport: boolean = !sport && (!category || category === 'betting' || category === 'all')
 ): Promise<InsightCard[]> {
   // Check in-memory cache first to avoid redundant API calls
   // (SSR page load populates this, /api/analyze reuses it)

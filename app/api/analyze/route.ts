@@ -52,10 +52,33 @@ export async function POST(request: NextRequest) {
     const body: AnalyzeRequestBody = await request.json();
     const { userMessage, existingCards = [], context = {}, customInstructions } = body;
 
+    // Inject live date into system prompt
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const baseSystemPrompt = SYSTEM_PROMPT.replace('[CURRENT_DATE]', dateStr);
+
     // Build dynamic system prompt — inject user instructions at highest priority level
     const systemPrompt = customInstructions?.trim()
-      ? `${SYSTEM_PROMPT}\n\n## USER PROFILE & BETTING PREFERENCES\n${customInstructions.trim()}`
-      : SYSTEM_PROMPT;
+      ? `${baseSystemPrompt}\n\n## USER PROFILE & BETTING PREFERENCES\n${customInstructions.trim()}`
+      : baseSystemPrompt;
+
+    // Detect ambiguous queries with no sport/intent context — ask a clarifying question
+    const isAmbiguous = !context?.sport
+      && !context?.isSportsQuery
+      && !context?.hasFantasyIntent
+      && !context?.isPoliticalMarket
+      && !context?.hasBettingIntent
+      && !customInstructions?.trim();
+
+    const clarificationOptions = isAmbiguous ? [
+      'NBA betting odds tonight',
+      'NFL betting analysis',
+      'MLB betting picks',
+      'NHL betting lines',
+      'Kalshi prediction markets',
+      'DFS lineups today',
+      'Fantasy advice',
+    ] : [];
 
     if (!userMessage || typeof userMessage !== 'string') {
       return NextResponse.json(
@@ -134,7 +157,10 @@ export async function POST(request: NextRequest) {
       && !context.isSportsQuery
       && !context.hasBettingIntent;
     let cardPromise: Promise<InsightCard[]>;
-    if (hasExistingCards) {
+    if (isAmbiguous) {
+      // Ambiguous query — don't show random cards, wait for clarification
+      cardPromise = Promise.resolve([]);
+    } else if (hasExistingCards) {
       cardPromise = Promise.resolve(existingCards as InsightCard[]);
     } else if (!context.isPoliticalMarket && context.hasFantasyIntent && !context.hasBettingIntent) {
       cardPromise = import('@/lib/fantasy/cards/fantasy-card-generator')
@@ -144,7 +170,7 @@ export async function POST(request: NextRequest) {
       const sportKey = context.sport || undefined;
       cardPromise = Promise.race([
         generateContextualCards('betting', sportKey, 6),
-        new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 6000)), // Reduced from 8s to 6s
+        new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 6000)),
       ]);
     } else {
       // General query — try to return cached/fresh multi-sport cards so the
@@ -279,8 +305,35 @@ export async function POST(request: NextRequest) {
 
     // Cards were launched in parallel with AI above — just await the in-flight promise.
     // If AI fell back to the static response, skip cards to avoid a mismatch.
-    const cards: InsightCard[] = usedFallback ? [] : await cardPromise.catch(() => []);
-    console.log(`[API/analyze] Returning ${cards.length} cards`);
+    let cards: InsightCard[] = usedFallback ? [] : await cardPromise.catch(() => []);
+
+    // When sport is known but no live games returned — build insight cards from AI bullets
+    if (cards.length === 0 && !isAmbiguous && !usedFallback && context.sport) {
+      const bullets = (aiText.match(/^[-•]\s+(.+)$/gm) ?? []).slice(0, 3);
+      if (bullets.length > 0) {
+        const sportGradients: Record<string, string> = {
+          nba: 'from-orange-600/20 to-orange-900/10',
+          nfl: 'from-blue-600/20 to-blue-900/10',
+          mlb: 'from-red-600/20 to-red-900/10',
+          nhl: 'from-cyan-600/20 to-cyan-900/10',
+          ncaab: 'from-indigo-600/20 to-indigo-900/10',
+          ncaaf: 'from-yellow-600/20 to-yellow-900/10',
+        };
+        const sport = context.sport.toLowerCase();
+        cards = bullets.map(b => ({
+          type: 'betting-insight',
+          title: `${sport.toUpperCase()} Analysis`,
+          category: sport,
+          subcategory: 'AI Analysis',
+          gradient: sportGradients[sport] ?? 'from-blue-600/20 to-purple-900/10',
+          data: { insight: b.replace(/^[-•]\s+/, ''), source: 'Grok 4' },
+          status: 'neutral',
+          realData: false,
+        } as InsightCard));
+      }
+    }
+
+    console.log(`[API/analyze] Returning ${cards.length} cards (clarification: ${isAmbiguous})`);
 
     const processingTime = Date.now() - startTime;
 
@@ -333,6 +386,8 @@ export async function POST(request: NextRequest) {
       trustMetrics,
       processingTime,
       useFallback: usedFallback,
+      clarificationNeeded: isAmbiguous,
+      clarificationOptions,
     });
   } catch (error) {
     console.error('[API/analyze] Unhandled error:', error);

@@ -264,16 +264,20 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
   // Fantasy league setup state — must NOT read localStorage here (causes SSR hydration mismatch #418)
   interface FantasyLeague {
-    type: 'season-long' | 'best-ball' | 'dfs-contest' | 'survivor';
+    sport: string;                // 'nfl' | 'mlb' | 'nba' | 'nhl'
+    platform: string;             // 'espn' | 'yahoo' | 'fantrax' | 'cbs' | 'nfbc' | 'nfl_com'
     teams: number;
-    scoring: 'PPR' | 'Half-PPR' | 'Standard';
+    leagueType: string;           // 'ppr' | 'half_ppr' | 'standard' | 'h2h' | 'roto' | 'roto_h2h'
     teamName: string;
-    sport: string;
+    leagueName: string;
+    // legacy compat
+    type?: string;
+    scoring?: string;
     setupComplete: boolean;
   }
   const [fantasyLeague, setFantasyLeague] = useState<FantasyLeague | null>(null);
   const [fantasySetupStep, setFantasySetupStep] = useState(0);
-  const [fantasySetupData, setFantasySetupData] = useState<Partial<FantasyLeague>>({});
+  const [fantasySetupData, setFantasySetupData] = useState<Partial<FantasyLeague>>({ sport: 'nfl', platform: 'espn', teams: 12, leagueType: 'ppr' });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1064,8 +1068,14 @@ No preamble. Start directly with section 1.`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userMessage: prompt, context }),
       });
-      const result: APIResponse = await res.json();
-      if (!res.ok || !result.success) {
+      let result: APIResponse;
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        result = { success: false, error: `Server error ${res.status}: ${text.slice(0, 150)}` };
+      } else {
+        result = await res.json().catch(() => ({ success: false, error: 'Invalid JSON response' })) as APIResponse;
+      }
+      if (!result.success) {
         setCardAnalysisMap(prev => ({ ...prev, [cardKey]: { loading: false, content: null, error: result.error ?? 'Analysis failed' } }));
         return;
       }
@@ -1151,7 +1161,9 @@ No preamble. Start directly with section 1.`;
         isPoliticalMarket: finalIsPoliticalMarket,
         hasBettingIntent,
         hasFantasyIntent,
-        previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }))
+        previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' })),
+        // Pass Kalshi sub-category pill value when in Kalshi mode
+        kalshiSubcategory: selectedCategory === 'kalshi' && selectedSport ? selectedSport : undefined,
       };
 
       if (isDev) {
@@ -1259,7 +1271,15 @@ No preamble. Start directly with section 1.`;
       // Inject fantasy league context when in fantasy mode
       let contextualUserMessage = userMessage;
       if (selectedCategory === 'fantasy' && fantasyLeague?.setupComplete) {
-        contextualUserMessage = `[My fantasy league: ${fantasyLeague.type}, ${fantasyLeague.teams} teams, ${fantasyLeague.scoring} scoring, Sport: ${fantasyLeague.sport}, Team name: "${fantasyLeague.teamName}"]\n\n${userMessage}`;
+        const leagueCtx = [
+          `Sport: ${fantasyLeague.sport?.toUpperCase() ?? 'NFL'}`,
+          `Platform: ${fantasyLeague.platform?.toUpperCase() ?? 'ESPN'}`,
+          `${fantasyLeague.teams ?? 12} teams`,
+          `Format: ${fantasyLeague.leagueType ?? fantasyLeague.scoring ?? 'PPR'}`,
+          `Team: "${fantasyLeague.teamName}"`,
+          fantasyLeague.leagueName ? `League: "${fantasyLeague.leagueName}"` : '',
+        ].filter(Boolean).join(', ');
+        contextualUserMessage = `[Fantasy League Context: ${leagueCtx}]\n\n${userMessage}`;
       }
 
       // Fetch real data from our API routes
@@ -1269,7 +1289,18 @@ No preamble. Start directly with section 1.`;
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userMessage: contextualUserMessage, existingCards: availableCards, context, customInstructions: customInstructions || undefined }),
           signal: controller.signal,
-        }).then((res) => res.json() as Promise<APIResponse>);
+        }).then(async (res) => {
+          if (!res.ok) {
+            const text = await res.text().catch(() => '');
+            const snippet = text.slice(0, 200);
+            console.error('[v0] /api/analyze non-OK response:', res.status, snippet);
+            return { success: false, error: `Server error ${res.status}` } as APIResponse;
+          }
+          return res.json().catch((e: unknown) => {
+            console.error('[v0] /api/analyze JSON parse error:', e);
+            return { success: false, error: 'Invalid response from server' } as APIResponse;
+          }) as Promise<APIResponse>;
+        });
 
       setVerifyStage('analyzing');
       let analysisResult = await fetchAnalysis();
@@ -3607,110 +3638,229 @@ No preamble. Start directly with section 1.`;
 
           <div className="relative max-w-5xl mx-auto">
             {/* Fantasy League Setup Flow — shown when Fantasy is selected and no league is configured */}
-            {selectedCategory === 'fantasy' && !fantasyLeague?.setupComplete && (
-              <div className="mb-5 bg-gradient-to-br from-green-900/30 via-gray-900/80 to-green-900/20 border border-green-700/40 rounded-2xl p-4 backdrop-blur-sm">
-                <div className="flex items-center gap-2 mb-3">
-                  <Trophy className="w-4 h-4 text-green-400" />
-                  <span className="text-sm font-bold text-green-300">Set up your fantasy league</span>
-                  <span className="ml-auto text-[10px] font-bold text-gray-500 uppercase tracking-wider">Step {fantasySetupStep + 1} of 4</span>
-                </div>
-                {fantasySetupStep === 0 && (
-                  <div>
-                    <p className="text-xs text-gray-400 mb-2">What kind of fantasy league are you playing?</p>
-                    <div className="flex flex-wrap gap-2">
-                      {[['season-long', 'Season-Long'], ['best-ball', 'Best Ball'], ['dfs-contest', 'DFS Contest'], ['survivor', 'Survivor']].map(([val, label]) => (
-                        <button key={val} onClick={() => { setFantasySetupData(d => ({ ...d, type: val as any })); setFantasySetupStep(1); }}
-                          className="px-3 py-1.5 rounded-full border border-green-700/50 bg-green-900/20 text-green-300 text-xs font-bold hover:bg-green-700/30 hover:border-green-500/60 transition-all">
-                          {label}
-                        </button>
-                      ))}
-                    </div>
+            {selectedCategory === 'fantasy' && !fantasyLeague?.setupComplete && (() => {
+              // ── Inline config data ─────────────────────────────────────────
+              const SETUP_SPORTS = [
+                { value: 'nfl', label: 'Football', icon: '🏈' },
+                { value: 'mlb', label: 'Baseball', icon: '⚾' },
+                { value: 'nba', label: 'Basketball', icon: '🏀' },
+                { value: 'nhl', label: 'Hockey', icon: '🏒' },
+              ] as const;
+              const SETUP_PLATFORMS: Record<string, Array<{ value: string; label: string }>> = {
+                nfl: [{ value:'espn',label:'ESPN' },{ value:'yahoo',label:'Yahoo' },{ value:'fantrax',label:'Fantrax' },{ value:'cbs',label:'CBS' },{ value:'nfl_com',label:'NFL.com' }],
+                mlb: [{ value:'espn',label:'ESPN' },{ value:'yahoo',label:'Yahoo' },{ value:'fantrax',label:'Fantrax' },{ value:'cbs',label:'CBS' },{ value:'nfbc',label:'NFBC' }],
+                nba: [{ value:'espn',label:'ESPN' },{ value:'yahoo',label:'Yahoo' },{ value:'fantrax',label:'Fantrax' },{ value:'cbs',label:'CBS' }],
+                nhl: [{ value:'espn',label:'ESPN' },{ value:'yahoo',label:'Yahoo' },{ value:'fantrax',label:'Fantrax' },{ value:'cbs',label:'CBS' }],
+              };
+              const SETUP_TYPES: Record<string, Array<{ value: string; label: string }>> = {
+                nfl: [{ value:'ppr',label:'PPR' },{ value:'half_ppr',label:'Half PPR' },{ value:'standard',label:'Standard' }],
+                mlb: [{ value:'h2h',label:'Head-to-Head' },{ value:'roto',label:'Rotisserie' },{ value:'roto_h2h',label:'Roto H2H' }],
+                nba: [{ value:'h2h',label:'Head-to-Head' },{ value:'roto',label:'Rotisserie' }],
+                nhl: [{ value:'h2h',label:'Head-to-Head' },{ value:'roto',label:'Rotisserie' }],
+              };
+              const activeSport = (fantasySetupData.sport || 'nfl') as string;
+              const platforms = SETUP_PLATFORMS[activeSport] ?? SETUP_PLATFORMS.nfl;
+              const leagueTypes = SETUP_TYPES[activeSport] ?? SETUP_TYPES.nfl;
+              const isNfbc = fantasySetupData.platform === 'nfbc';
+              const teamSizes = isNfbc ? [12, 15] : [8,10,12,14,16,20,24,30];
+              const sportIcon = SETUP_SPORTS.find(s => s.value === activeSport)?.icon ?? '🏆';
+
+              const STEP_NAMES = ['Sport', 'Platform', 'Teams', 'Format', 'Save'];
+              const btnBase = 'px-3 py-1.5 rounded-xl border text-xs font-bold transition-all';
+              const btnActive = 'border-green-400/70 bg-green-700/30 text-green-200';
+              const btnInactive = 'border-green-700/40 bg-green-900/15 text-green-400 hover:bg-green-700/20 hover:border-green-500/50';
+
+              return (
+                <div className="mb-5 bg-gradient-to-br from-[oklch(0.12_0.04_145/0.5)] via-[oklch(0.09_0.01_280/0.8)] to-[oklch(0.10_0.03_145/0.3)] border border-green-700/30 rounded-2xl p-4 backdrop-blur-sm">
+                  {/* Header */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <Trophy className="w-4 h-4 text-green-400" />
+                    <span className="text-sm font-bold text-green-300">Set up your fantasy league</span>
+                    <span className="ml-auto text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                      {STEP_NAMES[fantasySetupStep]} · {fantasySetupStep + 1}/{STEP_NAMES.length}
+                    </span>
                   </div>
-                )}
-                {fantasySetupStep === 1 && (
-                  <div>
-                    <p className="text-xs text-gray-400 mb-2">How many teams in your league?</p>
-                    <div className="flex flex-wrap gap-2">
-                      {[8, 10, 12, 14].map(n => (
-                        <button key={n} onClick={() => { setFantasySetupData(d => ({ ...d, teams: n })); setFantasySetupStep(2); }}
-                          className="px-3 py-1.5 rounded-full border border-green-700/50 bg-green-900/20 text-green-300 text-xs font-bold hover:bg-green-700/30 hover:border-green-500/60 transition-all">
-                          {n} teams
-                        </button>
-                      ))}
-                    </div>
+                  {/* Step indicators */}
+                  <div className="flex items-center gap-1 mb-4">
+                    {STEP_NAMES.map((name, i) => (
+                      <div key={i} className="flex items-center gap-1">
+                        <div className={`w-1.5 h-1.5 rounded-full transition-all ${i < fantasySetupStep ? 'bg-green-400' : i === fantasySetupStep ? 'bg-green-300 scale-125' : 'bg-gray-700'}`} />
+                        {i < STEP_NAMES.length - 1 && <div className={`w-4 h-px transition-all ${i < fantasySetupStep ? 'bg-green-500/50' : 'bg-gray-800'}`} />}
+                      </div>
+                    ))}
                   </div>
-                )}
-                {fantasySetupStep === 2 && (
-                  <div>
-                    <p className="text-xs text-gray-400 mb-2">Scoring format?</p>
-                    <div className="flex flex-wrap gap-2">
-                      {['PPR', 'Half-PPR', 'Standard'].map(s => (
-                        <button key={s} onClick={() => { setFantasySetupData(d => ({ ...d, scoring: s as any })); setFantasySetupStep(3); }}
-                          className="px-3 py-1.5 rounded-full border border-green-700/50 bg-green-900/20 text-green-300 text-xs font-bold hover:bg-green-700/30 hover:border-green-500/60 transition-all">
-                          {s}
-                        </button>
-                      ))}
+
+                  {/* Step 0: Sport */}
+                  {fantasySetupStep === 0 && (
+                    <div>
+                      <p className="text-xs text-gray-400 mb-2.5">What sport is your fantasy league?</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {SETUP_SPORTS.map(s => (
+                          <button key={s.value}
+                            onClick={() => {
+                              const defaultPlatform = (SETUP_PLATFORMS[s.value] ?? SETUP_PLATFORMS.nfl)[0].value;
+                              const defaultType = (SETUP_TYPES[s.value] ?? SETUP_TYPES.nfl)[0].value;
+                              setFantasySetupData(d => ({ ...d, sport: s.value, platform: defaultPlatform, leagueType: defaultType }));
+                              setFantasySetupStep(1);
+                            }}
+                            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all ${fantasySetupData.sport === s.value ? btnActive : btnInactive}`}>
+                            <span className="text-xl">{s.icon}</span>
+                            <span className="text-sm font-bold">{s.label}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-                {fantasySetupStep === 3 && (
-                  <div>
-                    <p className="text-xs text-gray-400 mb-2">Your sport and team name?</p>
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {['NFL', 'NBA', 'MLB', 'NHL'].map(sp => (
-                        <button key={sp} onClick={() => setFantasySetupData(d => ({ ...d, sport: sp.toLowerCase() }))}
-                          className={`px-3 py-1.5 rounded-full border text-xs font-bold transition-all ${fantasySetupData.sport === sp.toLowerCase() ? 'bg-green-700/40 border-green-500/60 text-green-200' : 'border-green-700/50 bg-green-900/20 text-green-300 hover:bg-green-700/30'}`}>
-                          {sp}
-                        </button>
-                      ))}
+                  )}
+
+                  {/* Step 1: Platform */}
+                  {fantasySetupStep === 1 && (
+                    <div>
+                      <p className="text-xs text-gray-400 mb-2.5">{sportIcon} Which platform is your {activeSport.toUpperCase()} league on?</p>
+                      <div className="flex flex-wrap gap-2">
+                        {platforms.map(p => (
+                          <button key={p.value}
+                            onClick={() => {
+                              const sizes = p.value === 'nfbc' ? [12,15] : [8,10,12,14,16,20,24,30];
+                              const newSize = sizes.includes(fantasySetupData.teams ?? 12) ? (fantasySetupData.teams ?? 12) : 12;
+                              setFantasySetupData(d => ({ ...d, platform: p.value, teams: newSize }));
+                              setFantasySetupStep(2);
+                            }}
+                            className={`${btnBase} ${fantasySetupData.platform === p.value ? btnActive : btnInactive}`}>
+                            {p.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="text"
-                        placeholder="Team name (e.g. Gronk's Hammers)"
+                  )}
+
+                  {/* Step 2: Teams slider */}
+                  {fantasySetupStep === 2 && (
+                    <div>
+                      <p className="text-xs text-gray-400 mb-2.5">How many teams in your league?</p>
+                      {isNfbc ? (
+                        <div className="flex gap-3">
+                          {[12,15].map(n => (
+                            <button key={n}
+                              onClick={() => { setFantasySetupData(d => ({ ...d, teams: n })); setFantasySetupStep(3); }}
+                              className={`flex-1 py-4 rounded-xl border text-2xl font-black transition-all ${(fantasySetupData.teams ?? 12) === n ? btnActive : btnInactive}`}>
+                              {n}<span className="block text-[10px] font-normal opacity-60 mt-0.5">teams</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="text-center">
+                            <span className="text-4xl font-black text-white tabular-nums">{fantasySetupData.teams ?? 12}</span>
+                            <span className="text-xs text-gray-500 ml-1">teams</span>
+                          </div>
+                          <input type="range" min={8} max={30} step={1}
+                            value={fantasySetupData.teams ?? 12}
+                            onChange={e => setFantasySetupData(d => ({ ...d, teams: parseInt(e.target.value) }))}
+                            className="w-full accent-green-400 cursor-pointer" />
+                          <div className="flex justify-between text-[9px] text-gray-600"><span>8</span><span>16</span><span>24</span><span>30</span></div>
+                          <div className="flex flex-wrap gap-1.5 justify-center">
+                            {teamSizes.map(n => (
+                              <button key={n}
+                                onClick={() => setFantasySetupData(d => ({ ...d, teams: n }))}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${(fantasySetupData.teams ?? 12) === n ? btnActive : btnInactive}`}>
+                                {n}
+                              </button>
+                            ))}
+                          </div>
+                          <button onClick={() => setFantasySetupStep(3)}
+                            className="w-full py-2 rounded-xl bg-green-700/30 border border-green-500/40 text-green-300 text-xs font-bold hover:bg-green-700/40 transition-all">
+                            Continue →
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Step 3: League Type */}
+                  {fantasySetupStep === 3 && (
+                    <div>
+                      <p className="text-xs text-gray-400 mb-2.5">Scoring format for your {activeSport.toUpperCase()} league?</p>
+                      <div className="space-y-2">
+                        {leagueTypes.map(t => (
+                          <button key={t.value}
+                            onClick={() => { setFantasySetupData(d => ({ ...d, leagueType: t.value })); setFantasySetupStep(4); }}
+                            className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all ${fantasySetupData.leagueType === t.value ? btnActive : btnInactive}`}>
+                            <span className="font-bold">{t.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 4: League name + team name → save */}
+                  {fantasySetupStep === 4 && (
+                    <div className="space-y-2.5">
+                      <p className="text-xs text-gray-400 mb-1">Almost done! Name your league and team.</p>
+                      <input type="text" placeholder="League name (e.g. The Winners Circle)"
+                        value={fantasySetupData.leagueName || ''}
+                        onChange={e => setFantasySetupData(d => ({ ...d, leagueName: e.target.value }))}
+                        className="w-full bg-gray-900/60 border border-green-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-500/60 transition-all"
+                        maxLength={60} />
+                      <input type="text" placeholder="Your team name (e.g. Gronk's Hammers)"
                         value={fantasySetupData.teamName || ''}
                         onChange={e => setFantasySetupData(d => ({ ...d, teamName: e.target.value }))}
-                        className="flex-1 bg-gray-900/60 border border-green-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-500/60 transition-all"
-                        maxLength={40}
-                      />
+                        className="w-full bg-gray-900/60 border border-green-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-500/60 transition-all"
+                        maxLength={40} />
+                      {/* Summary */}
+                      <div className="flex flex-wrap gap-1.5 text-[10px]">
+                        {[
+                          `${sportIcon} ${activeSport.toUpperCase()}`,
+                          (fantasySetupData.platform ?? 'ESPN').toUpperCase(),
+                          `${fantasySetupData.teams ?? 12} teams`,
+                          leagueTypes.find(t => t.value === fantasySetupData.leagueType)?.label ?? fantasySetupData.leagueType ?? '',
+                        ].map((chip, i) => (
+                          <span key={i} className="px-2 py-0.5 rounded-full bg-green-900/20 border border-green-700/30 text-green-400 font-medium">{chip}</span>
+                        ))}
+                      </div>
                       <button
                         onClick={() => {
-                          if (!fantasySetupData.sport || !fantasySetupData.teamName?.trim()) return;
+                          if (!fantasySetupData.teamName?.trim()) return;
                           const league: FantasyLeague = {
-                            type: fantasySetupData.type || 'season-long',
+                            sport: fantasySetupData.sport || 'nfl',
+                            platform: fantasySetupData.platform || 'espn',
                             teams: fantasySetupData.teams || 12,
-                            scoring: fantasySetupData.scoring || 'PPR',
+                            leagueType: fantasySetupData.leagueType || 'ppr',
                             teamName: fantasySetupData.teamName.trim(),
-                            sport: fantasySetupData.sport,
+                            leagueName: (fantasySetupData.leagueName || '').trim() || 'My League',
                             setupComplete: true,
+                            // legacy compat
+                            scoring: fantasySetupData.leagueType === 'ppr' ? 'PPR' : fantasySetupData.leagueType === 'half_ppr' ? 'Half-PPR' : 'Standard',
                           };
                           localStorage.setItem('leverage_fantasy_league', JSON.stringify(league));
                           setFantasyLeague(league);
                           setFantasySetupStep(0);
-                          setFantasySetupData({});
+                          setFantasySetupData({ sport: 'nfl', platform: 'espn', teams: 12, leagueType: 'ppr' });
                           toast.success(`League saved! Welcome, ${league.teamName} 🏆`);
                         }}
-                        disabled={!fantasySetupData.sport || !fantasySetupData.teamName?.trim()}
-                        className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all"
-                      >
-                        Save League →
+                        disabled={!fantasySetupData.teamName?.trim()}
+                        className="w-full py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-green-900/20">
+                        Save League 🚀
                       </button>
                     </div>
-                  </div>
-                )}
-                {fantasyLeague === null && fantasySetupStep > 0 && (
-                  <button onClick={() => setFantasySetupStep(s => Math.max(0, s - 1))} className="mt-2 text-[10px] text-gray-600 hover:text-gray-400 transition-colors">
-                    ← Back
-                  </button>
-                )}
-              </div>
-            )}
+                  )}
+
+                  {fantasySetupStep > 0 && (
+                    <button onClick={() => setFantasySetupStep(s => Math.max(0, s - 1))}
+                      className="mt-2.5 text-[10px] text-gray-600 hover:text-gray-400 transition-colors">
+                      ← Back
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
             {/* Show configured league context + reset button */}
             {selectedCategory === 'fantasy' && fantasyLeague?.setupComplete && (
               <div className="mb-3 flex items-center gap-2 px-1">
                 <Trophy className="w-3.5 h-3.5 text-green-500" />
                 <span className="text-[11px] font-bold text-green-400">{fantasyLeague.teamName}</span>
-                <span className="text-[10px] text-gray-600">{fantasyLeague.sport?.toUpperCase()} · {fantasyLeague.teams} teams · {fantasyLeague.scoring}</span>
+                <span className="text-[10px] text-gray-600">
+                  {fantasyLeague.sport?.toUpperCase()} · {fantasyLeague.platform?.toUpperCase()} · {fantasyLeague.teams} teams · {fantasyLeague.leagueType ?? fantasyLeague.scoring}
+                </span>
                 <button onClick={() => { setFantasyLeague(null); localStorage.removeItem('leverage_fantasy_league'); }} className="ml-auto text-[10px] text-gray-600 hover:text-gray-400 transition-colors">Edit league</button>
               </div>
             )}

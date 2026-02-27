@@ -353,7 +353,8 @@ export async function generateContextualCards(
   sport?: string,
   count: number = 3,
   // Multi-sport mode only makes sense for betting/all — never for kalshi/fantasy/dfs/props etc.
-  multiSport: boolean = !sport && (!category || category === 'betting' || category === 'all')
+  multiSport: boolean = !sport && (!category || category === 'betting' || category === 'all'),
+  kalshiSubcategory?: string
 ): Promise<InsightCard[]> {
   // Check in-memory cache first to avoid redundant API calls
   // (SSR page load populates this, /api/analyze reuses it)
@@ -743,37 +744,61 @@ export async function generateContextualCards(
     return cards;
   }
   
-  // Kalshi/Prediction Markets - Fetch ALL markets (sports, elections, politics, everything)
+  // Kalshi/Prediction Markets — route by subcategory pill when provided
   if (category === 'kalshi') {
-    console.log('[v0] [CARDS-GEN] Kalshi category - fetching ALL markets from API with retry logic');
+    const sub = (kalshiSubcategory || '').toLowerCase();
+    console.log('[v0] [CARDS-GEN] Kalshi category, subcategory=' + (sub || 'none (trending)'));
     try {
-      const { fetchKalshiMarketsWithRetry, kalshiMarketToCard } = await import('@/lib/kalshi-client');
-      
-      // Fetch ALL open markets from Kalshi with retry logic (no category filter)
-      console.log('[v0] [CARDS-GEN] Calling Kalshi API for all open markets (with 3 retry attempts)...');
-      const markets = await fetchKalshiMarketsWithRetry({ 
-        status: 'open', 
-        limit: Math.max(count, 50), // Fetch more to ensure variety
-        maxRetries: 3
-      });
-      
-      console.log(`[v0] [CARDS-GEN] Kalshi API returned ${markets.length} total markets`);
-      
+      const {
+        fetchKalshiMarketsWithRetry,
+        fetchSportsMarkets,
+        fetchElectionMarkets,
+        fetchWeatherMarkets,
+        fetchFinanceMarkets,
+        fetchTopMarketsByVolume,
+        kalshiMarketToCard,
+      } = await import('@/lib/kalshi-client');
+
+      let markets: any[] = [];
+
+      if (sub === 'sports' || sub === 'sport') {
+        markets = await fetchSportsMarkets();
+      } else if (sub === 'politics' || sub === 'elections' || sub === 'election') {
+        markets = await fetchElectionMarkets({ limit: count * 5 });
+      } else if (sub === 'weather' || sub === 'climate') {
+        markets = await fetchWeatherMarkets(count * 5);
+      } else if (['financials', 'finance', 'economics', 'crypto', 'companies'].includes(sub)) {
+        markets = await fetchFinanceMarkets(count * 5);
+      } else if (sub === 'trending') {
+        markets = await fetchTopMarketsByVolume(count);
+      } else {
+        // No sub-filter — fetch a broad set of open markets sorted by volume
+        markets = await fetchKalshiMarketsWithRetry({
+          status: 'open',
+          limit: Math.max(count * 5, 50),
+          maxRetries: 3,
+        });
+      }
+
+      console.log(`[v0] [CARDS-GEN] Kalshi fetched ${markets.length} markets`);
+
       if (markets.length > 0) {
-        // Convert to cards and take requested count
+        // Sort by volume descending (most liquid = most relevant)
+        markets.sort((a: any, b: any) =>
+          ((b.volume24h ?? 0) + (b.volume ?? 0)) - ((a.volume24h ?? 0) + (a.volume ?? 0))
+        );
         const kalshiCards = markets.slice(0, count).map(kalshiMarketToCard);
         cards.push(...kalshiCards);
-        console.log(`[v0] [CARDS-GEN] Added ${kalshiCards.length} Kalshi market cards`);
-        console.log('[v0] [CARDS-GEN] Market categories:', [...new Set(markets.map(m => m.category))].join(', '));
+        console.log(`[v0] [CARDS-GEN] Added ${kalshiCards.length} Kalshi cards`);
         return cards;
-      } else {
-        console.warn('[v0] [CARDS-GEN] Kalshi API returned 0 markets - may be connectivity issue');
       }
+
+      console.warn('[v0] [CARDS-GEN] Kalshi API returned 0 markets');
     } catch (error) {
       console.error('[v0] [CARDS-GEN] Kalshi API error:', error);
     }
-    
-    // Fallback to placeholder if no markets available
+
+    // Fallback placeholder
     cards.push({
       type: 'PREDICTION_MARKET',
       title: 'Kalshi Markets Unavailable',
@@ -785,8 +810,8 @@ export async function generateContextualCards(
         description: 'Unable to fetch Kalshi markets',
         note: 'Check API connectivity and try again',
         marketType: 'All Categories',
-        realData: false
-      }
+        realData: false,
+      },
     });
   }
 

@@ -21,7 +21,9 @@ export default function NewLeaguePage() {
         body: JSON.stringify({
           name: form.name,
           sport: form.sport,
+          platform: form.platform,
           leagueSize: form.leagueSize,
+          leagueType: form.leagueType,
           scoringType: form.scoringType,
           scoringSettings: form.scoringSettings,
           rosterSlots: form.rosterSlots,

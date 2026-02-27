@@ -6,7 +6,7 @@
  * API Documentation: https://trading-api.readme.io/reference/getting-started
  */
 
-const KALSHI_TRADING_URL = 'https://trading-api.kalshi.com/trade-api/v2';
+const KALSHI_TRADING_URL = 'https://api.elections.kalshi.com/trade-api/v2';
 
 export interface KalshiMarket {
   ticker: string;

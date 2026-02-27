@@ -142,6 +142,9 @@ export const getStripeMonthlyPriceId = () =>
 export const getStripeAnnualPriceId = () =>
   getServerEnv('STRIPE_ANNUAL_PRICE_ID', { required: false });
 
+export const getStripePublishableKey = () =>
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? null;
+
 export const isStripeConfigured = () =>
   !!getStripeSecretKey();
 

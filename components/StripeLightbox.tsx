@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { X, CreditCard, Sparkles, CheckCircle, Loader2, Shield, Zap, Crown } from 'lucide-react';
+import { X, CreditCard, Sparkles, CheckCircle, Loader2, Shield, Zap, Crown, AlertTriangle } from 'lucide-react';
+import { CREDIT_PACKAGES, SUBSCRIPTION_PLANS } from '@/lib/constants';
 
 interface StripeLightboxProps {
   isOpen: boolean;
@@ -13,47 +14,20 @@ interface StripeLightboxProps {
 
 type PurchaseTab = 'credits' | 'subscription';
 
-const CREDIT_PACKAGES = [
-  { amount: 10, credits: 10, label: '$10', popular: false },
-  { amount: 25, credits: 25, label: '$25', popular: false },
-  { amount: 50, credits: 50, label: '$50', popular: true },
-  { amount: 100, credits: 100, label: '$100', popular: false },
-  { amount: 250, credits: 250, label: '$250', popular: false },
-];
-
-const SUBSCRIPTION_PLANS = [
-  {
-    id: 'monthly',
-    name: 'Monthly',
-    price: 20,
-    credits: 20,
-    interval: 'month',
-    features: ['20 credits/month', 'Priority AI analysis', 'Real-time alerts', 'Cancel anytime'],
-  },
-  {
-    id: 'annual',
-    name: 'Annual',
-    price: 15,
-    credits: 25,
-    interval: 'month',
-    billed: 180,
-    features: ['25 credits/month', 'Priority AI analysis', 'Real-time alerts', 'Advanced analytics', 'Save 25%'],
-    popular: true,
-  },
-];
-
 export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaining, userEmail }: StripeLightboxProps) {
   const [activeTab, setActiveTab] = useState<PurchaseTab>('credits');
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<string>('annual');
   const [processing, setProcessing] = useState(false);
   const [customAmount, setCustomAmount] = useState('');
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   const handlePurchaseCredits = async () => {
     const amount = selectedPackage ?? (parseInt(customAmount) || 0);
     if (amount < 5) return;
 
     setProcessing(true);
+    setCheckoutError(null);
     try {
       const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
@@ -71,27 +45,25 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
       if (data.url) {
         // Redirect to Stripe Checkout
         window.location.href = data.url;
-      } else if (data.success) {
-        // Credits added directly (test mode)
+        return; // don't setProcessing(false) — page is navigating away
+      } else if (data.success && data.mock) {
+        // Mock mode (no Stripe key configured) — credits added server-side
         onCreditsAdded?.(amount);
         onClose();
       } else {
         console.error('[Stripe] Checkout error:', data.error);
-        // Fallback: add credits locally for demo
-        onCreditsAdded?.(amount);
-        onClose();
+        setCheckoutError(data.error || 'Payment could not be started. Please try again.');
       }
     } catch (err) {
       console.error('[Stripe] Checkout failed:', err);
-      // Fallback: add credits locally
-      onCreditsAdded?.(amount);
-      onClose();
+      setCheckoutError('Payment could not be started. Please try again.');
     }
     setProcessing(false);
   };
 
   const handleSubscribe = async () => {
     setProcessing(true);
+    setCheckoutError(null);
     try {
       const plan = SUBSCRIPTION_PLANS.find(p => p.id === selectedPlan);
       if (!plan) return;
@@ -111,19 +83,18 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
 
       if (data.url) {
         window.location.href = data.url;
-      } else if (data.success) {
+        return; // don't setProcessing(false) — page is navigating away
+      } else if (data.success && data.mock) {
+        // Mock mode (no Stripe key or price IDs configured)
         onCreditsAdded?.(plan.credits);
         onClose();
       } else {
         console.error('[Stripe] Subscription error:', data.error);
-        onCreditsAdded?.(plan.credits);
-        onClose();
+        setCheckoutError(data.error || 'Subscription could not be started. Please try again.');
       }
     } catch (err) {
       console.error('[Stripe] Subscription failed:', err);
-      const plan = SUBSCRIPTION_PLANS.find(p => p.id === selectedPlan);
-      onCreditsAdded?.(plan?.credits || 20);
-      onClose();
+      setCheckoutError('Subscription could not be started. Please try again.');
     }
     setProcessing(false);
   };
@@ -177,6 +148,14 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
             Subscribe
           </button>
         </div>
+
+        {/* Error Banner */}
+        {checkoutError && (
+          <div className="mx-6 mt-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span>{checkoutError}</span>
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">

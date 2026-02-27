@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getStripeSecretKey, getStripeMonthlyPriceId, getStripeAnnualPriceId } from '@/lib/config';
 
 /**
  * POST /api/stripe/checkout
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { type, amount, credits, planId, customer_email } = body;
 
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const stripeSecretKey = getStripeSecretKey();
 
     // If Stripe is not configured, fall back to mock mode
     if (!stripeSecretKey) {
@@ -50,8 +51,8 @@ export async function POST(request: NextRequest) {
     if (type === 'subscription') {
       // Map plan IDs to Stripe Price IDs (set these in your Stripe dashboard)
       const priceMap: Record<string, string> = {
-        monthly: process.env.STRIPE_MONTHLY_PRICE_ID || '',
-        annual: process.env.STRIPE_ANNUAL_PRICE_ID || '',
+        monthly: getStripeMonthlyPriceId() || '',
+        annual: getStripeAnnualPriceId() || '',
       };
 
       const priceId = priceMap[planId || 'monthly'];

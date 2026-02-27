@@ -687,7 +687,43 @@ CREATE POLICY "Draft pick access"    ON draft_picks
   );
 
 -- ============================================================================
--- 14. ENABLE REALTIME SUBSCRIPTIONS
+-- 14. USER CREDITS TABLE
+-- Persists credit balances server-side so they survive cache clears and
+-- are consistent across devices. Incremented by the Stripe webhook handler.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS api.user_credits (
+  user_id       uuid        PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  balance       integer     NOT NULL DEFAULT 0 CHECK (balance >= 0),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE api.user_credits ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "User can read own credits"
+  ON api.user_credits FOR SELECT
+  USING (auth.uid() = user_id);
+
+-- Only the service-role (Stripe webhook) can write; users cannot self-update
+CREATE POLICY "Service role can manage credits"
+  ON api.user_credits FOR ALL
+  USING (auth.role() = 'service_role');
+
+-- RPC: atomically increment a user's credit balance
+CREATE OR REPLACE FUNCTION api.increment_user_credits(p_user_id uuid, p_amount integer)
+RETURNS void
+LANGUAGE sql SECURITY DEFINER
+AS $$
+  INSERT INTO api.user_credits (user_id, balance, updated_at)
+  VALUES (p_user_id, p_amount, now())
+  ON CONFLICT (user_id)
+  DO UPDATE SET
+    balance    = api.user_credits.balance + EXCLUDED.balance,
+    updated_at = now();
+$$;
+
+-- ============================================================================
+-- 15. ENABLE REALTIME SUBSCRIPTIONS
 -- ============================================================================
 
 -- Core live data
@@ -713,7 +749,7 @@ DO $$
 BEGIN
   RAISE NOTICE '✓ Leverage AI database schema created successfully';
   RAISE NOTICE '✓ api schema created and set as search path';
-  RAISE NOTICE '✓ 27 tables created with indexes and constraints:';
+  RAISE NOTICE '✓ 28 tables created with indexes and constraints:';
   RAISE NOTICE '    Core: live_odds_cache, mlb/nfl/nba/nhl_odds, line_movement,';
   RAISE NOTICE '          arbitrage_opportunities, player_props_markets, kalshi_markets,';
   RAISE NOTICE '          historical_games, ai_response_trust, ai_predictions, capital_state, bet_allocations';

@@ -11,6 +11,7 @@ interface TierGateProps {
   requiredFeature: FantasyFeature;
   children: ReactNode;
   featureLabel?: string;
+  onUpgradeClick?: () => void;
 }
 
 const TIER_LABELS: Record<SubscriptionTier, string> = {
@@ -28,7 +29,7 @@ function getMinimumTier(feature: FantasyFeature): SubscriptionTier {
   return 'high_stakes';
 }
 
-export function TierGate({ tier, requiredFeature, children, featureLabel }: TierGateProps) {
+export function TierGate({ tier, requiredFeature, children, featureLabel, onUpgradeClick }: TierGateProps) {
   if (hasFeatureAccess(tier, requiredFeature)) {
     return <>{children}</>;
   }
@@ -46,7 +47,7 @@ export function TierGate({ tier, requiredFeature, children, featureLabel }: Tier
           This feature requires {TIER_LABELS[minimumTier]} or higher.
           Upgrade to unlock advanced analytics and AI-powered tools.
         </p>
-        <Button variant="default" size="sm">
+        <Button variant="default" size="sm" onClick={onUpgradeClick}>
           Upgrade to {TIER_LABELS[minimumTier]}
         </Button>
       </CardContent>

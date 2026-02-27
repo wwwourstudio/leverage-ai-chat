@@ -337,15 +337,20 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const loadCreditsFromSupabase = async (authId: string) => {
     try {
       const supabase = createClient();
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('id, credits_remaining')
-        .eq('user_id', authId)
-        .single();
+
+      // Fetch profile credits and purchased credits in parallel
+      const [profileResult, creditsResult] = await Promise.all([
+        supabase.from('user_profiles').select('id, credits_remaining').eq('user_id', authId).single(),
+        supabase.from('user_credits').select('balance').eq('user_id', authId).single(),
+      ]);
+
+      const profile = profileResult.data;
+      const purchasedBalance = creditsResult.data?.balance ?? 0;
 
       if (profile) {
         setSupabaseProfileId(profile.id);
-        const dbCredits = profile.credits_remaining ?? MESSAGE_LIMIT;
+        // Use purchased balance if it exists; otherwise fall back to profile credits
+        const dbCredits = purchasedBalance > 0 ? purchasedBalance : (profile.credits_remaining ?? MESSAGE_LIMIT);
         setCreditsRemaining(dbCredits);
         const creditData = getCreditData();
         localStorage.setItem('userCredits', JSON.stringify({ ...creditData, credits: dbCredits }));
@@ -453,21 +458,39 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle Stripe checkout success: add credits from URL params on return
+  // Handle Stripe checkout success: verify session server-side before adding credits
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get('session_id');
-    const creditsPurchased = params.get('credits');
-    if (sessionId && creditsPurchased) {
-      const amount = parseInt(creditsPurchased, 10);
-      if (amount > 0) {
-        addCredits(amount);
-        console.log(`[Stripe] Added ${amount} credits from checkout session ${sessionId}`);
+    if (!sessionId) return;
+
+    // Clean up URL params immediately so reloads don't re-trigger
+    window.history.replaceState({}, '', window.location.pathname);
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/stripe/verify?session_id=${encodeURIComponent(sessionId)}`);
+        const data = await res.json();
+        if (data.verified && data.credits > 0) {
+          addCredits(data.credits);
+          console.log(`[Stripe] Verified and added ${data.credits} credits for session ${sessionId}`);
+        } else if (!data.verified) {
+          // Stripe not configured (dev mode) — fall back to URL param
+          const creditsPurchased = params.get('credits');
+          const amount = creditsPurchased ? parseInt(creditsPurchased, 10) : 0;
+          if (amount > 0) {
+            addCredits(amount);
+            console.log(`[Stripe] Dev mode: added ${amount} credits from URL param`);
+          }
+        }
+      } catch {
+        // Network error — fall back to URL param (best-effort)
+        const creditsPurchased = params.get('credits');
+        const amount = creditsPurchased ? parseInt(creditsPurchased, 10) : 0;
+        if (amount > 0) addCredits(amount);
       }
-      // Clean up URL params
-      window.history.replaceState({}, '', window.location.pathname);
-    }
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

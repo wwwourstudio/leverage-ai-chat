@@ -252,6 +252,19 @@ CREATE TABLE IF NOT EXISTS ai_predictions (
 CREATE INDEX IF NOT EXISTS idx_ai_predictions_user ON ai_predictions(user_id);
 CREATE INDEX IF NOT EXISTS idx_ai_predictions_created ON ai_predictions(created_at DESC);
 
+-- AI feedback (helpful/improve votes from users)
+CREATE TABLE IF NOT EXISTS ai_feedback (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
+  session_id      TEXT,
+  vote            TEXT        NOT NULL CHECK (vote IN ('helpful', 'improve')),
+  message_excerpt TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_feedback_user ON ai_feedback(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_feedback_vote ON ai_feedback(vote);
+
 -- ============================================================================
 -- 9. QUANTITATIVE TRADING ENGINE
 -- ============================================================================

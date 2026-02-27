@@ -343,7 +343,7 @@ export const NFL_REPLACEMENT_LEVELS = {
 export const CATEGORY_NAMES = {
   [ANALYSIS_CATEGORIES.ALL]: 'All Platforms',
   [ANALYSIS_CATEGORIES.BETTING]: 'Sports Betting',
-  [ANALYSIS_CATEGORIES.FANTASY]: 'Fantasy (NFC)',
+  [ANALYSIS_CATEGORIES.FANTASY]: 'Fantasy',
   [ANALYSIS_CATEGORIES.DFS]: 'DFS',
   [ANALYSIS_CATEGORIES.KALSHI]: 'Kalshi Markets',
 } as const;
@@ -352,7 +352,7 @@ export const CATEGORY_NAMES = {
 export const ANALYSIS_TITLES = {
   [ANALYSIS_CATEGORIES.ALL]: 'New Analysis',
   [ANALYSIS_CATEGORIES.BETTING]: 'New Sports Betting Analysis',
-  [ANALYSIS_CATEGORIES.FANTASY]: 'New Fantasy (NFC) Analysis',
+  [ANALYSIS_CATEGORIES.FANTASY]: 'New Fantasy Analysis',
   [ANALYSIS_CATEGORIES.DFS]: 'New DFS Lineup Analysis',
   [ANALYSIS_CATEGORIES.KALSHI]: 'New Kalshi Market Analysis',
 } as const;
@@ -435,7 +435,7 @@ export const LOG_PREFIXES = {
 } as const;
 
 // System Prompt Template
-export const SYSTEM_PROMPT = `You are Leverage AI, an elite sports betting and prediction markets analyst powered by Grok (xAI). Current date: 2026.
+export const SYSTEM_PROMPT = `You are Leverage AI, an elite sports betting and prediction markets analyst powered by Grok (xAI). Today: [CURRENT_DATE].
 
 RESPONSE FORMAT — always follow this structure:
 1. **First line**: Your direct pick, recommendation, or answer — decisive, no preamble
@@ -464,6 +464,14 @@ YOU CAN ALWAYS ANSWER WITHOUT LIVE DATA:
 - Fantasy/DFS: stacking, ownership, matchups, tournament vs cash game approach
 - Kalshi: market mechanics, contract value, portfolio strategy, cross-market arbitrage
 - General: how parlays work, what is a spread, how to read odds
+
+CLARIFICATION RULE — CRITICAL: If the user's message has NO specific sport, team, game, player, or market mentioned:
+- Do NOT guess or provide generic analysis
+- Ask exactly one question: "Which area would you like me to focus on?"
+- Then list options as a numbered list:
+  1. NBA  2. NFL  3. MLB  4. NHL  5. Kalshi prediction markets  6. DFS lineups  7. Fantasy advice
+- Keep your ENTIRE response to just that question + the numbered list. Nothing else.
+- Once the user specifies, proceed with full expert analysis immediately.
 
 NEVER say "I cannot provide analysis" or "real-time data unavailable" for general strategy questions. If you genuinely need one piece of info to be specific, ask ONE focused question.` as const;
 

@@ -122,6 +122,7 @@ interface Message {
   processingTime?: number;
   trustMetrics?: TrustMetrics;
   attachments?: FileAttachment[];
+  voted?: 'up' | 'down';
 }
 
 interface Chat {
@@ -260,6 +261,22 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string; query?: string }>>([]);
   const [lastUserQuery, setLastUserQuery] = useState<string>('');
   const [selectedSport, setSelectedSport] = useState<string>('');
+
+  // Fantasy league setup state
+  interface FantasyLeague {
+    type: 'season-long' | 'best-ball' | 'dfs-contest' | 'survivor';
+    teams: number;
+    scoring: 'PPR' | 'Half-PPR' | 'Standard';
+    teamName: string;
+    sport: string;
+    setupComplete: boolean;
+  }
+  const [fantasyLeague, setFantasyLeague] = useState<FantasyLeague | null>(() => {
+    try { return JSON.parse(localStorage.getItem('leverage_fantasy_league') || 'null'); }
+    catch { return null; }
+  });
+  const [fantasySetupStep, setFantasySetupStep] = useState(0);
+  const [fantasySetupData, setFantasySetupData] = useState<Partial<FantasyLeague>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -559,7 +576,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const categories = [
     { id: 'all', name: 'All', icon: Layers, color: 'text-blue-400', desc: 'Everything' },
     { id: 'betting', name: 'Sports Betting', icon: TrendingUp, color: 'text-orange-400', desc: 'Live Odds & Props' },
-    { id: 'fantasy', name: 'Fantasy (NFC)', icon: Trophy, color: 'text-green-400', desc: 'NFBC/NFFC/NFBKC' },
+    { id: 'fantasy', name: 'Fantasy', icon: Trophy, color: 'text-green-400', desc: 'Season-long & Best Ball' },
     { id: 'dfs', name: 'DFS Optimizer', icon: Award, color: 'text-purple-400', desc: 'DK/FD Lineups' },
     { id: 'kalshi', name: 'Kalshi Markets', icon: BarChart3, color: 'text-cyan-400', desc: 'Financial Prediction' },
   ];
@@ -1228,12 +1245,18 @@ No preamble. Start directly with section 1.`;
         .filter((c: InsightCard) => c.data?.realData !== false)
         .slice(0, 6);
 
+      // Inject fantasy league context when in fantasy mode
+      let contextualUserMessage = userMessage;
+      if (selectedCategory === 'fantasy' && fantasyLeague?.setupComplete) {
+        contextualUserMessage = `[My fantasy league: ${fantasyLeague.type}, ${fantasyLeague.teams} teams, ${fantasyLeague.scoring} scoring, Sport: ${fantasyLeague.sport}, Team name: "${fantasyLeague.teamName}"]\n\n${userMessage}`;
+      }
+
       // Fetch real data from our API routes
       const fetchAnalysis = () =>
         fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userMessage, existingCards: availableCards, context, customInstructions: customInstructions || undefined }),
+          body: JSON.stringify({ userMessage: contextualUserMessage, existingCards: availableCards, context, customInstructions: customInstructions || undefined }),
           signal: controller.signal,
         }).then((res) => res.json() as Promise<APIResponse>);
 
@@ -1357,10 +1380,18 @@ No preamble. Start directly with section 1.`;
       
       // Add message to state
       setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
-      
-      // Generate contextual suggestions
-      const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);
-      setSuggestedPrompts(contextualSuggestions);
+
+      // Generate contextual suggestions — use clarificationOptions from API if ambiguous
+      if (analysisResult.clarificationOptions?.length) {
+        setSuggestedPrompts(analysisResult.clarificationOptions.map((o: string) => ({
+          label: o,
+          icon: Target,
+          category: selectedCategory,
+        })));
+      } else {
+        const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);
+        setSuggestedPrompts(contextualSuggestions);
+      }
 
     } catch (error) {
       // Ignore abort errors — user intentionally cancelled
@@ -1798,7 +1829,7 @@ No preamble. Start directly with section 1.`;
     const categoryTitles = {
       all: 'New Analysis',
       betting: 'New Sports Betting Analysis',
-      fantasy: 'New Fantasy (NFC) Analysis',
+      fantasy: 'New Fantasy Analysis',
       dfs: 'New DFS Lineup Analysis',
       kalshi: 'New Kalshi Market Analysis'
     };
@@ -1909,9 +1940,23 @@ No preamble. Start directly with section 1.`;
     }
   };
 
-  const handleVote = (index: number, direction: 'up' | 'down') => {
-    // Placeholder for vote handling logic
-    console.log(`Vote ${direction} on message ${index}`);
+  const handleVote = async (index: number, direction: 'up' | 'down') => {
+    // Optimistic UI update
+    setMessages(prev => prev.map((m, i) => i === index ? { ...m, voted: direction } : m));
+    toast.success(direction === 'up' ? 'Marked helpful — thanks!' : "Got it, we'll improve this");
+    try {
+      await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vote: direction === 'up' ? 'helpful' : 'improve',
+          messageExcerpt: messages[index]?.content?.slice(0, 500),
+          sessionId: activeChat,
+        }),
+      });
+    } catch {
+      // Non-blocking — feedback is best-effort
+    }
   };
 
   const handleEditChatTitle = (chatId: string, currentTitle: string, e: React.MouseEvent) => {
@@ -2429,14 +2474,16 @@ No preamble. Start directly with section 1.`;
 
           <div className="mt-4">
             <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">Platform</div>
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            <div className="relative">
+              <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-gray-950 to-transparent z-10 pointer-events-none" />
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide pr-6">
               {categories.map(cat => {
                 const Icon = cat.icon;
                 const isActive = selectedCategory === cat.id;
                 return (
                   <button
                     key={cat.id}
-                    onClick={() => { setSelectedCategory(cat.id); setSelectedSport(''); }}
+                    onClick={() => { setSelectedCategory(cat.id); setSelectedSport(''); setSuggestedPrompts([]); setLastUserQuery(''); }}
                     className={`group/pill flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 border whitespace-nowrap flex-shrink-0 ${
                       isActive
                         ? 'bg-gray-800 text-white border-gray-700 shadow-lg'
@@ -2452,10 +2499,13 @@ No preamble. Start directly with section 1.`;
                 );
               })}
             </div>
+            </div>
             {/* Sports filter row — visible for all non-Kalshi platforms */}
             {selectedCategory !== 'kalshi' && (
-              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide mt-2">
-                {sports.map(sport => {
+              <div className="relative mt-2">
+                <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-gray-950 to-transparent z-10 pointer-events-none" />
+              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide pr-6">
+                {sports.filter(s => !(['fantasy', 'dfs'].includes(selectedCategory) && s.id.startsWith('ncaa'))).map(sport => {
                   const isActive = selectedSport === sport.id;
                   return (
                     <button
@@ -2471,6 +2521,7 @@ No preamble. Start directly with section 1.`;
                     </button>
                   );
                 })}
+              </div>
               </div>
             )}
             {/* Kalshi category filters */}
@@ -2840,9 +2891,26 @@ No preamble. Start directly with section 1.`;
                         </div>
                       )}
 
-                      {/* Confidence */}
+                      {/* Confidence / Benford Trust Score */}
                       {message.confidence && !message.isWelcome && (
-                        <span className="text-[10px] text-gray-600 font-medium">{message.confidence}% conf.</span>
+                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-md border ${
+                          message.confidence >= 85 ? 'bg-green-500/10 border-green-500/20' :
+                          message.confidence >= 65 ? 'bg-amber-500/10 border-amber-500/20' :
+                          'bg-red-500/10 border-red-500/20'
+                        }`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${
+                            message.confidence >= 85 ? 'bg-green-400' :
+                            message.confidence >= 65 ? 'bg-amber-400' : 'bg-red-400'
+                          }`} />
+                          <span className={`text-[9px] font-bold uppercase tracking-wider ${
+                            message.confidence >= 85 ? 'text-green-400' :
+                            message.confidence >= 65 ? 'text-amber-400' : 'text-red-400'
+                          }`}>{message.confidence}% integrity</span>
+                        </div>
+                      )}
+                      {/* Model badge */}
+                      {message.modelUsed && !message.isWelcome && (
+                        <span className="text-[9px] font-bold text-gray-600 uppercase tracking-wider">{message.modelUsed}</span>
                       )}
                     </div>
                   )}
@@ -2850,8 +2918,8 @@ No preamble. Start directly with section 1.`;
                   <div
                     className={`relative group/message ${
                       message.role === 'user'
-                        ? 'rounded-2xl px-4 py-3 bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-lg shadow-blue-500/20 w-fit max-w-[85%] ml-auto'
-                        : 'rounded-xl px-4 py-3 bg-gray-900/50 text-gray-100 border border-gray-800/60'
+                        ? 'rounded-2xl rounded-tr-sm px-5 py-3.5 bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-lg shadow-blue-500/25 w-fit max-w-[85%] ml-auto'
+                        : 'rounded-2xl rounded-tl-sm px-5 py-4 bg-gradient-to-br from-gray-900 via-gray-800/50 to-gray-900 text-gray-100 border border-gray-700/40 shadow-lg shadow-black/30'
                     }`}
                   >
                     {editingMessageIndex === index ? (
@@ -3415,22 +3483,30 @@ No preamble. Start directly with section 1.`;
                       {message.role === 'assistant' && (
                         <>
                           <button
-                            onClick={() => handleVote(index, 'up')}
-                            className="flex items-center gap-2 px-3.5 py-2 rounded-xl hover:bg-green-500/10 active:bg-green-500/20 transition-all group/action border border-transparent hover:border-green-500/30"
+                            onClick={() => message.voted !== 'up' && handleVote(index, 'up')}
+                            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all group/action border ${
+                              message.voted === 'up'
+                                ? 'bg-green-500/15 border-green-500/40 cursor-default'
+                                : 'hover:bg-green-500/10 active:bg-green-500/20 border-transparent hover:border-green-500/30'
+                            }`}
                             title="This response was helpful"
                             aria-label="Mark as helpful"
                           >
-                            <ThumbsUp className="w-4 h-4 text-gray-500 group-hover/action:text-green-400 transition-colors" />
-                            <span className="text-xs font-bold text-gray-500 group-hover/action:text-green-400">Helpful</span>
+                            <ThumbsUp className={`w-4 h-4 transition-colors ${message.voted === 'up' ? 'text-green-400 fill-green-400/30' : 'text-gray-500 group-hover/action:text-green-400'}`} />
+                            <span className={`text-xs font-bold ${message.voted === 'up' ? 'text-green-400' : 'text-gray-500 group-hover/action:text-green-400'}`}>Helpful</span>
                           </button>
                           <button
-                            onClick={() => handleVote(index, 'down')}
-                            className="flex items-center gap-2 px-3.5 py-2 rounded-xl hover:bg-red-500/10 active:bg-red-500/20 transition-all group/action border border-transparent hover:border-red-500/30"
+                            onClick={() => message.voted !== 'down' && handleVote(index, 'down')}
+                            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all group/action border ${
+                              message.voted === 'down'
+                                ? 'bg-red-500/15 border-red-500/40 cursor-default'
+                                : 'hover:bg-red-500/10 active:bg-red-500/20 border-transparent hover:border-red-500/30'
+                            }`}
                             title="This response needs improvement"
                             aria-label="Mark as needing improvement"
                           >
-                            <ThumbsDown className="w-4 h-4 text-gray-500 group-hover/action:text-red-400 transition-colors" />
-                            <span className="text-xs font-bold text-gray-500 group-hover/action:text-red-400">Improve</span>
+                            <ThumbsDown className={`w-4 h-4 transition-colors ${message.voted === 'down' ? 'text-red-400 fill-red-400/30' : 'text-gray-500 group-hover/action:text-red-400'}`} />
+                            <span className={`text-xs font-bold ${message.voted === 'down' ? 'text-red-400' : 'text-gray-500 group-hover/action:text-red-400'}`}>Improve</span>
                           </button>
                           <button
                             onClick={() => handleRegenerateResponse(index)}
@@ -3519,6 +3595,114 @@ No preamble. Start directly with section 1.`;
           )}
 
           <div className="relative max-w-5xl mx-auto">
+            {/* Fantasy League Setup Flow — shown when Fantasy is selected and no league is configured */}
+            {selectedCategory === 'fantasy' && !fantasyLeague?.setupComplete && (
+              <div className="mb-5 bg-gradient-to-br from-green-900/30 via-gray-900/80 to-green-900/20 border border-green-700/40 rounded-2xl p-4 backdrop-blur-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <Trophy className="w-4 h-4 text-green-400" />
+                  <span className="text-sm font-bold text-green-300">Set up your fantasy league</span>
+                  <span className="ml-auto text-[10px] font-bold text-gray-500 uppercase tracking-wider">Step {fantasySetupStep + 1} of 4</span>
+                </div>
+                {fantasySetupStep === 0 && (
+                  <div>
+                    <p className="text-xs text-gray-400 mb-2">What kind of fantasy league are you playing?</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[['season-long', 'Season-Long'], ['best-ball', 'Best Ball'], ['dfs-contest', 'DFS Contest'], ['survivor', 'Survivor']].map(([val, label]) => (
+                        <button key={val} onClick={() => { setFantasySetupData(d => ({ ...d, type: val as any })); setFantasySetupStep(1); }}
+                          className="px-3 py-1.5 rounded-full border border-green-700/50 bg-green-900/20 text-green-300 text-xs font-bold hover:bg-green-700/30 hover:border-green-500/60 transition-all">
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {fantasySetupStep === 1 && (
+                  <div>
+                    <p className="text-xs text-gray-400 mb-2">How many teams in your league?</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[8, 10, 12, 14].map(n => (
+                        <button key={n} onClick={() => { setFantasySetupData(d => ({ ...d, teams: n })); setFantasySetupStep(2); }}
+                          className="px-3 py-1.5 rounded-full border border-green-700/50 bg-green-900/20 text-green-300 text-xs font-bold hover:bg-green-700/30 hover:border-green-500/60 transition-all">
+                          {n} teams
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {fantasySetupStep === 2 && (
+                  <div>
+                    <p className="text-xs text-gray-400 mb-2">Scoring format?</p>
+                    <div className="flex flex-wrap gap-2">
+                      {['PPR', 'Half-PPR', 'Standard'].map(s => (
+                        <button key={s} onClick={() => { setFantasySetupData(d => ({ ...d, scoring: s as any })); setFantasySetupStep(3); }}
+                          className="px-3 py-1.5 rounded-full border border-green-700/50 bg-green-900/20 text-green-300 text-xs font-bold hover:bg-green-700/30 hover:border-green-500/60 transition-all">
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {fantasySetupStep === 3 && (
+                  <div>
+                    <p className="text-xs text-gray-400 mb-2">Your sport and team name?</p>
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {['NFL', 'NBA', 'MLB', 'NHL'].map(sp => (
+                        <button key={sp} onClick={() => setFantasySetupData(d => ({ ...d, sport: sp.toLowerCase() }))}
+                          className={`px-3 py-1.5 rounded-full border text-xs font-bold transition-all ${fantasySetupData.sport === sp.toLowerCase() ? 'bg-green-700/40 border-green-500/60 text-green-200' : 'border-green-700/50 bg-green-900/20 text-green-300 hover:bg-green-700/30'}`}>
+                          {sp}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="text"
+                        placeholder="Team name (e.g. Gronk's Hammers)"
+                        value={fantasySetupData.teamName || ''}
+                        onChange={e => setFantasySetupData(d => ({ ...d, teamName: e.target.value }))}
+                        className="flex-1 bg-gray-900/60 border border-green-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-500/60 transition-all"
+                        maxLength={40}
+                      />
+                      <button
+                        onClick={() => {
+                          if (!fantasySetupData.sport || !fantasySetupData.teamName?.trim()) return;
+                          const league: FantasyLeague = {
+                            type: fantasySetupData.type || 'season-long',
+                            teams: fantasySetupData.teams || 12,
+                            scoring: fantasySetupData.scoring || 'PPR',
+                            teamName: fantasySetupData.teamName.trim(),
+                            sport: fantasySetupData.sport,
+                            setupComplete: true,
+                          };
+                          localStorage.setItem('leverage_fantasy_league', JSON.stringify(league));
+                          setFantasyLeague(league);
+                          setFantasySetupStep(0);
+                          setFantasySetupData({});
+                          toast.success(`League saved! Welcome, ${league.teamName} 🏆`);
+                        }}
+                        disabled={!fantasySetupData.sport || !fantasySetupData.teamName?.trim()}
+                        className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all"
+                      >
+                        Save League →
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {fantasyLeague === null && fantasySetupStep > 0 && (
+                  <button onClick={() => setFantasySetupStep(s => Math.max(0, s - 1))} className="mt-2 text-[10px] text-gray-600 hover:text-gray-400 transition-colors">
+                    ← Back
+                  </button>
+                )}
+              </div>
+            )}
+            {/* Show configured league context + reset button */}
+            {selectedCategory === 'fantasy' && fantasyLeague?.setupComplete && (
+              <div className="mb-3 flex items-center gap-2 px-1">
+                <Trophy className="w-3.5 h-3.5 text-green-500" />
+                <span className="text-[11px] font-bold text-green-400">{fantasyLeague.teamName}</span>
+                <span className="text-[10px] text-gray-600">{fantasyLeague.sport?.toUpperCase()} · {fantasyLeague.teams} teams · {fantasyLeague.scoring}</span>
+                <button onClick={() => { setFantasyLeague(null); localStorage.removeItem('leverage_fantasy_league'); }} className="ml-auto text-[10px] text-gray-600 hover:text-gray-400 transition-colors">Edit league</button>
+              </div>
+            )}
             {/* Follow up on: label — plain text, not a pill */}
             {/* Welcome categorized quick-start grid — shown only on fresh session */}
             {messages.length === 1 && messages[0]?.isWelcome && suggestedPrompts.length === 0 && (
@@ -3569,7 +3753,10 @@ No preamble. Start directly with section 1.`;
               </div>
             )}
             {/* Dynamic Contextual Suggestions or Platform Prompts */}
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-0 mb-5">
+            <div className="relative mb-5">
+              <div className="absolute left-0 inset-y-0 w-6 bg-gradient-to-r from-black to-transparent z-10 pointer-events-none" />
+              <div className="absolute right-0 inset-y-0 w-14 bg-gradient-to-l from-black to-transparent z-10 pointer-events-none" />
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 px-2">
               {(suggestedPrompts.length > 0 && messages.length > 1 ? suggestedPrompts : quickActions).map((action, idx) => {
                 const Icon = action.icon;
                 const isSuggested = suggestedPrompts.length > 0 && messages.length > 1;
@@ -3625,6 +3812,7 @@ No preamble. Start directly with section 1.`;
                 );
               })}
             </div>
+            </div>
 
             {/* File Upload Preview */}
             {uploadedFiles.length > 0 && (
@@ -3666,7 +3854,7 @@ No preamble. Start directly with section 1.`;
             )}
 
             <form onSubmit={handleSubmit} className="flex gap-3">
-              <div className="flex-1 relative group/input">
+              <div className="flex-1 relative group/input focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:shadow-lg focus-within:shadow-blue-500/10 rounded-2xl transition-all duration-300">
                 {/* Hidden File Input */}
                 <input
                   ref={fileInputRef}
@@ -3692,7 +3880,7 @@ No preamble. Start directly with section 1.`;
                       ? `Follow up on your ${lastUserQuery.toLowerCase().includes('nba') ? 'NBA' : lastUserQuery.toLowerCase().includes('nfl') ? 'NFL' : lastUserQuery.toLowerCase().includes('kalshi') ? 'Kalshi' : lastUserQuery.toLowerCase().includes('dfs') ? 'DFS' : lastUserQuery.toLowerCase().includes('fantasy') ? 'fantasy' : 'sports'} analysis or ask something new...`
                       : 'Ask about betting odds, fantasy strategy, DFS lineups, or Kalshi markets...'
                   }
-                  className="w-full bg-gradient-to-r from-gray-900/80 to-gray-850/80 border border-gray-700/50 hover:border-gray-600/50 focus:border-blue-500/50 rounded-2xl px-6 py-4.5 pr-32 font-medium text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all backdrop-blur-sm shadow-inner text-xs"
+                  className="w-full bg-gray-900/90 border border-gray-700/50 hover:border-gray-600/60 focus:border-blue-500/40 rounded-2xl px-6 py-4.5 pr-32 font-medium text-white placeholder-gray-500 focus:outline-none transition-all backdrop-blur-sm shadow-inner text-sm"
                   disabled={isTyping}
                   maxLength={500}
                 />
@@ -3735,7 +3923,7 @@ No preamble. Start directly with section 1.`;
 
             <div className="flex items-center justify-between mt-4 px-1">
               <p className="text-[11px] font-bold text-gray-600">
-                Betting • Fantasy (NFBC/NFFC/NFBKC) • DFS • Kalshi • Real-time AI Analysis
+                Betting • Fantasy • DFS • Kalshi • Real-time AI Analysis
               </p>
               <div className="flex items-center gap-3">
                 <button

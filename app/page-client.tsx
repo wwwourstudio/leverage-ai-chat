@@ -225,7 +225,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const abortControllerRef = React.useRef<AbortController | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [verifyStage, setVerifyStage] = useState<'analyzing' | 'reverifying'>('analyzing');
   const [cardAnalysisMap, setCardAnalysisMap] = useState<Record<string, { loading: boolean; content: string | null; error: string | null }>>({});
   const [sidebarOpen, setSidebarOpen] = useState(true);

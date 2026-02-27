@@ -136,7 +136,7 @@ async function checkKalshiAPI(): Promise<ServiceHealth> {
     
     // Basic connectivity check via public endpoint
     const response = await fetch(
-      'https://trading-api.kalshi.com/trade-api/v2/markets?limit=1&status=open',
+      'https://api.elections.kalshi.com/trade-api/v2/markets?limit=1&status=open',
       {
         headers: {
           'Accept': 'application/json'

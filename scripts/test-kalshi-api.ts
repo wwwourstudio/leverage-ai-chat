@@ -3,7 +3,7 @@
  * Tests API endpoints, verifies credentials, and diagnoses connection issues
  */
 
-const KALSHI_BASE_URL = 'https://trading-api.kalshi.com/trade-api/v2';
+const KALSHI_BASE_URL = 'https://api.elections.kalshi.com/trade-api/v2';
 const DEMO_BASE_URL = 'https://demo-api.kalshi.co/trade-api/v2';
 
 interface TestResult {
@@ -308,7 +308,7 @@ function printSummary() {
   console.log('='.repeat(60) + '\n');
   
   if (failed > 0) {
-    console.log('1. Check network connectivity to trading-api.kalshi.com');
+    console.log('1. Check network connectivity to api.elections.kalshi.com');
     console.log('2. Verify API endpoint URLs are correct');
     console.log('3. Check for CORS issues if running from browser');
   }

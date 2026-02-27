@@ -747,7 +747,7 @@ export async function generateContextualCards(
   // Kalshi/Prediction Markets — route by subcategory pill when provided
   if (category === 'kalshi') {
     const sub = (kalshiSubcategory || '').toLowerCase();
-    console.log(`[v0] [CARDS-GEN] Kalshi category, subcategory="${sub || 'none (trending)"}"`);
+    console.log('[v0] [CARDS-GEN] Kalshi category, subcategory=' + (sub || 'none (trending)'));
     try {
       const {
         fetchKalshiMarketsWithRetry,

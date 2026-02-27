@@ -1,24 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
+import { getStripeSecretKey, getStripeMonthlyPriceId, getStripeAnnualPriceId } from '@/lib/config';
 
 /**
  * POST /api/stripe/checkout
- * Creates a Stripe Checkout session for credit purchases or subscriptions.
+ *
+ * Creates a Stripe Embedded Checkout session and returns a clientSecret
+ * for the frontend to render the in-app Stripe form.
  *
  * Request body:
  * - type: 'credits' | 'subscription'
- * - amount: number (for credits)
+ * - amount: number (for credits, in dollars)
  * - credits: number
- * - planId: string (for subscriptions)
- * - customer_email?: string (pre-fills Stripe Link for returning users)
+ * - planId: string (for subscriptions: 'monthly' | 'annual')
+ * - customer_email?: string
+ *
+ * Response (real mode): { clientSecret: string }
+ * Response (mock mode):  { success: true, mock: true, credits: number }
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { type, amount, credits, planId, customer_email } = body;
 
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const stripeSecretKey = getStripeSecretKey();
 
-    // If Stripe is not configured, fall back to mock mode
     if (!stripeSecretKey) {
       console.log('[Stripe] No STRIPE_SECRET_KEY configured, using mock mode');
       return NextResponse.json({
@@ -29,29 +35,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Dynamic import with webpackIgnore so Next.js doesn't try to bundle
-    // the stripe package at build time (it may not be installed).
-    let Stripe: any;
-    try {
-      Stripe = (await import(/* webpackIgnore: true */ 'stripe')).default;
-    } catch {
-      console.log('[Stripe] stripe package not installed, using mock mode');
-      return NextResponse.json({
-        success: true,
-        mock: true,
-        credits: credits || amount || 20,
-        message: 'Credits added (mock mode — install stripe package for real payments)',
-      });
-    }
-
     const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-12-18.acacia' });
     const origin = request.headers.get('origin') || 'http://localhost:3000';
+    // After embedded checkout completes, Stripe redirects to return_url
+    const returnUrl = `${origin}?session_id={CHECKOUT_SESSION_ID}`;
 
     if (type === 'subscription') {
-      // Map plan IDs to Stripe Price IDs (set these in your Stripe dashboard)
       const priceMap: Record<string, string> = {
-        monthly: process.env.STRIPE_MONTHLY_PRICE_ID || '',
-        annual: process.env.STRIPE_ANNUAL_PRICE_ID || '',
+        monthly: getStripeMonthlyPriceId() || '',
+        annual: getStripeAnnualPriceId() || '',
       };
 
       const priceId = priceMap[planId || 'monthly'];
@@ -65,22 +57,22 @@ export async function POST(request: NextRequest) {
       }
 
       const session = await stripe.checkout.sessions.create({
+        ui_mode: 'embedded',
         mode: 'subscription',
         line_items: [{ price: priceId, quantity: 1 }],
-        automatic_payment_methods: { enabled: true }, // enables Stripe Link for returning customers
         customer_email: customer_email || undefined,
         allow_promotion_codes: true,
-        success_url: `${origin}?session_id={CHECKOUT_SESSION_ID}&credits=${credits}`,
-        cancel_url: `${origin}?canceled=true`,
+        return_url: returnUrl,
         metadata: { type: 'subscription', planId, credits: String(credits) },
       });
 
-      return NextResponse.json({ url: session.url });
+      return NextResponse.json({ clientSecret: session.client_secret });
     } else {
       // One-time credit purchase
       const unitAmount = Math.max((amount || 10) * 100, 500); // min $5
 
       const session = await stripe.checkout.sessions.create({
+        ui_mode: 'embedded',
         mode: 'payment',
         line_items: [
           {
@@ -95,15 +87,13 @@ export async function POST(request: NextRequest) {
             quantity: 1,
           },
         ],
-        automatic_payment_methods: { enabled: true }, // enables Stripe Link for returning customers
         customer_email: customer_email || undefined,
         allow_promotion_codes: true,
-        success_url: `${origin}?session_id={CHECKOUT_SESSION_ID}&credits=${credits || amount}`,
-        cancel_url: `${origin}?canceled=true`,
+        return_url: returnUrl,
         metadata: { type: 'credits', credits: String(credits || amount) },
       });
 
-      return NextResponse.json({ url: session.url });
+      return NextResponse.json({ clientSecret: session.client_secret });
     }
   } catch (error: any) {
     console.error('[Stripe] Checkout error:', error);

@@ -62,7 +62,8 @@ const ORIG_ANNUAL_ID = process.env.STRIPE_ANNUAL_PRICE_ID;
 beforeEach(() => {
   mockSessionCreate.mockReset();
   MockStripe.mockClear();
-  mockSessionCreate.mockResolvedValue({ url: 'https://checkout.stripe.com/pay/test-session' });
+  // Embedded checkout returns client_secret instead of a redirect url
+  mockSessionCreate.mockResolvedValue({ client_secret: 'cs_test_embedded_secret_123' });
 });
 
 afterEach(() => {
@@ -158,9 +159,10 @@ describe('POST /api/stripe/checkout', () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.url).toBe('https://checkout.stripe.com/pay/test-session');
+    expect(body.clientSecret).toBe('cs_test_embedded_secret_123');
     expect(mockSessionCreate).toHaveBeenCalledWith(
       expect.objectContaining({
+        ui_mode: 'embedded',
         mode: 'subscription',
         line_items: [{ price: 'price_monthly_123', quantity: 1 }],
         customer_email: 'user@example.com',
@@ -175,9 +177,10 @@ describe('POST /api/stripe/checkout', () => {
     const res = await POST(makePostRequest({ type: 'subscription', planId: 'annual', credits: 150 }));
     const body = await res.json();
 
-    expect(body.url).toBeTruthy();
+    expect(body.clientSecret).toBeTruthy();
     expect(mockSessionCreate).toHaveBeenCalledWith(
       expect.objectContaining({
+        ui_mode: 'embedded',
         line_items: [{ price: 'price_annual_456', quantity: 1 }],
       }),
     );
@@ -196,7 +199,7 @@ describe('POST /api/stripe/checkout', () => {
     );
   });
 
-  it('includes success_url and cancel_url in subscription session', async () => {
+  it('includes return_url in embedded checkout session', async () => {
     process.env.STRIPE_SECRET_KEY = 'sk_test_abc';
     process.env.STRIPE_MONTHLY_PRICE_ID = 'price_monthly_123';
 
@@ -207,8 +210,10 @@ describe('POST /api/stripe/checkout', () => {
     }, 'https://app.example.com'));
 
     const call = mockSessionCreate.mock.calls[0][0];
-    expect(call.success_url).toContain('https://app.example.com');
-    expect(call.cancel_url).toContain('https://app.example.com');
+    expect(call.ui_mode).toBe('embedded');
+    expect(call.return_url).toContain('https://app.example.com');
+    expect(call.success_url).toBeUndefined();
+    expect(call.cancel_url).toBeUndefined();
   });
 
   // ── Credits (one-time) type ────────────────────────────────────────────────
@@ -220,9 +225,10 @@ describe('POST /api/stripe/checkout', () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.url).toBe('https://checkout.stripe.com/pay/test-session');
+    expect(body.clientSecret).toBe('cs_test_embedded_secret_123');
     expect(mockSessionCreate).toHaveBeenCalledWith(
       expect.objectContaining({
+        ui_mode: 'embedded',
         mode: 'payment',
         line_items: expect.arrayContaining([
           expect.objectContaining({
@@ -273,9 +279,9 @@ describe('POST /api/stripe/checkout', () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.url).toBeTruthy();
+    expect(body.clientSecret).toBeTruthy();
     expect(mockSessionCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ mode: 'payment' }),
+      expect.objectContaining({ ui_mode: 'embedded', mode: 'payment' }),
     );
   });
 

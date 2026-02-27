@@ -126,8 +126,27 @@ export const getGrokApiKey = () =>
   getServerEnv('GROK_API_KEY', { required: false });
 
 // External APIs
-export const getOddsApiKey = () => 
+export const getOddsApiKey = () =>
   getServerEnv('ODDS_API_KEY', { required: false });
+
+// Stripe
+export const getStripeSecretKey = () =>
+  getServerEnv('STRIPE_SECRET_KEY', { required: false });
+
+export const getStripeWebhookSecret = () =>
+  getServerEnv('STRIPE_WEBHOOK_SECRET', { required: false });
+
+export const getStripeMonthlyPriceId = () =>
+  getServerEnv('STRIPE_MONTHLY_PRICE_ID', { required: false });
+
+export const getStripeAnnualPriceId = () =>
+  getServerEnv('STRIPE_ANNUAL_PRICE_ID', { required: false });
+
+export const getStripePublishableKey = () =>
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? null;
+
+export const isStripeConfigured = () =>
+  !!getStripeSecretKey();
 
 // ============================================================================
 // SERVICE STATUS CHECKS

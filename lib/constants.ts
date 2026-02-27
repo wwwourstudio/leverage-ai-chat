@@ -271,6 +271,39 @@ export const FANTASY_CONFIG = {
   INJURY_ALERT_DELAY_FREE_MS: 5 * 60 * 1000,
 } as const;
 
+// Stripe Credit Packages
+export const CREDIT_PACKAGES = [
+  { amount: 10, credits: 10, label: '$10', popular: false },
+  { amount: 25, credits: 25, label: '$25', popular: false },
+  { amount: 50, credits: 50, label: '$50', popular: true },
+  { amount: 100, credits: 100, label: '$100', popular: false },
+  { amount: 250, credits: 250, label: '$250', popular: false },
+];
+
+// Stripe Subscription Plans
+export const SUBSCRIPTION_PLANS = [
+  {
+    id: 'monthly',
+    name: 'Monthly',
+    price: 20,
+    credits: 20,
+    interval: 'month',
+    billed: null as number | null,
+    popular: false,
+    features: ['20 credits/month', 'Priority AI analysis', 'Real-time alerts', 'Cancel anytime'],
+  },
+  {
+    id: 'annual',
+    name: 'Annual',
+    price: 15,
+    credits: 25,
+    interval: 'month',
+    billed: 180 as number | null,
+    popular: true,
+    features: ['25 credits/month', 'Priority AI analysis', 'Real-time alerts', 'Advanced analytics', 'Save 25%'],
+  },
+];
+
 // Default NFL Scoring (PPR)
 export const DEFAULT_SCORING_NFL_PPR = {
   pass_yards_per_point: 25,

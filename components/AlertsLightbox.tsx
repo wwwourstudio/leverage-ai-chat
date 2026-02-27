@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Bell, Plus, Trash2, AlertTriangle, TrendingUp, Target, Activity, Zap, Loader2, CheckCircle, ToggleLeft, ToggleRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/toast-provider';
+import { SPORT_KEYS } from '@/lib/constants';
 
 interface AlertsLightboxProps {
   isOpen: boolean;
@@ -38,7 +39,17 @@ const ALERT_TYPES = [
   { value: 'game_start', label: 'Game Start', icon: Bell, color: 'text-cyan-400' },
 ];
 
-const SPORTS = ['NBA', 'NFL', 'MLB', 'NHL', 'NCAAB', 'NCAAF', 'EPL', 'MLS', 'UFC'];
+const SPORTS = Object.values(SPORT_KEYS).map(s => s.NAME);
+
+function formatRelativeTime(isoString: string): string {
+  const diff = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
 
 export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
   const toast = useToast();
@@ -48,6 +59,7 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
   const [saving, setSaving] = useState(false);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // New alert form state
   const [newAlert, setNewAlert] = useState({
@@ -87,6 +99,34 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
       loadAlerts();
     }
   }, [authReady, authUserId]);
+
+  // Poll /api/alerts/check every 60 s; fire toasts for newly triggered alerts
+  useEffect(() => {
+    if (!authUserId || !isOpen) return;
+
+    const checkAlerts = async () => {
+      try {
+        const res = await fetch('/api/alerts/check');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.triggered && Array.isArray(data.triggered)) {
+          for (const alert of data.triggered as { title: string }[]) {
+            toast.success(`Alert fired: ${alert.title}`);
+          }
+          if (data.triggered.length > 0) {
+            await loadAlerts(); // refresh counts
+          }
+        }
+      } catch {
+        // silent — polling failures are non-fatal
+      }
+    };
+
+    pollingRef.current = setInterval(checkAlerts, 60_000);
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [authUserId, isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadAlerts = async () => {
     if (!authUserId) {
@@ -134,7 +174,10 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
           description: newAlert.description || null,
           threshold: newAlert.threshold ? parseFloat(newAlert.threshold) : null,
           max_triggers: parseInt(newAlert.max_triggers) || 1,
-          condition: {},
+          condition: {
+            marketType: newAlert.alert_type,
+            threshold: newAlert.threshold ? parseFloat(newAlert.threshold) : null,
+          },
           is_active: true,
         });
 
@@ -385,7 +428,8 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
                     </p>
                     <p className="text-[10px] text-gray-600 mt-0.5">
                       Created {new Date(alert.created_at).toLocaleDateString()}
-                      {alert.trigger_count > 0 && ` · Triggered ${alert.trigger_count}x`}
+                      {alert.trigger_count > 0 && ` · Triggered ${alert.trigger_count}×`}
+                      {alert.last_triggered_at && ` · last ${formatRelativeTime(alert.last_triggered_at)}`}
                     </p>
                   </div>
 

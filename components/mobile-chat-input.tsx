@@ -1,7 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { Send, Mic, Paperclip } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Send, Paperclip } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+const MAX_CHARS = 1500;
 
 interface MobileChatInputProps {
   onSend: (message: string) => void;
@@ -9,70 +12,122 @@ interface MobileChatInputProps {
   placeholder?: string;
 }
 
-export function MobileChatInput({ onSend, disabled, placeholder = "Ask about betting opportunities..." }: MobileChatInputProps) {
+export function MobileChatInput({
+  onSend,
+  disabled,
+  placeholder = 'Ask about betting opportunities...',
+}: MobileChatInputProps) {
   const [input, setInput] = useState('');
+  const [focused, setFocused] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const charCount = input.length;
+  const atLimit = charCount >= MAX_CHARS;
+  const nearLimit = charCount >= MAX_CHARS * 0.85;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (input.trim() && !disabled) {
-      onSend(input.trim());
-      setInput('');
+    const trimmed = input.trim();
+    if (!trimmed || disabled || atLimit) return;
+    onSend(trimmed);
+    setInput('');
+    // Reset textarea height
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
     }
   };
 
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (e.target.value.length > MAX_CHARS) return;
+    setInput(e.target.value);
+    // Auto-expand height
+    const ta = e.target;
+    ta.style.height = 'auto';
+    ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
+  };
+
+  const canSend = input.trim().length > 0 && !disabled && !atLimit;
+
   return (
-    <div className="border-t border-[oklch(0.22_0.02_280)] bg-[oklch(0.10_0.01_280)]/95 backdrop-blur-xl p-4">
-      <form onSubmit={handleSubmit} className="flex items-end gap-2">
+    <div className="border-t border-[oklch(0.20_0.018_280)] bg-[oklch(0.095_0.01_280)]/95 backdrop-blur-xl">
+      <form onSubmit={handleSubmit} className="flex items-end gap-2 p-3">
+
+        {/* Attach */}
         <button
           type="button"
-          className="p-3 rounded-xl bg-[oklch(0.16_0.015_280)] hover:bg-[oklch(0.20_0.02_280)] transition-colors flex-shrink-0"
           aria-label="Attach file"
+          className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-gray-600 hover:text-gray-400 hover:bg-[oklch(0.16_0.015_280)] transition-all border border-[oklch(0.20_0.018_280)] hover:border-[oklch(0.28_0.02_280)] mb-0.5"
         >
-          <Paperclip className="w-5 h-5 text-gray-400" />
+          <Paperclip className="w-4 h-4" />
         </button>
 
-        <div className="flex-1 relative">
+        {/* Text area wrapper */}
+        <div className={cn(
+          'flex-1 relative rounded-xl border transition-all duration-150',
+          focused
+            ? 'border-blue-500/50 bg-[oklch(0.13_0.015_280)] ring-2 ring-blue-500/15'
+            : 'border-[oklch(0.22_0.02_280)] bg-[oklch(0.13_0.015_280)]',
+          disabled && 'opacity-50',
+        )}>
           <textarea
+            ref={textareaRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(e);
-              }
-            }}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
-            className="w-full resize-none bg-[oklch(0.16_0.015_280)] border border-[oklch(0.22_0.02_280)] rounded-xl px-4 py-3 pr-12 text-gray-100 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            style={{ maxHeight: '120px' }}
+            aria-label="Chat message"
+            aria-describedby="chat-input-hint"
+            className="w-full resize-none bg-transparent text-[13px] text-gray-100 placeholder-gray-600 py-2.5 px-3.5 pr-14 focus:outline-none disabled:cursor-not-allowed leading-relaxed"
+            style={{ maxHeight: '160px' }}
           />
 
-          <button
-            type="button"
-            className="absolute right-2 bottom-2 p-2 rounded-lg bg-[oklch(0.20_0.02_280)] hover:bg-[oklch(0.25_0.02_280)] transition-colors"
-            aria-label="Voice input"
-          >
-            <Mic className="w-4 h-4 text-slate-400" />
-          </button>
+          {/* Char counter — appears near limit */}
+          {nearLimit && (
+            <span className={cn(
+              'absolute bottom-2 right-3 text-[10px] tabular-nums font-mono pointer-events-none',
+              atLimit ? 'text-red-400' : 'text-yellow-500/70',
+            )}>
+              {charCount}/{MAX_CHARS}
+            </span>
+          )}
         </div>
 
+        {/* Send */}
         <button
           type="submit"
-          disabled={!input.trim() || disabled}
-          className="p-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+          disabled={!canSend}
           aria-label="Send message"
+          className={cn(
+            'flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-150 mb-0.5',
+            canSend
+              ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/40'
+              : 'bg-[oklch(0.16_0.015_280)] text-gray-700 cursor-not-allowed border border-[oklch(0.20_0.018_280)]',
+          )}
         >
-          <Send className="w-5 h-5 text-white" />
+          <Send className="w-4 h-4" />
         </button>
       </form>
-      
-      <div className="flex items-center gap-2 mt-2 px-1">
-        <div className="flex-1 flex items-center gap-1 text-xs text-slate-500">
-          <span className="w-2 h-2 rounded-full bg-green-500"></span>
-          <span>AI Online</span>
+
+      {/* Footer hint bar */}
+      <div id="chat-input-hint" className="flex items-center justify-between px-3.5 pb-2.5">
+        <div className="flex items-center gap-1.5">
+          <span className={cn('w-1.5 h-1.5 rounded-full', disabled ? 'bg-yellow-500' : 'bg-emerald-500')} />
+          <span className="text-[10px] text-gray-600 font-medium">
+            {disabled ? 'AI thinking...' : 'Grok 4 ready'}
+          </span>
         </div>
-        <span className="text-xs text-slate-600">Press Enter to send</span>
+        <span className="text-[10px] text-gray-700">
+          <kbd className="font-mono">Enter</kbd> to send &middot; <kbd className="font-mono">Shift+Enter</kbd> for newline
+        </span>
       </div>
     </div>
   );

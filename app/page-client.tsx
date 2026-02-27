@@ -1049,7 +1049,7 @@ No preamble. Start directly with section 1.`;
       // Political market guard — respects the UI platform selection:
       // - Kalshi platform selected → always political (never fetch sports odds)
       // - Betting platform selected → never political (don't let message keywords override)
-      // - Otherwise ��� use message-based detection
+      // - Otherwise ����� use message-based detection
       const finalIsPoliticalMarket = selectedCategory === 'kalshi' ||
         ((isPoliticalMarket || detectedPlatform === 'kalshi') && selectedCategory !== 'betting');
 
@@ -2338,85 +2338,110 @@ No preamble. Start directly with section 1.`;
         </div>
       )}
       
-      {/* Sidebar */}
+      {/* ============================================================
+        Sidebar
+        ============================================================ */}
       <div
         className={`${
-          sidebarOpen ? 'w-80' : 'w-0'
-        } bg-gradient-to-b from-gray-950 via-gray-900 to-black border-r border-gray-800/50 transition-all duration-300 overflow-hidden flex flex-col backdrop-blur-xl`}
+          sidebarOpen ? 'w-72' : 'w-0'
+        } bg-[oklch(0.075_0.01_280)] border-r border-[oklch(0.16_0.015_280)] transition-all duration-300 overflow-hidden flex flex-col`}
       >
-        <div className="p-4 border-b border-gray-800/50 bg-gradient-to-b from-gray-900/50 to-transparent">
+        {/* Brand header */}
+        <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[oklch(0.14_0.014_280)]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm shadow-blue-900/50 flex-shrink-0">
+              <Zap className="w-3.5 h-3.5 text-white" />
+            </div>
+            <div className="leading-none">
+              <p className="text-[13px] font-bold text-white tracking-tight">Leverage AI</p>
+              <p className="text-[10px] text-gray-600 font-mono mt-0.5">Powered by Grok 4</p>
+            </div>
+          </div>
+          {/* Sidebar close toggle */}
+          <button
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Collapse sidebar"
+            className="p-1.5 rounded-lg text-gray-600 hover:text-gray-400 hover:bg-[oklch(0.14_0.014_280)] transition-all"
+          >
+            <Menu className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* New Analysis CTA */}
+        <div className="px-3 pt-3 pb-2">
           <button
             onClick={handleNewChat}
-            className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white rounded-full px-4 py-3 transition-all duration-300 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 flex items-center justify-center gap-2 font-bold group relative overflow-hidden"
+            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-[13px] font-semibold rounded-xl px-4 py-2.5 transition-colors shadow-sm shadow-blue-900/40"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-            <Plus className="w-4 h-4 relative z-10 group-hover:rotate-90 transition-transform duration-300" />
-            <span className="relative z-10 text-sm">New Analysis</span>
+            <Plus className="w-4 h-4" />
+            New Analysis
           </button>
 
           {/* Chat search */}
-          <div className="relative mt-3">
+          <div className="relative mt-2.5">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600 pointer-events-none" />
             <input
               value={chatSearch}
               onChange={e => setChatSearch(e.target.value)}
               placeholder="Search chats..."
-              className="w-full bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] rounded-lg py-2 pl-8 pr-3 text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 transition-colors"
+              className="w-full bg-[oklch(0.11_0.012_280)] border border-[oklch(0.18_0.015_280)] rounded-lg py-2 pl-8 pr-3 text-[12px] text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/20 transition-all"
             />
           </div>
+        </div>
 
-          <div className="mt-4">
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">Platform</div>
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-              {categories.map(cat => {
-                const Icon = cat.icon;
-                const isActive = selectedCategory === cat.id;
+        {/* Platform + Sport filters */}
+        <div className="px-3 pb-2 border-b border-[oklch(0.14_0.014_280)]">
+          <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-2 px-0.5">Platform</p>
+          <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-hide">
+            {categories.map(cat => {
+              const Icon = cat.icon;
+              const isActive = selectedCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => { setSelectedCategory(cat.id); setSelectedSport(''); }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap flex-shrink-0 border ${
+                    isActive
+                      ? 'bg-blue-600 text-white border-blue-500 shadow-sm shadow-blue-900/40'
+                      : 'bg-transparent text-gray-500 border-[oklch(0.18_0.015_280)] hover:text-gray-300 hover:bg-[oklch(0.14_0.014_280)] hover:border-[oklch(0.24_0.02_280)]'
+                  }`}
+                  title={cat.desc}
+                >
+                  <Icon className={`w-3 h-3 ${isActive ? 'text-white' : 'text-gray-600'}`} />
+                  {cat.id === 'all' ? 'ALL' : cat.name.toUpperCase()}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Sports sub-filter */}
+          {selectedCategory !== 'kalshi' && (
+            <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide mt-1.5">
+              {sports.map(sport => {
+                const isActive = selectedSport === sport.id;
                 return (
                   <button
-                    key={cat.id}
-                    onClick={() => { setSelectedCategory(cat.id); setSelectedSport(''); }}
-                    className={`group/pill flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 border whitespace-nowrap flex-shrink-0 ${
+                    key={sport.id}
+                    onClick={() => setSelectedSport(isActive ? '' : sport.id)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all whitespace-nowrap flex-shrink-0 border ${
                       isActive
-                        ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-500/30'
-                        : 'bg-transparent text-gray-500 border-gray-800 hover:text-gray-300 hover:bg-gray-800/50 hover:border-gray-700'
+                        ? 'bg-blue-600/25 text-blue-300 border-blue-500/50'
+                        : 'bg-transparent text-gray-600 border-[oklch(0.18_0.015_280)] hover:text-gray-400 hover:border-[oklch(0.26_0.02_280)]'
                     }`}
-                    title={cat.desc}
                   >
-                    <Icon className={`w-3.5 h-3.5 transition-colors duration-300 ${
-                      isActive ? 'text-white' : `text-gray-600 group-hover/pill:text-gray-400`
-                    }`} />
-                    <span>{cat.id === 'all' ? 'ALL' : cat.name.toUpperCase()}</span>
+                    {sport.name}
                   </button>
                 );
               })}
             </div>
-            {/* Sports filter row — visible for all non-Kalshi platforms */}
-            {selectedCategory !== 'kalshi' && (
-              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide mt-2">
-                {sports.map(sport => {
-                  const isActive = selectedSport === sport.id;
-                  return (
-                    <button
-                      key={sport.id}
-                      onClick={() => setSelectedSport(isActive ? '' : sport.id)}
-                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all duration-200 border whitespace-nowrap flex-shrink-0 ${
-                        isActive
-                          ? 'bg-blue-600/30 text-blue-200 border-blue-500/70 shadow-sm shadow-blue-500/20'
-                          : 'bg-transparent text-gray-600 border-gray-800/60 hover:text-gray-400 hover:border-gray-700'
-                      }`}
-                    >
-                      {sport.name}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            {/* Kalshi category filters */}
-            {selectedCategory === 'kalshi' && (
-              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide mt-2">
-                {['Trending', 'Politics', 'Sports', 'Culture', 'Crypto', 'Climate', 'Economics', 'Mentions', 'Companies', 'Financials', 'Tech & Science'].map(topic => (
-                  <button
-                    key={topic}
+          )}
+
+          {/* Kalshi topic filters */}
+          {selectedCategory === 'kalshi' && (
+            <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide mt-1.5">
+              {['Trending', 'Politics', 'Sports', 'Culture', 'Crypto', 'Climate', 'Economics', 'Mentions', 'Companies', 'Financials', 'Tech & Science'].map(topic => (
+                <button
+                  key={topic}
                     onClick={() => setSelectedSport(selectedSport === topic ? '' : topic)}
                     className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all duration-200 border whitespace-nowrap flex-shrink-0 ${
                       selectedSport === topic
@@ -2432,14 +2457,14 @@ No preamble. Start directly with section 1.`;
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2.5 space-y-3 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {/* Starred Chats Section */}
-                  {filteredChats.filter((chat: Chat) => chat.starred).length > 0 && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between px-2.5 py-1.5">
-                <div className="flex items-center gap-2">
-                  <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+          {filteredChats.filter((chat: Chat) => chat.starred).length > 0 && (
+            <div className="space-y-0.5 mb-1">
+              <div className="flex items-center justify-between px-2 py-1">
+                <div className="flex items-center gap-1.5">
+                  <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
                     Starred
                   </span>
                 </div>
@@ -2451,16 +2476,16 @@ No preamble. Start directly with section 1.`;
                 <div
                   key={chat.id}
                   onClick={() => handleSelectChat(chat.id)}
-                  className={`group relative rounded-lg p-3 cursor-pointer transition-all duration-300 ${
+                  className={`group relative rounded-lg p-2.5 cursor-pointer transition-all duration-150 border-l-2 ${
                     activeChat === chat.id
-                      ? 'bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10 border border-blue-500/30 shadow-lg shadow-blue-500/10'
-                      : 'bg-gray-900/30 hover:bg-gray-800/50 border border-transparent hover:border-gray-700/50'
+                      ? 'bg-[oklch(0.13_0.014_280)] border-l-blue-500 border-y border-r border-[oklch(0.20_0.018_280)]'
+                      : 'bg-transparent border-l-transparent hover:bg-[oklch(0.10_0.012_280)] border-y border-r border-transparent hover:border-[oklch(0.16_0.015_280)]'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1.5 group/title">
-                        <MessageSquare className={`w-3.5 h-3.5 ${activeChat === chat.id ? 'text-blue-400' : 'text-gray-500'} flex-shrink-0`} />
+                        <MessageSquare className={`w-3 h-3 ${activeChat === chat.id ? 'text-blue-400' : 'text-gray-600'} flex-shrink-0`} />
                         {editingChatId === chat.id ? (
                           <div className="flex-1 flex items-center gap-1">
                             <input
@@ -2486,7 +2511,7 @@ No preamble. Start directly with section 1.`;
                           </div>
                         ) : (
                           <div className="flex-1 flex items-center gap-1.5 min-w-0">
-                            <h3 className="text-xs font-bold text-white truncate flex-1">
+                            <h3 className={`text-[12px] font-semibold truncate flex-1 ${activeChat === chat.id ? 'text-white' : 'text-gray-300'}`}>
                               {chat.title}
                             </h3>
                             <button
@@ -2499,17 +2524,17 @@ No preamble. Start directly with section 1.`;
                           </div>
                         )}
                       </div>
-                      <p className="text-[11px] text-gray-400 truncate mb-2 leading-tight">{chat.preview}</p>
+                      <p className="text-[11px] text-gray-500 truncate leading-snug">{chat.preview}</p>
                       
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center justify-between gap-2 mt-1.5">
                         <div className="flex items-center gap-1 flex-wrap">
                           {chat.tags.slice(0, 2).map((tag, i) => (
-                            <span key={i} className="px-1.5 py-0.5 bg-gray-800/50 border border-gray-700/50 rounded text-[10px] font-semibold text-gray-500">
+                            <span key={i} className="px-1.5 py-0.5 bg-[oklch(0.14_0.012_280)] border border-[oklch(0.20_0.016_280)] rounded text-[9px] font-bold text-gray-600 uppercase tracking-wide">
                               {tag}
                             </span>
                           ))}
                         </div>
-                        <span className="text-[10px] font-medium text-gray-600">{formatTimestamp(chat.timestamp)}</span>
+                        <span className="text-[10px] font-mono text-gray-700 tabular-nums">{formatTimestamp(chat.timestamp)}</span>
                       </div>
                     </div>
                     <div className="flex flex-col gap-1">
@@ -2533,18 +2558,16 @@ No preamble. Start directly with section 1.`;
           )}
 
           {/* All Chats Section */}
-          <div className="space-y-1.5">
+          <div className="space-y-0.5">
             {/* Divider — only shown when starred section is also visible */}
             {filteredChats.filter((chat: Chat) => chat.starred).length > 0 && (
-              <div className="flex items-center gap-2 px-2.5 pt-1 pb-0.5">
-                <div className="flex-1 h-px bg-gray-800/80" />
-              </div>
+              <div className="h-px bg-[oklch(0.14_0.014_280)] mx-2 my-1" />
             )}
-            <div className="flex items-center justify-between px-2.5 py-1.5">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <div className="flex items-center justify-between px-2 py-1">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
                 {selectedCategory === 'all' ? 'All Chats' : categories.find(c => c.id === selectedCategory)?.name || 'Chats'}
               </span>
-              <span className="text-[10px] font-bold text-gray-600">
+              <span className="text-[10px] font-mono text-gray-700">
                   {filteredChats.filter((chat: Chat) => !chat.starred).length}
               </span>
             </div>
@@ -2600,17 +2623,17 @@ No preamble. Start directly with section 1.`;
                       </div>
                     )}
                   </div>
-                  <p className="text-[11px] text-gray-400 truncate mb-2 leading-tight">{chat.preview}</p>
+                  <p className="text-[11px] text-gray-500 truncate leading-snug">{chat.preview}</p>
                   
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-2 mt-1.5">
                     <div className="flex items-center gap-1 flex-wrap">
                       {chat.tags.slice(0, 2).map((tag, i) => (
-                        <span key={i} className="px-1.5 py-0.5 bg-gray-800/50 border border-gray-700/50 rounded text-[10px] font-semibold text-gray-500">
+                        <span key={i} className="px-1.5 py-0.5 bg-[oklch(0.14_0.012_280)] border border-[oklch(0.20_0.016_280)] rounded text-[9px] font-bold text-gray-600 uppercase tracking-wide">
                           {tag}
                         </span>
                       ))}
                     </div>
-                    <span className="text-[10px] font-medium text-gray-600">{formatTimestamp(chat.timestamp)}</span>
+                    <span className="text-[10px] font-mono text-gray-700 tabular-nums">{formatTimestamp(chat.timestamp)}</span>
                   </div>
                 </div>
                 <div className="flex flex-col gap-1">
@@ -2641,11 +2664,10 @@ No preamble. Start directly with section 1.`;
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-black via-gray-950 to-black">
+      <div className="flex-1 flex flex-col overflow-hidden bg-[oklch(0.08_0.01_280)]">
         {/* Header */}
-        <div className="relative bg-gradient-to-r from-gray-950 via-gray-900 to-gray-950 border-b border-gray-800/50 px-6 py-4 shadow-2xl backdrop-blur-xl">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-transparent to-transparent pointer-events-none"></div>
-          <div className="relative flex items-center justify-between max-w-6xl mx-auto">
+        <div className="bg-[oklch(0.075_0.01_280)] border-b border-[oklch(0.16_0.015_280)] px-5 py-3.5">
+          <div className="flex items-center justify-between max-w-5xl mx-auto">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -3418,7 +3440,10 @@ No preamble. Start directly with section 1.`;
           </div>
           <div className="flex-1 space-y-3">
             <div className="bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl px-5 py-4 border border-gray-700/60 shadow-2xl">
-              <AIProgressIndicator stage={verifyStage} />
+              <AIProgressIndicator
+                      stage={verifyStage}
+                      onCancel={() => setIsTyping(false)}
+                    />
             </div>
           </div>
         </div>

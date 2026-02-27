@@ -139,20 +139,46 @@
   }
   body {
     @apply bg-background text-foreground;
+    scroll-behavior: smooth;
+  }
+
+  /* Custom scrollbar — thin, dark, no track */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.28 0.02 280);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.36 0.025 280);
+  }
+
+  /* Scrollbar hide utility */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }
 
+/* ============================================================
+   Keyframes
+   ============================================================ */
+
 @keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
 }
 
 @keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -162,22 +188,53 @@
 }
 
 @keyframes slide-in-left {
-  from { opacity: 0; transform: translateX(-10px); }
+  from { opacity: 0; transform: translateX(-12px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50%       { box-shadow: 0 0 0 3px oklch(0.55 0.2 250 / 0.35); }
+}
+
+/* ============================================================
+   Animation utilities
+   ============================================================ */
+
 @utility animate-fade-in-up {
-  animation: fade-in-up 0.3s ease-out both;
+  animation: fade-in-up 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @utility animate-fade-in {
-  animation: fade-in 0.25s ease-out both;
+  animation: fade-in 0.22s ease-out both;
 }
 
 @utility animate-slide-in-left {
-  animation: slide-in-left 0.3s ease-out both;
+  animation: slide-in-left 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@utility animate-slide-in-right {
+  animation: slide-in-right 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@utility animate-scale-in {
+  animation: scale-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @utility animate-shimmer {
-  animation: shimmer 1.2s linear infinite;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@utility animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
 }

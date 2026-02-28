@@ -2807,7 +2807,7 @@ No preamble. Start directly with section 1.`;
                             </span>
                           ))}
                         </div>
-                        <span className="text-[10px] font-medium text-gray-600">{formatTimestamp(chat.timestamp)}</span>
+                        <span suppressHydrationWarning className="text-[10px] font-medium text-gray-600">{formatTimestamp(chat.timestamp)}</span>
                       </div>
                     </div>
                     <div className="flex flex-col gap-1">
@@ -2902,7 +2902,7 @@ No preamble. Start directly with section 1.`;
                         </span>
                       ))}
                     </div>
-                    <span className="text-[10px] font-medium text-gray-600">{formatTimestamp(chat.timestamp)}</span>
+                    <span suppressHydrationWarning className="text-[10px] font-medium text-gray-600">{formatTimestamp(chat.timestamp)}</span>
                   </div>
                 </div>
                 <div className="flex flex-col gap-1">
@@ -3053,7 +3053,7 @@ No preamble. Start directly with section 1.`;
                 
                 return (
                   <div
-                    key={`message-${index}-${message.timestamp.getTime()}`}
+                    key={`message-${index}`}
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn ${isGrouped ? 'mt-1.5' : 'mt-5'}`}
                   >
                 <div className={message.role === 'user' ? 'max-w-[75%]' : 'w-full max-w-4xl'}>

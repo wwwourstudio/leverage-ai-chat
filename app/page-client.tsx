@@ -2004,15 +2004,15 @@ No preamble. Start directly with section 1.`;
 
       for (const f of currentFiles) {
         if (f.data?.headers && f.data?.rows) {
-          // CSV/TSV — cap at 40 rows to stay within grok-4 context budget.
-          // DFS slates rarely need more than 40 players per position group for lineup building.
-          const MAX_CSV_ROWS = 40;
+          // Cap at 20 rows — top 20 salary players is all grok-4 needs for DFS lineup
+          // building. More rows → bigger prompt → timeouts without meaningful quality gain.
+          const MAX_CSV_ROWS = 20;
           const headers = f.data.headers.join('\t');
           const rows = f.data.rows.slice(0, MAX_CSV_ROWS).map((r: string[]) => r.join('\t')).join('\n');
           const truncated = f.data.rows.length > MAX_CSV_ROWS
-            ? `\n[... ${f.data.rows.length - MAX_CSV_ROWS} more rows omitted — top ${MAX_CSV_ROWS} by file order shown]`
+            ? `\n[... ${f.data.rows.length - MAX_CSV_ROWS} additional rows available but omitted to stay within context budget. Top ${MAX_CSV_ROWS} rows by file order shown above.]`
             : '';
-          fileSections.push(`[File: ${f.name} (${f.data.rows.length} rows total, showing ${Math.min(f.data.rows.length, MAX_CSV_ROWS)})]
+          fileSections.push(`[File: ${f.name} (${f.data.rows.length} rows total, showing top ${Math.min(f.data.rows.length, MAX_CSV_ROWS)})]
 ${headers}
 ${rows}${truncated}`);
         } else if (f.textContent) {
@@ -2023,11 +2023,11 @@ ${rows}${truncated}`);
 
       if (fileSections.length > 0) {
         const fileContext = fileSections.join('\n\n');
-        // Hard cap at 6,000 chars of file context so the combined prompt stays
-        // well within grok-4's processing budget and doesn't trigger timeouts.
-        const MAX_FILE_CONTEXT_CHARS = 6000;
+        // Hard cap at 3,500 chars of file context — enough for 20 players with all
+        // DK columns while keeping the total prompt under grok-4's timeout threshold.
+        const MAX_FILE_CONTEXT_CHARS = 3500;
         const cappedContext = fileContext.length > MAX_FILE_CONTEXT_CHARS
-          ? fileContext.slice(0, MAX_FILE_CONTEXT_CHARS) + `\n[... file context truncated at ${MAX_FILE_CONTEXT_CHARS} chars to prevent timeout]`
+          ? fileContext.slice(0, MAX_FILE_CONTEXT_CHARS) + `\n[... file context truncated at ${MAX_FILE_CONTEXT_CHARS} chars]`
           : fileContext;
         promptForAI = (input ? input + '\n\n' : 'Analyze this data:\n\n') + cappedContext;
       } else if (!input) {

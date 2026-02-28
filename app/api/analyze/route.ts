@@ -171,6 +171,28 @@ export async function POST(request: NextRequest) {
       enrichedPrompt += `\n\n[System: Live odds are unavailable — ODDS_API_KEY is not configured in the server environment. Inform the user they need to add ODDS_API_KEY to their Vercel environment variables to enable live odds.]`;
     }
 
+    // ── Server-side prompt guard ─────────────────────────────────────────────
+    // Truncate the enriched prompt to 4,000 chars before sending to the AI.
+    // This is the last line of defense against oversized prompts that cause timeouts.
+    // The client already caps at 3,500 chars of file context, but the odds/fantasy
+    // context injection above can add another ~800 chars, so we cap the full combined
+    // prompt here at 4,000 chars (≈ ~1,000 tokens — well within grok-4's comfort zone).
+    const MAX_PROMPT_CHARS = 4000;
+    if (enrichedPrompt.length > MAX_PROMPT_CHARS) {
+      console.warn(`[API/analyze] Prompt too long (${enrichedPrompt.length} chars) — truncating to ${MAX_PROMPT_CHARS}`);
+      enrichedPrompt = enrichedPrompt.slice(0, MAX_PROMPT_CHARS) + '\n[... prompt truncated to prevent timeout]';
+    }
+
+    // DFS CSV prompts route to grok-3-fast directly — it handles structured data
+    // faster and the routing logic is simpler than complex sports reasoning.
+    const hasCsvData = enrichedPrompt.includes('[File:') && enrichedPrompt.includes('rows total');
+    const isDfsOrFantasy = context.hasFantasyIntent || userMessage.toLowerCase().includes('lineup') || userMessage.toLowerCase().includes('dfs') || userMessage.toLowerCase().includes('salary');
+    const useFastModel = hasCsvData && isDfsOrFantasy;
+
+    if (useFastModel) {
+      console.log('[API/analyze] CSV+DFS detected — routing directly to grok-3-fast for speed');
+    }
+
     // ── Launch card generation BEFORE AI (they're independent operations) ──────
     // Starting both in parallel shaves ~6-8 seconds off the total request time
     // because card generation (Odds API fetch) runs during the AI generation window.
@@ -243,10 +265,16 @@ export async function POST(request: NextRequest) {
 
     if (xaiApiKey) {
       try {
+        // Route CSV+DFS queries directly to grok-3-fast; use grok-4 for everything else
+        const primaryModelId = useFastModel ? 'grok-3-fast' : AI_CONFIG.MODEL_NAME;
+        if (useFastModel) {
+          modelUsed = 'Grok 3 Fast';
+        }
+
         // Initial generation with timeout protection
         const result = await Promise.race([
           generateText({
-            model: createXai({ apiKey: xaiApiKey })(AI_CONFIG.MODEL_NAME),
+            model: createXai({ apiKey: xaiApiKey })(primaryModelId),
             system: systemPrompt,
             ...buildGenOptions(enrichedPrompt, hasImages ? body.imageAttachments : undefined),
             temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
@@ -307,9 +335,9 @@ export async function POST(request: NextRequest) {
           );
         }
       } catch (aiError) {
-        // If grok-4 fails (e.g. API key lacks access), try grok-3-fast before giving up
-        const primaryModel = AI_CONFIG.MODEL_NAME;
-        const fallbackModel = 'grok-3-fast';
+        // If primary model fails, fall back to grok-3-fast (or grok-3-mini if already on fast)
+        const primaryModel = useFastModel ? 'grok-3-fast' : AI_CONFIG.MODEL_NAME;
+        const fallbackModel = useFastModel ? 'grok-3-mini' : 'grok-3-fast';
         console.warn(`[API/analyze] ${primaryModel} failed, retrying with ${fallbackModel}:`, aiError instanceof Error ? aiError.message : aiError);
         try {
           const fallbackTimeoutPromise = new Promise<never>((_, reject) => {

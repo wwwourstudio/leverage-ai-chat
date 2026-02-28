@@ -45,7 +45,9 @@ interface FileAttachment {
   url: string;
   size: number;
   data?: { headers: string[]; rows: string[][] } | null; // For CSV parsed data
-  textContent?: string | null; // For txt / json files
+  textContent?: string | null; // For txt / json / pdf files
+  imageBase64?: string | null;  // Raw base64 (no data: prefix) for vision API
+  mimeType?: string | null;     // e.g. 'image/jpeg'
 }
 
 interface APIResponse<T = any> {
@@ -263,6 +265,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string; query?: string }>>([]);
   const [lastUserQuery, setLastUserQuery] = useState<string>('');
   const [selectedSport, setSelectedSport] = useState<string>('');
+  const [cardsRefreshedAt, setCardsRefreshedAt] = useState<Date | null>(null);
+  const cardsRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fantasy league setup state — must NOT read localStorage here (causes SSR hydration mismatch #418)
   interface FantasyLeague {
@@ -562,6 +566,44 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         console.error('[v0] Error loading initial data:', err);
       });
   }, []);
+
+  // Auto-refresh cards every 5 minutes when the conversation has AI cards
+  useEffect(() => {
+    const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+    const refreshCards = async () => {
+      // Only refresh if there are messages with cards showing
+      const hasCards = messages.some(m => m.role === 'assistant' && m.cards && m.cards.length > 0);
+      if (!hasCards || !lastUserQuery) return;
+
+      try {
+        const { fetchDynamicCards: fetchCards } = await import('@/lib/data-service');
+        const freshCards = await fetchCards({ userContext: lastUserQuery, limit: 4 });
+        if (freshCards.length === 0) return;
+
+        const converted = freshCards.map(convertToInsightCard);
+        setMessages(prev => {
+          const updated = [...prev];
+          // Update the last assistant message that has cards
+          for (let i = updated.length - 1; i >= 0; i--) {
+            if (updated[i].role === 'assistant' && updated[i].cards?.length) {
+              updated[i] = { ...updated[i], cards: converted };
+              break;
+            }
+          }
+          return updated;
+        });
+        setCardsRefreshedAt(new Date());
+      } catch {
+        // Non-critical — silently skip on error
+      }
+    };
+
+    if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current);
+    cardsRefreshIntervalRef.current = setInterval(refreshCards, REFRESH_INTERVAL);
+    return () => { if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length, lastUserQuery]);
 
   // Start with empty chat history - user creates real chats
   const [chats, setChats] = useState<Chat[]>([
@@ -1100,7 +1142,7 @@ No preamble. Start directly with section 1.`;
     setIsTyping(false);
   };
 
-  const generateRealResponse = async (userMessage: string) => {
+  const generateRealResponse = async (userMessage: string, imageAttachments?: Array<{ name: string; base64: string; mimeType: string }>) => {
     // Cancel any in-flight request
     abortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -1289,7 +1331,7 @@ No preamble. Start directly with section 1.`;
         fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userMessage: contextualUserMessage, existingCards: availableCards, context, customInstructions: customInstructions || undefined }),
+          body: JSON.stringify({ userMessage: contextualUserMessage, existingCards: availableCards, context, customInstructions: customInstructions || undefined, imageAttachments: imageAttachments?.length ? imageAttachments : undefined }),
           signal: controller.signal,
         }).then(async (res) => {
           if (!res.ok) {
@@ -1712,6 +1754,43 @@ No preamble. Start directly with section 1.`;
 
 
 
+  /** Read a File as raw base64 (no data: URI prefix) for vision API */
+  const readFileAsBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result.includes(',') ? result.split(',')[1] : result);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  /** Basic PDF text extraction — filters printable chars from raw PDF bytes */
+  const extractPdfText = async (file: File): Promise<string> => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const decoder = new TextDecoder('latin1');
+      const rawText = decoder.decode(arrayBuffer);
+      const matches = rawText.match(/\(([^)]{1,300})\)\s*(?:Tj|TJ|'|")/g) ?? [];
+      const extracted = matches
+        .map(m => m.replace(/^\(/, '').replace(/\)\s*(?:Tj|TJ|'|")$/, ''))
+        .join(' ')
+        .replace(/\\[nrt]/g, ' ')
+        .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
+        .replace(/\s{3,}/g, '\n')
+        .trim();
+      if (extracted.length > 50) return extracted.slice(0, 10000);
+      return rawText
+        .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
+        .replace(/\s{3,}/g, '\n')
+        .trim()
+        .slice(0, 10000);
+    } catch {
+      return '';
+    }
+  };
+
   const processFiles = async (fileList: FileList | File[]): Promise<FileAttachment[]> => {
     const files = Array.from(fileList);
     const newAttachments: FileAttachment[] = [];
@@ -1725,9 +1804,10 @@ No preamble. Start directly with section 1.`;
       const isTextFile = fileType === 'text/plain' || file.name.endsWith('.txt');
       const isJsonFile = fileType === 'application/json' || fileType === 'text/json' || file.name.endsWith('.json');
       const isImage = fileType.startsWith('image/');
+      const isPdf = fileType === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
-      if (!isImage && !isCsvOrTsv && !isTextFile && !isJsonFile) {
-        alert(`File type not supported: ${file.name}. Supported: images, CSV, TSV, TXT, JSON.`);
+      if (!isImage && !isCsvOrTsv && !isTextFile && !isJsonFile && !isPdf) {
+        alert(`File type not supported: ${file.name}. Supported: images, CSV, TSV, TXT, JSON, PDF.`);
         continue;
       }
 
@@ -1739,9 +1819,16 @@ No preamble. Start directly with section 1.`;
         type: isImage ? 'image' : isCsvOrTsv ? 'csv' : isJsonFile ? 'json' : 'text',
         url: fileUrl,
         size: file.size,
+        mimeType: isImage ? fileType : undefined,
       };
 
-      if (isCsvOrTsv) {
+      if (isImage) {
+        try {
+          attachment.imageBase64 = await readFileAsBase64(file);
+        } catch {
+          // Vision skipped; filename still included in text prompt
+        }
+      } else if (isCsvOrTsv) {
         const text = await file.text();
         const delimiter = file.name.endsWith('.tsv') || fileType === 'text/tab-separated-values' ? '\t' : ',';
         attachment.data = parseDelimitedFile(text, delimiter);
@@ -1757,6 +1844,11 @@ No preamble. Start directly with section 1.`;
           const text = await file.text();
           attachment.textContent = text.slice(0, 10000);
         }
+      } else if (isPdf) {
+        const pdfText = await extractPdfText(file);
+        attachment.textContent = pdfText.length > 50
+          ? `[PDF: ${file.name}]\n${pdfText}`
+          : `[PDF: ${file.name} — text extraction limited. Please describe what you want analyzed from this document.]`;
       }
 
       newAttachments.push(attachment);
@@ -1900,7 +1992,11 @@ No preamble. Start directly with section 1.`;
     }
 
     setInput('');
-    generateRealResponse(promptForAI);
+    // Extract image attachments for vision (must be done before setUploadedFiles clears them)
+    const visionAttachments = currentFiles
+      .filter(f => f.type === 'image' && f.imageBase64)
+      .map(f => ({ name: f.name, base64: f.imageBase64!, mimeType: f.mimeType ?? 'image/jpeg' }));
+    generateRealResponse(promptForAI, visionAttachments.length > 0 ? visionAttachments : undefined);
   };
 
   const handleNewChat = () => {
@@ -4098,7 +4194,7 @@ No preamble. Start directly with section 1.`;
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/jpg,image/gif,image/webp,text/csv,.tsv,text/tab-separated-values,text/plain,.txt,.json,application/json"
+                  accept="image/jpeg,image/png,image/jpg,image/gif,image/webp,text/csv,.tsv,text/tab-separated-values,text/plain,.txt,.json,application/json,.pdf,application/pdf"
                   multiple
                   onChange={handleFileUpload}
                   className="hidden"

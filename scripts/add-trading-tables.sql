@@ -119,3 +119,18 @@ CREATE TRIGGER portfolios_updated_at
 CREATE TRIGGER positions_updated_at
   BEFORE UPDATE ON api.positions
   FOR EACH ROW EXECUTE FUNCTION api.set_updated_at();
+
+-- ─── user_credits table ───────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS api.user_credits (
+  user_id     UUID PRIMARY KEY,
+  credits     INTEGER NOT NULL DEFAULT 10,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE api.user_credits ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "credits_own" ON api.user_credits
+  FOR ALL USING (auth.uid() = user_id);
+
+-- ─── Add saved_files column to user_preferences ───────────────────────────────
+ALTER TABLE api.user_preferences
+  ADD COLUMN IF NOT EXISTS saved_files JSONB DEFAULT '[]'::jsonb;

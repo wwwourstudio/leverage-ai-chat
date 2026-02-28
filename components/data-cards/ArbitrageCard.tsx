@@ -1,7 +1,11 @@
 'use client';
 
-import { TrendingUp, CheckCircle, AlertCircle, ChevronRight, Clock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { TrendingUp, CheckCircle, AlertCircle, ChevronRight, Clock, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+const ARB_EXPIRE_MS = 10 * 60 * 1000; // 10 minutes
+const ARB_WARN_MS = 5 * 60 * 1000;    // 5 minutes warning
 
 interface ArbitrageCardProps {
   data: {
@@ -15,6 +19,7 @@ interface ArbitrageCardProps {
     confidence: string;
     efficiency: string;
     books: string;
+    generatedAt?: string; // ISO timestamp — injected when card is created
   };
   gradient?: string;
   onAnalyze?: () => void;
@@ -22,6 +27,21 @@ interface ArbitrageCardProps {
 }
 
 export function ArbitrageCard({ data, gradient = 'from-emerald-500 to-green-600', onAnalyze, isHero }: ArbitrageCardProps) {
+  const [ageMs, setAgeMs] = useState(0);
+
+  useEffect(() => {
+    if (!data.generatedAt) return;
+    const created = new Date(data.generatedAt).getTime();
+    const tick = () => setAgeMs(Date.now() - created);
+    tick();
+    const id = setInterval(tick, 30_000); // Update every 30s
+    return () => clearInterval(id);
+  }, [data.generatedAt]);
+
+  const ageMin = Math.floor(ageMs / 60_000);
+  const isExpired = ageMs >= ARB_EXPIRE_MS;
+  const isWarning = ageMs >= ARB_WARN_MS && !isExpired;
+
   const confColor =
     data.confidence === 'HIGH' ? 'text-emerald-400' :
     data.confidence === 'MEDIUM' ? 'text-sky-400' :
@@ -32,8 +52,30 @@ export function ArbitrageCard({ data, gradient = 'from-emerald-500 to-green-600'
     'bg-[oklch(0.40_0.01_280)]';
 
   return (
-    <article className="group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200 animate-fade-in-up">
+    <article className={cn(
+      'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border transition-all duration-200 animate-fade-in-up',
+      isExpired
+        ? 'border-[oklch(0.22_0.02_280)] opacity-50 grayscale'
+        : isWarning
+          ? 'border-amber-600/40 hover:border-amber-500/60'
+          : 'border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)]',
+    )}>
       <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)} aria-hidden="true" />
+
+      {/* Expiry banner */}
+      {(isWarning || isExpired) && (
+        <div className={cn(
+          'flex items-center gap-2 px-4 py-1.5 text-[10px] font-bold border-b',
+          isExpired
+            ? 'bg-red-900/30 border-red-700/30 text-red-400'
+            : 'bg-amber-900/20 border-amber-700/20 text-amber-400',
+        )}>
+          <AlertTriangle className="w-3 h-3 shrink-0" />
+          {isExpired
+            ? `Opportunity expired ${ageMin} min ago — odds likely changed`
+            : `${10 - ageMin} min remaining — execute quickly`}
+        </div>
+      )}
 
       <div className="pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5">
         {/* Header */}
@@ -43,9 +85,12 @@ export function ArbitrageCard({ data, gradient = 'from-emerald-500 to-green-600'
             <span className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.55_0.01_280)]">ARBITRAGE</span>
           </div>
           <div className="flex items-center gap-1.5 shrink-0" role="status">
-            <span className={cn('w-1.5 h-1.5 rounded-full animate-pulse', confDot)} />
-            <span className={cn('text-[10px] font-bold uppercase tracking-wider', confColor)}>
-              {data.confidence}
+            {data.generatedAt && ageMin > 0 && (
+              <span className="text-[9px] text-[oklch(0.38_0.01_280)] mr-1">{ageMin}m ago</span>
+            )}
+            <span className={cn('w-1.5 h-1.5 rounded-full animate-pulse', isExpired ? 'bg-red-400 animate-none' : confDot)} />
+            <span className={cn('text-[10px] font-bold uppercase tracking-wider', isExpired ? 'text-red-400' : confColor)}>
+              {isExpired ? 'EXPIRED' : data.confidence}
             </span>
           </div>
         </div>

@@ -16,10 +16,17 @@ import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-dete
 // Types
 // ============================================================================
 
+interface ImageAttachment {
+  name: string;
+  base64: string;    // Raw base64 without data: URI prefix
+  mimeType: string;  // e.g. 'image/jpeg'
+}
+
 interface AnalyzeRequestBody {
   userMessage: string;
   existingCards?: InsightCard[];
   customInstructions?: string;
+  imageAttachments?: ImageAttachment[];
   context?: {
     sport?: string | null;
     marketType?: string | null;
@@ -218,6 +225,22 @@ export async function POST(request: NextRequest) {
 
     const MAX_HALLUCINATION_RETRIES = 2;
 
+    const hasImages = (body.imageAttachments?.length ?? 0) > 0;
+
+    /** Build the generateText call options supporting both text-only and multimodal */
+    const buildGenOptions = (prompt: string, imgs?: ImageAttachment[]) => {
+      if (imgs?.length) {
+        // Multimodal: images + text in messages array
+        type ContentPart = { type: 'text'; text: string } | { type: 'image'; image: string; mimeType: string };
+        const content: ContentPart[] = [{ type: 'text', text: prompt }];
+        for (const img of imgs) {
+          content.push({ type: 'image', image: img.base64, mimeType: img.mimeType });
+        }
+        return { messages: [{ role: 'user' as const, content }] };
+      }
+      return { prompt };
+    };
+
     if (xaiApiKey) {
       try {
         // Initial generation with timeout protection
@@ -225,7 +248,7 @@ export async function POST(request: NextRequest) {
           generateText({
             model: createXai({ apiKey: xaiApiKey })(AI_CONFIG.MODEL_NAME),
             system: systemPrompt,
-            prompt: enrichedPrompt,
+            ...buildGenOptions(enrichedPrompt, hasImages ? body.imageAttachments : undefined),
             temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
             maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
             maxRetries: 1, // Reduced retries to prevent timeout

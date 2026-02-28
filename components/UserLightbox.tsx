@@ -1,9 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, LogOut, Save, Loader2, CheckCircle, Bot, ChevronDown } from 'lucide-react';
+import { X, LogOut, Save, Loader2, CheckCircle, Bot, ChevronDown, Paperclip, FileText, ImageIcon, Trash2 } from 'lucide-react';
 import { SPORT_KEYS } from '@/lib/constants';
 import { useToast } from '@/components/toast-provider';
+
+const SAVED_FILES_KEY = 'leverage_saved_files';
+
+export interface SavedFile {
+  id: string;
+  name: string;
+  type: 'image' | 'csv' | 'text' | 'json';
+  size: number;
+  data?: { headers: string[]; rows: string[][] } | null;
+  textContent?: string | null;
+  savedAt: string;
+}
 
 interface UserLightboxProps {
   isOpen: boolean;
@@ -11,6 +23,7 @@ interface UserLightboxProps {
   user: { name: string; email: string; avatar?: string } | null;
   onLogout: () => void;
   onInstructionsChange: (instructions: string) => void;
+  onAttachFile?: (file: SavedFile) => void;
 }
 
 const STORAGE_KEY = 'leverage_custom_instructions';
@@ -27,7 +40,7 @@ const TEMPLATES = [
 
 const SPORT_NAMES = Object.values(SPORT_KEYS).map(s => s.NAME);
 
-export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsChange }: UserLightboxProps) {
+export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsChange, onAttachFile }: UserLightboxProps) {
   const toast = useToast();
   const [instructions, setInstructions] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,6 +51,19 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
   const [primarySport, setPrimarySport] = useState(SPORT_NAMES[0]);
   const [riskTolerance, setRiskTolerance] = useState<'Conservative' | 'Medium' | 'Aggressive'>('Medium');
   const [stakeStyle, setStakeStyle] = useState('Flat');
+
+  // Saved files state
+  const [savedFiles, setSavedFiles] = useState<SavedFile[]>([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    try {
+      const raw = localStorage.getItem(SAVED_FILES_KEY);
+      setSavedFiles(raw ? JSON.parse(raw) : []);
+    } catch {
+      setSavedFiles([]);
+    }
+  }, [isOpen]);
 
   // Load saved instructions on open
   useEffect(() => {
@@ -114,6 +140,20 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
     }
     onLogout();
     onClose();
+    // Hard-navigate to clear all in-memory state
+    setTimeout(() => { window.location.href = '/'; }, 150);
+  };
+
+  const handleDeleteSavedFile = (id: string) => {
+    const updated = savedFiles.filter(f => f.id !== id);
+    setSavedFiles(updated);
+    localStorage.setItem(SAVED_FILES_KEY, JSON.stringify(updated));
+  };
+
+  const handleAttachFile = (file: SavedFile) => {
+    onAttachFile?.(file);
+    onClose();
+    toast.success(`"${file.name}" attached to your message`);
   };
 
   if (!isOpen) return null;
@@ -255,6 +295,59 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
               >
                 Add to instructions ↑
               </button>
+            </div>
+          </details>
+
+          {/* Saved Files */}
+          <details className="mt-4 group">
+            <summary className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-400 hover:text-gray-200 transition-colors select-none list-none">
+              <ChevronDown className="w-3.5 h-3.5 transition-transform group-open:rotate-180" />
+              Saved Files
+              {savedFiles.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-blue-900/50 text-blue-300 text-[10px] font-black">{savedFiles.length}</span>
+              )}
+            </summary>
+            <div className="mt-3 p-4 bg-gray-950/60 border border-gray-800 rounded-xl space-y-2">
+              {savedFiles.length === 0 ? (
+                <p className="text-xs text-gray-600 text-center py-2">
+                  No saved files. Attach a file to a message and click the bookmark icon to save it here.
+                </p>
+              ) : (
+                savedFiles.map(file => (
+                  <div
+                    key={file.id}
+                    className="flex items-center gap-2 p-2 rounded-lg bg-gray-900/60 border border-gray-800 hover:border-gray-700 transition-all"
+                  >
+                    {file.type === 'image' ? (
+                      <ImageIcon className="w-4 h-4 text-blue-400 shrink-0" />
+                    ) : (
+                      <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-200 truncate">{file.name}</p>
+                      <p className="text-[10px] text-gray-600">
+                        {(file.size / 1024).toFixed(1)} KB · {new Date(file.savedAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => handleAttachFile(file)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-900/40 hover:bg-blue-800/60 border border-blue-700/50 text-[10px] font-bold text-blue-300 hover:text-blue-200 transition-all"
+                      >
+                        <Paperclip className="w-3 h-3" />
+                        Attach
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSavedFile(file.id)}
+                        className="p-1 rounded-md hover:bg-red-900/30 text-gray-600 hover:text-red-400 transition-all"
+                        title="Delete saved file"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </details>
         </div>

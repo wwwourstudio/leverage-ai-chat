@@ -145,6 +145,20 @@ export async function POST(request: NextRequest) {
       enrichedPrompt += `\n\n[Context: General question — answer with your full expert knowledge about sports betting, fantasy, DFS, or prediction markets as appropriate.]`;
     }
 
+    // Fantasy-specific context injection
+    if (context.hasFantasyIntent) {
+      const sport = context.sport || '';
+      const isNFL = sport.includes('football') || sport === '';
+      if (isNFL) {
+        // NFL 2025 season is complete (Super Bowl ~Feb 2026) — tell AI to focus on 2026 offseason
+        enrichedPrompt += `\n\n[Fantasy Context: The 2025 NFL regular season and playoffs are complete. Fantasy advice should now address the 2026 offseason: free agency moves, rookie targets, ADP for 2026 redraft leagues, and dynasty/devy strategy. The card data shows 2025 historical stats as reference.]`;
+      } else {
+        // In-season sport (NBA, MLB, NHL, etc.) — tell AI to use its current knowledge
+        const sportName = sport.replace(/^(americanfootball|basketball|baseball|icehockey|soccer|mma)_?/, '').toUpperCase().replace(/_/g, ' ') || sport.toUpperCase();
+        enrichedPrompt += `\n\n[Fantasy Context: The user is asking about ${sportName} fantasy. Use your current knowledge of active rosters, recent performance, injury reports, and this week's matchups to give accurate advice. Today's date: ${dateStr}.]`;
+      }
+    }
+
     // Regardless of other odds context, tell the AI when the key is missing
     if (context.oddsKeyMissing) {
       enrichedPrompt += `\n\n[System: Live odds are unavailable — ODDS_API_KEY is not configured in the server environment. Inform the user they need to add ODDS_API_KEY to their Vercel environment variables to enable live odds.]`;

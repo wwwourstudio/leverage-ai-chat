@@ -49,16 +49,12 @@ interface AnalyzeRequestBody {
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  // Total budget: 25s primary + 8s fallback = 33s. Vercel limit is 60s on Pro / 30s on Hobby.
-  // grok-4 is reserved for live-odds betting only; grok-3-fast handles everything else.
-  const TIMEOUT_MS = 25000;
+  // Per-attempt budgets: grok-3-fast gets 20s, grok-4 gets 25s.
+  // Fallback gets 10s. Total worst-case: 35s (within Vercel Pro 60s / Hobby 30s limits).
+  const PRIMARY_TIMEOUT_MS = 25000;
+  const FALLBACK_TIMEOUT_MS = 10000;
 
   try {
-    // Add timeout wrapper
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Request timeout - analysis taking too long')), TIMEOUT_MS);
-    });
-
     const body: AnalyzeRequestBody = await request.json();
     const { userMessage, existingCards = [], context = {}, customInstructions } = body;
 
@@ -112,35 +108,40 @@ export async function POST(request: NextRequest) {
     let enrichedPrompt = userMessage;
 
     if (context.oddsData?.events?.length > 0) {
+      // Limit to 5 games × 1 bookmaker — keeps the odds block under ~900 chars
+      // so the combined prompt stays well within grok-4's fast-response zone.
+      // Using 2 bookmakers per game was the #1 cause of oversized prompts.
       const oddsPreview = context.oddsData.events
-        .slice(0, 8)
+        .slice(0, 5)
         .map((e: any) => {
           const lines: string[] = [`${e.away_team} @ ${e.home_team}`];
-          for (const book of (e.bookmakers || []).slice(0, 2)) {
+          // Pick the first available bookmaker only
+          const book = (e.bookmakers || [])[0];
+          if (book) {
             const h2h = book.markets?.find((m: any) => m.key === 'h2h');
             const spread = book.markets?.find((m: any) => m.key === 'spreads');
             const total = book.markets?.find((m: any) => m.key === 'totals');
             if (h2h) {
               const home = h2h.outcomes?.find((o: any) => o.name === e.home_team);
               const away = h2h.outcomes?.find((o: any) => o.name === e.away_team);
-              lines.push(`  ML (${book.title}): ${e.away_team} ${away?.price > 0 ? '+' : ''}${away?.price ?? 'N/A'} | ${e.home_team} ${home?.price > 0 ? '+' : ''}${home?.price ?? 'N/A'}`);
+              lines.push(`  ML: ${e.away_team} ${away?.price > 0 ? '+' : ''}${away?.price ?? 'N/A'} | ${e.home_team} ${home?.price > 0 ? '+' : ''}${home?.price ?? 'N/A'}`);
             }
             if (spread) {
               const home = spread.outcomes?.find((o: any) => o.name === e.home_team);
               const away = spread.outcomes?.find((o: any) => o.name === e.away_team);
-              lines.push(`  Spread (${book.title}): ${e.away_team} ${away?.point > 0 ? '+' : ''}${away?.point ?? ''} (${away?.price > 0 ? '+' : ''}${away?.price ?? 'N/A'}) | ${e.home_team} ${home?.point > 0 ? '+' : ''}${home?.point ?? ''} (${home?.price > 0 ? '+' : ''}${home?.price ?? 'N/A'})`);
+              lines.push(`  Spread: ${e.away_team} ${away?.point > 0 ? '+' : ''}${away?.point ?? ''}(${away?.price > 0 ? '+' : ''}${away?.price ?? 'N/A'}) | ${e.home_team} ${home?.point > 0 ? '+' : ''}${home?.point ?? ''}(${home?.price > 0 ? '+' : ''}${home?.price ?? 'N/A'})`);
             }
             if (total) {
               const over = total.outcomes?.find((o: any) => o.name === 'Over');
               const under = total.outcomes?.find((o: any) => o.name === 'Under');
-              lines.push(`  Total (${book.title}): O${over?.point ?? ''} (${over?.price > 0 ? '+' : ''}${over?.price ?? 'N/A'}) | U${under?.point ?? ''} (${under?.price > 0 ? '+' : ''}${under?.price ?? 'N/A'})`);
+              lines.push(`  Total: O${over?.point ?? ''}(${over?.price > 0 ? '+' : ''}${over?.price ?? 'N/A'}) U${under?.point ?? ''}(${under?.price > 0 ? '+' : ''}${under?.price ?? 'N/A'})`);
             }
           }
           return lines.join('\n');
         })
         .join('\n\n');
 
-      enrichedPrompt += `\n\n--- REAL LIVE ODDS DATA (use ONLY these numbers for odds/lines) ---\nSport: ${context.oddsData.sport}\n\n${oddsPreview}\n--- END ODDS DATA ---`;
+      enrichedPrompt += `\n\n--- REAL LIVE ODDS (use ONLY these for any odds/lines) ---\nSport: ${context.oddsData.sport}\n\n${oddsPreview}\n--- END ODDS ---`;
     } else if (context.noGamesAvailable) {
       // No live games but let the AI give knowledge-based analysis
       enrichedPrompt += `\n\n[Context: No live ${context.sport?.toUpperCase() || 'sports'} games are currently scheduled (offseason or between games). Provide expert analysis, offseason insights, betting strategy, and relevant market knowledge instead of live odds.]`;

@@ -49,10 +49,9 @@ interface AnalyzeRequestBody {
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  // grok-4 is now only used for live-odds betting analysis (tight prompt, high accuracy).
-  // grok-3-fast handles DFS, fantasy, offseason, and CSV — completes well under 10s.
-  // 22s primary + 8s fallback = 30s total, matching Vercel's function limit exactly.
-  const TIMEOUT_MS = 22000;
+  // Total budget: 25s primary + 8s fallback = 33s. Vercel limit is 60s on Pro / 30s on Hobby.
+  // grok-4 is reserved for live-odds betting only; grok-3-fast handles everything else.
+  const TIMEOUT_MS = 25000;
 
   try {
     // Add timeout wrapper
@@ -185,25 +184,24 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Model routing ──────────────────────────────────────────────────────────
-    // Route to grok-3-fast for query types that don't benefit from grok-4's
-    // extended reasoning but reliably trigger timeouts due to prompt size or
-    // model latency:
-    //   • Any query with a CSV/file attachment
-    //   • DFS / lineup building queries (structured output, not deep reasoning)
-    //   • Fantasy-only queries (no betting math requiring grok-4 accuracy)
-    //   • Off-season queries (knowledge-only, no live odds cross-reference needed)
-    // Use grok-4 only for live-odds betting analysis where accuracy matters most.
+    // grok-4  → ONLY for live-odds betting analysis (has actual game lines in prompt)
+    // grok-3-fast → everything else: DFS, fantasy, offseason, CSV, player props, general
+    //
+    // Key insight: grok-4 timeout is caused by large prompts + internal SDK retries.
+    // Any query that doesn't strictly need grok-4's accuracy goes to grok-3-fast.
     const hasCsvData = enrichedPrompt.includes('[File:') && enrichedPrompt.includes('rows total');
     const lc = userMessage.toLowerCase();
-    const isDfsQuery = lc.includes('dfs') || lc.includes('lineup') || lc.includes('salary') || lc.includes('draftkings') || lc.includes('fanduel');
+    const isDfsQuery = lc.includes('dfs') || lc.includes('lineup') || lc.includes('salary')
+      || lc.includes('draftkings') || lc.includes('fanduel') || lc.includes('optimal lineup')
+      || lc.includes('daily fantasy');
     const isFantasyOnly = context.hasFantasyIntent && !context.hasBettingIntent;
     const isOffseason = context.noGamesAvailable === true;
+    const hasLiveOdds = (context.oddsData?.events?.length ?? 0) > 0;
+    // Only use grok-4 when we have REAL live odds to analyze — otherwise it's slower
+    // than grok-3-fast with zero accuracy benefit.
+    const useFastModel = hasCsvData || isDfsQuery || isFantasyOnly || isOffseason || !hasLiveOdds;
 
-    const useFastModel = hasCsvData || isDfsQuery || isFantasyOnly || isOffseason;
-
-    if (useFastModel) {
-      console.log(`[API/analyze] Routing to grok-3-fast — reason: ${hasCsvData ? 'csv' : isDfsQuery ? 'dfs' : isFantasyOnly ? 'fantasy-only' : 'offseason'}`);
-    }
+    console.log(`[API/analyze] Model routing: ${useFastModel ? 'grok-3-fast' : 'grok-4'} — csv=${hasCsvData} dfs=${isDfsQuery} fantasyOnly=${isFantasyOnly} offseason=${isOffseason} hasLiveOdds=${hasLiveOdds}`);
 
     // ── Launch card generation BEFORE AI (they're independent operations) ──────
     // Starting both in parallel shaves ~6-8 seconds off the total request time
@@ -283,7 +281,9 @@ export async function POST(request: NextRequest) {
           modelUsed = 'Grok 3 Fast';
         }
 
-        // Initial generation with timeout protection
+        // Initial generation with timeout protection.
+        // maxRetries: 0 is critical — SDK-level retries bypass our timeoutPromise race,
+        // causing silent double-latency. We manage retries ourselves below.
         const result = await Promise.race([
           generateText({
             model: createXai({ apiKey: xaiApiKey })(primaryModelId),
@@ -291,18 +291,21 @@ export async function POST(request: NextRequest) {
             ...buildGenOptions(enrichedPrompt, hasImages ? body.imageAttachments : undefined),
             temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
             maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
-            maxRetries: 1, // Reduced retries to prevent timeout
+            maxRetries: 0,
           }),
           timeoutPromise
         ]);
         aiText = result.text;
 
-        // Hallucination-detection retry loop (with timeout awareness)
+        // Hallucination-detection retry loop (with live timeout awareness)
         let detection = detectHallucinations(aiText, userMessage, context.oddsData);
         let retryAttempt = 0;
-        const remainingTime = TIMEOUT_MS - (Date.now() - startTime);
 
-        while (detection.shouldRetry && retryAttempt < MAX_HALLUCINATION_RETRIES && remainingTime > 8000) {
+        while (
+          detection.shouldRetry
+          && retryAttempt < MAX_HALLUCINATION_RETRIES
+          && (TIMEOUT_MS - (Date.now() - startTime)) > 8000  // re-check live elapsed time each iteration
+        ) {
           retryAttempt++;
           console.warn(
             `[API/analyze] Hallucination detected (attempt ${retryAttempt}/${MAX_HALLUCINATION_RETRIES}):`,

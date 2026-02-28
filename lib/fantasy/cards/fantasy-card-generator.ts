@@ -2,20 +2,24 @@
  * Fantasy Card Generator
  *
  * Generates InsightCard objects for the fantasy platform's chat-card experience.
- * Uses embedded 2025 NFL projection data + VBD math computed on-the-fly.
+ * Uses archived 2025 NFL season data + VBD math computed on-the-fly for NFL.
+ * For in-season sports (NBA, MLB, NHL) returns live-query cards backed by the AI.
  *
  * Card types produced:
- *   FANTASY_VBD         - Top players at a position by Value-Based Drafting score
+ *   FANTASY_VBD         - Top players at a position by Value-Based Drafting score (NFL 2025 historical)
  *   FANTASY_TIER_CLIFF  - Tier drop alerts (pick-now-or-never signals)
  *   FANTASY_DRAFT       - Draft recommendation (best pick + leverage plays)
  *   FANTASY_WAIVER      - Waiver wire targets with FAAB bid estimates
  *   FANTASY_PROJECTION  - Single-player projection detail
+ *   FANTASY_ADVICE      - Live-query cards for non-NFL sports (NBA, MLB, NHL, etc.)
  */
 
 import type { InsightCard } from '@/lib/cards-generator';
 
 // ============================================================================
-// Embedded 2025 NFL projection data (PPR, standard 16-game season)
+// Archived 2025 NFL season data (PPR, final season projections)
+// NOTE: NFL 2025 season is complete. These are historical reference values.
+// For live in-season sports (NBA, MLB, NHL) use generateNonNFLFantasyCards().
 // ============================================================================
 
 interface EmbeddedPlayer {
@@ -330,7 +334,7 @@ export function generateVBDCard(pos?: string): InsightCard {
     title: pos ? `${pos.toUpperCase()} VBD Rankings` : 'Value Board — Top Picks',
     icon: 'Trophy',
     category: 'FANTASY',
-    subcategory: pos ? `${pos.toUpperCase()} • PPR • 12-Team` : 'PPR • 12-Team • All Positions',
+    subcategory: pos ? `${pos.toUpperCase()} • PPR • NFL 2025 Historical` : 'NFL 2025 Season · PPR · 12-Team',
     gradient: getGradient(pos?.toUpperCase() || 'WR'),
     data: {
       fantasyCardType: 'vbd_rankings',
@@ -353,7 +357,7 @@ export function generateVBDCard(pos?: string): InsightCard {
       leagueSize: 12,
       status: bestTier === 1 ? 'target' : bestTier === 2 ? 'value' : 'sleeper',
     },
-    metadata: { realData: true, dataSource: 'Embedded 2025 Projections' },
+    metadata: { realData: false, dataSource: 'NFL 2025 Season (Historical)' },
   };
 }
 
@@ -381,7 +385,7 @@ export function generateTierCliffCard(): InsightCard {
       description: 'These tier breaks represent the highest-leverage draft moments. Miss a tier-1 player and you may wait 3–4 rounds for equivalent value.',
       status: 'hot',
     },
-    metadata: { realData: true, dataSource: 'Tier Cliff Detector' },
+    metadata: { realData: false, dataSource: 'NFL 2025 Season (Historical)' },
   };
 }
 
@@ -440,7 +444,7 @@ export function generateDraftCard(round: number = 1, pick: number = 5, leagueSiz
       tierCliffAlerts: cliffs.map(c => `${c.pos}: ${c.dropPct.toFixed(1)}% drop after ${c.cliffAfterName}`),
       status: 'target',
     },
-    metadata: { realData: true, dataSource: 'Draft Assistant' },
+    metadata: { realData: false, dataSource: 'NFL 2025 Season (Historical)' },
   };
 }
 
@@ -478,7 +482,7 @@ export function generateWaiverCard(): InsightCard {
       budgetNote: 'Bids shown as % of $100 FAAB budget. Scale linearly with your actual budget.',
       status: 'hot',
     },
-    metadata: { realData: false, dataSource: 'Waiver Engine (demo)' },
+    metadata: { realData: false, dataSource: 'NFL 2025 Waiver (Historical)' },
   };
 }
 
@@ -513,7 +517,7 @@ export function generatePlayerProjectionCard(playerName: string): InsightCard | 
       analysis: generatePlayerAnalysis(player),
       status: player.tier === 1 ? 'target' : player.tier === 2 ? 'value' : 'sleeper',
     },
-    metadata: { realData: true, dataSource: 'Embedded 2025 Projections' },
+    metadata: { realData: false, dataSource: 'NFL 2025 Season (Historical)' },
   };
 }
 
@@ -528,13 +532,112 @@ function generatePlayerAnalysis(p: PlayerVBD): string {
 // ============================================================================
 
 /**
+ * Build sport-appropriate placeholder cards for non-NFL sports.
+ * NFL_PROJECTIONS_2025 is the only embedded dataset; other sports get
+ * informational cards rather than showing incorrect NFL player data.
+ */
+function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[] {
+  // Derive a human-readable sport label from the API key (e.g. 'baseball_mlb' → 'MLB')
+  const sportLabel = sport
+    .replace(/^(americanfootball|basketball|baseball|icehockey|soccer|mma|boxing)_?/, '')
+    .toUpperCase()
+    .replace(/_/g, ' ') || sport.toUpperCase();
+
+  const gradientMap: Record<string, string> = {
+    MLB: 'from-indigo-600 to-purple-700',
+    NBA: 'from-orange-600 to-red-700',
+    NHL: 'from-blue-600 to-cyan-700',
+    NCAAB: 'from-orange-600 to-red-700',
+    EPL: 'from-green-500 to-teal-600',
+    MLS: 'from-green-500 to-teal-600',
+  };
+  const gradient = gradientMap[sportLabel] || 'from-slate-600 to-gray-700';
+
+  const cards: InsightCard[] = [];
+
+  cards.push({
+    type: 'FANTASY_ADVICE',
+    title: `${sportLabel} Fantasy Intelligence`,
+    icon: 'Trophy',
+    category: 'FANTASY',
+    subcategory: `${sportLabel} • Season Analysis`,
+    gradient,
+    data: {
+      fantasyCardType: 'sport_overview',
+      sport: sportLabel,
+      description: `${sportLabel} fantasy analysis powered by Grok AI with live knowledge.`,
+      note: `Ask about specific ${sportLabel} players, waiver targets, trade values, or matchup analysis. Grok AI has current-season knowledge of stats, injuries, and trends.`,
+      features: ['Live Player Stats', 'Waiver Wire Targets', 'Injury Updates', 'Trade Analysis'],
+      realData: false,
+      status: 'available',
+    },
+    metadata: { realData: false, dataSource: `${sportLabel} Fantasy Engine` },
+  });
+
+  while (cards.length < count) {
+    if (cards.length === 1) {
+      cards.push({
+        type: 'FANTASY_WAIVER',
+        title: `${sportLabel} Waiver Targets`,
+        icon: 'Zap',
+        category: 'FANTASY',
+        subcategory: `${sportLabel} • Waiver Wire`,
+        gradient,
+        data: {
+          fantasyCardType: 'waiver',
+          sport: sportLabel,
+          description: `Ask Leverage AI for this week's top ${sportLabel} waiver wire pickups.`,
+          note: 'Include your league settings (e.g. 5×5 rotisserie, H2H categories) for tailored advice.',
+          realData: false,
+          status: 'available',
+        },
+        metadata: { realData: false, dataSource: `${sportLabel} Waiver Engine (live query)` },
+      });
+    } else {
+      cards.push({
+        type: 'FANTASY_DRAFT',
+        title: `${sportLabel} Draft Board`,
+        icon: 'Target',
+        category: 'FANTASY',
+        subcategory: `${sportLabel} • Rankings`,
+        gradient,
+        data: {
+          fantasyCardType: 'draft_recommendation',
+          sport: sportLabel,
+          description: `Ask for ${sportLabel} draft rankings, sleepers, or ADP analysis.`,
+          note: 'Specify your draft format (snake, auction) and league size for personalised recommendations.',
+          realData: false,
+          status: 'available',
+        },
+        metadata: { realData: false, dataSource: `${sportLabel} Draft Engine (live query)` },
+      });
+    }
+  }
+
+  return cards.slice(0, count);
+}
+
+/**
  * Parse user message for fantasy intent signals and return relevant cards.
  * Called by lib/cards-generator.ts when category === 'fantasy' | 'draft' | 'waiver'.
+ *
+ * @param userMessage - The user's chat message (used to detect intent keywords)
+ * @param count       - Number of cards to return
+ * @param sport       - Normalised sport key from context (e.g. 'baseball_mlb').
+ *                      When set and non-NFL, returns sport-appropriate cards instead
+ *                      of the hardcoded NFL projection data.
  */
 export function generateFantasyCards(
   userMessage: string = '',
-  count: number = 3
+  count: number = 3,
+  sport?: string
 ): InsightCard[] {
+  // Non-NFL sport → don't show NFL player data; return sport-branded cards instead
+  const isNFL = !sport || sport.includes('football') || sport === '';
+  if (!isNFL) {
+    return generateNonNFLFantasyCards(sport, count);
+  }
+
   const msg = userMessage.toLowerCase();
   const cards: InsightCard[] = [];
 

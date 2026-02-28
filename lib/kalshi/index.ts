@@ -102,21 +102,60 @@ function buildHeaders(): Record<string, string> {
   return headers;
 }
 
+/** Map cryptic Kalshi series/event tickers to human-readable category labels */
+function normalizeCategoryLabel(raw: string): string {
+  if (!raw) return 'Prediction Market';
+  const upper = raw.toUpperCase();
+  const map: Record<string, string> = {
+    'KXBT': 'Crypto', 'KXBTD': 'Crypto', 'KXETH': 'Crypto',
+    'NFL': 'NFL', 'NBA': 'NBA', 'MLB': 'MLB', 'NHL': 'NHL',
+    'NCAAB': 'College Basketball', 'NCAAF': 'College Football',
+    'NASCAR': 'NASCAR', 'PGA': 'Golf', 'F1': 'Formula 1',
+    'UFC': 'MMA', 'BOXING': 'Boxing', 'WNBA': 'WNBA',
+    'KXUSSENATE': 'Politics', 'KXUSHOUSE': 'Politics', 'KXUSGOV': 'Politics',
+    'PRES': 'Politics', 'POTUS': 'Politics',
+    'FED': 'Finance', 'KXFED': 'Finance', 'FOMC': 'Finance',
+    'KXCPI': 'Finance', 'KXGDP': 'Finance', 'SP500': 'Finance',
+    'KXSP': 'Finance', 'KXNQ': 'Finance',
+    'WEATHER': 'Weather', 'TEMP': 'Weather', 'HURR': 'Weather',
+    'OSCAR': 'Entertainment', 'GRAMMY': 'Entertainment',
+    'EMMY': 'Entertainment', 'GOLDEN': 'Entertainment',
+  };
+  if (map[upper]) return map[upper];
+  for (const [key, val] of Object.entries(map)) {
+    if (upper.startsWith(key)) return val;
+  }
+  if (raw.length < 30 && /^[A-Za-z\s]+$/.test(raw)) {
+    return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+  }
+  return 'Prediction Market';
+}
+
 /** Parse a raw Kalshi market response object into a typed KalshiMarket */
 function parseMarket(m: any): KalshiMarket {
   const yesBid = m.yes_bid ?? 0;
-  const yesAsk = m.yes_ask ?? yesBid;
+  const yesAsk = m.yes_ask ?? 0;
   const noBid  = m.no_bid  ?? 0;
-  const noAsk  = m.no_ask  ?? noBid;
+  const noAsk  = m.no_ask  ?? 0;
   const lastPrice = m.last_price ?? 0;
   const prevBid = m.previous_yes_bid ?? yesBid;
+
+  // Best estimate for YES probability: prefer last traded price, then midpoint, then ask/bid
+  const yesMidpoint = yesBid > 0 && yesAsk > 0 ? Math.round((yesBid + yesAsk) / 2) : 0;
+  const yesPrice = lastPrice || yesMidpoint || yesAsk || yesBid || m.floor_strike || 50;
+  const noPrice  = noBid > 0 && noAsk > 0
+    ? Math.round((noBid + noAsk) / 2)
+    : Math.max(0, 100 - yesPrice);
+
+  const rawCategory = m.category || m.series_ticker || m.event_ticker || '';
+
   return {
     ticker: m.ticker || '',
     title: m.title || m.event_title || m.yes_sub_title || m.subtitle || '',
-    category: m.category || m.series_ticker || m.event_ticker || '',
-    subtitle: m.subtitle || m.yes_sub_title || '',
-    yesPrice: yesBid || yesAsk || lastPrice || m.floor_strike || 0,
-    noPrice: noBid || noAsk || (lastPrice ? (100 - lastPrice) : 100),
+    category: normalizeCategoryLabel(rawCategory),
+    subtitle: m.subtitle || m.yes_sub_title || m.event_title || '',
+    yesPrice,
+    noPrice,
     yesBid,
     yesAsk,
     noBid,
@@ -383,46 +422,21 @@ export async function fetchKalshiMarketsWithRetry(params?: {
  * Searches across all supported sports using keyword title searches, deduplicated by ticker.
  */
 export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
+  // Trimmed to the 12 most consistently active sports to avoid hammering Kalshi's
+  // rate limit (previously 29 searches → 429 errors on batches 2+).
   const sportSearches = [
-    // American football
-    { search: 'NFL', label: 'NFL' },
-    { search: 'Super Bowl', label: 'Super Bowl' },
-    { search: 'NCAAF', label: 'NCAAF' },
-    // Basketball
-    { search: 'NBA', label: 'NBA' },
-    { search: 'NCAAB', label: 'NCAAB' },
-    { search: 'March Madness', label: 'March Madness' },
-    // Baseball
-    { search: 'MLB', label: 'MLB' },
-    { search: 'World Series', label: 'World Series' },
-    // Hockey
-    { search: 'NHL', label: 'NHL' },
-    { search: 'Stanley Cup', label: 'Stanley Cup' },
-    // Soccer
-    { search: 'Premier League', label: 'EPL' },
-    { search: 'Champions League', label: 'UCL' },
-    { search: 'World Cup', label: 'World Cup' },
-    { search: 'MLS', label: 'MLS' },
-    { search: 'La Liga', label: 'La Liga' },
-    { search: 'Bundesliga', label: 'Bundesliga' },
-    // Tennis
-    { search: 'US Open tennis', label: 'US Open' },
-    { search: 'Wimbledon', label: 'Wimbledon' },
-    { search: 'French Open', label: 'French Open' },
-    { search: 'Australian Open', label: 'Australian Open' },
-    // Combat sports
-    { search: 'UFC', label: 'UFC' },
-    { search: 'boxing', label: 'Boxing' },
-    // Golf
-    { search: 'Masters', label: 'Masters' },
-    { search: 'PGA', label: 'PGA' },
-    // Racing
-    { search: 'Formula 1', label: 'F1' },
-    { search: 'NASCAR', label: 'NASCAR' },
-    // Other
-    { search: 'WNBA', label: 'WNBA' },
-    { search: 'college football', label: 'CFB' },
-    { search: 'college basketball', label: 'CBB' },
+    { search: 'NFL',          label: 'NFL' },
+    { search: 'Super Bowl',   label: 'Super Bowl' },
+    { search: 'NBA',          label: 'NBA' },
+    { search: 'March Madness',label: 'March Madness' },
+    { search: 'NCAAB',        label: 'NCAAB' },
+    { search: 'MLB',          label: 'MLB' },
+    { search: 'NHL',          label: 'NHL' },
+    { search: 'Stanley Cup',  label: 'Stanley Cup' },
+    { search: 'NASCAR',       label: 'NASCAR' },
+    { search: 'UFC',          label: 'UFC' },
+    { search: 'Masters',      label: 'Masters' },
+    { search: 'Formula 1',    label: 'F1' },
   ];
 
   const seen = new Set<string>();
@@ -430,12 +444,19 @@ export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
 
   console.log(`[KALSHI] Fetching sports markets across ${sportSearches.length} categories...`);
 
-  // Batch into groups of 5 concurrent requests
-  const batchSize = 5;
+  // Batch into groups of 3 with a 400 ms pause between batches to stay within
+  // Kalshi's rate limit.  Results are cached for 5 minutes to reduce re-fetches
+  // across warm Lambda invocations.
+  const batchSize = 3;
+  const BATCH_DELAY_MS = 400;
+  const SPORTS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
   for (let i = 0; i < sportSearches.length; i += batchSize) {
     const batch = sportSearches.slice(i, i + batchSize);
     const results = await Promise.allSettled(
-      batch.map(({ search }) => fetchKalshiMarkets({ search, limit: 100, useCache: true }))
+      batch.map(({ search }) =>
+        fetchKalshiMarkets({ search, limit: 100, useCache: true, cacheTtlMs: SPORTS_CACHE_TTL_MS })
+      )
     );
 
     for (let j = 0; j < results.length; j++) {
@@ -451,6 +472,11 @@ export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
       } else {
         console.warn(`[KALSHI] ${batch[j].label} failed:`, result.reason);
       }
+    }
+
+    // Pause between batches (skip after the final batch)
+    if (i + batchSize < sportSearches.length) {
+      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
     }
   }
 
@@ -470,11 +496,16 @@ export async function fetchElectionMarkets(options?: {
 
   console.log('[KALSHI] Fetching election markets for year:', year);
 
+  // Each strategy uses `search` only (not combined category+search) to avoid the
+  // known bug where `search` silently overwrites the `title` param set by `category`,
+  // causing the API to return unrelated markets (e.g. all "2026" titles).
   const searchStrategies = [
-    { category: 'election', search: `${year}` },
-    { category: 'politics' },
-    { search: `president ${year}` },
-    { search: 'h2h' },
+    { search: `senate ${year}` },
+    { search: `house ${year}` },
+    { search: `governor ${year}` },
+    { search: `midterm` },
+    { category: 'politics' },          // maps to title='senate' via categorySearchMap
+    { search: `election ${year}` },
   ];
 
   const allMarkets: KalshiMarket[] = [];
@@ -493,13 +524,21 @@ export async function fetchElectionMarkets(options?: {
 
   const electionMarkets = allMarkets.filter(market => {
     const text = `${market.title} ${market.category} ${market.subtitle}`.toLowerCase();
+    // Broader keyword set to catch 2026 midterm markets that don't use "election"
     const isElection = text.includes('election') ||
+                       text.includes('senate') ||
+                       text.includes('house') ||
+                       text.includes('congress') ||
+                       text.includes('midterm') ||
+                       text.includes('governor') ||
                        text.includes('president') ||
                        text.includes('harris') ||
                        text.includes('trump');
-    const isCorrectYear = text.includes(year.toString());
+    const hasYear = text.includes(year.toString());
     const isH2H = includeH2H ? text.includes('h2h') || text.includes('vs') : true;
-    return isElection && (isCorrectYear || (includeH2H && isH2H));
+    // Pass if it has election keywords OR matches the year (to catch future markets
+    // whose titles don't spell out the year explicitly)
+    return isElection || (hasYear && (includeH2H ? isH2H : true));
   });
 
   console.log(`[KALSHI] Found ${electionMarkets.length} election markets for ${year}`);

@@ -359,7 +359,8 @@ export function arbitrageToCard(opp: ArbitrageOpportunity): any {
       },
       confidence: opp.confidence.toUpperCase(),
       efficiency: `${opp.impliedProbabilities.total}%`,
-      books: opp.allBooks.join(', ')
+      books: opp.allBooks.join(', '),
+      generatedAt: new Date().toISOString(), // Used by ArbitrageCard for 10-min expiry countdown
     }
   };
 }

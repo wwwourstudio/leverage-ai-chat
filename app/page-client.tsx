@@ -22,7 +22,7 @@ import { createClient } from '@/lib/supabase/client';
 import { AuthModals } from '@/components/AuthModals';
 import { MessageList } from '@/components/message-list';
 import { MobileChatInput } from '@/components/mobile-chat-input';
-import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2 } from 'lucide-react';
+import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2, Bookmark } from 'lucide-react';
 import { DynamicCardRenderer, CardList, EmptyState } from '@/components/data-cards';
 import { CardLayout } from '@/components/data-cards/CardLayout';
 import { DatabaseStatusBanner } from '@/components/database-status-banner';
@@ -41,10 +41,13 @@ import { useToast } from '@/components/toast-provider';
 interface FileAttachment {
   id: string;
   name: string;
-  type: 'image' | 'csv';
+  type: 'image' | 'csv' | 'text' | 'json';
   url: string;
   size: number;
-  data?: any; // For CSV parsed data
+  data?: { headers: string[]; rows: string[][] } | null; // For CSV parsed data
+  textContent?: string | null; // For txt / json / pdf files
+  imageBase64?: string | null;  // Raw base64 (no data: prefix) for vision API
+  mimeType?: string | null;     // e.g. 'image/jpeg'
 }
 
 interface APIResponse<T = any> {
@@ -258,9 +261,12 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     } : null
   );
   const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string; query?: string }>>([]);
   const [lastUserQuery, setLastUserQuery] = useState<string>('');
   const [selectedSport, setSelectedSport] = useState<string>('');
+  const [cardsRefreshedAt, setCardsRefreshedAt] = useState<Date | null>(null);
+  const cardsRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fantasy league setup state — must NOT read localStorage here (causes SSR hydration mismatch #418)
   interface FantasyLeague {
@@ -560,6 +566,44 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         console.error('[v0] Error loading initial data:', err);
       });
   }, []);
+
+  // Auto-refresh cards every 5 minutes when the conversation has AI cards
+  useEffect(() => {
+    const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+    const refreshCards = async () => {
+      // Only refresh if there are messages with cards showing
+      const hasCards = messages.some(m => m.role === 'assistant' && m.cards && m.cards.length > 0);
+      if (!hasCards || !lastUserQuery) return;
+
+      try {
+        const { fetchDynamicCards: fetchCards } = await import('@/lib/data-service');
+        const freshCards = await fetchCards({ userContext: lastUserQuery, limit: 4 });
+        if (freshCards.length === 0) return;
+
+        const converted = freshCards.map(convertToInsightCard);
+        setMessages(prev => {
+          const updated = [...prev];
+          // Update the last assistant message that has cards
+          for (let i = updated.length - 1; i >= 0; i--) {
+            if (updated[i].role === 'assistant' && updated[i].cards?.length) {
+              updated[i] = { ...updated[i], cards: converted };
+              break;
+            }
+          }
+          return updated;
+        });
+        setCardsRefreshedAt(new Date());
+      } catch {
+        // Non-critical — silently skip on error
+      }
+    };
+
+    if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current);
+    cardsRefreshIntervalRef.current = setInterval(refreshCards, REFRESH_INTERVAL);
+    return () => { if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length, lastUserQuery]);
 
   // Start with empty chat history - user creates real chats
   const [chats, setChats] = useState<Chat[]>([
@@ -1098,7 +1142,7 @@ No preamble. Start directly with section 1.`;
     setIsTyping(false);
   };
 
-  const generateRealResponse = async (userMessage: string) => {
+  const generateRealResponse = async (userMessage: string, imageAttachments?: Array<{ name: string; base64: string; mimeType: string }>) => {
     // Cancel any in-flight request
     abortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -1287,7 +1331,7 @@ No preamble. Start directly with section 1.`;
         fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userMessage: contextualUserMessage, existingCards: availableCards, context, customInstructions: customInstructions || undefined }),
+          body: JSON.stringify({ userMessage: contextualUserMessage, existingCards: availableCards, context, customInstructions: customInstructions || undefined, imageAttachments: imageAttachments?.length ? imageAttachments : undefined }),
           signal: controller.signal,
         }).then(async (res) => {
           if (!res.ok) {
@@ -1710,48 +1754,117 @@ No preamble. Start directly with section 1.`;
 
 
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  /** Read a File as raw base64 (no data: URI prefix) for vision API */
+  const readFileAsBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result.includes(',') ? result.split(',')[1] : result);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
 
+  /** Basic PDF text extraction — filters printable chars from raw PDF bytes */
+  const extractPdfText = async (file: File): Promise<string> => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const decoder = new TextDecoder('latin1');
+      const rawText = decoder.decode(arrayBuffer);
+      const matches = rawText.match(/\(([^)]{1,300})\)\s*(?:Tj|TJ|'|")/g) ?? [];
+      const extracted = matches
+        .map(m => m.replace(/^\(/, '').replace(/\)\s*(?:Tj|TJ|'|")$/, ''))
+        .join(' ')
+        .replace(/\\[nrt]/g, ' ')
+        .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
+        .replace(/\s{3,}/g, '\n')
+        .trim();
+      if (extracted.length > 50) return extracted.slice(0, 10000);
+      return rawText
+        .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
+        .replace(/\s{3,}/g, '\n')
+        .trim()
+        .slice(0, 10000);
+    } catch {
+      return '';
+    }
+  };
+
+  const processFiles = async (fileList: FileList | File[]): Promise<FileAttachment[]> => {
+    const files = Array.from(fileList);
     const newAttachments: FileAttachment[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const fileType = file.type;
 
-      // Validate file type
-      const isCsvOrTsv = fileType === 'text/csv' || fileType === 'text/tab-separated-values' || file.name.endsWith('.tsv');
-      if (!fileType.startsWith('image/') && !isCsvOrTsv) {
-        alert(`File type not supported: ${file.name}. Please upload images (JPEG, PNG), CSV, or TSV files.`);
+      const isCsvOrTsv = fileType === 'text/csv' || fileType === 'text/tab-separated-values'
+        || file.name.endsWith('.tsv') || file.name.endsWith('.csv');
+      const isTextFile = fileType === 'text/plain' || file.name.endsWith('.txt');
+      const isJsonFile = fileType === 'application/json' || fileType === 'text/json' || file.name.endsWith('.json');
+      const isImage = fileType.startsWith('image/');
+      const isPdf = fileType === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+      if (!isImage && !isCsvOrTsv && !isTextFile && !isJsonFile && !isPdf) {
+        alert(`File type not supported: ${file.name}. Supported: images, CSV, TSV, TXT, JSON, PDF.`);
         continue;
       }
 
-      // Create file URL
-      const fileUrl = URL.createObjectURL(file);
+      const fileUrl = isImage ? URL.createObjectURL(file) : '';
 
       const attachment: FileAttachment = {
         id: `${Date.now()}-${i}`,
         name: file.name,
-        type: fileType.startsWith('image/') ? 'image' : isCsvOrTsv ? 'csv' : 'csv',
+        type: isImage ? 'image' : isCsvOrTsv ? 'csv' : isJsonFile ? 'json' : 'text',
         url: fileUrl,
-        size: file.size
+        size: file.size,
+        mimeType: isImage ? fileType : undefined,
       };
 
-      // Parse CSV/TSV if needed
-      if (isCsvOrTsv) {
+      if (isImage) {
+        try {
+          attachment.imageBase64 = await readFileAsBase64(file);
+        } catch {
+          // Vision skipped; filename still included in text prompt
+        }
+      } else if (isCsvOrTsv) {
         const text = await file.text();
         const delimiter = file.name.endsWith('.tsv') || fileType === 'text/tab-separated-values' ? '\t' : ',';
-        const parsed = parseDelimitedFile(text, delimiter);
-        attachment.data = parsed;
+        attachment.data = parseDelimitedFile(text, delimiter);
+      } else if (isTextFile) {
+        const text = await file.text();
+        attachment.textContent = text.slice(0, 10000);
+      } else if (isJsonFile) {
+        try {
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+          attachment.textContent = JSON.stringify(parsed, null, 2).slice(0, 10000);
+        } catch {
+          const text = await file.text();
+          attachment.textContent = text.slice(0, 10000);
+        }
+      } else if (isPdf) {
+        const pdfText = await extractPdfText(file);
+        attachment.textContent = pdfText.length > 50
+          ? `[PDF: ${file.name}]\n${pdfText}`
+          : `[PDF: ${file.name} — text extraction limited. Please describe what you want analyzed from this document.]`;
       }
 
       newAttachments.push(attachment);
     }
 
+    return newAttachments;
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newAttachments = await processFiles(files);
     setUploadedFiles((prev: FileAttachment[]) => [...prev, ...newAttachments]);
     console.log('[v0] Files uploaded:', newAttachments.length);
-    
+
     // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -1773,11 +1886,29 @@ No preamble. Start directly with section 1.`;
   const removeAttachment = (id: string) => {
     setUploadedFiles((prev: FileAttachment[]) => {
       const file = prev.find(f => f.id === id);
-      if (file) {
-        URL.revokeObjectURL(file.url);
-      }
+      if (file && file.url) URL.revokeObjectURL(file.url);
       return prev.filter(f => f.id !== id);
     });
+  };
+
+  const saveFileToProfile = (file: FileAttachment) => {
+    try {
+      const existing = JSON.parse(localStorage.getItem('leverage_saved_files') || '[]');
+      const entry = {
+        id: file.id,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        data: file.data ?? null,
+        textContent: file.textContent ?? null,
+        savedAt: new Date().toISOString(),
+      };
+      const deduped = existing.filter((f: any) => f.name !== entry.name);
+      localStorage.setItem('leverage_saved_files', JSON.stringify([entry, ...deduped].slice(0, 20)));
+      toast.success(`"${file.name}" saved to your profile`);
+    } catch {
+      toast.error('Could not save file to profile');
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1833,17 +1964,25 @@ No preamble. Start directly with section 1.`;
       return chat;
     }));
 
-    // Build the prompt that actually reaches the AI — append CSV/TSV data as text
+    // Build the prompt that actually reaches the AI — append file data as text
     // so the model can analyse the file content directly.
     let promptForAI = input;
     if (currentFiles.length > 0) {
-      const fileSections = currentFiles
-        .filter(f => f.data?.headers && f.data?.rows)
-        .map(f => {
-          const headers = f.data!.headers.join('\t');
-          const rows = f.data!.rows.slice(0, 200).map((r: string[]) => r.join('\t')).join('\n');
-          return `[File: ${f.name}]\n${headers}\n${rows}`;
-        });
+      const fileSections: string[] = [];
+
+      for (const f of currentFiles) {
+        if (f.data?.headers && f.data?.rows) {
+          // CSV/TSV: include up to 500 rows
+          const headers = f.data.headers.join('\t');
+          const rows = f.data.rows.slice(0, 500).map((r: string[]) => r.join('\t')).join('\n');
+          const truncated = f.data.rows.length > 500 ? `\n[... ${f.data.rows.length - 500} more rows truncated]` : '';
+          fileSections.push(`[File: ${f.name} (${f.data.rows.length} rows)]\n${headers}\n${rows}${truncated}`);
+        } else if (f.textContent) {
+          // TXT / JSON
+          fileSections.push(`[File: ${f.name}]\n${f.textContent}`);
+        }
+      }
+
       if (fileSections.length > 0) {
         promptForAI = (input ? input + '\n\n' : 'Analyze this data:\n\n') + fileSections.join('\n\n');
       } else if (!input) {
@@ -1853,7 +1992,11 @@ No preamble. Start directly with section 1.`;
     }
 
     setInput('');
-    generateRealResponse(promptForAI);
+    // Extract image attachments for vision (must be done before setUploadedFiles clears them)
+    const visionAttachments = currentFiles
+      .filter(f => f.type === 'image' && f.imageBase64)
+      .map(f => ({ name: f.name, base64: f.imageBase64!, mimeType: f.mimeType ?? 'image/jpeg' }));
+    generateRealResponse(promptForAI, visionAttachments.length > 0 ? visionAttachments : undefined);
   };
 
   const handleNewChat = () => {
@@ -2517,7 +2660,7 @@ No preamble. Start directly with section 1.`;
           <div className="mt-4">
             <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">Platform</div>
             <div className="relative">
-              <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-gray-950 to-transparent z-10 pointer-events-none" />
+              <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-gray-900 to-transparent z-10 pointer-events-none" />
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide pr-6">
               {categories.map(cat => {
                 const Icon = cat.icon;
@@ -2545,7 +2688,7 @@ No preamble. Start directly with section 1.`;
             {/* Sports filter row — visible for all non-Kalshi platforms */}
             {selectedCategory !== 'kalshi' && (
               <div className="relative mt-2">
-                <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-gray-950 to-transparent z-10 pointer-events-none" />
+                <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-gray-900 to-transparent z-10 pointer-events-none" />
               <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide pr-6">
                 {sports.filter(s => !(['fantasy', 'dfs'].includes(selectedCategory) && s.id.startsWith('ncaa'))).map(sport => {
                   const isActive = selectedSport === sport.id;
@@ -3995,15 +4138,23 @@ No preamble. Start directly with section 1.`;
                       ) : (
                         <FileText className="w-4 h-4 text-green-400" />
                       )}
-                      <span className="text-xs font-bold text-gray-300 max-w-[150px] truncate">
+                      <span className="text-xs font-bold text-gray-300 max-w-[120px] truncate">
                         {file.name}
                       </span>
                       <span className="text-xs text-gray-500">
                         {(file.size / 1024).toFixed(1)} KB
                       </span>
+                      {/* Save to profile */}
+                      <button
+                        onClick={() => saveFileToProfile(file)}
+                        className="p-1 hover:bg-blue-900/40 rounded transition-all"
+                        title="Save file to profile"
+                      >
+                        <Bookmark className="w-3.5 h-3.5 text-gray-500 hover:text-blue-400" />
+                      </button>
                       <button
                         onClick={() => removeAttachment(file.id)}
-                        className="p-1 hover:bg-gray-700/50 rounded transition-all ml-1"
+                        className="p-1 hover:bg-gray-700/50 rounded transition-all"
                         title="Remove file"
                       >
                         <X className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
@@ -4014,13 +4165,36 @@ No preamble. Start directly with section 1.`;
               </div>
             )}
 
+            {/* Drag-and-drop + form wrapper */}
+            <div
+              onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
+              onDragEnter={e => { e.preventDefault(); setIsDragOver(true); }}
+              onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false); }}
+              onDrop={async e => {
+                e.preventDefault();
+                setIsDragOver(false);
+                const dropped = await processFiles(e.dataTransfer.files);
+                if (dropped.length > 0) setUploadedFiles(prev => [...prev, ...dropped]);
+              }}
+              className={`relative rounded-2xl transition-all duration-200 ${isDragOver ? 'ring-2 ring-blue-500/60 bg-blue-500/5' : ''}`}
+            >
+              {isDragOver && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed border-blue-500/60 bg-blue-500/10 pointer-events-none">
+                  <div className="flex flex-col items-center gap-1">
+                    <Paperclip className="w-6 h-6 text-blue-400" />
+                    <span className="text-sm font-bold text-blue-300">Drop files here</span>
+                    <span className="text-xs text-blue-400/70">Images, CSV, TXT, JSON</span>
+                  </div>
+                </div>
+              )}
+
             <form onSubmit={handleSubmit} className="flex gap-3">
               <div className="flex-1 relative group/input focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:shadow-lg focus-within:shadow-blue-500/10 rounded-2xl transition-all duration-300">
                 {/* Hidden File Input */}
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/jpg,text/csv,.tsv,text/tab-separated-values"
+                  accept="image/jpeg,image/png,image/jpg,image/gif,image/webp,text/csv,.tsv,text/tab-separated-values,text/plain,.txt,.json,application/json,.pdf,application/pdf"
                   multiple
                   onChange={handleFileUpload}
                   className="hidden"
@@ -4081,6 +4255,7 @@ No preamble. Start directly with section 1.`;
                 </button>
               )}
             </form>
+            </div>{/* end drag-and-drop wrapper */}
 
             <div className="flex items-center justify-between mt-4 px-1">
               <p className="text-[11px] font-bold text-gray-600">
@@ -4280,6 +4455,7 @@ No preamble. Start directly with section 1.`;
         user={user}
         onLogout={() => { setUser(null); setIsLoggedIn(false); }}
         onInstructionsChange={setCustomInstructions}
+        onAttachFile={(file) => setUploadedFiles(prev => [...prev, { ...file, url: '' }])}
       />
 
       {/* Settings Lightbox */}

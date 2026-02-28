@@ -986,7 +986,7 @@ export async function generateContextualCards(
   if (category === 'fantasy' || category === 'draft' || category === 'waiver') {
     try {
       const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
-      const fantasyCards = generateFantasyCards('', count);
+      const fantasyCards = generateFantasyCards('', count, normalizedSport);
       cards.push(...fantasyCards.slice(0, count));
     } catch (err) {
       console.error('[v0] [CARDS-GEN] Fantasy card generation failed:', err);

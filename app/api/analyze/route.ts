@@ -16,10 +16,17 @@ import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-dete
 // Types
 // ============================================================================
 
+interface ImageAttachment {
+  name: string;
+  base64: string;    // Raw base64 without data: URI prefix
+  mimeType: string;  // e.g. 'image/jpeg'
+}
+
 interface AnalyzeRequestBody {
   userMessage: string;
   existingCards?: InsightCard[];
   customInstructions?: string;
+  imageAttachments?: ImageAttachment[];
   context?: {
     sport?: string | null;
     marketType?: string | null;
@@ -145,6 +152,20 @@ export async function POST(request: NextRequest) {
       enrichedPrompt += `\n\n[Context: General question — answer with your full expert knowledge about sports betting, fantasy, DFS, or prediction markets as appropriate.]`;
     }
 
+    // Fantasy-specific context injection
+    if (context.hasFantasyIntent) {
+      const sport = context.sport || '';
+      const isNFL = sport.includes('football') || sport === '';
+      if (isNFL) {
+        // NFL 2025 season is complete (Super Bowl ~Feb 2026) — tell AI to focus on 2026 offseason
+        enrichedPrompt += `\n\n[Fantasy Context: The 2025 NFL regular season and playoffs are complete. Fantasy advice should now address the 2026 offseason: free agency moves, rookie targets, ADP for 2026 redraft leagues, and dynasty/devy strategy. The card data shows 2025 historical stats as reference.]`;
+      } else {
+        // In-season sport (NBA, MLB, NHL, etc.) — tell AI to use its current knowledge
+        const sportName = sport.replace(/^(americanfootball|basketball|baseball|icehockey|soccer|mma)_?/, '').toUpperCase().replace(/_/g, ' ') || sport.toUpperCase();
+        enrichedPrompt += `\n\n[Fantasy Context: The user is asking about ${sportName} fantasy. Use your current knowledge of active rosters, recent performance, injury reports, and this week's matchups to give accurate advice. Today's date: ${dateStr}.]`;
+      }
+    }
+
     // Regardless of other odds context, tell the AI when the key is missing
     if (context.oddsKeyMissing) {
       enrichedPrompt += `\n\n[System: Live odds are unavailable — ODDS_API_KEY is not configured in the server environment. Inform the user they need to add ODDS_API_KEY to their Vercel environment variables to enable live odds.]`;
@@ -167,8 +188,8 @@ export async function POST(request: NextRequest) {
       cardPromise = Promise.resolve(existingCards as InsightCard[]);
     } else if (!context.isPoliticalMarket && context.hasFantasyIntent && !context.hasBettingIntent) {
       cardPromise = import('@/lib/fantasy/cards/fantasy-card-generator')
-        .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 3) as InsightCard[])
-        .catch(() => generateContextualCards('fantasy', undefined, 3).catch(() => []));
+        .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 3, context.sport ?? undefined) as InsightCard[])
+        .catch(() => generateContextualCards('fantasy', context.sport ?? undefined, 3).catch(() => []));
     } else if (!context.isPoliticalMarket && (context.isSportsQuery || context.hasBettingIntent)) {
       const sportKey = context.sport || undefined;
       cardPromise = Promise.race([
@@ -204,6 +225,22 @@ export async function POST(request: NextRequest) {
 
     const MAX_HALLUCINATION_RETRIES = 2;
 
+    const hasImages = (body.imageAttachments?.length ?? 0) > 0;
+
+    /** Build the generateText call options supporting both text-only and multimodal */
+    const buildGenOptions = (prompt: string, imgs?: ImageAttachment[]) => {
+      if (imgs?.length) {
+        // Multimodal: images + text in messages array
+        type ContentPart = { type: 'text'; text: string } | { type: 'image'; image: string; mimeType: string };
+        const content: ContentPart[] = [{ type: 'text', text: prompt }];
+        for (const img of imgs) {
+          content.push({ type: 'image', image: img.base64, mimeType: img.mimeType });
+        }
+        return { messages: [{ role: 'user' as const, content }] };
+      }
+      return { prompt };
+    };
+
     if (xaiApiKey) {
       try {
         // Initial generation with timeout protection
@@ -211,7 +248,7 @@ export async function POST(request: NextRequest) {
           generateText({
             model: createXai({ apiKey: xaiApiKey })(AI_CONFIG.MODEL_NAME),
             system: systemPrompt,
-            prompt: enrichedPrompt,
+            ...buildGenOptions(enrichedPrompt, hasImages ? body.imageAttachments : undefined),
             temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
             maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
             maxRetries: 1, // Reduced retries to prevent timeout

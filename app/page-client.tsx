@@ -1872,13 +1872,45 @@ No preamble. Start directly with section 1.`;
   };
 
   const parseDelimitedFile = (text: string, delimiter: string = ',') => {
-    const lines = text.split('\n').filter(line => line.trim());
+    // RFC 4180-compliant parser that handles quoted fields (e.g. DraftKings CSV exports)
+    const parseRow = (line: string): string[] => {
+      const cells: string[] = [];
+      let i = 0;
+      while (i <= line.length) {
+        if (line[i] === '"') {
+          // Quoted field
+          let cell = '';
+          i++; // skip opening quote
+          while (i < line.length) {
+            if (line[i] === '"' && line[i + 1] === '"') {
+              cell += '"'; i += 2; // escaped quote
+            } else if (line[i] === '"') {
+              i++; break; // closing quote
+            } else {
+              cell += line[i++];
+            }
+          }
+          cells.push(cell.trim());
+          // skip delimiter after closing quote
+          if (line[i] === delimiter[0]) i++;
+        } else {
+          // Unquoted field — read until delimiter or end
+          const start = i;
+          while (i < line.length && line[i] !== delimiter[0]) i++;
+          cells.push(line.slice(start, i).trim());
+          if (i < line.length) i++; // skip delimiter
+        }
+      }
+      return cells;
+    };
+
+    // Handle Windows line endings and BOM
+    const cleaned = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const lines = cleaned.split('\n').filter(line => line.trim());
     if (lines.length === 0) return { headers: [], rows: [] };
 
-    const headers = lines[0].split(delimiter).map(h => h.trim());
-    const rows = lines.slice(1).map(line => 
-      line.split(delimiter).map(cell => cell.trim())
-    );
+    const headers = parseRow(lines[0]);
+    const rows = lines.slice(1).map(line => parseRow(line));
 
     return { headers, rows };
   };

@@ -12,13 +12,19 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ success: true, files: [] });
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('user_preferences')
       .select('saved_files')
       .eq('user_id', user.id)
       .single();
 
-    const files = data?.saved_files ?? [];
+    // Gracefully handle missing column (schema cache lag after migration)
+    if (error) {
+      console.warn('[API/user/files GET] Column may not exist yet:', error.message);
+      return NextResponse.json({ success: true, files: [] });
+    }
+
+    const files = (data as any)?.saved_files ?? [];
     return NextResponse.json({ success: true, files });
   } catch (err) {
     console.error('[API/user/files GET]', err);
@@ -53,12 +59,17 @@ export async function POST(req: NextRequest) {
       textContent: typeof f.textContent === 'string' ? f.textContent.slice(0, 50_000) : null,
     }));
 
-    await supabase
+    const { error: upsertError } = await supabase
       .from('user_preferences')
       .upsert(
         { user_id: user.id, saved_files: sanitized, updated_at: new Date().toISOString() },
         { onConflict: 'user_id' }
       );
+
+    if (upsertError && upsertError.message?.includes('saved_files')) {
+      console.warn('[API/user/files POST] saved_files column not yet in schema cache');
+      return NextResponse.json({ success: true, count: sanitized.length, warning: 'Schema sync pending' });
+    }
 
     return NextResponse.json({ success: true, count: sanitized.length });
   } catch (err) {

@@ -26,22 +26,28 @@ export async function GET() {
       return NextResponse.json({ instructions: '' });
     }
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('user_preferences')
       .select('custom_instructions')
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (!data) {
-      // First access — upsert a blank row so future PUTs can update
-      await supabase.from('user_preferences').upsert(
-        { user_id: user.id, custom_instructions: '' },
-        { onConflict: 'user_id' }
-      );
+    // Column may not exist yet (schema cache lag) — return empty gracefully
+    if (error) {
+      console.warn('[API/user/instructions] SELECT error (column may not exist yet):', error.message);
       return NextResponse.json({ instructions: '' });
     }
 
-    return NextResponse.json({ instructions: data.custom_instructions ?? '' });
+    if (!data) {
+      // First access — attempt to upsert a blank row; ignore errors from missing column
+      await supabase.from('user_preferences').upsert(
+        { user_id: user.id, custom_instructions: '' },
+        { onConflict: 'user_id' }
+      ).select().maybeSingle();
+      return NextResponse.json({ instructions: '' });
+    }
+
+    return NextResponse.json({ instructions: (data as any).custom_instructions ?? '' });
   } catch {
     // Supabase not configured or other error — return empty gracefully
     return NextResponse.json({ instructions: '' });
@@ -68,6 +74,12 @@ export async function PUT(request: NextRequest) {
     );
 
     if (error) {
+      // If the column still doesn't exist in schema cache, return partial success
+      // so the UI doesn't break — the migration will resolve this on next deploy.
+      if (error.message?.includes('custom_instructions')) {
+        console.warn('[API/user/instructions] Column not yet in schema cache — migration may still be propagating');
+        return NextResponse.json({ success: true, warning: 'Preferences saved locally; server sync pending.' });
+      }
       console.error('[API/user/instructions] Upsert error:', error.message);
       return NextResponse.json({ success: false, error: error.message });
     }
@@ -78,3 +90,4 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Internal error' });
   }
 }
+

@@ -167,8 +167,8 @@ export async function POST(request: NextRequest) {
       cardPromise = Promise.resolve(existingCards as InsightCard[]);
     } else if (!context.isPoliticalMarket && context.hasFantasyIntent && !context.hasBettingIntent) {
       cardPromise = import('@/lib/fantasy/cards/fantasy-card-generator')
-        .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 3) as InsightCard[])
-        .catch(() => generateContextualCards('fantasy', undefined, 3).catch(() => []));
+        .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 3, context.sport ?? undefined) as InsightCard[])
+        .catch(() => generateContextualCards('fantasy', context.sport ?? undefined, 3).catch(() => []));
     } else if (!context.isPoliticalMarket && (context.isSportsQuery || context.hasBettingIntent)) {
       const sportKey = context.sport || undefined;
       cardPromise = Promise.race([

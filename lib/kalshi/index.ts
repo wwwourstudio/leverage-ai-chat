@@ -383,46 +383,21 @@ export async function fetchKalshiMarketsWithRetry(params?: {
  * Searches across all supported sports using keyword title searches, deduplicated by ticker.
  */
 export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
+  // Trimmed to the 12 most consistently active sports to avoid hammering Kalshi's
+  // rate limit (previously 29 searches → 429 errors on batches 2+).
   const sportSearches = [
-    // American football
-    { search: 'NFL', label: 'NFL' },
-    { search: 'Super Bowl', label: 'Super Bowl' },
-    { search: 'NCAAF', label: 'NCAAF' },
-    // Basketball
-    { search: 'NBA', label: 'NBA' },
-    { search: 'NCAAB', label: 'NCAAB' },
-    { search: 'March Madness', label: 'March Madness' },
-    // Baseball
-    { search: 'MLB', label: 'MLB' },
-    { search: 'World Series', label: 'World Series' },
-    // Hockey
-    { search: 'NHL', label: 'NHL' },
-    { search: 'Stanley Cup', label: 'Stanley Cup' },
-    // Soccer
-    { search: 'Premier League', label: 'EPL' },
-    { search: 'Champions League', label: 'UCL' },
-    { search: 'World Cup', label: 'World Cup' },
-    { search: 'MLS', label: 'MLS' },
-    { search: 'La Liga', label: 'La Liga' },
-    { search: 'Bundesliga', label: 'Bundesliga' },
-    // Tennis
-    { search: 'US Open tennis', label: 'US Open' },
-    { search: 'Wimbledon', label: 'Wimbledon' },
-    { search: 'French Open', label: 'French Open' },
-    { search: 'Australian Open', label: 'Australian Open' },
-    // Combat sports
-    { search: 'UFC', label: 'UFC' },
-    { search: 'boxing', label: 'Boxing' },
-    // Golf
-    { search: 'Masters', label: 'Masters' },
-    { search: 'PGA', label: 'PGA' },
-    // Racing
-    { search: 'Formula 1', label: 'F1' },
-    { search: 'NASCAR', label: 'NASCAR' },
-    // Other
-    { search: 'WNBA', label: 'WNBA' },
-    { search: 'college football', label: 'CFB' },
-    { search: 'college basketball', label: 'CBB' },
+    { search: 'NFL',          label: 'NFL' },
+    { search: 'Super Bowl',   label: 'Super Bowl' },
+    { search: 'NBA',          label: 'NBA' },
+    { search: 'March Madness',label: 'March Madness' },
+    { search: 'NCAAB',        label: 'NCAAB' },
+    { search: 'MLB',          label: 'MLB' },
+    { search: 'NHL',          label: 'NHL' },
+    { search: 'Stanley Cup',  label: 'Stanley Cup' },
+    { search: 'NASCAR',       label: 'NASCAR' },
+    { search: 'UFC',          label: 'UFC' },
+    { search: 'Masters',      label: 'Masters' },
+    { search: 'Formula 1',    label: 'F1' },
   ];
 
   const seen = new Set<string>();
@@ -430,12 +405,19 @@ export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
 
   console.log(`[KALSHI] Fetching sports markets across ${sportSearches.length} categories...`);
 
-  // Batch into groups of 5 concurrent requests
-  const batchSize = 5;
+  // Batch into groups of 3 with a 400 ms pause between batches to stay within
+  // Kalshi's rate limit.  Results are cached for 5 minutes to reduce re-fetches
+  // across warm Lambda invocations.
+  const batchSize = 3;
+  const BATCH_DELAY_MS = 400;
+  const SPORTS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
   for (let i = 0; i < sportSearches.length; i += batchSize) {
     const batch = sportSearches.slice(i, i + batchSize);
     const results = await Promise.allSettled(
-      batch.map(({ search }) => fetchKalshiMarkets({ search, limit: 100, useCache: true }))
+      batch.map(({ search }) =>
+        fetchKalshiMarkets({ search, limit: 100, useCache: true, cacheTtlMs: SPORTS_CACHE_TTL_MS })
+      )
     );
 
     for (let j = 0; j < results.length; j++) {
@@ -451,6 +433,11 @@ export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
       } else {
         console.warn(`[KALSHI] ${batch[j].label} failed:`, result.reason);
       }
+    }
+
+    // Pause between batches (skip after the final batch)
+    if (i + batchSize < sportSearches.length) {
+      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
     }
   }
 
@@ -470,11 +457,16 @@ export async function fetchElectionMarkets(options?: {
 
   console.log('[KALSHI] Fetching election markets for year:', year);
 
+  // Each strategy uses `search` only (not combined category+search) to avoid the
+  // known bug where `search` silently overwrites the `title` param set by `category`,
+  // causing the API to return unrelated markets (e.g. all "2026" titles).
   const searchStrategies = [
-    { category: 'election', search: `${year}` },
-    { category: 'politics' },
-    { search: `president ${year}` },
-    { search: 'h2h' },
+    { search: `senate ${year}` },
+    { search: `house ${year}` },
+    { search: `governor ${year}` },
+    { search: `midterm` },
+    { category: 'politics' },          // maps to title='senate' via categorySearchMap
+    { search: `election ${year}` },
   ];
 
   const allMarkets: KalshiMarket[] = [];
@@ -493,13 +485,21 @@ export async function fetchElectionMarkets(options?: {
 
   const electionMarkets = allMarkets.filter(market => {
     const text = `${market.title} ${market.category} ${market.subtitle}`.toLowerCase();
+    // Broader keyword set to catch 2026 midterm markets that don't use "election"
     const isElection = text.includes('election') ||
+                       text.includes('senate') ||
+                       text.includes('house') ||
+                       text.includes('congress') ||
+                       text.includes('midterm') ||
+                       text.includes('governor') ||
                        text.includes('president') ||
                        text.includes('harris') ||
                        text.includes('trump');
-    const isCorrectYear = text.includes(year.toString());
+    const hasYear = text.includes(year.toString());
     const isH2H = includeH2H ? text.includes('h2h') || text.includes('vs') : true;
-    return isElection && (isCorrectYear || (includeH2H && isH2H));
+    // Pass if it has election keywords OR matches the year (to catch future markets
+    // whose titles don't spell out the year explicitly)
+    return isElection || (hasYear && (includeH2H ? isH2H : true));
   });
 
   console.log(`[KALSHI] Found ${electionMarkets.length} election markets for ${year}`);

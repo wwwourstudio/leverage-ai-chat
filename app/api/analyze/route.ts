@@ -49,9 +49,10 @@ interface AnalyzeRequestBody {
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  // Keep well under Vercel's 30s limit.
-  // grok-4 gets 18s; on failure, grok-3-fast fallback gets 10s = 28s total, leaving 2s headroom.
-  const TIMEOUT_MS = 18000;
+  // grok-4 is now only used for live-odds betting analysis (tight prompt, high accuracy).
+  // grok-3-fast handles DFS, fantasy, offseason, and CSV — completes well under 10s.
+  // 22s primary + 8s fallback = 30s total, matching Vercel's function limit exactly.
+  const TIMEOUT_MS = 22000;
 
   try {
     // Add timeout wrapper
@@ -183,14 +184,25 @@ export async function POST(request: NextRequest) {
       enrichedPrompt = enrichedPrompt.slice(0, MAX_PROMPT_CHARS) + '\n[... prompt truncated to prevent timeout]';
     }
 
-    // DFS CSV prompts route to grok-3-fast directly — it handles structured data
-    // faster and the routing logic is simpler than complex sports reasoning.
+    // ── Model routing ──────────────────────────────────────────────────────────
+    // Route to grok-3-fast for query types that don't benefit from grok-4's
+    // extended reasoning but reliably trigger timeouts due to prompt size or
+    // model latency:
+    //   • Any query with a CSV/file attachment
+    //   • DFS / lineup building queries (structured output, not deep reasoning)
+    //   • Fantasy-only queries (no betting math requiring grok-4 accuracy)
+    //   • Off-season queries (knowledge-only, no live odds cross-reference needed)
+    // Use grok-4 only for live-odds betting analysis where accuracy matters most.
     const hasCsvData = enrichedPrompt.includes('[File:') && enrichedPrompt.includes('rows total');
-    const isDfsOrFantasy = context.hasFantasyIntent || userMessage.toLowerCase().includes('lineup') || userMessage.toLowerCase().includes('dfs') || userMessage.toLowerCase().includes('salary');
-    const useFastModel = hasCsvData && isDfsOrFantasy;
+    const lc = userMessage.toLowerCase();
+    const isDfsQuery = lc.includes('dfs') || lc.includes('lineup') || lc.includes('salary') || lc.includes('draftkings') || lc.includes('fanduel');
+    const isFantasyOnly = context.hasFantasyIntent && !context.hasBettingIntent;
+    const isOffseason = context.noGamesAvailable === true;
+
+    const useFastModel = hasCsvData || isDfsQuery || isFantasyOnly || isOffseason;
 
     if (useFastModel) {
-      console.log('[API/analyze] CSV+DFS detected — routing directly to grok-3-fast for speed');
+      console.log(`[API/analyze] Routing to grok-3-fast — reason: ${hasCsvData ? 'csv' : isDfsQuery ? 'dfs' : isFantasyOnly ? 'fantasy-only' : 'offseason'}`);
     }
 
     // ── Launch card generation BEFORE AI (they're independent operations) ──────
@@ -311,13 +323,14 @@ export async function POST(request: NextRequest) {
 
             const retryResult = await Promise.race([
               generateText({
-                model: createXai({ apiKey: xaiApiKey })(AI_CONFIG.MODEL_NAME),
+                // Always use grok-3-fast for retries — primary model already timed out
+                // or returned low-confidence output; speed matters more here.
+                model: createXai({ apiKey: xaiApiKey })('grok-3-fast'),
                 system: systemPrompt,
                 prompt: retryPrompt,
-                // Lower temperature on retries to reduce hallucination likelihood
                 temperature: Math.max(0.1, (AI_CONFIG.DEFAULT_TEMPERATURE ?? 0.7) - retryAttempt * 0.2),
                 maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
-                maxRetries: 0, // No retries within retry
+                maxRetries: 0,
               }),
               retryTimeoutPromise
             ]);

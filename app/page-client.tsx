@@ -1876,7 +1876,7 @@ No preamble. Start directly with section 1.`;
     const parseRow = (line: string): string[] => {
       const cells: string[] = [];
       let i = 0;
-      while (i <= line.length) {
+      while (i < line.length) {
         if (line[i] === '"') {
           // Quoted field
           let cell = '';

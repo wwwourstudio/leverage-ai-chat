@@ -141,14 +141,14 @@ export function logEnvValidation(result: EnvValidationResult, context: 'server' 
  */
 export function getMissingAPIKeys(): string[] {
   const missing: string[] = [];
-  
-  const apiKeys = [
+
+  // Only check truly required keys — KALSHI_API_KEY is optional (app works without it)
+  const requiredApiKeys = [
     'XAI_API_KEY',
     'ODDS_API_KEY',
-    'KALSHI_API_KEY',
   ];
 
-  for (const key of apiKeys) {
+  for (const key of requiredApiKeys) {
     if (!process.env[key]) {
       missing.push(key);
     }

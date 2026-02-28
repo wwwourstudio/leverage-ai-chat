@@ -102,21 +102,60 @@ function buildHeaders(): Record<string, string> {
   return headers;
 }
 
+/** Map cryptic Kalshi series/event tickers to human-readable category labels */
+function normalizeCategoryLabel(raw: string): string {
+  if (!raw) return 'Prediction Market';
+  const upper = raw.toUpperCase();
+  const map: Record<string, string> = {
+    'KXBT': 'Crypto', 'KXBTD': 'Crypto', 'KXETH': 'Crypto',
+    'NFL': 'NFL', 'NBA': 'NBA', 'MLB': 'MLB', 'NHL': 'NHL',
+    'NCAAB': 'College Basketball', 'NCAAF': 'College Football',
+    'NASCAR': 'NASCAR', 'PGA': 'Golf', 'F1': 'Formula 1',
+    'UFC': 'MMA', 'BOXING': 'Boxing', 'WNBA': 'WNBA',
+    'KXUSSENATE': 'Politics', 'KXUSHOUSE': 'Politics', 'KXUSGOV': 'Politics',
+    'PRES': 'Politics', 'POTUS': 'Politics',
+    'FED': 'Finance', 'KXFED': 'Finance', 'FOMC': 'Finance',
+    'KXCPI': 'Finance', 'KXGDP': 'Finance', 'SP500': 'Finance',
+    'KXSP': 'Finance', 'KXNQ': 'Finance',
+    'WEATHER': 'Weather', 'TEMP': 'Weather', 'HURR': 'Weather',
+    'OSCAR': 'Entertainment', 'GRAMMY': 'Entertainment',
+    'EMMY': 'Entertainment', 'GOLDEN': 'Entertainment',
+  };
+  if (map[upper]) return map[upper];
+  for (const [key, val] of Object.entries(map)) {
+    if (upper.startsWith(key)) return val;
+  }
+  if (raw.length < 30 && /^[A-Za-z\s]+$/.test(raw)) {
+    return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+  }
+  return 'Prediction Market';
+}
+
 /** Parse a raw Kalshi market response object into a typed KalshiMarket */
 function parseMarket(m: any): KalshiMarket {
   const yesBid = m.yes_bid ?? 0;
-  const yesAsk = m.yes_ask ?? yesBid;
+  const yesAsk = m.yes_ask ?? 0;
   const noBid  = m.no_bid  ?? 0;
-  const noAsk  = m.no_ask  ?? noBid;
+  const noAsk  = m.no_ask  ?? 0;
   const lastPrice = m.last_price ?? 0;
   const prevBid = m.previous_yes_bid ?? yesBid;
+
+  // Best estimate for YES probability: prefer last traded price, then midpoint, then ask/bid
+  const yesMidpoint = yesBid > 0 && yesAsk > 0 ? Math.round((yesBid + yesAsk) / 2) : 0;
+  const yesPrice = lastPrice || yesMidpoint || yesAsk || yesBid || m.floor_strike || 50;
+  const noPrice  = noBid > 0 && noAsk > 0
+    ? Math.round((noBid + noAsk) / 2)
+    : Math.max(0, 100 - yesPrice);
+
+  const rawCategory = m.category || m.series_ticker || m.event_ticker || '';
+
   return {
     ticker: m.ticker || '',
     title: m.title || m.event_title || m.yes_sub_title || m.subtitle || '',
-    category: m.category || m.series_ticker || m.event_ticker || '',
-    subtitle: m.subtitle || m.yes_sub_title || '',
-    yesPrice: yesBid || yesAsk || lastPrice || m.floor_strike || 0,
-    noPrice: noBid || noAsk || (lastPrice ? (100 - lastPrice) : 100),
+    category: normalizeCategoryLabel(rawCategory),
+    subtitle: m.subtitle || m.yes_sub_title || m.event_title || '',
+    yesPrice,
+    noPrice,
     yesBid,
     yesAsk,
     noBid,

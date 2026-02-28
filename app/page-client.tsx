@@ -2517,7 +2517,7 @@ No preamble. Start directly with section 1.`;
           <div className="mt-4">
             <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">Platform</div>
             <div className="relative">
-              <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-gray-950 to-transparent z-10 pointer-events-none" />
+              <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-gray-900 to-transparent z-10 pointer-events-none" />
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide pr-6">
               {categories.map(cat => {
                 const Icon = cat.icon;
@@ -2545,7 +2545,7 @@ No preamble. Start directly with section 1.`;
             {/* Sports filter row — visible for all non-Kalshi platforms */}
             {selectedCategory !== 'kalshi' && (
               <div className="relative mt-2">
-                <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-gray-950 to-transparent z-10 pointer-events-none" />
+                <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-gray-900 to-transparent z-10 pointer-events-none" />
               <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide pr-6">
                 {sports.filter(s => !(['fantasy', 'dfs'].includes(selectedCategory) && s.id.startsWith('ncaa'))).map(sport => {
                   const isActive = selectedSport === sport.id;

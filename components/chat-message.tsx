@@ -264,12 +264,15 @@ export function ChatMessage({ message, onEdit, onCopy }: ChatMessageProps) {
             </>
           )}
         </div>
-        {/* Timestamp */}
+        {/* Timestamp — suppressHydrationWarning because Date.now() differs between SSR and client */}
         {message.timestamp && (
-          <p className={cn(
-            'text-[10px] mt-1 text-[oklch(0.38_0.008_280)]',
-            isUser ? 'text-right' : 'text-left'
-          )}>
+          <p
+            suppressHydrationWarning
+            className={cn(
+              'text-[10px] mt-1 text-[oklch(0.38_0.008_280)]',
+              isUser ? 'text-right' : 'text-left'
+            )}
+          >
             {formatRelativeTime(message.timestamp)}
           </p>
         )}

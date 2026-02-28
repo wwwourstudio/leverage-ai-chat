@@ -9,6 +9,7 @@
  * - Converts back to display format for user-facing text
  */
 
+import { unstable_cache } from 'next/cache';
 import { CARD_TYPES, SPORT_KEYS, sportToApi, apiToSport } from '@/lib/constants';
 import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
 
@@ -16,6 +17,9 @@ import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
 // In-memory card cache (shared between SSR page load and /api/analyze)
 // Prevents duplicate API calls when the analyze endpoint needs cards that
 // were already fetched during SSR.
+//
+// Uses a Map keyed by "category:sport" so kalshi, betting, arbitrage, etc.
+// each maintain independent cache slots that never evict one another.
 // ============================================================================
 interface CachedCards {
   cards: InsightCard[];
@@ -24,38 +28,29 @@ interface CachedCards {
 }
 
 const CARD_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
-let cachedCards: CachedCards | null = null;
+const cardCacheMap = new Map<string, CachedCards>();
 
-/** Retrieve cached cards if still fresh, filtered by category/sport */
-export function getCachedCards(category?: string, sport?: string, count: number = 6): InsightCard[] | null {
-  if (!cachedCards) return null;
-  if (Date.now() - cachedCards.timestamp > CARD_CACHE_TTL) {
-    cachedCards = null;
-    return null;
-  }
-
-  let filtered = cachedCards.cards;
-
-  // Filter by sport if specified
-  if (sport) {
-    const normalized = sportToApi(sport);
-    const sportFiltered = filtered.filter(c => {
-      const cardSport = c.data?.sport as string;
-      return cardSport && (cardSport === normalized || cardSport === sport);
-    });
-    if (sportFiltered.length > 0) {
-      filtered = sportFiltered;
-    } else {
-      return null; // No matching sport cards in cache — force a fresh fetch
-    }
-  }
-
-  return filtered.slice(0, count);
+/** Build a stable cache key from category + sport */
+function makeCacheKey(category?: string, sport?: string): string {
+  return `${category ?? 'all'}:${sport ?? ''}`;
 }
 
-/** Store cards in the in-memory cache */
-function setCachedCards(cards: InsightCard[], category: string): void {
-  cachedCards = { cards, timestamp: Date.now(), category };
+/** Retrieve cached cards if still fresh for the given category+sport */
+export function getCachedCards(category?: string, sport?: string, count: number = 6): InsightCard[] | null {
+  const key = makeCacheKey(category, sport);
+  const entry = cardCacheMap.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CARD_CACHE_TTL) {
+    cardCacheMap.delete(key);
+    return null;
+  }
+  return entry.cards.slice(0, count);
+}
+
+/** Store cards in the in-memory cache under the given category+sport key */
+function setCachedCards(cards: InsightCard[], category: string, sport?: string): void {
+  const key = makeCacheKey(category, sport);
+  cardCacheMap.set(key, { cards, timestamp: Date.now(), category });
 }
 
 /**
@@ -348,7 +343,7 @@ export interface InsightCard {
  * @param count - Number of cards to generate (default: 3)
  * @param multiSport - If true, generates cards from ALL major sports (default: true when no sport specified)
  */
-export async function generateContextualCards(
+async function _generateContextualCards(
   category?: string,
   sport?: string,
   count: number = 3,
@@ -501,7 +496,7 @@ export async function generateContextualCards(
     
     const finalCards = cards.slice(0, count);
     console.log(`[v0] [MULTI-SPORT] Final result: ${finalCards.length} cards from ${[...new Set(finalCards.map(c => c.category))].join(', ')}`);
-    if (finalCards.length > 0) setCachedCards(finalCards, category || 'all');
+    if (finalCards.length > 0) setCachedCards(finalCards, category || 'all', sport);
     return finalCards;
   }
 
@@ -513,7 +508,7 @@ export async function generateContextualCards(
     console.log(`[v0] [CARDS-GEN] Single-sport mode: fetching ${normalizedSport} odds directly`);
     const sportCards = await generateSportSpecificCards(normalizedSport, count, category);
     if (sportCards.length > 0) {
-      setCachedCards(sportCards, category || 'betting');
+      setCachedCards(sportCards, category || 'betting', normalizedSport);
       return sportCards;
     }
     // Fall through if no games available (off-season etc.)
@@ -572,7 +567,8 @@ export async function generateContextualCards(
             }
           });
         });
-        
+
+        if (cards.length > 0) setCachedCards(cards, 'arbitrage', sport);
         return cards;
       } else {
         console.log('[v0] [CARDS-GEN] No active arbitrage opportunities');
@@ -580,7 +576,7 @@ export async function generateContextualCards(
     } catch (error) {
       console.error('[v0] [CARDS-GEN] Arbitrage fetch error:', error);
     }
-    
+
     // Fallback if no opportunities found
     cards.push({
       type: 'ARBITRAGE',
@@ -597,7 +593,8 @@ export async function generateContextualCards(
         status: 'SCANNING'
       }
     });
-    
+
+    if (cards.length > 0) setCachedCards(cards, 'arbitrage', sport);
     return cards;
   }
   
@@ -715,7 +712,8 @@ export async function generateContextualCards(
             }
           });
         });
-        
+
+        if (cards.length > 0) setCachedCards(cards, 'line_movement', sport);
         return cards;
       } else {
         console.log('[v0] [CARDS-GEN] No recent line movements');
@@ -723,7 +721,7 @@ export async function generateContextualCards(
     } catch (error) {
       console.error('[v0] [CARDS-GEN] Line movement fetch error:', error);
     }
-    
+
     // Fallback
     cards.push({
       type: 'LINE_MOVEMENT',
@@ -740,7 +738,8 @@ export async function generateContextualCards(
         status: 'MONITORING'
       }
     });
-    
+
+    if (cards.length > 0) setCachedCards(cards, 'line_movement', sport);
     return cards;
   }
   
@@ -790,6 +789,7 @@ export async function generateContextualCards(
         const kalshiCards = markets.slice(0, count).map(kalshiMarketToCard);
         cards.push(...kalshiCards);
         console.log(`[v0] [CARDS-GEN] Added ${kalshiCards.length} Kalshi cards`);
+        if (cards.length > 0) setCachedCards(cards, 'kalshi', sport);
         return cards;
       }
 
@@ -897,13 +897,14 @@ export async function generateContextualCards(
             });
           });
         }
-        
+
+        if (cards.length > 0) setCachedCards(cards, 'portfolio', sport);
         return cards;
       }
     } catch (error) {
       console.error('[v0] [CARDS-GEN] Portfolio fetch error:', error);
     }
-    
+
     // Fallback
     cards.push({
       type: 'PORTFOLIO',
@@ -920,7 +921,8 @@ export async function generateContextualCards(
         status: 'SETUP_REQUIRED'
       }
     });
-    
+
+    if (cards.length > 0) setCachedCards(cards, 'portfolio', sport);
     return cards;
   }
   
@@ -943,6 +945,7 @@ export async function generateContextualCards(
           const propCards = props.slice(0, count).map(playerPropToCard);
           cards.push(...propCards);
           console.log(`[v0] [CARDS-GEN] Added ${propCards.length} player prop cards`);
+          if (cards.length > 0) setCachedCards(cards, 'props', normalizedSport);
           return cards;
         }
       }
@@ -1070,7 +1073,7 @@ export async function generateContextualCards(
 
   // Populate the in-memory cache so subsequent calls (e.g. /api/analyze) reuse these
   if (cards.length > 0) {
-    setCachedCards(cards, category || 'all');
+    setCachedCards(cards, category || 'all', sport);
   }
 
   // Add weather cards for outdoor sports if betting category
@@ -1094,3 +1097,15 @@ export async function generateContextualCards(
 
   return cards.slice(0, count);
 }
+
+// ============================================================================
+// Exported function — wrapped with Next.js unstable_cache so results survive
+// across Vercel serverless invocations (Next.js Data Cache, 3-minute TTL).
+// The in-memory cardCacheMap above acts as a fast L1 cache within a warm
+// container; unstable_cache is the L2 that bridges cold starts.
+// ============================================================================
+export const generateContextualCards = unstable_cache(
+  _generateContextualCards,
+  ['cards-generator'],
+  { revalidate: 180 } // 3 minutes — matches CARD_CACHE_TTL
+);

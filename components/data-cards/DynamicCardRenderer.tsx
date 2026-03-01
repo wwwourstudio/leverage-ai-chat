@@ -8,6 +8,7 @@ import { WeatherCard } from './WeatherCard';
 import { ArbitrageCard } from './ArbitrageCard';
 import { CardSkeleton } from './CardSkeleton';
 import { StatcastCard } from './StatcastCard';
+import { ADPCard } from './ADPCard';
 
 interface CardData {
   type: string;
@@ -208,6 +209,24 @@ export function DynamicCardRenderer({
           <span className="text-[9px] font-bold text-gray-600 uppercase tracking-wider">Powered by {safeCard.data?.source || 'Grok 4'}</span>
         </div>
       </div>
+    );
+  }
+
+  // ADP leaderboard cards (NFBC ADP tool results)
+  if (cardType === 'adp-analysis' || cardType.includes('adp')) {
+    return (
+      <ADPCard
+        type={safeCard.type}
+        title={safeCard.title}
+        category={safeCard.category}
+        subcategory={safeCard.subcategory}
+        gradient={safeCard.gradient}
+        data={safeCard.data}
+        status={safeCard.status}
+        onAnalyze={handleAnalyze}
+        error={error}
+        isHero={isHero}
+      />
     );
   }
 

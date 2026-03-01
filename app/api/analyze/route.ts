@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { generateText } from 'ai';
+import { generateText, tool } from 'ai';
 import { createXai } from '@ai-sdk/xai';
+import { z } from 'zod';
 import {
   AI_CONFIG,
   SYSTEM_PROMPT,
   MLB_ANALYSIS_ADDENDUM,
+  NFBC_ADP_ADDENDUM,
   DEFAULT_SOURCES,
   HTTP_STATUS,
   ERROR_MESSAGES,
 } from '@/lib/constants';
+import { getADPData, queryADP } from '@/lib/adp-data';
 import { generateContextualCards, type InsightCard } from '@/lib/cards-generator';
 import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-detector';
 
@@ -100,9 +103,23 @@ export async function POST(request: NextRequest) {
     // For MLB queries, append the MLB_ANALYSIS_ADDENDUM so Grok returns structured
     // JSON cards (statcast_summary_card, hr_prop_card, etc.) instead of prose.
     const isMLBQuery = context?.sport === 'mlb';
-    const baseWithAddendum = isMLBQuery
+
+    // ADP intent: user is asking about NFBC draft positions / rankings.
+    // When true: use NFBC_ADP_ADDENDUM + query_adp tool instead of statcast JSON mode.
+    const msgLower = userMessage.toLowerCase();
+    const hasADPIntent =
+      ['adp', 'nfbc', 'average draft', 'draft position', 'draft rank', 'draft order', 'nfbc board']
+        .some(k => msgLower.includes(k)) ||
+      (context?.hasFantasyIntent === true && context?.sport === 'mlb');
+
+    // Statcast JSON mode only applies to non-ADP MLB queries
+    const isMLBStatcastMode = isMLBQuery && !hasADPIntent;
+
+    const baseWithAddendum = isMLBStatcastMode
       ? `${baseSystemPrompt}${MLB_ANALYSIS_ADDENDUM}`
-      : baseSystemPrompt;
+      : hasADPIntent
+        ? `${baseSystemPrompt}${NFBC_ADP_ADDENDUM}`
+        : baseSystemPrompt;
     const systemPrompt = customInstructions?.trim()
       ? `${baseWithAddendum}\n\n## USER PROFILE & BETTING PREFERENCES\n${customInstructions.trim()}`
       : baseWithAddendum;
@@ -257,6 +274,7 @@ export async function POST(request: NextRequest) {
     let aiText: string;
     let modelUsed = AI_CONFIG.MODEL_DISPLAY_NAME;
     let usedFallback = false;
+    let pendingADPCard: InsightCard | null = null;
 
     const MAX_HALLUCINATION_RETRIES = 2;
 
@@ -278,11 +296,45 @@ export async function POST(request: NextRequest) {
 
     // Route DFS, pure-fantasy, file-upload, and off-season queries directly to
     // grok-3-fast (3-6s). Reserve grok-4 for live-odds betting analysis only.
-    const useFastPath = shouldUseFastModel(userMessage, context);
+    // ADP queries override to grok-4: reliable tool use requires the stronger model.
+    const useFastPath = hasADPIntent ? false : shouldUseFastModel(userMessage, context);
     const primaryModel = useFastPath ? 'grok-3-fast' : AI_CONFIG.MODEL_NAME;
     if (useFastPath) {
       console.log(`[API/analyze] Fast-path routing → grok-3-fast (intent: DFS/fantasy/file/offseason)`);
     }
+
+    // ── ADP tool (injected when hasADPIntent) ────────────────────────────────────
+    const adpTool = tool({
+      description:
+        'Query 2025 NFBC (National Fantasy Baseball Championship) ADP data. ' +
+        'Use for any question about player draft rankings, average draft position (ADP), ' +
+        'positional scarcity in fantasy baseball drafts, or where a specific player is being drafted.',
+      parameters: z.object({
+        player:   z.string().optional().describe('Partial player name — case-insensitive (e.g. "Judge", "Ohtani", "Trout")'),
+        position: z.string().optional().describe('Position filter: SP | RP | 1B | 2B | 3B | SS | OF | DH | C'),
+        rankMin:  z.number().optional().describe('Minimum overall NFBC rank (inclusive)'),
+        rankMax:  z.number().optional().describe('Maximum overall NFBC rank (inclusive)'),
+        limit:    z.number().optional().describe('Number of players to return (default 10, max 25)'),
+      }),
+      execute: async ({ player, position, rankMin, rankMax, limit }) => {
+        console.log('[API/analyze] ADP tool called:', { player, position, rankMin, rankMax, limit });
+        const data = await getADPData();
+        if (data.length === 0) {
+          return {
+            players: [],
+            total_players_in_dataset: 0,
+            source: 'NFBC 2025 ADP',
+            error: 'NFBC ADP data is temporarily unavailable. Please try again shortly or consult nfc.shgn.com.',
+          };
+        }
+        const results = queryADP(data, { player, position, rankMin, rankMax, limit });
+        return {
+          players: results,
+          total_players_in_dataset: data.length,
+          source: 'NFBC 2025 ADP',
+        };
+      },
+    });
 
     if (xaiApiKey) {
       try {
@@ -295,18 +347,58 @@ export async function POST(request: NextRequest) {
             temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
             maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
             maxRetries: 1, // Reduced retries to prevent timeout
+            // Inject ADP tool only when user is asking about NFBC draft positions
+            ...(hasADPIntent && { tools: { query_adp: adpTool }, maxSteps: 3 }),
           }),
           timeoutPromise
         ]);
         aiText = result.text;
         modelUsed = useFastPath ? 'Grok 3 Fast' : AI_CONFIG.MODEL_DISPLAY_NAME;
 
+        // ── Capture ADP tool result for card injection (done after cards await) ──
+        if (hasADPIntent) {
+          const toolResults: any[] = (result as any).toolResults ?? [];
+          const adpResult = toolResults.find((tr: any) => tr.toolName === 'query_adp');
+          if (adpResult?.result?.players?.length > 0) {
+            const tr = adpResult.result;
+            const callArgs =
+              ((result as any).toolCalls ?? []).find((tc: any) => tc.toolName === 'query_adp')?.args ?? {};
+            let cardTitle = 'NFBC 2025 ADP Rankings';
+            if (callArgs.player) {
+              const name = tr.players[0]?.displayName ?? callArgs.player;
+              cardTitle = `${name} — NFBC ADP`;
+            } else if (callArgs.position) {
+              const rankSuffix = callArgs.rankMax ? ` (Top ${callArgs.rankMax})` : '';
+              cardTitle = `Top ${callArgs.position}${rankSuffix} — NFBC ADP Board`;
+            } else if (callArgs.rankMin != null || callArgs.rankMax != null) {
+              const lo = callArgs.rankMin ?? 1;
+              const hi = callArgs.rankMax ?? tr.total_players_in_dataset;
+              cardTitle = `NFBC ADP Picks #${lo}–${hi}`;
+            }
+            pendingADPCard = {
+              type: 'adp-analysis',
+              title: cardTitle,
+              category: 'MLB',
+              subcategory: 'NFBC Draft Board',
+              gradient: 'from-cyan-600/80 via-teal-700/60 to-cyan-900/40',
+              status: 'value',
+              realData: true,
+              icon: '⚾',
+              data: {
+                players: JSON.stringify(tr.players),
+                source: tr.source ?? 'NFBC 2025 ADP',
+                totalInDataset: tr.total_players_in_dataset,
+              },
+            };
+          }
+        }
+
         // Hallucination-detection retry loop (with timeout awareness)
         let detection = detectHallucinations(aiText, userMessage, context.oddsData);
         let retryAttempt = 0;
         const remainingTime = TIMEOUT_MS - (Date.now() - startTime);
 
-        while (detection.shouldRetry && !isMLBQuery && retryAttempt < MAX_HALLUCINATION_RETRIES && remainingTime > 8000) {
+        while (detection.shouldRetry && !isMLBQuery && !hasADPIntent && retryAttempt < MAX_HALLUCINATION_RETRIES && remainingTime > 8000) {
           retryAttempt++;
           console.warn(
             `[API/analyze] Hallucination detected (attempt ${retryAttempt}/${MAX_HALLUCINATION_RETRIES}):`,
@@ -393,11 +485,16 @@ export async function POST(request: NextRequest) {
     // If AI fell back to the static response, skip cards to avoid a mismatch.
     let cards: InsightCard[] = usedFallback ? [] : await cardPromise.catch(() => []);
 
+    // Inject ADP card at the front when the tool returned results
+    if (pendingADPCard) {
+      cards = [pendingADPCard, ...cards.slice(0, 5)];
+    }
+
     // ── MLB Statcast: parse Grok's JSON response into a card ──────────────────
     // The MLB_ANALYSIS_ADDENDUM instructs Grok to return ONLY JSON for MLB queries.
     // Parse it here, inject it as a StatcastCard, and replace aiText with
     // human-readable prose so the chat doesn't display raw JSON to the user.
-    if (isMLBQuery && !usedFallback) {
+    if (isMLBStatcastMode && !usedFallback) {
       const STATCAST_TYPES = new Set([
         'statcast_summary_card', 'hr_prop_card', 'game_simulation_card',
         'leaderboard_card', 'pitch_analysis_card',
@@ -497,6 +594,9 @@ export async function POST(request: NextRequest) {
     if (context.isPoliticalMarket) sources.push(DEFAULT_SOURCES.KALSHI);
     if (context.hasFantasyIntent && !context.hasBettingIntent) {
       sources.push({ name: 'Fantasy Projections Engine', type: 'database' as const, reliability: 91 });
+    }
+    if (hasADPIntent) {
+      sources.push({ name: 'NFBC 2025 ADP Board', type: 'api' as const, reliability: 97 });
     }
 
     return NextResponse.json({

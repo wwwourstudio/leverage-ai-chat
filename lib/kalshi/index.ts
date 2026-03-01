@@ -149,11 +149,19 @@ function parseMarket(m: any): KalshiMarket {
 
   const rawCategory = m.category || m.series_ticker || m.event_ticker || '';
 
+  // yes_sub_title is a short outcome label (e.g. "yes Baylor") — never use it
+  // alone as the card title. When a market lacks a proper title, combine
+  // event_title + cleaned yes_sub_title so the result is still readable.
+  const rawYesSub = typeof m.yes_sub_title === 'string' ? m.yes_sub_title : '';
+  const cleanYesSub = rawYesSub.replace(/^yes\s+/i, '').trim();
+  const compositeTitle =
+    m.event_title && cleanYesSub ? `${m.event_title}: ${cleanYesSub}` : '';
+
   return {
     ticker: m.ticker || '',
-    title: m.title || m.event_title || m.yes_sub_title || m.subtitle || '',
+    title: m.title || compositeTitle || m.event_title || m.subtitle || '',
     category: normalizeCategoryLabel(rawCategory),
-    subtitle: m.subtitle || m.yes_sub_title || m.event_title || '',
+    subtitle: m.subtitle || (cleanYesSub ? `Yes: ${cleanYesSub}` : '') || m.event_title || '',
     yesPrice,
     noPrice,
     yesBid,

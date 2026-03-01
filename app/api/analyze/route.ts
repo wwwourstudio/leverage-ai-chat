@@ -393,6 +393,45 @@ export async function POST(request: NextRequest) {
     // If AI fell back to the static response, skip cards to avoid a mismatch.
     let cards: InsightCard[] = usedFallback ? [] : await cardPromise.catch(() => []);
 
+    // ── MLB Statcast: parse Grok's JSON response into a card ──────────────────
+    // The MLB_ANALYSIS_ADDENDUM instructs Grok to return ONLY JSON for MLB queries.
+    // Parse it here, inject it as a StatcastCard, and replace aiText with
+    // human-readable prose so the chat doesn't display raw JSON to the user.
+    if (isMLBQuery && !usedFallback) {
+      const STATCAST_TYPES = new Set([
+        'statcast_summary_card', 'hr_prop_card', 'game_simulation_card',
+        'leaderboard_card', 'pitch_analysis_card',
+      ]);
+      // Strip markdown code fences Grok may add despite instructions
+      const jsonStr = aiText.trim()
+        .replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+
+      if (jsonStr.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(jsonStr);
+          if (parsed && typeof parsed.type === 'string' && STATCAST_TYPES.has(parsed.type)) {
+            // Spread ALL parsed fields at card top level so DynamicCardRenderer passes
+            // summary_metrics + lightbox through to StatcastCard unchanged
+            const statcastCard: InsightCard = { icon: '⚾', ...parsed };
+            cards = [statcastCard, ...cards.slice(0, 5)];
+
+            // Replace raw JSON with readable prose for the chat message
+            const metricLines = (parsed.summary_metrics ?? [])
+              .slice(0, 3)
+              .map((m: { label: string; value: string }) => `**${m.label}:** ${m.value}`)
+              .join(' · ');
+            aiText = [
+              `**${parsed.title}** — MLB Statcast Analysis`,
+              metricLines,
+              'See the card below for the full breakdown and splits.',
+            ].filter(Boolean).join('\n');
+          }
+        } catch {
+          console.warn('[API/analyze] MLB JSON parse failed — returning raw text');
+        }
+      }
+    }
+
     // When sport is known but no live games returned — build insight cards from AI bullets
     if (cards.length === 0 && !isAmbiguous && !usedFallback && context.sport) {
       const bullets = (aiText.match(/^[-•]\s+(.+)$/gm) ?? []).slice(0, 3);

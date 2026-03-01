@@ -175,7 +175,7 @@ export function DynamicCardRenderer({
   ) {
     return (
       <StatcastCard
-        data={safeCard as any}
+        data={{ ...safeCard, ...(card as any) } as any}
         onAnalyze={handleAnalyze}
         isHero={isHero}
       />

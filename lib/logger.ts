@@ -146,17 +146,32 @@ class Logger {
   }
 
   /**
-   * Send critical logs to monitoring service
+   * Send critical logs to monitoring services.
+   * Integrates with Vercel Analytics (client-only) and Google Analytics (gtag).
+   * Safe to call from server context — client-only calls are no-ops on SSR.
    */
   private sendToMonitoring(entry: LogEntry): void {
-    // TODO: Integrate with monitoring service (Sentry, Datadog, Vercel Analytics)
-    // Example: Sentry.captureException(entry.error, { extra: entry.context });
-    
-    if (typeof window !== 'undefined' && (window as any).gtag) {
-      (window as any).gtag('event', 'exception', {
-        description: entry.message,
-        fatal: entry.level === LogLevel.FATAL,
+    if (typeof window !== 'undefined') {
+      // Vercel Analytics: track ERROR/FATAL log events as custom events.
+      // Dynamic import avoids SSR module evaluation issues (track() throws in dev on server).
+      import('@vercel/analytics').then(({ track }) => {
+        track('log_error', {
+          level: entry.level,
+          category: entry.category,
+          message: entry.message,
+          fatal: entry.level === LogLevel.FATAL,
+        });
+      }).catch(() => {
+        // Silently ignore if analytics module fails to load
       });
+
+      // Google Analytics (gtag) — existing integration preserved
+      if ((window as any).gtag) {
+        (window as any).gtag('event', 'exception', {
+          description: entry.message,
+          fatal: entry.level === LogLevel.FATAL,
+        });
+      }
     }
   }
 

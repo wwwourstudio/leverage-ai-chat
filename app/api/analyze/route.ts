@@ -68,6 +68,7 @@ function shouldUseFastModel(
   if (context?.hasFantasyIntent && !context?.hasBettingIntent) return true;
   if (userMessage.includes('[File:')) return true;   // CSV / file upload
   if (context?.noGamesAvailable) return true;         // off-season
+  if (context?.isPoliticalMarket) return true;        // Kalshi — no live-odds accuracy needed
   // MLB Statcast / HR / pitch queries always use the primary model — accuracy matters
   if (context?.sport === 'mlb' && (lower.includes('hr') || lower.includes('statcast') || lower.includes('pitch') || lower.includes('home run') || lower.includes('barrel'))) {
     return false;

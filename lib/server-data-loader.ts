@@ -12,7 +12,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
-import { validateServerEnv, getMissingAPIKeys } from '@/lib/env-validator';
+import { validateServerEnv, getMissingAPIKeys } from '@/lib/config';
 import { generateContextualCards } from '@/lib/cards-generator';
 
 export interface ServerDataResult {

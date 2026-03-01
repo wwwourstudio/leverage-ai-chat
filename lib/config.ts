@@ -417,3 +417,89 @@ export function checkClientConfig(): {
     ready: supabaseUrl && supabaseKey,
   };
 }
+
+// ── Env Validation Helpers (consolidated from env-validator.ts) ────────────────
+
+export interface EnvValidationResult {
+  isValid: boolean;
+  missing: string[];
+  warnings: string[];
+  errors: string[];
+}
+
+const REQUIRED_ENV_VARS: Record<string, string> = {
+  NEXT_PUBLIC_SUPABASE_URL:   'Supabase project URL',
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: 'Supabase anonymous key',
+  SUPABASE_SERVICE_ROLE_KEY:  'Supabase service role key (server-side only)',
+  XAI_API_KEY:                'xAI Grok API key for AI responses',
+  ODDS_API_KEY:               'The Odds API key for sports betting data',
+};
+
+const OPTIONAL_ENV_VARS: Record<string, string> = {
+  NEXT_PUBLIC_SITE_URL:  'Site URL for absolute links',
+  WEATHER_API_KEY:       'Weather API key for outdoor sports',
+  STRIPE_SECRET_KEY:     'Stripe secret key for payments',
+  STRIPE_PUBLISHABLE_KEY:'Stripe publishable key for payments',
+  KALSHI_API_KEY:        'Kalshi API key for prediction markets',
+};
+
+export function validateServerEnv(): EnvValidationResult {
+  const missing: string[] = [];
+  const warnings: string[] = [];
+  const errors: string[] = [];
+
+  for (const [key, description] of Object.entries(REQUIRED_ENV_VARS)) {
+    const value = process.env[key];
+    if (!value || value.trim() === '') {
+      missing.push(`${key} (${description})`);
+      errors.push(`Missing required environment variable: ${key}`);
+    } else if (key.includes('KEY') && value.length < 20) {
+      warnings.push(`${key} looks suspiciously short - verify it's correct`);
+    }
+  }
+  for (const [key, description] of Object.entries(OPTIONAL_ENV_VARS)) {
+    if (!process.env[key]) {
+      warnings.push(`Optional: ${key} (${description}) not configured`);
+    }
+  }
+  return { isValid: missing.length === 0, missing, warnings, errors };
+}
+
+export function validateClientEnv(): EnvValidationResult {
+  if (typeof window === 'undefined') {
+    return { isValid: true, missing: [], warnings: [], errors: [] };
+  }
+  const missing: string[] = [];
+  const errors: string[] = [];
+  for (const key of ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY']) {
+    const value = process.env[key];
+    if (!value || value.trim() === '') {
+      missing.push(`${key} (${REQUIRED_ENV_VARS[key]})`);
+      errors.push(`Missing required public environment variable: ${key}`);
+    }
+  }
+  return { isValid: missing.length === 0, missing, warnings: [], errors };
+}
+
+let envLogged = false;
+export function logEnvValidation(result: EnvValidationResult, context: 'server' | 'client') {
+  if (result.missing.length > 0) {
+    console.error(`[v0] ${context.toUpperCase()}: Missing required env vars:`, result.missing);
+  }
+  if (result.errors.length > 0) {
+    console.error(`[v0] ${context.toUpperCase()}: Environment errors:`, result.errors);
+  }
+  if (!envLogged) {
+    envLogged = true;
+    console.log(`[v0] ${context.toUpperCase()}: Environment validation ${result.isValid ? '✓ PASSED' : '✗ FAILED'}`);
+    if (result.warnings.length > 0 && process.env.NODE_ENV === 'development') {
+      console.log(`[v0] Environment info:`, result.warnings.filter(w => !w.startsWith('Optional:')).length > 0
+        ? result.warnings
+        : `${result.warnings.length} optional vars not configured (non-critical)`);
+    }
+  }
+}
+
+export function getMissingAPIKeys(): string[] {
+  return ['XAI_API_KEY', 'ODDS_API_KEY'].filter(key => !process.env[key]);
+}

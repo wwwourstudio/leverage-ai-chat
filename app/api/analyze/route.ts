@@ -5,6 +5,7 @@ import { createXai } from '@ai-sdk/xai';
 import {
   AI_CONFIG,
   SYSTEM_PROMPT,
+  MLB_ANALYSIS_ADDENDUM,
   DEFAULT_SOURCES,
   HTTP_STATUS,
   ERROR_MESSAGES,
@@ -64,6 +65,10 @@ function shouldUseFastModel(
   if (context?.hasFantasyIntent && !context?.hasBettingIntent) return true;
   if (userMessage.includes('[File:')) return true;   // CSV / file upload
   if (context?.noGamesAvailable) return true;         // off-season
+  // MLB Statcast / HR / pitch queries always use the primary model — accuracy matters
+  if (context?.sport === 'mlb' && (lower.includes('hr') || lower.includes('statcast') || lower.includes('pitch') || lower.includes('home run') || lower.includes('barrel'))) {
+    return false;
+  }
   return false;
 }
 
@@ -91,10 +96,16 @@ export async function POST(request: NextRequest) {
     const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const baseSystemPrompt = SYSTEM_PROMPT.replace('[CURRENT_DATE]', dateStr);
 
-    // Build dynamic system prompt — inject user instructions at highest priority level
-    const systemPrompt = customInstructions?.trim()
-      ? `${baseSystemPrompt}\n\n## USER PROFILE & BETTING PREFERENCES\n${customInstructions.trim()}`
+    // Build dynamic system prompt — inject user instructions at highest priority level.
+    // For MLB queries, append the MLB_ANALYSIS_ADDENDUM so Grok returns structured
+    // JSON cards (statcast_summary_card, hr_prop_card, etc.) instead of prose.
+    const isMLBQuery = context?.sport === 'mlb';
+    const baseWithAddendum = isMLBQuery
+      ? `${baseSystemPrompt}${MLB_ANALYSIS_ADDENDUM}`
       : baseSystemPrompt;
+    const systemPrompt = customInstructions?.trim()
+      ? `${baseWithAddendum}\n\n## USER PROFILE & BETTING PREFERENCES\n${customInstructions.trim()}`
+      : baseWithAddendum;
 
     // Detect ambiguous queries with no sport/intent context — ask a clarifying question
     const isAmbiguous = !context?.sport

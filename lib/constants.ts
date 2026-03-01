@@ -181,6 +181,12 @@ export const CARD_TYPES = {
   WEATHER_IMPACT: 'weather-impact',
   WEATHER_GAME: 'weather-game',
   WEATHER_FORECAST: 'weather-forecast',
+  // MLB Statcast card types
+  STATCAST_SUMMARY:  'statcast_summary_card',
+  HR_PROP:           'hr_prop_card',
+  GAME_SIMULATION:   'game_simulation_card',
+  LEADERBOARD:       'leaderboard_card',
+  PITCH_ANALYSIS:    'pitch_analysis_card',
 } as const;
 
 // Card Status Values
@@ -474,6 +480,54 @@ CLARIFICATION RULE — CRITICAL: If the user's message has NO specific sport, te
 - Once the user specifies, proceed with full expert analysis immediately.
 
 NEVER say "I cannot provide analysis" or "real-time data unavailable" for general strategy questions. If you genuinely need one piece of info to be specific, ask ONE focused question.` as const;
+
+// MLB Statcast Analysis Addendum
+// Injected ONLY when context.sport === 'mlb' — appended after SYSTEM_PROMPT.
+// Overrides the free-text response format for MLB queries.
+export const MLB_ANALYSIS_ADDENDUM = `
+
+## MLB QUANT MODE — ACTIVE
+You have access to pitch-level Statcast data via /api/statcast/query.
+For MLB queries, respond ONLY with a single valid JSON object — NO prose, NO markdown, ONLY the JSON.
+Choose the most appropriate type from:
+  statcast_summary_card | hr_prop_card | game_simulation_card | leaderboard_card | pitch_analysis_card
+
+Required shape (all fields mandatory):
+{
+  "type": "<one of the five types above>",
+  "title": "string — concise card headline",
+  "category": "MLB",
+  "subcategory": "string — e.g. 'HR Props' | 'Simulation' | 'Statcast' | 'Leaderboard' | 'Pitch Mix'",
+  "gradient": "from-indigo-600/80 via-violet-700/60 to-indigo-900/40",
+  "status": "hot | value | edge | optimal",
+  "summary_metrics": [
+    { "label": "string", "value": "string" }
+  ],
+  "lightbox": {
+    "sections": [
+      {
+        "title": "string",
+        "metrics": [{ "label": "string", "value": "string" }]
+      }
+    ]
+  }
+}
+
+Type-specific required fields inside lightbox sections:
+- hr_prop_card: include hr_probability (e.g. "12.4%"), fair_odds (American), market_odds, edge (e.g. "+3.1%"), kelly_fraction (e.g. "1.8%")
+- game_simulation_card: include win_probability, push_probability, expected_total, p10_total, p90_total, expected_home_runs
+- pitch_analysis_card: include tunneling_score for best pitch pair, worst pair, avg_separation
+- leaderboard_card: include rank, player_name, metric_value for each player
+- statcast_summary_card: include barrel_rate, avg_exit_velocity, air_pull_rate, hard_hit_rate, hr_rate
+
+Modeling rules:
+- Apply Bayesian shrinkage when sample_size < 300 PA (blend toward .037 league-avg HR/PA)
+- Always include home/road split and vs_LHP / vs_RHP split in lightbox sections
+- Include rolling 15-game trend note in summary_metrics
+- Cap kelly_fraction at 2.0% of bankroll
+- Derive fair_odds from logistic model probability; derive edge = model_prob - market_implied_prob
+
+NEVER output any text outside the JSON object. NEVER use markdown code fences.` as const;
 
 // Default Source Configurations
 export const DEFAULT_SOURCES = {

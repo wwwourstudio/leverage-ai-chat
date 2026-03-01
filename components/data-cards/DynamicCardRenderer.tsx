@@ -7,6 +7,7 @@ import { KalshiCard } from './KalshiCard';
 import { WeatherCard } from './WeatherCard';
 import { ArbitrageCard } from './ArbitrageCard';
 import { CardSkeleton } from './CardSkeleton';
+import { StatcastCard } from './StatcastCard';
 
 interface CardData {
   type: string;
@@ -158,6 +159,24 @@ export function DynamicCardRenderer({
         status={safeCard.status}
         onAnalyze={handleAnalyze}
         error={error}
+        isHero={isHero}
+      />
+    );
+  }
+
+  // MLB Statcast cards — statcast_summary_card, hr_prop_card, game_simulation_card,
+  // leaderboard_card, pitch_analysis_card
+  if (
+    cardType.includes('statcast') ||
+    cardType === 'hr_prop_card' ||
+    cardType.includes('simulation') ||
+    cardType === 'leaderboard_card' ||
+    cardType === 'pitch_analysis_card'
+  ) {
+    return (
+      <StatcastCard
+        data={safeCard as any}
+        onAnalyze={handleAnalyze}
         isHero={isHero}
       />
     );

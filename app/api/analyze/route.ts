@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { generateText, tool } from 'ai';
+import { generateText, tool, stepCountIs } from 'ai';
 import { createXai } from '@ai-sdk/xai';
 import { z } from 'zod';
 import {
@@ -347,8 +347,10 @@ export async function POST(request: NextRequest) {
             temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
             maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
             maxRetries: 1, // Reduced retries to prevent timeout
-            // Inject ADP tool only when user is asking about NFBC draft positions
-            ...(hasADPIntent && { tools: { query_adp: adpTool }, maxSteps: 3 }),
+            // Inject ADP tool only when user is asking about NFBC draft positions.
+            // stopWhen: stepCountIs(3) allows: step1=tool-call, step2=final-response, step3=safety
+            // (default is stepCountIs(1) which would stop before the model sees tool results)
+            ...(hasADPIntent && { tools: { query_adp: adpTool }, stopWhen: stepCountIs(3) }),
           }),
           timeoutPromise
         ]);

@@ -37,6 +37,7 @@ import { AlertsLightbox } from '@/components/AlertsLightbox';
 import { StripeLightbox } from '@/components/StripeLightbox';
 import { UserLightbox } from '@/components/UserLightbox';
 import { useToast } from '@/components/toast-provider';
+import { Sidebar } from '@/components/Sidebar';
 
 interface FileAttachment {
   id: string;
@@ -404,8 +405,13 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
       const profile = profileResult.data;
       // Suppress 404-class errors: user_credits table may not be migrated yet — fallback is fine
-      if (creditsResult.error && !creditsResult.error.message?.toLowerCase().includes('does not exist')) {
-        console.warn('[Credits] user_credits query failed:', creditsResult.error.message);
+      if (creditsResult.error) {
+        const isMissingTable = creditsResult.error.message?.toLowerCase().includes('does not exist')
+          || (creditsResult.error as any).code === '42P01'
+          || (creditsResult.error as any).code === 'PGRST200';
+        if (!isMissingTable) {
+          console.warn('[Credits] user_credits query failed:', creditsResult.error.message);
+        }
       }
       const purchasedBalance = creditsResult.data?.balance ?? 0;
 
@@ -2658,306 +2664,33 @@ No preamble. Start directly with section 1.`;
       )}
       
       {/* Sidebar */}
-      <div
-        className={`${
-          sidebarOpen ? 'w-80' : 'w-0'
-        } bg-gradient-to-b from-gray-950 via-gray-900 to-black border-r border-gray-800/50 transition-all duration-300 overflow-hidden flex flex-col backdrop-blur-xl`}
-      >
-        <div className="p-4 border-b border-gray-800/50 bg-gradient-to-b from-gray-900/50 to-transparent">
-          <button
-            onClick={handleNewChat}
-            className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white rounded-full px-4 py-3 transition-all duration-300 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 flex items-center justify-center gap-2 font-bold group relative overflow-hidden"
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-            <Plus className="w-4 h-4 relative z-10 group-hover:rotate-90 transition-transform duration-300" />
-            <span className="relative z-10 text-sm">New Analysis</span>
-          </button>
-
-          {/* Chat search */}
-          <div className="relative mt-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600 pointer-events-none" />
-            <input
-              value={chatSearch}
-              onChange={e => setChatSearch(e.target.value)}
-              placeholder="Search chats..."
-              className="w-full bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] rounded-lg py-2 pl-8 pr-3 text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 transition-colors"
-            />
-          </div>
-
-          <div className="mt-4">
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">Platform</div>
-            <div className="relative">
-              <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-gray-900 to-transparent z-10 pointer-events-none" />
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide pr-6">
-              {categories.map(cat => {
-                const Icon = cat.icon;
-                const isActive = selectedCategory === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => { setSelectedCategory(cat.id); setSelectedSport(''); setSuggestedPrompts([]); setLastUserQuery(''); }}
-                    className={`group/pill flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 border whitespace-nowrap flex-shrink-0 ${
-                      isActive
-                        ? 'bg-gray-800 text-white border-gray-700 shadow-lg'
-                        : 'bg-transparent text-gray-500 border-gray-800 hover:text-gray-300 hover:bg-gray-800/50 hover:border-gray-700'
-                    }`}
-                    title={cat.desc}
-                  >
-                    <Icon className={`w-3.5 h-3.5 transition-colors duration-300 ${
-                      isActive ? cat.color : 'text-gray-600 group-hover/pill:text-gray-400'
-                    }`} />
-                    <span>{cat.id === 'all' ? 'ALL' : cat.name.toUpperCase()}</span>
-                  </button>
-                );
-              })}
-            </div>
-            </div>
-            {/* Sports filter row — visible for all non-Kalshi platforms */}
-            {selectedCategory !== 'kalshi' && (
-              <div className="relative mt-2">
-                <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-gray-900 to-transparent z-10 pointer-events-none" />
-              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide pr-6">
-                {sports.filter(s => !(['fantasy', 'dfs'].includes(selectedCategory) && s.id.startsWith('ncaa'))).map(sport => {
-                  const isActive = selectedSport === sport.id;
-                  return (
-                    <button
-                      key={sport.id}
-                      onClick={() => setSelectedSport(isActive ? '' : sport.id)}
-                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all duration-200 border whitespace-nowrap flex-shrink-0 ${
-                        isActive
-                          ? 'bg-blue-600/20 text-blue-300 border-blue-500/50'
-                          : 'bg-transparent text-gray-600 border-gray-800/60 hover:text-gray-400 hover:border-gray-700'
-                      }`}
-                    >
-                      {sport.name}
-                    </button>
-                  );
-                })}
-              </div>
-              </div>
-            )}
-            {/* Kalshi category filters */}
-            {selectedCategory === 'kalshi' && (
-              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide mt-2">
-                {['Trending', 'Politics', 'Sports', 'Culture', 'Crypto', 'Climate', 'Economics', 'Mentions', 'Companies', 'Financials', 'Tech & Science'].map(topic => (
-                  <button
-                    key={topic}
-                    onClick={() => setSelectedSport(selectedSport === topic ? '' : topic)}
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all duration-200 border whitespace-nowrap flex-shrink-0 ${
-                      selectedSport === topic
-                        ? 'bg-cyan-600/20 text-cyan-300 border-cyan-500/50'
-                        : 'bg-transparent text-gray-600 border-gray-800/60 hover:text-gray-400 hover:border-gray-700'
-                    }`}
-                  >
-                    {topic}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-2.5 space-y-3 custom-scrollbar">
-          {/* Starred Chats Section */}
-                  {filteredChats.filter((chat: Chat) => chat.starred).length > 0 && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between px-2.5 py-1.5">
-                <div className="flex items-center gap-2">
-                  <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                    Starred
-                  </span>
-                </div>
-                <span className="text-[10px] font-bold text-gray-600">
-                  {filteredChats.filter(chat => chat.starred).length}
-                </span>
-              </div>
-              {filteredChats.filter(chat => chat.starred).map((chat) => (
-                <div
-                  key={chat.id}
-                  onClick={() => handleSelectChat(chat.id)}
-                  className={`group relative rounded-lg p-3 cursor-pointer transition-all duration-300 ${
-                    activeChat === chat.id
-                      ? 'bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10 border border-blue-500/30 shadow-lg shadow-blue-500/10'
-                      : 'bg-gray-900/30 hover:bg-gray-800/50 border border-transparent hover:border-gray-700/50'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5 group/title">
-                        <MessageSquare className={`w-3.5 h-3.5 ${activeChat === chat.id ? 'text-blue-400' : 'text-gray-500'} flex-shrink-0`} />
-                        {editingChatId === chat.id ? (
-                          <div className="flex-1 flex items-center gap-1">
-                            <input
-                              type="text"
-                              value={editingChatTitle}
-                              onChange={(e) => setEditingChatTitle(e.target.value)}
-                              onKeyDown={(e) => handleKeyDownChatTitle(e, chat.id)}
-                              onBlur={() => handleSaveChatTitle(chat.id)}
-                              className="flex-1 bg-gray-800/80 border border-blue-500/50 rounded-md px-2 py-1 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                              autoFocus
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <button
-                              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                e.stopPropagation();
-                                handleSaveChatTitle(chat.id);
-                              }}
-                              className="p-1 hover:bg-gray-700/50 rounded transition-all"
-                              title="Save title"
-                            >
-                              <CheckCircle className="w-3.5 h-3.5 text-green-400" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex-1 flex items-center gap-1.5 min-w-0">
-                            <h3 className="text-xs font-bold text-white truncate flex-1">
-                              {chat.title}
-                            </h3>
-                            <button
-                              onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleEditChatTitle(chat.id, chat.title, e)}
-                              className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-gray-700/50 rounded transition-all flex-shrink-0"
-                              title="Edit title"
-                            >
-                              <Edit3 className="w-3 h-3 text-gray-500 hover:text-blue-400" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-gray-400 truncate mb-2 leading-tight">{chat.preview}</p>
-                      
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {chat.tags.slice(0, 2).map((tag, i) => (
-                            <span key={i} className="px-1.5 py-0.5 bg-gray-800/50 border border-gray-700/50 rounded text-[10px] font-semibold text-gray-500">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                        <span suppressHydrationWarning className="text-[10px] font-medium text-gray-600">{formatTimestamp(chat.timestamp)}</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <button
-                        onClick={(e: React.MouseEvent) => handleStarChat(chat.id, e)}
-                        className="p-1 rounded-md hover:bg-gray-700/50 transition-all opacity-100"
-                      >
-                        <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
-                      </button>
-                      <button
-                        onClick={(e: React.MouseEvent) => handleDeleteChat(chat.id, e)}
-                        className="p-1 rounded-md hover:bg-gray-700/50 opacity-0 group-hover:opacity-100 transition-all"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* All Chats Section */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between px-2.5 py-1.5">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                {selectedCategory === 'all' ? 'All Chats' : categories.find(c => c.id === selectedCategory)?.name || 'Chats'}
-              </span>
-              <span className="text-[10px] font-bold text-gray-600">
-                  {filteredChats.filter((chat: Chat) => !chat.starred).length}
-              </span>
-            </div>
-            {filteredChats.filter(chat => !chat.starred).map((chat) => (
-            <div
-              key={chat.id}
-              onClick={() => handleSelectChat(chat.id)}
-              className={`group relative rounded-lg p-3 cursor-pointer transition-all duration-300 ${
-                activeChat === chat.id
-                  ? 'bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10 border border-blue-500/30 shadow-lg shadow-blue-500/10'
-                  : 'bg-gray-900/30 hover:bg-gray-800/50 border border-transparent hover:border-gray-700/50'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5 group/title">
-                    <MessageSquare className={`w-3.5 h-3.5 ${activeChat === chat.id ? 'text-blue-400' : 'text-gray-500'} flex-shrink-0`} />
-                    {editingChatId === chat.id ? (
-                      <div className="flex-1 flex items-center gap-1">
-                        <input
-                          type="text"
-                          value={editingChatTitle}
-                          onChange={(e) => setEditingChatTitle(e.target.value)}
-                          onKeyDown={(e) => handleKeyDownChatTitle(e, chat.id)}
-                          onBlur={() => handleSaveChatTitle(chat.id)}
-                          className="flex-1 bg-gray-800/80 border border-blue-500/50 rounded-md px-2 py-1 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                          autoFocus
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSaveChatTitle(chat.id);
-                          }}
-                          className="p-1 hover:bg-gray-700/50 rounded transition-all"
-                          title="Save title"
-                        >
-                          <CheckCircle className="w-3.5 h-3.5 text-green-400" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex-1 flex items-center gap-1.5 min-w-0">
-                        <h3 className="text-xs font-bold text-white truncate flex-1">
-                          {chat.title}
-                        </h3>
-                        <button
-                          onClick={(e: React.MouseEvent) => handleEditChatTitle(chat.id, chat.title, e)}
-                          className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-gray-700/50 rounded transition-all flex-shrink-0"
-                          title="Edit title"
-                        >
-                          <Edit3 className="w-3 h-3 text-gray-500 hover:text-blue-400" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-gray-400 truncate mb-2 leading-tight">{chat.preview}</p>
-                  
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {chat.tags.slice(0, 2).map((tag, i) => (
-                        <span key={i} className="px-1.5 py-0.5 bg-gray-800/50 border border-gray-700/50 rounded text-[10px] font-semibold text-gray-500">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                    <span suppressHydrationWarning className="text-[10px] font-medium text-gray-600">{formatTimestamp(chat.timestamp)}</span>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <button
-                    onClick={(e: React.MouseEvent) => handleStarChat(chat.id, e)}
-                    className={`p-1 rounded-md hover:bg-gray-700/50 transition-all ${
-                      chat.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                    }`}
-                  >
-                    <Star
-                      className={`w-3.5 h-3.5 ${
-                        chat.starred ? 'text-yellow-400 fill-yellow-400' : 'text-gray-500'
-                      }`}
-                    />
-                  </button>
-                  <button
-                    onClick={(e: React.MouseEvent) => handleDeleteChat(chat.id, e)}
-                    className="p-1 rounded-md hover:bg-gray-700/50 opacity-0 group-hover:opacity-100 transition-all"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-          </div>
-        </div>
-      </div>
+      <Sidebar
+        open={sidebarOpen}
+        onNewChat={handleNewChat}
+        chatSearch={chatSearch}
+        setChatSearch={setChatSearch}
+        activeChat={activeChat}
+        onSelectChat={handleSelectChat}
+        selectedCategory={selectedCategory}
+        setSelectedCategory={setSelectedCategory}
+        selectedSport={selectedSport}
+        setSelectedSport={setSelectedSport}
+        filteredChats={filteredChats}
+        editingChatId={editingChatId}
+        editingChatTitle={editingChatTitle}
+        setEditingChatTitle={setEditingChatTitle}
+        onEditChatTitle={handleEditChatTitle}
+        onSaveChatTitle={handleSaveChatTitle}
+        onKeyDownChatTitle={handleKeyDownChatTitle}
+        onStarChat={handleStarChat}
+        onDeleteChat={handleDeleteChat}
+        categories={categories}
+        sports={sports}
+        setSuggestedPrompts={setSuggestedPrompts}
+        setLastUserQuery={setLastUserQuery}
+        user={user}
+        creditsRemaining={creditsRemaining}
+      />
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-black via-gray-950 to-black">

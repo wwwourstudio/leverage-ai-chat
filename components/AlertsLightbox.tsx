@@ -147,7 +147,13 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
         .limit(20);
 
       if (alertsError) {
-        console.error('[Alerts] Failed to load alerts:', alertsError);
+        // Suppress 404/42P01 when the table hasn't been migrated yet — silently use empty list
+        const isMissingTable = alertsError.message?.toLowerCase().includes('does not exist')
+          || (alertsError as any).code === '42P01'
+          || (alertsError as any).code === 'PGRST200';
+        if (!isMissingTable) {
+          console.error('[Alerts] Failed to load alerts:', alertsError);
+        }
       }
 
       setAlerts(alertsData || []);

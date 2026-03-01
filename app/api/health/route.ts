@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-export const runtime = 'edge';
-
 interface ServiceHealth {
   status: 'healthy' | 'degraded' | 'unhealthy';
   responseTime?: number;

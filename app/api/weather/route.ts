@@ -6,8 +6,6 @@ import {
   type GameTimeForecast
 } from '@/lib/weather/index';
 
-export const runtime = 'edge';
-
 const HTTP_STATUS = {
   OK: 200,
   BAD_REQUEST: 400,

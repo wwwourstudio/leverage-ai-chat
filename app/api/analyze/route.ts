@@ -44,14 +44,38 @@ interface AnalyzeRequestBody {
 }
 
 // ============================================================================
+// Model routing helpers
+// ============================================================================
+
+/**
+ * Returns true for query types where grok-3-fast is sufficient and faster:
+ * - DFS lineup questions (no live-odds accuracy needed)
+ * - Pure fantasy queries (hasFantasyIntent && !hasBettingIntent)
+ * - CSV / file uploads (user's own data, not real-time odds)
+ * - Off-season / no-games contexts
+ */
+function shouldUseFastModel(
+  userMessage: string,
+  context: AnalyzeRequestBody['context'],
+): boolean {
+  const lower = userMessage.toLowerCase();
+  const dfsKeywords = ['dfs', 'daily fantasy', 'draftkings lineup', 'fanduel lineup', 'optimal lineup'];
+  if (dfsKeywords.some(k => lower.includes(k))) return true;
+  if (context?.hasFantasyIntent && !context?.hasBettingIntent) return true;
+  if (userMessage.includes('[File:')) return true;   // CSV / file upload
+  if (context?.noGamesAvailable) return true;         // off-season
+  return false;
+}
+
+// ============================================================================
 // POST /api/analyze
 // ============================================================================
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  // Keep well under Vercel's 30s limit.
-  // grok-4 gets 15s; on failure, grok-3-fast fallback gets 10s = 25s total, leaving 5s headroom.
-  const TIMEOUT_MS = 15000;
+  // grok-4 gets 22s; on failure, grok-3-fast fallback gets 8s = 30s total = Vercel limit.
+  // Fast-routed queries (DFS, fantasy, CSV, off-season) skip grok-4 entirely.
+  const TIMEOUT_MS = 22000;
 
   try {
     // Add timeout wrapper
@@ -241,12 +265,20 @@ export async function POST(request: NextRequest) {
       return { prompt };
     };
 
+    // Route DFS, pure-fantasy, file-upload, and off-season queries directly to
+    // grok-3-fast (3-6s). Reserve grok-4 for live-odds betting analysis only.
+    const useFastPath = shouldUseFastModel(userMessage, context);
+    const primaryModel = useFastPath ? 'grok-3-fast' : AI_CONFIG.MODEL_NAME;
+    if (useFastPath) {
+      console.log(`[API/analyze] Fast-path routing → grok-3-fast (intent: DFS/fantasy/file/offseason)`);
+    }
+
     if (xaiApiKey) {
       try {
         // Initial generation with timeout protection
         const result = await Promise.race([
           generateText({
-            model: createXai({ apiKey: xaiApiKey })(AI_CONFIG.MODEL_NAME),
+            model: createXai({ apiKey: xaiApiKey })(primaryModel),
             system: systemPrompt,
             ...buildGenOptions(enrichedPrompt, hasImages ? body.imageAttachments : undefined),
             temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
@@ -256,6 +288,7 @@ export async function POST(request: NextRequest) {
           timeoutPromise
         ]);
         aiText = result.text;
+        modelUsed = useFastPath ? 'Grok 3 Fast' : AI_CONFIG.MODEL_DISPLAY_NAME;
 
         // Hallucination-detection retry loop (with timeout awareness)
         let detection = detectHallucinations(aiText, userMessage, context.oddsData);
@@ -283,7 +316,9 @@ export async function POST(request: NextRequest) {
 
             const retryResult = await Promise.race([
               generateText({
-                model: createXai({ apiKey: xaiApiKey })(AI_CONFIG.MODEL_NAME),
+                // Always use grok-3-fast for retries — avoids double-timeout when
+                // the primary model already consumed most of the time budget.
+                model: createXai({ apiKey: xaiApiKey })('grok-3-fast'),
                 system: systemPrompt,
                 prompt: retryPrompt,
                 // Lower temperature on retries to reduce hallucination likelihood
@@ -307,13 +342,13 @@ export async function POST(request: NextRequest) {
           );
         }
       } catch (aiError) {
-        // If grok-4 fails (e.g. API key lacks access), try grok-3-fast before giving up
-        const primaryModel = AI_CONFIG.MODEL_NAME;
+        // If primary model fails (e.g. timeout or API error), try grok-3-fast before giving up.
+        // Fast-path queries already used grok-3-fast, so this fallback only kicks in for grok-4 failures.
         const fallbackModel = 'grok-3-fast';
         console.warn(`[API/analyze] ${primaryModel} failed, retrying with ${fallbackModel}:`, aiError instanceof Error ? aiError.message : aiError);
         try {
           const fallbackTimeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('Fallback timeout')), 10000); // 10s for fallback
+            setTimeout(() => reject(new Error('Fallback timeout')), 8000); // 8s for fallback
           });
 
           const fallbackResult = await Promise.race([

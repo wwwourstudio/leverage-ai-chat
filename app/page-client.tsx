@@ -606,12 +606,13 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   }, [messages.length, lastUserQuery]);
 
   // Start with empty chat history - user creates real chats
+  // Use serverData.serverTime for the initial timestamp to avoid SSR/client hydration mismatch (#418).
   const [chats, setChats] = useState<Chat[]>([
     {
       id: 'chat-1',
       title: 'New Chat',
       preview: 'Start a conversation to get real-time sports betting insights...',
-      timestamp: new Date(),
+      timestamp: serverData?.serverTime ? new Date(serverData.serverTime) : new Date(),
       starred: false,
       category: 'all',
       tags: []
@@ -1872,15 +1873,22 @@ No preamble. Start directly with section 1.`;
   };
 
   const parseDelimitedFile = (text: string, delimiter: string = ',') => {
-    const lines = text.split('\n').filter(line => line.trim());
-    if (lines.length === 0) return { headers: [], rows: [] };
+    // Safety limits — prevent RangeError: Invalid array length on huge or binary files
+    const MAX_BYTES = 5_000_000; // 5 MB
+    const MAX_ROWS  = 5_000;
+    const MAX_COLS  = 200;
 
-    const headers = lines[0].split(delimiter).map(h => h.trim());
-    const rows = lines.slice(1).map(line => 
-      line.split(delimiter).map(cell => cell.trim())
+    const safeText = text.length > MAX_BYTES ? text.slice(0, MAX_BYTES) : text;
+    const lines = safeText.split('\n').filter(line => line.trim());
+    if (lines.length === 0) return { headers: [], rows: [], truncated: false };
+
+    const headers = lines[0].split(delimiter).map(h => h.trim()).slice(0, MAX_COLS);
+    const dataLines = lines.slice(1, MAX_ROWS + 1);
+    const rows = dataLines.map(line =>
+      line.split(delimiter).map(cell => cell.trim()).slice(0, MAX_COLS)
     );
 
-    return { headers, rows };
+    return { headers, rows, truncated: lines.length > MAX_ROWS + 1 };
   };
 
   const removeAttachment = (id: string) => {

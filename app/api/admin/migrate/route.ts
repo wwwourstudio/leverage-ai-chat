@@ -172,6 +172,111 @@ GRANT ALL ON api.user_profiles TO anon, authenticated;
 GRANT ALL ON api.user_preferences TO anon, authenticated;
 `;
 
+// Migration 006 — Statcast pitch-level data + hitter splits (mirrors scripts/statcast-schema.sql)
+const MIGRATION_006_SQL = `
+CREATE TABLE IF NOT EXISTS api.statcast_pitches_raw (
+  id                BIGSERIAL PRIMARY KEY,
+  batter            INTEGER       NOT NULL,
+  pitcher           INTEGER       NOT NULL,
+  game_date         DATE          NOT NULL,
+  game_pk           BIGINT,
+  pitch_type        VARCHAR(5),
+  release_speed     NUMERIC(5,1),
+  release_spin_rate INTEGER,
+  release_extension NUMERIC(4,2),
+  pfx_x             NUMERIC(6,3),
+  pfx_z             NUMERIC(6,3),
+  vx0               NUMERIC(8,4),
+  vy0               NUMERIC(8,4),
+  vz0               NUMERIC(8,4),
+  ax                NUMERIC(8,4),
+  ay                NUMERIC(8,4),
+  az                NUMERIC(8,4),
+  launch_speed      NUMERIC(5,1),
+  launch_angle      NUMERIC(5,1),
+  hit_distance_sc   NUMERIC(7,1),
+  events            VARCHAR(50),
+  description       VARCHAR(100),
+  stand             CHAR(1),
+  p_throws          CHAR(1),
+  home_team         VARCHAR(5),
+  away_team         VARCHAR(5),
+  inning            SMALLINT,
+  inning_topbot     VARCHAR(3),
+  outs_when_up      SMALLINT,
+  balls             SMALLINT,
+  strikes           SMALLINT,
+  created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_statcast_batter_date
+  ON api.statcast_pitches_raw (batter, game_date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_statcast_pitcher_date
+  ON api.statcast_pitches_raw (pitcher, game_date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_statcast_game_date
+  ON api.statcast_pitches_raw (game_date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_statcast_pitch_type
+  ON api.statcast_pitches_raw (pitch_type, pitcher);
+
+ALTER TABLE api.statcast_pitches_raw ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "public_read_statcast_pitches" ON api.statcast_pitches_raw;
+CREATE POLICY "public_read_statcast_pitches"
+  ON api.statcast_pitches_raw
+  FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "service_write_statcast_pitches" ON api.statcast_pitches_raw;
+CREATE POLICY "service_write_statcast_pitches"
+  ON api.statcast_pitches_raw
+  FOR ALL
+  USING (auth.role() = 'service_role');
+
+CREATE TABLE IF NOT EXISTS api.hitter_splits (
+  id                BIGSERIAL     PRIMARY KEY,
+  batter            INTEGER       NOT NULL,
+  player_name       VARCHAR(100),
+  season            INTEGER       NOT NULL,
+  split_type        VARCHAR(20)   NOT NULL,
+  pa                INTEGER       NOT NULL DEFAULT 0,
+  hr                INTEGER       NOT NULL DEFAULT 0,
+  hr_rate           NUMERIC(7,5),
+  barrel_rate       NUMERIC(7,5),
+  avg_exit_velocity NUMERIC(5,1),
+  air_pull_rate     NUMERIC(7,5),
+  hard_hit_rate     NUMERIC(7,5),
+  xslg              NUMERIC(5,3),
+  updated_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  UNIQUE (batter, season, split_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_hitter_splits_batter
+  ON api.hitter_splits (batter, season);
+
+CREATE INDEX IF NOT EXISTS idx_hitter_splits_leaderboard
+  ON api.hitter_splits (season, split_type, barrel_rate DESC NULLS LAST);
+
+CREATE INDEX IF NOT EXISTS idx_hitter_splits_hr_leaderboard
+  ON api.hitter_splits (season, split_type, hr_rate DESC NULLS LAST);
+
+ALTER TABLE api.hitter_splits ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "public_read_hitter_splits" ON api.hitter_splits;
+CREATE POLICY "public_read_hitter_splits"
+  ON api.hitter_splits
+  FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "service_write_hitter_splits" ON api.hitter_splits;
+CREATE POLICY "service_write_hitter_splits"
+  ON api.hitter_splits
+  FOR ALL
+  USING (auth.role() = 'service_role');
+`;
+
 // Migration 005 — ai_predictions table for storing chat history
 const MIGRATION_005_SQL = `
 CREATE TABLE IF NOT EXISTS api.ai_predictions (
@@ -202,6 +307,7 @@ const MIGRATIONS = [
   { id: '003', name: 'player_props_markets', sql: MIGRATION_003_SQL },
   { id: '004', name: 'user_profiles + user_preferences', sql: MIGRATION_004_SQL },
   { id: '005', name: 'ai_predictions', sql: MIGRATION_005_SQL },
+  { id: '006', name: 'statcast_pitches_raw + hitter_splits', sql: MIGRATION_006_SQL },
 ];
 
 function extractProjectRef(supabaseUrl: string): string | null {

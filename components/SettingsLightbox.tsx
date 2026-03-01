@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, User, Bell, Shield, Palette, Save, Loader2, CheckCircle, ChevronRight } from 'lucide-react';
+import { X, User, Bell, Shield, Palette, Save, Loader2, CheckCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/toast-provider';
 
@@ -28,18 +28,11 @@ interface SettingsLightboxProps {
 
 interface UserProfile {
   id: string;
-  full_name: string;
-  email: string;
+  user_id: string;
+  display_name: string;
   avatar_url: string;
   subscription_tier: string;
-  credits: number;
-  notification_preferences: {
-    email: boolean;
-    push: boolean;
-    odds_alerts: boolean;
-    line_movement: boolean;
-    arbitrage: boolean;
-  };
+  credits_remaining: number;
 }
 
 interface UserSettings {
@@ -75,7 +68,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
   });
   const [notificationPrefs, setNotificationPrefs] = useState({
     email: true,
-    push: true,
+    push: false,
     odds_alerts: true,
     line_movement: true,
     arbitrage: true,
@@ -94,6 +87,16 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
+        // Guest: restore from localStorage
+        try {
+          const stored = localStorage.getItem('leverage_guest_prefs');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed.fullName) setFullName(parsed.fullName);
+            if (parsed.notificationPrefs) setNotificationPrefs(parsed.notificationPrefs);
+            if (parsed.settings) setSettings(parsed.settings);
+          }
+        } catch { /* ignore */ }
         setLoading(false);
         return;
       }
@@ -101,16 +104,16 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
       // Load profile from user_profiles
       const { data: profileData } = await supabase
         .from('user_profiles')
-        .select('*')
+        .select('id, user_id, display_name, avatar_url, subscription_tier, credits_remaining')
         .eq('user_id', session.user.id)
         .single();
 
       if (profileData) {
-        setProfile(profileData);
+        setProfile(profileData as UserProfile);
         setFullName(profileData.display_name || '');
       }
 
-      // Load preferences from user_preferences
+      // Load all preferences from user_preferences
       const { data: prefsData } = await supabase
         .from('user_preferences')
         .select('*')
@@ -118,20 +121,20 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
         .single();
 
       if (prefsData) {
-        if (prefsData.email_notifications !== undefined || prefsData.push_notifications !== undefined) {
-          setNotificationPrefs(prev => ({
-            ...prev,
-            email: prefsData.email_notifications ?? true,
-            push: prefsData.push_notifications ?? false,
-          }));
-        }
+        setNotificationPrefs({
+          email:         prefsData.email_notifications   ?? true,
+          push:          prefsData.push_notifications    ?? false,
+          odds_alerts:   prefsData.odds_alerts           ?? true,
+          line_movement: prefsData.line_movement_alerts  ?? true,
+          arbitrage:     prefsData.arbitrage_alerts      ?? true,
+        });
         setSettings({
-          preferred_books: [],
-          preferred_sports: prefsData.tracked_sports || ['NBA', 'NFL'],
-          bankroll: 0,
-          risk_tolerance: 'medium',
+          preferred_books:  prefsData.preferred_books  ?? [],
+          preferred_sports: prefsData.tracked_sports   ?? ['NBA', 'NFL'],
+          bankroll:         Number(prefsData.bankroll) || 0,
+          risk_tolerance:   prefsData.risk_tolerance   ?? 'medium',
           notifications_enabled: prefsData.email_notifications ?? true,
-          dark_mode: prefsData.theme === 'dark',
+          dark_mode:        prefsData.theme === 'dark',
         });
       }
     } catch (err) {
@@ -147,8 +150,8 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
 
-      if (!session?.user || !profile) {
-        // Guest: persist to localStorage so preferences survive page reload
+      if (!session?.user) {
+        // Guest: persist to localStorage
         const guestPrefs = { fullName, notificationPrefs, settings };
         localStorage.setItem('leverage_guest_prefs', JSON.stringify(guestPrefs));
         if (onUserUpdate && fullName) {
@@ -161,26 +164,34 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
         return;
       }
 
-      // Authenticated: persist to Supabase
+      // Update display name in user_profiles (keyed by user_id for RLS)
       const { error: profileError } = await supabase
         .from('user_profiles')
         .update({
           display_name: fullName,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', profile.id);
+        .eq('user_id', session.user.id);
 
       if (profileError) throw profileError;
 
+      // Upsert all preference fields
       const { error: settingsError } = await supabase
         .from('user_preferences')
         .upsert({
-          user_id: profile.user_id || session.user.id,
-          tracked_sports: settings.preferred_sports,
-          email_notifications: settings.notifications_enabled,
-          theme: settings.dark_mode ? 'dark' : 'light',
-          default_sport: settings.preferred_sports?.[0] || 'NBA',
-          updated_at: new Date().toISOString(),
+          user_id:              session.user.id,
+          tracked_sports:       settings.preferred_sports,
+          preferred_books:      settings.preferred_books,
+          bankroll:             settings.bankroll,
+          risk_tolerance:       settings.risk_tolerance,
+          email_notifications:  notificationPrefs.email,
+          push_notifications:   notificationPrefs.push,
+          odds_alerts:          notificationPrefs.odds_alerts,
+          line_movement_alerts: notificationPrefs.line_movement,
+          arbitrage_alerts:     notificationPrefs.arbitrage,
+          theme:                settings.dark_mode ? 'dark' : 'light',
+          default_sport:        settings.preferred_sports?.[0] || 'NBA',
+          updated_at:           new Date().toISOString(),
         }, { onConflict: 'user_id' });
 
       if (settingsError) throw settingsError;
@@ -205,6 +216,8 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
 
   if (!isOpen) return null;
 
+  const isPaid = !!profile?.subscription_tier && profile.subscription_tier !== 'free';
+
   const tabs: { id: SettingsTab; label: string; icon: typeof User }[] = [
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'notifications', label: 'Notifications', icon: Bell },
@@ -225,7 +238,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">Settings</h2>
-              <p className="text-xs text-gray-500">{profile?.subscription_tier === 'premium' ? 'Premium' : 'Free'} Plan</p>
+              <p className="text-xs text-gray-500">{isPaid ? 'Premium' : 'Free'} Plan</p>
             </div>
           </div>
           <button
@@ -293,7 +306,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                       <p className="text-xs text-gray-500">Current available credits</p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl font-black text-blue-400">{profile?.credits ?? 0}</span>
+                      <span className="text-2xl font-black text-blue-400">{profile?.credits_remaining ?? 0}</span>
                       <button
                         onClick={() => { onClose(); onOpenStripe?.(); }}
                         className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors"
@@ -305,11 +318,11 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                   <div className="flex items-center justify-between p-4 bg-gray-800/30 rounded-xl border border-gray-800">
                     <div>
                       <p className="text-sm font-semibold text-white">Subscription</p>
-                      <p className="text-xs text-gray-500">{profile?.subscription_tier === 'premium' ? 'Active premium plan' : 'Free tier — upgrade for unlimited access'}</p>
+                      <p className="text-xs text-gray-500">{isPaid ? 'Active premium plan' : 'Free tier — upgrade for unlimited access'}</p>
                     </div>
-                    {profile?.subscription_tier === 'premium' ? (
-                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                        Premium
+                    {isPaid ? (
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30 capitalize">
+                        {profile?.subscription_tier}
                       </span>
                     ) : (
                       <button

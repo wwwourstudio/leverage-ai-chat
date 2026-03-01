@@ -2689,7 +2689,6 @@ No preamble. Start directly with section 1.`;
         setSuggestedPrompts={setSuggestedPrompts}
         setLastUserQuery={setLastUserQuery}
         user={user}
-        creditsRemaining={creditsRemaining}
       />
 
       {/* Main Chat Area */}

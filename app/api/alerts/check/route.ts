@@ -1,17 +1,25 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServiceKey, getSupabaseUrl } from '@/lib/config';
+import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
 
 /**
  * GET /api/alerts/check
  *
- * Evaluates all active user alerts against current data in Supabase.
- * For each alert whose condition is met, increments trigger_count and
- * sets last_triggered_at.
+ * Authenticated endpoint. Evaluates active alerts for the current user only.
+ * For each alert whose condition is met, increments trigger_count and sets
+ * last_triggered_at.
  *
  * Returns: { triggered: Array<{ id, title }> }
  */
 export async function GET() {
+  // Authenticate the caller — only return alerts belonging to them
+  const authSupabase = await createServerClient();
+  const { data: { user } } = await authSupabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ triggered: [] });
+  }
+
   const supabaseUrl = getSupabaseUrl();
   const serviceKey = getSupabaseServiceKey();
 
@@ -19,16 +27,18 @@ export async function GET() {
     return NextResponse.json({ triggered: [] });
   }
 
+  // Service-role client for cross-table evaluation queries (line_movement, arbitrage, etc.)
   const supabase = createClient(supabaseUrl, serviceKey, {
     db: { schema: 'api' },
   });
 
   try {
-    // Fetch all active alerts that haven't hit their trigger ceiling
+    // Fetch active alerts scoped to the authenticated user
     const { data: alerts, error: fetchError } = await supabase
       .from('user_alerts')
       .select('id, user_id, alert_type, sport, team, player, condition, threshold, trigger_count, max_triggers, title')
       .eq('is_active', true)
+      .eq('user_id', user.id)
       .or('max_triggers.is.null,trigger_count.lt.max_triggers');
 
     if (fetchError || !alerts) {

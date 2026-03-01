@@ -1,6 +1,6 @@
 'use client';
 
-import { Trophy, Target, Zap, AlertTriangle, User, ChevronRight, TrendingUp, ArrowUpRight } from 'lucide-react';
+import { Trophy, Target, Zap, AlertTriangle, User, ChevronRight, TrendingUp, ArrowUpRight, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PlayerAvatar } from './PlayerAvatar';
 import { getPlayerHeadshotUrl } from '@/lib/constants';
@@ -21,16 +21,27 @@ interface FantasyCardProps {
 
 // ── Position badge ─────────────────────────────────────────────────────────────
 const POS_COLORS: Record<string, string> = {
+  // NFL
   QB:  'text-red-400    bg-red-400/12    border-red-400/30',
   RB:  'text-green-400  bg-green-400/12  border-green-400/30',
   WR:  'text-blue-400   bg-blue-400/12   border-blue-400/30',
   TE:  'text-orange-400 bg-orange-400/12 border-orange-400/30',
   K:   'text-purple-400 bg-purple-400/12 border-purple-400/30',
   DEF: 'text-slate-400  bg-slate-400/12  border-slate-400/30',
+  // MLB
   SP:  'text-cyan-400   bg-cyan-400/12   border-cyan-400/30',
+  RP:  'text-violet-400 bg-violet-400/12 border-violet-400/30',
   C:   'text-yellow-400 bg-yellow-400/12 border-yellow-400/30',
   '1B':'text-pink-400   bg-pink-400/12   border-pink-400/30',
+  '2B':'text-lime-400   bg-lime-400/12   border-lime-400/30',
+  '3B':'text-amber-400  bg-amber-400/12  border-amber-400/30',
   SS:  'text-teal-400   bg-teal-400/12   border-teal-400/30',
+  OF:  'text-sky-400    bg-sky-400/12    border-sky-400/30',
+  // NBA
+  PG:  'text-blue-400   bg-blue-400/12   border-blue-400/30',
+  SG:  'text-indigo-400 bg-indigo-400/12 border-indigo-400/30',
+  SF:  'text-green-400  bg-green-400/12  border-green-400/30',
+  PF:  'text-orange-400 bg-orange-400/12 border-orange-400/30',
 };
 function PosBadge({ pos }: { pos: string }) {
   const c = POS_COLORS[pos] ?? 'text-gray-400 bg-gray-400/12 border-gray-400/30';
@@ -118,22 +129,40 @@ function Shell({
   );
 }
 
+// Tier-colored rank circle for VBD rows
+function RankCircle({ rank, tier }: { rank: number; tier: number }) {
+  const c = tier === 1
+    ? 'bg-yellow-400/20 border-yellow-400/50 text-yellow-300'
+    : tier === 2
+    ? 'bg-slate-400/15 border-slate-400/40 text-slate-300'
+    : tier === 3
+    ? 'bg-amber-700/20 border-amber-700/40 text-amber-500'
+    : 'bg-[oklch(0.10_0.01_280)] border-[oklch(0.18_0.01_280)] text-[oklch(0.38_0.01_280)]';
+  return (
+    <span className={cn('inline-flex items-center justify-center w-5 h-5 rounded-full border text-[9px] font-black shrink-0', c)}>
+      {rank}
+    </span>
+  );
+}
+
 // ── VBD Rankings ───────────────────────────────────────────────────────────────
 function VBDCard({ data, isHero, ...p }: FantasyCardProps) {
-  const { players = [], tierCliff, scoringFormat, leagueSize } = data;
-  const sport = p.category?.toLowerCase();
+  const { players = [], tierCliff, scoringFormat, leagueSize, sport } = data;
+  const avatarSport = sport?.toLowerCase() || p.category?.toLowerCase();
   return (
     <Shell {...p} status={data.status ?? 'target'} Icon={Trophy}>
       <div className="space-y-1">
         {players.slice(0, isHero ? 8 : 6).map((pl: any, idx: number) => {
           const isCliff = tierCliff && pl.name === tierCliff.cliffAfterName;
           const photoUrl = pl.photoUrl ?? getPlayerHeadshotUrl(pl.name);
-          const rowBg = idx === 0 ? 'bg-teal-500/8 border-teal-500/20' : 'bg-[oklch(0.08_0.01_280)] border-[oklch(0.15_0.01_280)]';
+          const rowBg = idx === 0
+            ? 'bg-teal-500/8 border-teal-500/20 shadow-[inset_0_0_0_1px_oklch(0.5_0.15_170/0.08)]'
+            : 'bg-[oklch(0.08_0.01_280)] border-[oklch(0.15_0.01_280)]';
           return (
             <div key={pl.name}>
-              <div className={cn('flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-colors hover:bg-[oklch(0.12_0.01_280)]', rowBg)}>
-                <span className="text-[10px] font-black tabular-nums text-[oklch(0.38_0.01_280)] w-4 shrink-0">#{pl.rank}</span>
-                <PlayerAvatar playerName={pl.name} photoUrl={photoUrl} sport={sport} size="sm" />
+              <div className={cn('flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-colors hover:bg-[oklch(0.12_0.01_280)]', rowBg)}>
+                <RankCircle rank={pl.rank ?? idx + 1} tier={pl.tier ?? 4} />
+                <PlayerAvatar playerName={pl.name} photoUrl={photoUrl} sport={avatarSport} size="sm" />
                 <span className="text-xs font-bold text-white flex-1 truncate min-w-0">
                   {pl.name}
                   <span className="text-[10px] font-normal text-[oklch(0.42_0.01_280)] ml-1">{pl.team}</span>
@@ -143,12 +172,12 @@ function VBDCard({ data, isHero, ...p }: FantasyCardProps) {
                 <span className="text-[11px] font-black tabular-nums text-emerald-400 w-10 text-right shrink-0">+{pl.vbd}</span>
               </div>
               {isCliff && (
-                <div className="flex items-center gap-2 py-1 px-2.5">
-                  <div className="flex-1 h-px bg-amber-500/40" />
-                  <span className="text-[9px] font-black text-amber-400 whitespace-nowrap">
+                <div className="flex items-center gap-2 py-1 px-2">
+                  <div className="flex-1 h-[1.5px] bg-gradient-to-r from-transparent via-amber-500/60 to-transparent" />
+                  <span className="text-[9px] font-black text-amber-400 whitespace-nowrap flex items-center gap-1">
                     ▼ TIER CLIFF — {tierCliff.dropPct?.toFixed(1)}% DROP
                   </span>
-                  <div className="flex-1 h-px bg-amber-500/40" />
+                  <div className="flex-1 h-[1.5px] bg-gradient-to-r from-transparent via-amber-500/60 to-transparent" />
                 </div>
               )}
             </div>
@@ -252,8 +281,8 @@ function DraftCard({ data, ...p }: FantasyCardProps) {
 
 // ── Waiver Wire ────────────────────────────────────────────────────────────────
 function WaiverCard({ data, isHero, ...p }: FantasyCardProps) {
-  const { targets = [], description, budgetNote } = data;
-  const sport = p.category?.toLowerCase();
+  const { targets = [], description, budgetNote, sport } = data;
+  const avatarSport = sport?.toLowerCase() || p.category?.toLowerCase();
   return (
     <Shell {...p} status="hot" Icon={Zap}>
       {description && (
@@ -262,46 +291,59 @@ function WaiverCard({ data, isHero, ...p }: FantasyCardProps) {
       <div className="space-y-2">
         {targets.slice(0, isHero ? 4 : 3).map((t: any, i: number) => {
           const photoUrl = t.photoUrl ?? getPlayerHeadshotUrl(t.name);
-          const urgency = t.breakoutScore >= 2 ? 'border-red-500/25 bg-red-500/5'
-            : t.breakoutScore >= 1 ? 'border-amber-500/25 bg-amber-500/5'
+          const isHot = t.breakoutScore >= 2;
+          const isMedium = t.breakoutScore >= 1.5;
+          const urgencyBorder = isHot
+            ? 'border-red-500/30 bg-red-500/5'
+            : isMedium
+            ? 'border-amber-500/30 bg-amber-500/5'
             : 'border-[oklch(0.16_0.015_280)] bg-[oklch(0.08_0.01_280)]';
           return (
-            <div key={i} className={cn('px-3 py-2.5 rounded-xl border', urgency)}>
-              <div className="flex items-center gap-2 mb-1.5">
-                <PlayerAvatar playerName={t.name} photoUrl={photoUrl} sport={sport} size="sm" />
+            <div key={i} className={cn('px-3 py-2.5 rounded-xl border', urgencyBorder)}>
+              <div className="flex items-center gap-2 mb-2">
+                <PlayerAvatar playerName={t.name} photoUrl={photoUrl} sport={avatarSport} size="sm" />
                 <PosBadge pos={t.pos} />
-                <span className="text-xs font-black text-white">{t.name}</span>
+                <span className="text-xs font-black text-white leading-tight">{t.name}</span>
                 <span className="text-[10px] text-[oklch(0.42_0.01_280)]">{t.team}</span>
-                {t.rostered && (
-                  <span className="ml-auto text-[9px] text-[oklch(0.40_0.01_280)]">{t.rostered}% owned</span>
-                )}
+                <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                  {isHot && (
+                    <span className="flex items-center gap-0.5 text-[8px] font-black uppercase text-red-400 bg-red-500/10 border border-red-500/30 px-1.5 py-0.5 rounded-full">
+                      <Flame className="w-2.5 h-2.5" /> ADD NOW
+                    </span>
+                  )}
+                  {t.rostered != null && (
+                    <span className="text-[9px] text-[oklch(0.40_0.01_280)]">{t.rostered}% owned</span>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-3 mb-1">
+              <div className="flex items-center gap-3 mb-1.5">
                 {t.faabBid != null && (
-                  <>
+                  <div className="flex items-center gap-1">
                     <span className="text-[9px] font-bold text-[oklch(0.42_0.01_280)]">FAAB</span>
-                    <span className="text-sm font-black text-teal-400">${t.faabBid}</span>
+                    <span className="text-base font-black text-teal-400 tabular-nums">${t.faabBid}</span>
                     {t.faabPct != null && (
                       <span className="text-[9px] text-[oklch(0.38_0.01_280)]">({t.faabPct}%)</span>
                     )}
-                  </>
+                  </div>
                 )}
                 {t.breakoutScore != null && (
-                  <>
-                    <span className="text-[9px] font-bold text-[oklch(0.42_0.01_280)] ml-2">BREAKOUT</span>
-                    <span className="text-sm font-black text-orange-400">{t.breakoutScore.toFixed(1)}σ</span>
-                  </>
+                  <div className="flex items-center gap-1 ml-3">
+                    <span className="text-[9px] font-bold text-[oklch(0.42_0.01_280)]">BREAKOUT</span>
+                    <span className={cn('text-base font-black tabular-nums', isHot ? 'text-red-400' : isMedium ? 'text-amber-400' : 'text-orange-400')}>
+                      {t.breakoutScore.toFixed(1)}σ
+                    </span>
+                  </div>
                 )}
               </div>
               {t.reason && (
-                <p className="text-[10px] text-[oklch(0.45_0.01_280)] leading-relaxed">{t.reason}</p>
+                <p className="text-[10px] text-[oklch(0.48_0.01_280)] leading-relaxed">{t.reason}</p>
               )}
             </div>
           );
         })}
       </div>
       {budgetNote && (
-        <p className="text-[9px] text-[oklch(0.35_0.01_280)]">{budgetNote}</p>
+        <p className="text-[9px] text-[oklch(0.35_0.01_280)] pt-0.5">{budgetNote}</p>
       )}
     </Shell>
   );

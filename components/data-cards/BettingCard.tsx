@@ -280,32 +280,59 @@ export const BettingCard = memo(function BettingCard({
 
       {/* ── Full-bleed gradient header ───────────────────────────────── */}
       <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', theme.headerGrad)}>
-        {/* Live badge */}
-        {data.realData && (
-          <div className="absolute top-3 right-3 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[9px] font-black uppercase tracking-widest text-emerald-300">LIVE</span>
-          </div>
-        )}
-        {/* Category */}
+        {/* Live / FINAL badge top-right */}
+        <div className="absolute top-3 right-3 flex items-center gap-1.5">
+          {data.realData && (
+            <>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-emerald-300">LIVE</span>
+            </>
+          )}
+          {isFinal && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-[9px] font-black text-emerald-300 uppercase tracking-wider">
+              FINAL
+            </span>
+          )}
+        </div>
+        {/* Category breadcrumb */}
         <div className="flex items-center gap-1.5 mb-1.5">
           <span className="text-[9px] font-black uppercase tracking-widest text-white/70">{category}</span>
           <span className="text-white/30">·</span>
           <span className="text-[9px] text-white/50 truncate">{subcategory}</span>
         </div>
-        {/* Game time in header */}
-        {data.gameTime && (
-          <div className="flex items-center gap-1 text-[10px] text-white/60 mb-1">
-            <Clock className="w-3 h-3" />
-            {data.gameTime}
-          </div>
-        )}
-        {/* FINAL badge */}
-        {isFinal && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-[9px] font-black text-emerald-300 uppercase tracking-wider">
-            FINAL
-          </span>
-        )}
+        {/* Bottom row: game time + edge badge + line move pill */}
+        <div className="flex items-center gap-2 flex-wrap mt-1">
+          {data.gameTime && (
+            <div className="flex items-center gap-1 text-[10px] text-white/60">
+              <Clock className="w-3 h-3" />
+              {data.gameTime}
+            </div>
+          )}
+          {data.edge && (() => {
+            const edgeNum = parseFloat(String(data.edge).replace(/[^0-9.-]/g, ''));
+            const edgeCls = !isNaN(edgeNum) && edgeNum >= 5
+              ? 'bg-emerald-500/20 border-emerald-500/35 text-emerald-300'
+              : !isNaN(edgeNum) && edgeNum >= 2
+              ? 'bg-amber-500/20 border-amber-500/35 text-amber-300'
+              : 'bg-white/10 border-white/20 text-white/70';
+            return (
+              <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider', edgeCls)}>
+                EDGE {data.edge}
+              </span>
+            );
+          })()}
+          {hasLineMove && (
+            <span className={cn(
+              'inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full border text-[9px] font-bold',
+              moveDir === 'up'   ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+              : moveDir === 'down' ? 'bg-red-500/15 border-red-500/30 text-red-300'
+              : 'bg-white/10 border-white/20 text-white/60',
+            )}>
+              {moveDir === 'up' ? <TrendingUp className="w-2.5 h-2.5" /> : moveDir === 'down' ? <TrendingDown className="w-2.5 h-2.5" /> : <Minus className="w-2.5 h-2.5" />}
+              {!isNaN(moveNum) && moveNum !== 0 ? (moveNum > 0 ? `+${moveNum}` : String(moveNum)) : String(rawMove)}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="px-4 pb-4 space-y-3">
@@ -333,11 +360,14 @@ export const BettingCard = memo(function BettingCard({
               {/* Away team */}
               <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
                 <TeamLogo name={teams.away} sport={data.sport} avatarCls={theme.avatarCls} isLarge={isHero} />
-                <span className="text-[11px] font-bold text-white/80 text-center leading-tight truncate w-full">{teams.away}</span>
+                <span className={cn('font-bold text-white/90 text-center leading-tight truncate w-full', isHero ? 'text-sm' : 'text-xs')}>{teams.away}</span>
                 {awayML && (
-                  <span className={cn('text-base font-black tabular-nums', awayML.positive ? 'text-emerald-400' : 'text-white/70')}>
+                  <span className={cn('font-black tabular-nums', isHero ? 'text-xl' : 'text-lg', awayML.positive ? 'text-emerald-400' : 'text-white/80')}>
                     {awayML.display}
                   </span>
+                )}
+                {awayProb !== null && (
+                  <span className="text-[9px] text-[oklch(0.42_0.01_280)]">{awayProb}% win</span>
                 )}
               </div>
 
@@ -346,21 +376,24 @@ export const BettingCard = memo(function BettingCard({
                 {isFinal && data.finalScore ? (
                   <span className="text-sm font-black text-white tabular-nums">{data.finalScore}</span>
                 ) : (
-                  <span className="text-[11px] font-black text-[oklch(0.30_0.01_280)]">@</span>
+                  <span className="text-sm font-black text-[oklch(0.26_0.01_280)]">@</span>
                 )}
                 {!isFinal && data.gameTime && (
-                  <span className="text-[9px] text-[oklch(0.30_0.01_280)]">{data.gameTime}</span>
+                  <span className="text-[9px] text-[oklch(0.28_0.01_280)]">{data.gameTime}</span>
                 )}
               </div>
 
               {/* Home team */}
               <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
                 <TeamLogo name={teams.home} sport={data.sport} avatarCls={theme.avatarCls} isLarge={isHero} />
-                <span className="text-[11px] font-bold text-white/80 text-center leading-tight truncate w-full">{teams.home}</span>
+                <span className={cn('font-bold text-white/90 text-center leading-tight truncate w-full', isHero ? 'text-sm' : 'text-xs')}>{teams.home}</span>
                 {homeML && (
-                  <span className={cn('text-base font-black tabular-nums', homeML.positive ? 'text-emerald-400' : 'text-white/70')}>
+                  <span className={cn('font-black tabular-nums', isHero ? 'text-xl' : 'text-lg', homeML.positive ? 'text-emerald-400' : 'text-white/80')}>
                     {homeML.display}
                   </span>
+                )}
+                {homeProb !== null && (
+                  <span className="text-[9px] text-[oklch(0.42_0.01_280)]">{homeProb}% win</span>
                 )}
               </div>
             </div>
@@ -508,7 +541,7 @@ export const BettingCard = memo(function BettingCard({
         )}
 
         {/* ── Footer ────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between pt-2 border-t border-[oklch(0.15_0.015_280)]">
+        <div className="pt-2 border-t border-[oklch(0.15_0.015_280)] space-y-2">
           <div className="flex items-center gap-2">
             {data.bookmaker && (
               <span className="text-[10px] font-semibold text-[oklch(0.43_0.01_280)] bg-[oklch(0.13_0.012_280)] px-2 py-0.5 rounded-md border border-[oklch(0.19_0.015_280)]">
@@ -522,9 +555,11 @@ export const BettingCard = memo(function BettingCard({
           {onAnalyze && (
             <button
               onClick={onAnalyze}
-              className="flex items-center gap-1 text-[10px] font-bold text-[oklch(0.43_0.01_280)] hover:text-blue-400 transition-colors"
+              className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)] text-xs font-semibold text-[oklch(0.46_0.01_280)] hover:text-white hover:bg-[oklch(0.14_0.015_280)] hover:border-[oklch(0.26_0.02_280)] transition-all duration-150"
             >
-              Analyze <ChevronRight className="w-3 h-3" />
+              <TrendingUp className="w-3.5 h-3.5" />
+              Full Analysis
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           )}
         </div>

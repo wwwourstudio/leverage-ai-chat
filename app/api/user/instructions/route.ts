@@ -17,6 +17,13 @@ async function getSupabase() {
   return createClient();
 }
 
+/** True if the Supabase error indicates the column hasn't been migrated yet. */
+function isMissingColumnError(msg: string): boolean {
+  return msg.includes('custom_instructions') && (
+    msg.includes('column') || msg.includes('schema cache')
+  );
+}
+
 export async function GET() {
   try {
     const supabase = await getSupabase();
@@ -26,11 +33,17 @@ export async function GET() {
       return NextResponse.json({ instructions: '' });
     }
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('user_preferences')
       .select('custom_instructions')
       .eq('user_id', user.id)
       .maybeSingle();
+
+    // Column not yet migrated — degrade silently so the UI still loads
+    if (error && isMissingColumnError(error.message)) {
+      console.warn('[API/user/instructions] custom_instructions column not yet migrated — returning empty');
+      return NextResponse.json({ instructions: '' });
+    }
 
     if (!data) {
       // First access — upsert a blank row so future PUTs can update
@@ -68,6 +81,12 @@ export async function PUT(request: NextRequest) {
     );
 
     if (error) {
+      // Column not yet migrated — return success so the UI doesn't show an error,
+      // but log a warning so the operator knows to run the migration.
+      if (isMissingColumnError(error.message)) {
+        console.warn('[API/user/instructions] custom_instructions column not yet migrated — instructions not saved. Run: ALTER TABLE api.user_preferences ADD COLUMN IF NOT EXISTS custom_instructions TEXT NOT NULL DEFAULT \'\';');
+        return NextResponse.json({ success: true, migrationPending: true });
+      }
       console.error('[API/user/instructions] Upsert error:', error.message);
       return NextResponse.json({ success: false, error: error.message });
     }

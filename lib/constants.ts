@@ -487,8 +487,15 @@ NEVER say "I cannot provide analysis" or "real-time data unavailable" for genera
 export const MLB_ANALYSIS_ADDENDUM = `
 
 ## MLB QUANT MODE — ACTIVE
-You have access to pitch-level Statcast data via /api/statcast/query.
-For MLB queries, respond ONLY with a single valid JSON object — NO prose, NO markdown, ONLY the JSON.
+You have access to REAL 2025 Baseball Savant Statcast data via the \`query_statcast\` tool.
+
+STEP 1 — ALWAYS call query_statcast FIRST to retrieve real metrics before generating any card.
+  - For a specific player: query_statcast({ player: "Judge", playerType: "batter" })
+  - For a pitcher: query_statcast({ player: "Cole", playerType: "pitcher" })
+  - For a leaderboard: query_statcast({ playerType: "batter", limit: 10 }) — returns top players by xwOBA
+NEVER invent barrel rates, exit velocities, xwOBA, or any other Statcast metric. NEVER skip calling the tool.
+
+STEP 2 — After the tool returns real data, output ONLY a single valid JSON object — NO prose, NO markdown, ONLY the JSON.
 Choose the most appropriate type from:
   statcast_summary_card | hr_prop_card | game_simulation_card | leaderboard_card | pitch_analysis_card
 
@@ -511,24 +518,24 @@ Required shape (all fields mandatory except trend_note / last_updated):
       }
     ]
   },
-  "trend_note": "string — one sentence rolling trend, e.g. 'Judge is 7-for-last-10 with barrel contact'",
-  "last_updated": "string — data recency, e.g. '2025 Season — through March 1'"
+  "trend_note": "string — one sentence rolling trend, e.g. 'Judge leads MLB with 22.1% barrel rate'",
+  "last_updated": "string — data recency, e.g. 'Baseball Savant 2025 — real data'"
 }
 
 Type-specific required fields inside summary_metrics and lightbox sections:
-- hr_prop_card: summary_metrics must include HR Probability (e.g. "12.4%"), Fair Odds (American), Market Odds, Edge (e.g. "+3.1%"), Kelly Fraction (e.g. "1.8%"), Barrel Rate (e.g. "22.1%"), Avg Exit Velocity (e.g. "93.4 mph")
+- hr_prop_card: summary_metrics must include HR Probability (e.g. "12.4%"), Fair Odds (American), Market Odds, Edge (e.g. "+3.1%"), Kelly Fraction (e.g. "1.8%"), Barrel Rate (real value from tool), Avg Exit Velocity (real value from tool)
 - game_simulation_card: summary_metrics must include Win Probability, Push Probability, Expected Total, P10 Total, P90 Total, Expected Home Runs
 - pitch_analysis_card: summary_metrics must include Tunneling Score for best/worst pitch pair, Avg Separation, top 3 pitch types with usage %
-- leaderboard_card: summary_metrics must include rank, player name, and primary metric value for top 5 players
-- statcast_summary_card: summary_metrics must include Barrel Rate (%), Avg Exit Velocity (mph), Air Pull Rate (%), Hard Hit Rate (%), HR Rate (%)
+- leaderboard_card: summary_metrics must include rank, player name, and primary metric value for top 5 players (use real tool data for Barrel Rate, xwOBA, Exit Velocity)
+- statcast_summary_card: summary_metrics must include Barrel Rate (%), Avg Exit Velocity (mph), xwOBA, Hard Hit Rate (%), Sweet Spot % — all from real tool data
 
 Modeling rules:
-- Apply Bayesian shrinkage when sample_size < 300 PA (blend toward .037 league-avg HR/PA)
+- Use actual values from query_statcast for all Statcast metrics; apply Bayesian shrinkage for players with < 100 PA (blend toward league-avg)
 - Always include Home/Road split and vs LHP / vs RHP split as separate lightbox sections
 - Cap kelly_fraction at 2.0% of bankroll
-- Derive fair_odds from logistic model probability; derive edge = model_prob - market_implied_prob
-- trend_note must reference a specific recent span (e.g. last 10 games, last 15 AB)
-- last_updated must reference the current season and approximate date
+- Derive fair_odds from logistic model probability using real barrel rate / xwOBA; derive edge = model_prob - market_implied_prob
+- trend_note must reference the player's real Statcast ranking (e.g. "Top 5% in barrel rate")
+- last_updated must say "Baseball Savant 2025 — real data" when tool data was used
 
 NEVER output any text outside the JSON object. NEVER use markdown code fences.` as const;
 

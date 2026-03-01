@@ -1,9 +1,10 @@
 'use client';
 
+import { memo } from 'react';
 import {
   TrendingUp, TrendingDown, Vote, Trophy, CloudRain,
   Cpu, Film, Globe, Clock, ChevronRight, Flame,
-  Activity, BarChart3, Zap, ArrowUp, ArrowDown, Minus,
+  Activity, BarChart3, Zap, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -85,7 +86,7 @@ function volTierStyles(tier?: string) {
   }
 }
 
-export function KalshiCard({
+export const KalshiCard = memo(function KalshiCard({
   title,
   category,
   subcategory,
@@ -128,21 +129,25 @@ export function KalshiCard({
     )}>
 
       {/* ── Gradient header band ─────────────────────────────────────── */}
-      <div className={cn('relative px-4 pt-4 pb-3 bg-gradient-to-br', gradient, 'opacity-90')}>
+      <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', gradient)}>
         {/* Live / closed pulse */}
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
-          <span className={cn('w-1.5 h-1.5 rounded-full', isActive ? 'bg-white animate-pulse' : 'bg-white/40')} />
-          <span className="text-[9px] font-bold uppercase tracking-widest text-white/80">
-            {isActive ? 'LIVE' : 'CLOSED'}
-          </span>
+          {isActive ? (
+            <>
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-white/80">LIVE</span>
+            </>
+          ) : (
+            <span className="text-[9px] font-bold uppercase tracking-widest text-white/40">CLOSED</span>
+          )}
         </div>
 
         {/* Category breadcrumb */}
-        <div className="flex items-center gap-1.5 mb-2">
+        <div className="flex items-center gap-1.5 mb-1.5">
           <CategoryIcon label={d.iconLabel} className="text-white/70 w-3 h-3" />
           <span className="text-[9px] font-black uppercase tracking-widest text-white/70">KALSHI</span>
           <span className="text-white/30 text-[9px]">/</span>
-          <span className="text-[9px] font-medium text-white/60 truncate">{subcategory || category}</span>
+          <span className="text-[9px] font-medium text-white/55 truncate">{subcategory || category}</span>
         </div>
 
         {/* Title */}
@@ -177,10 +182,12 @@ export function KalshiCard({
           <div className="flex items-end gap-3">
             {/* YES */}
             <div className="text-center">
-              <div className={cn('text-3xl font-black tabular-nums leading-none',
+              <div className={cn(
+                'font-black tabular-nums leading-none',
+                isHero ? 'text-4xl' : 'text-3xl',
                 yesPct >= 50 ? 'text-white' : 'text-[oklch(0.45_0.01_280)]'
               )}>
-                {yesPct}<span className="text-base font-bold">%</span>
+                {yesPct}<span className={cn('font-bold', isHero ? 'text-lg' : 'text-base')}>%</span>
               </div>
               <div className="text-[9px] font-black uppercase tracking-widest text-emerald-400/80 mt-1">YES</div>
             </div>
@@ -192,16 +199,18 @@ export function KalshiCard({
 
             {/* NO */}
             <div className="text-center">
-              <div className={cn('text-3xl font-black tabular-nums leading-none',
+              <div className={cn(
+                'font-black tabular-nums leading-none',
+                isHero ? 'text-4xl' : 'text-3xl',
                 noPct >= 50 ? 'text-white' : 'text-[oklch(0.45_0.01_280)]'
               )}>
-                {noPct}<span className="text-base font-bold">%</span>
+                {noPct}<span className={cn('font-bold', isHero ? 'text-lg' : 'text-base')}>%</span>
               </div>
               <div className="text-[9px] font-black uppercase tracking-widest text-red-400/80 mt-1">NO</div>
             </div>
           </div>
 
-          {/* Linear bar backup / supplement */}
+          {/* Linear bar */}
           <div className="mt-2">
             <div className="relative h-2 rounded-full bg-[oklch(0.13_0.01_280)] overflow-hidden">
               <div
@@ -224,7 +233,11 @@ export function KalshiCard({
               <span className="text-[9px] font-bold uppercase tracking-wider text-[oklch(0.40_0.01_280)]">Market Edge</span>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-sm font-black text-white">{edgeScore}</span>
+              <span className={cn(
+                'font-black',
+                isHero ? 'text-base' : 'text-sm',
+                edgeScore >= 60 ? 'text-emerald-400' : edgeScore >= 30 ? 'text-amber-400' : 'text-white',
+              )}>{edgeScore}</span>
               <span className="text-[9px] text-[oklch(0.35_0.01_280)]">/100</span>
             </div>
           </div>
@@ -343,4 +356,4 @@ export function KalshiCard({
       </div>
     </article>
   );
-}
+});

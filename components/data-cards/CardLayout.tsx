@@ -49,6 +49,7 @@ export const CardLayout = memo(function CardLayout({
   messageIndex = 0,
 }: CardLayoutProps) {
   const [heroIndex, setHeroIndex] = useState(0);
+  const [transitioning, setTransitioning] = useState(false);
 
   if (!cards || cards.length === 0) return null;
 
@@ -59,16 +60,36 @@ export const CardLayout = memo(function CardLayout({
 
   const insight = aiInsight ? extractInsightBlurb(aiInsight) : null;
 
+  function selectHero(index: number) {
+    if (index === heroIndex) return;
+    setTransitioning(true);
+    // Brief fade-out then swap
+    setTimeout(() => {
+      setHeroIndex(index);
+      setTransitioning(false);
+    }, 120);
+  }
+
   return (
     <div className="mt-4 space-y-2.5 w-full">
       {/* ── Hero Card ────────────────────────────────────────────────── */}
       <div className="w-full">
-        <DynamicCardRenderer
-          card={heroCard}
-          index={heroIndex}
-          isHero
-          onAnalyze={onAnalyze ? () => onAnalyze(heroCard) : undefined}
+        {/* Ambient glow behind hero */}
+        <div
+          className="absolute -inset-1 rounded-3xl opacity-20 blur-xl pointer-events-none transition-opacity duration-500"
+          aria-hidden="true"
         />
+        <div className={cn(
+          'transition-opacity duration-150',
+          transitioning ? 'opacity-0' : 'opacity-100',
+        )}>
+          <DynamicCardRenderer
+            card={heroCard}
+            index={heroIndex}
+            isHero
+            onAnalyze={onAnalyze ? () => onAnalyze(heroCard) : undefined}
+          />
+        </div>
 
         {/* AI Insight blurb */}
         {insight && (
@@ -105,7 +126,7 @@ export const CardLayout = memo(function CardLayout({
                   card={card}
                   index={i}
                   isActive={false}
-                  onClick={() => setHeroIndex(originalIndex)}
+                  onClick={() => selectHero(originalIndex)}
                 />
               );
             })}

@@ -332,6 +332,7 @@ export interface InsightCard {
   category: string;
   subcategory: string;
   gradient: string;
+  status?: string;
   data?: any;
   metadata?: any;
 }

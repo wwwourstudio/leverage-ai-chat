@@ -306,7 +306,7 @@ export async function POST(request: NextRequest) {
         let retryAttempt = 0;
         const remainingTime = TIMEOUT_MS - (Date.now() - startTime);
 
-        while (detection.shouldRetry && retryAttempt < MAX_HALLUCINATION_RETRIES && remainingTime > 8000) {
+        while (detection.shouldRetry && !isMLBQuery && retryAttempt < MAX_HALLUCINATION_RETRIES && remainingTime > 8000) {
           retryAttempt++;
           console.warn(
             `[API/analyze] Hallucination detected (attempt ${retryAttempt}/${MAX_HALLUCINATION_RETRIES}):`,
@@ -402,13 +402,11 @@ export async function POST(request: NextRequest) {
         'statcast_summary_card', 'hr_prop_card', 'game_simulation_card',
         'leaderboard_card', 'pitch_analysis_card',
       ]);
-      // Strip markdown code fences Grok may add despite instructions
-      const jsonStr = aiText.trim()
-        .replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-
-      if (jsonStr.startsWith('{')) {
+      // Extract the first {...} block — handles code fences, preamble text, and bare JSON
+      const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
         try {
-          const parsed = JSON.parse(jsonStr);
+          const parsed = JSON.parse(jsonMatch[0]);
           if (parsed && typeof parsed.type === 'string' && STATCAST_TYPES.has(parsed.type)) {
             // Spread ALL parsed fields at card top level so DynamicCardRenderer passes
             // summary_metrics + lightbox through to StatcastCard unchanged

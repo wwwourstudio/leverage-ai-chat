@@ -348,8 +348,9 @@ async function _generateContextualCards(
   category?: string,
   sport?: string,
   count: number = 3,
-  // Multi-sport mode only makes sense for betting/all — never for kalshi/fantasy/dfs/props etc.
-  multiSport: boolean = !sport && (!category || category === 'betting' || category === 'all'),
+  // Multi-sport mode only makes sense for unset or explicit betting category.
+  // 'all' has its own mixed-mode block below and must NOT trigger multiSport (betting-only).
+  multiSport: boolean = !sport && (!category || category === 'betting'),
   kalshiSubcategory?: string
 ): Promise<InsightCard[]> {
   // Check in-memory cache first to avoid redundant API calls
@@ -372,6 +373,22 @@ async function _generateContextualCards(
   console.log('[v0] [CARDS GENERATOR] Input:', { category, sport, normalizedSport, displaySport, multiSport });
   console.log('[v0] [CARDS GENERATOR] Category:', category, '| Display Sport:', displaySport, '| Count:', count);
   
+  // 'all' category — mix betting + Kalshi cards so the default view shows card variety
+  if (category === 'all') {
+    console.log('[v0] [CARDS-GEN] All-category mode: generating mixed betting + Kalshi cards');
+    const bettingCount = Math.max(1, count - 1);
+    const kalshiCount  = Math.max(1, count - bettingCount);
+    const [bettingResult, kalshiResult] = await Promise.allSettled([
+      _generateContextualCards('betting', sport, bettingCount),
+      _generateContextualCards('kalshi',  sport, kalshiCount),
+    ]);
+    const betting = bettingResult.status === 'fulfilled' ? bettingResult.value : [];
+    const kalshi  = kalshiResult.status  === 'fulfilled' ? kalshiResult.value  : [];
+    const mixed = [...betting.slice(0, bettingCount), ...kalshi.slice(0, kalshiCount)].slice(0, count);
+    if (mixed.length > 0) setCachedCards(mixed, 'all', sport);
+    return mixed;
+  }
+
   // If multiSport requested, generate variety from ALL major sports with REAL data
   if (multiSport) {
     console.log('[v0] [CARDS GENERATOR] Multi-sport mode - fetching from ALL MAJOR SPORTS (NFL, NBA, MLB, NHL)');

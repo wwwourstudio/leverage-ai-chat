@@ -54,7 +54,6 @@ export interface SidebarProps {
   setSuggestedPrompts: (p: any[]) => void;
   setLastUserQuery: (q: string) => void;
   user: { name: string; email: string; avatar?: string } | null;
-  creditsRemaining: number;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -348,7 +347,6 @@ export function Sidebar({
   setSuggestedPrompts,
   setLastUserQuery,
   user,
-  creditsRemaining,
 }: SidebarProps) {
   // Avoid server/client hydration mismatch (#418): date grouping uses Date.now() which
   // differs between UTC server and local-timezone client. Defer to after mount.
@@ -571,36 +569,6 @@ export function Sidebar({
             )}
           </div>
 
-          {/* ── User profile footer ────────────────────────────────────────── */}
-          <div className="border-t border-[oklch(0.16_0.016_280)] p-3 flex items-center gap-2.5 flex-shrink-0 bg-[oklch(0.09_0.010_280)]">
-            {/* Avatar */}
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-md">
-              {user?.avatar
-                ? <img src={user.avatar} className="w-8 h-8 rounded-full object-cover" alt="" />
-                : user
-                  ? <span className="text-[11px] font-black text-white">{user.name[0]?.toUpperCase()}</span>
-                  : <UserCircle className="w-5 h-5 text-white/70" />
-              }
-            </div>
-
-            {/* Name + credits */}
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-white truncate leading-tight">{user?.name ?? 'Guest'}</p>
-              <p className="text-[10px] text-[oklch(0.36_0.01_280)] leading-tight">
-                {creditsRemaining} credits remaining
-              </p>
-            </div>
-
-            {/* Tier badge */}
-            <span className={cn(
-              'text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border flex-shrink-0',
-              creditsRemaining > 10
-                ? 'text-[oklch(0.55_0.01_280)] bg-[oklch(0.12_0.01_280)] border-[oklch(0.20_0.01_280)]'
-                : 'text-blue-300 bg-blue-400/10 border-blue-400/30',
-            )}>
-              {creditsRemaining > 10 ? 'FREE' : 'PRO'}
-            </span>
-          </div>
         </>
       )}
     </div>

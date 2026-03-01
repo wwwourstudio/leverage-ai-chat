@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Plus, Search, Star, Trash2, MessageSquare, Edit3, CheckCircle, LayoutGrid, TrendingUp, Trophy, Award, BarChart3, UserCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -349,9 +350,18 @@ export function Sidebar({
   user,
   creditsRemaining,
 }: SidebarProps) {
+  // Avoid server/client hydration mismatch (#418): date grouping uses Date.now() which
+  // differs between UTC server and local-timezone client. Defer to after mount.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const starredChats = filteredChats.filter(c => c.starred);
   const unstarredChats = filteredChats.filter(c => !c.starred);
-  const dateGroups = groupChatsByDate(unstarredChats);
+  // Before hydration completes, put all chats under "Recent" (stable SSR output).
+  // After mount, switch to proper date groups.
+  const dateGroups = mounted
+    ? groupChatsByDate(unstarredChats)
+    : (unstarredChats.length > 0 ? [{ label: 'Recent', chats: unstarredChats }] : []);
 
   const KALSHI_TOPICS = ['Trending', 'Politics', 'Sports', 'Culture', 'Crypto', 'Climate', 'Economics', 'Mentions', 'Companies', 'Financials', 'Tech & Science'];
 

@@ -405,8 +405,13 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
       const profile = profileResult.data;
       // Suppress 404-class errors: user_credits table may not be migrated yet — fallback is fine
-      if (creditsResult.error && !creditsResult.error.message?.toLowerCase().includes('does not exist')) {
-        console.warn('[Credits] user_credits query failed:', creditsResult.error.message);
+      if (creditsResult.error) {
+        const isMissingTable = creditsResult.error.message?.toLowerCase().includes('does not exist')
+          || (creditsResult.error as any).code === '42P01'
+          || (creditsResult.error as any).code === 'PGRST200';
+        if (!isMissingTable) {
+          console.warn('[Credits] user_credits query failed:', creditsResult.error.message);
+        }
       }
       const purchasedBalance = creditsResult.data?.balance ?? 0;
 

@@ -532,6 +532,30 @@ Modeling rules:
 
 NEVER output any text outside the JSON object. NEVER use markdown code fences.` as const;
 
+// ── NFBC ADP Tool Addendum ────────────────────────────────────────────────────
+// Injected into the system prompt when hasADPIntent is true.
+// Replaces MLB_ANALYSIS_ADDENDUM for ADP / fantasy-draft queries so the AI
+// returns prose (not statcast JSON) and knows to call the query_adp tool.
+export const NFBC_ADP_ADDENDUM = `
+
+## NFBC ADP TOOL — ACTIVE
+You have access to live 2025 NFBC (National Fantasy Baseball Championship) ADP data via the \`query_adp\` tool.
+
+For ANY question about player draft rankings, average draft position, positional scarcity, or where to draft a specific player:
+1. Call \`query_adp\` with the most relevant filter(s) — be specific.
+2. Synthesise the results into a clear, helpful prose response.
+3. When listing multiple players, format as a numbered list with rank, name, position, team, and ADP.
+4. Always cite "NFBC 2025 ADP" as the source.
+5. NEVER invent ADP values — if the tool returns no results, say so and offer to broaden the search.
+
+Tool parameter guide:
+- \`player\`: partial name (e.g. "Ohtani", "Judge") — case-insensitive
+- \`position\`: SP | RP | 1B | 2B | 3B | SS | OF | DH | C
+- \`rankMin\` / \`rankMax\`: narrow by overall rank range
+- \`limit\`: number of results (default 10, max 25)
+
+Respond in natural prose — do NOT output raw JSON or markdown code blocks.` as const;
+
 // Default Source Configurations
 export const DEFAULT_SOURCES = {
   GROK_AI: {

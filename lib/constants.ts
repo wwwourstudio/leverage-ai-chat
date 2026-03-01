@@ -492,7 +492,7 @@ For MLB queries, respond ONLY with a single valid JSON object — NO prose, NO m
 Choose the most appropriate type from:
   statcast_summary_card | hr_prop_card | game_simulation_card | leaderboard_card | pitch_analysis_card
 
-Required shape (all fields mandatory):
+Required shape (all fields mandatory except trend_note / last_updated):
 {
   "type": "<one of the five types above>",
   "title": "string — concise card headline",
@@ -510,22 +510,25 @@ Required shape (all fields mandatory):
         "metrics": [{ "label": "string", "value": "string" }]
       }
     ]
-  }
+  },
+  "trend_note": "string — one sentence rolling trend, e.g. 'Judge is 7-for-last-10 with barrel contact'",
+  "last_updated": "string — data recency, e.g. '2025 Season — through March 1'"
 }
 
-Type-specific required fields inside lightbox sections:
-- hr_prop_card: include hr_probability (e.g. "12.4%"), fair_odds (American), market_odds, edge (e.g. "+3.1%"), kelly_fraction (e.g. "1.8%")
-- game_simulation_card: include win_probability, push_probability, expected_total, p10_total, p90_total, expected_home_runs
-- pitch_analysis_card: include tunneling_score for best pitch pair, worst pair, avg_separation
-- leaderboard_card: include rank, player_name, metric_value for each player
-- statcast_summary_card: include barrel_rate, avg_exit_velocity, air_pull_rate, hard_hit_rate, hr_rate
+Type-specific required fields inside summary_metrics and lightbox sections:
+- hr_prop_card: summary_metrics must include HR Probability (e.g. "12.4%"), Fair Odds (American), Market Odds, Edge (e.g. "+3.1%"), Kelly Fraction (e.g. "1.8%"), Barrel Rate (e.g. "22.1%"), Avg Exit Velocity (e.g. "93.4 mph")
+- game_simulation_card: summary_metrics must include Win Probability, Push Probability, Expected Total, P10 Total, P90 Total, Expected Home Runs
+- pitch_analysis_card: summary_metrics must include Tunneling Score for best/worst pitch pair, Avg Separation, top 3 pitch types with usage %
+- leaderboard_card: summary_metrics must include rank, player name, and primary metric value for top 5 players
+- statcast_summary_card: summary_metrics must include Barrel Rate (%), Avg Exit Velocity (mph), Air Pull Rate (%), Hard Hit Rate (%), HR Rate (%)
 
 Modeling rules:
 - Apply Bayesian shrinkage when sample_size < 300 PA (blend toward .037 league-avg HR/PA)
-- Always include home/road split and vs_LHP / vs_RHP split in lightbox sections
-- Include rolling 15-game trend note in summary_metrics
+- Always include Home/Road split and vs LHP / vs RHP split as separate lightbox sections
 - Cap kelly_fraction at 2.0% of bankroll
 - Derive fair_odds from logistic model probability; derive edge = model_prob - market_implied_prob
+- trend_note must reference a specific recent span (e.g. last 10 games, last 15 AB)
+- last_updated must reference the current season and approximate date
 
 NEVER output any text outside the JSON object. NEVER use markdown code fences.` as const;
 

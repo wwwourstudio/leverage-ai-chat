@@ -87,7 +87,13 @@ export function PropHitRateCard({
           />
           <div className="min-w-0 flex-1">
             <p className={cn('font-black text-white truncate', isHero ? 'text-base' : 'text-sm')}>{playerName}</p>
-            <p className="text-[11px] text-gray-500 truncate">{statType}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[11px] text-gray-500 truncate">{statType}</p>
+              {(sport === 'mlb' || sport === 'baseball') && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src="/statcast-logo.png" alt="Statcast" className="h-3 w-auto opacity-50 flex-shrink-0" />
+              )}
+            </div>
           </div>
           <div className="text-right shrink-0">
             <p className={cn('font-black tabular-nums', hitColor, isHero ? 'text-2xl' : 'text-xl')}>

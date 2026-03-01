@@ -206,9 +206,16 @@ async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage
     return { markets: [], cursor: null };
   }
 
+  // Reject titles shorter than 10 chars or that look like raw ticker symbols
+  // (all-caps + digits + dashes/dots/%, e.g. "KXBT-25DEC25-T45000")
+  const TICKER_RE = /^[A-Z0-9\-\.%]+$/;
   const markets = data.markets
     .map(parseMarket)
-    .filter((m: KalshiMarket) => m.title && m.title.length > 5);
+    .filter((m: KalshiMarket) => {
+      if (!m.title || m.title.length < 10) return false;
+      if (TICKER_RE.test(m.title)) return false;
+      return true;
+    });
 
   const cursor = data.cursor && data.cursor !== '' ? data.cursor : null;
   return { markets, cursor };

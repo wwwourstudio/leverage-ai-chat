@@ -603,7 +603,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
       try {
         const { fetchDynamicCards: fetchCards } = await import('@/lib/data-service');
-        const freshCards = await fetchCards({ userContext: lastUserQuery, limit: 4 });
+        const freshCards = await fetchCards({ userContext: lastUserQuery, category: selectedCategory, limit: 4 });
         if (freshCards.length === 0) return;
 
         const converted = freshCards.map(convertToInsightCard);

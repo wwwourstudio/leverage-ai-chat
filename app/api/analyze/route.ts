@@ -13,6 +13,7 @@ import {
   ERROR_MESSAGES,
 } from '@/lib/constants';
 import { getADPData, queryADP } from '@/lib/adp-data';
+import { getStatcastData, queryStatcast } from '@/lib/baseball-savant';
 import { generateContextualCards, type InsightCard } from '@/lib/cards-generator';
 import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-detector';
 
@@ -68,6 +69,7 @@ function shouldUseFastModel(
   if (context?.hasFantasyIntent && !context?.hasBettingIntent) return true;
   if (userMessage.includes('[File:')) return true;   // CSV / file upload
   if (context?.noGamesAvailable) return true;         // off-season
+  if (context?.isPoliticalMarket) return true;        // Kalshi — no live-odds accuracy needed
   // MLB Statcast / HR / pitch queries always use the primary model — accuracy matters
   if (context?.sport === 'mlb' && (lower.includes('hr') || lower.includes('statcast') || lower.includes('pitch') || lower.includes('home run') || lower.includes('barrel'))) {
     return false;
@@ -310,14 +312,16 @@ export async function POST(request: NextRequest) {
         'Use for any question about player draft rankings, average draft position (ADP), ' +
         'positional scarcity in fantasy baseball drafts, or where a specific player is being drafted.',
       parameters: z.object({
-        player:   z.string().optional().describe('Partial player name — case-insensitive (e.g. "Judge", "Ohtani", "Trout")'),
-        position: z.string().optional().describe('Position filter: SP | RP | 1B | 2B | 3B | SS | OF | DH | C'),
-        rankMin:  z.number().optional().describe('Minimum overall NFBC rank (inclusive)'),
-        rankMax:  z.number().optional().describe('Maximum overall NFBC rank (inclusive)'),
-        limit:    z.number().optional().describe('Number of players to return (default 10, max 25)'),
+        player:    z.string().optional().describe('Partial player name — case-insensitive (e.g. "Judge", "Ohtani", "Trout")'),
+        position:  z.string().optional().describe('Position filter: SP | RP | 1B | 2B | 3B | SS | OF | DH | C'),
+        rankMin:   z.number().optional().describe('Minimum overall NFBC rank (inclusive)'),
+        rankMax:   z.number().optional().describe('Maximum overall NFBC rank (inclusive)'),
+        limit:     z.number().optional().describe('Number of players to return (default 10, max 25)'),
+        team:      z.string().optional().describe('MLB team abbreviation — e.g. "NYY", "LAD", "BOS", "CHC"'),
+        valueOnly: z.boolean().optional().describe('Return only value picks: players drafted 15+ spots later than their rank (sleepers)'),
       }),
-      execute: async ({ player, position, rankMin, rankMax, limit }) => {
-        console.log('[API/analyze] ADP tool called:', { player, position, rankMin, rankMax, limit });
+      execute: async ({ player, position, rankMin, rankMax, limit, team, valueOnly }) => {
+        console.log('[API/analyze] ADP tool called:', { player, position, rankMin, rankMax, limit, team, valueOnly });
         const data = await getADPData();
         if (data.length === 0) {
           return {
@@ -327,11 +331,43 @@ export async function POST(request: NextRequest) {
             error: 'NFBC ADP data is temporarily unavailable. Please try again shortly or consult nfc.shgn.com.',
           };
         }
-        const results = queryADP(data, { player, position, rankMin, rankMax, limit });
+        const results = queryADP(data, { player, position, rankMin, rankMax, limit, team, valueOnly });
         return {
           players: results,
           total_players_in_dataset: data.length,
           source: 'NFBC 2025 ADP',
+        };
+      },
+    });
+
+    // ── Statcast tool (injected when isMLBStatcastMode) ──────────────────────────
+    const statcastTool = tool({
+      description:
+        'Query REAL 2025 Baseball Savant Statcast metrics (barrel rate, exit velocity, ' +
+        'xwOBA, hard-hit %, sweet-spot %, xBA, xSLG). ' +
+        'Use for any MLB player question about Statcast performance or HR probability. ' +
+        'Always call this tool FIRST — never invent Statcast numbers.',
+      parameters: z.object({
+        player:     z.string().optional().describe('Partial player name — case-insensitive (e.g. "Judge", "Ohtani")'),
+        playerType: z.enum(['batter', 'pitcher']).optional().describe('Restrict to batters or pitchers only'),
+        limit:      z.number().optional().describe('Number of players to return (default 10, max 25)'),
+      }),
+      execute: async ({ player, playerType, limit }) => {
+        console.log('[API/analyze] Statcast tool called:', { player, playerType, limit });
+        const data = await getStatcastData();
+        if (data.length === 0) {
+          return {
+            players: [],
+            total_in_dataset: 0,
+            source: 'Baseball Savant 2025',
+            error: 'Statcast data temporarily unavailable. Use model knowledge for analysis.',
+          };
+        }
+        const results = queryStatcast(data, { player, playerType, limit });
+        return {
+          players: results,
+          total_in_dataset: data.length,
+          source: 'Baseball Savant 2025 (real data)',
         };
       },
     });
@@ -351,6 +387,8 @@ export async function POST(request: NextRequest) {
             // stopWhen: stepCountIs(3) allows: step1=tool-call, step2=final-response, step3=safety
             // (default is stepCountIs(1) which would stop before the model sees tool results)
             ...(hasADPIntent && { tools: { query_adp: adpTool }, stopWhen: stepCountIs(3) }),
+            // Inject Statcast tool for MLB queries — AI must call it first, then output JSON card.
+            ...(isMLBStatcastMode && { tools: { query_statcast: statcastTool }, stopWhen: stepCountIs(3) }),
           }),
           timeoutPromise
         ]);

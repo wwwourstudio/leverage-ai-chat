@@ -23,6 +23,15 @@ export interface NFBCPlayer {
   positions: string;
   /** MLB team abbreviation */
   team: string;
+  /**
+   * ADP minus rank: positive = being drafted LATER than ranked (value/sleeper),
+   * negative = being drafted EARLIER than ranked (reach).
+   */
+  valueDelta: number;
+  /** True when valueDelta > 15 — player available at a meaningful discount to rank */
+  isValuePick: boolean;
+  /** Auction dollar value if available from NFBC auction board (otherwise undefined) */
+  auctionValue?: number;
 }
 
 export interface ADPQueryParams {
@@ -40,6 +49,10 @@ export interface ADPQueryParams {
   rankMax?: number;
   /** Max results to return (default 10, hard cap 25) */
   limit?: number;
+  /** MLB team abbreviation filter — case-insensitive exact match (e.g. "NYY", "LAD") */
+  team?: string;
+  /** When true, return only players where ADP > rank by 15+ (value/sleeper picks) */
+  valueOnly?: boolean;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -91,11 +104,12 @@ function parseTSV(tsv: string): NFBCPlayer[] {
     return -1;
   };
 
-  const rankIdx     = col(['rank']);
-  const playerIdx   = col(['player', 'name']);
-  const adpIdx      = col(['overall adp', 'adp', 'overall']);
-  const posIdx      = col(['position(s)', 'positions', 'pos']);
-  const teamIdx     = col(['team']);
+  const rankIdx        = col(['rank']);
+  const playerIdx      = col(['player', 'name']);
+  const adpIdx         = col(['overall adp', 'adp', 'overall']);
+  const posIdx         = col(['position(s)', 'positions', 'pos']);
+  const teamIdx        = col(['team']);
+  const auctionIdx     = col(['auction value', 'auction', 'value', 'salary', 'cost', '$']);
 
   const players: NFBCPlayer[] = [];
 
@@ -111,13 +125,23 @@ function parseTSV(tsv: string): NFBCPlayer[] {
     const positions = posIdx   !== -1 ? (cols[posIdx]  ?? '').trim()       : '';
     const team      = teamIdx  !== -1 ? (cols[teamIdx] ?? '').trim()       : '';
 
+    const safeRank  = isNaN(rank) ? i : rank;
+    const safeAdp   = isNaN(adp)  ? safeRank : adp;
+    const valueDelta = Math.round((safeAdp - safeRank) * 10) / 10;
+
+    const rawAuction  = auctionIdx !== -1 ? parseFloat(cols[auctionIdx] ?? '') : NaN;
+    const auctionValue = !isNaN(rawAuction) && rawAuction > 0 ? rawAuction : undefined;
+
     players.push({
-      rank:        isNaN(rank) ? i : rank,
-      playerName:  rawName,
-      displayName: normalisePlayerName(rawName),
-      adp:         isNaN(adp)  ? rank : adp,
+      rank:         safeRank,
+      playerName:   rawName,
+      displayName:  normalisePlayerName(rawName),
+      adp:          safeAdp,
       positions,
       team,
+      valueDelta,
+      isValuePick:  valueDelta > 15,
+      auctionValue,
     });
   }
 
@@ -186,7 +210,7 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
  * All parameters are optional — called with no params returns the top-`limit` players.
  */
 export function queryADP(players: NFBCPlayer[], params: ADPQueryParams): NFBCPlayer[] {
-  const { player, position, rankMin, rankMax } = params;
+  const { player, position, rankMin, rankMax, team, valueOnly } = params;
   const limit = Math.min(params.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
 
   let results = players;
@@ -206,8 +230,15 @@ export function queryADP(players: NFBCPlayer[], params: ADPQueryParams): NFBCPla
     results = results.filter(p => p.positions.toUpperCase().split(',').map(s => s.trim()).includes(pos));
   }
 
+  if (team) {
+    const t = team.trim().toUpperCase();
+    results = results.filter(p => p.team.toUpperCase() === t);
+  }
+
   if (rankMin != null) results = results.filter(p => p.rank >= rankMin);
   if (rankMax != null) results = results.filter(p => p.rank <= rankMax);
+
+  if (valueOnly) results = results.filter(p => p.isValuePick);
 
   return results.slice(0, limit);
 }

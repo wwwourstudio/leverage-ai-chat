@@ -215,7 +215,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     {
       role: 'assistant',
       content: STATIC_WELCOME,
-      timestamp: serverData?.serverTime ? new Date(serverData.serverTime) : new Date(),
+      // Fixed epoch fallback keeps SSR and client hydration identical (no #418 mismatch).
+      // The useEffect below corrects this to the real current time after hydration.
+      timestamp: new Date(serverData?.serverTime ?? 0),
       isWelcome: true,
       cards: [],
       insights: {
@@ -288,6 +290,19 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
+  // Correct the welcome message timestamp to real local time after hydration.
+  // Runs once on mount — safe because it's client-only (no server/client mismatch).
+  useEffect(() => {
+    const now = new Date();
+    setMessages(prev =>
+      prev[0]?.isWelcome ? [{ ...prev[0], timestamp: now }, ...prev.slice(1)] : prev
+    );
+    setChats(prev =>
+      prev[0]?.id === 'chat-1' ? [{ ...prev[0], timestamp: now }, ...prev.slice(1)] : prev
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Personalize the welcome message client-side after hydration (and when user logs in).
   // This runs only in the browser, so getWelcomeMessage()'s timezone-sensitive
   // date/time calls are safe here (no server/client mismatch).
@@ -388,6 +403,10 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       ]);
 
       const profile = profileResult.data;
+      // Suppress 404-class errors: user_credits table may not be migrated yet — fallback is fine
+      if (creditsResult.error && !creditsResult.error.message?.toLowerCase().includes('does not exist')) {
+        console.warn('[Credits] user_credits query failed:', creditsResult.error.message);
+      }
       const purchasedBalance = creditsResult.data?.balance ?? 0;
 
       if (profile) {
@@ -612,7 +631,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       id: 'chat-1',
       title: 'New Chat',
       preview: 'Start a conversation to get real-time sports betting insights...',
-      timestamp: serverData?.serverTime ? new Date(serverData.serverTime) : new Date(),
+      timestamp: new Date(serverData?.serverTime ?? 0),
       starred: false,
       category: 'all',
       tags: []

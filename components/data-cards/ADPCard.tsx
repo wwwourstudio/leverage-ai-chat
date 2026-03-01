@@ -25,6 +25,9 @@ interface ADPPlayerRow {
   adp: number;
   positions: string;
   team: string;
+  valueDelta?: number;
+  isValuePick?: boolean;
+  auctionValue?: number;
 }
 
 // ── Position badge (matches FantasyCard colours) ───────────────────────────────
@@ -115,6 +118,8 @@ export function ADPCard({
   const totalInDataset: number | undefined = typeof data.totalInDataset === 'number' ? data.totalInDataset : undefined;
 
   const maxRows = isHero ? 12 : 8;
+  const hasValuePicks = players.some(p => p.isValuePick);
+  const hasAuctionValues = players.some(p => p.auctionValue != null);
 
   return (
     <div className="animate-fade-in-up">
@@ -150,7 +155,12 @@ export function ADPCard({
             <div className="flex items-center gap-2 px-2">
               <span className="w-6 shrink-0" />
               <span className="flex-1 text-[9px] font-black uppercase tracking-wider text-[oklch(0.38_0.01_280)]">Player</span>
-              <span className="w-10 text-right text-[9px] font-black uppercase tracking-wider text-[oklch(0.38_0.01_280)] shrink-0">ADP</span>
+              {hasAuctionValues && (
+                <span className="w-8 text-right text-[9px] font-black uppercase tracking-wider text-[oklch(0.38_0.01_280)] shrink-0">$Val</span>
+              )}
+              <span className="w-10 text-right text-[9px] font-black uppercase tracking-wider text-[oklch(0.38_0.01_280)] shrink-0">
+                {hasValuePicks ? 'ADP/Δ' : 'ADP'}
+              </span>
             </div>
           )}
 
@@ -158,7 +168,9 @@ export function ADPCard({
           <div className="space-y-1">
             {players.slice(0, maxRows).map((p, idx) => {
               const isTopPick = p.rank <= 12;
-              const rowBg = idx === 0
+              const rowBg = p.isValuePick
+                ? 'bg-emerald-500/10 border-emerald-500/25'
+                : idx === 0
                 ? 'bg-teal-500/8 border-teal-500/20'
                 : isTopPick
                 ? 'bg-yellow-400/5 border-yellow-400/15'
@@ -179,10 +191,32 @@ export function ADPCard({
                       <span className="text-[10px] font-normal text-[oklch(0.42_0.01_280)] ml-1">{p.team}</span>
                     )}
                   </span>
+                  {p.isValuePick && (
+                    <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-400/12 border border-emerald-400/30 px-1 py-0.5 rounded shrink-0">
+                      SLEEPER
+                    </span>
+                  )}
                   {p.positions && <PosBadge positions={p.positions} />}
-                  <span className="text-[11px] font-black tabular-nums text-cyan-400 w-10 text-right shrink-0">
-                    {p.adp.toFixed(1)}
-                  </span>
+                  {hasAuctionValues && (
+                    <span className="text-[10px] font-bold tabular-nums text-amber-400 w-8 text-right shrink-0">
+                      {p.auctionValue != null ? `$${p.auctionValue}` : '—'}
+                    </span>
+                  )}
+                  <div className="w-10 text-right shrink-0">
+                    <span className="text-[11px] font-black tabular-nums text-cyan-400">
+                      {p.adp.toFixed(1)}
+                    </span>
+                    {p.valueDelta != null && p.valueDelta > 0 && (
+                      <span className="block text-[8px] font-bold text-emerald-400 tabular-nums leading-none">
+                        +{p.valueDelta.toFixed(0)}
+                      </span>
+                    )}
+                    {p.valueDelta != null && p.valueDelta < -5 && (
+                      <span className="block text-[8px] font-bold text-amber-400 tabular-nums leading-none">
+                        {p.valueDelta.toFixed(0)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })}

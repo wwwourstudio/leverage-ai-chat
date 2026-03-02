@@ -758,6 +758,58 @@ ALTER PUBLICATION supabase_realtime ADD TABLE waiver_transactions;
 ALTER PUBLICATION supabase_realtime ADD TABLE user_alerts;
 
 -- ============================================================================
+-- 14. CHAT PERSISTENCE
+-- ============================================================================
+
+-- Chat threads (one row per conversation / sidebar entry)
+CREATE TABLE IF NOT EXISTS chat_threads (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL DEFAULT 'New Chat',
+  preview TEXT DEFAULT '',
+  category TEXT DEFAULT 'all',
+  tags TEXT[] DEFAULT '{}',
+  starred BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_threads_user ON chat_threads(user_id, updated_at DESC);
+
+ALTER TABLE chat_threads ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Own threads only" ON chat_threads;
+CREATE POLICY "Own threads only" ON chat_threads
+  FOR ALL USING (auth.uid() = user_id);
+
+-- Chat messages (individual turns in a thread)
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  thread_id UUID NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+  content TEXT NOT NULL,
+  model_used TEXT,
+  confidence FLOAT8,
+  is_welcome BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_messages_thread ON chat_messages(thread_id, created_at ASC);
+
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Thread owner messages" ON chat_messages;
+CREATE POLICY "Thread owner messages" ON chat_messages
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM chat_threads
+      WHERE chat_threads.id = chat_messages.thread_id
+        AND chat_threads.user_id = auth.uid()
+    )
+  );
+
+-- Enable realtime for live sidebar updates
+ALTER PUBLICATION supabase_realtime ADD TABLE chat_threads;
+
+-- ============================================================================
 -- SUCCESS MESSAGE
 -- ============================================================================
 
@@ -765,7 +817,7 @@ DO $$
 BEGIN
   RAISE NOTICE '✓ Leverage AI database schema created successfully';
   RAISE NOTICE '✓ api schema created and set as search path';
-  RAISE NOTICE '✓ 28 tables created with indexes and constraints:';
+  RAISE NOTICE '✓ 30 tables created with indexes and constraints:';
   RAISE NOTICE '    Core: live_odds_cache, mlb/nfl/nba/nhl_odds, line_movement,';
   RAISE NOTICE '          arbitrage_opportunities, player_props_markets, kalshi_markets,';
   RAISE NOTICE '          historical_games, ai_response_trust, ai_predictions, capital_state, bet_allocations';
@@ -774,6 +826,7 @@ BEGIN
   RAISE NOTICE '    Fantasy: fantasy_leagues, fantasy_teams, fantasy_rosters,';
   RAISE NOTICE '             fantasy_projections, waiver_transactions';
   RAISE NOTICE '    Draft: draft_rooms, draft_picks';
+  RAISE NOTICE '    Chat: chat_threads, chat_messages';
   RAISE NOTICE '✓ RLS policies applied for all tables';
   RAISE NOTICE '✓ Realtime subscriptions enabled';
   RAISE NOTICE 'Next steps:';

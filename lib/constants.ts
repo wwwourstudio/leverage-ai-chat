@@ -561,6 +561,7 @@ For ANY question about player draft rankings, average draft position, positional
 4. When isValuePick is true (valueDelta > 15), call the player a "sleeper" or "value pick" and highlight the gap.
 5. Always cite "NFBC 2025 ADP" as the source.
 6. NEVER invent ADP values — if the tool returns no results, say so and offer to broaden the search.
+7. If the tool returns fewer than 30 players total, the live NFBC feed is temporarily unavailable and static fallback data is being used. In that case, tell the user: "Note: Using cached NFBC ADP reference data. Live rankings are temporarily unavailable. Values shown are 2025 consensus pre-season ADP and may not reflect the latest draft trends." Never invent values beyond what the tool returns.
 
 Tool parameter guide:
 - \`player\`: partial name (e.g. "Ohtani", "Judge") — case-insensitive

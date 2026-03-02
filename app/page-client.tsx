@@ -38,6 +38,7 @@ import { StripeLightbox } from '@/components/StripeLightbox';
 import { UserLightbox } from '@/components/UserLightbox';
 import { useToast } from '@/components/toast-provider';
 import { Sidebar } from '@/components/Sidebar';
+import { loadThreads, createThread, updateThread, deleteThread, loadMessages, saveMessage } from '@/lib/chat-service';
 
 interface FileAttachment {
   id: string;
@@ -498,6 +499,27 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           // Load credits and instructions from Supabase
           loadCreditsFromSupabase(session.user.id);
           loadInstructionsFromApi();
+          // Load persisted chat threads from Supabase
+          loadThreads().then(threads => {
+            if (threads.length > 0) {
+              setChats(threads);
+              setActiveChat(threads[0].id);
+              // Load messages for the most recent thread
+              loadMessages(threads[0].id).then(msgs => {
+                if (msgs.length > 0) {
+                  setMessages(msgs.map(m => ({
+                    role: m.role,
+                    content: m.content,
+                    timestamp: m.timestamp,
+                    cards: [],
+                    modelUsed: m.modelUsed,
+                    confidence: m.confidence,
+                    isWelcome: m.isWelcome,
+                  })));
+                }
+              });
+            }
+          });
         } else {
           // Not logged in — load instructions from localStorage
           const stored = localStorage.getItem('leverage_custom_instructions') || '';
@@ -710,6 +732,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     setChats(chats.map((c: Chat) =>
       c.id === chatId ? { ...c, starred: !c.starred } : c
     ));
+    if (isLoggedIn) {
+      updateThread(chatId, { starred: !wasStarred });
+    }
     toast.success(wasStarred ? 'Removed from starred' : 'Analysis saved');
   };
 
@@ -1493,6 +1518,17 @@ No preamble. Start directly with section 1.`;
       // Add message to state
       setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
 
+      // Persist both messages to Supabase (fire-and-forget)
+      if (isLoggedIn) {
+        saveMessage(activeChat, { role: 'user', content: userMessage });
+        saveMessage(activeChat, {
+          role: 'assistant',
+          content: newMessage.content,
+          model_used: newMessage.modelUsed,
+          confidence: newMessage.confidence,
+        });
+      }
+
       // Generate contextual suggestions — use clarificationOptions from API if ambiguous
       if (analysisResult.clarificationOptions?.length) {
         setSuggestedPrompts(analysisResult.clarificationOptions.map((o: string) => ({
@@ -1992,6 +2028,15 @@ No preamble. Start directly with section 1.`;
         if (contentLower.includes('bet') || contentLower.includes('odds')) newTags.push('live');
         updatedChat.tags = [...new Set(newTags)].slice(0, 3);
 
+        // Persist updated title/preview to Supabase (fire-and-forget)
+        if (isLoggedIn) {
+          updateThread(chat.id, {
+            title: updatedChat.title,
+            preview: updatedChat.preview,
+            tags: updatedChat.tags,
+          });
+        }
+
         return updatedChat;
       }
       return chat;
@@ -2039,10 +2084,9 @@ No preamble. Start directly with section 1.`;
       return;
     }
 
-    const newChatId = `chat-${Date.now()}`;
     // Generate dynamic welcome message based on selected category
     const welcomeMessage = getWelcomeMessage(selectedCategory);
-    
+
     // Category-specific titles
     const categoryTitles = {
       all: 'New Analysis',
@@ -2051,14 +2095,17 @@ No preamble. Start directly with section 1.`;
       dfs: 'New DFS Lineup Analysis',
       kalshi: 'New Kalshi Market Analysis'
     };
-    
+    const chatTitle = categoryTitles[selectedCategory as keyof typeof categoryTitles] || 'New Analysis';
+    const chatCategory = selectedCategory === 'all' ? 'betting' : selectedCategory;
+
+    const newChatId = `chat-${Date.now()}`;
     const newChat: Chat = {
       id: newChatId,
-      title: categoryTitles[selectedCategory as keyof typeof categoryTitles] || 'New Analysis',
+      title: chatTitle,
       preview: welcomeMessage.slice(0, 50) + '...',
       timestamp: new Date(),
       starred: false,
-      category: selectedCategory === 'all' ? 'betting' : selectedCategory,
+      category: chatCategory,
       tags: [selectedCategory === 'all' ? 'multi-platform' : selectedCategory]
     };
     setChats([newChat, ...chats]);
@@ -2074,6 +2121,17 @@ No preamble. Start directly with section 1.`;
       }
     ]);
 
+    // For logged-in users, persist the new thread to Supabase and swap in the real UUID
+    if (isLoggedIn) {
+      createThread(chatCategory, chatTitle).then(created => {
+        if (created) {
+          // Swap the temp ID for the real Supabase UUID
+          setChats(prev => prev.map(c => c.id === newChatId ? { ...c, id: created.id } : c));
+          setActiveChat(created.id);
+        }
+      });
+    }
+
     // Update rate limit count
     const updated = updateRateLimitCount();
     setChatsRemaining(CHAT_LIMIT - updated.count);
@@ -2082,14 +2140,42 @@ No preamble. Start directly with section 1.`;
 
   const handleSelectChat = (chatId: string) => {
     setActiveChat(chatId);
-    setMessages([
-      {
+
+    if (isLoggedIn) {
+      // Load messages from Supabase for logged-in users
+      loadMessages(chatId).then(msgs => {
+        if (msgs.length > 0) {
+          setMessages(msgs.map(m => ({
+            role: m.role,
+            content: m.content,
+            timestamp: m.timestamp,
+            cards: [],
+            modelUsed: m.modelUsed,
+            confidence: m.confidence,
+            isWelcome: m.isWelcome,
+          })));
+        } else {
+          const chat = chats.find((c: Chat) => c.id === chatId);
+          setMessages([{
+            role: 'assistant',
+            content: `**${chat?.title || 'Chat'}**\n\nNo saved messages found. Start a new message to continue.`,
+            timestamp: new Date(),
+            cards: [],
+            isWelcome: true,
+          }]);
+        }
+      });
+    } else {
+      // Not logged in — keep showing current in-memory welcome
+      const chat = chats.find((c: Chat) => c.id === chatId);
+      setMessages([{
         role: 'assistant',
-        content: "**Analysis Restored**\n\nYour previous conversation has been loaded. All data sources remain active and verified.\n\n**Ready to continue optimizing your strategy across all platforms.**",
+        content: `**${chat?.title || 'Analysis Restored'}**\n\nSign in to save and restore your conversation history.\n\n**Ready to continue optimizing your strategy.**`,
         timestamp: new Date(),
-        cards: []
-      }
-    ]);
+        cards: [],
+        isWelcome: true,
+      }]);
+    }
   };
 
   const handleDeleteChat = (chatId: string, e: React.MouseEvent) => {
@@ -2098,6 +2184,9 @@ No preamble. Start directly with section 1.`;
     if (activeChat === chatId && chats.length > 1) {
       const remainingChats = chats.filter((chat: Chat) => chat.id !== chatId);
       setActiveChat(remainingChats[0].id);
+    }
+    if (isLoggedIn) {
+      deleteThread(chatId);
     }
     toast.info('Chat deleted');
   };

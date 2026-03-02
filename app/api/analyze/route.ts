@@ -277,6 +277,7 @@ export async function POST(request: NextRequest) {
     let modelUsed = AI_CONFIG.MODEL_DISPLAY_NAME;
     let usedFallback = false;
     let pendingADPCard: InsightCard | null = null;
+    let skipStatcastJSON = false; // set true when statcast tool returned empty players
 
     const MAX_HALLUCINATION_RETRIES = 2;
 
@@ -433,6 +434,17 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // If statcast tool returned zero players, skip JSON card parsing.
+        // The AI will have output prose (per the addendum instructions) rather than a broken N/A card.
+        if (isMLBStatcastMode) {
+          const toolResults: any[] = (result as any).toolResults ?? [];
+          const statcastResult = toolResults.find((tr: any) => tr.toolName === 'query_statcast');
+          if (statcastResult && statcastResult.result?.players?.length === 0) {
+            skipStatcastJSON = true;
+            console.warn('[API/analyze] Statcast tool returned no players — skipping JSON card mode');
+          }
+        }
+
         // Hallucination-detection retry loop (with timeout awareness)
         let detection = detectHallucinations(aiText, userMessage, context.oddsData);
         let retryAttempt = 0;
@@ -534,7 +546,7 @@ export async function POST(request: NextRequest) {
     // The MLB_ANALYSIS_ADDENDUM instructs Grok to return ONLY JSON for MLB queries.
     // Parse it here, inject it as a StatcastCard, and replace aiText with
     // human-readable prose so the chat doesn't display raw JSON to the user.
-    if (isMLBStatcastMode && !usedFallback) {
+    if (isMLBStatcastMode && !usedFallback && !skipStatcastJSON) {
       const STATCAST_TYPES = new Set([
         'statcast_summary_card', 'hr_prop_card', 'game_simulation_card',
         'leaderboard_card', 'pitch_analysis_card',

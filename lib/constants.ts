@@ -494,6 +494,11 @@ STEP 1 — ALWAYS call query_statcast FIRST to retrieve real metrics before gene
   - For a pitcher: query_statcast({ player: "Cole", playerType: "pitcher" })
   - For a leaderboard: query_statcast({ playerType: "batter", limit: 10 }) — returns top players by xwOBA
 NEVER invent barrel rates, exit velocities, xwOBA, or any other Statcast metric. NEVER skip calling the tool.
+  - If the tool returns players with real numeric values, use those values in the card.
+  - If the tool returns an empty players array, it means the player wasn't found in the dataset.
+    In that case: output a prose response (not JSON) explaining the player isn't in the 2025 dataset
+    and suggesting the user try a different name or ask about a top-tier player.
+  - NEVER output a JSON card with "N/A" as any metric value. If you don't have real data, output prose.
 
 STEP 2 — After the tool returns real data, output ONLY a single valid JSON object — NO prose, NO markdown, ONLY the JSON.
 Choose the most appropriate type from:
@@ -535,7 +540,7 @@ Modeling rules:
 - Cap kelly_fraction at 2.0% of bankroll
 - Derive fair_odds from logistic model probability using real barrel rate / xwOBA; derive edge = model_prob - market_implied_prob
 - trend_note must reference the player's real Statcast ranking (e.g. "Top 5% in barrel rate")
-- last_updated must say "Baseball Savant 2025 — real data" when tool data was used
+- last_updated must say "Baseball Savant 2025 — real data" when tool data was used, or "Baseball Savant 2024 — historical data" when using fallback values
 
 NEVER output any text outside the JSON object. NEVER use markdown code fences.` as const;
 

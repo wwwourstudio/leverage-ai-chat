@@ -795,6 +795,29 @@ async function _generateContextualCards(
           limit: Math.max(count * 5, 50),
           maxRetries: 3,
         });
+
+        // When sport context is present, filter to sport-relevant markets
+        if (sport && markets.length > 0) {
+          const SPORT_KALSHI_KEYWORDS: Record<string, string[]> = {
+            basketball_nba: ['NBA', 'basketball'],
+            americanfootball_nfl: ['NFL', 'football', 'Super Bowl'],
+            baseball_mlb: ['MLB', 'baseball', 'World Series'],
+            icehockey_nhl: ['NHL', 'hockey', 'Stanley Cup'],
+            americanfootball_ncaaf: ['NCAAF', 'college football', 'CFP'],
+            basketball_ncaab: ['NCAAB', 'March Madness', 'college basketball'],
+          };
+          const keywords = SPORT_KALSHI_KEYWORDS[sport];
+          if (keywords) {
+            const sportFiltered = markets.filter((m: any) => {
+              const title = ((m.title || m.ticker || '') as string).toLowerCase();
+              return keywords.some(kw => title.includes(kw.toLowerCase()));
+            });
+            if (sportFiltered.length > 0) {
+              markets = sportFiltered;
+              console.log(`[v0] [CARDS-GEN] Kalshi filtered to ${markets.length} ${sport} markets`);
+            }
+          }
+        }
       }
 
       console.log(`[v0] [CARDS-GEN] Kalshi fetched ${markets.length} markets`);

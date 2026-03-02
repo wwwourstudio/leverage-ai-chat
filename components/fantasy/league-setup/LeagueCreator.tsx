@@ -263,7 +263,10 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
                 const newTeams = Array.from({ length: newSize }, (_, i) => ({
                   name: form.teams[i]?.name || `Team ${i + 1}`,
                 }));
-                update({ platform: p.value, rosterSlots: newRoster, leagueSize: newSize, teams: newTeams });
+                const leagueTypeOverride = p.value === 'nfbc' && form.sport === 'mlb'
+                  ? { leagueType: 'roto', scoringType: 'roto' }
+                  : {};
+                update({ platform: p.value, rosterSlots: newRoster, leagueSize: newSize, teams: newTeams, ...leagueTypeOverride });
               }}
               className={cn(
                 'rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-200',
@@ -381,12 +384,19 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
 
   // ── Step 4: League type ────────────────────────────────────────────────────
   const StepLeagueType = () => {
-    const types = LEAGUE_TYPES[form.sport] ?? LEAGUE_TYPES.nfl;
+    const allTypes = LEAGUE_TYPES[form.sport] ?? LEAGUE_TYPES.nfl;
+    // NFBC only supports Rotisserie format
+    const types = form.platform === 'nfbc' ? allTypes.filter(t => t.value === 'roto') : allTypes;
     return (
       <div className="space-y-3">
         <p className="text-sm text-[oklch(0.55_0.01_280)] mb-4">
           What scoring format does your league use?
         </p>
+        {form.platform === 'nfbc' && (
+          <p className="text-xs text-emerald-400/70">
+            NFBC leagues use Rotisserie scoring exclusively.
+          </p>
+        )}
         <div className="space-y-2.5">
           {types.map(t => (
             <button

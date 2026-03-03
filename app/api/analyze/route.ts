@@ -83,9 +83,9 @@ function shouldUseFastModel(
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  // grok-4 gets 22s; on failure, grok-3-fast fallback gets 8s = 30s total = Vercel limit.
-  // Fast-routed queries (DFS, fantasy, CSV, off-season) skip grok-4 entirely.
-  const TIMEOUT_MS = 22000;
+  // grok-4 gets 15s; on failure, grok-3-fast fallback gets 10s = 25s total (safe under Vercel's 30s limit).
+  // Fast-routed queries (DFS, fantasy, CSV, off-season, political) skip grok-4 entirely.
+  const TIMEOUT_MS = 15000;
 
   try {
     // Add timeout wrapper
@@ -383,7 +383,7 @@ export async function POST(request: NextRequest) {
             ...buildGenOptions(enrichedPrompt, hasImages ? body.imageAttachments : undefined),
             temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
             maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
-            maxRetries: 1, // Reduced retries to prevent timeout
+            maxRetries: 0, // No internal SDK retries — our outer Promise.race handles fallback
             // Inject ADP tool only when user is asking about NFBC draft positions.
             // stopWhen: stepCountIs(3) allows: step1=tool-call, step2=final-response, step3=safety
             // (default is stepCountIs(1) which would stop before the model sees tool results)
@@ -503,7 +503,7 @@ export async function POST(request: NextRequest) {
         console.warn(`[API/analyze] ${primaryModel} failed, retrying with ${fallbackModel}:`, aiError instanceof Error ? aiError.message : aiError);
         try {
           const fallbackTimeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('Fallback timeout')), 8000); // 8s for fallback
+            setTimeout(() => reject(new Error('Fallback timeout')), 10000); // 10s for fallback
           });
 
           const fallbackResult = await Promise.race([

@@ -75,7 +75,9 @@ function getSupabaseClient() {
     throw new Error('Supabase not configured. Missing URL or service key.');
   }
 
-  return createClient(supabaseUrl, serviceKey, { db: { schema: 'api' } });
+  // Use public schema — nba_odds, nfl_odds, etc. with flat columns (away_implied_prob,
+  // event_id, etc.) live there. The api schema tables only have JSONB blobs.
+  return createClient(supabaseUrl, serviceKey);
 }
 
 /**

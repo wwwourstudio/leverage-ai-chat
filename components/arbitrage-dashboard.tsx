@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { TrendingUp, AlertCircle, RefreshCw, DollarSign, Clock, CheckCircle } from 'lucide-react';
 import { useRealtimeSubscription } from '@/lib/hooks/use-realtime';
-import type { ArbitrageOpportunity } from '@/lib/arbitrage-detector';
+import type { ArbitrageOpportunity } from '@/lib/arbitrage/index';
 
 export function ArbitrageDashboard() {
   const [opportunities, setOpportunities] = useState<ArbitrageOpportunity[]>([]);

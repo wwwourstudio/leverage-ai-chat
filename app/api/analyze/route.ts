@@ -70,6 +70,12 @@ function shouldUseFastModel(
   if (userMessage.includes('[File:')) return true;   // CSV / file upload
   if (context?.noGamesAvailable) return true;         // off-season
   if (context?.isPoliticalMarket) return true;        // Kalshi — no live-odds accuracy needed
+
+  // Kalshi/prediction-market follow-ups often lose isPoliticalMarket=true (e.g. "Deeper analysis on: yes Jokić: 6+...")
+  // Detect them by keyword so they always take the fast path regardless of context flags.
+  const kalshiKeywords = ['kalshi', 'prediction market', 'deeper analysis on:', 'yes ', ': yes ', ',yes '];
+  if (kalshiKeywords.some(k => lower.includes(k))) return true;
+
   // MLB Statcast / HR / pitch queries always use the primary model — accuracy matters
   if (context?.sport === 'mlb' && (lower.includes('hr') || lower.includes('statcast') || lower.includes('pitch') || lower.includes('home run') || lower.includes('barrel'))) {
     return false;
@@ -448,9 +454,11 @@ export async function POST(request: NextRequest) {
         // Hallucination-detection retry loop (with timeout awareness)
         let detection = detectHallucinations(aiText, userMessage, context.oddsData);
         let retryAttempt = 0;
-        const remainingTime = TIMEOUT_MS - (Date.now() - startTime);
 
-        while (detection.shouldRetry && !isMLBQuery && !hasADPIntent && retryAttempt < MAX_HALLUCINATION_RETRIES && remainingTime > 8000) {
+        while (detection.shouldRetry && !isMLBQuery && !hasADPIntent && retryAttempt < MAX_HALLUCINATION_RETRIES) {
+          // Re-calculate remaining time each iteration — the pre-generation snapshot is stale
+          const remainingTime = TIMEOUT_MS - (Date.now() - startTime);
+          if (remainingTime < 8000) break; // Not enough budget for a safe retry
           retryAttempt++;
           console.warn(
             `[API/analyze] Hallucination detected (attempt ${retryAttempt}/${MAX_HALLUCINATION_RETRIES}):`,

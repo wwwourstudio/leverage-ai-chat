@@ -92,9 +92,9 @@ function shouldUseFastModel(
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   // Per-AI-call timeouts (independent from each other and from card generation):
-  //   grok-4 primary: 12s | grok-3-fast primary: 10s | fallback: 10s
-  // Total worst-case: 12 + 10 = 22s, safely under Vercel's 30s hard limit.
-  const PRIMARY_TIMEOUT_MS = useFastPath => useFastPath ? 10000 : 12000;
+  //   grok-4 primary: 15s | grok-3-fast primary: 10s | fallback: 8s
+  // Total worst-case: 15 + 8 = 23s, safely under Vercel's 30s hard limit.
+  const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 10000 : 15000;
 
   try {
     const body: AnalyzeRequestBody = await request.json();
@@ -301,10 +301,11 @@ export async function POST(request: NextRequest) {
       return { prompt };
     };
 
-    // Route DFS, pure-fantasy, file-upload, and off-season queries directly to
+    // Route DFS, pure-fantasy, file-upload, off-season, and ambiguous queries directly to
     // grok-3-fast (3-6s). Reserve grok-4 for live-odds betting analysis only.
     // ADP queries override to grok-4: reliable tool use requires the stronger model.
-    const useFastPath = hasADPIntent ? false : shouldUseFastModel(userMessage, context);
+    // isAmbiguous queries only need a short clarification reply — no need for grok-4.
+    const useFastPath = hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context));
     const primaryModel = useFastPath ? 'grok-3-fast' : AI_CONFIG.MODEL_NAME;
     if (useFastPath) {
       console.log(`[API/analyze] Fast-path routing → grok-3-fast (intent: DFS/fantasy/file/offseason)`);
@@ -517,7 +518,7 @@ export async function POST(request: NextRequest) {
         if (!alreadyFast) {
           try {
             const fallbackTimeoutPromise = new Promise<never>((_, reject) => {
-              setTimeout(() => reject(new Error('Fallback timeout')), 10000);
+              setTimeout(() => reject(new Error('Fallback timeout')), 8000);
             });
 
             const fallbackResult = await Promise.race([

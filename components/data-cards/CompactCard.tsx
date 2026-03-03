@@ -21,56 +21,47 @@ interface CompactCardProps {
   onClick: () => void;
 }
 
-/** Pick a single key stat to surface in the compact view */
-function getKeyStat(card: CompactCardData): string | null {
+const YES_COLOR = '#00c47c';
+const NO_COLOR  = '#f43f5e';
+
+/** Derive a compact stat to show on the subcard thumbnail */
+function getKeyStat(card: CompactCardData): { label: string; value: string; color?: string } | null {
   const d = card.data;
   const t = card.type.toLowerCase();
 
+  if (t.includes('kalshi') || t.includes('prediction')) {
+    if (d.yesPct != null) {
+      const pct = d.yesPct as number;
+      const isYes = pct >= 50;
+      return {
+        label: isYes ? 'YES' : 'NO',
+        value: isYes ? `${pct}¢` : `${100 - pct}¢`,
+        color: isYes ? YES_COLOR : NO_COLOR,
+      };
+    }
+  }
   if (t.includes('odds') || t.includes('betting') || t.includes('moneyline')) {
-    if (d.homeOdds) return d.homeOdds;
+    if (d.homeOdds) return { label: 'ML', value: d.homeOdds };
     if (d.overUnder) {
       const m = String(d.overUnder).match(/([\d.]+)/);
-      return m ? `O/U ${m[1]}` : null;
+      return m ? { label: 'O/U', value: m[1] } : null;
     }
   }
   if (t.includes('dfs')) {
-    if (d.projection) return `${d.projection} proj`;
-    if (d.salary) return d.salary;
-  }
-  if (t.includes('fantasy') || t.includes('draft')) {
-    const players = d.players;
-    if (Array.isArray(players) && players[0]) return players[0].name?.split(' ').pop() ?? null;
-    if (d.pts) return `${d.pts} pts`;
-  }
-  if (t.includes('kalshi') || t.includes('prediction')) {
-    if (d.yesPct != null) return `YES ${d.yesPct}%`;
+    if (d.projection) return { label: 'Proj', value: `${d.projection}` };
+    if (d.salary) return { label: '$', value: d.salary };
   }
   if (t.includes('weather')) {
-    if (d.temperature) return d.temperature;
+    if (d.temperature) return { label: 'Temp', value: d.temperature };
   }
   if (t.includes('arbitrage')) {
-    if (d.profit) return `+${d.profit}%`;
+    if (d.profit) return { label: 'Arb', value: `+${d.profit}%`, color: YES_COLOR };
   }
-  if (d.hitRatePercentage != null) return `${d.hitRatePercentage}% hit`;
+  if (d.hitRatePercentage != null) return { label: 'Hit', value: `${d.hitRatePercentage}%` };
   return null;
 }
 
-/** Status dot color */
-const STATUS_DOT: Record<string, string> = {
-  hot: 'bg-red-400',
-  value: 'bg-emerald-400',
-  optimal: 'bg-sky-400',
-  target: 'bg-teal-400',
-  elite: 'bg-purple-400',
-  sleeper: 'bg-indigo-400',
-  opportunity: 'bg-amber-400',
-  edge: 'bg-blue-400',
-  alert: 'bg-red-400',
-  favorable: 'bg-green-400',
-  neutral: 'bg-slate-400',
-};
-
-/** Pick a representative Lucide icon based on card type */
+/** Pick an icon based on card type */
 function cardIcon(type: string): LucideIcon {
   const t = type.toLowerCase();
   if (t.includes('odds') || t.includes('betting') || t.includes('moneyline') || t.includes('spread')) return TrendingUp;
@@ -83,51 +74,93 @@ function cardIcon(type: string): LucideIcon {
   return Star;
 }
 
+/** Mini probability bar for Kalshi subcards */
+function MiniProbBar({ yesPct }: { yesPct: number }) {
+  return (
+    <div className="h-1 rounded-full overflow-hidden bg-[oklch(0.16_0.01_280)] mt-1">
+      <div
+        className="h-full rounded-full"
+        style={{
+          width: `${yesPct}%`,
+          backgroundColor: yesPct >= 50 ? YES_COLOR : NO_COLOR,
+          opacity: 0.8,
+        }}
+      />
+    </div>
+  );
+}
+
 export const CompactCard = memo(function CompactCard({ card, index, isActive, onClick }: CompactCardProps) {
   const keyStat = getKeyStat(card);
-  const dotColor = STATUS_DOT[card.status] ?? 'bg-slate-400';
   const Icon = cardIcon(card.type);
+  const isKalshi = card.type.toLowerCase().includes('kalshi') || card.type.toLowerCase().includes('prediction');
+  const yesPct: number | null = isKalshi && typeof card.data.yesPct === 'number' ? card.data.yesPct : null;
+
+  // Subcategory display: use normalised data.subcategory or card.subcategory, never raw ticker
+  const displayCategory =
+    (card.data.subcategory as string) ||
+    (card.subcategory && !card.subcategory.match(/^[A-Z0-9\-]{5,}$/) ? card.subcategory : null) ||
+    card.category ||
+    'Market';
 
   return (
     <button
       onClick={onClick}
       className={cn(
-        'group relative flex flex-col gap-1.5 p-2.5 rounded-xl border text-left transition-all duration-200 w-full',
-        'bg-[oklch(0.11_0.012_280)] hover:bg-[oklch(0.15_0.015_280)]',
+        'group relative flex flex-col gap-2 p-3 rounded-xl border text-left transition-all duration-200 w-full',
+        'bg-[#0f0f11] hover:bg-[oklch(0.14_0.014_280)]',
         isActive
-          ? 'border-[oklch(0.40_0.08_260)] shadow-[0_0_16px_oklch(0.4_0.12_260/0.25)]'
-          : 'border-[oklch(0.20_0.015_280)] hover:border-[oklch(0.28_0.02_280)]',
+          ? 'border-[#00c47c40] shadow-[0_0_16px_#00c47c18]'
+          : 'border-[oklch(0.18_0.014_280)] hover:border-[oklch(0.26_0.018_280)]',
       )}
       aria-pressed={isActive}
       title={card.title}
     >
-      {/* Gradient left micro-bar */}
-      <div className={cn('absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-gradient-to-b opacity-80', card.gradient)} />
+      {/* Active indicator — Kalshi teal left bar */}
+      {isActive && (
+        <div className="absolute left-0 top-2.5 bottom-2.5 w-[2px] rounded-full bg-[#00c47c]" />
+      )}
 
-      {/* Icon + status dot */}
-      <div className="flex items-center justify-between pl-2">
-        <div className={cn('p-1.5 rounded-md bg-gradient-to-br opacity-90', card.gradient)}>
-          <Icon className="w-3 h-3 text-white" aria-hidden="true" />
+      {/* Top row: icon + key stat */}
+      <div className="flex items-start justify-between gap-1">
+        <div className={cn(
+          'flex items-center justify-center w-6 h-6 rounded-md shrink-0',
+          isKalshi ? 'bg-[#00c47c15] border border-[#00c47c25]' : 'bg-[oklch(0.14_0.018_280)] border border-[oklch(0.20_0.018_280)]',
+        )}>
+          <Icon
+            className="w-3 h-3"
+            style={{ color: isKalshi ? YES_COLOR : 'oklch(0.55 0.015 280)' }}
+            aria-hidden="true"
+          />
         </div>
-        <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', dotColor)} />
+
+        {keyStat && (
+          <div className="flex flex-col items-end shrink-0">
+            <span
+              className="text-sm font-black tabular-nums leading-none"
+              style={{ color: keyStat.color ?? 'white' }}
+            >
+              {keyStat.value}
+            </span>
+            <span className="text-[9px] font-bold uppercase tracking-widest mt-0.5" style={{ color: keyStat.color ? `${keyStat.color}80` : 'oklch(0.40 0.01 280)' }}>
+              {keyStat.label}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Title */}
-      <p className="pl-2 text-[11px] font-semibold text-[oklch(0.82_0.005_85)] leading-tight line-clamp-2">
+      <p className="text-[11px] font-semibold text-[oklch(0.78_0.005_280)] leading-tight line-clamp-2 text-balance">
         {card.title}
       </p>
 
-      {/* Key stat + category */}
-      <div className="pl-2 flex items-center justify-between gap-1">
-        {keyStat && (
-          <span className="text-[10px] font-black tabular-nums text-[oklch(0.92_0.005_85)]">
-            {keyStat}
-          </span>
-        )}
-        <span className="text-[9px] font-bold uppercase tracking-wider text-[oklch(0.40_0.01_280)] truncate">
-          {card.category}
-        </span>
-      </div>
+      {/* Mini prob bar for Kalshi cards */}
+      {yesPct !== null && <MiniProbBar yesPct={yesPct} />}
+
+      {/* Category label */}
+      <span className="text-[9px] font-bold uppercase tracking-wider text-[oklch(0.35_0.01_280)] truncate">
+        {displayCategory}
+      </span>
     </button>
   );
 });

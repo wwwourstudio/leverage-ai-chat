@@ -153,13 +153,18 @@ function parseMarket(m: any): KalshiMarket {
   // alone as the card title. When a market lacks a proper title, combine
   // event_title + cleaned yes_sub_title so the result is still readable.
   const rawYesSub = typeof m.yes_sub_title === 'string' ? m.yes_sub_title : '';
-  const cleanYesSub = rawYesSub.replace(/^yes\s+/i, '').trim();
+  // Strip leading "yes "/"no " prefix that Kalshi sometimes surfaces in sub_title fields
+  const cleanYesSub = rawYesSub.replace(/^(yes|no)\s+/i, '').trim();
   const compositeTitle =
     m.event_title && cleanYesSub ? `${m.event_title}: ${cleanYesSub}` : '';
 
+  // Primary title — also strip any stray "yes "/"no " prefix that leaks through
+  const rawTitle: string = m.title || compositeTitle || m.event_title || m.subtitle || '';
+  const cleanTitle = rawTitle.replace(/^(yes|no)\s+/i, '').trim();
+
   return {
     ticker: m.ticker || '',
-    title: m.title || compositeTitle || m.event_title || m.subtitle || '',
+    title: cleanTitle,
     category: normalizeCategoryLabel(rawCategory),
     subtitle: m.subtitle || (cleanYesSub ? `Yes: ${cleanYesSub}` : '') || m.event_title || '',
     yesPrice,
@@ -936,7 +941,7 @@ export function kalshiMarketToCard(market: KalshiMarket): any {
         ? `$${(market.volume / 1_000_000).toFixed(1)}M`
         : market.volume >= 1_000
         ? `$${(market.volume / 1_000).toFixed(0)}K`
-        : `$${market.volume}`,
+        : market.volume > 0 ? `$${market.volume}` : '—',
       volume24h: market.volume24h >= 1_000_000
         ? `$${(market.volume24h / 1_000_000).toFixed(1)}M`
         : market.volume24h >= 1_000
@@ -946,13 +951,14 @@ export function kalshiMarketToCard(market: KalshiMarket): any {
         ? `$${(market.openInterest / 1_000_000).toFixed(1)}M`
         : market.openInterest >= 1_000
         ? `$${(market.openInterest / 1_000).toFixed(0)}K`
-        : `$${market.openInterest}`,
+        : market.openInterest > 0 ? `$${market.openInterest}` : '—',
       closeTime: market.closeTime
         ? new Date(market.closeTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
         : 'TBD',
       expiresLabel,
       expiryUrgency,
       volumeTier,
+      isHot: market.volume24h >= 50_000 || market.volume >= 500_000,
       recommendation: signal,
       // Event/series metadata
       eventTicker: market.eventTicker,

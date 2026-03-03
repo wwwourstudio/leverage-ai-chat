@@ -509,57 +509,70 @@ export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
  */
 export async function fetchElectionMarkets(options?: {
   year?: number;
-  includeH2H?: boolean;
   limit?: number;
 }): Promise<KalshiMarket[]> {
-  const { year = 2026, includeH2H = true, limit = 20 } = options || {};
+  const { year = 2026, limit = 20 } = options || {};
 
   console.log('[KALSHI] Fetching election markets for year:', year);
 
-  // Each strategy uses `search` only (not combined category+search) to avoid the
-  // known bug where `search` silently overwrites the `title` param set by `category`,
-  // causing the API to return unrelated markets (e.g. all "2026" titles).
-  const searchStrategies = [
+  const ELECTION_KEYWORDS = [
+    'election', 'senate', 'house', 'congress', 'midterm',
+    'governor', 'president', 'harris', 'trump', 'republican',
+    'democrat', 'ballot', 'primary', 'gop',
+  ];
+
+  function isElectionMarket(market: KalshiMarket): boolean {
+    const text = `${market.title} ${market.category} ${market.subtitle}`.toLowerCase();
+    return ELECTION_KEYWORDS.some(k => text.includes(k)) || text.includes(year.toString());
+  }
+
+  // Apply the election filter INSIDE the collection loop so the early-break
+  // condition (`electionMarkets.length >= limit`) counts only matching markets,
+  // not raw API results.  The Kalshi `title` search param does not reliably act
+  // as a substring filter — it often returns the top-50 open markets regardless —
+  // so we must filter client-side before deciding whether to try the next strategy.
+  const searchStrategies: Array<Parameters<typeof fetchKalshiMarkets>[0]> = [
     { search: `senate ${year}` },
     { search: `house ${year}` },
     { search: `governor ${year}` },
-    { search: `midterm` },
-    { category: 'politics' },          // maps to title='senate' via categorySearchMap
+    { search: 'midterm' },
+    { category: 'politics' },
     { search: `election ${year}` },
+    { search: 'congress' },
   ];
 
-  const allMarkets: KalshiMarket[] = [];
+  const seen = new Set<string>();
+  const electionMarkets: KalshiMarket[] = [];
 
   for (const strategy of searchStrategies) {
+    if (electionMarkets.length >= limit) break;
+
     const markets = await fetchKalshiMarkets({ ...strategy, limit: 50 });
 
-    markets.forEach(market => {
-      if (!allMarkets.some(m => m.ticker === market.ticker)) {
-        allMarkets.push(market);
+    for (const market of markets) {
+      if (seen.has(market.ticker)) continue;
+      seen.add(market.ticker);
+      if (isElectionMarket(market)) {
+        electionMarkets.push(market);
       }
-    });
-
-    if (allMarkets.length >= limit) break;
+    }
   }
 
-  const electionMarkets = allMarkets.filter(market => {
-    const text = `${market.title} ${market.category} ${market.subtitle}`.toLowerCase();
-    // Broader keyword set to catch 2026 midterm markets that don't use "election"
-    const isElection = text.includes('election') ||
-                       text.includes('senate') ||
-                       text.includes('house') ||
-                       text.includes('congress') ||
-                       text.includes('midterm') ||
-                       text.includes('governor') ||
-                       text.includes('president') ||
-                       text.includes('harris') ||
-                       text.includes('trump');
-    const hasYear = text.includes(year.toString());
-    const isH2H = includeH2H ? text.includes('h2h') || text.includes('vs') : true;
-    // Pass if it has election keywords OR matches the year (to catch future markets
-    // whose titles don't spell out the year explicitly)
-    return isElection || (hasYear && (includeH2H ? isH2H : true));
-  });
+  // Fallback: if no matches after all strategies, fetch a broad set and filter.
+  // This handles the case where the Kalshi API returns unrelated markets for all searches.
+  if (electionMarkets.length === 0) {
+    console.log('[KALSHI] No election markets from targeted searches — falling back to broad fetch');
+    try {
+      const broad = await fetchKalshiMarketsWithRetry({ limit: 200, maxRetries: 2 });
+      for (const market of broad) {
+        if (!seen.has(market.ticker) && isElectionMarket(market)) {
+          electionMarkets.push(market);
+        }
+      }
+    } catch {
+      // Non-critical fallback
+    }
+  }
 
   console.log(`[KALSHI] Found ${electionMarkets.length} election markets for ${year}`);
   return electionMarkets.slice(0, limit);

@@ -62,9 +62,21 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
 }
 
 function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) => void }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
-  if (!mounted) return null;
+  const [container, setContainer] = useState<Element | null>(null);
+
+  useEffect(() => {
+    // Create a dedicated mount point instead of using document.body directly.
+    // This avoids hydration mismatches caused by Next.js streaming SSR markers
+    // that already live inside document.body when React tries to reconcile.
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    setContainer(div);
+    return () => {
+      document.body.removeChild(div);
+    };
+  }, []);
+
+  if (!container) return null;
   return createPortal(
     <div className="fixed bottom-5 right-5 z-[9999] flex flex-col gap-2 items-end pointer-events-none">
       {toasts.map(t => (
@@ -73,7 +85,7 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
         </div>
       ))}
     </div>,
-    document.body
+    container
   );
 }
 

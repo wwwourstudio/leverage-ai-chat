@@ -125,8 +125,12 @@ export class SupabaseOddsService {
       .insert(records);
 
     if (error) {
-      // Silently ignore duplicate key or constraint violations
-      if (!['23505', 'PGRST205', '42P10'].includes((error as any).code)) {
+      // Silently ignore duplicate key, constraint, and schema-cache violations.
+      // PGRST204 = column not found in schema cache (live_odds_cache schema mismatch — non-blocking)
+      const code = (error as any).code as string;
+      const msg: string = (error as any).message ?? '';
+      if (!['23505', 'PGRST204', 'PGRST205', '42P10'].includes(code) &&
+          !msg.includes('schema cache')) {
         console.error('[Supabase] Error storing odds:', error);
       }
       return false;
@@ -210,12 +214,15 @@ export class SupabaseOddsService {
         .upsert(records, { onConflict: 'event_id' });
 
       if (error) {
-        // Silently ignore permission / constraint errors -- sport tables may lack RLS policies for anon writes
+        // Silently ignore permission / constraint / schema-cache errors.
+        // PGRST204 = column not found in schema cache (table schema mismatch — non-blocking)
+        // PGRST205 = ambiguous column, 42P10 = policy, 42501 = permission denied, 23505 = unique violation
         const code = (error as any).code;
         const msg: string = (error as any).message ?? '';
-        if (!['PGRST205', '42P10', '42501', '23505'].includes(code) &&
+        if (!['PGRST204', 'PGRST205', '42P10', '42501', '23505'].includes(code) &&
             !msg.includes('policy') &&
-            !msg.includes('fetch failed')) {
+            !msg.includes('fetch failed') &&
+            !msg.includes('schema cache')) {
           console.error(`[Supabase] Sport odds store error (${tableName}):`, msg || error);
         }
         return false;

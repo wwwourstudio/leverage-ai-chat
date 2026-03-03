@@ -28,9 +28,12 @@ function getSupabase() {
     }
 
     // Server: create a lightweight client without cookies dependency.
+    // Use the public schema — that's where the fully-structured odds tables live
+    // (nba_odds, nfl_odds, live_odds_cache, etc. with flat columns like away_implied_prob).
+    // The legacy `api` schema tables only have JSONB blobs and lack those columns.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { createClient } = require('@supabase/supabase-js');
-    return createClient(url, key, { db: { schema: 'api' } });
+    return createClient(url, key);
   } catch (err) {
     console.error('[SupabaseOddsService] Failed to create Supabase client:', err);
     return null;

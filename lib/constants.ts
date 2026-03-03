@@ -10,7 +10,7 @@ export const AI_CONFIG = {
   PROVIDER: 'xAI',
   API_ENDPOINT: 'https://api.x.ai/v1/chat/completions',
   DEFAULT_TEMPERATURE: 0.35, // Slightly tighter for more precise, structured responses
-  DEFAULT_MAX_TOKENS: 800, // Richer, fully-formatted responses with headers and bullets
+  DEFAULT_MAX_TOKENS: 600, // Matches 350-word response cap in system prompt; faster generation
   DEFAULT_PROCESSING_TIME: 950,
   FALLBACK_MODEL: 'Grok 4',
 } as const;

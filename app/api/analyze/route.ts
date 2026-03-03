@@ -73,8 +73,10 @@ function shouldUseFastModel(
 
   // Kalshi/prediction-market follow-ups often lose isPoliticalMarket=true (e.g. "Deeper analysis on: yes Jokić: 6+...")
   // Detect them by keyword so they always take the fast path regardless of context flags.
-  const kalshiKeywords = ['kalshi', 'prediction market', 'deeper analysis on:', 'yes ', ': yes ', ',yes '];
+  // Use a regex to handle both ",yes " and ", yes " patterns (no-space after comma from Kalshi titles).
+  const kalshiKeywords = ['kalshi', 'prediction market', 'deeper analysis on:'];
   if (kalshiKeywords.some(k => lower.includes(k))) return true;
+  if (/[,\s]yes\s+\w/i.test(userMessage)) return true; // catches ",yes Giannis" and ", yes Team"
 
   // MLB Statcast / HR / pitch queries always use the primary model — accuracy matters
   if (context?.sport === 'mlb' && (lower.includes('hr') || lower.includes('statcast') || lower.includes('pitch') || lower.includes('home run') || lower.includes('barrel'))) {
@@ -89,16 +91,12 @@ function shouldUseFastModel(
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  // grok-4 gets 15s; on failure, grok-3-fast fallback gets 10s = 25s total (safe under Vercel's 30s limit).
-  // Fast-routed queries (DFS, fantasy, CSV, off-season, political) skip grok-4 entirely.
-  const TIMEOUT_MS = 15000;
+  // Per-AI-call timeouts (independent from each other and from card generation):
+  //   grok-4 primary: 12s | grok-3-fast primary: 10s | fallback: 10s
+  // Total worst-case: 12 + 10 = 22s, safely under Vercel's 30s hard limit.
+  const PRIMARY_TIMEOUT_MS = useFastPath => useFastPath ? 10000 : 12000;
 
   try {
-    // Add timeout wrapper
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Request timeout - analysis taking too long')), TIMEOUT_MS);
-    });
-
     const body: AnalyzeRequestBody = await request.json();
     const { userMessage, existingCards = [], context = {}, customInstructions } = body;
 
@@ -381,6 +379,11 @@ export async function POST(request: NextRequest) {
 
     if (xaiApiKey) {
       try {
+        // Per-call timeout — only covers AI generation, not card fetches or JSON parsing
+        const primaryTimeoutMs = PRIMARY_TIMEOUT_MS(useFastPath);
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Request timeout - analysis taking too long')), primaryTimeoutMs);
+        });
         // Initial generation with timeout protection
         const result = await Promise.race([
           generateText({
@@ -456,9 +459,9 @@ export async function POST(request: NextRequest) {
         let retryAttempt = 0;
 
         while (detection.shouldRetry && !isMLBQuery && !hasADPIntent && retryAttempt < MAX_HALLUCINATION_RETRIES) {
-          // Re-calculate remaining time each iteration — the pre-generation snapshot is stale
-          const remainingTime = TIMEOUT_MS - (Date.now() - startTime);
-          if (remainingTime < 8000) break; // Not enough budget for a safe retry
+          // Limit retries to 8s remaining budget (using a fixed cap since TIMEOUT_MS is now per-call)
+          const elapsed = Date.now() - startTime;
+          if (elapsed > 20000) break; // >20s total elapsed — not safe to retry
           retryAttempt++;
           console.warn(
             `[API/analyze] Hallucination detected (attempt ${retryAttempt}/${MAX_HALLUCINATION_RETRIES}):`,
@@ -506,30 +509,39 @@ export async function POST(request: NextRequest) {
         }
       } catch (aiError) {
         // If primary model fails (e.g. timeout or API error), try grok-3-fast before giving up.
-        // Fast-path queries already used grok-3-fast, so this fallback only kicks in for grok-4 failures.
+        // IMPORTANT: If we're already on the fast path (grok-3-fast was primary), skip the
+        // fallback retry entirely — it would just time out a second time and waste 10s.
         const fallbackModel = 'grok-3-fast';
-        console.warn(`[API/analyze] ${primaryModel} failed, retrying with ${fallbackModel}:`, aiError instanceof Error ? aiError.message : aiError);
-        try {
-          const fallbackTimeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('Fallback timeout')), 10000); // 10s for fallback
-          });
+        const alreadyFast = useFastPath; // grok-3-fast was already the primary
+        console.warn(`[API/analyze] ${primaryModel} failed, retrying with ${alreadyFast ? 'static fallback (already on fast path)' : fallbackModel}:`, aiError instanceof Error ? aiError.message : aiError);
+        if (!alreadyFast) {
+          try {
+            const fallbackTimeoutPromise = new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error('Fallback timeout')), 10000);
+            });
 
-          const fallbackResult = await Promise.race([
-            generateText({
-              model: createXai({ apiKey: xaiApiKey })(fallbackModel),
-              system: systemPrompt,
-              prompt: enrichedPrompt,
-              temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-              maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
-              maxRetries: 0,
-            }),
-            fallbackTimeoutPromise
-          ]);
-          aiText = fallbackResult.text;
-          modelUsed = 'Grok 3 Fast (fallback)';
-          console.log(`[API/analyze] ${fallbackModel} fallback succeeded`);
-        } catch (fallbackError) {
-          console.error('[API/analyze] Fallback model also failed:', fallbackError instanceof Error ? fallbackError.message : fallbackError);
+            const fallbackResult = await Promise.race([
+              generateText({
+                model: createXai({ apiKey: xaiApiKey })(fallbackModel),
+                system: systemPrompt,
+                prompt: enrichedPrompt,
+                temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
+                maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
+                maxRetries: 0,
+              }),
+              fallbackTimeoutPromise
+            ]);
+            aiText = fallbackResult.text;
+            modelUsed = 'Grok 3 Fast (fallback)';
+            console.log(`[API/analyze] ${fallbackModel} fallback succeeded`);
+          } catch (fallbackError) {
+            console.error('[API/analyze] Fallback model also failed:', fallbackError instanceof Error ? fallbackError.message : fallbackError);
+            aiText = generateFallbackResponse(userMessage, context);
+            modelUsed = 'Fallback';
+            usedFallback = true;
+          }
+        } else {
+          // Already used grok-3-fast — go straight to static fallback, no second AI call
           aiText = generateFallbackResponse(userMessage, context);
           modelUsed = 'Fallback';
           usedFallback = true;

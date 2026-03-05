@@ -92,9 +92,9 @@ function shouldUseFastModel(
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   // Per-AI-call timeouts (independent from each other and from card generation):
-  //   grok-4 primary: 22s | grok-3-mini primary: 10s | fallback: 8s
-  // Total worst-case sequential: 22 + 8 = 30s (card generation runs concurrently so adds ~0s).
-  const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 10000 : 22000;
+  //   grok-4 primary: 22s | grok-3-mini primary: 20s | fallback: 7s
+  // Total worst-case sequential: 22 + 7 = 29s (card generation runs concurrently so adds ~0s).
+  const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 20000 : 22000;
 
   try {
     const body: AnalyzeRequestBody = await request.json();
@@ -522,40 +522,37 @@ export async function POST(request: NextRequest) {
           `[API/analyze] Primary model "${primaryModel}" failed — full error:`,
           aiError,
           '| Retrying with:',
-          alreadyFast ? 'static fallback (already on fast path)' : fallbackModel,
+          alreadyFast ? AI_CONFIG.MODEL_NAME : fallbackModel,
         );
-        if (!alreadyFast) {
-          try {
-            const fallbackTimeoutPromise = new Promise<never>((_, reject) => {
-              setTimeout(() => reject(new Error('Fallback timeout')), 8000);
-            });
+        // Regardless of whether we were on the fast path, always try the other model
+        // before giving up. Fast path (grok-3-mini) failure → retry with grok-4.
+        // Slow path (grok-4) failure → retry with grok-3-mini.
+        const actualFallbackModel = alreadyFast ? AI_CONFIG.MODEL_NAME : fallbackModel;
+        try {
+          const fallbackTimeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Fallback timeout')), 7000);
+          });
 
-            const fallbackResult = await Promise.race([
-              generateText({
-                model: createXai({ apiKey: xaiApiKey })(fallbackModel),
-                system: systemPrompt,
-                prompt: enrichedPrompt,
-                temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-                maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
-                maxRetries: 0,
-              }),
-              fallbackTimeoutPromise
-            ]);
-            aiText = fallbackResult.text;
-            modelUsed = 'Grok 3 Mini (fallback)';
-            console.log(`[API/analyze] ${fallbackModel} fallback succeeded`);
-          } catch (fallbackError) {
-            const fallbackMsg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
-            console.error('[API/analyze] Fallback model also failed:', fallbackMsg);
-            aiText = generateFallbackResponse(userMessage, context);
-            // Surface the underlying API error in the model label so it's visible in the UI
-            modelUsed = fallbackMsg.includes('timeout') ? 'Fallback (timeout)' : 'Fallback (API error — check XAI_API_KEY)';
-            usedFallback = true;
-          }
-        } else {
-          // Already used grok-3-mini — go straight to static fallback, no second AI call
+          const fallbackResult = await Promise.race([
+            generateText({
+              model: createXai({ apiKey: xaiApiKey })(actualFallbackModel),
+              system: systemPrompt,
+              prompt: enrichedPrompt,
+              temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
+              maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
+              maxRetries: 0,
+            }),
+            fallbackTimeoutPromise
+          ]);
+          aiText = fallbackResult.text;
+          modelUsed = alreadyFast ? `${AI_CONFIG.MODEL_DISPLAY_NAME} (fallback)` : 'Grok 3 Mini (fallback)';
+          console.log(`[API/analyze] ${actualFallbackModel} fallback succeeded`);
+        } catch (fallbackError) {
+          const fallbackMsg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+          console.error('[API/analyze] Fallback model also failed:', fallbackMsg);
           aiText = generateFallbackResponse(userMessage, context);
-          modelUsed = 'Fallback';
+          // Surface the underlying API error in the model label so it's visible in the UI
+          modelUsed = fallbackMsg.includes('timeout') ? 'Fallback (timeout)' : 'Fallback (API error — check XAI_API_KEY)';
           usedFallback = true;
         }
       }

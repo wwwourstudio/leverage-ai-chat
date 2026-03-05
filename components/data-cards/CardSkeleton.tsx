@@ -69,3 +69,22 @@ export function CardGrid({ count = 3 }: { count?: number }) {
     </div>
   );
 }
+
+/** Inline loading state shown inside a card's analysis panel while the AI response streams. */
+export function CardAnalysisSkeleton({ cardType = 'betting' }: { cardType?: string }) {
+  return (
+    <div className="p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+        <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+        <div className="w-1.5 h-1.5 bg-blue-500/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+        <span className="text-[11px] text-gray-400 ml-1">
+          Analyzing {cardType === 'kalshi' ? 'prediction market' : 'opportunity'}...
+        </span>
+      </div>
+      <div className="h-2 bg-gray-700/40 rounded-full animate-pulse w-full" />
+      <div className="h-2 bg-gray-700/40 rounded-full animate-pulse w-5/6" />
+      <div className="h-2 bg-gray-700/40 rounded-full animate-pulse w-3/5" />
+    </div>
+  );
+}

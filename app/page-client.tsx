@@ -25,6 +25,7 @@ import { MobileChatInput } from '@/components/mobile-chat-input';
 import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2, Bookmark } from 'lucide-react';
 import { DynamicCardRenderer, CardList, EmptyState } from '@/components/data-cards';
 import { CardLayout } from '@/components/data-cards/CardLayout';
+import { CardAnalysisSkeleton } from '@/components/data-cards/CardSkeleton';
 import { DatabaseStatusBanner } from '@/components/database-status-banner';
 import { TrustMetricsDisplay, TrustMetricsBadge } from '@/components/trust-metrics-display';
 import { InsightsDashboard } from '@/components/insights-dashboard';
@@ -713,28 +714,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
-
-  // Loading skeleton for cards
-  const CardLoadingSkeleton = () => (
-    <div className="group relative bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/60 overflow-hidden animate-pulse">
-      <div className="flex items-start gap-4 mb-5">
-        <div className="w-12 h-12 rounded-xl bg-gray-700/50"></div>
-        <div className="flex-1 space-y-2">
-          <div className="h-3 w-24 bg-gray-700/50 rounded"></div>
-          <div className="h-4 w-48 bg-gray-700/50 rounded"></div>
-          <div className="h-6 w-20 bg-gray-700/50 rounded-full"></div>
-        </div>
-      </div>
-      <div className="space-y-3">
-        {[1, 2, 3, 4].map(i => (
-          <div key={i} className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-800/30">
-            <div className="h-3 w-24 bg-gray-700/50 rounded"></div>
-            <div className="h-3 w-32 bg-gray-700/50 rounded"></div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 
   const handleStarChat = (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -3384,17 +3363,7 @@ No preamble. Start directly with section 1.`;
                         return (
                           <div key={cardKey} className="mt-2 rounded-xl border border-gray-700/50 bg-gray-900/95 backdrop-blur-xl overflow-hidden w-full">
                             {analysis.loading ? (
-                              <div className="p-4 space-y-3">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                  <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                  <div className="w-1.5 h-1.5 bg-blue-500/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                                  <span className="text-[11px] text-gray-400 ml-1">Analyzing {card.type === 'kalshi' ? 'prediction market' : 'opportunity'}...</span>
-                                </div>
-                                <div className="h-2 bg-gray-700/40 rounded-full animate-pulse w-full" />
-                                <div className="h-2 bg-gray-700/40 rounded-full animate-pulse w-5/6" />
-                                <div className="h-2 bg-gray-700/40 rounded-full animate-pulse w-3/5" />
-                              </div>
+                              <CardAnalysisSkeleton cardType={card.type} />
                             ) : analysis.error ? (
                               <div className="p-4 flex items-center gap-2 text-xs text-red-400">
                                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />

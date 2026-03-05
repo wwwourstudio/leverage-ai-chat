@@ -245,7 +245,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const abortControllerRef = useRef<AbortController | null>(null);
   const [verifyStage, setVerifyStage] = useState<'analyzing' | 'reverifying'>('analyzing');
   const [cardAnalysisMap, setCardAnalysisMap] = useState<Record<string, { loading: boolean; content: string | null; error: string | null }>>({});
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatSearch, setChatSearch] = useState('');
   const [activeChat, setActiveChat] = useState('chat-1');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -2763,69 +2763,83 @@ No preamble. Start directly with section 1.`;
         </div>
       )}
       
-      {/* Sidebar */}
-      <Sidebar
-        open={sidebarOpen}
-        onNewChat={handleNewChat}
-        chatSearch={chatSearch}
-        setChatSearch={setChatSearch}
-        activeChat={activeChat}
-        onSelectChat={handleSelectChat}
-        selectedCategory={selectedCategory}
-        setSelectedCategory={setSelectedCategory}
-        selectedSport={selectedSport}
-        setSelectedSport={setSelectedSport}
-        filteredChats={filteredChats}
-        editingChatId={editingChatId}
-        editingChatTitle={editingChatTitle}
-        setEditingChatTitle={setEditingChatTitle}
-        onEditChatTitle={handleEditChatTitle}
-        onSaveChatTitle={handleSaveChatTitle}
-        onKeyDownChatTitle={handleKeyDownChatTitle}
-        onStarChat={handleStarChat}
-        onDeleteChat={handleDeleteChat}
-        categories={categories}
-        sports={sports}
-        setSuggestedPrompts={setSuggestedPrompts}
-        setLastUserQuery={setLastUserQuery}
-        user={user}
-      />
+      {/* Mobile backdrop — closes sidebar when tapping outside */}
+      {sidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar wrapper — overlay on mobile, flex item on desktop */}
+      <div className={`flex-shrink-0 transition-all duration-300 ease-in-out max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 ${sidebarOpen ? 'max-md:w-72' : 'max-md:w-0 max-md:overflow-hidden'}`}>
+        <Sidebar
+          open={sidebarOpen}
+          onNewChat={handleNewChat}
+          chatSearch={chatSearch}
+          setChatSearch={setChatSearch}
+          activeChat={activeChat}
+          onSelectChat={handleSelectChat}
+          selectedCategory={selectedCategory}
+          setSelectedCategory={setSelectedCategory}
+          selectedSport={selectedSport}
+          setSelectedSport={setSelectedSport}
+          filteredChats={filteredChats}
+          editingChatId={editingChatId}
+          editingChatTitle={editingChatTitle}
+          setEditingChatTitle={setEditingChatTitle}
+          onEditChatTitle={handleEditChatTitle}
+          onSaveChatTitle={handleSaveChatTitle}
+          onKeyDownChatTitle={handleKeyDownChatTitle}
+          onStarChat={handleStarChat}
+          onDeleteChat={handleDeleteChat}
+          categories={categories}
+          sports={sports}
+          setSuggestedPrompts={setSuggestedPrompts}
+          setLastUserQuery={setLastUserQuery}
+          user={user}
+          onUserClick={() => setShowUserLightbox(true)}
+        />
+      </div>
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-black via-gray-950 to-black">
         {/* Header */}
-        <div className="relative bg-gradient-to-r from-gray-950 via-gray-900 to-gray-950 border-b border-gray-800/50 px-6 py-4 shadow-2xl backdrop-blur-xl">
+        <div className="relative bg-gradient-to-r from-gray-950 via-gray-900 to-gray-950 border-b border-gray-800/50 px-3 py-3 md:px-6 md:py-4 shadow-2xl backdrop-blur-xl">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-transparent to-transparent pointer-events-none"></div>
           <div className="relative flex items-center justify-between max-w-6xl mx-auto">
-            <div className="flex items-center gap-4">
+            {/* Left: hamburger + logo */}
+            <div className="flex items-center gap-2 md:gap-4">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="group p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 border border-gray-800 hover:border-gray-700 hover:shadow-lg active:scale-95 border-none bg-transparent"
+                className="group p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 active:scale-95 bg-transparent"
               >
                 <Menu className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" />
               </button>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 md:gap-3">
                 {/* Logo mark */}
                 <div className="relative">
                   <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 blur-md opacity-40" />
-                  <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                    <TrendingUp className="w-4.5 h-4.5 text-white" />
+                  <div className="relative w-8 h-8 md:w-9 md:h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <TrendingUp className="w-4 h-4 text-white" />
                   </div>
                 </div>
                 <div className="flex flex-col leading-none gap-0.5">
-                  <h1 className="text-base font-black tracking-tight text-white">
+                  <h1 className="text-sm md:text-base font-black tracking-tight text-white">
                     Leverage<span className="text-blue-400"> AI</span>
                   </h1>
-                  <p className="text-[10px] font-semibold text-gray-600 tracking-widest uppercase">Sports Intelligence</p>
+                  <p className="hidden sm:block text-[10px] font-semibold text-gray-600 tracking-widest uppercase">Sports Intelligence</p>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+
+            {/* Right: user card (desktop only) + bell + settings / auth buttons */}
+            <div className="flex items-center gap-2 md:gap-3">
               {isLoggedIn && user ? (
                 <>
-                  {/* User Profile Info */}
+                  {/* User profile card — hidden on mobile, use sidebar avatar instead */}
                   <div
-                    className="flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 hover:bg-gray-800/50 transition-all"
+                    className="hidden md:flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 hover:bg-gray-800/50 transition-all"
                     onClick={() => setShowUserLightbox(true)}
                   >
                     <div className="flex items-center gap-2.5">
@@ -2846,33 +2860,31 @@ No preamble. Start directly with section 1.`;
                     </div>
                   </div>
 
-                  {/* Notifications and Settings for logged-in users */}
                   <button
                     onClick={() => setShowAlertsLightbox(true)}
-                    className="relative p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 border border-gray-800 hover:border-gray-700 hover:shadow-lg group active:scale-95 border-none bg-transparent"
+                    className="relative p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
                   >
                     <Bell className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" />
                     <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-gray-950 shadow-lg shadow-red-500/50 animate-pulse"></div>
                   </button>
                   <button
                     onClick={() => setShowSettingsLightbox(true)}
-                    className="p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 border border-gray-800 hover:border-gray-700 hover:shadow-lg group active:scale-95 border-none bg-transparent"
+                    className="p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
                   >
-                    <Settings className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors group-hover:rotate-90 transition-transform" />
+                    <Settings className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" />
                   </button>
                 </>
               ) : (
                 <>
-                  {/* Login and Sign Up buttons for non-authenticated users */}
                   <button
                     onClick={() => setShowLoginModal(true)}
-                    className="px-4 py-2 rounded-xl border border-gray-800 bg-gray-900/50 hover:bg-gray-800/70 hover:border-gray-700 text-gray-300 hover:text-white text-sm font-semibold transition-all"
+                    className="px-3 py-1.5 md:px-4 md:py-2 rounded-xl border border-gray-800 bg-gray-900/50 hover:bg-gray-800/70 hover:border-gray-700 text-gray-300 hover:text-white text-xs md:text-sm font-semibold transition-all"
                   >
                     Log in
                   </button>
                   <button
                     onClick={() => setShowSignupModal(true)}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-sm font-bold transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40"
+                    className="px-3 py-1.5 md:px-4 md:py-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-xs md:text-sm font-bold transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40"
                   >
                     Sign up
                   </button>
@@ -4037,38 +4049,56 @@ No preamble. Start directly with section 1.`;
                 </div>
               )}
 
-            <form onSubmit={handleSubmit} className="flex gap-3">
+            <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-3">
+              {/* Hidden File Input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/jpg,image/gif,image/webp,text/csv,.tsv,text/tab-separated-values,text/plain,.txt,.json,application/json,.pdf,application/pdf"
+                multiple
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+
+              {/* Attach button — visible outside input on mobile for easy tapping */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="md:hidden flex-shrink-0 p-3 rounded-xl bg-gray-900/90 border border-gray-700/50 hover:border-gray-600 active:scale-95 transition-all"
+                style={{ minHeight: '52px', minWidth: '52px' }}
+                title="Attach file"
+                disabled={isTyping}
+              >
+                <Paperclip className="w-5 h-5 text-gray-400" />
+              </button>
+
               <div className="flex-1 relative group/input focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:shadow-lg focus-within:shadow-blue-500/10 rounded-2xl transition-all duration-300">
-                {/* Hidden File Input */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/jpg,image/gif,image/webp,text/csv,.tsv,text/tab-separated-values,text/plain,.txt,.json,application/json,.pdf,application/pdf"
-                  multiple
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                
-                <input
-                  type="text"
+                <textarea
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      handleSubmit(e as React.FormEvent<HTMLInputElement>);
+                      handleSubmit(e as any);
                     }
                   }}
                   placeholder={
                     lastUserQuery
                       ? `Follow up on your ${lastUserQuery.toLowerCase().includes('nba') ? 'NBA' : lastUserQuery.toLowerCase().includes('nfl') ? 'NFL' : lastUserQuery.toLowerCase().includes('kalshi') ? 'Kalshi' : lastUserQuery.toLowerCase().includes('dfs') ? 'DFS' : lastUserQuery.toLowerCase().includes('fantasy') ? 'fantasy' : 'sports'} analysis or ask something new...`
-                      : 'Ask about betting odds, fantasy strategy, DFS lineups, or Kalshi markets...'
+                      : 'Ask about betting odds, fantasy, DFS, or Kalshi markets...'
                   }
-                  className="w-full bg-gray-900/90 border border-gray-700/50 hover:border-gray-600/60 focus:border-blue-500/40 rounded-2xl px-6 py-4.5 pr-32 font-medium text-white placeholder-gray-500 focus:outline-none transition-all backdrop-blur-sm shadow-inner text-sm"
+                  className="w-full bg-gray-900/90 border border-gray-700/50 hover:border-gray-600/60 focus:border-blue-500/40 rounded-2xl px-4 py-3.5 md:px-6 md:pr-32 font-medium text-white placeholder-gray-500 focus:outline-none transition-all backdrop-blur-sm shadow-inner text-base leading-relaxed resize-none overflow-hidden"
                   disabled={isTyping}
                   maxLength={500}
+                  rows={1}
+                  style={{ minHeight: '52px', maxHeight: '160px' }}
                 />
-                <div className="absolute right-5 top-1/2 -translate-y-1/2 flex items-center gap-3">
+                {/* Attach + char count — inside input on desktop only */}
+                <div className="hidden md:flex absolute right-5 top-1/2 -translate-y-1/2 items-center gap-3">
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
@@ -4083,24 +4113,27 @@ No preamble. Start directly with section 1.`;
                   </span>
                 </div>
               </div>
+
               {isTyping ? (
                 <button
                   type="button"
                   onClick={stopGeneration}
-                  className="relative bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white rounded-2xl px-8 py-4.5 transition-all duration-300 shadow-xl shadow-red-900/30 flex items-center gap-2.5 font-bold group overflow-hidden hover:scale-[1.02] active:scale-95"
+                  className="flex-shrink-0 relative bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white rounded-2xl px-4 md:px-8 transition-all duration-300 shadow-xl shadow-red-900/30 flex items-center gap-2.5 font-bold group overflow-hidden active:scale-95"
+                  style={{ minHeight: '52px' }}
                 >
                   <X className="w-5 h-5 relative z-10" />
-                  <span className="text-sm relative z-10 tracking-wide">Stop</span>
+                  <span className="hidden md:inline text-sm relative z-10 tracking-wide">Stop</span>
                 </button>
               ) : (
                 <button
                   type="submit"
                   disabled={(!input.trim() && uploadedFiles.length === 0)}
-                  className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-800 disabled:to-gray-900 disabled:cursor-not-allowed text-white rounded-2xl px-8 py-4.5 transition-all duration-300 shadow-xl shadow-blue-500/25 hover:shadow-blue-500/50 hover:shadow-2xl disabled:shadow-none flex items-center gap-2.5 font-bold group overflow-hidden hover:scale-[1.02] active:scale-95 disabled:hover:scale-100"
+                  className="flex-shrink-0 relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-800 disabled:to-gray-900 disabled:cursor-not-allowed text-white rounded-2xl px-4 md:px-8 transition-all duration-300 shadow-xl shadow-blue-500/25 hover:shadow-blue-500/50 disabled:shadow-none flex items-center gap-2.5 font-bold group overflow-hidden active:scale-95 disabled:hover:scale-100"
+                  style={{ minHeight: '52px' }}
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-                  <Send className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
-                  <span className="text-sm relative z-10 tracking-wide">Analyze</span>
+                  <Send className="w-5 h-5 relative z-10" />
+                  <span className="hidden md:inline text-sm relative z-10 tracking-wide">Analyze</span>
                 </button>
               )}
             </form>

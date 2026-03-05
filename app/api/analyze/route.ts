@@ -306,11 +306,11 @@ export async function POST(request: NextRequest) {
     // ADP queries override to grok-4: reliable tool use requires the stronger model.
     // isAmbiguous queries only need a short clarification reply — no need for grok-4.
     const useFastPath = hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context));
-    const primaryModel = useFastPath ? 'grok-3-mini' : AI_CONFIG.MODEL_NAME;
+    const primaryModel = useFastPath ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.MODEL_NAME;
     // Always log the resolved model so failures are immediately traceable in Vercel logs
     console.log(`[API/analyze] Model selected: ${primaryModel} (fastPath=${useFastPath}, hasADPIntent=${hasADPIntent})`);
     if (useFastPath) {
-      console.log(`[API/analyze] Fast-path routing → grok-3-mini (intent: DFS/fantasy/file/offseason)`);
+      console.log(`[API/analyze] Fast-path routing → ${AI_CONFIG.FAST_MODEL_NAME} (intent: DFS/fantasy/file/offseason)`);
     }
 
     // ── ADP tool (injected when hasADPIntent) ────────────────────────────────────
@@ -485,9 +485,9 @@ export async function POST(request: NextRequest) {
 
             const retryResult = await Promise.race([
               generateText({
-                // Always use grok-3-mini for retries — avoids double-timeout when
+                // Always use the fast model for retries — avoids double-timeout when
                 // the primary model already consumed most of the time budget.
-                model: createXai({ apiKey: xaiApiKey })('grok-3-mini'),
+                model: createXai({ apiKey: xaiApiKey })(AI_CONFIG.FAST_MODEL_NAME),
                 system: systemPrompt,
                 prompt: retryPrompt,
                 // Lower temperature on retries to reduce hallucination likelihood
@@ -511,11 +511,11 @@ export async function POST(request: NextRequest) {
           );
         }
       } catch (aiError) {
-        // If primary model fails (e.g. timeout or API error), try grok-3-mini before giving up.
-        // IMPORTANT: If we're already on the fast path (grok-3-mini was primary), skip the
-        // fallback retry entirely — it would just time out a second time and waste 10s.
-        const fallbackModel = 'grok-3-mini';
-        const alreadyFast = useFastPath; // grok-3-mini was already the primary
+        // If primary model fails (e.g. timeout or API error), try the fast model before giving up.
+        // IMPORTANT: If we're already on the fast path, skip the fallback retry entirely —
+        // it would just time out a second time and waste the remaining budget.
+        const fallbackModel = AI_CONFIG.FAST_MODEL_NAME;
+        const alreadyFast = useFastPath;
         // Log the full error object (not just message) so model-not-found / 401 / 404
         // errors from the xAI API are visible in Vercel logs — not silently swallowed.
         console.error(

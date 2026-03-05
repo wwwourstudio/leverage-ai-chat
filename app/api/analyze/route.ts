@@ -307,6 +307,8 @@ export async function POST(request: NextRequest) {
     // isAmbiguous queries only need a short clarification reply — no need for grok-4.
     const useFastPath = hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context));
     const primaryModel = useFastPath ? 'grok-3-fast' : AI_CONFIG.MODEL_NAME;
+    // Always log the resolved model so failures are immediately traceable in Vercel logs
+    console.log(`[API/analyze] Model selected: ${primaryModel} (fastPath=${useFastPath}, hasADPIntent=${hasADPIntent})`);
     if (useFastPath) {
       console.log(`[API/analyze] Fast-path routing → grok-3-fast (intent: DFS/fantasy/file/offseason)`);
     }
@@ -514,7 +516,14 @@ export async function POST(request: NextRequest) {
         // fallback retry entirely — it would just time out a second time and waste 10s.
         const fallbackModel = 'grok-3-fast';
         const alreadyFast = useFastPath; // grok-3-fast was already the primary
-        console.warn(`[API/analyze] ${primaryModel} failed, retrying with ${alreadyFast ? 'static fallback (already on fast path)' : fallbackModel}:`, aiError instanceof Error ? aiError.message : aiError);
+        // Log the full error object (not just message) so model-not-found / 401 / 404
+        // errors from the xAI API are visible in Vercel logs — not silently swallowed.
+        console.error(
+          `[API/analyze] Primary model "${primaryModel}" failed — full error:`,
+          aiError,
+          '| Retrying with:',
+          alreadyFast ? 'static fallback (already on fast path)' : fallbackModel,
+        );
         if (!alreadyFast) {
           try {
             const fallbackTimeoutPromise = new Promise<never>((_, reject) => {

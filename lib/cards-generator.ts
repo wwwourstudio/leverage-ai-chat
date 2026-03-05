@@ -839,9 +839,10 @@ async function _generateContextualCards(
       console.error('[v0] [CARDS-GEN] Kalshi API error:', error);
     }
 
-    // Fallback placeholder
+    // Fallback placeholder — use canonical CARD_TYPES.KALSHI_MARKET so DynamicCardRenderer
+    // routes this correctly, rather than a bare 'PREDICTION_MARKET' string literal.
     cards.push({
-      type: 'PREDICTION_MARKET',
+      type: CARD_TYPES.KALSHI_MARKET,
       title: 'Kalshi Markets Unavailable',
       icon: 'BarChart',
       category: 'KALSHI',

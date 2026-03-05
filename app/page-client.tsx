@@ -410,23 +410,15 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     try {
       const supabase = createClient();
 
-      // Fetch profile credits and purchased credits in parallel
-      const [profileResult, creditsResult] = await Promise.all([
+      // Use /api/credits for user_credits (server route bypasses RLS 403 that affects browser client).
+      // Fetch profile and credits in parallel.
+      const [profileResult, creditsJson] = await Promise.all([
         supabase.from('user_profiles').select('id, credits_remaining').eq('user_id', authId).single(),
-        supabase.from('user_credits').select('balance').eq('user_id', authId).single(),
+        fetch('/api/credits').then(r => r.json()).catch(() => ({ success: false, credits: 0 })),
       ]);
 
       const profile = profileResult.data;
-      // Suppress 404-class errors: user_credits table may not be migrated yet — fallback is fine
-      if (creditsResult.error) {
-        const isMissingTable = creditsResult.error.message?.toLowerCase().includes('does not exist')
-          || (creditsResult.error as any).code === '42P01'
-          || (creditsResult.error as any).code === 'PGRST200';
-        if (!isMissingTable) {
-          console.warn('[Credits] user_credits query failed:', creditsResult.error.message);
-        }
-      }
-      const purchasedBalance = creditsResult.data?.balance ?? 0;
+      const purchasedBalance: number = creditsJson?.credits ?? 0;
 
       if (profile) {
         setSupabaseProfileId(profile.id);

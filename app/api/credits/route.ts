@@ -21,7 +21,7 @@ export async function GET() {
     // Try user_credits table first
     const { data, error } = await supabase
       .from('user_credits')
-      .select('credits, updated_at')
+      .select('balance, updated_at')
       .eq('user_id', user.id)
       .single();
 
@@ -30,13 +30,13 @@ export async function GET() {
       const DEFAULT_CREDITS = 10;
       await supabase
         .from('user_credits')
-        .upsert({ user_id: user.id, credits: DEFAULT_CREDITS, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+        .upsert({ user_id: user.id, balance: DEFAULT_CREDITS, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
         .select()
         .single();
       return NextResponse.json({ success: true, credits: DEFAULT_CREDITS, source: 'initialized' });
     }
 
-    return NextResponse.json({ success: true, credits: data.credits, source: 'database', updatedAt: data.updated_at });
+    return NextResponse.json({ success: true, credits: data.balance, source: 'database', updatedAt: data.updated_at });
   } catch (err) {
     console.error('[API/credits GET]', err);
     return NextResponse.json({ success: false, credits: 0, error: 'Failed to load credits' });
@@ -61,11 +61,11 @@ export async function POST(req: NextRequest) {
     // Read current balance
     const { data: current } = await supabase
       .from('user_credits')
-      .select('credits')
+      .select('balance')
       .eq('user_id', user.id)
       .single();
 
-    const currentCredits = current?.credits ?? 0;
+    const currentCredits = current?.balance ?? 0;
 
     if (action === 'consume') {
       if (currentCredits < amount) {
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       const newBalance = currentCredits - amount;
       await supabase
         .from('user_credits')
-        .upsert({ user_id: user.id, credits: newBalance, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+        .upsert({ user_id: user.id, balance: newBalance, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
       return NextResponse.json({ success: true, credits: newBalance, consumed: amount });
     }
 
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
       const newBalance = currentCredits + amount;
       await supabase
         .from('user_credits')
-        .upsert({ user_id: user.id, credits: newBalance, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+        .upsert({ user_id: user.id, balance: newBalance, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
       return NextResponse.json({ success: true, credits: newBalance, added: amount });
     }
 

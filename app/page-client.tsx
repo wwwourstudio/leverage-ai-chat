@@ -71,6 +71,9 @@ interface APIResponse<T = any> {
   useFallback?: boolean; // Flag to indicate fallback mode was used
   details?: string; // Additional error or diagnostic details
   errorType?: string; // Type of error that occurred
+  clarificationNeeded?: boolean;
+  clarificationOptions?: string[];
+  processingTime?: number;
 }
 
 interface OddsEvent {
@@ -96,6 +99,11 @@ interface TrustMetrics {
   }>;
   riskLevel: 'low' | 'medium' | 'high';
   adjustedTone?: string;
+  modelUsed?: string;
+  sources?: Array<{ name: string; type: string; reliability: number }>;
+  processingTime?: number;
+  hasLiveOdds?: boolean;
+  hasKalshi?: boolean;
 }
 
 interface Message {
@@ -271,6 +279,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [selectedSport, setSelectedSport] = useState<string>('');
   const [cardsRefreshedAt, setCardsRefreshedAt] = useState<Date | null>(null);
   const cardsRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Tracks an in-flight createThread() call so saveMessage can await it instead of
+  // firing against a placeholder ID ('chat-1' or 'chat-{timestamp}').
+  const pendingThreadRef = useRef<Promise<import('@/lib/chat-service').ChatThread | null> | null>(null);
 
   // Fantasy league setup state — must NOT read localStorage here (causes SSR hydration mismatch #418)
   interface FantasyLeague {
@@ -1518,14 +1529,39 @@ No preamble. Start directly with section 1.`;
       // Add message to state
       setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
 
-      // Persist both messages to Supabase (fire-and-forget)
+      // Persist both messages to Supabase (fire-and-forget).
+      // Guard: only save when we have a real Supabase UUID — not a placeholder like
+      // 'chat-1' or 'chat-{timestamp}'. If a thread creation is in-flight (pendingThreadRef),
+      // await it; if there is no pending thread at all (first-ever message scenario),
+      // create one on the fly.
       if (isLoggedIn) {
-        saveMessage(activeChat, { role: 'user', content: userMessage });
-        saveMessage(activeChat, {
-          role: 'assistant',
-          content: newMessage.content,
-          model_used: newMessage.modelUsed,
-          confidence: newMessage.confidence,
+        const capturedChat = activeChat;
+        const capturedMsg = newMessage;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(capturedChat);
+        const resolveThreadId = async (): Promise<string | null> => {
+          if (isUuid) return capturedChat;
+          if (pendingThreadRef.current) {
+            const created = await pendingThreadRef.current;
+            return created?.id ?? null;
+          }
+          // First-ever message — no thread exists yet; create one now
+          const category = selectedCategory === 'all' ? 'betting' : selectedCategory;
+          const created = await createThread(category, userMessage.slice(0, 50));
+          if (created) {
+            setChats(prev => prev.map(c => c.id === capturedChat ? { ...c, id: created.id } : c));
+            setActiveChat(created.id);
+          }
+          return created?.id ?? null;
+        };
+        resolveThreadId().then(threadId => {
+          if (!threadId) return;
+          saveMessage(threadId, { role: 'user', content: userMessage });
+          saveMessage(threadId, {
+            role: 'assistant',
+            content: capturedMsg.content,
+            model_used: capturedMsg.modelUsed,
+            confidence: capturedMsg.confidence,
+          });
         });
       }
 
@@ -2121,9 +2157,13 @@ No preamble. Start directly with section 1.`;
       }
     ]);
 
-    // For logged-in users, persist the new thread to Supabase and swap in the real UUID
+    // For logged-in users, persist the new thread to Supabase and swap in the real UUID.
+    // Store the promise so saveMessage can await it rather than firing against a temp ID.
     if (isLoggedIn) {
-      createThread(chatCategory, chatTitle).then(created => {
+      const threadPromise = createThread(chatCategory, chatTitle);
+      pendingThreadRef.current = threadPromise;
+      threadPromise.then(created => {
+        pendingThreadRef.current = null;
         if (created) {
           // Swap the temp ID for the real Supabase UUID
           setChats(prev => prev.map(c => c.id === newChatId ? { ...c, id: created.id } : c));
@@ -2470,7 +2510,7 @@ No preamble. Start directly with section 1.`;
     });
   
   // Platform-specific AI-powered prompt suggestions
-  const platformPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }>> = {
+  const platformPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string; query?: string }>> = {
     all: [
       { label: 'Cross-platform arbitrage opportunities', icon: Sparkles, category: 'all' },
       { label: 'Today\'s best value plays across all platforms', icon: TrendingUp, category: 'all' },
@@ -3329,8 +3369,8 @@ No preamble. Start directly with section 1.`;
                         cards={message.cards}
                         aiInsight={message.content}
                         onAnalyze={(card) => {
-                          const cardIndex = message.cards!.indexOf(card);
-                          generateCardAnalysis(card, `${index}-${cardIndex}`);
+                          const cardIndex = message.cards!.indexOf(card as InsightCard);
+                          generateCardAnalysis(card as InsightCard, `${index}-${cardIndex}`);
                         }}
                         messageIndex={index}
                       />

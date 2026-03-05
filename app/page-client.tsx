@@ -2776,8 +2776,8 @@ No preamble. Start directly with section 1.`;
         />
       )}
 
-      {/* Sidebar wrapper — overlay on mobile, flex item on desktop */}
-      <div className={`flex-shrink-0 transition-all duration-300 ease-in-out max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 ${sidebarOpen ? 'max-md:w-72' : 'max-md:w-0 max-md:overflow-hidden'}`}>
+      {/* Sidebar wrapper — overlay when open on mobile, icon rail in flow when closed */}
+      <div className={`flex-shrink-0 transition-all duration-300 ease-in-out${sidebarOpen ? ' max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-72' : ''}`}>
         <Sidebar
           open={sidebarOpen}
           onNewChat={handleNewChat}
@@ -3964,7 +3964,7 @@ No preamble. Start directly with section 1.`;
                         generateRealResponse(submitText);
                       }, 0);
                     }}
-                    className={`group/prompt flex items-center gap-2.5 px-4 py-2.5 rounded-full border text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                    className={`group/prompt flex items-center gap-1.5 md:gap-2.5 px-2.5 md:px-4 py-1 md:py-2.5 rounded-full border text-xs md:text-sm font-medium whitespace-nowrap transition-all duration-200 ${
                       isSuggested
                         ? 'bg-gray-900/60 border-blue-500/50 text-gray-200 hover:bg-gradient-to-r hover:from-blue-600/20 hover:via-purple-600/20 hover:to-blue-600/20 hover:border-blue-400/70'
                         : selectedCategory === 'kalshi'
@@ -3972,7 +3972,7 @@ No preamble. Start directly with section 1.`;
                           : 'bg-gray-900/60 border-gray-800/70 text-gray-400 hover:bg-gray-800/70 hover:border-gray-700 hover:text-gray-200'
                     }`}
                   >
-                    <Icon className={`w-4 h-4 ${
+                    <Icon className={`w-3 h-3 md:w-4 md:h-4 flex-shrink-0 ${
                       isSuggested ? 'text-gray-400 group-hover/prompt:text-blue-400'
                       : selectedCategory === 'kalshi' ? 'text-cyan-600 group-hover/prompt:text-cyan-400'
                       : 'text-gray-500 group-hover/prompt:text-gray-400'
@@ -4069,12 +4069,12 @@ No preamble. Start directly with section 1.`;
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="md:hidden flex-shrink-0 p-3 rounded-xl bg-gray-900/90 border border-gray-700/50 hover:border-gray-600 active:scale-95 transition-all"
-                style={{ minHeight: '52px', minWidth: '52px' }}
+                className="md:hidden flex-shrink-0 p-2 rounded-xl bg-gray-900/90 border border-gray-700/50 hover:border-gray-600 active:scale-95 transition-all"
+                style={{ minHeight: '44px', minWidth: '44px' }}
                 title="Attach file"
                 disabled={isTyping}
               >
-                <Paperclip className="w-5 h-5 text-gray-400" />
+                <Paperclip className="w-4 h-4 text-gray-400" />
               </button>
 
               <div className="flex-1 relative group/input focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:shadow-lg focus-within:shadow-blue-500/10 rounded-2xl transition-all duration-300">
@@ -4096,11 +4096,11 @@ No preamble. Start directly with section 1.`;
                       ? `Follow up on your ${lastUserQuery.toLowerCase().includes('nba') ? 'NBA' : lastUserQuery.toLowerCase().includes('nfl') ? 'NFL' : lastUserQuery.toLowerCase().includes('kalshi') ? 'Kalshi' : lastUserQuery.toLowerCase().includes('dfs') ? 'DFS' : lastUserQuery.toLowerCase().includes('fantasy') ? 'fantasy' : 'sports'} analysis or ask something new...`
                       : 'Ask about betting odds, fantasy, DFS, or Kalshi markets...'
                   }
-                  className="w-full bg-gray-900/90 border border-gray-700/50 hover:border-gray-600/60 focus:border-blue-500/40 rounded-2xl px-4 py-3.5 md:px-6 md:pr-32 font-medium text-white placeholder-gray-500 focus:outline-none transition-all backdrop-blur-sm shadow-inner text-base leading-relaxed resize-none overflow-hidden"
+                  className="w-full bg-gray-900/90 border border-gray-700/50 hover:border-gray-600/60 focus:border-blue-500/40 rounded-2xl px-3 py-2.5 md:px-6 md:pr-32 font-medium text-white placeholder-gray-500 focus:outline-none transition-all backdrop-blur-sm shadow-inner text-sm md:text-base leading-relaxed resize-none overflow-hidden"
                   disabled={isTyping}
                   maxLength={500}
                   rows={1}
-                  style={{ minHeight: '52px', maxHeight: '160px' }}
+                  style={{ minHeight: '44px', maxHeight: '160px' }}
                 />
                 {/* Attach + char count — inside input on desktop only */}
                 <div className="hidden md:flex absolute right-5 top-1/2 -translate-y-1/2 items-center gap-3">
@@ -4123,8 +4123,8 @@ No preamble. Start directly with section 1.`;
                 <button
                   type="button"
                   onClick={stopGeneration}
-                  className="flex-shrink-0 relative bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white rounded-2xl px-4 md:px-8 transition-all duration-300 shadow-xl shadow-red-900/30 flex items-center gap-2.5 font-bold group overflow-hidden active:scale-95"
-                  style={{ minHeight: '52px' }}
+                  className="flex-shrink-0 relative bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white rounded-2xl px-3 md:px-8 transition-all duration-300 shadow-xl shadow-red-900/30 flex items-center gap-2.5 font-bold group overflow-hidden active:scale-95"
+                  style={{ minHeight: '44px' }}
                 >
                   <X className="w-5 h-5 relative z-10" />
                   <span className="hidden md:inline text-sm relative z-10 tracking-wide">Stop</span>
@@ -4133,8 +4133,8 @@ No preamble. Start directly with section 1.`;
                 <button
                   type="submit"
                   disabled={(!input.trim() && uploadedFiles.length === 0)}
-                  className="flex-shrink-0 relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-800 disabled:to-gray-900 disabled:cursor-not-allowed text-white rounded-2xl px-4 md:px-8 transition-all duration-300 shadow-xl shadow-blue-500/25 hover:shadow-blue-500/50 disabled:shadow-none flex items-center gap-2.5 font-bold group overflow-hidden active:scale-95 disabled:hover:scale-100"
-                  style={{ minHeight: '52px' }}
+                  className="flex-shrink-0 relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-800 disabled:to-gray-900 disabled:cursor-not-allowed text-white rounded-2xl px-3 md:px-8 transition-all duration-300 shadow-xl shadow-blue-500/25 hover:shadow-blue-500/50 disabled:shadow-none flex items-center gap-2.5 font-bold group overflow-hidden active:scale-95 disabled:hover:scale-100"
+                  style={{ minHeight: '44px' }}
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
                   <Send className="w-5 h-5 relative z-10" />
@@ -4144,27 +4144,28 @@ No preamble. Start directly with section 1.`;
             </form>
             </div>{/* end drag-and-drop wrapper */}
 
-            <div className="flex items-center justify-between mt-4 px-1">
-              <p className="text-[11px] font-bold text-gray-600">
+            <div className="flex items-center justify-between mt-2 px-1">
+              <p className="hidden sm:block text-[10px] font-bold text-gray-600">
                 Betting • Fantasy • DFS • Kalshi • Real-time AI Analysis
               </p>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 ml-auto">
                 <button
                   onClick={() => setShowStripeLightbox(true)}
-                  className={`flex items-center gap-2 text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all cursor-pointer hover:opacity-80 ${
+                  className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-md border transition-all cursor-pointer hover:opacity-80 ${
                   creditsRemaining <= 3
                     ? 'text-orange-400 bg-orange-500/10 border-orange-500/30'
                     : 'text-gray-500 bg-gray-900/30 border-gray-800'
                 }`}>
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>{creditsRemaining} {creditsRemaining === 1 ? 'credit' : 'credits'} remaining</span>
+                  <Sparkles className="w-3 h-3" />
+                  <span>{creditsRemaining} {creditsRemaining === 1 ? 'credit' : 'credits'}</span>
                 </button>
-                <div className="flex items-center gap-2 text-[11px] font-bold text-gray-600">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-600">
                   <div className="relative flex items-center justify-center">
                     <div className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-lg shadow-green-500/50"></div>
                     <div className="absolute inset-0 bg-green-400 rounded-full animate-ping"></div>
                   </div>
-                  <span>All systems operational</span>
+                  <span className="hidden sm:inline">All systems operational</span>
+                  <span className="sm:hidden">Online</span>
                 </div>
               </div>
             </div>

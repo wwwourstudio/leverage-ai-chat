@@ -2970,9 +2970,9 @@ No preamble. Start directly with section 1.`;
                       <div className="space-y-3">
               <textarea
                 ref={textareaRef}
-                value={input}
+                value={editingContent}
                 onChange={(e) => {
-                  setInput(e.target.value);
+                  setEditingContent(e.target.value);
                   adjustTextareaHeight();
                 }}
                 onKeyDown={handleKeyDown}

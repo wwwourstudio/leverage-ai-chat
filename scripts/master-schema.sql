@@ -785,20 +785,20 @@ $$;
 -- 15. ENABLE REALTIME SUBSCRIPTIONS
 -- ============================================================================
 
--- Core live data
-ALTER PUBLICATION supabase_realtime ADD TABLE live_odds_cache;
-ALTER PUBLICATION supabase_realtime ADD TABLE line_movement;
-ALTER PUBLICATION supabase_realtime ADD TABLE arbitrage_opportunities;
-ALTER PUBLICATION supabase_realtime ADD TABLE player_props_markets;
-ALTER PUBLICATION supabase_realtime ADD TABLE kalshi_markets;
+-- Core live data (idempotent: ignore if already a member)
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE live_odds_cache;        EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE line_movement;           EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE arbitrage_opportunities; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE player_props_markets;    EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE kalshi_markets;          EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Fantasy & alerts live updates
-ALTER PUBLICATION supabase_realtime ADD TABLE fantasy_leagues;
-ALTER PUBLICATION supabase_realtime ADD TABLE fantasy_teams;
-ALTER PUBLICATION supabase_realtime ADD TABLE draft_rooms;
-ALTER PUBLICATION supabase_realtime ADD TABLE draft_picks;
-ALTER PUBLICATION supabase_realtime ADD TABLE waiver_transactions;
-ALTER PUBLICATION supabase_realtime ADD TABLE user_alerts;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE fantasy_leagues;        EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE fantasy_teams;           EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE draft_rooms;             EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE draft_picks;             EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE waiver_transactions;     EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE user_alerts;             EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ============================================================================
 -- 14. CHAT PERSISTENCE
@@ -850,7 +850,7 @@ CREATE POLICY "Thread owner messages" ON chat_messages
   );
 
 -- Enable realtime for live sidebar updates
-ALTER PUBLICATION supabase_realtime ADD TABLE chat_threads;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE chat_threads; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ============================================================================
 -- SUCCESS MESSAGE

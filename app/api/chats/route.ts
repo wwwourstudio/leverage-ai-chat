@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       }
       console.error('[v0] [API/chats] Create error:', error);
       return NextResponse.json(
-        { success: false, error: 'Failed to create chat thread', details: error.message, code: (error as any).code },
+        { success: false, error: 'Failed to create chat thread' },
         { status: HTTP_STATUS.INTERNAL_ERROR }
       );
     }
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error('[v0] [API/chats] POST error:', err);
     return NextResponse.json(
-      { success: false, error: 'Internal server error', details: String(err) },
+      { success: false, error: 'Internal server error' },
       { status: HTTP_STATUS.INTERNAL_ERROR }
     );
   }

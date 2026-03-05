@@ -92,9 +92,9 @@ function shouldUseFastModel(
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   // Per-AI-call timeouts (independent from each other and from card generation):
-  //   grok-4 primary: 22s | grok-3-mini primary: 20s | fallback: 7s
-  // Total worst-case sequential: 22 + 7 = 29s (card generation runs concurrently so adds ~0s).
-  const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 20000 : 22000;
+  //   grok-4 primary: 45s | grok-3-mini primary: 25s | fallback: 12s
+  // Total worst-case sequential: 45 + 12 = 57s (card generation runs concurrently so adds ~0s).
+  const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 25000 : 45000;
 
   try {
     const body: AnalyzeRequestBody = await request.json();
@@ -480,7 +480,7 @@ export async function POST(request: NextRequest) {
 
           try {
             const retryTimeoutPromise = new Promise<never>((_, reject) => {
-              setTimeout(() => reject(new Error('Retry timeout')), 7000); // 7s per retry
+              setTimeout(() => reject(new Error('Retry timeout')), 12000); // 12s per retry
             });
 
             const retryResult = await Promise.race([
@@ -530,7 +530,7 @@ export async function POST(request: NextRequest) {
         const actualFallbackModel = alreadyFast ? AI_CONFIG.MODEL_NAME : fallbackModel;
         try {
           const fallbackTimeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('Fallback timeout')), 7000);
+            setTimeout(() => reject(new Error('Fallback timeout')), 12000);
           });
 
           const fallbackResult = await Promise.race([

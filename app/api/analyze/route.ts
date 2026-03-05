@@ -53,7 +53,7 @@ interface AnalyzeRequestBody {
 // ============================================================================
 
 /**
- * Returns true for query types where grok-3-fast is sufficient and faster:
+ * Returns true for query types where grok-3-mini is sufficient and faster:
  * - DFS lineup questions (no live-odds accuracy needed)
  * - Pure fantasy queries (hasFantasyIntent && !hasBettingIntent)
  * - CSV / file uploads (user's own data, not real-time odds)
@@ -92,7 +92,7 @@ function shouldUseFastModel(
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   // Per-AI-call timeouts (independent from each other and from card generation):
-  //   grok-4 primary: 15s | grok-3-fast primary: 10s | fallback: 8s
+  //   grok-4 primary: 15s | grok-3-mini primary: 10s | fallback: 8s
   // Total worst-case: 15 + 8 = 23s, safely under Vercel's 30s hard limit.
   const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 10000 : 15000;
 
@@ -302,15 +302,15 @@ export async function POST(request: NextRequest) {
     };
 
     // Route DFS, pure-fantasy, file-upload, off-season, and ambiguous queries directly to
-    // grok-3-fast (3-6s). Reserve grok-4 for live-odds betting analysis only.
+    // grok-3-mini (3-6s). Reserve grok-4 for live-odds betting analysis only.
     // ADP queries override to grok-4: reliable tool use requires the stronger model.
     // isAmbiguous queries only need a short clarification reply — no need for grok-4.
     const useFastPath = hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context));
-    const primaryModel = useFastPath ? 'grok-3-fast' : AI_CONFIG.MODEL_NAME;
+    const primaryModel = useFastPath ? 'grok-3-mini' : AI_CONFIG.MODEL_NAME;
     // Always log the resolved model so failures are immediately traceable in Vercel logs
     console.log(`[API/analyze] Model selected: ${primaryModel} (fastPath=${useFastPath}, hasADPIntent=${hasADPIntent})`);
     if (useFastPath) {
-      console.log(`[API/analyze] Fast-path routing → grok-3-fast (intent: DFS/fantasy/file/offseason)`);
+      console.log(`[API/analyze] Fast-path routing → grok-3-mini (intent: DFS/fantasy/file/offseason)`);
     }
 
     // ── ADP tool (injected when hasADPIntent) ────────────────────────────────────
@@ -485,9 +485,9 @@ export async function POST(request: NextRequest) {
 
             const retryResult = await Promise.race([
               generateText({
-                // Always use grok-3-fast for retries — avoids double-timeout when
+                // Always use grok-3-mini for retries — avoids double-timeout when
                 // the primary model already consumed most of the time budget.
-                model: createXai({ apiKey: xaiApiKey })('grok-3-fast'),
+                model: createXai({ apiKey: xaiApiKey })('grok-3-mini'),
                 system: systemPrompt,
                 prompt: retryPrompt,
                 // Lower temperature on retries to reduce hallucination likelihood
@@ -511,11 +511,11 @@ export async function POST(request: NextRequest) {
           );
         }
       } catch (aiError) {
-        // If primary model fails (e.g. timeout or API error), try grok-3-fast before giving up.
-        // IMPORTANT: If we're already on the fast path (grok-3-fast was primary), skip the
+        // If primary model fails (e.g. timeout or API error), try grok-3-mini before giving up.
+        // IMPORTANT: If we're already on the fast path (grok-3-mini was primary), skip the
         // fallback retry entirely — it would just time out a second time and waste 10s.
-        const fallbackModel = 'grok-3-fast';
-        const alreadyFast = useFastPath; // grok-3-fast was already the primary
+        const fallbackModel = 'grok-3-mini';
+        const alreadyFast = useFastPath; // grok-3-mini was already the primary
         // Log the full error object (not just message) so model-not-found / 401 / 404
         // errors from the xAI API are visible in Vercel logs — not silently swallowed.
         console.error(
@@ -542,7 +542,7 @@ export async function POST(request: NextRequest) {
               fallbackTimeoutPromise
             ]);
             aiText = fallbackResult.text;
-            modelUsed = 'Grok 3 Fast (fallback)';
+            modelUsed = 'Grok 3 Mini (fallback)';
             console.log(`[API/analyze] ${fallbackModel} fallback succeeded`);
           } catch (fallbackError) {
             console.error('[API/analyze] Fallback model also failed:', fallbackError instanceof Error ? fallbackError.message : fallbackError);
@@ -551,7 +551,7 @@ export async function POST(request: NextRequest) {
             usedFallback = true;
           }
         } else {
-          // Already used grok-3-fast — go straight to static fallback, no second AI call
+          // Already used grok-3-mini — go straight to static fallback, no second AI call
           aiText = generateFallbackResponse(userMessage, context);
           modelUsed = 'Fallback';
           usedFallback = true;
@@ -651,7 +651,7 @@ export async function POST(request: NextRequest) {
           trustLevel: 'medium' as const,
           riskLevel: 'medium' as const,
           adjustedTone: 'Limited data — AI unavailable',
-          flags: [{ type: 'info', message: 'Using fallback mode — configure XAI_API_KEY for full analysis', severity: 'info' as const }],
+          flags: [{ type: 'info', message: 'Using fallback mode — AI temporarily unavailable', severity: 'info' as const }],
         }
       : detectHallucinations(aiText, userMessage, context.oddsData);
 
@@ -764,16 +764,16 @@ function generateFallbackResponse(
       const away = h2h?.outcomes?.find((o: any) => o.name === e.away_team);
       return `• ${e.away_team} @ ${e.home_team}: ${e.away_team} ${away?.price > 0 ? '+' : ''}${away?.price ?? 'N/A'} / ${e.home_team} ${home?.price > 0 ? '+' : ''}${home?.price ?? 'N/A'}`;
     }).join('\n');
-    return `**Live ${sport} Games (${count} available)**\n\nHere are the current moneylines:\n${sample}\n\n• To unlock AI-powered sharp money analysis, configure XAI_API_KEY in your environment.`;
+    return `**Live ${sport} Games (${count} available)**\n\nHere are the current moneylines:\n${sample}\n\n• For AI-powered sharp money analysis, please try again in a moment.`;
   }
 
   // No live games — give a useful knowledge-based response
   if (context?.noGamesAvailable || (context?.sport && !context?.oddsData)) {
     const sport = context.sport?.toUpperCase() || 'sports';
     if (lowerMsg.includes('offseason') || lowerMsg.includes('trade') || lowerMsg.includes('free agent')) {
-      return `**${sport} Offseason Analysis**\n\n• No live games are scheduled right now, but there's plenty of betting value to track in the offseason.\n• Monitor futures markets — championship odds often offer the best value before spring/summer public betting shifts prices.\n• Track free agency signings and trades: roster changes are the #1 driver of futures line movement.\n• Win totals are set early in the offseason and tend to close toward public perception — sharp bettors target the opening numbers.\n• Configure XAI_API_KEY for AI-powered offseason intelligence.`;
+      return `**${sport} Offseason Analysis**\n\n• No live games are scheduled right now, but there's plenty of betting value to track in the offseason.\n• Monitor futures markets — championship odds often offer the best value before spring/summer public betting shifts prices.\n• Track free agency signings and trades: roster changes are the #1 driver of futures line movement.\n• Win totals are set early in the offseason and tend to close toward public perception — sharp bettors target the opening numbers.`;
     }
-    return `**${sport} Analysis**\n\n• No live games are currently scheduled. ${sport} season games typically post odds 24–48 hours before tip/kickoff.\n• In the meantime, futures markets (division winner, championship odds) are open year-round.\n• This is a great time to research team trends, injury reports, and schedule strength ahead of the season.\n• Configure XAI_API_KEY for full AI-powered analysis.`;
+    return `**${sport} Analysis**\n\n• No live games are currently scheduled. ${sport} season games typically post odds 24–48 hours before tip/kickoff.\n• In the meantime, futures markets (division winner, championship odds) are open year-round.\n• This is a great time to research team trends, injury reports, and schedule strength ahead of the season.`;
   }
 
   // General betting/strategy question
@@ -790,8 +790,8 @@ function generateFallbackResponse(
   }
 
   if (context?.isPoliticalMarket || lowerMsg.includes('kalshi') || lowerMsg.includes('prediction market')) {
-    return `**Kalshi Prediction Markets**\n\n• Kalshi markets are CFTC-regulated event contracts that pay $1 if the event occurs, $0 if not.\n• Prices represent implied probability — 65¢ YES = 65% market probability of that outcome.\n• Look for: markets trading significantly away from your probability estimate.\n• Key categories: elections, economic indicators (CPI, unemployment, Fed rate), weather events, sports championships.\n• Strategy: compare Kalshi prices to Polymarket/PredictIt for cross-market arbitrage.\n• Configure XAI_API_KEY for live Kalshi market intelligence.`;
+    return `**Kalshi Prediction Markets**\n\n• Kalshi markets are CFTC-regulated event contracts that pay $1 if the event occurs, $0 if not.\n• Prices represent implied probability — 65¢ YES = 65% market probability of that outcome.\n• Look for: markets trading significantly away from your probability estimate.\n• Key categories: elections, economic indicators (CPI, unemployment, Fed rate), weather events, sports championships.\n• Strategy: compare Kalshi prices to Polymarket/PredictIt for cross-market arbitrage.`;
   }
 
-  return `**Leverage AI — Expert Sports Analysis**\n\n• I'm ready to analyze betting lines, DFS, fantasy, Kalshi markets, and more.\n• Ask me about specific games, offseason moves, betting strategy, or prediction markets.\n• Live odds data cards are loading below — click any card for detailed analysis.\n• Configure XAI_API_KEY in your environment for full AI-powered responses.`;
+  return `**Leverage AI — Expert Sports Analysis**\n\n• I'm ready to analyze betting lines, DFS, fantasy, Kalshi markets, and more.\n• Ask me about specific games, offseason moves, betting strategy, or prediction markets.\n• Live odds data cards are loading below — click any card for detailed analysis.`;
 }

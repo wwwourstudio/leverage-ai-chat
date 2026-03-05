@@ -4,11 +4,11 @@
  */
 
 // AI Model Configuration
-// Model name: use the versioned alias 'grok-4-0' — the bare 'grok-4' tag is not
+// Model name: use the versioned alias 'grok-4-0709' — the bare 'grok-4' tag is not
 // currently published on the xAI API and returns a 404 model-not-found error,
 // causing every primary-model call to silently fall through to the static fallback.
 export const AI_CONFIG = {
-  MODEL_NAME: 'grok-4-0',
+  MODEL_NAME: 'grok-4-0709',
   MODEL_DISPLAY_NAME: 'Grok 4',
   PROVIDER: 'xAI',
   API_ENDPOINT: 'https://api.x.ai/v1/chat/completions',

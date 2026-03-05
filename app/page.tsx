@@ -13,6 +13,7 @@ import { Suspense } from 'react';
 import { loadServerData, type ServerDataResult } from '@/lib/server-data-loader';
 import { logEnvValidation, validateServerEnv } from '@/lib/config';
 import UnifiedAIPlatform from './page-client';
+import { CardGrid } from '@/components/data-cards/CardSkeleton';
 
 export interface ServerDataProps extends ServerDataResult {
   // Extended with data source tracking
@@ -68,13 +69,21 @@ export default async function Page() {
 
 function PageSkeleton() {
   return (
-    <div className="flex h-screen bg-gray-950 text-white animate-pulse">
-      <div className="flex-1 flex flex-col">
-        <div className="h-16 bg-gray-900/50 border-b border-gray-800/50" />
-        <div className="flex-1 p-6 space-y-4">
-          <div className="h-20 bg-gray-900/30 rounded-lg" />
-          <div className="h-20 bg-gray-900/30 rounded-lg" />
-          <div className="h-20 bg-gray-900/30 rounded-lg" />
+    <div className="flex h-screen bg-[oklch(0.08_0.01_280)] text-white overflow-hidden">
+      {/* Sidebar skeleton */}
+      <div className="w-72 flex-shrink-0 bg-[oklch(0.10_0.01_280)] border-r border-[oklch(0.18_0.015_280)] flex flex-col gap-3 p-4">
+        <div className="h-9 rounded-lg bg-[oklch(0.16_0.015_280)] animate-pulse" />
+        <div className="flex flex-col gap-2 mt-2">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-14 rounded-xl bg-[oklch(0.13_0.015_280)] animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
+          ))}
+        </div>
+      </div>
+      {/* Main content skeleton */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="h-16 flex-shrink-0 bg-[oklch(0.10_0.01_280)] border-b border-[oklch(0.18_0.015_280)] animate-pulse" />
+        <div className="flex-1 overflow-auto p-6">
+          <CardGrid count={3} />
         </div>
       </div>
     </div>

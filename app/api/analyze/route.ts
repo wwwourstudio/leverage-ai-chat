@@ -92,9 +92,9 @@ function shouldUseFastModel(
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   // Per-AI-call timeouts (independent from each other and from card generation):
-  //   grok-4 primary: 15s | grok-3-mini primary: 10s | fallback: 8s
-  // Total worst-case: 15 + 8 = 23s, safely under Vercel's 30s hard limit.
-  const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 10000 : 15000;
+  //   grok-4 primary: 22s | grok-3-mini primary: 10s | fallback: 8s
+  // Total worst-case sequential: 22 + 8 = 30s (card generation runs concurrently so adds ~0s).
+  const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 10000 : 22000;
 
   try {
     const body: AnalyzeRequestBody = await request.json();
@@ -545,9 +545,11 @@ export async function POST(request: NextRequest) {
             modelUsed = 'Grok 3 Mini (fallback)';
             console.log(`[API/analyze] ${fallbackModel} fallback succeeded`);
           } catch (fallbackError) {
-            console.error('[API/analyze] Fallback model also failed:', fallbackError instanceof Error ? fallbackError.message : fallbackError);
+            const fallbackMsg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+            console.error('[API/analyze] Fallback model also failed:', fallbackMsg);
             aiText = generateFallbackResponse(userMessage, context);
-            modelUsed = 'Fallback';
+            // Surface the underlying API error in the model label so it's visible in the UI
+            modelUsed = fallbackMsg.includes('timeout') ? 'Fallback (timeout)' : 'Fallback (API error — check XAI_API_KEY)';
             usedFallback = true;
           }
         } else {

@@ -158,19 +158,28 @@ function parseMarket(m: any): KalshiMarket {
     ? Math.round((noBid + noAsk) / 2)
     : Math.max(0, 100 - yesPrice);
 
-  const rawCategory = m.category || m.series_ticker || m.event_ticker || '';
+  // Safe string coercion — Kalshi occasionally returns array values for string fields;
+  // take the first element when that happens, otherwise coerce to string or ''.
+  const toStr = (v: unknown): string =>
+    Array.isArray(v) ? String(v[0] ?? '') : typeof v === 'string' ? v : '';
+
+  const rawCategory = toStr(m.category) || toStr(m.series_ticker) || toStr(m.event_ticker) || '';
 
   // yes_sub_title is a short outcome label (e.g. "yes Baylor") — never use it
   // alone as the card title. When a market lacks a proper title, combine
   // event_title + cleaned yes_sub_title so the result is still readable.
-  const rawYesSub = typeof m.yes_sub_title === 'string' ? m.yes_sub_title : '';
+  const rawYesSub = toStr(m.yes_sub_title);
   // Strip leading "yes "/"no " prefix that Kalshi sometimes surfaces in sub_title fields
   const cleanYesSub = rawYesSub.replace(/^(yes|no)\s+/i, '').trim();
+  // Guard against Kalshi concatenating multiple market sub-titles into one field
+  // (e.g. "Scottie Barnes: 2+,yes Precious Achiuwa: 10+,...") — keep only the first entry.
+  const singleYesSub = cleanYesSub.split(/,\s*(yes|no)\s+/i)[0].trim();
+
   const compositeTitle =
-    m.event_title && cleanYesSub ? `${m.event_title}: ${cleanYesSub}` : '';
+    toStr(m.event_title) && singleYesSub ? `${toStr(m.event_title)}: ${singleYesSub}` : '';
 
   // Primary title — also strip any stray "yes "/"no " prefix that leaks through
-  const rawTitle: string = m.title || compositeTitle || m.event_title || m.subtitle || '';
+  const rawTitle: string = toStr(m.title) || compositeTitle || toStr(m.event_title) || toStr(m.subtitle) || '';
   const cleanTitle = rawTitle.replace(/^(yes|no)\s+/i, '').trim();
 
   // Price change: only compute when previous_yes_bid is a real (non-zero) prior snapshot.
@@ -182,7 +191,7 @@ function parseMarket(m: any): KalshiMarket {
     ticker: m.ticker || '',
     title: cleanTitle,
     category: normalizeCategoryLabel(rawCategory),
-    subtitle: m.subtitle || (cleanYesSub ? `Yes: ${cleanYesSub}` : '') || m.event_title || '',
+    subtitle: toStr(m.subtitle) || (singleYesSub ? `Yes: ${singleYesSub}` : '') || toStr(m.event_title) || '',
     yesPrice,
     noPrice,
     yesBid,

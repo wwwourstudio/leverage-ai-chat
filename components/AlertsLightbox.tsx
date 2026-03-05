@@ -147,11 +147,15 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
         .limit(20);
 
       if (alertsError) {
-        // Suppress 404/42P01 when the table hasn't been migrated yet — silently use empty list
+        // Suppress missing-table errors (schema not migrated yet)
         const isMissingTable = alertsError.message?.toLowerCase().includes('does not exist')
           || (alertsError as any).code === '42P01'
           || (alertsError as any).code === 'PGRST200';
-        if (!isMissingTable) {
+        // Suppress RLS 403: user_alerts policy not yet applied in Supabase dashboard
+        const isRLSDenied = (alertsError as any).code === '42501'
+          || alertsError.message?.toLowerCase().includes('permission denied')
+          || (alertsError as any).status === 403;
+        if (!isMissingTable && !isRLSDenied) {
           console.error('[Alerts] Failed to load alerts:', alertsError);
         }
       }

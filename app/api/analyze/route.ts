@@ -406,7 +406,7 @@ export async function POST(request: NextRequest) {
           timeoutPromise
         ]);
         aiText = result.text;
-        modelUsed = useFastPath ? 'Grok 3 Fast' : AI_CONFIG.MODEL_DISPLAY_NAME;
+        modelUsed = useFastPath ? 'Grok 3 Mini' : AI_CONFIG.MODEL_DISPLAY_NAME;
 
         // ── Capture ADP tool result for card injection (done after cards await) ──
         if (hasADPIntent) {
@@ -563,9 +563,10 @@ export async function POST(request: NextRequest) {
       usedFallback = true;
     }
 
-    // Cards were launched in parallel with AI above — just await the in-flight promise.
-    // If AI fell back to the static response, skip cards to avoid a mismatch.
-    let cards: InsightCard[] = usedFallback ? [] : await cardPromise.catch(() => []);
+    // Cards run concurrently with AI — always await regardless of AI outcome.
+    // When AI falls back to static text, we still want contextual data cards
+    // to render (they come from the live Odds/Kalshi APIs, not the AI model).
+    let cards: InsightCard[] = await cardPromise.catch(() => []);
 
     // Inject ADP card at the front when the tool returned results
     if (pendingADPCard) {

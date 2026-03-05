@@ -245,7 +245,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const abortControllerRef = useRef<AbortController | null>(null);
   const [verifyStage, setVerifyStage] = useState<'analyzing' | 'reverifying'>('analyzing');
   const [cardAnalysisMap, setCardAnalysisMap] = useState<Record<string, { loading: boolean; content: string | null; error: string | null }>>({});
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // corrected to desktop-open by useEffect below
   const [chatSearch, setChatSearch] = useState('');
   const [activeChat, setActiveChat] = useState('chat-1');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -304,6 +304,11 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
+  // Open sidebar by default on desktop (lg breakpoint = 1024px). Mobile/tablet stay closed.
+  useEffect(() => {
+    if (window.innerWidth >= 1024) setSidebarOpen(true);
+  }, []);
+
   // Correct the welcome message timestamp to real local time after hydration.
   // Runs once on mount — safe because it's client-only (no server/client mismatch).
   useEffect(() => {

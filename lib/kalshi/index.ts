@@ -138,11 +138,22 @@ function parseMarket(m: any): KalshiMarket {
   const noBid  = m.no_bid  ?? 0;
   const noAsk  = m.no_ask  ?? 0;
   const lastPrice = m.last_price ?? 0;
-  const prevBid = m.previous_yes_bid ?? yesBid;
+  // previous_yes_bid is 0 when the market has never had a bid — treat that as absent
+  const prevBid = m.previous_yes_bid ?? 0;
 
-  // Best estimate for YES probability: prefer last traded price, then midpoint, then ask/bid
+  // Best estimate for YES probability: prefer last traded price, then midpoint, then ask/bid.
+  // IMPORTANT: never fall through to floor_strike — it is a numeric strike price (e.g. 45000
+  // for a BTC contract), not a cents probability, and would corrupt the probability bar.
   const yesMidpoint = yesBid > 0 && yesAsk > 0 ? Math.round((yesBid + yesAsk) / 2) : 0;
-  const yesPrice = lastPrice || yesMidpoint || yesAsk || yesBid || m.floor_strike || 50;
+  const rawYesPrice =
+    lastPrice > 0   ? lastPrice   :
+    yesMidpoint > 0 ? yesMidpoint :
+    yesAsk > 0      ? yesAsk      :
+    yesBid > 0      ? yesBid      :
+    50; // genuine 50¢ default only when no price signals exist
+  // Kalshi markets trade in the 1–99¢ range — clamp to prevent rendering edge-cases
+  const yesPrice = Math.min(99, Math.max(1, rawYesPrice));
+
   const noPrice  = noBid > 0 && noAsk > 0
     ? Math.round((noBid + noAsk) / 2)
     : Math.max(0, 100 - yesPrice);
@@ -162,6 +173,11 @@ function parseMarket(m: any): KalshiMarket {
   const rawTitle: string = m.title || compositeTitle || m.event_title || m.subtitle || '';
   const cleanTitle = rawTitle.replace(/^(yes|no)\s+/i, '').trim();
 
+  // Price change: only compute when previous_yes_bid is a real (non-zero) prior snapshot.
+  // When prevBid === 0 the field was unset by the API (fresh market), so the delta of
+  // `yesBid - 0` would falsely appear as a large positive move — guard against that.
+  const priceChange = (prevBid > 0 && prevBid !== yesBid) ? yesBid - prevBid : 0;
+
   return {
     ticker: m.ticker || '',
     title: cleanTitle,
@@ -178,7 +194,7 @@ function parseMarket(m: any): KalshiMarket {
     volume24h: m.volume_24h ?? 0,
     eventTicker: m.event_ticker || '',
     seriesTicker: m.series_ticker || '',
-    priceChange: yesBid - prevBid,
+    priceChange,
     volume: m.volume ?? m.volume_24h ?? 0,
     openInterest: m.open_interest ?? 0,
     closeTime: m.close_time || m.expiration_time || m.end_date || '',
@@ -946,25 +962,25 @@ export function kalshiMarketToCard(market: KalshiMarket): any {
       lastPrice: market.lastPrice,
       priceChange: market.priceChange,
       priceDirection,
-      // Formatted display strings
+      // Formatted display strings — volumes are in contracts, not dollars, so no $ prefix
       yesPrice: `${yesPct}¢`,
       noPrice: `${noPct}¢`,
       impliedProbability: `${yesPct.toFixed(1)}%`,
       volume: market.volume >= 1_000_000
-        ? `$${(market.volume / 1_000_000).toFixed(1)}M`
+        ? `${(market.volume / 1_000_000).toFixed(1)}M`
         : market.volume >= 1_000
-        ? `$${(market.volume / 1_000).toFixed(0)}K`
-        : market.volume > 0 ? `$${market.volume}` : '—',
+        ? `${(market.volume / 1_000).toFixed(0)}K`
+        : market.volume > 0 ? `${market.volume}` : '—',
       volume24h: market.volume24h >= 1_000_000
-        ? `$${(market.volume24h / 1_000_000).toFixed(1)}M`
+        ? `${(market.volume24h / 1_000_000).toFixed(1)}M`
         : market.volume24h >= 1_000
-        ? `$${(market.volume24h / 1_000).toFixed(0)}K`
-        : market.volume24h > 0 ? `$${market.volume24h}` : '',
+        ? `${(market.volume24h / 1_000).toFixed(0)}K`
+        : market.volume24h > 0 ? `${market.volume24h}` : '',
       openInterest: market.openInterest >= 1_000_000
-        ? `$${(market.openInterest / 1_000_000).toFixed(1)}M`
+        ? `${(market.openInterest / 1_000_000).toFixed(1)}M`
         : market.openInterest >= 1_000
-        ? `$${(market.openInterest / 1_000).toFixed(0)}K`
-        : market.openInterest > 0 ? `$${market.openInterest}` : '—',
+        ? `${(market.openInterest / 1_000).toFixed(0)}K`
+        : market.openInterest > 0 ? `${market.openInterest}` : '—',
       closeTime: market.closeTime
         ? new Date(market.closeTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
         : 'TBD',

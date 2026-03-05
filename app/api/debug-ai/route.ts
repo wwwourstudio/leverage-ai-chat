@@ -12,7 +12,7 @@ export async function GET() {
   } else {
     try {
       const r = await generateText({
-        model: createXai({ apiKey: xaiKey })('grok-3-fast'),
+        model: createXai({ apiKey: xaiKey })('grok-3-mini'),
         prompt: 'Reply with the single word OK.',
         maxOutputTokens: 10,
       });

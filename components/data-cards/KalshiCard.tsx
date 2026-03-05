@@ -273,7 +273,16 @@ export const KalshiCard = memo(function KalshiCard({
   onAnalyze,
   isHero,
 }: KalshiCardProps) {
-  const yesPct: number = typeof d.yesPct === 'number' ? d.yesPct : parseFloat(d.yesPrice) || 50;
+  // yesPct: use explicit null-check so a genuine 0% market is honoured, not coerced to 50.
+  // The || 50 pattern treats 0 as falsy and replaces a legitimately resolved market with 50/50.
+  const yesPct: number = (() => {
+    if (typeof d.yesPct === 'number') return d.yesPct;
+    if (typeof d.yesPrice === 'string') {
+      const parsed = parseFloat(d.yesPrice);
+      return Number.isFinite(parsed) ? parsed : 50;
+    }
+    return 50;
+  })();
   const isActive = status === 'active' || status === 'open' || status === 'live';
   const edgeScore: number = typeof d.edgeScore === 'number' ? d.edgeScore : Math.round(Math.abs(yesPct - 50) * 2);
 
@@ -286,7 +295,12 @@ export const KalshiCard = memo(function KalshiCard({
   const noAsk:  number | null = typeof d.noAsk  === 'number' ? d.noAsk  : null;
   const spread = yesAsk !== null && yesBid !== null ? yesAsk - yesBid : null;
 
-  const priceDir: 'up' | 'down' | 'flat' = d.priceDirection || (d.priceChange > 0 ? 'up' : d.priceChange < 0 ? 'down' : 'flat');
+  const rawChange = d.priceChange ?? 0;
+  // Guard against corrupted deltas (e.g. full-scale bid value when prevBid was 0 on the server).
+  // A real intra-day price move on Kalshi is always ≤99¢, so clamp the display range.
+  const safeChange = Math.abs(rawChange) <= 99 ? rawChange : 0;
+  const priceDir: 'up' | 'down' | 'flat' =
+    d.priceDirection || (safeChange > 0 ? 'up' : safeChange < 0 ? 'down' : 'flat');
 
   // Subcategory label: prefer normalised category from data
   const marketCategory = d.subcategory || subcategory || category || 'Prediction Market';
@@ -325,13 +339,13 @@ export const KalshiCard = memo(function KalshiCard({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* Price change delta */}
+            {/* Price change delta — only shown when within valid ≤99¢ range */}
             {priceDir !== 'flat' && (
               <span className={cn('flex items-center gap-0.5 text-[10px] font-bold',
                 priceDir === 'up' ? 'text-[#00c47c]' : 'text-[#f43f5e]',
               )}>
                 {priceDir === 'up' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-                {Math.abs(d.priceChange ?? 0)}¢
+                {Math.abs(safeChange)}¢
               </span>
             )}
             {/* Live dot */}
@@ -390,7 +404,7 @@ export const KalshiCard = memo(function KalshiCard({
           </>
         )}
 
-        {/* ── Stats strip ──────────────────────────────────────────────── */}
+        {/* ── Stats strip ──────────────────────────────────────────────��─ */}
         <div className="h-px bg-[oklch(0.13_0.01_280)]" />
         <div className="flex flex-wrap items-center gap-2">
           {/* Volume tier badge */}

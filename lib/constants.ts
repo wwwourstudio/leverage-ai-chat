@@ -4,13 +4,18 @@
  */
 
 // AI Model Configuration
+// The @ai-sdk/xai package (^3.0.0) maps 'grok-4' to the current Grok 4 model endpoint.
+// Do NOT use versioned aliases like 'grok-4-0709' or 'grok-4-0' — the SDK handles
+// versioning internally and raw aliases may be rejected depending on SDK version.
+// Fast-path model: 'grok-3-mini' replaces the deprecated 'grok-3-fast' alias.
 export const AI_CONFIG = {
   MODEL_NAME: 'grok-4',
+  FAST_MODEL_NAME: 'grok-3-mini',
   MODEL_DISPLAY_NAME: 'Grok 4',
   PROVIDER: 'xAI',
   API_ENDPOINT: 'https://api.x.ai/v1/chat/completions',
-  DEFAULT_TEMPERATURE: 0.35, // Slightly tighter for more precise, structured responses
-  DEFAULT_MAX_TOKENS: 600, // Matches 350-word response cap in system prompt; faster generation
+  DEFAULT_TEMPERATURE: 0.35,
+  DEFAULT_MAX_TOKENS: 600,
   DEFAULT_PROCESSING_TIME: 950,
   FALLBACK_MODEL: 'Grok 4',
 } as const;

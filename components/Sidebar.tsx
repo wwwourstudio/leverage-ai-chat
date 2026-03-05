@@ -54,6 +54,7 @@ export interface SidebarProps {
   setSuggestedPrompts: (p: any[]) => void;
   setLastUserQuery: (q: string) => void;
   user: { name: string; email: string; avatar?: string } | null;
+  onUserClick?: () => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -256,12 +257,14 @@ function IconRail({
   setSelectedCategory,
   onNewChat,
   user,
+  onUserClick,
 }: {
   categories: CategoryDef[];
   selectedCategory: string;
   setSelectedCategory: (c: string) => void;
   onNewChat: () => void;
   user: { name: string; email?: string; avatar?: string } | null;
+  onUserClick?: () => void;
 }) {
   return (
     <div className="w-14 flex flex-col items-center py-3 gap-1 h-full">
@@ -303,10 +306,11 @@ function IconRail({
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* User avatar */}
+      {/* User avatar — tappable on mobile to open profile lightbox */}
       <div
-        className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 mb-1"
-        title={user?.name ?? 'Guest'}
+        className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 mb-1 cursor-pointer hover:ring-2 hover:ring-blue-400/50 active:scale-95 transition-all"
+        title={user?.name ?? 'Sign in'}
+        onClick={onUserClick}
       >
         {user ? (
           user.avatar
@@ -347,6 +351,7 @@ export function Sidebar({
   setSuggestedPrompts,
   setLastUserQuery,
   user,
+  onUserClick,
 }: SidebarProps) {
   // Avoid server/client hydration mismatch (#418): date grouping uses Date.now() which
   // differs between UTC server and local-timezone client. Defer to after mount.
@@ -378,6 +383,7 @@ export function Sidebar({
           setSelectedCategory={setSelectedCategory}
           onNewChat={onNewChat}
           user={user}
+          onUserClick={onUserClick}
         />
       )}
 

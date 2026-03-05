@@ -15,6 +15,14 @@
 CREATE SCHEMA IF NOT EXISTS api;
 SET search_path TO api;
 
+-- Grant schema access to Supabase roles
+-- NOTE: The 'api' schema is not public schema, so explicit grants are required.
+-- Without these, RLS policies exist but the role still gets "permission denied" (42501).
+GRANT USAGE ON SCHEMA api TO authenticated, anon, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA api GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA api GRANT SELECT ON TABLES TO anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA api GRANT ALL ON TABLES TO service_role;
+
 -- ============================================================================
 -- 1. CORE ODDS TABLES
 -- ============================================================================
@@ -851,6 +859,15 @@ CREATE POLICY "Thread owner messages" ON chat_messages
 
 -- Enable realtime for live sidebar updates
 DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE chat_threads; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ============================================================================
+-- ROLE GRANTS (explicit grants for all tables created above)
+-- ALTER DEFAULT PRIVILEGES only covers future tables; existing tables need GRANT.
+-- ============================================================================
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA api TO authenticated;
+GRANT SELECT ON ALL TABLES IN SCHEMA api TO anon;
+GRANT ALL ON ALL TABLES IN SCHEMA api TO service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA api TO authenticated, service_role;
 
 -- ============================================================================
 -- SUCCESS MESSAGE

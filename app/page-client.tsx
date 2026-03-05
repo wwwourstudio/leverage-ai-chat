@@ -71,6 +71,9 @@ interface APIResponse<T = any> {
   useFallback?: boolean; // Flag to indicate fallback mode was used
   details?: string; // Additional error or diagnostic details
   errorType?: string; // Type of error that occurred
+  clarificationNeeded?: boolean;
+  clarificationOptions?: string[];
+  processingTime?: number;
 }
 
 interface OddsEvent {
@@ -96,6 +99,11 @@ interface TrustMetrics {
   }>;
   riskLevel: 'low' | 'medium' | 'high';
   adjustedTone?: string;
+  modelUsed?: string;
+  sources?: Array<{ name: string; type: string; reliability: number }>;
+  processingTime?: number;
+  hasLiveOdds?: boolean;
+  hasKalshi?: boolean;
 }
 
 interface Message {
@@ -2470,7 +2478,7 @@ No preamble. Start directly with section 1.`;
     });
   
   // Platform-specific AI-powered prompt suggestions
-  const platformPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }>> = {
+  const platformPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string; query?: string }>> = {
     all: [
       { label: 'Cross-platform arbitrage opportunities', icon: Sparkles, category: 'all' },
       { label: 'Today\'s best value plays across all platforms', icon: TrendingUp, category: 'all' },
@@ -3329,8 +3337,8 @@ No preamble. Start directly with section 1.`;
                         cards={message.cards}
                         aiInsight={message.content}
                         onAnalyze={(card) => {
-                          const cardIndex = message.cards!.indexOf(card);
-                          generateCardAnalysis(card, `${index}-${cardIndex}`);
+                          const cardIndex = message.cards!.indexOf(card as InsightCard);
+                          generateCardAnalysis(card as InsightCard, `${index}-${cardIndex}`);
                         }}
                         messageIndex={index}
                       />

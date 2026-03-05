@@ -45,6 +45,25 @@
   --warning-foreground: oklch(0.15 0.01 280);
   --info: oklch(0.65 0.18 240);
   --info-foreground: oklch(0.99 0 0);
+
+  /* Semantic surface tokens */
+  --bg-surface: oklch(0.96 0.005 85);
+  --bg-elevated: oklch(0.98 0.005 85);
+  --bg-overlay: oklch(0.94 0.005 85);
+  --border-subtle: oklch(0.88 0.01 85);
+  --border-hover: oklch(0.78 0.01 85);
+  --text-muted: oklch(0.50 0.01 280);
+  --text-faint: oklch(0.62 0.01 280);
+
+  /* Animation timing */
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+
+  /* Elevation shadows */
+  --shadow-card: 0 2px 8px oklch(0 0 0 / 0.08);
+  --shadow-elevated: 0 8px 24px oklch(0 0 0 / 0.12);
+  --shadow-glow: 0 0 32px oklch(0.5 0.06 260 / 0.08);
 }
 
 .dark {
@@ -88,6 +107,25 @@
   --warning-foreground: oklch(0.08 0.01 280);
   --info: oklch(0.7 0.2 240);
   --info-foreground: oklch(0.98 0 0);
+
+  /* Semantic surface tokens (dark) */
+  --bg-surface: oklch(0.13 0.015 280);
+  --bg-elevated: oklch(0.16 0.015 280);
+  --bg-overlay: oklch(0.10 0.01 280);
+  --border-subtle: oklch(0.22 0.02 280);
+  --border-hover: oklch(0.30 0.02 280);
+  --text-muted: oklch(0.50 0.01 280);
+  --text-faint: oklch(0.38 0.01 280);
+
+  /* Animation timing */
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+
+  /* Elevation shadows (dark) */
+  --shadow-card: 0 2px 8px oklch(0 0 0 / 0.25);
+  --shadow-elevated: 0 8px 24px oklch(0 0 0 / 0.4);
+  --shadow-glow: 0 0 32px oklch(0.3 0.06 260 / 0.15);
 }
 
 @theme inline {
@@ -131,6 +169,23 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Semantic surface color mappings */
+  --color-surface: var(--bg-surface);
+  --color-elevated: var(--bg-elevated);
+  --color-overlay: var(--bg-overlay);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-hover: var(--border-hover);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
+
+  /* Semantic color utilities */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
 }
 
 @layer base {
@@ -179,6 +234,21 @@
   to   { opacity: 1; transform: translateX(0); }
 }
 
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(100%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 @utility animate-fade-in-up {
   animation: fade-in-up 0.35s ease-out both;
 }
@@ -208,4 +278,16 @@
 
 @utility animate-skeleton-fade {
   animation: skeleton-fade 0.3s ease-out both;
+}
+
+@utility animate-slide-up {
+  animation: slide-up var(--duration-slow, 400ms) cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@utility animate-scale-in {
+  animation: scale-in var(--duration-normal, 250ms) ease-out both;
+}
+
+@utility animate-backdrop-in {
+  animation: backdrop-in var(--duration-fast, 150ms) ease-out both;
 }

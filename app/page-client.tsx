@@ -39,6 +39,9 @@ import { StripeLightbox } from '@/components/StripeLightbox';
 import { UserLightbox } from '@/components/UserLightbox';
 import { useToast } from '@/components/toast-provider';
 import { Sidebar } from '@/components/Sidebar';
+import { ChatHeader } from '@/components/chat-header';
+import { SuggestedPrompts, type SuggestedAction } from '@/components/suggested-prompts';
+import { ChatInput, type FileAttachment as ChatFileAttachment } from '@/components/chat-input';
 import { loadThreads, createThread, updateThread, deleteThread, loadMessages, saveMessage } from '@/lib/chat-service';
 
 interface FileAttachment {
@@ -2810,94 +2813,17 @@ No preamble. Start directly with section 1.`;
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-black via-gray-950 to-black">
         {/* Header */}
-        <div className="relative bg-gradient-to-r from-gray-950 via-gray-900 to-gray-950 border-b border-gray-800/50 px-3 py-3 md:px-6 md:py-4 shadow-2xl backdrop-blur-xl">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-transparent to-transparent pointer-events-none"></div>
-          <div className="relative flex items-center justify-between max-w-6xl mx-auto">
-            {/* Left: hamburger + logo */}
-            <div className="flex items-center gap-2 md:gap-4">
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="group p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 active:scale-95 bg-transparent"
-              >
-                <Menu className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" />
-              </button>
-              <div className="flex items-center gap-2 md:gap-3">
-                {/* Logo mark */}
-                <div className="relative">
-                  <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 blur-md opacity-40" />
-                  <div className="relative w-8 h-8 md:w-9 md:h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                    <TrendingUp className="w-4 h-4 text-white" />
-                  </div>
-                </div>
-                <div className="flex flex-col leading-none gap-0.5">
-                  <h1 className="text-sm md:text-base font-black tracking-tight text-white">
-                    Leverage<span className="text-blue-400"> AI</span>
-                  </h1>
-                  <p className="hidden sm:block text-[10px] font-semibold text-gray-600 tracking-widest uppercase">Sports Intelligence</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: user card (desktop only) + bell + settings / auth buttons */}
-            <div className="flex items-center gap-2 md:gap-3">
-              {isLoggedIn && user ? (
-                <>
-                  {/* User profile card — hidden on mobile, use sidebar avatar instead */}
-                  <div
-                    className="hidden md:flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 hover:bg-gray-800/50 transition-all"
-                    onClick={() => setShowUserLightbox(true)}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="relative">
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
-                          {user.avatar ? (
-                            <img src={user.avatar || "/placeholder.svg"} alt={user.name} className="w-full h-full rounded-full object-cover" />
-                          ) : (
-                            user.name.charAt(0).toUpperCase()
-                          )}
-                        </div>
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-950"></div>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-white">{user.name}</span>
-                        <span className="text-[10px] text-gray-500">{user.email}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setShowAlertsLightbox(true)}
-                    className="relative p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
-                  >
-                    <Bell className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" />
-                    <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-gray-950 shadow-lg shadow-red-500/50 animate-pulse"></div>
-                  </button>
-                  <button
-                    onClick={() => setShowSettingsLightbox(true)}
-                    className="p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
-                  >
-                    <Settings className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => setShowLoginModal(true)}
-                    className="px-3 py-1.5 md:px-4 md:py-2 rounded-xl border border-gray-800 bg-gray-900/50 hover:bg-gray-800/70 hover:border-gray-700 text-gray-300 hover:text-white text-xs md:text-sm font-semibold transition-all"
-                  >
-                    Log in
-                  </button>
-                  <button
-                    onClick={() => setShowSignupModal(true)}
-                    className="px-3 py-1.5 md:px-4 md:py-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-xs md:text-sm font-bold transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40"
-                  >
-                    Sign up
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+        <ChatHeader
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          isLoggedIn={isLoggedIn}
+          user={user}
+          onOpenUserLightbox={() => setShowUserLightbox(true)}
+          onOpenAlerts={() => setShowAlertsLightbox(true)}
+          onOpenSettings={() => setShowSettingsLightbox(true)}
+          onOpenLogin={() => setShowLoginModal(true)}
+          onOpenSignup={() => setShowSignupModal(true)}
+        />
 
         {/* Messages Container - Dynamic Data-Driven Interface */}
         <div 
@@ -3873,302 +3799,62 @@ No preamble. Start directly with section 1.`;
                 <button onClick={() => { setFantasyLeague(null); localStorage.removeItem('leverage_fantasy_league'); }} className="ml-auto text-[10px] text-gray-600 hover:text-gray-400 transition-colors">Edit league</button>
               </div>
             )}
-            {/* Follow up on: label — plain text, not a pill */}
-            {/* Welcome categorized quick-start grid — shown only on fresh session */}
-            {messages.length === 1 && messages[0]?.isWelcome && suggestedPrompts.length === 0 && (
-              <div className="mb-5 hidden sm:block">
-                <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-3 px-1">
-                  Get started — choose a category
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-                  {[
-                    { label: 'Betting', desc: 'Live odds & arbitrage', icon: TrendingUp, color: 'text-blue-400', bg: 'from-blue-600/10 to-blue-900/5', border: 'border-blue-500/20', sample: 'Live arbitrage alerts across sportsbooks', sampleIcon: Zap },
-                    { label: 'Fantasy', desc: 'Draft & waiver tools', icon: Trophy, color: 'text-purple-400', bg: 'from-purple-600/10 to-purple-900/5', border: 'border-purple-500/20', sample: 'NFBC draft strategy for my pick position', sampleIcon: Award },
-                    { label: 'DFS', desc: 'Optimal lineups', icon: Medal, color: 'text-amber-400', bg: 'from-amber-600/10 to-amber-900/5', border: 'border-amber-500/20', sample: 'DFS NFL optimal lineups for DraftKings', sampleIcon: BarChart3 },
-                    { label: 'Predictions', desc: 'Kalshi markets', icon: Activity, color: 'text-cyan-400', bg: 'from-cyan-600/10 to-cyan-900/5', border: 'border-cyan-500/20', sample: 'Show me trending Kalshi prediction markets right now', sampleIcon: Sparkles },
-                  ].map(({ label, desc, icon: Icon, color, bg, border, sample, sampleIcon: SampleIcon }) => (
-                    <button
-                      key={label}
-                      onClick={() => {
-                        const userMessage: Message = { role: 'user', content: sample, timestamp: new Date() };
-                        setMessages((prev: Message[]) => [...prev, userMessage]);
-                        setInput('');
-                        generateRealResponse(sample);
-                      }}
-                      className={`group/cat flex flex-col items-start gap-1.5 p-3 rounded-xl bg-gradient-to-br ${bg} border ${border} hover:border-opacity-60 transition-all hover:scale-[1.02] active:scale-[0.98] text-left`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Icon className={`w-4 h-4 ${color}`} />
-                        <span className={`text-xs font-bold ${color}`}>{label}</span>
-                      </div>
-                      <p className="text-[10px] text-[oklch(0.45_0.008_280)] leading-tight">{desc}</p>
-                      <div className="flex items-center gap-1 mt-1 opacity-0 group-hover/cat:opacity-100 transition-opacity">
-                        <SampleIcon className="w-3 h-3 text-[oklch(0.45_0.008_280)]" />
-                        <span className="text-[9px] text-[oklch(0.45_0.008_280)] line-clamp-1">{sample}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {lastUserQuery && suggestedPrompts.length > 0 && messages.length > 1 && (
-              <div className="mb-3 px-1 flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600">
-                  Follow up on:
-                </span>
-                <span className="text-[11px] text-gray-400 truncate max-w-[420px]">
-                  {lastUserQuery.length > 72 ? lastUserQuery.slice(0, 72) + '…' : lastUserQuery}
-                </span>
-              </div>
-            )}
-            {/* Dynamic Contextual Suggestions or Platform Prompts */}
-            <div className="relative mb-5">
-              <div className="absolute left-0 inset-y-0 w-6 bg-gradient-to-r from-black to-transparent z-10 pointer-events-none" />
-              <div className="absolute right-0 inset-y-0 w-14 bg-gradient-to-l from-black to-transparent z-10 pointer-events-none" />
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 px-2">
-              {(suggestedPrompts.length > 0 && messages.length > 1 ? suggestedPrompts : quickActions).map((action, idx) => {
-                const Icon = action.icon;
-                const isSuggested = suggestedPrompts.length > 0 && messages.length > 1;
-                const submitText = (action as any).query || action.label;
-
-                return (
-                  <button
-                    key={`${action.label}-${idx}`}
-                    onClick={() => {
-                      setInput(submitText);
-                      setTimeout(() => {
-                        const userMessage: Message = {
-                          role: 'user',
-                          content: submitText,
-                          timestamp: new Date()
-                        };
-                        setMessages((prev: Message[]) => [...prev, userMessage]);
-
-                        // Update chat metadata
-                        setChats((prevChats: Chat[]) => prevChats.map((chat: Chat) => {
-                          if (chat.id === activeChat) {
-                            const updatedChat = { ...chat };
-                            updatedChat.preview = submitText.slice(0, 50) + (submitText.length > 50 ? '...' : '');
-                            updatedChat.timestamp = new Date();
-                            if (chat.title === 'New Analysis') {
-                              const words = submitText.split(' ').slice(0, 5).join(' ');
-                              updatedChat.title = words + (submitText.split(' ').length > 5 ? '...' : '');
-                            }
-                            return updatedChat;
-                          }
-                          return chat;
-                        }));
-
-                        setInput('');
-                        generateRealResponse(submitText);
-                      }, 0);
-                    }}
-                    className={`group/prompt flex items-center gap-1.5 md:gap-2.5 px-2.5 md:px-4 py-1 md:py-2.5 rounded-full border text-xs md:text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                      isSuggested
-                        ? 'bg-gray-900/60 border-blue-500/50 text-gray-200 hover:bg-gradient-to-r hover:from-blue-600/20 hover:via-purple-600/20 hover:to-blue-600/20 hover:border-blue-400/70'
-                        : selectedCategory === 'kalshi'
-                          ? 'bg-gray-900/60 border-cyan-800/50 text-gray-400 hover:bg-cyan-900/20 hover:border-cyan-600/50 hover:text-cyan-300'
-                          : 'bg-gray-900/60 border-gray-800/70 text-gray-400 hover:bg-gray-800/70 hover:border-gray-700 hover:text-gray-200'
-                    }`}
-                  >
-                    <Icon className={`w-3 h-3 md:w-4 md:h-4 flex-shrink-0 ${
-                      isSuggested ? 'text-gray-400 group-hover/prompt:text-blue-400'
-                      : selectedCategory === 'kalshi' ? 'text-cyan-600 group-hover/prompt:text-cyan-400'
-                      : 'text-gray-500 group-hover/prompt:text-gray-400'
-                    }`} />
-                    <span>{action.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-            </div>
-
-            {/* File Upload Preview */}
-            {uploadedFiles.length > 0 && (
-              <div className="mb-4 space-y-2">
-                <div className="flex items-center gap-2 mb-2">
-                  <Paperclip className="w-4 h-4 text-blue-400" />
-                  <span className="text-xs font-bold text-gray-400">
-                    {uploadedFiles.length} file{uploadedFiles.length !== 1 ? 's' : ''} attached
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {uploadedFiles.map((file) => (
-                    <div
-                      key={file.id}
-                      className="flex items-center gap-2 px-3 py-2 bg-gray-800/60 border border-gray-700/50 rounded-xl group/file hover:border-gray-600 transition-all"
-                    >
-                      {file.type === 'image' ? (
-                        <ImageIcon className="w-4 h-4 text-blue-400" />
-                      ) : (
-                        <FileText className="w-4 h-4 text-green-400" />
-                      )}
-                      <span className="text-xs font-bold text-gray-300 max-w-[120px] truncate">
-                        {file.name}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {(file.size / 1024).toFixed(1)} KB
-                      </span>
-                      {/* Save to profile */}
-                      <button
-                        onClick={() => saveFileToProfile(file)}
-                        className="p-1 hover:bg-blue-900/40 rounded transition-all"
-                        title="Save file to profile"
-                      >
-                        <Bookmark className="w-3.5 h-3.5 text-gray-500 hover:text-blue-400" />
-                      </button>
-                      <button
-                        onClick={() => removeAttachment(file.id)}
-                        className="p-1 hover:bg-gray-700/50 rounded transition-all"
-                        title="Remove file"
-                      >
-                        <X className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Drag-and-drop + form wrapper */}
-            <div
-              onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
-              onDragEnter={e => { e.preventDefault(); setIsDragOver(true); }}
-              onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false); }}
-              onDrop={async e => {
-                e.preventDefault();
-                setIsDragOver(false);
-                const dropped = await processFiles(e.dataTransfer.files);
-                if (dropped.length > 0) setUploadedFiles(prev => [...prev, ...dropped]);
+            {/* Suggested Prompts — welcome grid + scrollable pills */}
+            <SuggestedPrompts
+              showWelcomeGrid={messages.length === 1 && !!messages[0]?.isWelcome && suggestedPrompts.length === 0}
+              onWelcomeAction={(query) => {
+                const userMessage: Message = { role: 'user', content: query, timestamp: new Date() };
+                setMessages((prev: Message[]) => [...prev, userMessage]);
+                setInput('');
+                generateRealResponse(query);
               }}
-              className={`relative rounded-2xl transition-all duration-200 ${isDragOver ? 'ring-2 ring-blue-500/60 bg-blue-500/5' : ''}`}
-            >
-              {isDragOver && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed border-blue-500/60 bg-blue-500/10 pointer-events-none">
-                  <div className="flex flex-col items-center gap-1">
-                    <Paperclip className="w-6 h-6 text-blue-400" />
-                    <span className="text-sm font-bold text-blue-300">Drop files here</span>
-                    <span className="text-xs text-blue-400/70">Images, CSV, TXT, JSON</span>
-                  </div>
-                </div>
-              )}
-
-            <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-3">
-              {/* Hidden File Input */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/jpg,image/gif,image/webp,text/csv,.tsv,text/tab-separated-values,text/plain,.txt,.json,application/json,.pdf,application/pdf"
-                multiple
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-
-              {/* Attach button — hidden on mobile (moved to status bar row below) */}
-
-              <div className="flex-1 relative group/input focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:shadow-lg focus-within:shadow-blue-500/10 rounded-2xl transition-all duration-300">
-                <textarea
-                  value={input}
-                  onChange={(e) => {
-                    setInput(e.target.value);
-                    e.target.style.height = 'auto';
-                    e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSubmit(e as any);
+              suggestedPrompts={suggestedPrompts}
+              quickActions={quickActions}
+              hasMessages={messages.length > 1}
+              lastUserQuery={lastUserQuery}
+              selectedCategory={selectedCategory}
+              onPromptClick={(submitText) => {
+                setInput(submitText);
+                setTimeout(() => {
+                  const userMessage: Message = { role: 'user', content: submitText, timestamp: new Date() };
+                  setMessages((prev: Message[]) => [...prev, userMessage]);
+                  setChats((prevChats: Chat[]) => prevChats.map((chat: Chat) => {
+                    if (chat.id === activeChat) {
+                      const updatedChat = { ...chat };
+                      updatedChat.preview = submitText.slice(0, 50) + (submitText.length > 50 ? '...' : '');
+                      updatedChat.timestamp = new Date();
+                      if (chat.title === 'New Analysis') {
+                        const words = submitText.split(' ').slice(0, 5).join(' ');
+                        updatedChat.title = words + (submitText.split(' ').length > 5 ? '...' : '');
+                      }
+                      return updatedChat;
                     }
-                  }}
-                  placeholder={
-                    lastUserQuery
-                      ? `Follow up on your ${lastUserQuery.toLowerCase().includes('nba') ? 'NBA' : lastUserQuery.toLowerCase().includes('nfl') ? 'NFL' : lastUserQuery.toLowerCase().includes('kalshi') ? 'Kalshi' : lastUserQuery.toLowerCase().includes('dfs') ? 'DFS' : lastUserQuery.toLowerCase().includes('fantasy') ? 'fantasy' : 'sports'} analysis or ask something new...`
-                      : 'Ask about betting odds, fantasy, DFS, or Kalshi markets...'
-                  }
-                  className="w-full bg-gray-900/90 border border-gray-700/50 hover:border-gray-600/60 focus:border-blue-500/40 rounded-2xl px-3 py-2.5 md:px-6 md:pr-32 font-medium text-white placeholder-gray-500 focus:outline-none transition-all backdrop-blur-sm shadow-inner text-xs md:text-base leading-relaxed resize-none overflow-hidden"
-                  disabled={isTyping}
-                  maxLength={500}
-                  rows={1}
-                  style={{ minHeight: '44px', maxHeight: '160px' }}
-                />
-                {/* Attach + char count — inside input on desktop only */}
-                <div className="hidden md:flex absolute right-5 top-1/2 -translate-y-1/2 items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="p-2 hover:bg-gray-800/70 rounded-lg transition-all group/attach border-none bg-transparent"
-                    title="Attach image or CSV file"
-                    disabled={isTyping}
-                  >
-                    <Paperclip className="w-4.5 h-4.5 text-gray-500 group-hover/attach:text-blue-400 transition-colors" />
-                  </button>
-                  <span className={`text-xs font-bold transition-colors ${input.length > 450 ? 'text-orange-400' : 'text-gray-600'}`}>
-                    {input.length}/500
-                  </span>
-                </div>
-              </div>
+                    return chat;
+                  }));
+                  setInput('');
+                  generateRealResponse(submitText);
+                }, 0);
+              }}
+            />
 
-              {isTyping ? (
-                <button
-                  type="button"
-                  onClick={stopGeneration}
-                  className="flex-shrink-0 relative bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white rounded-2xl px-3 md:px-8 transition-all duration-300 shadow-xl shadow-red-900/30 flex items-center gap-2.5 font-bold group overflow-hidden active:scale-95"
-                  style={{ minHeight: '44px' }}
-                >
-                  <X className="w-5 h-5 relative z-10" />
-                  <span className="hidden md:inline text-sm relative z-10 tracking-wide">Stop</span>
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={(!input.trim() && uploadedFiles.length === 0)}
-                  className="flex-shrink-0 relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-800 disabled:to-gray-900 disabled:cursor-not-allowed text-white rounded-2xl px-3 md:px-8 transition-all duration-300 shadow-xl shadow-blue-500/25 hover:shadow-blue-500/50 disabled:shadow-none flex items-center gap-2.5 font-bold group overflow-hidden active:scale-95 disabled:hover:scale-100"
-                  style={{ minHeight: '44px' }}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-                  <Send className="w-5 h-5 relative z-10" />
-                  <span className="hidden md:inline text-sm relative z-10 tracking-wide">Analyze</span>
-                </button>
-              )}
-            </form>
-            </div>{/* end drag-and-drop wrapper */}
-
-            <div className="flex items-center justify-between mt-2 px-1">
-              {/* Mobile: attach button on left; Desktop: label text */}
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="sm:hidden flex-shrink-0 p-1.5 rounded-lg bg-gray-900/80 border border-gray-700/50 hover:border-gray-600 active:scale-95 transition-all"
-                title="Attach file"
-                disabled={isTyping}
-              >
-                <Paperclip className="w-3.5 h-3.5 text-gray-400" />
-              </button>
-              <p className="hidden sm:block text-[10px] font-bold text-gray-600">
-                Betting • Fantasy • DFS • Kalshi • Real-time AI Analysis
-              </p>
-              <div className="flex items-center gap-2 ml-auto">
-                <button
-                  onClick={() => setShowStripeLightbox(true)}
-                  className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-md border transition-all cursor-pointer hover:opacity-80 ${
-                  creditsRemaining <= 3
-                    ? 'text-orange-400 bg-orange-500/10 border-orange-500/30'
-                    : 'text-gray-500 bg-gray-900/30 border-gray-800'
-                }`}>
-                  <Sparkles className="w-3 h-3" />
-                  <span>{creditsRemaining} {creditsRemaining === 1 ? 'credit' : 'credits'}</span>
-                </button>
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-600">
-                  <div className="relative flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-lg shadow-green-500/50"></div>
-                    <div className="absolute inset-0 bg-green-400 rounded-full animate-ping"></div>
-                  </div>
-                  <span className="hidden sm:inline">All systems operational</span>
-                  <span className="sm:hidden">Online</span>
-                </div>
-              </div>
-            </div>
+            {/* Desktop Chat Input */}
+            <ChatInput
+              input={input}
+              onInputChange={setInput}
+              onSubmit={handleSubmit}
+              isTyping={isTyping}
+              onStopGeneration={stopGeneration}
+              uploadedFiles={uploadedFiles}
+              onFileUpload={handleFileUpload}
+              onRemoveFile={removeAttachment}
+              onSaveFile={saveFileToProfile}
+              onFileDrop={processFiles}
+              onFilesAdded={(files) => setUploadedFiles(prev => [...prev, ...files])}
+              creditsRemaining={creditsRemaining}
+              onOpenStripe={() => setShowStripeLightbox(true)}
+              lastUserQuery={lastUserQuery}
+              selectedCategory={selectedCategory}
+            />
           </div>
         </div>
       </div>

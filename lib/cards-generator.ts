@@ -10,7 +10,7 @@
  */
 
 import { unstable_cache } from 'next/cache';
-import { CARD_TYPES, SPORT_KEYS, sportToApi, apiToSport } from '@/lib/constants';
+import { CARD_TYPES, SPORT_KEYS, sportToApi, apiToSport, getSportGradient } from '@/lib/constants';
 import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
 
 // ============================================================================
@@ -312,18 +312,7 @@ async function generateSportSpecificCards(
   return cards;
 }
 
-/**
- * Get gradient colors by sport
- */
-function getSportGradient(sport: string): string {
-  if (sport.includes('basketball')) return 'from-orange-600 to-red-700';
-  if (sport.includes('football')) return 'from-green-600 to-emerald-700';
-  if (sport.includes('hockey')) return 'from-blue-600 to-cyan-700';
-  if (sport.includes('baseball')) return 'from-indigo-600 to-purple-700';
-  if (sport.includes('soccer')) return 'from-green-500 to-teal-600';
-  if (sport.includes('mma') || sport.includes('boxing')) return 'from-red-600 to-rose-700';
-  return 'from-slate-600 to-gray-700';
-}
+// getSportGradient imported from @/lib/constants (centralized)
 
 export interface InsightCard {
   type: string;

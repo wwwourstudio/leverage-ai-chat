@@ -147,6 +147,51 @@ export function apiToSport(apiFormat: string): string {
   return apiFormat;
 }
 
+// Sport Gradients — single source of truth for all sport-specific gradients
+export const SPORT_GRADIENTS: Record<string, string> = {
+  basketball: 'from-orange-600 to-red-700',
+  football: 'from-green-600 to-emerald-700',
+  hockey: 'from-blue-600 to-cyan-700',
+  baseball: 'from-indigo-600 to-purple-700',
+  soccer: 'from-green-500 to-teal-600',
+  mma: 'from-red-600 to-rose-700',
+  boxing: 'from-red-600 to-rose-700',
+  default: 'from-slate-600 to-gray-700',
+} as const;
+
+/** Get the gradient classes for a sport string (e.g. 'basketball_nba' → orange-red) */
+export function getSportGradient(sport: string): string {
+  const s = sport.toLowerCase();
+  for (const [key, gradient] of Object.entries(SPORT_GRADIENTS)) {
+    if (key !== 'default' && s.includes(key)) return gradient;
+  }
+  return SPORT_GRADIENTS.default;
+}
+
+// Category Gradients — for Kalshi markets, card categories, etc.
+export const CATEGORY_GRADIENTS: Record<string, string> = {
+  politics: 'from-blue-600 to-indigo-700',
+  sports: 'from-green-600 to-emerald-700',
+  weather: 'from-sky-600 to-cyan-700',
+  finance: 'from-amber-600 to-orange-700',
+  entertainment: 'from-fuchsia-600 to-pink-700',
+  tech: 'from-violet-600 to-purple-700',
+  betting: 'from-blue-600 to-indigo-600',
+  fantasy: 'from-blue-600 to-cyan-700',
+  dfs: 'from-orange-600 to-red-700',
+  kalshi: 'from-purple-600 to-indigo-700',
+  arbitrage: 'from-emerald-600 to-teal-700',
+  portfolio: 'from-purple-600 to-pink-600',
+  lines: 'from-blue-600 to-indigo-600',
+  props: 'from-blue-600 to-cyan-600',
+  default: 'from-purple-600 to-indigo-700',
+} as const;
+
+/** Get the gradient classes for a category string */
+export function getCategoryGradient(category: string): string {
+  return CATEGORY_GRADIENTS[category.toLowerCase()] || CATEGORY_GRADIENTS.default;
+}
+
 // Market Types
 /**
  * H2H (Head-to-Head) Markets: Direct moneyline betting on which team will win

@@ -522,7 +522,7 @@ export async function POST(request: NextRequest) {
           `[API/analyze] Primary model "${primaryModel}" failed — full error:`,
           aiError,
           '| Retrying with:',
-          alreadyFast ? 'static fallback (already on fast path)' : fallbackModel,
+          alreadyFast ? AI_CONFIG.MODEL_NAME : fallbackModel,
         );
         // Regardless of whether we were on the fast path, always try the other model
         // before giving up. Fast path (grok-3-mini) failure → retry with grok-4.

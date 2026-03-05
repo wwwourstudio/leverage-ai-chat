@@ -590,31 +590,55 @@ ALTER TABLE capital_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bet_allocations ENABLE ROW LEVEL SECURITY;
 
 -- Public read access (no auth required)
+DROP POLICY IF EXISTS "Public read access" ON live_odds_cache;
 CREATE POLICY "Public read access" ON live_odds_cache FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON mlb_odds;
 CREATE POLICY "Public read access" ON mlb_odds FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON nfl_odds;
 CREATE POLICY "Public read access" ON nfl_odds FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON nba_odds;
 CREATE POLICY "Public read access" ON nba_odds FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON nhl_odds;
 CREATE POLICY "Public read access" ON nhl_odds FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON line_movement;
 CREATE POLICY "Public read access" ON line_movement FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON arbitrage_opportunities;
 CREATE POLICY "Public read access" ON arbitrage_opportunities FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON player_props_markets;
 CREATE POLICY "Public read access" ON player_props_markets FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON kalshi_markets;
 CREATE POLICY "Public read access" ON kalshi_markets FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON historical_games;
 CREATE POLICY "Public read access" ON historical_games FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON ai_response_trust;
 CREATE POLICY "Public read access" ON ai_response_trust FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON capital_state;
 CREATE POLICY "Public read access" ON capital_state FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON bet_allocations;
 CREATE POLICY "Public read access" ON bet_allocations FOR SELECT USING (true);
 
 -- Authenticated write access
+DROP POLICY IF EXISTS "Auth write access" ON live_odds_cache;
 CREATE POLICY "Auth write access" ON live_odds_cache FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Auth write access" ON mlb_odds;
 CREATE POLICY "Auth write access" ON mlb_odds FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Auth write access" ON nfl_odds;
 CREATE POLICY "Auth write access" ON nfl_odds FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Auth write access" ON nba_odds;
 CREATE POLICY "Auth write access" ON nba_odds FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Auth write access" ON nhl_odds;
 CREATE POLICY "Auth write access" ON nhl_odds FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Auth write access" ON line_movement;
 CREATE POLICY "Auth write access" ON line_movement FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Auth write access" ON arbitrage_opportunities;
 CREATE POLICY "Auth write access" ON arbitrage_opportunities FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Auth write access" ON player_props_markets;
 CREATE POLICY "Auth write access" ON player_props_markets FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Auth write access" ON kalshi_markets;
 CREATE POLICY "Auth write access" ON kalshi_markets FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Auth write access" ON capital_state;
 CREATE POLICY "Auth write access" ON capital_state FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Auth write access" ON bet_allocations;
 CREATE POLICY "Auth write access" ON bet_allocations FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
 -- RLS for user tables (each user owns their own rows)
@@ -632,17 +656,26 @@ ALTER TABLE waiver_transactions  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE draft_rooms          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE draft_picks          ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Own predictions only"  ON ai_predictions;
 CREATE POLICY "Own predictions only"  ON ai_predictions     FOR ALL USING (auth.uid() = user_id OR user_id IS NULL);
+DROP POLICY IF EXISTS "Own profile only"      ON user_profiles;
 CREATE POLICY "Own profile only"      ON user_profiles      FOR ALL USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Own preferences only"  ON user_preferences;
 CREATE POLICY "Own preferences only"  ON user_preferences   FOR ALL USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Own alerts only"       ON user_alerts;
 CREATE POLICY "Own alerts only"       ON user_alerts        FOR ALL USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Own stats only"        ON user_stats;
 CREATE POLICY "Own stats only"        ON user_stats         FOR ALL USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Own insights only"     ON user_insights;
 CREATE POLICY "Own insights only"     ON user_insights      FOR ALL USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Own subscription only" ON subscription_tiers;
 CREATE POLICY "Own subscription only" ON subscription_tiers FOR ALL USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "League owner access"  ON fantasy_leagues;
 CREATE POLICY "League owner access"  ON fantasy_leagues
   FOR ALL USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "League member read"   ON fantasy_teams;
 CREATE POLICY "League member read"   ON fantasy_teams
   FOR SELECT USING (
     EXISTS (
@@ -651,6 +684,7 @@ CREATE POLICY "League member read"   ON fantasy_teams
         AND fantasy_leagues.user_id = auth.uid()
     )
   );
+DROP POLICY IF EXISTS "League owner write"   ON fantasy_teams;
 CREATE POLICY "League owner write"   ON fantasy_teams
   FOR ALL USING (
     EXISTS (
@@ -660,6 +694,7 @@ CREATE POLICY "League owner write"   ON fantasy_teams
     )
   );
 
+DROP POLICY IF EXISTS "Roster access"        ON fantasy_rosters;
 CREATE POLICY "Roster access"        ON fantasy_rosters
   FOR ALL USING (
     EXISTS (
@@ -670,10 +705,14 @@ CREATE POLICY "Roster access"        ON fantasy_rosters
     )
   );
 
+DROP POLICY IF EXISTS "Projections read"     ON fantasy_projections;
 CREATE POLICY "Projections read"     ON fantasy_projections FOR SELECT USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Projections write"    ON fantasy_projections;
 CREATE POLICY "Projections write"    ON fantasy_projections FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Projections update"   ON fantasy_projections;
 CREATE POLICY "Projections update"   ON fantasy_projections FOR UPDATE USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Waiver access"        ON waiver_transactions;
 CREATE POLICY "Waiver access"        ON waiver_transactions
   FOR ALL USING (
     EXISTS (
@@ -683,6 +722,7 @@ CREATE POLICY "Waiver access"        ON waiver_transactions
     )
   );
 
+DROP POLICY IF EXISTS "Draft room access"    ON draft_rooms;
 CREATE POLICY "Draft room access"    ON draft_rooms
   FOR ALL USING (
     EXISTS (
@@ -692,6 +732,7 @@ CREATE POLICY "Draft room access"    ON draft_rooms
     )
   );
 
+DROP POLICY IF EXISTS "Draft pick access"    ON draft_picks;
 CREATE POLICY "Draft pick access"    ON draft_picks
   FOR ALL USING (
     EXISTS (
@@ -716,11 +757,13 @@ CREATE TABLE IF NOT EXISTS api.user_credits (
 
 ALTER TABLE api.user_credits ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "User can read own credits" ON api.user_credits;
 CREATE POLICY "User can read own credits"
   ON api.user_credits FOR SELECT
   USING (auth.uid() = user_id);
 
 -- Only the service-role (Stripe webhook) can write; users cannot self-update
+DROP POLICY IF EXISTS "Service role can manage credits" ON api.user_credits;
 CREATE POLICY "Service role can manage credits"
   ON api.user_credits FOR ALL
   USING (auth.role() = 'service_role');

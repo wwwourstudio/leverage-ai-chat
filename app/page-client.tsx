@@ -3876,7 +3876,7 @@ No preamble. Start directly with section 1.`;
             {/* Follow up on: label — plain text, not a pill */}
             {/* Welcome categorized quick-start grid — shown only on fresh session */}
             {messages.length === 1 && messages[0]?.isWelcome && suggestedPrompts.length === 0 && (
-              <div className="mb-5">
+              <div className="mb-5 hidden sm:block">
                 <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-3 px-1">
                   Get started — choose a category
                 </p>
@@ -4065,17 +4065,7 @@ No preamble. Start directly with section 1.`;
                 className="hidden"
               />
 
-              {/* Attach button — visible outside input on mobile for easy tapping */}
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="md:hidden flex-shrink-0 p-2 rounded-xl bg-gray-900/90 border border-gray-700/50 hover:border-gray-600 active:scale-95 transition-all"
-                style={{ minHeight: '44px', minWidth: '44px' }}
-                title="Attach file"
-                disabled={isTyping}
-              >
-                <Paperclip className="w-4 h-4 text-gray-400" />
-              </button>
+              {/* Attach button — hidden on mobile (moved to status bar row below) */}
 
               <div className="flex-1 relative group/input focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:shadow-lg focus-within:shadow-blue-500/10 rounded-2xl transition-all duration-300">
                 <textarea
@@ -4096,7 +4086,7 @@ No preamble. Start directly with section 1.`;
                       ? `Follow up on your ${lastUserQuery.toLowerCase().includes('nba') ? 'NBA' : lastUserQuery.toLowerCase().includes('nfl') ? 'NFL' : lastUserQuery.toLowerCase().includes('kalshi') ? 'Kalshi' : lastUserQuery.toLowerCase().includes('dfs') ? 'DFS' : lastUserQuery.toLowerCase().includes('fantasy') ? 'fantasy' : 'sports'} analysis or ask something new...`
                       : 'Ask about betting odds, fantasy, DFS, or Kalshi markets...'
                   }
-                  className="w-full bg-gray-900/90 border border-gray-700/50 hover:border-gray-600/60 focus:border-blue-500/40 rounded-2xl px-3 py-2.5 md:px-6 md:pr-32 font-medium text-white placeholder-gray-500 focus:outline-none transition-all backdrop-blur-sm shadow-inner text-sm md:text-base leading-relaxed resize-none overflow-hidden"
+                  className="w-full bg-gray-900/90 border border-gray-700/50 hover:border-gray-600/60 focus:border-blue-500/40 rounded-2xl px-3 py-2.5 md:px-6 md:pr-32 font-medium text-white placeholder-gray-500 focus:outline-none transition-all backdrop-blur-sm shadow-inner text-xs md:text-base leading-relaxed resize-none overflow-hidden"
                   disabled={isTyping}
                   maxLength={500}
                   rows={1}
@@ -4145,6 +4135,16 @@ No preamble. Start directly with section 1.`;
             </div>{/* end drag-and-drop wrapper */}
 
             <div className="flex items-center justify-between mt-2 px-1">
+              {/* Mobile: attach button on left; Desktop: label text */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="sm:hidden flex-shrink-0 p-1.5 rounded-lg bg-gray-900/80 border border-gray-700/50 hover:border-gray-600 active:scale-95 transition-all"
+                title="Attach file"
+                disabled={isTyping}
+              >
+                <Paperclip className="w-3.5 h-3.5 text-gray-400" />
+              </button>
               <p className="hidden sm:block text-[10px] font-bold text-gray-600">
                 Betting • Fantasy • DFS • Kalshi • Real-time AI Analysis
               </p>

@@ -31,6 +31,8 @@ interface SuggestedPromptsProps {
   lastUserQuery: string;
   selectedCategory: string;
   onPromptClick: (query: string) => void;
+  // True when pills are sport-selection prompts needing user clarification
+  clarificationMode?: boolean;
 }
 
 const WELCOME_CATEGORIES = [
@@ -49,6 +51,7 @@ export function SuggestedPrompts({
   lastUserQuery,
   selectedCategory,
   onPromptClick,
+  clarificationMode = false,
 }: SuggestedPromptsProps) {
   const isSuggested = suggestedPrompts.length > 0 && hasMessages;
   const pills = isSuggested ? suggestedPrompts : quickActions;
@@ -83,8 +86,18 @@ export function SuggestedPrompts({
         </div>
       )}
 
-      {/* Follow up on: label */}
-      {lastUserQuery && suggestedPrompts.length > 0 && hasMessages && (
+      {/* Clarification header — amber pulsing dot, shown when a sport choice is needed */}
+      {clarificationMode && (
+        <div className="mb-3 px-1 flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-amber-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            Choose a sport to continue:
+          </span>
+        </div>
+      )}
+
+      {/* Follow up on: label — shown after a real AI response */}
+      {!clarificationMode && lastUserQuery && suggestedPrompts.length > 0 && hasMessages && (
         <div className="hidden sm:flex mb-3 px-1 items-center gap-2">
           <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">
             Follow up on:
@@ -109,15 +122,18 @@ export function SuggestedPrompts({
                 key={`${action.label}-${idx}`}
                 onClick={() => onPromptClick(submitText)}
                 className={`group/prompt flex items-center gap-1.5 md:gap-2.5 px-2.5 md:px-4 py-1 md:py-2.5 rounded-full border text-xs md:text-sm font-medium whitespace-nowrap transition-all duration-200 snap-start ${
-                  isSuggested
-                    ? 'bg-[var(--bg-overlay)] border-blue-500/50 text-white/80 hover:bg-gradient-to-r hover:from-blue-600/20 hover:via-purple-600/20 hover:to-blue-600/20 hover:border-blue-400/70'
-                    : selectedCategory === 'kalshi'
-                      ? 'bg-[var(--bg-overlay)] border-cyan-800/50 text-[var(--text-muted)] hover:bg-cyan-900/20 hover:border-cyan-600/50 hover:text-cyan-300'
-                      : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:border-[oklch(0.28_0.02_280)] hover:text-white/80'
+                  clarificationMode
+                    ? 'bg-[var(--bg-overlay)] border-amber-500/50 text-amber-200/80 hover:bg-amber-900/20 hover:border-amber-400/70 hover:text-amber-100'
+                    : isSuggested
+                      ? 'bg-[var(--bg-overlay)] border-blue-500/50 text-white/80 hover:bg-gradient-to-r hover:from-blue-600/20 hover:via-purple-600/20 hover:to-blue-600/20 hover:border-blue-400/70'
+                      : selectedCategory === 'kalshi'
+                        ? 'bg-[var(--bg-overlay)] border-cyan-800/50 text-[var(--text-muted)] hover:bg-cyan-900/20 hover:border-cyan-600/50 hover:text-cyan-300'
+                        : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:border-[oklch(0.28_0.02_280)] hover:text-white/80'
                 }`}
               >
                 <Icon className={`w-3 h-3 md:w-4 md:h-4 flex-shrink-0 ${
-                  isSuggested ? 'text-[var(--text-muted)] group-hover/prompt:text-blue-400'
+                  clarificationMode ? 'text-amber-500 group-hover/prompt:text-amber-300'
+                  : isSuggested     ? 'text-[var(--text-muted)] group-hover/prompt:text-blue-400'
                   : selectedCategory === 'kalshi' ? 'text-cyan-600 group-hover/prompt:text-cyan-400'
                   : 'text-[var(--text-faint)] group-hover/prompt:text-[var(--text-muted)]'
                 }`} />

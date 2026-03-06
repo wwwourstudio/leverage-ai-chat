@@ -377,7 +377,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
           <span className="text-[11px] text-[oklch(0.50_0.01_280)]">{form.leagueSize}-team league · {form.platform.toUpperCase()} · {sportMeta.icon} {sportMeta.label}</span>
         </div>
 
-        <NavButtons onBack={() => setStep(2)} onNext={() => setStep(4)} />
+        <NavButtons onBack={() => setStep(2)} onNext={() => setStep(form.platform === 'nfbc' ? 5 : 4)} />
       </div>
     );
   };
@@ -495,7 +495,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
       </div>
 
       <div className="flex gap-2 mt-2">
-        <Button variant="outline" onClick={() => setStep(4)} className="flex-1">
+        <Button variant="outline" onClick={() => setStep(form.platform === 'nfbc' ? 3 : 4)} className="flex-1">
           <ChevronLeft className="w-4 h-4 mr-1" /> Back
         </Button>
         <Button

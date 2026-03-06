@@ -61,6 +61,15 @@ export function DynamicCardRenderer({
     realData: card.realData
   };
 
+  // Hide cards with no live game data — "No Games Available" placeholders and offseason stubs
+  const isNoGamesCard =
+    safeCard.subcategory === 'No Games Available' ||
+    safeCard.subcategory.toLowerCase().includes('no games') ||
+    (typeof safeCard.data.status === 'string' && safeCard.data.status === 'NO_DATA') ||
+    (safeCard.title.toLowerCase().includes('offseason') && safeCard.realData === false);
+
+  if (isNoGamesCard) return null;
+
   const handleAnalyze = onAnalyze ? () => onAnalyze(card) : undefined;
 
   // Determine card type and render appropriate component

@@ -1266,7 +1266,7 @@ No preamble. Start directly with section 1.`;
         if (isDev) console.log('[FANTASY INTENT] Generating fantasy cards');
         try {
           const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
-          const fantasyCards = generateFantasyCards(userMessage, 3);
+          const fantasyCards = generateFantasyCards(userMessage, 3, context.sport ?? undefined);
           context.existingCards = fantasyCards;
         } catch (err) {
           if (isDev) console.error('[FANTASY INTENT] Card generation failed:', err);
@@ -2806,7 +2806,7 @@ No preamble. Start directly with section 1.`;
           setSuggestedPrompts={setSuggestedPrompts}
           setLastUserQuery={setLastUserQuery}
           user={user}
-          onUserClick={() => setShowUserLightbox(true)}
+          onUserClick={() => isLoggedIn ? setShowUserLightbox(true) : setShowLoginModal(true)}
         />
       </div>
 
@@ -3782,7 +3782,7 @@ No preamble. Start directly with section 1.`;
               );
             })()}
             {/* Show configured league context + reset button */}
-            {selectedCategory === 'fantasy' && fantasyLeague?.setupComplete && (
+            {selectedCategory === 'fantasy' && fantasyLeague?.setupComplete && isLoggedIn && (
               <div className="mb-3 flex items-center gap-2 px-1">
                 <Trophy className="w-3.5 h-3.5 text-green-500" />
                 <span className="text-[11px] font-bold text-green-400">{fantasyLeague.teamName}</span>

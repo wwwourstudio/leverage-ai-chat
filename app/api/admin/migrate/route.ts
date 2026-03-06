@@ -74,6 +74,9 @@ CREATE TABLE IF NOT EXISTS api.user_profiles (
   user_id uuid UNIQUE NOT NULL,
   email text,
   display_name text,
+  avatar_url text,
+  subscription_tier text NOT NULL DEFAULT 'free'
+    CHECK (subscription_tier IN ('free','core','pro','high_stakes')),
   credits_remaining integer DEFAULT 50,
   total_predictions integer DEFAULT 0,
   correct_predictions integer DEFAULT 0,
@@ -277,6 +280,28 @@ CREATE POLICY "service_write_hitter_splits"
   USING (auth.role() = 'service_role');
 `;
 
+// Migration 007 — patch api.user_profiles to add columns required by SettingsLightbox
+const MIGRATION_007_SQL = `
+-- Add columns missing from the original migration 004 definition
+ALTER TABLE api.user_profiles ADD COLUMN IF NOT EXISTS avatar_url text;
+ALTER TABLE api.user_profiles ADD COLUMN IF NOT EXISTS subscription_tier text NOT NULL DEFAULT 'free';
+
+-- Add CHECK constraint only if not already present (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'user_profiles_subscription_tier_check'
+      AND conrelid = 'api.user_profiles'::regclass
+  ) THEN
+    ALTER TABLE api.user_profiles
+      ADD CONSTRAINT user_profiles_subscription_tier_check
+      CHECK (subscription_tier IN ('free','core','pro','high_stakes'));
+  END IF;
+END;
+$$;
+`;
+
 // Migration 005 — ai_predictions table for storing chat history
 const MIGRATION_005_SQL = `
 CREATE TABLE IF NOT EXISTS api.ai_predictions (
@@ -308,6 +333,7 @@ const MIGRATIONS = [
   { id: '004', name: 'user_profiles + user_preferences', sql: MIGRATION_004_SQL },
   { id: '005', name: 'ai_predictions', sql: MIGRATION_005_SQL },
   { id: '006', name: 'statcast_pitches_raw + hitter_splits', sql: MIGRATION_006_SQL },
+  { id: '007', name: 'user_profiles column patch (avatar_url + subscription_tier)', sql: MIGRATION_007_SQL },
 ];
 
 function extractProjectRef(supabaseUrl: string): string | null {

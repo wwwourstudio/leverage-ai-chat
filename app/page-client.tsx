@@ -1293,7 +1293,7 @@ No preamble. Start directly with section 1.`;
         if (isDev) console.log('[POLITICAL MARKET DETECTED] Skipping sports odds fetch');
         // Route directly to Kalshi analysis without attempting sports odds
         // Note: The /api/analyze endpoint will handle Kalshi market analysis
-      } else if (context.hasFantasyIntent && !context.hasBettingIntent && selectedCategory !== 'dfs') {
+      } else if (context.hasFantasyIntent && (!context.hasBettingIntent || selectedCategory === 'fantasy') && selectedCategory !== 'dfs') {
         // Fantasy intent — only generate cards when we know the sport; otherwise
         // NFL VBD cards would flash for NBA/MLB/etc. queries.
         if (context.sport) {

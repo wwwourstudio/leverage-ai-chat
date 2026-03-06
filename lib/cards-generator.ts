@@ -1000,7 +1000,7 @@ async function _generateContextualCards(
     });
   }
 
-  // DFS cards — sport-specific slate data
+  // DFS cards — fetch real player prop lines from Odds API, fall back to hardcoded
   if (category === 'dfs') {
     const dfsSlates: Record<string, Record<string, unknown>> = {
       baseball_mlb: {
@@ -1031,7 +1031,7 @@ async function _generateContextualCards(
         value: '4.3',
       },
     };
-    const slateData = dfsSlates[normalizedSport || ''] || {
+    const genericFallback: Record<string, unknown> = {
       player: 'Core Value Play', team: '—', position: 'FLEX',
       salary: '$7,200', projection: '32.0', ownership: '11%',
       boomCeiling: '52.0', bustFloor: '16.0',
@@ -1040,6 +1040,95 @@ async function _generateContextualCards(
       tips: 'Focus on value plays in GPP tournaments. Low ownership + high upside = leverage.',
       value: '4.4',
     };
+
+    let slateData: Record<string, unknown> = dfsSlates[normalizedSport || ''] ?? genericFallback;
+    let isRealData = false;
+
+    // Try to get real player lines from The Odds API
+    const dfsMarketMap: Record<string, string> = {
+      basketball_nba: 'player_points',
+      americanfootball_nfl: 'player_passing_yards',
+      baseball_mlb: 'batter_hits',
+      icehockey_nhl: 'player_shots_on_goal',
+    };
+    const dfsPositionMap: Record<string, string> = {
+      basketball_nba: 'G/F',
+      americanfootball_nfl: 'QB',
+      baseball_mlb: 'OF',
+      icehockey_nhl: 'W',
+    };
+    const dfsStatLabel: Record<string, string> = {
+      basketball_nba: 'scoring',
+      americanfootball_nfl: 'passing yards',
+      baseball_mlb: 'hits',
+      icehockey_nhl: 'shots',
+    };
+    const dfsMarket = dfsMarketMap[normalizedSport || ''];
+
+    if (dfsMarket && normalizedSport) {
+      try {
+        const { getOddsApiKey } = await import('@/lib/config');
+        const apiKey = getOddsApiKey();
+        const url = `https://api.the-odds-api.com/v4/sports/${normalizedSport}/odds?apiKey=${apiKey}&regions=us&markets=${dfsMarket}&oddsFormat=american`;
+
+        type OddsEvent = {
+          home_team: string;
+          away_team: string;
+          bookmakers: Array<{
+            markets: Array<{
+              key: string;
+              outcomes: Array<{ description?: string; name?: string; price: number; point?: number }>;
+            }>;
+          }>;
+        };
+
+        const resp = await Promise.race<Response | null>([
+          fetch(url, { next: { revalidate: 0 } } as RequestInit),
+          new Promise<null>(resolve => setTimeout(() => resolve(null), 5000)),
+        ]);
+
+        if (resp?.ok) {
+          const events = await resp.json() as OddsEvent[];
+          const lines: Array<{ player: string; line: number; game: string }> = [];
+          for (const ev of events) {
+            const game = `${ev.away_team}@${ev.home_team}`;
+            for (const bk of ev.bookmakers ?? []) {
+              const mkt = bk.markets?.find(m => m.key === dfsMarket);
+              for (const out of mkt?.outcomes ?? []) {
+                const playerName = out.description ?? out.name;
+                if (playerName && out.point !== undefined) {
+                  lines.push({ player: playerName, line: out.point, game });
+                }
+              }
+            }
+          }
+
+          if (lines.length > 0) {
+            const top = lines.reduce((a, b) => b.line > a.line ? b : a);
+            const salaryBase = Math.round((top.line * 190 + 3800) / 100) * 100;
+            const proj = top.line;
+            slateData = {
+              player: top.player,
+              team: '—',
+              position: dfsPositionMap[normalizedSport] ?? 'FLEX',
+              salary: `$${salaryBase.toLocaleString()}`,
+              projection: proj.toFixed(1),
+              ownership: `${Math.min(35, Math.round(8 + proj / 4))}%`,
+              boomCeiling: (proj * 1.52).toFixed(1),
+              bustFloor: (proj * 0.52).toFixed(1),
+              targetGame: top.game,
+              platforms: ['DraftKings', 'FanDuel'],
+              value: (proj / (salaryBase / 1000)).toFixed(1),
+              tips: `${top.player} leads ${dfsStatLabel[normalizedSport] ?? 'production'} market with ${proj} line — elite ceiling for GPP play.`,
+            };
+            isRealData = true;
+          }
+        }
+      } catch {
+        // Keep hardcoded fallback — silently degrade
+      }
+    }
+
     cards.push({
       type: 'DFS_LINEUP',
       title: `${displaySport || 'DFS'} Optimal Lineup`,
@@ -1048,6 +1137,7 @@ async function _generateContextualCards(
       subcategory: `${displaySport || 'Daily Fantasy'} • GPP Stack`,
       gradient: 'from-orange-600 to-red-700',
       data: slateData,
+      realData: isRealData,
     });
   }
 

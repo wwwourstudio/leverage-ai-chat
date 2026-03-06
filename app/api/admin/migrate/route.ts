@@ -93,6 +93,12 @@ CREATE TABLE IF NOT EXISTS api.user_preferences (
   tracked_sports text[] DEFAULT ARRAY['NBA', 'NFL'],
   theme text DEFAULT 'dark',
   default_sport text DEFAULT 'NBA',
+  odds_alerts boolean NOT NULL DEFAULT true,
+  line_movement_alerts boolean NOT NULL DEFAULT true,
+  arbitrage_alerts boolean NOT NULL DEFAULT true,
+  preferred_books text[] NOT NULL DEFAULT '{}',
+  bankroll numeric NOT NULL DEFAULT 0,
+  risk_tolerance text NOT NULL DEFAULT 'medium',
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
@@ -302,6 +308,16 @@ END;
 $$;
 `;
 
+// Migration 008 — patch api.user_preferences to add alert/settings columns required by SettingsLightbox
+const MIGRATION_008_SQL = `
+ALTER TABLE api.user_preferences ADD COLUMN IF NOT EXISTS odds_alerts         boolean NOT NULL DEFAULT true;
+ALTER TABLE api.user_preferences ADD COLUMN IF NOT EXISTS line_movement_alerts boolean NOT NULL DEFAULT true;
+ALTER TABLE api.user_preferences ADD COLUMN IF NOT EXISTS arbitrage_alerts    boolean NOT NULL DEFAULT true;
+ALTER TABLE api.user_preferences ADD COLUMN IF NOT EXISTS preferred_books     text[]  NOT NULL DEFAULT '{}';
+ALTER TABLE api.user_preferences ADD COLUMN IF NOT EXISTS bankroll            numeric NOT NULL DEFAULT 0;
+ALTER TABLE api.user_preferences ADD COLUMN IF NOT EXISTS risk_tolerance      text    NOT NULL DEFAULT 'medium';
+`;
+
 // Migration 005 — ai_predictions table for storing chat history
 const MIGRATION_005_SQL = `
 CREATE TABLE IF NOT EXISTS api.ai_predictions (
@@ -334,6 +350,7 @@ const MIGRATIONS = [
   { id: '005', name: 'ai_predictions', sql: MIGRATION_005_SQL },
   { id: '006', name: 'statcast_pitches_raw + hitter_splits', sql: MIGRATION_006_SQL },
   { id: '007', name: 'user_profiles column patch (avatar_url + subscription_tier)', sql: MIGRATION_007_SQL },
+  { id: '008', name: 'user_preferences column patch (alerts + bankroll + risk_tolerance)', sql: MIGRATION_008_SQL },
 ];
 
 function extractProjectRef(supabaseUrl: string): string | null {

@@ -48,6 +48,9 @@ interface CacheEntry {
 
 const marketCache = new Map<string, CacheEntry>();
 
+// Tracks in-flight requests by cache key so concurrent callers share one HTTP request
+const pendingRequests = new Map<string, Promise<KalshiMarket[]>>();
+
 /**
  * Generate cache key from parameters
  */
@@ -299,88 +302,105 @@ export async function fetchKalshiMarkets(params?: {
   cacheTtlMs?: number;
 }): Promise<KalshiMarket[]> {
   const { category, status = 'open', limit = 200, search, cursor, useCache = true, cacheTtlMs = 60000 } = params || {};
+  const cacheKey = getCacheKey({ category, status, limit, search });
 
   // Check cache first (only when not mid-pagination)
   if (useCache && !cursor) {
-    const cacheKey = getCacheKey({ category, status, limit, search });
     const cached = getCachedMarkets(cacheKey);
     if (cached) {
       console.log('[KALSHI] Returning cached markets');
       return cached;
     }
-    console.log('[KALSHI] Cache miss, fetching from API...');
+
+    // Coalesce: if an identical request is already in-flight, await that promise
+    const pending = pendingRequests.get(cacheKey);
+    if (pending) {
+      console.log('[KALSHI] Request already in-flight, coalescing:', cacheKey);
+      return pending;
+    }
   }
 
-  try {
-    const queryParams = new URLSearchParams({
-      limit: Math.min(limit, 1000).toString(),
-      status,
-    });
+  console.log('[KALSHI] Cache miss, fetching from API...');
 
-    // Use title keyword search (series_ticker expects exact IDs like "KXBT", not names)
-    const categorySearchMap: Record<string, string> = {
-      // Elections & Politics
-      'election': 'election', 'elections': 'election', 'politics': 'senate',
-      'political': 'senate', '2026': '2026', 'president': 'president',
-      'presidential': 'president', 'congress': 'congress', 'senate': 'senate',
-      'house': 'house representatives', 'governor': 'governor',
-      // Finance & Economics
-      'finance': 'stock', 'financial': 'stock market', 'stocks': 'stock',
-      'crypto': 'bitcoin', 'bitcoin': 'bitcoin', 'ethereum': 'ethereum',
-      'interest_rate': 'interest rate', 'fed': 'federal reserve',
-      'inflation': 'inflation', 'gdp': 'GDP', 'recession': 'recession',
-      'unemployment': 'unemployment', 'sp500': 'S&P', 'nasdaq': 'NASDAQ',
-      'economy': 'economic',
-      // Weather & Climate
-      'weather': 'temperature', 'climate': 'climate', 'hurricane': 'hurricane',
-      'tornado': 'tornado', 'temperature': 'temperature', 'snow': 'snow',
-      'rain': 'rainfall', 'wildfire': 'wildfire', 'earthquake': 'earthquake',
-      // Sports
-      'sports': 'game', 'nfl': 'NFL', 'nba': 'NBA', 'mlb': 'MLB',
-      'nhl': 'NHL', 'soccer': 'soccer', 'mma': 'UFC', 'boxing': 'boxing',
-      'golf': 'golf', 'tennis': 'tennis', 'f1': 'Formula',
-      // Entertainment & Culture
-      'entertainment': 'award', 'oscars': 'Oscar', 'grammys': 'Grammy',
-      'emmys': 'Emmy', 'movies': 'box office', 'tv': 'ratings',
-      // Tech & Science
-      'tech': 'technology', 'ai': 'artificial intelligence', 'spacex': 'SpaceX',
-      'space': 'space', 'nasa': 'NASA',
-      // Global Events
-      'war': 'conflict', 'global': 'global', 'china': 'China', 'russia': 'Russia',
-      'ukraine': 'Ukraine', 'trade': 'trade', 'tariff': 'tariff',
-    };
+  const doFetch = async (): Promise<KalshiMarket[]> => {
+    try {
+      const queryParams = new URLSearchParams({
+        limit: Math.min(limit, 1000).toString(),
+        status,
+      });
 
-    if (category) {
-      const titleSearch = categorySearchMap[category.toLowerCase()] ?? category;
-      queryParams.append('title', titleSearch);
+      // Use title keyword search (series_ticker expects exact IDs like "KXBT", not names)
+      const categorySearchMap: Record<string, string> = {
+        // Elections & Politics
+        'election': 'election', 'elections': 'election', 'politics': 'senate',
+        'political': 'senate', '2026': '2026', 'president': 'president',
+        'presidential': 'president', 'congress': 'congress', 'senate': 'senate',
+        'house': 'house representatives', 'governor': 'governor',
+        // Finance & Economics
+        'finance': 'stock', 'financial': 'stock market', 'stocks': 'stock',
+        'crypto': 'bitcoin', 'bitcoin': 'bitcoin', 'ethereum': 'ethereum',
+        'interest_rate': 'interest rate', 'fed': 'federal reserve',
+        'inflation': 'inflation', 'gdp': 'GDP', 'recession': 'recession',
+        'unemployment': 'unemployment', 'sp500': 'S&P', 'nasdaq': 'NASDAQ',
+        'economy': 'economic',
+        // Weather & Climate
+        'weather': 'temperature', 'climate': 'climate', 'hurricane': 'hurricane',
+        'tornado': 'tornado', 'temperature': 'temperature', 'snow': 'snow',
+        'rain': 'rainfall', 'wildfire': 'wildfire', 'earthquake': 'earthquake',
+        // Sports
+        'sports': 'game', 'nfl': 'NFL', 'nba': 'NBA', 'mlb': 'MLB',
+        'nhl': 'NHL', 'soccer': 'soccer', 'mma': 'UFC', 'boxing': 'boxing',
+        'golf': 'golf', 'tennis': 'tennis', 'f1': 'Formula',
+        // Entertainment & Culture
+        'entertainment': 'award', 'oscars': 'Oscar', 'grammys': 'Grammy',
+        'emmys': 'Emmy', 'movies': 'box office', 'tv': 'ratings',
+        // Tech & Science
+        'tech': 'technology', 'ai': 'artificial intelligence', 'spacex': 'SpaceX',
+        'space': 'space', 'nasa': 'NASA',
+        // Global Events
+        'war': 'conflict', 'global': 'global', 'china': 'China', 'russia': 'Russia',
+        'ukraine': 'Ukraine', 'trade': 'trade', 'tariff': 'tariff',
+      };
+
+      if (category) {
+        const titleSearch = categorySearchMap[category.toLowerCase()] ?? category;
+        queryParams.append('title', titleSearch);
+      }
+      if (search) {
+        queryParams.set('title', search);
+      }
+      if (cursor) {
+        queryParams.append('cursor', cursor);
+      }
+
+      console.log('[KALSHI] Fetching markets — params:', { category, status, limit, search, cursor: !!cursor });
+
+      const { markets: meaningfulMarkets } = await fetchKalshiPage(queryParams);
+
+      console.log(`[KALSHI] Fetched ${meaningfulMarkets.length} meaningful markets`);
+
+      if (useCache && !cursor && meaningfulMarkets.length > 0) {
+        cacheMarkets(cacheKey, meaningfulMarkets, cacheTtlMs);
+      }
+
+      return meaningfulMarkets;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('[KALSHI] ❌ Request timeout after 10s');
+      } else {
+        console.error('[KALSHI] ❌ Failed to fetch markets:', error instanceof Error ? error.message : error);
+      }
+      return [];
+    } finally {
+      pendingRequests.delete(cacheKey);
     }
-    if (search) {
-      queryParams.set('title', search);
-    }
-    if (cursor) {
-      queryParams.append('cursor', cursor);
-    }
+  };
 
-    console.log('[KALSHI] Fetching markets — params:', { category, status, limit, search, cursor: !!cursor });
-
-    const { markets: meaningfulMarkets } = await fetchKalshiPage(queryParams);
-
-    console.log(`[KALSHI] Fetched ${meaningfulMarkets.length} meaningful markets`);
-
-    if (useCache && !cursor && meaningfulMarkets.length > 0) {
-      const cacheKey = getCacheKey({ category, status, limit, search });
-      cacheMarkets(cacheKey, meaningfulMarkets, cacheTtlMs);
-    }
-
-    return meaningfulMarkets;
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      console.error('[KALSHI] ❌ Request timeout after 10s');
-    } else {
-      console.error('[KALSHI] ❌ Failed to fetch markets:', error instanceof Error ? error.message : error);
-    }
-    return [];
+  const fetchPromise = doFetch();
+  if (useCache && !cursor) {
+    pendingRequests.set(cacheKey, fetchPromise);
   }
+  return fetchPromise;
 }
 
 /**
@@ -644,36 +664,28 @@ export async function fetchElectionMarkets(options?: {
  * Fetch weather-related markets from Kalshi
  */
 export async function fetchWeatherMarkets(limit: number = 50): Promise<KalshiMarket[]> {
-  const weatherSearches = [
-    'temperature', 'hurricane', 'tornado', 'snow', 'rainfall',
-    'wildfire', 'earthquake', 'climate', 'weather',
-  ];
+  // Trimmed to 3 broad terms to avoid Kalshi rate limits (previously 9 terms → 429 errors).
+  const weatherSearches = ['weather', 'temperature', 'climate'];
+  const WEATHER_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
   const seen = new Set<string>();
   const all: KalshiMarket[] = [];
 
   console.log('[KALSHI] Fetching weather markets...');
 
-  const batchSize = 3;
-  const BATCH_DELAY_MS = 400;
-
-  for (let i = 0; i < weatherSearches.length; i += batchSize) {
-    const batch = weatherSearches.slice(i, i + batchSize);
-    const results = await Promise.allSettled(
-      batch.map(search => fetchKalshiMarkets({ search, limit: 50, useCache: true }))
-    );
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        for (const market of result.value) {
-          if (!seen.has(market.ticker)) {
-            seen.add(market.ticker);
-            all.push(market);
-          }
+  const results = await Promise.allSettled(
+    weatherSearches.map(search =>
+      fetchKalshiMarkets({ search, limit: 50, useCache: true, cacheTtlMs: WEATHER_CACHE_TTL_MS })
+    )
+  );
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      for (const market of result.value) {
+        if (!seen.has(market.ticker)) {
+          seen.add(market.ticker);
+          all.push(market);
         }
       }
-    }
-    if (i + batchSize < weatherSearches.length) {
-      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
     }
   }
 

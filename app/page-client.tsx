@@ -3346,18 +3346,18 @@ No preamble. Start directly with section 1.`;
 
                   {/* Combined Metadata: Source Credibility & AI Trust - Hidden for welcome message */}
                   {message.role === 'assistant' && !message.isWelcome && (message.sources || message.trustMetrics) && (
-                    <div className="mt-4 ml-11">
+                    <div className="mt-3 md:ml-11">
                       {/* Compact Metadata Summary */}
-                      <div className="flex items-center gap-3 text-[11px] text-gray-600">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-600">
                         {message.modelUsed && (
-                          <span className="flex items-center gap-1.5">
-                            <BookOpen className="w-3 h-3 text-purple-500/60" />
+                          <span className="flex items-center gap-1">
+                            <BookOpen className="w-3 h-3 text-purple-500/60 shrink-0" />
                             <span>Model: <span className="text-gray-500 font-semibold">{message.modelUsed.replace('Grok 3', 'Grok 4').replace('grok-3', 'Grok 4').replace('grok-4', 'Grok 4')}</span></span>
                           </span>
                         )}
                         {message.processingTime && (
-                          <span className="flex items-center gap-1.5">
-                            <Zap className="w-3 h-3 text-yellow-500/60" />
+                          <span className="flex items-center gap-1">
+                            <Zap className="w-3 h-3 text-yellow-500/60 shrink-0" />
                             <span>Processed in: <span className="text-gray-500 font-semibold tabular-nums">{message.processingTime}ms</span></span>
                           </span>
                         )}
@@ -3365,26 +3365,26 @@ No preamble. Start directly with section 1.`;
 
                       {/* Collapsible Source Credibility */}
                       {message.sources && message.sources.length > 0 && (
-                        <details className="mt-3 group/sources">
-                          <summary className="cursor-pointer list-none flex items-center gap-2 text-[11px] text-gray-600 hover:text-gray-500 transition-colors">
-                            <Shield className="w-3.5 h-3.5 text-blue-500/60" />
+                        <details className="mt-2 group/sources">
+                          <summary className="cursor-pointer list-none flex items-center gap-1.5 text-[11px] text-gray-600 hover:text-gray-500 transition-colors">
+                            <Shield className="w-3.5 h-3.5 text-blue-500/60 shrink-0" />
                             <span className="font-semibold uppercase tracking-wide">Source Credibility</span>
                             <span className="text-gray-700">({message.sources.length} sources)</span>
-                            <ChevronRight className="w-3 h-3 group-open/sources:rotate-90 transition-transform" />
+                            <ChevronRight className="w-3 h-3 group-open/sources:rotate-90 transition-transform shrink-0" />
                           </summary>
-                          <div className="mt-3 flex flex-wrap gap-2 pl-5">
+                          <div className="mt-2 flex flex-wrap gap-1.5">
                             {message.sources.map((source, idx) => {
                               const reliabilityColor = source.reliability >= 95 ? 'text-green-500 border-green-600/20' :
                                                       source.reliability >= 90 ? 'text-blue-500 border-blue-600/20' :
                                                       'text-yellow-500 border-yellow-600/20';
-                              const Icon = source.type === 'database' ? Database : 
-                                          source.type === 'api' ? Activity : 
-                                          source.type === 'model' ? Sparkles : 
+                              const Icon = source.type === 'database' ? Database :
+                                          source.type === 'api' ? Activity :
+                                          source.type === 'model' ? Sparkles :
                                           RefreshCw;
                               return (
-                                <div 
-                                  key={idx} 
-                                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border bg-gray-900/30 ${reliabilityColor} text-[11px]`}
+                                <div
+                                  key={idx}
+                                  className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border bg-gray-900/30 ${reliabilityColor} text-[11px]`}
                                   title={`${source.name} - ${source.reliability}% reliability`}
                                 >
                                   <Icon className="w-3 h-3" />
@@ -3399,9 +3399,9 @@ No preamble. Start directly with section 1.`;
 
                       {/* Collapsible AI Trust & Integrity */}
                       {message.trustMetrics && (
-                        <details className="mt-3 group/trust">
-                          <summary className="cursor-pointer list-none flex items-center gap-2 text-[11px] text-gray-600 hover:text-gray-400 transition-colors">
-                            <Shield className={`w-3.5 h-3.5 ${
+                        <details className="mt-2 group/trust">
+                          <summary className="cursor-pointer list-none flex flex-wrap items-center gap-1.5 text-[11px] text-gray-600 hover:text-gray-400 transition-colors">
+                            <Shield className={`w-3.5 h-3.5 shrink-0 ${
                               message.trustMetrics.trustLevel === 'high' ? 'text-emerald-500/70' :
                               message.trustMetrics.trustLevel === 'medium' ? 'text-yellow-500/70' :
                               'text-red-500/70'
@@ -3425,9 +3425,9 @@ No preamble. Start directly with section 1.`;
                             <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-500/10 text-purple-400/80">
                               {message.modelUsed || 'Grok 4'}
                             </span>
-                            <ChevronRight className="w-3 h-3 group-open/trust:rotate-90 transition-transform ml-auto" />
+                            <ChevronRight className="w-3 h-3 group-open/trust:rotate-90 transition-transform shrink-0" />
                           </summary>
-                          <div className="mt-3 pl-5">
+                          <div className="mt-2">
                             <TrustMetricsDisplay
                               metrics={{
                                 ...message.trustMetrics,

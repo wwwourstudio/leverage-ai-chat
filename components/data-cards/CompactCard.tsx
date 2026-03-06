@@ -1,8 +1,9 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { LucideIcon, TrendingUp, Activity, Zap, Trophy, BarChart2, CloudRain, GitMerge, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getTeamLogoUrl } from '@/lib/constants';
 
 interface CompactCardData {
   type: string;
@@ -74,6 +75,34 @@ function cardIcon(type: string): LucideIcon {
   return Star;
 }
 
+/** Parse "Away @ Home" or "Away vs Home" from a string */
+function parseTeams(text: string): { away: string; home: string } | null {
+  const atIdx = text.indexOf(' @ ');
+  if (atIdx >= 0) return { away: text.slice(0, atIdx).trim(), home: text.slice(atIdx + 3).trim() };
+  const vsMatch = text.match(/^(.+?)\s+vs\.?\s+(.+)$/i);
+  if (vsMatch) return { away: vsMatch[1].trim(), home: vsMatch[2].trim() };
+  return null;
+}
+
+/** Tiny team logo with abbr fallback */
+function MiniTeamLogo({ name, sport }: { name: string; sport?: string }) {
+  const [failed, setFailed] = useState(false);
+  const url = getTeamLogoUrl(name, sport);
+  const abbr = name.trim().split(/\s+/).pop()?.slice(0, 3).toUpperCase() ?? name.slice(0, 3).toUpperCase();
+  if (url && !failed) {
+    return (
+      <div className="w-5 h-5 rounded-md overflow-hidden bg-white/5 flex items-center justify-center shrink-0">
+        <img src={url} alt={name} className="w-full h-full object-contain" onError={() => setFailed(true)} />
+      </div>
+    );
+  }
+  return (
+    <div className="w-5 h-5 rounded-md bg-[oklch(0.18_0.015_280)] flex items-center justify-center shrink-0 text-[7px] font-black text-[oklch(0.55_0.015_280)]">
+      {abbr}
+    </div>
+  );
+}
+
 /** Mini probability bar for Kalshi subcards */
 function MiniProbBar({ yesPct }: { yesPct: number }) {
   return (
@@ -95,6 +124,10 @@ export const CompactCard = memo(function CompactCard({ card, index, isActive, on
   const Icon = cardIcon(card.type);
   const isKalshi = card.type.toLowerCase().includes('kalshi') || card.type.toLowerCase().includes('prediction');
   const yesPct: number | null = isKalshi && typeof card.data.yesPct === 'number' ? card.data.yesPct : null;
+
+  // Parse teams from title or matchup data
+  const teams = parseTeams(card.title) ?? (card.data.matchup ? parseTeams(String(card.data.matchup)) : null);
+  const sport = card.data.sport as string | undefined;
 
   // Subcategory display: use normalised data.subcategory or card.subcategory, never raw ticker
   const displayCategory =
@@ -121,18 +154,27 @@ export const CompactCard = memo(function CompactCard({ card, index, isActive, on
         <div className="absolute left-0 top-2.5 bottom-2.5 w-[2px] rounded-full bg-[#00c47c]" />
       )}
 
-      {/* Top row: icon + key stat */}
+      {/* Top row: icon/logos + key stat */}
       <div className="flex items-start justify-between gap-1">
-        <div className={cn(
-          'flex items-center justify-center w-6 h-6 rounded-md shrink-0',
-          isKalshi ? 'bg-[#00c47c15] border border-[#00c47c25]' : 'bg-[oklch(0.14_0.018_280)] border border-[oklch(0.20_0.018_280)]',
-        )}>
-          <Icon
-            className="w-3 h-3"
-            style={{ color: isKalshi ? YES_COLOR : 'oklch(0.55 0.015 280)' }}
-            aria-hidden="true"
-          />
-        </div>
+        {teams ? (
+          /* Dual team logos */
+          <div className="flex items-center gap-1 shrink-0">
+            <MiniTeamLogo name={teams.away} sport={sport} />
+            <span className="text-[8px] font-bold text-[oklch(0.30_0.01_280)]">@</span>
+            <MiniTeamLogo name={teams.home} sport={sport} />
+          </div>
+        ) : (
+          <div className={cn(
+            'flex items-center justify-center w-6 h-6 rounded-md shrink-0',
+            isKalshi ? 'bg-[#00c47c15] border border-[#00c47c25]' : 'bg-[oklch(0.14_0.018_280)] border border-[oklch(0.20_0.018_280)]',
+          )}>
+            <Icon
+              className="w-3 h-3"
+              style={{ color: isKalshi ? YES_COLOR : 'oklch(0.55 0.015 280)' }}
+              aria-hidden="true"
+            />
+          </div>
+        )}
 
         {keyStat && (
           <div className="flex flex-col items-end shrink-0">

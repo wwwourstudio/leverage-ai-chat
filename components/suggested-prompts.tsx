@@ -85,7 +85,7 @@ export function SuggestedPrompts({
 
       {/* Follow up on: label */}
       {lastUserQuery && suggestedPrompts.length > 0 && hasMessages && (
-        <div className="mb-3 px-1 flex items-center gap-2">
+        <div className="hidden sm:flex mb-3 px-1 items-center gap-2">
           <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">
             Follow up on:
           </span>

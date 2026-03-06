@@ -26,16 +26,16 @@ export function ChatHeader({
   onOpenSignup,
 }: ChatHeaderProps) {
   return (
-    <div className="relative bg-gradient-to-r from-gray-950 via-gray-900 to-gray-950 border-b border-[var(--border-subtle)] px-3 py-3 md:px-6 md:py-4 shadow-2xl backdrop-blur-xl">
+    <div className="relative bg-[var(--bg-overlay)] border-b border-[var(--border-subtle)] px-3 py-3 md:px-6 md:py-4 shadow-2xl backdrop-blur-xl">
       <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-transparent to-transparent pointer-events-none"></div>
       <div className="relative flex items-center justify-between max-w-6xl mx-auto">
         {/* Left: hamburger + logo */}
         <div className="flex items-center gap-2 md:gap-4">
           <button
             onClick={onToggleSidebar}
-            className="group p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 active:scale-95 bg-transparent"
+            className="group p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 active:scale-95 bg-transparent"
           >
-            <Menu className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" />
+            <Menu className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
           </button>
           <div className="flex items-center gap-2 md:gap-3">
             {/* Logo mark */}
@@ -60,7 +60,7 @@ export function ChatHeader({
             <>
               {/* User profile card — hidden on mobile, use sidebar avatar instead */}
               <div
-                className="hidden md:flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 hover:bg-gray-800/50 transition-all"
+                className="hidden md:flex items-center gap-3 px-3 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] cursor-pointer hover:border-[var(--border-hover,oklch(0.30_0.02_280))] hover:bg-[var(--bg-elevated)] transition-all"
                 onClick={onOpenUserLightbox}
               >
                 <div className="flex items-center gap-2.5">
@@ -72,7 +72,7 @@ export function ChatHeader({
                         user.name.charAt(0).toUpperCase()
                       )}
                     </div>
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-950"></div>
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-[var(--bg-overlay)]"></div>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-sm font-bold text-white">{user.name}</span>
@@ -83,23 +83,23 @@ export function ChatHeader({
 
               <button
                 onClick={onOpenAlerts}
-                className="relative p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
+                className="relative p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
               >
-                <Bell className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" />
-                <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-gray-950 shadow-lg shadow-red-500/50 animate-pulse"></div>
+                <Bell className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
+                <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-[var(--bg-overlay)] shadow-lg shadow-red-500/50 animate-pulse"></div>
               </button>
               <button
                 onClick={onOpenSettings}
-                className="p-2.5 hover:bg-gray-800/70 rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
+                className="p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
               >
-                <Settings className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" />
+                <Settings className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
               </button>
             </>
           ) : (
             <>
               <button
                 onClick={onOpenLogin}
-                className="px-3 py-1.5 md:px-4 md:py-2 rounded-xl border border-gray-800 bg-gray-900/50 hover:bg-gray-800/70 hover:border-gray-700 text-gray-300 hover:text-white text-xs md:text-sm font-semibold transition-all"
+                className="px-3 py-1.5 md:px-4 md:py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-overlay)] hover:bg-[var(--bg-elevated)] hover:border-[oklch(0.28_0.02_280)] text-[var(--text-muted)] hover:text-white text-xs md:text-sm font-semibold transition-all"
               >
                 Log in
               </button>

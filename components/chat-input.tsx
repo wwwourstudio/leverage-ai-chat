@@ -112,14 +112,14 @@ export function ChatInput({
             {uploadedFiles.map((file) => (
               <div
                 key={file.id}
-                className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl group/file hover:border-gray-600 transition-all"
+                className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl group/file hover:border-[oklch(0.30_0.02_280)] transition-all"
               >
                 {file.type === 'image' ? (
                   <ImageIcon className="w-4 h-4 text-blue-400" />
                 ) : (
                   <FileText className="w-4 h-4 text-green-400" />
                 )}
-                <span className="text-xs font-bold text-gray-300 max-w-[120px] truncate">
+                <span className="text-xs font-bold text-white/80 max-w-[120px] truncate">
                   {file.name}
                 </span>
                 <span className="text-xs text-[var(--text-muted)]">
@@ -183,7 +183,7 @@ export function ChatInput({
               onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
               placeholder={placeholder ?? defaultPlaceholder}
-              className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-gray-600/60 focus:border-blue-500/40 rounded-2xl px-3 py-2.5 md:px-6 md:pr-32 font-medium text-white placeholder-gray-500 focus:outline-none transition-all backdrop-blur-sm shadow-inner text-xs md:text-base leading-relaxed resize-none overflow-hidden"
+              className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[oklch(0.28_0.02_280)] focus:border-blue-500/40 rounded-2xl px-3 py-2.5 md:px-6 md:pr-32 font-medium text-white placeholder-[var(--text-faint)] focus:outline-none transition-all backdrop-blur-sm shadow-inner text-xs md:text-base leading-relaxed resize-none overflow-hidden"
               disabled={isTyping}
               maxLength={500}
               rows={1}
@@ -194,7 +194,7 @@ export function ChatInput({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="p-2 hover:bg-gray-800/70 rounded-lg transition-all group/attach border-none bg-transparent"
+                className="p-2 hover:bg-[var(--bg-elevated)] rounded-lg transition-all group/attach border-none bg-transparent"
                 title="Attach image or CSV file"
                 disabled={isTyping}
               >
@@ -220,7 +220,7 @@ export function ChatInput({
             <button
               type="submit"
               disabled={!input.trim() && uploadedFiles.length === 0}
-              className="flex-shrink-0 relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-gray-800 disabled:to-gray-900 disabled:cursor-not-allowed text-white rounded-2xl px-3 md:px-8 transition-all duration-300 shadow-xl shadow-blue-500/25 hover:shadow-blue-500/50 disabled:shadow-none flex items-center gap-2.5 font-bold group overflow-hidden active:scale-95 disabled:hover:scale-100"
+              className="flex-shrink-0 relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-[var(--bg-elevated)] disabled:to-[var(--bg-surface)] disabled:cursor-not-allowed text-white rounded-2xl px-3 md:px-8 transition-all duration-300 shadow-xl shadow-blue-500/25 hover:shadow-blue-500/50 disabled:shadow-none flex items-center gap-2.5 font-bold group overflow-hidden active:scale-95 disabled:hover:scale-100"
               style={{ minHeight: '44px' }}
             >
               <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
@@ -236,7 +236,7 @@ export function ChatInput({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="sm:hidden flex-shrink-0 p-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-gray-600 active:scale-95 transition-all"
+          className="sm:hidden flex-shrink-0 p-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[oklch(0.30_0.02_280)] active:scale-95 transition-all"
           title="Attach file"
           disabled={isTyping}
         >
@@ -251,7 +251,7 @@ export function ChatInput({
             className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-md border transition-all cursor-pointer hover:opacity-80 ${
               creditsRemaining <= 3
                 ? 'text-orange-400 bg-orange-500/10 border-orange-500/30'
-                : 'text-[var(--text-muted)] bg-gray-900/30 border-gray-800'
+                : 'text-[var(--text-muted)] bg-[var(--bg-overlay)] border-[var(--border-subtle)]'
             }`}
           >
             <Sparkles className="w-3 h-3" />

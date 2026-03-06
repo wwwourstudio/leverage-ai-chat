@@ -86,10 +86,10 @@ export function SuggestedPrompts({
       {/* Follow up on: label */}
       {lastUserQuery && suggestedPrompts.length > 0 && hasMessages && (
         <div className="mb-3 px-1 flex items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">
             Follow up on:
           </span>
-          <span className="text-[11px] text-gray-400 truncate max-w-[420px]">
+          <span className="text-[11px] text-[var(--text-muted)] truncate max-w-[420px]">
             {lastUserQuery.length > 72 ? lastUserQuery.slice(0, 72) + '\u2026' : lastUserQuery}
           </span>
         </div>
@@ -110,16 +110,16 @@ export function SuggestedPrompts({
                 onClick={() => onPromptClick(submitText)}
                 className={`group/prompt flex items-center gap-1.5 md:gap-2.5 px-2.5 md:px-4 py-1 md:py-2.5 rounded-full border text-xs md:text-sm font-medium whitespace-nowrap transition-all duration-200 snap-start ${
                   isSuggested
-                    ? 'bg-gray-900/60 border-blue-500/50 text-gray-200 hover:bg-gradient-to-r hover:from-blue-600/20 hover:via-purple-600/20 hover:to-blue-600/20 hover:border-blue-400/70'
+                    ? 'bg-[var(--bg-overlay)] border-blue-500/50 text-white/80 hover:bg-gradient-to-r hover:from-blue-600/20 hover:via-purple-600/20 hover:to-blue-600/20 hover:border-blue-400/70'
                     : selectedCategory === 'kalshi'
-                      ? 'bg-gray-900/60 border-cyan-800/50 text-gray-400 hover:bg-cyan-900/20 hover:border-cyan-600/50 hover:text-cyan-300'
-                      : 'bg-gray-900/60 border-gray-800/70 text-gray-400 hover:bg-gray-800/70 hover:border-gray-700 hover:text-gray-200'
+                      ? 'bg-[var(--bg-overlay)] border-cyan-800/50 text-[var(--text-muted)] hover:bg-cyan-900/20 hover:border-cyan-600/50 hover:text-cyan-300'
+                      : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:border-[oklch(0.28_0.02_280)] hover:text-white/80'
                 }`}
               >
                 <Icon className={`w-3 h-3 md:w-4 md:h-4 flex-shrink-0 ${
-                  isSuggested ? 'text-gray-400 group-hover/prompt:text-blue-400'
+                  isSuggested ? 'text-[var(--text-muted)] group-hover/prompt:text-blue-400'
                   : selectedCategory === 'kalshi' ? 'text-cyan-600 group-hover/prompt:text-cyan-400'
-                  : 'text-gray-500 group-hover/prompt:text-gray-400'
+                  : 'text-[var(--text-faint)] group-hover/prompt:text-[var(--text-muted)]'
                 }`} />
                 <span>{action.label}</span>
               </button>

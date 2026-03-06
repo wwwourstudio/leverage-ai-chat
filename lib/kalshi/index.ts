@@ -99,8 +99,12 @@ function buildHeaders(url: string = ''): Record<string, string> {
     'Accept': 'application/json',
     'User-Agent': 'LeverageAI/1.0',
   };
-  const keyId      = process.env.KALSHI_API_KEY_ID;
-  const privateKey = process.env.KALSHI_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const keyId  = process.env.KALSHI_API_KEY_ID;
+  const rawKey = process.env.KALSHI_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  // Wrap bare base64 in PEM headers if needed
+  const privateKey = rawKey && !rawKey.includes('-----')
+    ? `-----BEGIN RSA PRIVATE KEY-----\n${rawKey.match(/.{1,64}/g)?.join('\n') ?? rawKey}\n-----END RSA PRIVATE KEY-----`
+    : rawKey;
   if (keyId && privateKey && url) {
     try {
       const { pathname, search } = new URL(url);

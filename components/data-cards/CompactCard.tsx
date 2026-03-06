@@ -107,11 +107,11 @@ export const CompactCard = memo(function CompactCard({ card, index, isActive, on
     <button
       onClick={onClick}
       className={cn(
-        'group relative flex flex-col gap-2 p-3 rounded-xl border text-left transition-all duration-200 w-full',
+        'group relative flex flex-col gap-2 p-3 rounded-xl border text-left transition-all duration-200 w-full hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50',
         'bg-[#0f0f11] hover:bg-[oklch(0.14_0.014_280)]',
         isActive
           ? 'border-[#00c47c40] shadow-[0_0_16px_#00c47c18]'
-          : 'border-[oklch(0.18_0.014_280)] hover:border-[oklch(0.26_0.018_280)]',
+          : 'border-[oklch(0.18_0.014_280)] hover:border-[oklch(0.26_0.018_280)] hover:shadow-[0_2px_16px_oklch(0.3_0.08_240/0.10)]',
       )}
       aria-pressed={isActive}
       title={card.title}

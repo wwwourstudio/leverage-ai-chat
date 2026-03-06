@@ -104,7 +104,7 @@ export function MobileChatInput({
   return (
     <div
       className={cn(
-        'border-t border-[oklch(0.22_0.02_280)] bg-[oklch(0.10_0.01_280)]/95 backdrop-blur-xl p-3 transition-all',
+        'border-t border-[var(--border-subtle)] bg-[var(--bg-overlay)]/95 backdrop-blur-xl p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] transition-all',
         isDragOver && 'border-blue-500/50 bg-blue-950/20',
       )}
       onDragEnter={handleDragEnter}
@@ -128,7 +128,7 @@ export function MobileChatInput({
           {files.map(file => (
             <div
               key={file.id}
-              className="flex items-center gap-1.5 px-2 py-1 bg-[oklch(0.16_0.015_280)] border border-[oklch(0.22_0.02_280)] rounded-lg"
+              className="flex items-center gap-1.5 px-2 py-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg"
             >
               {file.type === 'image' ? (
                 <ImageIcon className="w-3 h-3 text-blue-400 shrink-0" />
@@ -148,7 +148,7 @@ export function MobileChatInput({
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="flex items-end gap-2">
+      <form onSubmit={handleSubmit} className="flex items-center gap-2">
         <input
           ref={fileInputRef}
           type="file"
@@ -162,27 +162,26 @@ export function MobileChatInput({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled}
-          className="p-2.5 rounded-xl bg-[oklch(0.16_0.015_280)] hover:bg-[oklch(0.20_0.02_280)] transition-colors flex-shrink-0 disabled:opacity-50"
+          className="p-2.5 rounded-xl bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] transition-colors flex-shrink-0 disabled:opacity-50"
           aria-label="Attach file"
         >
           <Paperclip className="w-4.5 h-4.5 text-gray-400" />
         </button>
 
-        <div className="flex-1 relative">
-          <textarea
+        <div className="flex-1 relative min-w-0">
+          <input
+            type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (e.key === 'Enter') {
                 e.preventDefault();
                 handleSubmit(e);
               }
             }}
             placeholder={isDragOver ? 'Drop files here...' : placeholder}
             disabled={disabled}
-            rows={1}
-            className="w-full resize-none bg-[oklch(0.16_0.015_280)] border border-[oklch(0.22_0.02_280)] rounded-xl px-3 py-2.5 text-gray-100 placeholder-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            style={{ maxHeight: '120px' }}
+            className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl px-3 py-2.5 text-gray-100 placeholder-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all overflow-x-auto whitespace-nowrap"
           />
         </div>
 

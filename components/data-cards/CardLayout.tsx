@@ -114,8 +114,8 @@ export const CardLayout = memo(function CardLayout({
           <div className={cn(
             'grid gap-2',
             suggestedCards.length === 1 ? 'grid-cols-1' :
-            suggestedCards.length === 2 ? 'grid-cols-2' :
-            'grid-cols-3',
+            suggestedCards.length === 2 ? 'grid-cols-1 sm:grid-cols-2' :
+            'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
           )}>
             {suggestedCards.map((card, i) => {
               // Map back to original index in the cards array

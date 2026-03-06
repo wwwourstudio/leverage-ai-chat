@@ -77,7 +77,7 @@ export const BaseCard = memo(function BaseCard({
 
   return (
     <article className={cn(
-      'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] hover:shadow-[0_0_40px_oklch(0.4_0.12_240/0.12)] transition-all duration-200 animate-fade-in-up',
+      'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] hover:shadow-[0_0_40px_oklch(0.4_0.12_240/0.12)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 transition-all duration-200 animate-fade-in-up',
       isHero && 'border-[oklch(0.26_0.025_260)] shadow-[0_0_24px_oklch(0.3_0.08_260/0.15)]',
       className,
     )}>

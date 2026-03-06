@@ -3782,7 +3782,7 @@ No preamble. Start directly with section 1.`;
               );
             })()}
             {/* Show configured league context + reset button */}
-            {selectedCategory === 'fantasy' && fantasyLeague?.setupComplete && (
+            {selectedCategory === 'fantasy' && fantasyLeague?.setupComplete && isLoggedIn && (
               <div className="mb-3 flex items-center gap-2 px-1">
                 <Trophy className="w-3.5 h-3.5 text-green-500" />
                 <span className="text-[11px] font-bold text-green-400">{fantasyLeague.teamName}</span>

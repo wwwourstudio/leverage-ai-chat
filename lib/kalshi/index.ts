@@ -8,7 +8,7 @@
 
 import crypto from 'crypto';
 
-const KALSHI_TRADING_URL = 'https://api.elections.kalshi.com/trade-api/v2';
+const KALSHI_TRADING_URL = 'https://trading.kalshi.com/trade-api/v2';
 
 export interface KalshiMarket {
   ticker: string;
@@ -204,7 +204,11 @@ function parseMarket(m: any): KalshiMarket {
     toStr(m.event_title) && singleYesSub ? `${toStr(m.event_title)}: ${singleYesSub}` : '';
 
   // Primary title — also strip any stray "yes "/"no " prefix that leaks through
-  const rawTitle: string = toStr(m.title) || compositeTitle || toStr(m.event_title) || toStr(m.subtitle) || '';
+  const rawTitleFull: string = toStr(m.title) || compositeTitle || toStr(m.event_title) || toStr(m.subtitle) || '';
+  // Kalshi combo markets concatenate outcomes as "Boston,yes Portland,yes Amen Thompson: 4+"
+  // Split on the ",yes "/" ,no " separator and rejoin with · for a readable card title
+  const titleParts = rawTitleFull.split(/,\s*(yes|no)\s+/i).filter((_, i) => i % 2 === 0).map(s => s.trim()).filter(Boolean);
+  const rawTitle = titleParts.length > 1 ? titleParts.join(' · ') : rawTitleFull.trim();
   const cleanTitle = rawTitle.replace(/^(yes|no)\s+/i, '').trim();
 
   // Price change: only compute when previous_yes_bid is a real (non-zero) prior snapshot.

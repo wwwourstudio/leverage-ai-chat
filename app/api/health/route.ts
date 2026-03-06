@@ -122,19 +122,19 @@ async function checkKalshiAPI(): Promise<ServiceHealth> {
   const startTime = Date.now();
   
   try {
-    const apiKey = process.env.KALSHI_API_KEY;
-    
+    const apiKey = process.env.KALSHI_API_KEY_ID;
+
     if (!apiKey) {
       return {
         status: 'degraded',
-        error: 'KALSHI_API_KEY not configured (optional service)',
+        error: 'KALSHI_API_KEY_ID not configured (optional service)',
         details: { configured: false }
       };
     }
-    
+
     // Basic connectivity check via public endpoint
     const response = await fetch(
-      'https://trading-api.kalshi.com/trade-api/v2/markets?limit=1&status=open',
+      'https://trading.kalshi.com/trade-api/v2/markets?limit=1&status=open',
       {
         headers: {
           'Accept': 'application/json'
@@ -164,7 +164,7 @@ async function checkKalshiAPI(): Promise<ServiceHealth> {
       status: 'degraded',
       responseTime: Date.now() - startTime,
       error: error instanceof Error ? error.message : String(error),
-      details: { configured: !!process.env.KALSHI_API_KEY }
+      details: { configured: !!(process.env.KALSHI_API_KEY_ID && process.env.KALSHI_PRIVATE_KEY) }
     };
   }
 }
@@ -258,7 +258,7 @@ export async function GET() {
     environment: {
       oddsApiConfigured: !!(process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY),
       weatherApiConfigured: true, // Open-Meteo doesn't require API key
-      kalshiApiConfigured: !!process.env.KALSHI_API_KEY,
+      kalshiApiConfigured: !!(process.env.KALSHI_API_KEY_ID && process.env.KALSHI_PRIVATE_KEY),
       databaseConfigured: !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
     }
   };

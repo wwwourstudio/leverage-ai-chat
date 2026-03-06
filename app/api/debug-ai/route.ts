@@ -64,13 +64,12 @@ export async function GET() {
   }
 
   // ── 3. Kalshi ──────────────────────────────────────────────────────────────
-  const kalshiKey = process.env.KALSHI_API_KEY;
+  const kalshiKey = process.env.KALSHI_API_KEY_ID;
   const kalshiHeaders: Record<string, string> = { Accept: 'application/json', 'User-Agent': 'LeverageAI/1.0' };
-  if (kalshiKey) kalshiHeaders['Authorization'] = `Bearer ${kalshiKey}`;
 
   try {
     const res = await fetch(
-      'https://trading-api.kalshi.com/trade-api/v2/markets?limit=1&status=open',
+      'https://trading.kalshi.com/trade-api/v2/markets?limit=1&status=open',
       { headers: kalshiHeaders, signal: AbortSignal.timeout(8000) }
     );
     if (res.ok) {

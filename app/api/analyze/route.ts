@@ -137,6 +137,7 @@ export async function POST(request: NextRequest) {
       && !context?.hasFantasyIntent
       && !context?.isPoliticalMarket
       && !context?.hasBettingIntent
+      && context?.selectedCategory !== 'kalshi'
       && !customInstructions?.trim();
 
     // Sport-specific clarification: intent known but sport missing
@@ -237,6 +238,9 @@ export async function POST(request: NextRequest) {
     } else if (!context.hasBettingIntent && context.sport) {
       // Sports question without betting intent — give expert analysis
       enrichedPrompt += `\n\n[Context: User is asking about ${context.sport.toUpperCase()} — provide expert analysis using your knowledge. No live odds needed for this question.]`;
+    } else if (context.isPoliticalMarket || context.selectedCategory === 'kalshi') {
+      // Kalshi prediction market query — answer directly, no sports clarification needed
+      enrichedPrompt += `\n\n[Context: This is a Kalshi prediction market query. Answer directly with prediction market analysis, probability edge, and trading recommendations. Do NOT ask the user to choose a sports platform or area — the user is already on the Kalshi tab. Analyze the specific market or topic asked about.]`;
     } else if (!context.hasBettingIntent && !context.sport && !context.isPoliticalMarket) {
       // General question — answer from knowledge
       enrichedPrompt += `\n\n[Context: General question — answer with your full expert knowledge about sports betting, fantasy, DFS, or prediction markets as appropriate.]`;

@@ -650,18 +650,26 @@ export async function fetchWeatherMarkets(limit: number = 50): Promise<KalshiMar
 
   console.log('[KALSHI] Fetching weather markets...');
 
-  const results = await Promise.allSettled(
-    weatherSearches.map(search => fetchKalshiMarkets({ search, limit: 50, useCache: true }))
-  );
+  const batchSize = 3;
+  const BATCH_DELAY_MS = 400;
 
-  for (const result of results) {
-    if (result.status === 'fulfilled') {
-      for (const market of result.value) {
-        if (!seen.has(market.ticker)) {
-          seen.add(market.ticker);
-          all.push(market);
+  for (let i = 0; i < weatherSearches.length; i += batchSize) {
+    const batch = weatherSearches.slice(i, i + batchSize);
+    const results = await Promise.allSettled(
+      batch.map(search => fetchKalshiMarkets({ search, limit: 50, useCache: true }))
+    );
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        for (const market of result.value) {
+          if (!seen.has(market.ticker)) {
+            seen.add(market.ticker);
+            all.push(market);
+          }
         }
       }
+    }
+    if (i + batchSize < weatherSearches.length) {
+      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
     }
   }
 

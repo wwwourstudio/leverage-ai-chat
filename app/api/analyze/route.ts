@@ -45,6 +45,7 @@ interface AnalyzeRequestBody {
     noGamesMessage?: string;
     previousMessages?: Array<{ role: string; content: string }>;
     kalshiSubcategory?: string;
+    selectedCategory?: string;
   };
 }
 
@@ -160,11 +161,13 @@ export async function POST(request: NextRequest) {
     // should use 'betting' so generateContextualCards fetches real game/odds cards.
     const category = context.isPoliticalMarket
       ? 'kalshi'
-      : context.hasFantasyIntent && !context.hasBettingIntent
-        ? 'fantasy'
-        : (context.hasBettingIntent || context.isSportsQuery)
-          ? 'betting'
-          : 'all';
+      : context.selectedCategory === 'dfs'
+        ? 'dfs'
+        : context.hasFantasyIntent && !context.hasBettingIntent
+          ? 'fantasy'
+          : (context.hasBettingIntent || context.isSportsQuery)
+            ? 'betting'
+            : 'all';
 
     // Build the enriched prompt with any real odds data or contextual info
     let enrichedPrompt = userMessage;
@@ -244,6 +247,12 @@ export async function POST(request: NextRequest) {
       cardPromise = Promise.resolve([]);
     } else if (hasExistingCards) {
       cardPromise = Promise.resolve(existingCards as InsightCard[]);
+    } else if (!context.isPoliticalMarket && context.selectedCategory === 'dfs') {
+      // DFS tab — generate DFS lineup card(s) specifically
+      cardPromise = Promise.race([
+        generateContextualCards('dfs', context.sport ?? undefined, 3),
+        new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 8000)),
+      ]).catch(() => []);
     } else if (!context.isPoliticalMarket && context.hasFantasyIntent && !context.hasBettingIntent) {
       cardPromise = import('@/lib/fantasy/cards/fantasy-card-generator')
         .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 3, context.sport ?? undefined) as InsightCard[])

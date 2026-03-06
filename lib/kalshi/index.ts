@@ -448,6 +448,13 @@ export async function fetchKalshiMarketsWithRetry(params?: {
     } catch (error) {
       console.error(`[KALSHI] Attempt ${attempt} failed:`, error);
 
+      // Auth failures won't succeed on retry — abort immediately
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('401') || msg.includes('Unauthorized')) {
+        console.error('[KALSHI] Auth failure (401) — aborting retries');
+        return [];
+      }
+
       if (attempt < maxRetries) {
         const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
         console.log(`[KALSHI] Retrying in ${backoffMs}ms...`);

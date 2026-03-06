@@ -1183,6 +1183,21 @@ No preamble. Start directly with section 1.`;
     setIsTyping(false);
   };
 
+  // Listen for player-name clicks dispatched from fantasy/DFS cards.
+  // Using a ref so the effect doesn't need generateRealResponse as a dependency.
+  const generateRealResponseRef = useRef<typeof generateRealResponse | null>(null);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { query } = (e as CustomEvent<{ query: string }>).detail;
+      const userMsg: Message = { role: 'user', content: query, timestamp: new Date() };
+      setMessages((prev: Message[]) => [...prev, userMsg]);
+      setInput('');
+      generateRealResponseRef.current?.(query);
+    };
+    window.addEventListener('leveragePlayerClick', handler);
+    return () => window.removeEventListener('leveragePlayerClick', handler);
+  }, []);
+
   const generateRealResponse = async (userMessage: string, imageAttachments?: Array<{ name: string; base64: string; mimeType: string }>) => {
     // Cancel any in-flight request
     abortControllerRef.current?.abort();
@@ -1249,6 +1264,8 @@ No preamble. Start directly with section 1.`;
         previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' })),
         // Pass Kalshi sub-category pill value when in Kalshi mode
         kalshiSubcategory: selectedCategory === 'kalshi' && selectedSport ? selectedSport : undefined,
+        // Pass selected tab so the API can route DFS vs fantasy correctly
+        selectedCategory,
       };
 
       if (isDev) {
@@ -1260,9 +1277,10 @@ No preamble. Start directly with section 1.`;
         if (isDev) console.log('[POLITICAL MARKET DETECTED] Skipping sports odds fetch');
         // Route directly to Kalshi analysis without attempting sports odds
         // Note: The /api/analyze endpoint will handle Kalshi market analysis
-      } else if (context.hasFantasyIntent && !context.hasBettingIntent) {
+      } else if (context.hasFantasyIntent && !context.hasBettingIntent && selectedCategory !== 'dfs') {
         // Fantasy intent — generate fantasy cards client-side immediately so they
         // appear before the AI response comes back.
+        // DFS tab skips this so the server can generate proper DFS lineup cards.
         if (isDev) console.log('[FANTASY INTENT] Generating fantasy cards');
         try {
           const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
@@ -1597,6 +1615,8 @@ No preamble. Start directly with section 1.`;
       setIsTyping(false);
     }
   };
+  // Keep the ref current so the player-click event handler always calls the latest version
+  generateRealResponseRef.current = generateRealResponse;
 
   // Helper functions for context extraction
   const extractSport = (message: string, conversationHistory?: Array<{ role: string; content: string }>): string | null => {

@@ -160,7 +160,14 @@ function VBDCard({ data, isHero, ...p }: FantasyCardProps) {
             : 'bg-[oklch(0.08_0.01_280)] border-[oklch(0.15_0.01_280)]';
           return (
             <div key={pl.name}>
-              <div className={cn('flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-colors hover:bg-[oklch(0.12_0.01_280)]', rowBg)}>
+              <div
+                className={cn('flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-colors hover:bg-[oklch(0.12_0.01_280)] cursor-pointer', rowBg)}
+                onClick={() => {
+                  const query = `Analyze ${pl.name} (${pl.team} ${pl.pos}) — show recent game stats, season projections, and best prop bets`;
+                  window.dispatchEvent(new CustomEvent('leveragePlayerClick', { detail: { query } }));
+                }}
+                title={`Analyze ${pl.name}`}
+              >
                 <RankCircle rank={pl.rank ?? idx + 1} tier={pl.tier ?? 4} />
                 <PlayerAvatar playerName={pl.name} photoUrl={photoUrl} sport={avatarSport} size="sm" />
                 <span className="text-xs font-bold text-white flex-1 truncate min-w-0">

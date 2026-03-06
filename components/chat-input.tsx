@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, type FormEvent, type ChangeEvent } from 'react';
+import { useState, useRef, type FormEvent } from 'react';
 import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles } from 'lucide-react';
 
 interface FileAttachment {
@@ -59,14 +59,8 @@ export function ChatInput({
     ? `Follow up on your ${lastUserQuery.toLowerCase().includes('nba') ? 'NBA' : lastUserQuery.toLowerCase().includes('nfl') ? 'NFL' : lastUserQuery.toLowerCase().includes('kalshi') ? 'Kalshi' : lastUserQuery.toLowerCase().includes('dfs') ? 'DFS' : lastUserQuery.toLowerCase().includes('fantasy') ? 'fantasy' : 'sports'} analysis or ask something new...`
     : 'Ask about betting odds, fantasy, DFS, or Kalshi markets...';
 
-  const handleTextareaChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
-    onInputChange(e.target.value);
-    e.target.style.height = 'auto';
-    e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
       e.preventDefault();
       onSubmit(e as unknown as FormEvent);
     }
@@ -178,16 +172,16 @@ export function ChatInput({
           {/* Attach button — hidden on mobile (moved to status bar row below) */}
 
           <div className="flex-1 relative group/input focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:shadow-lg focus-within:shadow-blue-500/10 rounded-2xl transition-all duration-300">
-            <textarea
+            <input
+              type="text"
               value={input}
-              onChange={handleTextareaChange}
+              onChange={e => onInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={placeholder ?? defaultPlaceholder}
-              className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[oklch(0.28_0.02_280)] focus:border-blue-500/40 rounded-2xl px-3 py-2.5 md:px-6 md:pr-32 font-medium text-white placeholder-[var(--text-faint)] focus:outline-none transition-all backdrop-blur-sm shadow-inner text-xs md:text-base leading-relaxed resize-none overflow-hidden"
+              className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[oklch(0.28_0.02_280)] focus:border-blue-500/40 rounded-2xl px-3 py-2.5 md:px-6 md:pr-32 font-medium text-white placeholder-[var(--text-faint)] focus:outline-none transition-all backdrop-blur-sm shadow-inner text-xs md:text-base"
               disabled={isTyping}
               maxLength={500}
-              rows={1}
-              style={{ minHeight: '44px', maxHeight: '160px' }}
+              style={{ minHeight: '44px' }}
             />
             {/* Attach + char count — inside input on desktop only */}
             <div className="hidden md:flex absolute right-5 top-1/2 -translate-y-1/2 items-center gap-3">

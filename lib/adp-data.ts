@@ -116,7 +116,7 @@ const STATIC_FALLBACK_PLAYERS: NFBCPlayer[] = [
   { rank: 42,  playerName: 'Arozarena, Randy',          displayName: 'Randy Arozarena',          adp: 45.0,  positions: 'OF',      team: 'SEA', valueDelta: 3.0,  isValuePick: false },
   { rank: 43,  playerName: 'Trout, Mike',               displayName: 'Mike Trout',               adp: 49.0,  positions: 'OF',      team: 'LAA', valueDelta: 6.0,  isValuePick: false },
   { rank: 44,  playerName: 'Hoerner, Nico',             displayName: 'Nico Hoerner',             adp: 46.2,  positions: '2B,SS',   team: 'CHC', valueDelta: 2.2,  isValuePick: false },
-  { rank: 45,  playerName: 'Verlander, Justin',         displayName: 'Justin Verlander',         adp: 50.0,  positions: 'SP',      team: 'HOU', valueDelta: 5.0,  isValuePick: false },
+  { rank: 45,  playerName: 'Rutschman, Adley',           displayName: 'Adley Rutschman',           adp: 43.5,  positions: 'C',       team: 'BAL', valueDelta: -1.5, isValuePick: false },
   { rank: 46,  playerName: 'Gausman, Kevin',            displayName: 'Kevin Gausman',            adp: 52.0,  positions: 'SP',      team: 'TOR', valueDelta: 6.0,  isValuePick: false },
   { rank: 47,  playerName: 'Diaz, Edwin',               displayName: 'Edwin Diaz',               adp: 55.5,  positions: 'RP',      team: 'NYM', valueDelta: 8.5,  isValuePick: false },
   { rank: 48,  playerName: 'Luzardo, Jesus',            displayName: 'Jesus Luzardo',            adp: 53.0,  positions: 'SP',      team: 'PHI', valueDelta: 5.0,  isValuePick: false },
@@ -198,7 +198,7 @@ const STATIC_FALLBACK_PLAYERS: NFBCPlayer[] = [
   { rank: 117, playerName: 'Yarbrough, Ryan',           displayName: 'Ryan Yarbrough',           adp: 127.5, positions: 'SP',      team: 'BOS', valueDelta: 10.5, isValuePick: false },
   { rank: 118, playerName: 'Merrill, Jackson',          displayName: 'Jackson Merrill',          adp: 126.0, positions: 'OF',      team: 'SD',  valueDelta: 8.0,  isValuePick: false },
   { rank: 119, playerName: 'Stephenson, Tyler',         displayName: 'Tyler Stephenson',         adp: 128.5, positions: 'C',       team: 'CIN', valueDelta: 9.5,  isValuePick: false },
-  { rank: 120, playerName: 'Stott, Bryson',             displayName: 'Bryson Stott',             adp: 130.0, positions: '2B,SS',   team: 'PHI', valueDelta: 10.0, isValuePick: false },
+  { rank: 120, playerName: 'Stephenson, Tyler',         displayName: 'Tyler Stephenson',         adp: 128.5, positions: 'C',       team: 'CIN', valueDelta: 8.5,  isValuePick: false },
 ];
 
 // ── Module-level cache ────────────────────────────────────────────────────────
@@ -300,12 +300,12 @@ function parseTSV(raw: string): NFBCPlayer[] {
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 
-// URL patterns to try in order — TSV/CSV exports only
+// URL patterns to try in order — JSON API first, then CSV, then legacy TSV
 const NFBC_ADP_URLS = [
-  'https://nfc.shgn.com/adp/baseball?board',
+  'https://www.fantasypros.com/api/v2/json/mlb-adp.php',
+  'https://www.fantasypros.com/mlb/adp/overall.php?export=csv',
   'https://nfc.shgn.com/adp/baseball.tsv',
   'https://nfc.shgn.com/adp/baseball?export=1',
-  'https://www.fantasypros.com/mlb/adp/overall.php?export=xls',
 ];
 
 async function tryFetchURL(url: string): Promise<NFBCPlayer[]> {
@@ -329,6 +329,27 @@ async function tryFetchURL(url: string): Promise<NFBCPlayer[]> {
   // Detect HTML response — endpoint returned a webpage, not data
   if (contentType.includes('text/html') || body.trimStart().startsWith('<')) {
     throw new Error(`NFBC ADP endpoint returned HTML (not TSV) — format may have changed`);
+  }
+
+  // JSON API response (e.g. FantasyPros JSON endpoint)
+  if (contentType.includes('application/json') || contentType.includes('json') || body.trimStart().startsWith('{') || body.trimStart().startsWith('[')) {
+    const json = JSON.parse(body) as Record<string, unknown>;
+    const raw = (json.players ?? json.data ?? json) as Array<Record<string, unknown>>;
+    if (!Array.isArray(raw) || raw.length === 0) throw new Error('JSON response has no player array');
+    const parsed = raw.map((p, i) => {
+      const rank = Number(p.rank ?? p.overall_rank ?? i + 1);
+      const adp  = Number(p.adp ?? p.average_draft_position ?? rank);
+      const name = String(p.player_name ?? p.name ?? '');
+      const pos  = String(p.pos ?? p.position ?? '');
+      const team = String(p.team ?? '');
+      const valueDelta = Math.round((adp - rank) * 10) / 10;
+      return {
+        rank, playerName: name, displayName: normalisePlayerName(name),
+        adp, positions: pos, team, valueDelta, isValuePick: valueDelta > 15,
+      } satisfies NFBCPlayer;
+    }).filter(p => p.displayName.length > 0);
+    if (parsed.length === 0) throw new Error('JSON response parsed to 0 valid players');
+    return parsed;
   }
 
   const players = parseTSV(body);

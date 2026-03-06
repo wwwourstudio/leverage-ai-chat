@@ -689,8 +689,8 @@ function generatePlayerAnalysis(p: PlayerVBD): string {
  * Other sports (NHL, soccer, etc.) fall back to informational prompt cards.
  */
 function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[] {
-  const isMLB = sport.includes('baseball');
-  const isNBA = sport.includes('basketball');
+  const isMLB = sport.includes('baseball') || sport === 'mlb';
+  const isNBA = sport.includes('basketball') || sport === 'nba';
 
   // ── MLB ──────────────────────────────────────────────────────────────────
   if (isMLB) {

@@ -2774,13 +2774,13 @@ No preamble. Start directly with section 1.`;
       {/* Mobile backdrop — closes sidebar when tapping outside */}
       {sidebarOpen && (
         <div
-          className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+          className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm animate-backdrop-in"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar wrapper — overlay when open on mobile, icon rail in flow when closed */}
-      <div className={`flex-shrink-0 transition-all duration-300 ease-in-out${sidebarOpen ? ' max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-72' : ''}`}>
+      {/* Sidebar wrapper — overlay when open on mobile/tablet, icon rail in flow when closed */}
+      <div className={`flex-shrink-0 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]${sidebarOpen ? ' max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:w-72 max-lg:animate-slide-in-left' : ''}`}>
         <Sidebar
           open={sidebarOpen}
           onNewChat={handleNewChat}
@@ -2858,7 +2858,7 @@ No preamble. Start directly with section 1.`;
                     key={`message-${index}`}
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn ${isGrouped ? 'mt-1.5' : 'mt-5'}`}
                   >
-                <div className={message.role === 'user' ? 'max-w-[75%]' : 'w-full max-w-4xl'}>
+                <div className={message.role === 'user' ? 'max-w-[85%] md:max-w-[75%]' : 'w-full max-w-4xl lg:max-w-3xl'}>
                   {message.role === 'assistant' && (
                     <div className="flex items-center gap-2.5 mb-2.5 flex-wrap">
                       {/* Logo mark */}
@@ -3861,8 +3861,8 @@ No preamble. Start directly with section 1.`;
 
       {/* Purchase Credits Modal */}
       {showPurchaseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowPurchaseModal(false)}>
-          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm animate-backdrop-in" onClick={() => setShowPurchaseModal(false)}>
+          <div className="relative w-full md:max-w-md max-h-[90vh] md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl animate-slide-up md:animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setShowPurchaseModal(false)}
               className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
@@ -3945,8 +3945,8 @@ No preamble. Start directly with section 1.`;
 
       {/* Subscription Modal */}
       {showSubscriptionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowSubscriptionModal(false)}>
-          <div className="relative w-full max-w-md mx-4 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm animate-backdrop-in" onClick={() => setShowSubscriptionModal(false)}>
+          <div className="relative w-full md:max-w-md max-h-[90vh] md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl animate-slide-up md:animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setShowSubscriptionModal(false)}
               className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"

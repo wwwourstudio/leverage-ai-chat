@@ -2782,6 +2782,46 @@ No preamble. Start directly with section 1.`;
     ],
   };
 
+  // Sport-specific cross-platform prompts for the "ALL" category when a sport is selected
+  const sportAllPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }>> = {
+    mlb: [
+      { label: 'MLB best bets and value plays today', icon: TrendingUp, category: 'all' },
+      { label: 'MLB player props with edge tonight',  icon: Target,     category: 'all' },
+      { label: 'MLB DFS optimal lineups for DraftKings', icon: Award,   category: 'all' },
+      { label: 'MLB arbitrage across sportsbooks',    icon: Zap,        category: 'all' },
+    ],
+    nba: [
+      { label: 'NBA best bets and spreads tonight',   icon: TrendingUp, category: 'all' },
+      { label: 'NBA player props with edge tonight',  icon: Target,     category: 'all' },
+      { label: 'NBA DFS optimal lineups for DraftKings', icon: Award,   category: 'all' },
+      { label: 'NBA arbitrage across sportsbooks',    icon: Zap,        category: 'all' },
+    ],
+    nfl: [
+      { label: 'NFL best bets and spreads this week', icon: TrendingUp, category: 'all' },
+      { label: 'NFL player props with sharp edge',    icon: Target,     category: 'all' },
+      { label: 'NFL DFS optimal lineups for DraftKings', icon: Award,   category: 'all' },
+      { label: 'NFL arbitrage across sportsbooks',    icon: Zap,        category: 'all' },
+    ],
+    nhl: [
+      { label: 'NHL best bets and puck lines tonight', icon: TrendingUp, category: 'all' },
+      { label: 'NHL player props with edge tonight',   icon: Target,     category: 'all' },
+      { label: 'NHL DFS optimal lineups for DraftKings', icon: Award,   category: 'all' },
+      { label: 'NHL arbitrage across sportsbooks',     icon: Zap,        category: 'all' },
+    ],
+    'ncaa-football': [
+      { label: 'NCAAF best bets and spreads this week', icon: TrendingUp, category: 'all' },
+      { label: 'NCAAF sharp money movement analysis',   icon: Activity,   category: 'all' },
+      { label: 'NCAAF DFS optimal lineups',             icon: Award,      category: 'all' },
+      { label: 'NCAAF arbitrage opportunities',         icon: Zap,        category: 'all' },
+    ],
+    'ncaa-basketball': [
+      { label: 'NCAAB best bets and spreads tonight', icon: TrendingUp, category: 'all' },
+      { label: 'NCAAB sharp money movement analysis', icon: Activity,   category: 'all' },
+      { label: 'NCAAB DFS optimal lineups',           icon: Award,      category: 'all' },
+      { label: 'NCAAB arbitrage opportunities',       icon: Zap,        category: 'all' },
+    ],
+  };
+
   // Sport-selection pills — shown when a category tab is active but no sport has been chosen.
   // query strings start with the sport name so extractSport() reliably detects them.
   const sportSelectionBettingPrompts = [
@@ -2813,6 +2853,7 @@ No preamble. Start directly with section 1.`;
       if (selectedCategory === 'betting' && sportBettingPrompts[selectedSport]) return sportBettingPrompts[selectedSport];
       if (selectedCategory === 'fantasy' && sportFantasyPrompts[selectedSport]) return sportFantasyPrompts[selectedSport];
       if (selectedCategory === 'dfs'     && sportDFSPrompts[selectedSport])     return sportDFSPrompts[selectedSport];
+      if (selectedCategory === 'all'     && sportAllPrompts[selectedSport])     return sportAllPrompts[selectedSport];
     }
     // No sport selected but category requires one — show sport-selection pills
     if (!selectedSport) {

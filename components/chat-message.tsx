@@ -165,7 +165,7 @@ export function ChatMessage({ message, onEdit, onCopy }: ChatMessageProps) {
         <div className={cn(
           'rounded-2xl px-5 py-4',
           isUser
-            ? 'bg-linear-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-900/20'
+            ? 'bg-linear-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-900/20 min-w-[200px]'
             : 'bg-[oklch(0.12_0.015_280)] border border-l-[3px] border-[oklch(0.22_0.02_280)] border-l-blue-500/50 shadow-sm',
         )}>
           {isEditing ? (

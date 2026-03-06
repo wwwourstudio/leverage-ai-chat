@@ -68,7 +68,7 @@ export function OpportunitiesFeed() {
         awayTeam: payload.new.away_team,
         gameTime: payload.new.game_time,
         profitPercentage: payload.new.profit_percentage,
-        description: `${payload.new.profit_percentage.toFixed(2)}% guaranteed profit`,
+        description: `${payload.new.profit_percentage.toFixed(2)}% potential profit`,
         confidence: 'high',
         created_at: payload.new.created_at
       };
@@ -126,7 +126,7 @@ export function OpportunitiesFeed() {
             awayTeam: opp.awayTeam,
             gameTime: opp.gameTime,
             profitPercentage: opp.profitPercentage,
-            description: `${opp.profitPercentage.toFixed(2)}% guaranteed profit`,
+            description: `${opp.profitPercentage.toFixed(2)}% potential profit`,
             confidence: 'high',
             created_at: new Date().toISOString()
           });

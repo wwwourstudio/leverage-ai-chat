@@ -290,8 +290,8 @@ function IconRail({
               className={cn(
                 'w-full h-9 rounded-xl flex items-center justify-center transition-all duration-200',
                 isActive
-                  ? 'bg-[oklch(0.16_0.02_280)] border border-[oklch(0.28_0.02_280)]'
-                  : 'hover:bg-[oklch(0.13_0.01_280)] border border-transparent',
+                  ? 'bg-[oklch(0.16_0.02_280)]'
+                  : 'hover:bg-[oklch(0.13_0.01_280)]',
               )}
             >
               <Icon className={cn(
@@ -433,10 +433,10 @@ export function Sidebar({
                         }}
                         title={cat.desc}
                         className={cn(
-                          'group/pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all duration-200 border whitespace-nowrap flex-shrink-0',
+                          'group/pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0',
                           isActive
-                            ? 'bg-[oklch(0.16_0.02_280)] text-white border-[oklch(0.28_0.02_280)]'
-                            : 'text-[oklch(0.42_0.01_280)] border-[oklch(0.18_0.01_280)] hover:text-[oklch(0.70_0.01_280)] hover:bg-[oklch(0.13_0.01_280)] hover:border-[oklch(0.24_0.01_280)]',
+                            ? 'bg-[oklch(0.16_0.02_280)] text-white'
+                            : 'text-[oklch(0.42_0.01_280)] hover:text-[oklch(0.70_0.01_280)] hover:bg-[oklch(0.13_0.01_280)]',
                         )}
                       >
                         <Icon className={cn(
@@ -464,10 +464,10 @@ export function Sidebar({
                             key={sport.id}
                             onClick={() => setSelectedSport(isActive ? '' : sport.id)}
                             className={cn(
-                              'px-2 py-1 rounded-full text-[9px] font-bold transition-all duration-200 border whitespace-nowrap flex-shrink-0',
+                              'px-2 py-1 rounded-full text-[9px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0',
                               isActive
-                                ? 'bg-blue-600/20 text-blue-300 border-blue-500/50'
-                                : 'text-[oklch(0.38_0.01_280)] border-[oklch(0.16_0.01_280)] hover:text-[oklch(0.58_0.01_280)] hover:border-[oklch(0.24_0.01_280)]',
+                                ? 'bg-blue-600/20 text-blue-300'
+                                : 'text-[oklch(0.38_0.01_280)] hover:text-[oklch(0.58_0.01_280)] hover:bg-[oklch(0.12_0.01_280)]',
                             )}
                           >
                             {sport.name}
@@ -487,10 +487,10 @@ export function Sidebar({
                         key={topic}
                         onClick={() => setSelectedSport(selectedSport === topic ? '' : topic)}
                         className={cn(
-                          'px-2 py-1 rounded-full text-[9px] font-bold transition-all duration-200 border whitespace-nowrap flex-shrink-0',
+                          'px-2 py-1 rounded-full text-[9px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0',
                           selectedSport === topic
-                            ? 'bg-cyan-600/20 text-cyan-300 border-cyan-500/50'
-                            : 'text-[oklch(0.38_0.01_280)] border-[oklch(0.16_0.01_280)] hover:text-[oklch(0.58_0.01_280)] hover:border-[oklch(0.24_0.01_280)]',
+                            ? 'bg-cyan-600/20 text-cyan-300'
+                            : 'text-[oklch(0.38_0.01_280)] hover:text-[oklch(0.58_0.01_280)] hover:bg-[oklch(0.12_0.01_280)]',
                         )}
                       >
                         {topic}

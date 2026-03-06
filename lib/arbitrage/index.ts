@@ -290,31 +290,31 @@ export function detectArbitrageOpportunities(
 }
 
 /**
- * Calculate Dutch betting (guaranteed profit on all outcomes)
+ * Calculate Dutch betting (potential profit across all outcomes)
  */
 export function calculateDutch(
   odds: number[],
   totalStake: number
 ): {
   stakes: number[];
-  guaranteedProfit: number;
+  potentialProfit: number;
   profitMargin: number;
 } | null {
   const decimalOdds = odds.map(americanToDecimal);
   const totalProb = decimalOdds.reduce((sum, d) => sum + 1 / d, 0);
-  
+
   if (totalProb >= 1) {
     return null;
   }
-  
+
   const stakes = decimalOdds.map((d) => totalStake / (d * totalProb));
-  const guaranteedReturn = stakes[0] * decimalOdds[0];
-  const guaranteedProfit = guaranteedReturn - totalStake;
-  const profitMargin = (guaranteedProfit / totalStake) * 100;
-  
+  const expectedReturn = stakes[0] * decimalOdds[0];
+  const potentialProfit = expectedReturn - totalStake;
+  const profitMargin = (potentialProfit / totalStake) * 100;
+
   return {
     stakes,
-    guaranteedProfit,
+    potentialProfit,
     profitMargin,
   };
 }
@@ -328,7 +328,7 @@ export function arbitrageToCard(opp: ArbitrageOpportunity): any {
   
   return {
     type: 'ARBITRAGE',
-    title: `${opp.profitPercentage.toFixed(2)}% Guaranteed Profit`,
+    title: `${opp.profitPercentage.toFixed(2)}% Arbitrage Opportunity`,
     icon: 'TrendingUp',
     category: 'ARBITRAGE',
     subcategory: opp.sport.replace('_', ' ').toUpperCase(),

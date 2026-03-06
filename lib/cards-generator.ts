@@ -551,7 +551,7 @@ async function _generateContextualCards(
               matchup: `${opp.away_team} @ ${opp.home_team}`,
               profitMargin: `${(opp.profit_margin * 100).toFixed(2)}%`,
               totalStake: `$${opp.total_stake.toFixed(2)}`,
-              guaranteedProfit: `$${(opp.total_stake * opp.profit_margin).toFixed(2)}`,
+              potentialProfit: `$${(opp.total_stake * opp.profit_margin).toFixed(2)}`,
               side1: {
                 bookmaker: opp.bookmaker_1,
                 odds: opp.odds_1 > 0 ? `+${opp.odds_1}` : opp.odds_1,
@@ -633,7 +633,7 @@ async function _generateContextualCards(
           subcategory: 'Arbitrage Scanner',
           gradient: 'from-emerald-600 to-teal-700',
           data: {
-            description: 'Scanning for guaranteed profit opportunities across sportsbooks',
+            description: 'Scanning for arbitrage opportunities across sportsbooks',
             note: 'No arbitrage opportunities currently available',
             markets: ['Moneyline', 'Spreads', 'Totals']
           }
@@ -650,7 +650,7 @@ async function _generateContextualCards(
         subcategory: 'Arbitrage Scanner',
         gradient: 'from-emerald-600 to-teal-700',
         data: {
-          description: 'Find guaranteed profit opportunities across sportsbooks',
+          description: 'Find potential arbitrage opportunities across sportsbooks',
           note: 'Arbitrage detection temporarily unavailable'
         }
       });

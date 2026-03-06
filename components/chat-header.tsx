@@ -1,6 +1,6 @@
 'use client';
 
-import { Menu, TrendingUp, Bell, Settings } from 'lucide-react';
+import { Menu, TrendingUp, Bell, Settings, LogIn, UserPlus } from 'lucide-react';
 
 interface ChatHeaderProps {
   sidebarOpen: boolean;
@@ -99,15 +99,17 @@ export function ChatHeader({
             <>
               <button
                 onClick={onOpenLogin}
-                className="px-3 py-1.5 md:px-4 md:py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-overlay)] hover:bg-[var(--bg-elevated)] hover:border-[oklch(0.28_0.02_280)] text-[var(--text-muted)] hover:text-white text-xs md:text-sm font-semibold transition-all"
+                className="p-2.5 md:px-4 md:py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-overlay)] hover:bg-[var(--bg-elevated)] hover:border-[oklch(0.28_0.02_280)] text-[var(--text-muted)] hover:text-white text-xs md:text-sm font-semibold transition-all"
               >
-                Log in
+                <LogIn className="w-5 h-5 md:hidden" />
+                <span className="hidden md:inline">Log in</span>
               </button>
               <button
                 onClick={onOpenSignup}
-                className="px-3 py-1.5 md:px-4 md:py-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-xs md:text-sm font-bold transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40"
+                className="p-2.5 md:px-4 md:py-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-xs md:text-sm font-bold transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40"
               >
-                Sign up
+                <UserPlus className="w-5 h-5 md:hidden" />
+                <span className="hidden md:inline">Sign up</span>
               </button>
             </>
           )}

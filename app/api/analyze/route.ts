@@ -305,7 +305,7 @@ export async function POST(request: NextRequest) {
     // Attempt AI generation via Vercel AI Gateway
     const xaiApiKey = process.env.XAI_API_KEY;
     const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
-    const kalshiApiKey = process.env.KALSHI_API_KEY;
+    const kalshiApiKey = process.env.KALSHI_API_KEY_ID || process.env.KALSHI_API_KEY;
     const hasClientOddsData = !!(context.oddsData?.events?.length);
     console.log('[API/analyze] Keys configured:', {
       XAI_API_KEY: !!xaiApiKey,

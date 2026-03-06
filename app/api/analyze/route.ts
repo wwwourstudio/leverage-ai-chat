@@ -139,15 +139,44 @@ export async function POST(request: NextRequest) {
       && !context?.hasBettingIntent
       && !customInstructions?.trim();
 
-    const clarificationOptions = isAmbiguous ? [
-      'NBA betting odds tonight',
-      'NFL betting analysis',
-      'MLB betting picks',
-      'NHL betting lines',
-      'Kalshi prediction markets',
-      'DFS lineups today',
-      'Fantasy advice',
-    ] : [];
+    // Sport-specific clarification: intent known but sport missing
+    const needsFantasySport = !!(context?.hasFantasyIntent && !context?.sport
+      && context?.selectedCategory === 'fantasy' && !context?.isPoliticalMarket);
+    const needsDFSSport = !!(context?.selectedCategory === 'dfs' && !context?.sport);
+    const needsBettingSport = !!(context?.hasBettingIntent && !context?.sport
+      && !context?.isPoliticalMarket && context?.selectedCategory === 'betting');
+
+    const clarificationOptions: string[] = isAmbiguous
+      ? [
+          'NBA betting odds tonight',
+          'NFL betting analysis',
+          'MLB betting picks',
+          'NHL betting lines',
+          'Kalshi prediction markets',
+          'DFS lineups today',
+          'Fantasy advice',
+        ]
+      : needsFantasySport
+        ? [
+            'NFL fantasy football waiver wire and start sit advice this week',
+            'NBA fantasy basketball pickups and trade value this week',
+            'MLB fantasy baseball waiver wire and streamer targets this week',
+            'NHL fantasy hockey pickups and power-play targets this week',
+          ]
+        : needsDFSSport
+          ? [
+              'NBA DFS optimal lineups and value plays for DraftKings tonight',
+              'NFL DFS optimal lineups and GPP stacks for DraftKings this week',
+              'MLB DFS optimal lineups and pitcher stacks for DraftKings tonight',
+            ]
+          : needsBettingSport
+            ? [
+                'NBA basketball betting odds and lines tonight',
+                'NFL football betting odds and best lines this week',
+                'MLB baseball betting odds and run lines tonight',
+                'NHL hockey betting odds and puck lines tonight',
+              ]
+            : [];
 
     if (!userMessage || typeof userMessage !== 'string') {
       return NextResponse.json(

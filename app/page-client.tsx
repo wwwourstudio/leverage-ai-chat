@@ -279,6 +279,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string; query?: string }>>([]);
+  const [isClarificationPills, setIsClarificationPills] = useState(false);
   const [lastUserQuery, setLastUserQuery] = useState<string>('');
   const [selectedSport, setSelectedSport] = useState<string>('');
   const [cardsRefreshedAt, setCardsRefreshedAt] = useState<Date | null>(null);
@@ -1272,22 +1273,40 @@ No preamble. Start directly with section 1.`;
         console.log('[v0] Context:', { sport: detectedSport || 'none', betting: hasBettingIntent, sports: isSportsQuery, political: finalIsPoliticalMarket, fantasy: hasFantasyIntent });
       }
 
+      // Inject sport-selection pills immediately (zero latency) when we know the intent
+      // but no sport has been provided — user sees choices before the AI responds.
+      if (!effectiveSport && selectedCategory !== 'kalshi' && selectedCategory !== 'all') {
+        if (selectedCategory === 'dfs') {
+          setSuggestedPrompts(sportSelectionDFSPrompts);
+          setIsClarificationPills(true);
+        } else if (hasFantasyIntent && selectedCategory === 'fantasy') {
+          setSuggestedPrompts(sportSelectionFantasyPrompts);
+          setIsClarificationPills(true);
+        } else if (hasBettingIntent || selectedCategory === 'betting') {
+          setSuggestedPrompts(sportSelectionBettingPrompts);
+          setIsClarificationPills(true);
+        }
+      }
+
       // HARD STOP: Political markets NEVER fetch sports odds
       if (context.isPoliticalMarket) {
         if (isDev) console.log('[POLITICAL MARKET DETECTED] Skipping sports odds fetch');
         // Route directly to Kalshi analysis without attempting sports odds
         // Note: The /api/analyze endpoint will handle Kalshi market analysis
       } else if (context.hasFantasyIntent && !context.hasBettingIntent && selectedCategory !== 'dfs') {
-        // Fantasy intent — generate fantasy cards client-side immediately so they
-        // appear before the AI response comes back.
-        // DFS tab skips this so the server can generate proper DFS lineup cards.
-        if (isDev) console.log('[FANTASY INTENT] Generating fantasy cards');
-        try {
-          const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
-          const fantasyCards = generateFantasyCards(userMessage, 3, context.sport ?? undefined);
-          context.existingCards = fantasyCards;
-        } catch (err) {
-          if (isDev) console.error('[FANTASY INTENT] Card generation failed:', err);
+        // Fantasy intent — only generate cards when we know the sport; otherwise
+        // NFL VBD cards would flash for NBA/MLB/etc. queries.
+        if (context.sport) {
+          if (isDev) console.log('[FANTASY INTENT] Generating fantasy cards');
+          try {
+            const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
+            const fantasyCards = generateFantasyCards(userMessage, 3, context.sport);
+            context.existingCards = fantasyCards;
+          } catch (err) {
+            if (isDev) console.error('[FANTASY INTENT] Card generation failed:', err);
+          }
+        } else {
+          if (isDev) console.log('[FANTASY INTENT] No sport detected — skipping card pregeneration');
         }
       } else if (context.hasBettingIntent || context.isSportsQuery) {
         // Fetch sports odds for any betting-related query OR explicit sports query
@@ -1569,9 +1588,11 @@ No preamble. Start directly with section 1.`;
           icon: Target,
           category: selectedCategory,
         })));
+        setIsClarificationPills(true);
       } else {
         const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);
         setSuggestedPrompts(contextualSuggestions);
+        setIsClarificationPills(false);
       }
 
     } catch (error) {
@@ -1611,6 +1632,7 @@ No preamble. Start directly with section 1.`;
       }]);
 
       setSuggestedPrompts(generateContextualSuggestions(userMessage, []));
+      setIsClarificationPills(false);
     } finally {
       setIsTyping(false);
     }
@@ -2760,6 +2782,28 @@ No preamble. Start directly with section 1.`;
     ],
   };
 
+  // Sport-selection pills — shown when a category tab is active but no sport has been chosen.
+  // query strings start with the sport name so extractSport() reliably detects them.
+  const sportSelectionBettingPrompts = [
+    { label: 'NBA Odds Tonight', icon: TrendingUp, category: 'betting', query: 'NBA basketball betting odds and lines tonight' },
+    { label: 'NFL Odds',         icon: Activity,   category: 'betting', query: 'NFL football betting odds and best lines this week' },
+    { label: 'MLB Odds',         icon: Target,     category: 'betting', query: 'MLB baseball betting odds and run lines tonight' },
+    { label: 'NHL Odds',         icon: Zap,        category: 'betting', query: 'NHL hockey betting odds and puck lines tonight' },
+    { label: 'NCAAB Odds',       icon: Award,      category: 'betting', query: 'NCAAB college basketball betting odds tonight' },
+    { label: 'UFC/MMA Odds',     icon: Medal,      category: 'betting', query: 'UFC MMA fight odds and best bets this weekend' },
+  ];
+  const sportSelectionFantasyPrompts = [
+    { label: 'NFL Fantasy', icon: Trophy,     category: 'fantasy', query: 'NFL fantasy football waiver wire and start sit advice this week' },
+    { label: 'NBA Fantasy', icon: TrendingUp, category: 'fantasy', query: 'NBA fantasy basketball pickups and trade value this week' },
+    { label: 'MLB Fantasy', icon: Target,     category: 'fantasy', query: 'MLB fantasy baseball waiver wire and streamer targets this week' },
+    { label: 'NHL Fantasy', icon: Medal,      category: 'fantasy', query: 'NHL fantasy hockey pickups and power-play targets this week' },
+  ];
+  const sportSelectionDFSPrompts = [
+    { label: 'NBA DFS Tonight', icon: Award,      category: 'dfs', query: 'NBA DFS optimal lineups and value plays for DraftKings tonight' },
+    { label: 'NFL DFS',         icon: Medal,      category: 'dfs', query: 'NFL DFS optimal lineups and GPP stacks for DraftKings this week' },
+    { label: 'MLB DFS',         icon: DollarSign, category: 'dfs', query: 'MLB DFS optimal lineups and pitcher stacks for DraftKings tonight' },
+  ];
+
   // Get dynamic prompts based on selected platform AND sport/topic
   const quickActions = (() => {
     if (selectedCategory === 'kalshi' && selectedSport && kalshiTopicPrompts[selectedSport]) {
@@ -2769,6 +2813,12 @@ No preamble. Start directly with section 1.`;
       if (selectedCategory === 'betting' && sportBettingPrompts[selectedSport]) return sportBettingPrompts[selectedSport];
       if (selectedCategory === 'fantasy' && sportFantasyPrompts[selectedSport]) return sportFantasyPrompts[selectedSport];
       if (selectedCategory === 'dfs'     && sportDFSPrompts[selectedSport])     return sportDFSPrompts[selectedSport];
+    }
+    // No sport selected but category requires one — show sport-selection pills
+    if (!selectedSport) {
+      if (selectedCategory === 'betting') return sportSelectionBettingPrompts;
+      if (selectedCategory === 'fantasy') return sportSelectionFantasyPrompts;
+      if (selectedCategory === 'dfs')     return sportSelectionDFSPrompts;
     }
     return platformPrompts[selectedCategory] || platformPrompts.all;
   })();
@@ -3826,6 +3876,7 @@ No preamble. Start directly with section 1.`;
               hasMessages={messages.length > 1}
               lastUserQuery={lastUserQuery}
               selectedCategory={selectedCategory}
+              clarificationMode={isClarificationPills}
               onPromptClick={(submitText) => {
                 setInput(submitText);
                 setTimeout(() => {

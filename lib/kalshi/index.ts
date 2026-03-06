@@ -6,6 +6,8 @@
  * API Documentation: https://trading-api.readme.io/reference/getting-started
  */
 
+import crypto from 'crypto';
+
 const KALSHI_TRADING_URL = 'https://api.elections.kalshi.com/trade-api/v2';
 
 export interface KalshiMarket {
@@ -91,14 +93,33 @@ function cacheMarkets(cacheKey: string, markets: KalshiMarket[], ttlMs: number =
   console.log(`[KALSHI] Cached ${markets.length} markets with ${ttlMs / 1000}s TTL`);
 }
 
-/** Build auth headers, attaching the API key when available */
-function buildHeaders(): Record<string, string> {
+/** Build auth headers with RSA-SHA256 signing when credentials are available */
+function buildHeaders(url: string = ''): Record<string, string> {
   const headers: Record<string, string> = {
     'Accept': 'application/json',
     'User-Agent': 'LeverageAI/1.0',
   };
-  const key = process.env.KALSHI_API_KEY;
-  if (key) headers['Authorization'] = `Bearer ${key}`;
+  const keyId      = process.env.KALSHI_API_KEY_ID;
+  const privateKey = process.env.KALSHI_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  if (keyId && privateKey && url) {
+    try {
+      const { pathname, search } = new URL(url);
+      const timestamp = Date.now().toString();
+      const message   = `${timestamp}GET${pathname}${search}`;
+      const sign      = crypto.createSign('RSA-SHA256');
+      sign.update(message);
+      sign.end();
+      const signature = sign.sign(
+        { key: privateKey, padding: crypto.constants.RSA_PKCS1_PADDING },
+        'base64',
+      );
+      headers['KALSHI-ACCESS-KEY']       = keyId;
+      headers['KALSHI-ACCESS-TIMESTAMP'] = timestamp;
+      headers['KALSHI-ACCESS-SIGNATURE'] = signature;
+    } catch (err) {
+      console.error('[KALSHI] RSA sign failed:', err);
+    }
+  }
   return headers;
 }
 
@@ -217,15 +238,16 @@ function parseMarket(m: any): KalshiMarket {
  * Returns parsed markets and the next cursor (null when done).
  */
 async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage> {
-  const response = await fetch(`${KALSHI_TRADING_URL}/markets?${queryParams}`, {
-    headers: buildHeaders(),
+  const url = `${KALSHI_TRADING_URL}/markets?${queryParams}`;
+  const response = await fetch(url, {
+    headers: buildHeaders(url),
     signal: AbortSignal.timeout(10000),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    const hasKey = !!process.env.KALSHI_API_KEY;
-    console.error(`[KALSHI] API error ${response.status} ${response.statusText} (KALSHI_API_KEY set: ${hasKey}) — ${errorText.substring(0, 200)}`);
+    const hasKey = !!process.env.KALSHI_API_KEY_ID;
+    console.error(`[KALSHI] API error ${response.status} ${response.statusText} (KALSHI_API_KEY_ID set: ${hasKey}) — ${errorText.substring(0, 200)}`);
     throw new Error(`Kalshi API error: ${response.status} ${response.statusText}`);
   }
 
@@ -712,8 +734,9 @@ export async function fetchAllCategoryMarkets(): Promise<Record<string, KalshiMa
  */
 export async function getMarketByTicker(ticker: string): Promise<KalshiMarket | null> {
   try {
-    const response = await fetch(`${KALSHI_TRADING_URL}/markets/${ticker}`, {
-      headers: buildHeaders(),
+    const marketUrl = `${KALSHI_TRADING_URL}/markets/${ticker}`;
+    const response = await fetch(marketUrl, {
+      headers: buildHeaders(marketUrl),
       signal: AbortSignal.timeout(10000),
     });
 
@@ -740,8 +763,9 @@ export async function fetchMarketOrderbook(ticker: string): Promise<{
   noAsks: Array<{ price: number; quantity: number }>;
 } | null> {
   try {
-    const response = await fetch(`${KALSHI_TRADING_URL}/markets/${ticker}/orderbook`, {
-      headers: buildHeaders(),
+    const orderbookUrl = `${KALSHI_TRADING_URL}/markets/${ticker}/orderbook`;
+    const response = await fetch(orderbookUrl, {
+      headers: buildHeaders(orderbookUrl),
       signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) return null;
@@ -769,8 +793,9 @@ export async function fetchMarketTrades(
 ): Promise<Array<{ ts: string; price: number; count: number }>> {
   try {
     const params = new URLSearchParams({ limit: String(limit) });
-    const response = await fetch(`${KALSHI_TRADING_URL}/markets/${ticker}/trades?${params}`, {
-      headers: buildHeaders(),
+    const tradesUrl = `${KALSHI_TRADING_URL}/markets/${ticker}/trades?${params}`;
+    const response = await fetch(tradesUrl, {
+      headers: buildHeaders(tradesUrl),
       signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) return [];
@@ -802,8 +827,9 @@ export async function fetchKalshiEvents(params?: {
     if (params?.search) qp.set('title', params.search);
     if (params?.series_ticker) qp.set('series_ticker', params.series_ticker);
 
-    const response = await fetch(`${KALSHI_TRADING_URL}/events?${qp}`, {
-      headers: buildHeaders(),
+    const eventsUrl = `${KALSHI_TRADING_URL}/events?${qp}`;
+    const response = await fetch(eventsUrl, {
+      headers: buildHeaders(eventsUrl),
       signal: AbortSignal.timeout(10000),
     });
     if (!response.ok) return [];

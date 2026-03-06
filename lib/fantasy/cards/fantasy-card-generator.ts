@@ -400,7 +400,7 @@ function getMLBWaiverTargets(): WaiverTarget[] {
 
 const NBA_PROJECTIONS_2025: GenericPlayer[] = [
   { name: 'Nikola Jokic',             team: 'DEN', pos: 'C',  pts: 68.4, adp: 1.1  },
-  { name: 'Luka Doncic',              team: 'DAL', pos: 'PG', pts: 64.2, adp: 2.3  },
+  { name: 'Luka Doncic',              team: 'LAL', pos: 'PG', pts: 64.2, adp: 2.3  },
   { name: 'Giannis Antetokounmpo',    team: 'MIL', pos: 'PF', pts: 61.8, adp: 3.5  },
   { name: 'Shai Gilgeous-Alexander',  team: 'OKC', pos: 'PG', pts: 58.4, adp: 4.8  },
   { name: 'LeBron James',             team: 'LAL', pos: 'SF', pts: 54.6, adp: 5.8  },
@@ -414,7 +414,7 @@ const NBA_PROJECTIONS_2025: GenericPlayer[] = [
   { name: 'Tyrese Haliburton',        team: 'IND', pos: 'PG', pts: 50.6, adp: 11.2 },
   { name: 'Domantas Sabonis',         team: 'SAC', pos: 'C',  pts: 48.2, adp: 12.3 },
   { name: 'Devin Booker',             team: 'PHX', pos: 'SG', pts: 49.2, adp: 13.1 },
-  { name: 'De\'Aaron Fox',            team: 'SAC', pos: 'PG', pts: 47.8, adp: 14.7 },
+  { name: 'De\'Aaron Fox',            team: 'SAS', pos: 'PG', pts: 47.8, adp: 14.7 },
   { name: 'Bam Adebayo',              team: 'MIA', pos: 'C',  pts: 44.8, adp: 16.4 },
   { name: 'Paolo Banchero',           team: 'ORL', pos: 'PF', pts: 46.4, adp: 15.3 },
   { name: 'Kawhi Leonard',            team: 'LAC', pos: 'SF', pts: 46.8, adp: 16.1 },
@@ -486,7 +486,7 @@ export function generateVBDCard(pos?: string): InsightCard {
     title: pos ? `${pos.toUpperCase()} VBD Rankings` : 'Value Board — Top Picks',
     icon: 'Trophy',
     category: 'FANTASY',
-    subcategory: pos ? `${pos.toUpperCase()} • PPR • NFL 2025 Historical` : 'NFL 2025 Season · PPR · 12-Team',
+    subcategory: pos ? `${pos.toUpperCase()} • PPR • NFL 2025 Final` : 'NFL 2025 Final · PPR · 12-Team',
     gradient: getGradient(pos?.toUpperCase() || 'WR'),
     data: {
       fantasyCardType: 'vbd_rankings',
@@ -509,7 +509,7 @@ export function generateVBDCard(pos?: string): InsightCard {
       leagueSize: 12,
       status: bestTier === 1 ? 'target' : bestTier === 2 ? 'value' : 'sleeper',
     },
-    metadata: { realData: false, dataSource: 'NFL 2025 Season (Historical)' },
+    metadata: { realData: false, dataSource: 'NFL 2025 Final Season Data' },
   };
 }
 
@@ -537,7 +537,7 @@ export function generateTierCliffCard(): InsightCard {
       description: 'These tier breaks represent the highest-leverage draft moments. Miss a tier-1 player and you may wait 3–4 rounds for equivalent value.',
       status: 'hot',
     },
-    metadata: { realData: false, dataSource: 'NFL 2025 Season (Historical)' },
+    metadata: { realData: false, dataSource: 'NFL 2025 Final Season Data' },
   };
 }
 
@@ -596,7 +596,7 @@ export function generateDraftCard(round: number = 1, pick: number = 5, leagueSiz
       tierCliffAlerts: cliffs.map(c => `${c.pos}: ${c.dropPct.toFixed(1)}% drop after ${c.cliffAfterName}`),
       status: 'target',
     },
-    metadata: { realData: false, dataSource: 'NFL 2025 Season (Historical)' },
+    metadata: { realData: false, dataSource: 'NFL 2025 Final Season Data' },
   };
 }
 
@@ -634,7 +634,7 @@ export function generateWaiverCard(): InsightCard {
       budgetNote: 'Bids shown as % of $100 FAAB budget. Scale linearly with your actual budget.',
       status: 'hot',
     },
-    metadata: { realData: false, dataSource: 'NFL 2025 Waiver (Historical)' },
+    metadata: { realData: false, dataSource: 'NFL 2025 Final Season Data' },
   };
 }
 
@@ -669,7 +669,7 @@ export function generatePlayerProjectionCard(playerName: string): InsightCard | 
       analysis: generatePlayerAnalysis(player),
       status: player.tier === 1 ? 'target' : player.tier === 2 ? 'value' : 'sleeper',
     },
-    metadata: { realData: false, dataSource: 'NFL 2025 Season (Historical)' },
+    metadata: { realData: false, dataSource: 'NFL 2025 Final Season Data' },
   };
 }
 
@@ -706,7 +706,7 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
       title: 'MLB Value Board — Top Picks',
       icon: 'Trophy',
       category: 'FANTASY',
-      subcategory: 'MLB 2025 • 5×5 Roto • 12-Team',
+      subcategory: 'MLB 2026 • 5×5 Roto • 12-Team',
       gradient: 'from-indigo-600 to-purple-700',
       data: {
         fantasyCardType: 'vbd_rankings',
@@ -718,7 +718,7 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
         leagueSize: 12,
         status: 'target',
       },
-      metadata: { realData: false, dataSource: 'MLB 2025 Projections' },
+      metadata: { realData: false, dataSource: 'MLB 2026 Pre-Season Projections' },
     });
 
     if (cards.length < count) {
@@ -728,7 +728,7 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
         title: 'MLB Waiver Wire Targets',
         icon: 'Zap',
         category: 'FANTASY',
-        subcategory: 'MLB • FAAB Optimizer',
+        subcategory: 'MLB 2026 • FAAB Optimizer',
         gradient: 'from-teal-600 to-cyan-700',
         data: {
           fantasyCardType: 'waiver',
@@ -738,7 +738,7 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
           budgetNote: 'FAAB bids shown as % of $100 budget. Scale to your actual budget.',
           status: 'hot',
         },
-        metadata: { realData: false, dataSource: 'MLB 2025 Waiver Engine' },
+        metadata: { realData: false, dataSource: 'MLB 2026 Waiver Engine' },
       });
     }
 
@@ -750,7 +750,7 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
         title: 'MLB Draft Board — SP Targets',
         icon: 'Target',
         category: 'FANTASY',
-        subcategory: 'MLB 2025 • SP Rankings',
+        subcategory: 'MLB 2026 • SP Rankings',
         gradient: 'from-indigo-600 to-purple-700',
         data: {
           fantasyCardType: 'draft_recommendation',
@@ -761,7 +761,7 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
           tierCliffAlerts: MLB_TIER_CLIFFS.slice(0, 2).map(c => `${c.pos}: ${c.dropPct.toFixed(1)}% drop after ${c.cliffAfterName}`),
           status: 'target',
         },
-        metadata: { realData: false, dataSource: 'MLB 2025 Draft Engine' },
+        metadata: { realData: false, dataSource: 'MLB 2026 Draft Engine' },
       });
     }
 
@@ -779,7 +779,7 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
       title: 'NBA Value Board — Top Picks',
       icon: 'Trophy',
       category: 'FANTASY',
-      subcategory: 'NBA 2025 • 9-Cat • 12-Team',
+      subcategory: 'NBA 2025-26 • 9-Cat • 12-Team',
       gradient: 'from-orange-600 to-red-700',
       data: {
         fantasyCardType: 'vbd_rankings',
@@ -791,7 +791,7 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
         leagueSize: 12,
         status: 'target',
       },
-      metadata: { realData: false, dataSource: 'NBA 2025 Projections' },
+      metadata: { realData: false, dataSource: 'NBA 2025-26 Projections' },
     });
 
     if (cards.length < count) {
@@ -801,7 +801,7 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
         title: 'NBA Waiver Wire Targets',
         icon: 'Zap',
         category: 'FANTASY',
-        subcategory: 'NBA • FAAB Optimizer',
+        subcategory: 'NBA 2025-26 • FAAB Optimizer',
         gradient: 'from-teal-600 to-cyan-700',
         data: {
           fantasyCardType: 'waiver',
@@ -811,7 +811,7 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
           budgetNote: 'Bids shown as % of $100 budget.',
           status: 'hot',
         },
-        metadata: { realData: false, dataSource: 'NBA 2025 Waiver Engine' },
+        metadata: { realData: false, dataSource: 'NBA 2025-26 Waiver Engine' },
       });
     }
 
@@ -823,7 +823,7 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
         title: 'NBA Draft Board — Round 1',
         icon: 'Target',
         category: 'FANTASY',
-        subcategory: 'NBA 2025 • 9-Cat Rankings',
+        subcategory: 'NBA 2025-26 • 9-Cat Rankings',
         gradient: 'from-orange-600 to-red-700',
         data: {
           fantasyCardType: 'draft_recommendation',
@@ -834,7 +834,7 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
           tierCliffAlerts: NBA_TIER_CLIFFS.slice(0, 2).map(c => `${c.pos}: ${c.dropPct.toFixed(1)}% drop after ${c.cliffAfterName}`),
           status: 'target',
         },
-        metadata: { realData: false, dataSource: 'NBA 2025 Draft Engine' },
+        metadata: { realData: false, dataSource: 'NBA 2025-26 Draft Engine' },
       });
     }
 

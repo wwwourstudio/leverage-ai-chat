@@ -57,23 +57,23 @@ export function SuggestedPrompts({
     <>
       {/* Welcome categorized quick-start grid — shown only on fresh session */}
       {showWelcomeGrid && (
-        <div className="mb-5 sm:block">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-3 px-1">
+        <div className="mb-3 sm:block">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-2 px-1">
             Get started — choose a category
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2">
             {WELCOME_CATEGORIES.map(({ label, desc, icon: Icon, color, bg, border, sample, sampleIcon: SampleIcon }) => (
               <button
                 key={label}
                 onClick={() => onWelcomeAction(sample)}
-                className={`group/cat flex flex-col items-start gap-1.5 p-2.5 sm:p-3 rounded-xl bg-gradient-to-br ${bg} border ${border} hover:border-opacity-60 transition-all hover:scale-[1.02] active:scale-[0.98] text-left`}
+                className={`group/cat flex flex-col items-start gap-1 p-2 sm:p-2.5 rounded-xl bg-gradient-to-br ${bg} border ${border} hover:border-opacity-60 transition-all hover:scale-[1.02] active:scale-[0.98] text-left`}
               >
-                <div className="flex items-center gap-2">
-                  <Icon className={`w-4 h-4 ${color}`} />
-                  <span className={`text-xs font-bold ${color}`}>{label}</span>
+                <div className="flex items-center gap-1.5">
+                  <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${color}`} />
+                  <span className={`text-[11px] sm:text-xs font-bold ${color}`}>{label}</span>
                 </div>
-                <p className="text-[10px] text-[oklch(0.45_0.008_280)] leading-tight">{desc}</p>
-                <div className="flex items-center gap-1 mt-1 opacity-0 group-hover/cat:opacity-100 transition-opacity">
+                <p className="text-[9px] sm:text-[10px] text-[oklch(0.45_0.008_280)] leading-tight">{desc}</p>
+                <div className="hidden sm:flex items-center gap-1 mt-0.5 opacity-0 group-hover/cat:opacity-100 transition-opacity">
                   <SampleIcon className="w-3 h-3 text-[oklch(0.45_0.008_280)]" />
                   <span className="text-[9px] text-[oklch(0.45_0.008_280)] line-clamp-1">{sample}</span>
                 </div>

@@ -3445,23 +3445,22 @@ No preamble. Start directly with section 1.`;
 
                   {/* Message Actions - Hidden for welcome message */}
                   {!message.isWelcome && (
-                    <div className={`flex items-center flex-wrap gap-2 mt-5 ${message.role === 'assistant' ? 'ml-11' : ''}`}>
+                    <div className={`flex items-center flex-nowrap gap-0.5 mt-2 ${message.role === 'assistant' ? 'ml-11' : ''}`}>
                       {message.role === 'user' && editingMessageIndex !== index && (
                         <button
                           onClick={() => handleEditMessage(index)}
-                          className="flex items-center gap-2 px-3.5 py-2 rounded-xl hover:bg-gray-800/60 active:bg-gray-800/80 transition-all group/action border border-gray-800 hover:border-gray-700"
+                          className={`p-1.5 rounded-lg transition-all group/action border border-transparent hover:bg-gray-800/60 active:bg-gray-800/80 hover:border-gray-700`}
                           title="Edit this message"
                           aria-label="Edit message"
                         >
-                          <Edit3 className="w-4 h-4 text-gray-500 group-hover/action:text-blue-400 transition-colors" />
-                          <span className="text-xs font-bold text-gray-500 group-hover/action:text-blue-400">Edit</span>
+                          <Edit3 className="w-3.5 h-3.5 text-gray-500 group-hover/action:text-blue-400 transition-colors" />
                         </button>
                       )}
                       {message.role === 'assistant' && (
                         <>
                           <button
                             onClick={() => message.voted !== 'up' && handleVote(index, 'up')}
-                            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all group/action border ${
+                            className={`p-1.5 rounded-lg transition-all group/action border ${
                               message.voted === 'up'
                                 ? 'bg-green-500/15 border-green-500/40 cursor-default'
                                 : 'hover:bg-green-500/10 active:bg-green-500/20 border-transparent hover:border-green-500/30'
@@ -3469,12 +3468,11 @@ No preamble. Start directly with section 1.`;
                             title="This response was helpful"
                             aria-label="Mark as helpful"
                           >
-                            <ThumbsUp className={`w-4 h-4 transition-colors ${message.voted === 'up' ? 'text-green-400 fill-green-400/30' : 'text-gray-500 group-hover/action:text-green-400'}`} />
-                            <span className={`text-xs font-bold ${message.voted === 'up' ? 'text-green-400' : 'text-gray-500 group-hover/action:text-green-400'}`}>Helpful</span>
+                            <ThumbsUp className={`w-3.5 h-3.5 transition-colors ${message.voted === 'up' ? 'text-green-400 fill-green-400/30' : 'text-gray-500 group-hover/action:text-green-400'}`} />
                           </button>
                           <button
                             onClick={() => message.voted !== 'down' && handleVote(index, 'down')}
-                            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all group/action border ${
+                            className={`p-1.5 rounded-lg transition-all group/action border ${
                               message.voted === 'down'
                                 ? 'bg-red-500/15 border-red-500/40 cursor-default'
                                 : 'hover:bg-red-500/10 active:bg-red-500/20 border-transparent hover:border-red-500/30'
@@ -3482,34 +3480,29 @@ No preamble. Start directly with section 1.`;
                             title="This response needs improvement"
                             aria-label="Mark as needing improvement"
                           >
-                            <ThumbsDown className={`w-4 h-4 transition-colors ${message.voted === 'down' ? 'text-red-400 fill-red-400/30' : 'text-gray-500 group-hover/action:text-red-400'}`} />
-                            <span className={`text-xs font-bold ${message.voted === 'down' ? 'text-red-400' : 'text-gray-500 group-hover/action:text-red-400'}`}>Improve</span>
+                            <ThumbsDown className={`w-3.5 h-3.5 transition-colors ${message.voted === 'down' ? 'text-red-400 fill-red-400/30' : 'text-gray-500 group-hover/action:text-red-400'}`} />
                           </button>
                           <button
                             onClick={() => handleRegenerateResponse(index)}
-                            className="flex items-center gap-2 px-3.5 py-2 rounded-xl hover:bg-purple-500/10 active:bg-purple-500/20 transition-all group/action border border-transparent hover:border-purple-500/30"
+                            className="p-1.5 rounded-lg hover:bg-purple-500/10 active:bg-purple-500/20 transition-all group/action border border-transparent hover:border-purple-500/30"
                             title="Regenerate this response"
                             aria-label="Regenerate response"
                           >
-                            <RotateCcw className="w-4 h-4 text-gray-500 group-hover/action:text-purple-400 transition-colors" />
-                            <span className="text-xs font-bold text-gray-500 group-hover/action:text-purple-400">Regenerate</span>
+                            <RotateCcw className="w-3.5 h-3.5 text-gray-500 group-hover/action:text-purple-400 transition-colors" />
                           </button>
                         </>
                       )}
                       <button
                         onClick={() => handleCopyMessage(message.content)}
-                        className="flex items-center gap-2 px-3.5 py-2 rounded-xl hover:bg-cyan-500/10 active:bg-cyan-500/20 transition-all group/action border border-transparent hover:border-cyan-500/30"
+                        className="p-1.5 rounded-lg hover:bg-cyan-500/10 active:bg-cyan-500/20 transition-all group/action border border-transparent hover:border-cyan-500/30"
                         title="Copy message to clipboard"
                         aria-label="Copy message"
                       >
-                        <Copy className="w-4 h-4 text-gray-500 group-hover/action:text-cyan-400 transition-colors" />
-                        <span className="text-xs font-bold text-gray-500 group-hover/action:text-cyan-400">Copy</span>
+                        <Copy className="w-3.5 h-3.5 text-gray-500 group-hover/action:text-cyan-400 transition-colors" />
                       </button>
-                      <div className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-gray-900/50 rounded-lg border border-gray-800/50">
-                        <Clock className="w-3.5 h-3.5 text-gray-600" />
-                        {/* suppressHydrationWarning: toLocaleTimeString() is timezone-dependent;
-                            server renders UTC, browser renders local time — mismatch is expected. */}
-                        <span suppressHydrationWarning className="text-xs font-medium text-gray-500 tabular-nums">{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <div className="ml-auto flex items-center gap-1 px-2 py-1 bg-gray-900/50 rounded-md border border-gray-800/50">
+                        <Clock className="w-3 h-3 text-gray-600" />
+                        <span suppressHydrationWarning className="text-[10px] font-medium text-gray-500 tabular-nums">{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     </div>
                   )}

@@ -230,6 +230,51 @@ export function DynamicCardRenderer({
     );
   }
 
+  // Player prop odds cards (from The Odds API via playerPropToCard())
+  if (cardType.includes('player_prop') || cardType === 'player-prop') {
+    const d = safeCard.data;
+    const overRaw  = String(d.over  ?? '');
+    const underRaw = String(d.under ?? '');
+    const overNum  = parseFloat(overRaw);
+    const underNum = parseFloat(underRaw);
+    const overStr  = !isNaN(overNum)  ? (overNum  > 0 ? `+${overNum}`  : String(overNum))  : overRaw;
+    const underStr = !isNaN(underNum) ? (underNum > 0 ? `+${underNum}` : String(underNum)) : underRaw;
+    return (
+      <div className={`group relative bg-gradient-to-br ${safeCard.gradient} rounded-2xl p-5 border border-gray-700/40 hover:border-gray-600/60 transition-all duration-300 shadow-lg hover:shadow-xl`}>
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400/70">{safeCard.category} · Player Props</span>
+            <h3 className="text-sm font-black text-white mt-0.5">{d.player}</h3>
+            <p className="text-xs text-gray-400 mt-0.5">{d.stat} — Line: <span className="text-white font-semibold">{d.line}</span></p>
+          </div>
+          <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-blue-500/15 text-blue-400 border border-blue-500/20 uppercase tracking-wider flex-shrink-0">LIVE</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="bg-black/20 rounded-lg p-2.5 text-center">
+            <p className="text-[9px] uppercase tracking-widest text-gray-500 mb-1">Over {d.line}</p>
+            <p className={`text-lg font-black ${!isNaN(overNum) && overNum > 0 ? 'text-green-400' : 'text-red-400'}`}>{overStr}</p>
+          </div>
+          <div className="bg-black/20 rounded-lg p-2.5 text-center">
+            <p className="text-[9px] uppercase tracking-widest text-gray-500 mb-1">Under {d.line}</p>
+            <p className={`text-lg font-black ${!isNaN(underNum) && underNum > 0 ? 'text-green-400' : 'text-red-400'}`}>{underStr}</p>
+          </div>
+        </div>
+        <div className="border-t border-gray-700/30 pt-2.5 space-y-1">
+          <p className="text-[11px] text-gray-400 truncate">{d.game}</p>
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] text-gray-500">{d.gameTime}</p>
+            <span className="text-[9px] text-gray-600 uppercase tracking-wider">{d.bookmaker}</span>
+          </div>
+        </div>
+        {handleAnalyze && (
+          <button onClick={handleAnalyze} className="mt-3 w-full text-[10px] font-bold uppercase tracking-widest text-blue-400/70 hover:text-blue-300 transition-colors">
+            Analyze →
+          </button>
+        )}
+      </div>
+    );
+  }
+
   // Arbitrage cards
   if (cardType.includes('arbitrage')) {
     return (

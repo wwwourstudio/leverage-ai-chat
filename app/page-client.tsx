@@ -557,6 +557,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             setIsLoggedIn(false);
             setUser(null);
             setSupabaseProfileId(null);
+            // Clear user-specific data on logout
+            setFantasyLeague(null);
+            localStorage.removeItem('leverage_fantasy_league');
             // Revert to localStorage instructions on logout
             const stored = localStorage.getItem('leverage_custom_instructions') || '';
             setCustomInstructions(stored);
@@ -1267,6 +1270,9 @@ No preamble. Start directly with section 1.`;
         kalshiSubcategory: selectedCategory === 'kalshi' && selectedSport ? selectedSport : undefined,
         // Pass selected tab so the API can route DFS vs fantasy correctly
         selectedCategory,
+        // Pass league settings so server-side card generation uses the correct size/format
+        leagueSize: fantasyLeague?.setupComplete ? (fantasyLeague.teams ?? 12) : undefined,
+        leagueScoringFormat: fantasyLeague?.setupComplete ? (fantasyLeague.leagueType ?? undefined) : undefined,
       };
 
       if (isDev) {
@@ -1300,7 +1306,10 @@ No preamble. Start directly with section 1.`;
           if (isDev) console.log('[FANTASY INTENT] Generating fantasy cards');
           try {
             const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
-            const fantasyCards = generateFantasyCards(userMessage, 3, context.sport);
+            const fantasyCards = await generateFantasyCards(userMessage, 3, context.sport, {
+              teamCount: fantasyLeague?.setupComplete ? (fantasyLeague.teams ?? 12) : undefined,
+              scoringFormat: fantasyLeague?.setupComplete ? (fantasyLeague.leagueType ?? undefined) : undefined,
+            });
             context.existingCards = fantasyCards;
           } catch (err) {
             if (isDev) console.error('[FANTASY INTENT] Card generation failed:', err);
@@ -4132,7 +4141,7 @@ No preamble. Start directly with section 1.`;
         isOpen={showUserLightbox}
         onClose={() => setShowUserLightbox(false)}
         user={user}
-        onLogout={() => { setUser(null); setIsLoggedIn(false); }}
+        onLogout={() => { setUser(null); setIsLoggedIn(false); setFantasyLeague(null); localStorage.removeItem('leverage_fantasy_league'); }}
         onInstructionsChange={setCustomInstructions}
         onAttachFile={(file) => setUploadedFiles(prev => [...prev, { ...file, url: '' }])}
       />

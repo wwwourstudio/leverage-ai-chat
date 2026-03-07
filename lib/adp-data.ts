@@ -99,7 +99,7 @@ const STATIC_FALLBACK_PLAYERS: NFBCPlayer[] = [
   { rank: 27,  playerName: 'Rodriguez, Julio',          displayName: 'Julio Rodriguez',          adp: 28.8,  positions: 'OF',      team: 'SEA', valueDelta: 1.8,  isValuePick: false },
   { rank: 28,  playerName: 'Ramirez, Jose',             displayName: 'Jose Ramirez',             adp: 29.0,  positions: '3B',      team: 'CLE', valueDelta: 1.0,  isValuePick: false },
   { rank: 29,  playerName: 'Machado, Manny',            displayName: 'Manny Machado',            adp: 31.8,  positions: '3B,SS',   team: 'SD',  valueDelta: 2.8,  isValuePick: false },
-  { rank: 30,  playerName: 'Verlander, Justin',         displayName: 'Justin Verlander',         adp: 38.0,  positions: 'SP',      team: 'HOU', valueDelta: 8.0,  isValuePick: false },
+  { rank: 30,  playerName: 'Valdez, Framber',            displayName: 'Framber Valdez',           adp: 36.5,  positions: 'SP',      team: 'HOU', valueDelta: 6.5,  isValuePick: false },
   // ── Round 4 (31–40) ─────────────────────────────────────────────────────────
   { rank: 31,  playerName: 'Bieber, Shane',             displayName: 'Shane Bieber',             adp: 35.5,  positions: 'SP',      team: 'CLE', valueDelta: 4.5,  isValuePick: false },
   { rank: 32,  playerName: 'Albies, Ozzie',             displayName: 'Ozzie Albies',             adp: 33.2,  positions: '2B',      team: 'ATL', valueDelta: 1.2,  isValuePick: false },
@@ -116,7 +116,7 @@ const STATIC_FALLBACK_PLAYERS: NFBCPlayer[] = [
   { rank: 42,  playerName: 'Arozarena, Randy',          displayName: 'Randy Arozarena',          adp: 45.0,  positions: 'OF',      team: 'SEA', valueDelta: 3.0,  isValuePick: false },
   { rank: 43,  playerName: 'Trout, Mike',               displayName: 'Mike Trout',               adp: 49.0,  positions: 'OF',      team: 'LAA', valueDelta: 6.0,  isValuePick: false },
   { rank: 44,  playerName: 'Hoerner, Nico',             displayName: 'Nico Hoerner',             adp: 46.2,  positions: '2B,SS',   team: 'CHC', valueDelta: 2.2,  isValuePick: false },
-  { rank: 45,  playerName: 'Rutschman, Adley',           displayName: 'Adley Rutschman',           adp: 43.5,  positions: 'C',       team: 'BAL', valueDelta: -1.5, isValuePick: false },
+  { rank: 45,  playerName: 'Pena, Jeremy',               displayName: 'Jeremy Peña',              adp: 47.5,  positions: 'SS',      team: 'HOU', valueDelta: 2.5,  isValuePick: false },
   { rank: 46,  playerName: 'Gausman, Kevin',            displayName: 'Kevin Gausman',            adp: 52.0,  positions: 'SP',      team: 'TOR', valueDelta: 6.0,  isValuePick: false },
   { rank: 47,  playerName: 'Diaz, Edwin',               displayName: 'Edwin Diaz',               adp: 55.5,  positions: 'RP',      team: 'NYM', valueDelta: 8.5,  isValuePick: false },
   { rank: 48,  playerName: 'Luzardo, Jesus',            displayName: 'Jesus Luzardo',            adp: 53.0,  positions: 'SP',      team: 'PHI', valueDelta: 5.0,  isValuePick: false },
@@ -198,7 +198,7 @@ const STATIC_FALLBACK_PLAYERS: NFBCPlayer[] = [
   { rank: 117, playerName: 'Yarbrough, Ryan',           displayName: 'Ryan Yarbrough',           adp: 127.5, positions: 'SP',      team: 'BOS', valueDelta: 10.5, isValuePick: false },
   { rank: 118, playerName: 'Merrill, Jackson',          displayName: 'Jackson Merrill',          adp: 126.0, positions: 'OF',      team: 'SD',  valueDelta: 8.0,  isValuePick: false },
   { rank: 119, playerName: 'Stephenson, Tyler',         displayName: 'Tyler Stephenson',         adp: 128.5, positions: 'C',       team: 'CIN', valueDelta: 9.5,  isValuePick: false },
-  { rank: 120, playerName: 'Stephenson, Tyler',         displayName: 'Tyler Stephenson',         adp: 128.5, positions: 'C',       team: 'CIN', valueDelta: 8.5,  isValuePick: false },
+  { rank: 120, playerName: 'Reynolds, Bryan',           displayName: 'Bryan Reynolds',           adp: 129.0, positions: 'OF',      team: 'PIT', valueDelta: 9.0,  isValuePick: false },
 ];
 
 // ── Module-level cache ────────────────────────────────────────────────────────
@@ -300,13 +300,12 @@ function parseTSV(raw: string): NFBCPlayer[] {
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 
-// URL patterns to try in order — JSON API first, then CSV, then legacy TSV
-const NFBC_ADP_URLS = [
-  'https://www.fantasypros.com/api/v2/json/mlb-adp.php',
-  'https://www.fantasypros.com/mlb/adp/overall.php?export=csv',
-  'https://nfc.shgn.com/adp/baseball.tsv',
-  'https://nfc.shgn.com/adp/baseball?export=1',
-];
+// URL patterns to try in order.
+// NOTE: NFBC ADP (nfc.shgn.com) requires a paid subscription — server-side
+// scraping will always 404 or return a login page. FantasyPros blocks non-browser
+// requests with 403. These URLs are kept as aspirational fallbacks in case
+// a working endpoint is discovered; the static fallback below is the true source.
+const NFBC_ADP_URLS: string[] = [];
 
 async function tryFetchURL(url: string): Promise<NFBCPlayer[]> {
   const res = await fetch(url, {
@@ -375,7 +374,7 @@ async function fetchNFBCADP(): Promise<NFBCPlayer[]> {
     }
   }
 
-  throw lastError ?? new Error('All NFBC ADP URLs failed');
+  throw lastError ?? new Error('No NFBC ADP URLs configured');
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

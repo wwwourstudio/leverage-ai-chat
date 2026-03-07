@@ -354,8 +354,13 @@ async function _generateContextualCards(
   
   console.log(`[v0] [CARDS-GEN] Cache MISS: fetching fresh data (multiSport=${multiSport}, sport=${sport}, category=${category})`);
 
+  // Fantasy with no sport: default to MLB — MLB draft season runs Jan–Apr (NFBC / TGFBI)
+  const effectiveSport = (category === 'fantasy' || category === 'draft' || category === 'waiver') && !sport
+    ? 'baseball_mlb'
+    : sport;
+
   // Normalize sport to API format, then get display name
-  const normalizedSport = sport ? sportToApi(sport) : undefined;
+  const normalizedSport = effectiveSport ? sportToApi(effectiveSport) : undefined;
   const displaySport = normalizedSport ? apiToSport(normalizedSport).toUpperCase() : 'MULTI-SPORT';
 
   console.log('[v0] [CARDS GENERATOR] Generating cards...');
@@ -1234,7 +1239,7 @@ async function _generateContextualCards(
     try {
       const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
       // Pass a default intent so VBD+waiver+draft cards are always generated
-      const fantasyCards = generateFantasyCards('ranking projection waiver', count, normalizedSport);
+      const fantasyCards = await generateFantasyCards('ranking projection waiver', count, normalizedSport);
       cards.push(...fantasyCards.slice(0, count));
     } catch (err) {
       console.error('[v0] [CARDS-GEN] Fantasy card generation failed:', err);

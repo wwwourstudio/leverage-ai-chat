@@ -684,12 +684,32 @@ function generatePlayerAnalysis(p: PlayerVBD): string {
 // Main Entry Point — Generate 1-N Fantasy Cards Based on Intent
 // ============================================================================
 
+interface LeagueOptions {
+  /** Number of teams in the league (default 12) */
+  teamCount?: number;
+  /** Scoring format code: 'roto' | 'h2h' | 'roto_h2h' | 'ppr' | 'half_ppr' | 'standard' */
+  scoringFormat?: string;
+}
+
+/** Map internal scoring-format codes to display strings */
+function formatLabel(code: string | undefined, sport: 'mlb' | 'nba'): string {
+  if (sport === 'mlb') {
+    if (code === 'h2h') return 'H2H Pts';
+    if (code === 'roto_h2h') return 'Roto H2H';
+    return '5×5 Roto'; // default MLB
+  }
+  // NBA
+  if (code === 'roto') return '9-Cat Roto';
+  if (code === 'h2h') return 'H2H Cat';
+  return '9-Cat'; // default NBA
+}
+
 /**
  * Generate fantasy cards for non-NFL sports.
  * MLB and NBA have embedded projections → real VBD/waiver/draft cards.
  * Other sports (NHL, soccer, etc.) fall back to informational prompt cards.
  */
-async function generateNonNFLFantasyCards(sport: string, count: number): Promise<InsightCard[]> {
+async function generateNonNFLFantasyCards(sport: string, count: number, leagueOptions?: LeagueOptions): Promise<InsightCard[]> {
   const isMLB = sport.includes('baseball') || sport === 'mlb';
   const isNBA = sport.includes('basketball') || sport === 'nba';
 
@@ -699,7 +719,9 @@ async function generateNonNFLFantasyCards(sport: string, count: number): Promise
     const mlbRaw = await getProjections('mlb', mlbSeason, () => MLB_PROJECTIONS_2025);
     const mlbVBD = computeVBDGeneric(mlbRaw, MLB_REPLACEMENT_RANKS);
     const mlbCliffs = detectCliffs(mlbVBD);
-    const mlbSeasonLabel = `MLB ${mlbSeason} • 5×5 Roto • 12-Team`;
+    const mlbTeams = leagueOptions?.teamCount ?? 12;
+    const mlbFmt = formatLabel(leagueOptions?.scoringFormat, 'mlb');
+    const mlbSeasonLabel = `MLB ${mlbSeason} • ${mlbFmt} • ${mlbTeams}-Team`;
     const mlbDataSource = `MLB ${mlbSeason} Projections`;
 
     const cards: InsightCard[] = [];
@@ -722,32 +744,70 @@ async function generateNonNFLFantasyCards(sport: string, count: number): Promise
         sport: 'MLB',
         players: topPlayers.map(p => ({ name: p.name, team: p.team, pos: p.pos, vbd: p.vbd, pts: p.pts, adp: p.adp, tier: p.tier, rank: p.rank })),
         tierCliff: cliff ? { cliffAfterName: cliff.cliffAfterName, dropPct: cliff.dropPct } : null,
-        scoringFormat: '5×5 Roto',
-        leagueSize: 12,
+        scoringFormat: mlbFmt,
+        leagueSize: mlbTeams,
         status: 'target',
       },
       metadata: { realData: false, dataSource: mlbDataSource },
     });
 
     if (cards.length < count) {
-      const targets = getMLBWaiverTargets();
-      cards.push({
-        type: 'FANTASY_WAIVER',
-        title: 'MLB Waiver Wire Targets',
-        icon: 'Zap',
-        category: 'FANTASY',
-        subcategory: `MLB ${mlbSeason} • FAAB Optimizer`,
-        gradient: 'from-teal-600 to-cyan-700',
-        data: {
-          fantasyCardType: 'waiver',
-          sport: 'MLB',
-          targets: targets.map(t => ({ name: t.name, team: t.team, pos: t.pos, faabBid: t.faabBid, faabPct: t.faabPct, breakoutScore: t.breakoutScore, reason: t.reason, rostered: t.rostered })),
-          description: 'Top MLB waiver pickups ranked by breakout score.',
-          budgetNote: 'FAAB bids shown as % of $100 budget. Scale to your actual budget.',
-          status: 'hot',
-        },
-        metadata: { realData: false, dataSource: `MLB ${mlbSeason} Waiver Engine` },
-      });
+      // Try to get real Statcast data for the waiver/hot-hitter card
+      let statcastHitters: Array<{ name: string; xwoba: number; exitVelo: number; barrelRate: number }> = [];
+      let statcastRealData = false;
+      try {
+        const { getStatcastData } = await import('@/lib/baseball-savant');
+        const statcastPlayers = await getStatcastData();
+        const batters = statcastPlayers
+          .filter(p => p.playerType === 'batter' && p.xwoba > 0)
+          .sort((a, b) => b.xwoba - a.xwoba)
+          .slice(0, 6);
+        if (batters.length > 0) {
+          statcastHitters = batters.map(p => ({ name: p.name, xwoba: p.xwoba, exitVelo: p.exitVelocity, barrelRate: p.barrelRate }));
+          statcastRealData = true;
+        }
+      } catch { /* fall through to static waiver targets */ }
+
+      if (statcastRealData && statcastHitters.length > 0) {
+        cards.push({
+          type: 'FANTASY_WAIVER',
+          title: 'MLB Hot Hitters — Statcast xwOBA',
+          icon: 'Zap',
+          category: 'FANTASY',
+          subcategory: `MLB ${mlbSeason} • Baseball Savant`,
+          gradient: 'from-teal-600 to-cyan-700',
+          data: {
+            fantasyCardType: 'waiver',
+            sport: 'MLB',
+            targets: statcastHitters.map(p => ({
+              name: p.name, xwoba: p.xwoba, exitVelo: p.exitVelo, barrelRate: p.barrelRate,
+              reason: `xwOBA ${p.xwoba.toFixed(3)} — exit velo ${p.exitVelo.toFixed(1)} mph, barrel ${p.barrelRate.toFixed(1)}%`,
+            })),
+            description: 'Top batters by expected weighted on-base average (xwOBA) from Baseball Savant.',
+            status: 'hot',
+          },
+          metadata: { realData: true, dataSource: `Baseball Savant ${mlbSeason}` },
+        });
+      } else {
+        const targets = getMLBWaiverTargets();
+        cards.push({
+          type: 'FANTASY_WAIVER',
+          title: 'MLB Waiver Wire Targets',
+          icon: 'Zap',
+          category: 'FANTASY',
+          subcategory: `MLB ${mlbSeason} • FAAB Optimizer`,
+          gradient: 'from-teal-600 to-cyan-700',
+          data: {
+            fantasyCardType: 'waiver',
+            sport: 'MLB',
+            targets: targets.map(t => ({ name: t.name, team: t.team, pos: t.pos, faabBid: t.faabBid, faabPct: t.faabPct, breakoutScore: t.breakoutScore, reason: t.reason, rostered: t.rostered })),
+            description: 'Top MLB waiver pickups ranked by breakout score.',
+            budgetNote: 'FAAB bids shown as % of $100 budget. Scale to your actual budget.',
+            status: 'hot',
+          },
+          metadata: { realData: false, dataSource: `MLB ${mlbSeason} Waiver Engine` },
+        });
+      }
     }
 
     if (cards.length < count) {
@@ -782,7 +842,9 @@ async function generateNonNFLFantasyCards(sport: string, count: number): Promise
     const nbaRaw = await getProjections('nba', nbaSeason, () => NBA_PROJECTIONS_2025);
     const nbaVBD = computeVBDGeneric(nbaRaw, NBA_REPLACEMENT_RANKS);
     const nbaCliffs = detectCliffs(nbaVBD);
-    const nbaSeasonLabel = `NBA ${nbaSeason}-${String(nbaSeason + 1).slice(2)} • 9-Cat • 12-Team`;
+    const nbaTeams = leagueOptions?.teamCount ?? 12;
+    const nbaFmt = formatLabel(leagueOptions?.scoringFormat, 'nba');
+    const nbaSeasonLabel = `NBA ${nbaSeason}-${String(nbaSeason + 1).slice(2)} • ${nbaFmt} • ${nbaTeams}-Team`;
 
     const cards: InsightCard[] = [];
     const topPlayers = nbaVBD.sort((a, b) => b.vbd - a.vbd).slice(0, 8);
@@ -892,12 +954,13 @@ async function generateNonNFLFantasyCards(sport: string, count: number): Promise
 export async function generateFantasyCards(
   userMessage: string = '',
   count: number = 3,
-  sport?: string
+  sport?: string,
+  leagueOptions?: LeagueOptions
 ): Promise<InsightCard[]> {
   // Non-NFL sport → don't show NFL player data; return sport-branded cards instead
   const isNFL = !sport || sport.includes('football') || sport === '';
   if (!isNFL) {
-    return generateNonNFLFantasyCards(sport, count);
+    return generateNonNFLFantasyCards(sport, count, leagueOptions);
   }
 
   const msg = userMessage.toLowerCase();

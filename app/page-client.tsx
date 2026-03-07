@@ -265,6 +265,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [showSignupModal, setShowSignupModal] = useState(false);
   const [showSettingsLightbox, setShowSettingsLightbox] = useState(false);
   const [showAlertsLightbox, setShowAlertsLightbox] = useState(false);
+  const [alertCount, setAlertCount] = useState(0);
   const [showStripeLightbox, setShowStripeLightbox] = useState(false);
   const [showUserLightbox, setShowUserLightbox] = useState(false);
   const [customInstructions, setCustomInstructions] = useState('');
@@ -2929,6 +2930,7 @@ No preamble. Start directly with section 1.`;
           user={user}
           onOpenUserLightbox={() => setShowUserLightbox(true)}
           onOpenAlerts={() => setShowAlertsLightbox(true)}
+          alertCount={alertCount}
           onOpenSettings={() => setShowSettingsLightbox(true)}
           onOpenLogin={() => setShowLoginModal(true)}
           onOpenSignup={() => setShowSignupModal(true)}
@@ -4148,6 +4150,7 @@ No preamble. Start directly with section 1.`;
       <AlertsLightbox
         isOpen={showAlertsLightbox}
         onClose={() => setShowAlertsLightbox(false)}
+        onAlertsCountChange={setAlertCount}
       />
 
       {/* Stripe Purchase Lightbox */}

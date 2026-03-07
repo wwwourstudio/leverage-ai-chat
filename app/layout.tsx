@@ -1,27 +1,9 @@
 import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { GeistSans } from 'geist/font/sans'
+import { GeistMono } from 'geist/font/mono'
 import { ToastProvider } from '@/components/toast-provider'
 import './globals.css'
-
-// Optimized font loading with display swap and subset for performance
-const geistSans = Geist({
-  subsets: ['latin'],
-  display: 'swap', // Prevents FOIT (Flash of Invisible Text)
-  variable: '--font-geist-sans',
-  preload: true,
-  fallback: ['system-ui', '-apple-system', 'sans-serif'],
-  adjustFontFallback: true, // Minimizes layout shift
-})
-
-const geistMono = Geist_Mono({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-geist-mono',
-  preload: true,
-  fallback: ['Menlo', 'Monaco', 'Courier New', 'monospace'],
-  adjustFontFallback: true,
-})
 
 export const metadata: Metadata = {
   title: 'Unified AI Platform - Sports Betting • Fantasy • DFS • Kalshi',
@@ -56,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} dark`}>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} dark`}>
       <body className="font-sans antialiased">
         <ToastProvider>
           {children}

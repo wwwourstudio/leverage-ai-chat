@@ -752,24 +752,62 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
     });
 
     if (cards.length < count) {
-      const targets = getMLBWaiverTargets();
-      cards.push({
-        type: 'FANTASY_WAIVER',
-        title: 'MLB Waiver Wire Targets',
-        icon: 'Zap',
-        category: 'FANTASY',
-        subcategory: `MLB ${mlbSeason} • FAAB Optimizer`,
-        gradient: 'from-teal-600 to-cyan-700',
-        data: {
-          fantasyCardType: 'waiver',
-          sport: 'MLB',
-          targets: targets.map(t => ({ name: t.name, team: t.team, pos: t.pos, faabBid: t.faabBid, faabPct: t.faabPct, breakoutScore: t.breakoutScore, reason: t.reason, rostered: t.rostered })),
-          description: 'Top MLB waiver pickups ranked by breakout score.',
-          budgetNote: 'FAAB bids shown as % of $100 budget. Scale to your actual budget.',
-          status: 'hot',
-        },
-        metadata: { realData: false, dataSource: `MLB ${mlbSeason} Waiver Engine` },
-      });
+      // Try to get real Statcast data for the waiver/hot-hitter card
+      let statcastHitters: Array<{ name: string; xwoba: number; exitVelo: number; barrelRate: number }> = [];
+      let statcastRealData = false;
+      try {
+        const { getStatcastData } = await import('@/lib/baseball-savant');
+        const statcastPlayers = await getStatcastData();
+        const batters = statcastPlayers
+          .filter(p => p.playerType === 'batter' && p.xwoba > 0)
+          .sort((a, b) => b.xwoba - a.xwoba)
+          .slice(0, 6);
+        if (batters.length > 0) {
+          statcastHitters = batters.map(p => ({ name: p.name, xwoba: p.xwoba, exitVelo: p.exitVelocity, barrelRate: p.barrelRate }));
+          statcastRealData = true;
+        }
+      } catch { /* fall through to static waiver targets */ }
+
+      if (statcastRealData && statcastHitters.length > 0) {
+        cards.push({
+          type: 'FANTASY_WAIVER',
+          title: 'MLB Hot Hitters — Statcast xwOBA',
+          icon: 'Zap',
+          category: 'FANTASY',
+          subcategory: `MLB ${mlbSeason} • Baseball Savant`,
+          gradient: 'from-teal-600 to-cyan-700',
+          data: {
+            fantasyCardType: 'waiver',
+            sport: 'MLB',
+            targets: statcastHitters.map(p => ({
+              name: p.name, xwoba: p.xwoba, exitVelo: p.exitVelo, barrelRate: p.barrelRate,
+              reason: `xwOBA ${p.xwoba.toFixed(3)} — exit velo ${p.exitVelo.toFixed(1)} mph, barrel ${p.barrelRate.toFixed(1)}%`,
+            })),
+            description: 'Top batters by expected weighted on-base average (xwOBA) from Baseball Savant.',
+            status: 'hot',
+          },
+          metadata: { realData: true, dataSource: `Baseball Savant ${mlbSeason}` },
+        });
+      } else {
+        const targets = getMLBWaiverTargets();
+        cards.push({
+          type: 'FANTASY_WAIVER',
+          title: 'MLB Waiver Wire Targets',
+          icon: 'Zap',
+          category: 'FANTASY',
+          subcategory: `MLB ${mlbSeason} • FAAB Optimizer`,
+          gradient: 'from-teal-600 to-cyan-700',
+          data: {
+            fantasyCardType: 'waiver',
+            sport: 'MLB',
+            targets: targets.map(t => ({ name: t.name, team: t.team, pos: t.pos, faabBid: t.faabBid, faabPct: t.faabPct, breakoutScore: t.breakoutScore, reason: t.reason, rostered: t.rostered })),
+            description: 'Top MLB waiver pickups ranked by breakout score.',
+            budgetNote: 'FAAB bids shown as % of $100 budget. Scale to your actual budget.',
+            status: 'hot',
+          },
+          metadata: { realData: false, dataSource: `MLB ${mlbSeason} Waiver Engine` },
+        });
+      }
     }
 
     if (cards.length < count) {

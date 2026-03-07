@@ -354,8 +354,13 @@ async function _generateContextualCards(
   
   console.log(`[v0] [CARDS-GEN] Cache MISS: fetching fresh data (multiSport=${multiSport}, sport=${sport}, category=${category})`);
 
+  // Fantasy with no sport: default to MLB — MLB draft season runs Jan–Apr (NFBC / TGFBI)
+  const effectiveSport = (category === 'fantasy' || category === 'draft' || category === 'waiver') && !sport
+    ? 'baseball_mlb'
+    : sport;
+
   // Normalize sport to API format, then get display name
-  const normalizedSport = sport ? sportToApi(sport) : undefined;
+  const normalizedSport = effectiveSport ? sportToApi(effectiveSport) : undefined;
   const displaySport = normalizedSport ? apiToSport(normalizedSport).toUpperCase() : 'MULTI-SPORT';
 
   console.log('[v0] [CARDS GENERATOR] Generating cards...');

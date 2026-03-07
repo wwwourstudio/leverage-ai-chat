@@ -54,18 +54,44 @@ vi.mock('@/lib/supabase/client', () => ({
 // ── MLB Stats API mock response ──────────────────────────────────────────────
 const MLB_STATS_EMPTY = JSON.stringify({ dates: [], totalGames: 0 });
 
-// ── Baseball Savant mock (minimal CSV for hitter + pitcher) ─────────────────
-const SAVANT_HITTER_CSV = [
-  'player_id,last_name,first_name,avg_hit_speed,avg_hit_angle,barrel_batted_rate,xwoba,iso,hr_flyball_ratio,sprint_speed,whiff_percent,hard_hit_percent',
-  '660271,Judge,Aaron,95.3,14.2,18.5,0.440,0.310,0.28,27.5,28.0,55.0',
-  '545361,Trout,Mike,94.1,13.8,16.0,0.415,0.280,0.24,28.1,25.5,52.3',
-].join('\n');
+// ── Baseball Savant mock (JSON — matches expected_statistics?csv=false format) ─
+const SAVANT_HITTER_JSON = [
+  {
+    player_id: '660271', last_name: 'Judge', first_name: 'Aaron',
+    pa: '450', launch_speed: '95.3', max_launch_speed: '119.2',
+    launch_angle: '14.2', barrel_batted_rate: '18.5', hard_hit_percent: '55.0',
+    sweet_spot_percent: '38.0', est_woba: '0.440', est_ba: '0.290',
+    est_slg: '0.600', pull_percent: '42.0', k_percent: '25.0',
+    bb_percent: '12.0', team_name_alt: 'NYY',
+  },
+  {
+    player_id: '545361', last_name: 'Trout', first_name: 'Mike',
+    pa: '380', launch_speed: '94.1', max_launch_speed: '117.5',
+    launch_angle: '13.8', barrel_batted_rate: '16.0', hard_hit_percent: '52.3',
+    sweet_spot_percent: '36.0', est_woba: '0.415', est_ba: '0.270',
+    est_slg: '0.550', pull_percent: '39.0', k_percent: '22.0',
+    bb_percent: '15.0', team_name_alt: 'LAA',
+  },
+];
 
-const SAVANT_PITCHER_CSV = [
-  'player_id,last_name,first_name,p_k_percent,p_bb_percent,p_era,p_whip,velocity,spin_rate,extension',
-  '543037,Cole,Gerrit,31.5,5.2,3.10,0.98,97.2,2521,6.5',
-  '605483,deGrom,Jacob,33.0,5.5,2.67,0.81,99.0,2450,6.8',
-].join('\n');
+const SAVANT_PITCHER_JSON = [
+  {
+    player_id: '543037', last_name: 'Cole', first_name: 'Gerrit',
+    p_ip: '180', k_percent: '31.5', bb_percent: '5.2', home_run_per_9: '1.1',
+    effective_speed: '97.2', release_spin_rate: '2521', release_extension: '6.5',
+    release_pos_z: '5.9', pfx_x: '-8.2', pfx_z: '12.1',
+    fastball_percent: '55', breaking_percent: '28', offspeed_percent: '17',
+    whiff_percent: '30.0', team_name_alt: 'NYY',
+  },
+  {
+    player_id: '605483', last_name: 'deGrom', first_name: 'Jacob',
+    p_ip: '160', k_percent: '33.0', bb_percent: '5.5', home_run_per_9: '0.9',
+    effective_speed: '99.0', release_spin_rate: '2450', release_extension: '6.8',
+    release_pos_z: '6.1', pfx_x: '-9.0', pfx_z: '13.5',
+    fastball_percent: '60', breaking_percent: '25', offspeed_percent: '15',
+    whiff_percent: '33.0', team_name_alt: 'NYM',
+  },
+];
 
 // ── Weather mock ─────────────────────────────────────────────────────────────
 const WEATHER_OK = JSON.stringify({
@@ -99,16 +125,16 @@ beforeEach(() => {
         headers: { 'Content-Type': 'application/json' },
       });
     }
-    if (url.includes('baseballsavant.mlb.com') && url.includes('pitcher')) {
-      return new Response(SAVANT_PITCHER_CSV, {
+    if (url.includes('baseballsavant.mlb.com') && url.includes('type=pitcher')) {
+      return new Response(JSON.stringify(SAVANT_PITCHER_JSON), {
         status: 200,
-        headers: { 'Content-Type': 'text/csv' },
+        headers: { 'Content-Type': 'application/json' },
       });
     }
     if (url.includes('baseballsavant.mlb.com')) {
-      return new Response(SAVANT_HITTER_CSV, {
+      return new Response(JSON.stringify(SAVANT_HITTER_JSON), {
         status: 200,
-        headers: { 'Content-Type': 'text/csv' },
+        headers: { 'Content-Type': 'application/json' },
       });
     }
     if (url.includes('open-meteo.com')) {

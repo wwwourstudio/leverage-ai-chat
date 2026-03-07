@@ -14,6 +14,7 @@ import {
   ERROR_MESSAGES,
 } from '@/lib/constants';
 import { getADPData, queryADP } from '@/lib/adp-data';
+import { getNFLADPData } from '@/lib/nfl-adp-data';
 import { getStatcastData, queryStatcast } from '@/lib/baseball-savant';
 import { generateContextualCards, type InsightCard } from '@/lib/cards-generator';
 import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-detector';
@@ -116,9 +117,9 @@ export async function POST(request: NextRequest) {
     // When true: use NFBC_ADP_ADDENDUM + query_adp tool instead of statcast JSON mode.
     const msgLower = userMessage.toLowerCase();
     const hasADPIntent =
-      ['adp', 'nfbc', 'average draft', 'draft position', 'draft rank', 'draft order', 'nfbc board']
+      ['adp', 'nfbc', 'nffc', 'average draft', 'draft position', 'draft rank', 'draft order', 'nfbc board', 'nffc board']
         .some(k => msgLower.includes(k)) ||
-      (context?.hasFantasyIntent === true && context?.sport === 'mlb');
+      (context?.hasFantasyIntent === true && (context?.sport === 'mlb' || context?.sport === 'football'));
 
     // Statcast JSON mode only applies to non-ADP MLB queries
     const isMLBStatcastMode = isMLBQuery && !hasADPIntent;
@@ -379,9 +380,10 @@ export async function POST(request: NextRequest) {
     // ── ADP tool (injected when hasADPIntent) ────────────────────────────────────
     const adpTool = tool({
       description:
-        'Query 2025 NFBC (National Fantasy Baseball Championship) ADP data. ' +
+        'Query NFBC MLB or NFFC NFL Average Draft Position (ADP) data. ' +
         'Use for any question about player draft rankings, average draft position (ADP), ' +
-        'positional scarcity in fantasy baseball drafts, or where a specific player is being drafted.',
+        'positional scarcity in fantasy drafts, or where a specific player is being drafted. ' +
+        'Works for both baseball (NFBC) and football (NFFC).',
       parameters: z.object({
         player:    z.string().optional().describe('Partial player name — case-insensitive (e.g. "Judge", "Ohtani", "Trout")'),
         position:  z.string().optional().describe('Position filter: SP | RP | 1B | 2B | 3B | SS | OF | DH | C'),
@@ -393,20 +395,24 @@ export async function POST(request: NextRequest) {
       }),
       execute: async ({ player, position, rankMin, rankMax, limit, team, valueOnly }) => {
         console.log('[API/analyze] ADP tool called:', { player, position, rankMin, rankMax, limit, team, valueOnly });
-        const data = await getADPData();
+        const isNFL = context?.sport?.includes('football') || context?.sport === 'nfl' ||
+          msgLower.includes('football') || msgLower.includes('nfl') || msgLower.includes('nffc');
+        const data = isNFL ? await getNFLADPData() : await getADPData();
+        const draftYear = new Date().getFullYear();
+        const source = isNFL ? `NFFC ${draftYear} NFL ADP` : `NFBC ${draftYear} ADP`;
         if (data.length === 0) {
           return {
             players: [],
             total_players_in_dataset: 0,
-            source: 'NFBC 2025 ADP',
-            error: 'NFBC ADP data is temporarily unavailable. Please try again shortly or consult nfc.shgn.com.',
+            source,
+            error: 'ADP data is temporarily unavailable. Please try again shortly or consult nfc.shgn.com.',
           };
         }
         const results = queryADP(data, { player, position, rankMin, rankMax, limit, team, valueOnly });
         return {
           players: results,
           total_players_in_dataset: data.length,
-          source: 'NFBC 2025 ADP',
+          source,
         };
       },
     });
@@ -560,7 +566,9 @@ export async function POST(request: NextRequest) {
             const tr = adpResult.result;
             const callArgs =
               ((result as any).toolCalls ?? []).find((tc: any) => tc.toolName === 'query_adp')?.args ?? {};
-            let cardTitle = 'NFBC 2025 ADP Rankings';
+            const adpSource = tr.source ?? `NFBC ${new Date().getFullYear()} ADP`;
+            const isNFLResult = adpSource.includes('NFFC') || adpSource.includes('NFL');
+            let cardTitle = isNFLResult ? `NFFC ${new Date().getFullYear()} NFL ADP Rankings` : `NFBC ${new Date().getFullYear()} ADP Rankings`;
             if (callArgs.player) {
               const name = tr.players[0]?.displayName ?? callArgs.player;
               cardTitle = `${name} — NFBC ADP`;
@@ -583,7 +591,7 @@ export async function POST(request: NextRequest) {
               icon: '⚾',
               data: {
                 players: JSON.stringify(tr.players),
-                source: tr.source ?? 'NFBC 2025 ADP',
+                source: tr.source ?? `NFBC ${new Date().getFullYear()} ADP`,
                 totalInDataset: tr.total_players_in_dataset,
               },
             };
@@ -822,7 +830,11 @@ export async function POST(request: NextRequest) {
       sources.push({ name: 'Fantasy Projections Engine', type: 'database' as const, reliability: 91 });
     }
     if (hasADPIntent) {
-      sources.push({ name: 'NFBC 2025 ADP Board', type: 'api' as const, reliability: 97 });
+      const isNFLContext = context?.sport?.includes('football') || context?.sport === 'nfl' || msgLower.includes('nffc') || msgLower.includes('nfl draft') || msgLower.includes('fantasy football');
+      const adpBoardName = isNFLContext
+        ? `NFFC ${new Date().getFullYear()} NFL ADP Board`
+        : `NFBC ${new Date().getFullYear()} ADP Board`;
+      sources.push({ name: adpBoardName, type: 'api' as const, reliability: 97 });
     }
 
     return NextResponse.json({

@@ -188,7 +188,7 @@ export function MobileChatInput({
         <button
           type="submit"
           disabled={(!input.trim() && files.length === 0) || disabled}
-          className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+          className="p-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-slate-700 disabled:to-slate-700 disabled:cursor-not-allowed transition-all duration-300 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/35 disabled:shadow-none flex-shrink-0"
           aria-label="Send message"
         >
           <Send className="w-4.5 h-4.5 text-white" />

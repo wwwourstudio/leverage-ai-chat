@@ -1,16 +1,14 @@
 /**
  * Fantasy Projections Cache
  *
- * Fetches player projection data from the Supabase `fantasy_projections` table,
- * falls back to hardcoded arrays when the table is empty or unreachable.
+ * Provides an in-memory cache for player projection data, falling back to
+ * hardcoded arrays when the cache is empty.
  *
- * Follows the same pattern as lib/adp-data.ts:
- *   1. In-memory cache (4-hour TTL)
- *   2. Supabase `fantasy_projections` table
- *   3. Hardcoded fallback arrays (from fantasy-card-generator.ts)
- *
- * The `fantasy_projections` table is populated via POST /api/fantasy/projections.
- * Admins can push updated projection data there any time without a code deploy.
+ * NOTE: Supabase is intentionally NOT imported here because this module is
+ * transitively bundled with page-client.tsx (a Client Component). Any import
+ * of lib/supabase/server (which uses next/headers) would break the build.
+ * Supabase projections can be fetched and seeded via seedProjectionsCache()
+ * from server-only code (API routes, server components).
  */
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -78,8 +76,10 @@ export function currentSeasonFor(sport: 'nfl' | 'mlb' | 'nba'): number {
  *
  * Priority:
  *   1. In-memory cache (fastest; survives warm serverless invocations)
- *   2. Supabase `api.fantasy_projections` table (refreshed by admins or imports)
- *   3. Hardcoded fallback arrays (guaranteed non-empty safety net)
+ *   2. Hardcoded fallback arrays (guaranteed non-empty safety net)
+ *
+ * To use live Supabase data, call seedProjectionsCache() from a server-only
+ * context (API route, server component) before generateFantasyCards() runs.
  *
  * @param sport  - 'nfl' | 'mlb' | 'nba'
  * @param season - Four-digit season year (e.g. 2026)
@@ -98,43 +98,22 @@ export async function getProjections(
     return cached.data;
   }
 
-  // 2. Supabase lookup
-  try {
-    // Dynamic import avoids pulling Supabase into client bundles
-    const { createClient } = await import('@/lib/supabase/server');
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .schema('api')
-      .from('fantasy_projections')
-      .select('player_name, position, stats, fantasy_points, adp')
-      .eq('sport', sport)
-      .eq('season_year', season)
-      .order('fantasy_points', { ascending: false })
-      .limit(250);
-
-    if (!error && data && data.length > 0) {
-      const players: GenericProjection[] = data.map(row => ({
-        name: row.player_name,
-        team: (row.stats as Record<string, string> | null)?.team ?? '',
-        pos: row.position,
-        pts: Number(row.fantasy_points) || 0,
-        adp: Number(row.adp) || 999,
-      }));
-
-      cache[key] = { data: players, fetchedAt: Date.now() };
-      console.log(`[v0] [ProjectionsCache] Loaded ${players.length} ${sport.toUpperCase()} ${season} projections from Supabase`);
-      return players;
-    }
-  } catch (err) {
-    console.warn('[v0] [ProjectionsCache] Supabase lookup failed, using fallback:', err instanceof Error ? err.message : String(err));
-  }
-
-  // 3. Hardcoded fallback
+  // 2. Hardcoded fallback
   const fallback = getFallback();
-  console.log(`[v0] [ProjectionsCache] Using hardcoded fallback: ${fallback.length} ${sport.toUpperCase()} ${season} players`);
-  // Cache the fallback too (shorter TTL would be ideal, but keep simple)
   cache[key] = { data: fallback, fetchedAt: Date.now() };
   return fallback;
+}
+
+/**
+ * Seeds the in-memory cache with externally-fetched data.
+ * Call this from server-only code (API routes) after fetching from Supabase.
+ */
+export function seedProjectionsCache(
+  sport: 'nfl' | 'mlb' | 'nba',
+  season: number,
+  players: GenericProjection[],
+): void {
+  cache[`${sport}:${season}`] = { data: players, fetchedAt: Date.now() };
 }
 
 /** Invalidate cache for a sport/season (call after an admin uploads new projections) */

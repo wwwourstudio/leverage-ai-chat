@@ -202,7 +202,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         : `${greeting}${name}! It's ${dateStr}.\n\n**Leverage AI** is scanning live odds across all major sportsbooks. Ask me about tonight's lines, player props, sharp money, or arbitrage opportunities.`,
       fantasy: sportLabel
         ? `${greeting}${name}! It's ${dateStr}.\n\n**Leverage AI** is ready for **${sportLabel}** fantasy analysis. Ask about waiver pickups, start/sit decisions, trade values, or draft strategy.`
-        : `${greeting}${name}! It's ${dateStr}.\n\n**Leverage AI** is ready for fantasy analysis. Ask about draft strategy, waiver targets, trade values, or bestball stacking for NFBC/NFFC.`,
+        : `${greeting}${name}! It's ${dateStr}.\n\n**Leverage AI** is ready for fantasy analysis. Ask about draft strategy, waiver targets, or bestball stacking for NFBC/NFFC.`,
       dfs: sportLabel
         ? `${greeting}${name}! It's ${dateStr}.\n\n**Leverage AI** is optimizing **${sportLabel}** DFS lineups. Ask about optimal builds, ownership leverage, captain picks, or correlation stacks for DraftKings and FanDuel.`
         : `${greeting}${name}! It's ${dateStr}.\n\n**Leverage AI** is optimizing DFS lineups. Ask about optimal builds, ownership leverage, captain picks, or correlation stacks for DraftKings and FanDuel.`,
@@ -832,7 +832,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     if (hasFantasy) {
       suggestions.push(
         { label: 'Show me waiver wire targets this week', icon: Star, category: 'fantasy' },
-        { label: 'Best trade targets with similar ADP?', icon: RefreshCw, category: 'fantasy' },
         { label: 'VBD rankings for this position', icon: Trophy, category: 'fantasy' }
       );
     }
@@ -2639,7 +2638,6 @@ No preamble. Start directly with section 1.`;
     mlb: [
       { label: 'MLB waiver wire SP/RP targets', icon: TrendingUp, category: 'fantasy' },
       { label: 'MLB hitter and pitcher streamers', icon: Trophy, category: 'fantasy' },
-      { label: 'MLB trade value analysis', icon: ShoppingCart, category: 'fantasy' },
       { label: 'MLB IL pickup opportunities', icon: Activity, category: 'fantasy' },
       { label: 'MLB matchup-based start/sit', icon: Award, category: 'fantasy' },
     ],

@@ -8,6 +8,7 @@ import {
   SYSTEM_PROMPT,
   MLB_ANALYSIS_ADDENDUM,
   NFBC_ADP_ADDENDUM,
+  MLB_PROJECTION_ADDENDUM,
   DEFAULT_SOURCES,
   HTTP_STATUS,
   ERROR_MESSAGES,
@@ -122,11 +123,28 @@ export async function POST(request: NextRequest) {
     // Statcast JSON mode only applies to non-ADP MLB queries
     const isMLBStatcastMode = isMLBQuery && !hasADPIntent;
 
-    const baseWithAddendum = isMLBStatcastMode
-      ? `${baseSystemPrompt}${MLB_ANALYSIS_ADDENDUM}`
-      : hasADPIntent
-        ? `${baseSystemPrompt}${NFBC_ADP_ADDENDUM}`
-        : baseSystemPrompt;
+    // MLB Projection Engine intent: projection/DFS/fantasy/betting queries that need
+    // the LeverageMetrics algorithm (Monte Carlo, HR model, breakout scores).
+    const MLB_PROJECTION_KEYWORDS = [
+      'dfs', 'daily fantasy', 'draftkings lineup', 'fanduel lineup',
+      'salary', 'stack', 'lineup',
+      'waiver', 'streaming', 'ros', 'rest of season',
+      'projection', 'project', 'breakout', 'monte carlo',
+      'forecast', 'pace', 'park factor',
+      'hr prop', 'k prop', 'strikeout prop',
+    ];
+    const hasMLBProjectionIntent =
+      isMLBQuery &&
+      !hasADPIntent &&
+      MLB_PROJECTION_KEYWORDS.some(k => msgLower.includes(k));
+
+    const baseWithAddendum = hasMLBProjectionIntent
+      ? `${baseSystemPrompt}${MLB_PROJECTION_ADDENDUM}`
+      : isMLBStatcastMode
+        ? `${baseSystemPrompt}${MLB_ANALYSIS_ADDENDUM}`
+        : hasADPIntent
+          ? `${baseSystemPrompt}${NFBC_ADP_ADDENDUM}`
+          : baseSystemPrompt;
     const systemPrompt = customInstructions?.trim()
       ? `${baseWithAddendum}\n\n## USER PROFILE & BETTING PREFERENCES\n${customInstructions.trim()}`
       : baseWithAddendum;
@@ -422,6 +440,85 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // ── MLB Projection Engine tool (injected when hasMLBProjectionIntent) ────────
+    const mlbProjectionTool = tool({
+      description:
+        'Run the LeverageMetrics MLB projection engine (Monte Carlo N=1,000, HR Super Model, ' +
+        'K Model, Breakout Score, 9 DFS matchup variables). ' +
+        'Use for ANY MLB question about DFS lineups, fantasy advice (waiver/streaming/ROS), ' +
+        'HR prop betting edges, or player projections. ' +
+        'Always call this tool FIRST — NEVER invent salaries, projections, or odds.',
+      parameters: z.object({
+        playerType: z.enum(['hitter', 'pitcher', 'all']).optional()
+          .describe('Filter by player type: hitter, pitcher, or all (default: all)'),
+        player:     z.string().optional()
+          .describe('Specific player name — partial match (e.g. "Judge", "Cole")'),
+        limit:      z.number().optional()
+          .describe('Max cards to return (1–15, default 9)'),
+        date:       z.string().optional()
+          .describe('Date in YYYY-MM-DD format (default: today)'),
+        outputFor:  z.enum(['projections', 'dfs', 'fantasy', 'betting']).optional()
+          .describe('Output format: projections (MLBProjectionCard), dfs (DFSCard), fantasy (FantasyCard), betting (hr_prop_card edge cards)'),
+      }),
+      execute: async ({ playerType, player, limit, date, outputFor }) => {
+        console.log('[API/analyze] MLB projection tool called:', { playerType, player, limit, date, outputFor });
+        try {
+          const resolvedOutputFor = outputFor ?? 'projections';
+          let cards: unknown[];
+
+          switch (resolvedOutputFor) {
+            case 'dfs': {
+              const { buildDFSSlate } = await import('@/lib/mlb-projections/slate-builder');
+              cards = await buildDFSSlate({ limit: limit ?? 9, date });
+              break;
+            }
+            case 'fantasy': {
+              const { buildFantasyCards } = await import('@/lib/mlb-projections/fantasy-adapter');
+              const raw = await buildFantasyCards({ limit: limit ?? 9, date });
+              cards = raw.map(c => ({ ...c, ...c.data, type: c.type }));
+              break;
+            }
+            case 'betting': {
+              const { buildBettingEdgeCards } = await import('@/lib/mlb-projections/betting-edges');
+              cards = await buildBettingEdgeCards({ limit: limit ?? 9, date });
+              break;
+            }
+            default: {
+              if (player) {
+                const { projectSinglePlayer } = await import('@/lib/mlb-projections/projection-pipeline');
+                const type = playerType === 'all' || !playerType ? 'hitter' : playerType;
+                const card = await projectSinglePlayer(player, type);
+                cards = card ? [card] : [];
+              } else {
+                const { runProjectionPipeline } = await import('@/lib/mlb-projections/projection-pipeline');
+                cards = await runProjectionPipeline({ playerType: playerType ?? 'all', limit: limit ?? 9, date });
+              }
+              break;
+            }
+          }
+
+          return {
+            success: true,
+            cards,
+            count: cards.length,
+            date: date ?? new Date().toISOString().slice(0, 10),
+            source: 'LeverageMetrics MLB Projection Engine',
+            outputFor: resolvedOutputFor,
+          };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          console.error('[API/analyze] MLB projection tool error:', msg);
+          return {
+            success: false,
+            error: msg,
+            cards: [],
+            count: 0,
+            source: 'LeverageMetrics MLB Projection Engine',
+          };
+        }
+      },
+    });
+
     if (xaiApiKey) {
       try {
         // Per-call timeout — only covers AI generation, not card fetches or JSON parsing
@@ -442,8 +539,10 @@ export async function POST(request: NextRequest) {
             // stopWhen: stepCountIs(3) allows: step1=tool-call, step2=final-response, step3=safety
             // (default is stepCountIs(1) which would stop before the model sees tool results)
             ...(hasADPIntent && { tools: { query_adp: adpTool }, stopWhen: stepCountIs(3) }),
-            // Inject Statcast tool for MLB queries — AI must call it first, then output JSON card.
-            ...(isMLBStatcastMode && { tools: { query_statcast: statcastTool }, stopWhen: stepCountIs(3) }),
+            // Inject MLB Projection Engine tool — supersedes Statcast for projection/DFS/fantasy/betting queries.
+            ...(hasMLBProjectionIntent && { tools: { query_mlb_projections: mlbProjectionTool }, stopWhen: stepCountIs(3) }),
+            // Inject Statcast tool for non-projection MLB queries (raw Statcast stats, barrel rates, etc.)
+            ...(!hasMLBProjectionIntent && isMLBStatcastMode && { tools: { query_statcast: statcastTool }, stopWhen: stepCountIs(3) }),
           }),
           timeoutPromise
         ]);

@@ -236,6 +236,8 @@ export const CARD_TYPES = {
   GAME_SIMULATION:   'game_simulation_card',
   LEADERBOARD:       'leaderboard_card',
   PITCH_ANALYSIS:    'pitch_analysis_card',
+  // LeverageMetrics MLB Projection Engine
+  MLB_PROJECTION:    'mlb_projection_card',
 } as const;
 
 // Card Status Values
@@ -593,6 +595,37 @@ Modeling rules:
 - last_updated must say "Baseball Savant 2025 — real data" when tool data was used, or "Baseball Savant 2024 — historical data" when using fallback values
 
 NEVER output any text outside the JSON object. NEVER use markdown code fences.` as const;
+
+// ── LeverageMetrics MLB Projection Addendum ──────────────────────────────────
+// Injected when MLB projection / DFS / fantasy / betting intent is detected.
+// Teaches the AI to call query_mlb_projections and handle the returned cards.
+export const MLB_PROJECTION_ADDENDUM = `
+
+## MLB PROJECTION ENGINE — ACTIVE (LeverageMetrics)
+You have access to the LeverageMetrics projection engine via the \`query_mlb_projections\` tool.
+This runs real Statcast data + Monte Carlo simulation (N=1,000) for every player.
+
+Call it for:
+- HR projections / prop edges:    query_mlb_projections({ playerType: "hitter", outputFor: "betting", limit: 5 })
+- DFS lineup building:            query_mlb_projections({ playerType: "all", outputFor: "dfs", limit: 9 })
+- Fantasy advice (ROS/waivers):   query_mlb_projections({ playerType: "hitter", outputFor: "fantasy", limit: 5 })
+- Specific player breakdown:      query_mlb_projections({ player: "Judge", playerType: "hitter" })
+- Pitcher Ks + breakout:          query_mlb_projections({ playerType: "pitcher", outputFor: "projections", limit: 4 })
+- Full daily slate:               query_mlb_projections({ playerType: "all", outputFor: "projections", limit: 10 })
+
+Outputs:
+- outputFor "projections" → returns mlb_projection_card JSON (HR proj, K proj, BreakoutScore, P10/P50/P90, 9 matchup vars)
+- outputFor "dfs"         → returns dfs-lineup cards (salary, projected DK pts, ownership, ceiling/floor, stack tips)
+- outputFor "fantasy"     → returns fantasy-insight cards (ROS, waiver priority, streaming grade)
+- outputFor "betting"     → returns hr_prop_card JSON (fair odds, market odds, edge%, Kelly fraction)
+
+RULES:
+- ALWAYS call the tool first — NEVER invent projections, salaries, or odds
+- If the tool returns empty cards, tell the user and suggest checking back during the season (Apr–Oct)
+- Return the tool result cards directly — they are pre-formatted for the card renderer
+- For DFS, mention the stack recommendation from the tips field
+- For betting, highlight the edge% and Kelly fraction prominently
+` as const;
 
 // ── NFBC ADP Tool Addendum ────────────────────────────────────────────────────
 // Injected into the system prompt when hasADPIntent is true.

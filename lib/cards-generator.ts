@@ -511,7 +511,9 @@ async function _generateContextualCards(
   // The multi-sport block above is skipped when sport is set, so we must call
   // generateSportSpecificCards directly here to get real game odds with moneylines,
   // spreads, and totals instead of falling through to the arbitrage placeholder.
-  if (!multiSport && normalizedSport && (category === 'betting' || category === 'all' || !category)) {
+  // NOTE: baseball_mlb is EXCLUDED — all MLB cards come from the LeverageMetrics
+  // projection engine below (line ~1006), not the Odds API.
+  if (!multiSport && normalizedSport && normalizedSport !== 'baseball_mlb' && (category === 'betting' || category === 'all' || !category)) {
     console.log(`[v0] [CARDS-GEN] Single-sport mode: fetching ${normalizedSport} odds directly`);
     const sportCards = await generateSportSpecificCards(normalizedSport, count, category);
     if (sportCards.length > 0) {
@@ -1000,8 +1002,94 @@ async function _generateContextualCards(
     });
   }
 
+  // ── LeverageMetrics MLB Projection Engine ──────────────────────────────────
+  // Intercepts all MLB categories and routes to the projection pipeline.
+  // On failure, falls through to the existing Odds API-based handlers below.
+  if (normalizedSport === 'baseball_mlb' && cards.length < actualCount) {
+    try {
+      if (category === 'dfs') {
+        // Full DK MLB slate with Monte Carlo projections
+        const { buildDFSSlate } = await import('@/lib/mlb-projections/slate-builder');
+        const dfsRaw = await Promise.race([
+          buildDFSSlate({ limit: actualCount }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000)),
+        ]);
+        for (const c of dfsRaw) {
+          cards.push({
+            type: 'dfs-lineup',
+            title: c.title,
+            icon: 'Users',
+            category: c.category,
+            subcategory: c.subcategory,
+            gradient: c.gradient,
+            status: c.status,
+            data: c.data,
+            metadata: { realData: true, source: 'LeverageMetrics' },
+          });
+        }
+      } else if (category === 'fantasy') {
+        // ROS projections, waiver wire, streaming pitchers
+        const { buildFantasyCards } = await import('@/lib/mlb-projections/fantasy-adapter');
+        const fantasyRaw = await Promise.race([
+          buildFantasyCards({ limit: actualCount }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000)),
+        ]);
+        for (const c of fantasyRaw) {
+          cards.push({
+            type: c.type ?? 'fantasy-insight',
+            title: c.title,
+            icon: 'Star',
+            category: c.category,
+            subcategory: c.subcategory,
+            gradient: c.gradient,
+            status: c.status,
+            data: c.data,
+            metadata: { realData: true, source: 'LeverageMetrics' },
+          });
+        }
+      } else if (category === 'betting') {
+        // HR/K prop betting edges with Kelly fractions (StatcastCard format)
+        const { buildBettingEdgeCards } = await import('@/lib/mlb-projections/betting-edges');
+        const edgeRaw = await Promise.race([
+          buildBettingEdgeCards({ limit: actualCount }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000)),
+        ]);
+        for (const c of edgeRaw) {
+          cards.push({
+            ...(c as any),
+            icon: 'TrendingUp',
+            metadata: { realData: true, source: 'LeverageMetrics' },
+          });
+        }
+      } else {
+        // Default (projections / all / undefined): full MLB projection cards (MLBProjectionCard)
+        const { runProjectionPipeline } = await import('@/lib/mlb-projections/projection-pipeline');
+        const projCards = await Promise.race([
+          runProjectionPipeline({ limit: actualCount }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000)),
+        ]);
+        for (const c of projCards) {
+          cards.push({
+            ...c,
+            icon: 'TrendingUp',
+            metadata: { realData: true, source: 'LeverageMetrics' },
+          });
+        }
+      }
+
+      if (cards.length > 0) {
+        console.log(`[v0] [CARDS-GEN] MLB projection engine: ${cards.length} cards (category: ${category ?? 'default'})`);
+        setCachedCards(cards, category ?? 'projections', 'baseball_mlb');
+        return cards;
+      }
+    } catch (err) {
+      console.warn('[v0] [CARDS-GEN] MLB projection engine failed, falling back:', (err as Error).message);
+    }
+  }
+
   // DFS cards — fetch real player prop lines from Odds API, fall back to hardcoded
-  if (category === 'dfs') {
+  // Note: MLB DFS is handled above by the projection engine; this block handles NBA/NFL/NHL
+  if (category === 'dfs' && normalizedSport !== 'baseball_mlb') {
     const dfsSlates: Record<string, Record<string, unknown>> = {
       baseball_mlb: {
         player: 'Ronald Acuna Jr.', team: 'ATL', position: 'OF',

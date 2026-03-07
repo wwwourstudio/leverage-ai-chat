@@ -9,6 +9,7 @@ interface ChatHeaderProps {
   user: { name: string; email: string; avatar?: string } | null;
   onOpenUserLightbox: () => void;
   onOpenAlerts: () => void;
+  alertCount: number;
   onOpenSettings: () => void;
   onOpenLogin: () => void;
   onOpenSignup: () => void;
@@ -21,6 +22,7 @@ export function ChatHeader({
   user,
   onOpenUserLightbox,
   onOpenAlerts,
+  alertCount,
   onOpenSettings,
   onOpenLogin,
   onOpenSignup,
@@ -86,7 +88,9 @@ export function ChatHeader({
                 className="relative p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
               >
                 <Bell className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
-                <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-[var(--bg-overlay)] shadow-lg shadow-red-500/50 animate-pulse"></div>
+                {alertCount > 0 && (
+                  <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-[var(--bg-overlay)] shadow-lg shadow-red-500/50 animate-pulse"></div>
+                )}
               </button>
               <button
                 onClick={onOpenSettings}

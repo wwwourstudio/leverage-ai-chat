@@ -9,6 +9,7 @@ import { SPORT_KEYS } from '@/lib/constants';
 interface AlertsLightboxProps {
   isOpen: boolean;
   onClose: () => void;
+  onAlertsCountChange?: (count: number) => void;
 }
 
 interface UserAlert {
@@ -51,7 +52,7 @@ function formatRelativeTime(isoString: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
+export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsLightboxProps) {
   const toast = useToast();
   const [alerts, setAlerts] = useState<UserAlert[]>([]);
   const [loading, setLoading] = useState(true);
@@ -161,6 +162,7 @@ export function AlertsLightbox({ isOpen, onClose }: AlertsLightboxProps) {
       }
 
       setAlerts(alertsData || []);
+      onAlertsCountChange?.(alertsData?.length ?? 0);
     } catch (err) {
       console.error('[Alerts] Failed to load:', err);
     }

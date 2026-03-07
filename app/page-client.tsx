@@ -360,8 +360,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   
   // Credit system utilities — syncs with Supabase user_profiles when logged in,
   // falls back to localStorage for anonymous users.
-  const MESSAGE_LIMIT = 15;
-  const CHAT_LIMIT = 10;
+  const MESSAGE_LIMIT = parseInt(process.env.NEXT_PUBLIC_FREE_MESSAGE_LIMIT ?? '15', 10);
+  const CHAT_LIMIT = parseInt(process.env.NEXT_PUBLIC_FREE_CHAT_LIMIT ?? '10', 10);
   const LIMIT_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
   const [supabaseProfileId, setSupabaseProfileId] = useState<string | null>(null);
 

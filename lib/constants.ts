@@ -3,6 +3,17 @@
  * Centralized configuration for all hard-coded values
  */
 
+// ── Season year helpers ────────────────────────────────────────────────────────
+// MLB regular season: April–November = current year; Dec–March = previous year.
+function _currentMLBSeason(): number {
+  const month = new Date().getMonth() + 1;
+  return month >= 4 ? new Date().getFullYear() : new Date().getFullYear() - 1;
+}
+/** Current MLB season year (auto-advances each April). */
+export const MLB_SEASON_YEAR: number = _currentMLBSeason();
+/** Current NFBC draft year — always the current calendar year (drafts happen pre-season). */
+export const NFBC_DRAFT_YEAR: number = new Date().getFullYear();
+
 // AI Model Configuration
 // Primary model: grok-3-fast — reliable sub-15s responses for all analysis.
 // grok-4 consistently times out (>45s) on the current xAI plan.
@@ -321,12 +332,12 @@ export const FANTASY_CONFIG = {
     SALARY_CAP_FD: 60000,
   },
   SUBSCRIPTION: {
-    CORE_PRICE_MONTHLY: 49,
-    PRO_PRICE_MONTHLY: 149,
-    HIGH_STAKES_PRICE_YEARLY: 999,
+    CORE_PRICE_MONTHLY: parseInt(process.env.NEXT_PUBLIC_CORE_PRICE ?? '49', 10),
+    PRO_PRICE_MONTHLY: parseInt(process.env.NEXT_PUBLIC_PRO_PRICE ?? '149', 10),
+    HIGH_STAKES_PRICE_YEARLY: parseInt(process.env.NEXT_PUBLIC_HIGH_STAKES_PRICE ?? '999', 10),
   },
   INJURY_ALERT_DELAY_FREE_MS: 5 * 60 * 1000,
-} as const;
+};
 
 // Stripe Credit Packages
 export const CREDIT_PACKAGES = [
@@ -539,7 +550,7 @@ NEVER say "I cannot provide analysis" or "real-time data unavailable" for genera
 export const MLB_ANALYSIS_ADDENDUM = `
 
 ## MLB QUANT MODE — ACTIVE
-You have access to REAL 2025 Baseball Savant Statcast data via the \`query_statcast\` tool.
+You have access to REAL ${MLB_SEASON_YEAR} Baseball Savant Statcast data via the \`query_statcast\` tool.
 
 STEP 1 — ALWAYS call query_statcast FIRST to retrieve real metrics before generating any card.
   - For a specific player: query_statcast({ player: "Judge", playerType: "batter" })
@@ -576,7 +587,7 @@ Required shape (all fields mandatory except trend_note / last_updated):
     ]
   },
   "trend_note": "string — one sentence rolling trend, e.g. 'Judge leads MLB with 22.1% barrel rate'",
-  "last_updated": "string — data recency, e.g. 'Baseball Savant 2025 — real data'"
+  "last_updated": "string — data recency, e.g. 'Baseball Savant ${MLB_SEASON_YEAR} — real data'"
 }
 
 Type-specific required fields inside summary_metrics and lightbox sections:
@@ -592,9 +603,9 @@ Modeling rules:
 - Cap kelly_fraction at 2.0% of bankroll
 - Derive fair_odds from logistic model probability using real barrel rate / xwOBA; derive edge = model_prob - market_implied_prob
 - trend_note must reference the player's real Statcast ranking (e.g. "Top 5% in barrel rate")
-- last_updated must say "Baseball Savant 2025 — real data" when tool data was used, or "Baseball Savant 2024 — historical data" when using fallback values
+- last_updated must say "Baseball Savant ${MLB_SEASON_YEAR} — real data" when tool data was used, or "Baseball Savant ${MLB_SEASON_YEAR - 1} — historical data" when using fallback values
 
-NEVER output any text outside the JSON object. NEVER use markdown code fences.` as const;
+NEVER output any text outside the JSON object. NEVER use markdown code fences.`;
 
 // ── LeverageMetrics MLB Projection Addendum ──────────────────────────────────
 // Injected when MLB projection / DFS / fantasy / betting intent is detected.
@@ -634,7 +645,7 @@ RULES:
 export const NFBC_ADP_ADDENDUM = `
 
 ## NFBC ADP TOOL — ACTIVE
-You have access to live 2026 NFBC (National Fantasy Baseball Championship) ADP data via the \`query_adp\` tool.
+You have access to live ${NFBC_DRAFT_YEAR} NFBC (National Fantasy Baseball Championship) ADP data via the \`query_adp\` tool.
 Each player result includes: rank, ADP, positions, team, valueDelta (ADP − rank), and isValuePick flag.
 
 For ANY question about player draft rankings, average draft position, positional scarcity, or where to draft a specific player:
@@ -642,9 +653,9 @@ For ANY question about player draft rankings, average draft position, positional
 2. Synthesise the results into a clear, helpful prose response.
 3. When listing multiple players, format as a numbered list with rank, name, position, team, and ADP.
 4. When isValuePick is true (valueDelta > 15), call the player a "sleeper" or "value pick" and highlight the gap.
-5. Always cite "NFBC 2026 ADP" as the source.
+5. Always cite "NFBC ${NFBC_DRAFT_YEAR} ADP" as the source.
 6. NEVER invent ADP values — if the tool returns no results, say so and offer to broaden the search.
-7. If the tool returns fewer than 30 players total, the live NFBC feed is temporarily unavailable and static fallback data is being used. In that case, tell the user: "Note: Using cached NFBC ADP reference data. Live rankings are temporarily unavailable. Values shown are 2026 consensus pre-season ADP and may not reflect the latest draft trends." Never invent values beyond what the tool returns.
+7. If the tool returns fewer than 30 players total, the live NFBC feed is temporarily unavailable and static fallback data is being used. In that case, tell the user: "Note: Using cached NFBC ADP reference data. Live rankings are temporarily unavailable. Values shown are ${NFBC_DRAFT_YEAR} consensus pre-season ADP and may not reflect the latest draft trends." Never invent values beyond what the tool returns.
 
 Tool parameter guide:
 - \`player\`: partial name (e.g. "Ohtani", "Judge") — case-insensitive
@@ -656,7 +667,7 @@ Tool parameter guide:
 - \`valueOnly\`: true — return only sleeper picks (ADP 15+ spots later than rank)
   Use for queries like "who are the best sleepers?" or "show me undervalued players"
 
-Respond in natural prose — do NOT output raw JSON or markdown code blocks.` as const;
+Respond in natural prose — do NOT output raw JSON or markdown code blocks.`;
 
 // Default Source Configurations
 export const DEFAULT_SOURCES = {

@@ -15,6 +15,7 @@
  */
 
 import type { InsightCard } from '@/lib/cards-generator';
+import { getProjections, currentSeasonFor } from '@/lib/fantasy/projections-cache';
 
 // ============================================================================
 // Archived 2025 NFL season data (PPR, final season projections)
@@ -688,25 +689,32 @@ function generatePlayerAnalysis(p: PlayerVBD): string {
  * MLB and NBA have embedded projections → real VBD/waiver/draft cards.
  * Other sports (NHL, soccer, etc.) fall back to informational prompt cards.
  */
-function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[] {
+async function generateNonNFLFantasyCards(sport: string, count: number): Promise<InsightCard[]> {
   const isMLB = sport.includes('baseball') || sport === 'mlb';
   const isNBA = sport.includes('basketball') || sport === 'nba';
 
   // ── MLB ──────────────────────────────────────────────────────────────────
   if (isMLB) {
+    const mlbSeason = currentSeasonFor('mlb');
+    const mlbRaw = await getProjections('mlb', mlbSeason, () => MLB_PROJECTIONS_2025);
+    const mlbVBD = computeVBDGeneric(mlbRaw, MLB_REPLACEMENT_RANKS);
+    const mlbCliffs = detectCliffs(mlbVBD);
+    const mlbSeasonLabel = `MLB ${mlbSeason} • 5×5 Roto • 12-Team`;
+    const mlbDataSource = `MLB ${mlbSeason} Projections`;
+
     const cards: InsightCard[] = [];
-    const topPlayers = ALL_MLB_VBD
+    const topPlayers = mlbVBD
       .filter(p => ['OF', 'SS', '1B', '2B', '3B', 'C'].includes(p.pos))
       .sort((a, b) => b.vbd - a.vbd)
       .slice(0, 8);
-    const cliff = MLB_TIER_CLIFFS[0];
+    const cliff = mlbCliffs[0];
 
     cards.push({
       type: 'FANTASY_VBD',
       title: 'MLB Value Board — Top Picks',
       icon: 'Trophy',
       category: 'FANTASY',
-      subcategory: 'MLB 2026 • 5×5 Roto • 12-Team',
+      subcategory: mlbSeasonLabel,
       gradient: 'from-indigo-600 to-purple-700',
       data: {
         fantasyCardType: 'vbd_rankings',
@@ -718,7 +726,7 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
         leagueSize: 12,
         status: 'target',
       },
-      metadata: { realData: false, dataSource: 'MLB 2026 Pre-Season Projections' },
+      metadata: { realData: false, dataSource: mlbDataSource },
     });
 
     if (cards.length < count) {
@@ -728,7 +736,7 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
         title: 'MLB Waiver Wire Targets',
         icon: 'Zap',
         category: 'FANTASY',
-        subcategory: 'MLB 2026 • FAAB Optimizer',
+        subcategory: `MLB ${mlbSeason} • FAAB Optimizer`,
         gradient: 'from-teal-600 to-cyan-700',
         data: {
           fantasyCardType: 'waiver',
@@ -738,19 +746,19 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
           budgetNote: 'FAAB bids shown as % of $100 budget. Scale to your actual budget.',
           status: 'hot',
         },
-        metadata: { realData: false, dataSource: 'MLB 2026 Waiver Engine' },
+        metadata: { realData: false, dataSource: `MLB ${mlbSeason} Waiver Engine` },
       });
     }
 
     if (cards.length < count) {
-      const spPlayers = ALL_MLB_VBD.filter(p => p.pos === 'SP').sort((a, b) => b.vbd - a.vbd).slice(0, 5);
+      const spPlayers = mlbVBD.filter(p => p.pos === 'SP').sort((a, b) => b.vbd - a.vbd).slice(0, 5);
       const bestSP = spPlayers[0];
       cards.push({
         type: 'FANTASY_DRAFT',
         title: 'MLB Draft Board — SP Targets',
         icon: 'Target',
         category: 'FANTASY',
-        subcategory: 'MLB 2026 • SP Rankings',
+        subcategory: `MLB ${mlbSeason} • SP Rankings`,
         gradient: 'from-indigo-600 to-purple-700',
         data: {
           fantasyCardType: 'draft_recommendation',
@@ -758,10 +766,10 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
           round: 2, pick: 3, overallPick: 15,
           bestPick: bestSP ? { name: bestSP.name, team: bestSP.team, pos: bestSP.pos, vbd: bestSP.vbd, pts: bestSP.pts, adp: bestSP.adp, tier: bestSP.tier, reason: `VBD +${bestSP.vbd} above SP replacement. Tier ${bestSP.tier} arm.` } : null,
           leveragePicks: spPlayers.slice(1, 4).map(p => ({ name: p.name, team: p.team, pos: p.pos, vbd: p.vbd, pts: p.pts, adp: p.adp, tier: p.tier, reason: `Tier ${p.tier} SP — elite ERA/WHIP/K combo at ADP ${p.adp}` })),
-          tierCliffAlerts: MLB_TIER_CLIFFS.slice(0, 2).map(c => `${c.pos}: ${c.dropPct.toFixed(1)}% drop after ${c.cliffAfterName}`),
+          tierCliffAlerts: mlbCliffs.slice(0, 2).map(c => `${c.pos}: ${c.dropPct.toFixed(1)}% drop after ${c.cliffAfterName}`),
           status: 'target',
         },
-        metadata: { realData: false, dataSource: 'MLB 2026 Draft Engine' },
+        metadata: { realData: false, dataSource: `MLB ${mlbSeason} Draft Engine` },
       });
     }
 
@@ -770,16 +778,22 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
 
   // ── NBA ──────────────────────────────────────────────────────────────────
   if (isNBA) {
+    const nbaSeason = currentSeasonFor('nba');
+    const nbaRaw = await getProjections('nba', nbaSeason, () => NBA_PROJECTIONS_2025);
+    const nbaVBD = computeVBDGeneric(nbaRaw, NBA_REPLACEMENT_RANKS);
+    const nbaCliffs = detectCliffs(nbaVBD);
+    const nbaSeasonLabel = `NBA ${nbaSeason}-${String(nbaSeason + 1).slice(2)} • 9-Cat • 12-Team`;
+
     const cards: InsightCard[] = [];
-    const topPlayers = ALL_NBA_VBD.sort((a, b) => b.vbd - a.vbd).slice(0, 8);
-    const cliff = NBA_TIER_CLIFFS[0];
+    const topPlayers = nbaVBD.sort((a, b) => b.vbd - a.vbd).slice(0, 8);
+    const cliff = nbaCliffs[0];
 
     cards.push({
       type: 'FANTASY_VBD',
       title: 'NBA Value Board — Top Picks',
       icon: 'Trophy',
       category: 'FANTASY',
-      subcategory: 'NBA 2025-26 • 9-Cat • 12-Team',
+      subcategory: nbaSeasonLabel,
       gradient: 'from-orange-600 to-red-700',
       data: {
         fantasyCardType: 'vbd_rankings',
@@ -791,7 +805,7 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
         leagueSize: 12,
         status: 'target',
       },
-      metadata: { realData: false, dataSource: 'NBA 2025-26 Projections' },
+      metadata: { realData: false, dataSource: `NBA ${nbaSeason}-${String(nbaSeason + 1).slice(2)} Projections` },
     });
 
     if (cards.length < count) {
@@ -801,7 +815,7 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
         title: 'NBA Waiver Wire Targets',
         icon: 'Zap',
         category: 'FANTASY',
-        subcategory: 'NBA 2025-26 • FAAB Optimizer',
+        subcategory: `NBA ${nbaSeason}-${String(nbaSeason + 1).slice(2)} • FAAB Optimizer`,
         gradient: 'from-teal-600 to-cyan-700',
         data: {
           fantasyCardType: 'waiver',
@@ -811,19 +825,19 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
           budgetNote: 'Bids shown as % of $100 budget.',
           status: 'hot',
         },
-        metadata: { realData: false, dataSource: 'NBA 2025-26 Waiver Engine' },
+        metadata: { realData: false, dataSource: `NBA ${nbaSeason}-${String(nbaSeason + 1).slice(2)} Waiver Engine` },
       });
     }
 
     if (cards.length < count) {
-      const bestPlayer = [...ALL_NBA_VBD].sort((a, b) => b.vbd - a.vbd)[0];
-      const leverages = [...ALL_NBA_VBD].sort((a, b) => b.vbd - a.vbd).slice(1, 4);
+      const bestPlayer = [...nbaVBD].sort((a, b) => b.vbd - a.vbd)[0];
+      const leverages = [...nbaVBD].sort((a, b) => b.vbd - a.vbd).slice(1, 4);
       cards.push({
         type: 'FANTASY_DRAFT',
         title: 'NBA Draft Board — Round 1',
         icon: 'Target',
         category: 'FANTASY',
-        subcategory: 'NBA 2025-26 • 9-Cat Rankings',
+        subcategory: `NBA ${nbaSeason}-${String(nbaSeason + 1).slice(2)} • 9-Cat Rankings`,
         gradient: 'from-orange-600 to-red-700',
         data: {
           fantasyCardType: 'draft_recommendation',
@@ -831,10 +845,10 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
           round: 1, pick: 1, overallPick: 1,
           bestPick: bestPlayer ? { name: bestPlayer.name, team: bestPlayer.team, pos: bestPlayer.pos, vbd: bestPlayer.vbd, pts: bestPlayer.pts, adp: bestPlayer.adp, tier: bestPlayer.tier, reason: `VBD +${bestPlayer.vbd} above positional replacement. Unanimous #1 overall.` } : null,
           leveragePicks: leverages.map(p => ({ name: p.name, team: p.team, pos: p.pos, vbd: p.vbd, pts: p.pts, adp: p.adp, tier: p.tier, reason: `Tier ${p.tier} ${p.pos} — ${p.pts} projected cat pts at ADP ${p.adp}` })),
-          tierCliffAlerts: NBA_TIER_CLIFFS.slice(0, 2).map(c => `${c.pos}: ${c.dropPct.toFixed(1)}% drop after ${c.cliffAfterName}`),
+          tierCliffAlerts: nbaCliffs.slice(0, 2).map(c => `${c.pos}: ${c.dropPct.toFixed(1)}% drop after ${c.cliffAfterName}`),
           status: 'target',
         },
-        metadata: { realData: false, dataSource: 'NBA 2025-26 Draft Engine' },
+        metadata: { realData: false, dataSource: `NBA ${nbaSeason}-${String(nbaSeason + 1).slice(2)} Draft Engine` },
       });
     }
 
@@ -875,11 +889,11 @@ function generateNonNFLFantasyCards(sport: string, count: number): InsightCard[]
  *                      When set and non-NFL, returns sport-appropriate cards instead
  *                      of the hardcoded NFL projection data.
  */
-export function generateFantasyCards(
+export async function generateFantasyCards(
   userMessage: string = '',
   count: number = 3,
   sport?: string
-): InsightCard[] {
+): Promise<InsightCard[]> {
   // Non-NFL sport → don't show NFL player data; return sport-branded cards instead
   const isNFL = !sport || sport.includes('football') || sport === '';
   if (!isNFL) {

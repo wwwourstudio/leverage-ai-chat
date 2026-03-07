@@ -1,15 +1,17 @@
 /**
  * Baseball Savant Data Service
  *
- * Fetches, parses, and caches real 2025 Statcast metrics from Baseball Savant's
+ * Fetches, parses, and caches Statcast metrics from Baseball Savant's
  * public Expected Statistics CSV endpoint (no API key required).
+ * The season year is computed dynamically: April–November = current year,
+ * December–March (off-season) = previous year.
  *
  * Cache TTL: 4 hours — Baseball Savant updates daily; this balances freshness
  * with Vercel serverless warm-invocation reuse (same pattern as lib/adp-data.ts).
  *
  * Data source:
- *   https://baseballsavant.mlb.com/expected_statistics?type=batter&year=2025&min=10&csv=true
- *   https://baseballsavant.mlb.com/expected_statistics?type=pitcher&year=2025&min=10&csv=true
+ *   https://baseballsavant.mlb.com/expected_statistics?type=batter&year={SEASON}&min=10&csv=true
+ *   https://baseballsavant.mlb.com/expected_statistics?type=pitcher&year={SEASON}&min=10&csv=true
  */
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -57,7 +59,12 @@ export interface StatcastQueryParams {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const SAVANT_BASE = 'https://baseballsavant.mlb.com/expected_statistics';
-const SEASON = 2025;
+// MLB regular season: April–November = current year; Dec–March (off-season) = previous year
+function currentMLBSeason(): number {
+  const month = new Date().getMonth() + 1; // 1-12
+  return month >= 4 ? new Date().getFullYear() : new Date().getFullYear() - 1;
+}
+const SEASON = currentMLBSeason();
 const MIN_PA = 10; // minimum PA/BF to appear in leaderboard
 const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const DEFAULT_LIMIT = 10;

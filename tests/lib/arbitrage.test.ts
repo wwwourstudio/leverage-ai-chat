@@ -400,7 +400,7 @@ describe('calculateDutch', () => {
     // totalProb = 1/4 + 1/4 + 1/3 = 5/6 ≈ 0.833 < 1 → Dutch exists
     const result = calculateDutch([300, 300, 200], 100);
     expect(result).not.toBeNull();
-    expect(result!.guaranteedProfit).toBeGreaterThan(0);
+    expect(result!.potentialProfit).toBeGreaterThan(0);
     expect(result!.profitMargin).toBeGreaterThan(0);
   });
 

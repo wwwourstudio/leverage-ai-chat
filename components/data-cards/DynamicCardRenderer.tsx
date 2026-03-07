@@ -9,6 +9,7 @@ import { ArbitrageCard } from './ArbitrageCard';
 import { CardSkeleton } from './CardSkeleton';
 import { StatcastCard } from './StatcastCard';
 import { ADPCard } from './ADPCard';
+import { MLBProjectionCard } from './MLBProjectionCard';
 
 interface CardData {
   type: string;
@@ -169,6 +170,17 @@ export function DynamicCardRenderer({
         status={safeCard.status}
         onAnalyze={handleAnalyze}
         error={error}
+        isHero={isHero}
+      />
+    );
+  }
+
+  // LeverageMetrics MLB Projection cards (HR/K/Breakout/Monte Carlo)
+  if (cardType === 'mlb_projection_card') {
+    return (
+      <MLBProjectionCard
+        data={{ ...safeCard, ...(card as any) } as any}
+        onAnalyze={handleAnalyze}
         isHero={isHero}
       />
     );

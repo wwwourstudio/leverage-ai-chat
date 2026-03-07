@@ -41,6 +41,18 @@ vi.mock('@/components/data-cards/CardSkeleton', () => ({
   CardSkeleton: () => <div data-testid="card-skeleton" />,
 }));
 
+vi.mock('@/components/data-cards/MLBProjectionCard', () => ({
+  MLBProjectionCard: ({ data }: any) => (
+    <div data-testid="mlb-projection-card">{data?.title ?? 'MLB Projection'}</div>
+  ),
+}));
+
+vi.mock('@/components/data-cards/StatcastCard', () => ({
+  StatcastCard: ({ data }: any) => (
+    <div data-testid="statcast-card">{data?.title ?? 'Statcast'}</div>
+  ),
+}));
+
 const baseCard = {
   type: 'odds',
   title: 'Test Card',
@@ -155,6 +167,55 @@ describe('DynamicCardRenderer', () => {
     it('falls back to BettingCard for unknown type', () => {
       render(<DynamicCardRenderer card={{ ...baseCard, type: 'unknown_type' }} />);
       expect(screen.getByTestId('betting-card')).toBeTruthy();
+    });
+
+    it('routes mlb_projection_card to MLBProjectionCard', () => {
+      render(
+        <DynamicCardRenderer
+          card={{
+            type: 'mlb_projection_card',
+            title: 'Aaron Judge',
+            category: 'MLB',
+            subcategory: 'HR Projection',
+            gradient: 'from-green-600 to-emerald-900',
+            data: {},
+          }}
+        />
+      );
+      expect(screen.getByTestId('mlb-projection-card')).toBeTruthy();
+      expect(screen.getByText('Aaron Judge')).toBeTruthy();
+    });
+
+    it('routes hr_prop_card to StatcastCard', () => {
+      render(
+        <DynamicCardRenderer
+          card={{
+            type: 'hr_prop_card',
+            title: 'HR Edge Play',
+            category: 'MLB',
+            subcategory: 'HR Prop',
+            gradient: 'from-green-600 to-emerald-900',
+            data: {},
+          }}
+        />
+      );
+      expect(screen.getByTestId('statcast-card')).toBeTruthy();
+    });
+
+    it('does NOT route mlb_projection_card to BettingCard', () => {
+      render(
+        <DynamicCardRenderer
+          card={{
+            type: 'mlb_projection_card',
+            title: 'Shohei Ohtani',
+            category: 'MLB',
+            subcategory: 'HR Projection',
+            gradient: 'from-green-600 to-emerald-900',
+            data: {},
+          }}
+        />
+      );
+      expect(screen.queryByTestId('betting-card')).toBeNull();
     });
   });
 

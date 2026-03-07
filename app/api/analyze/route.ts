@@ -12,6 +12,7 @@ import {
   DEFAULT_SOURCES,
   HTTP_STATUS,
   ERROR_MESSAGES,
+  NFBC_DRAFT_YEAR,
 } from '@/lib/constants';
 import { getADPData, queryADP } from '@/lib/adp-data';
 import { getNFLADPData } from '@/lib/nfl-adp-data';
@@ -398,8 +399,7 @@ export async function POST(request: NextRequest) {
         const isNFL = context?.sport?.includes('football') || context?.sport === 'nfl' ||
           msgLower.includes('football') || msgLower.includes('nfl') || msgLower.includes('nffc');
         const data = isNFL ? await getNFLADPData() : await getADPData();
-        const draftYear = new Date().getFullYear();
-        const source = isNFL ? `NFFC ${draftYear} NFL ADP` : `NFBC ${draftYear} ADP`;
+        const source = isNFL ? `NFFC ${NFBC_DRAFT_YEAR} NFL ADP` : `NFBC ${NFBC_DRAFT_YEAR} ADP`;
         if (data.length === 0) {
           return {
             players: [],
@@ -566,32 +566,37 @@ export async function POST(request: NextRequest) {
             const tr = adpResult.result;
             const callArgs =
               ((result as any).toolCalls ?? []).find((tc: any) => tc.toolName === 'query_adp')?.args ?? {};
-            const adpSource = tr.source ?? `NFBC ${new Date().getFullYear()} ADP`;
+            const adpSource = tr.source ?? `NFBC ${NFBC_DRAFT_YEAR} ADP`;
             const isNFLResult = adpSource.includes('NFFC') || adpSource.includes('NFL');
-            let cardTitle = isNFLResult ? `NFFC ${new Date().getFullYear()} NFL ADP Rankings` : `NFBC ${new Date().getFullYear()} ADP Rankings`;
+            const adpBrand = isNFLResult ? 'NFFC' : 'NFBC';
+            let cardTitle = isNFLResult
+              ? `NFFC ${NFBC_DRAFT_YEAR} NFL ADP Rankings`
+              : `NFBC ${NFBC_DRAFT_YEAR} ADP Rankings`;
             if (callArgs.player) {
               const name = tr.players[0]?.displayName ?? callArgs.player;
-              cardTitle = `${name} — NFBC ADP`;
+              cardTitle = `${name} — ${adpBrand} ADP`;
             } else if (callArgs.position) {
               const rankSuffix = callArgs.rankMax ? ` (Top ${callArgs.rankMax})` : '';
-              cardTitle = `Top ${callArgs.position}${rankSuffix} — NFBC ADP Board`;
+              cardTitle = `Top ${callArgs.position}${rankSuffix} — ${adpBrand} ADP Board`;
             } else if (callArgs.rankMin != null || callArgs.rankMax != null) {
               const lo = callArgs.rankMin ?? 1;
               const hi = callArgs.rankMax ?? tr.total_players_in_dataset;
-              cardTitle = `NFBC ADP Picks #${lo}–${hi}`;
+              cardTitle = `${adpBrand} ADP Picks #${lo}–${hi}`;
             }
             pendingADPCard = {
               type: 'adp-analysis',
               title: cardTitle,
-              category: 'MLB',
-              subcategory: 'NFBC Draft Board',
-              gradient: 'from-cyan-600/80 via-teal-700/60 to-cyan-900/40',
+              category: isNFLResult ? 'NFL' : 'MLB',
+              subcategory: isNFLResult ? 'NFFC Draft Board' : 'NFBC Draft Board',
+              gradient: isNFLResult
+                ? 'from-green-600/80 via-emerald-700/60 to-green-900/40'
+                : 'from-cyan-600/80 via-teal-700/60 to-cyan-900/40',
               status: 'value',
               realData: true,
-              icon: '⚾',
+              icon: isNFLResult ? '🏈' : '⚾',
               data: {
                 players: JSON.stringify(tr.players),
-                source: tr.source ?? `NFBC ${new Date().getFullYear()} ADP`,
+                source: adpSource,
                 totalInDataset: tr.total_players_in_dataset,
               },
             };

@@ -300,12 +300,13 @@ function parseTSV(raw: string): NFBCPlayer[] {
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 
-// URL patterns to try in order.
-// NOTE: NFBC ADP (nfc.shgn.com) requires a paid subscription — server-side
-// scraping will always 404 or return a login page. FantasyPros blocks non-browser
-// requests with 403. These URLs are kept as aspirational fallbacks in case
-// a working endpoint is discovered; the static fallback below is the true source.
-const NFBC_ADP_URLS: string[] = [];
+// URL patterns to try in order — matches the Download button on nfc.shgn.com/adp/baseball.
+// Tried in sequence; first successful TSV/CSV response wins.
+const NFBC_ADP_URLS: string[] = [
+  'https://nfc.shgn.com/adp/baseball?download=1',
+  'https://nfc.shgn.com/adp/baseball?export=csv',
+  'https://nfc.shgn.com/adp/baseball?format=csv',
+];
 
 async function tryFetchURL(url: string): Promise<NFBCPlayer[]> {
   const res = await fetch(url, {
@@ -313,7 +314,11 @@ async function tryFetchURL(url: string): Promise<NFBCPlayer[]> {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
       'Accept': 'text/tab-separated-values, text/csv, text/plain, application/vnd.ms-excel, */*',
       'Accept-Language': 'en-US,en;q=0.9',
-      'Referer': 'https://nfc.shgn.com/',
+      'Referer': 'https://nfc.shgn.com/adp/baseball',
+      'Origin': 'https://nfc.shgn.com',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'same-origin',
     },
     signal: AbortSignal.timeout(8000),
   });

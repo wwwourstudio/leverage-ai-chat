@@ -667,7 +667,9 @@ Tool parameter guide:
 - \`valueOnly\`: true — return only sleeper picks (ADP 15+ spots later than rank)
   Use for queries like "who are the best sleepers?" or "show me undervalued players"
 
-Respond in natural prose — do NOT output raw JSON or markdown code blocks.`;
+Respond in natural prose — do NOT output raw JSON or markdown code blocks.
+
+For NFL/NFFC queries, the same \`query_adp\` tool returns NFFC (National Fantasy Football Championship) Average Draft Position data. NFFC position codes: QB | RB | WR | TE | K | DEF. Always cite "NFFC ${NFBC_DRAFT_YEAR} NFL ADP" as the source for football queries.`;
 
 // Default Source Configurations
 export const DEFAULT_SOURCES = {

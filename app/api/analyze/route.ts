@@ -306,7 +306,10 @@ export async function POST(request: NextRequest) {
       ]).catch(() => []);
     } else if (!context.isPoliticalMarket && (context.hasFantasyIntent || hasADPIntent) && (!context.hasBettingIntent || context.selectedCategory === 'fantasy')) {
       cardPromise = import('@/lib/fantasy/cards/fantasy-card-generator')
-        .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 3, context.sport ?? undefined) as InsightCard[])
+        .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 3, context.sport ?? undefined, {
+          teamCount: context.leagueSize ?? undefined,
+          scoringFormat: context.leagueScoringFormat ?? undefined,
+        }))
         .catch(() => generateContextualCards('fantasy', context.sport ?? undefined, 3).catch(() => []));
     } else if (!context.isPoliticalMarket && (context.isSportsQuery || context.hasBettingIntent)) {
       const sportKey = context.sport || undefined;

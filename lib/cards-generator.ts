@@ -1234,7 +1234,7 @@ async function _generateContextualCards(
     try {
       const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
       // Pass a default intent so VBD+waiver+draft cards are always generated
-      const fantasyCards = generateFantasyCards('ranking projection waiver', count, normalizedSport);
+      const fantasyCards = await generateFantasyCards('ranking projection waiver', count, normalizedSport);
       cards.push(...fantasyCards.slice(0, count));
     } catch (err) {
       console.error('[v0] [CARDS-GEN] Fantasy card generation failed:', err);

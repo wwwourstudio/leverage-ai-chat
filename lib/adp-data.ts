@@ -305,19 +305,20 @@ function parseTSV(raw: string): NFBCPlayer[] {
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 
-// URL patterns to try in order — matches the Download button on nfc.shgn.com/adp/baseball.
-// Tried in sequence; first successful TSV/CSV response wins.
+// NFBC distributes ADP as tab-separated (.tsv) files, not CSV.
+// Tried in sequence; first successful TSV response wins.
 const NFBC_ADP_URLS: string[] = [
-  'https://nfc.shgn.com/adp/baseball?download=1',
-  'https://nfc.shgn.com/adp/baseball?export=csv',
-  'https://nfc.shgn.com/adp/baseball?format=csv',
+  'https://nfc.shgn.com/adp/baseball?export=tsv',
+  'https://nfc.shgn.com/adp/baseball?format=tsv',
+  'https://nfc.shgn.com/adp/baseball?download=tsv',
+  'https://nfc.shgn.com/adp/baseball.tsv',
 ];
 
 async function tryFetchURL(url: string): Promise<NFBCPlayer[]> {
   const res = await fetch(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-      'Accept': 'text/tab-separated-values, text/csv, text/plain, application/vnd.ms-excel, */*',
+      'Accept': 'text/tab-separated-values, text/plain, application/vnd.ms-excel, */*',
       'Accept-Language': 'en-US,en;q=0.9',
       'Referer': 'https://nfc.shgn.com/adp/baseball',
       'Origin': 'https://nfc.shgn.com',
@@ -335,9 +336,9 @@ async function tryFetchURL(url: string): Promise<NFBCPlayer[]> {
   const contentType = res.headers.get('content-type') ?? '';
   const body = await res.text();
 
-  // Detect HTML response — endpoint returned a webpage, not data
+  // Detect HTML response — endpoint returned a webpage instead of a TSV file
   if (contentType.includes('text/html') || body.trimStart().startsWith('<')) {
-    throw new Error(`NFBC ADP endpoint returned HTML (not TSV) — format may have changed`);
+    throw new Error(`NFBC ADP endpoint returned HTML instead of TSV — URL may be wrong or require auth`);
   }
 
   // JSON API response (e.g. FantasyPros JSON endpoint)

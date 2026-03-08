@@ -361,7 +361,7 @@ async function buildVPECards(limit: number): Promise<InsightCard[]> {
       fetchKalshiMarkets({ category: 'MLB', limit: 10 }),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
     ]);
-    kalshiMarkets = rawMarkets.slice(0, 6).map((m) => ({
+    kalshiMarkets = (Array.isArray(rawMarkets) ? rawMarkets : []).slice(0, 6).map((m) => ({
       title: m.title,
       yesPrice: m.yesPrice,
       ticker: m.ticker,

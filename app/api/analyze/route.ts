@@ -307,6 +307,21 @@ export async function POST(request: NextRequest) {
         new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 8000)),
       ]).catch(() => []);
     } else if (!context.isPoliticalMarket && (context.hasFantasyIntent || hasADPIntent) && (!context.hasBettingIntent || context.selectedCategory === 'fantasy')) {
+      // Fire-and-forget: warm the projections cache from Supabase so next request uses live data
+      const fantSport = context.sport === 'mlb' ? 'mlb'
+        : context.sport?.includes('football') ? 'nfl'
+        : context.sport === 'nba' ? 'nba'
+        : null;
+      if (fantSport) {
+        import('@/lib/fantasy/projections-cache')
+          .then(({ currentSeasonFor }) => {
+            const season = currentSeasonFor(fantSport as 'nfl' | 'mlb' | 'nba');
+            return import('@/lib/fantasy/projections-seeder').then(({ seedProjectionsFromSupabase }) =>
+              seedProjectionsFromSupabase(fantSport as 'nfl' | 'mlb' | 'nba', season)
+            );
+          })
+          .catch(() => { /* hardcoded fallback used automatically */ });
+      }
       cardPromise = import('@/lib/fantasy/cards/fantasy-card-generator')
         .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 3, context.sport ?? undefined, {
           teamCount: context.leagueSize ?? undefined,

@@ -206,6 +206,11 @@ const STATIC_FALLBACK_PLAYERS: NFBCPlayer[] = [
 let adpCache: NFBCPlayer[] | null = null;
 let lastFetched = 0;
 
+// Circuit breaker: after a full fetch failure, don't retry for 30 minutes to
+// avoid hammering a broken endpoint and flooding logs on every ADP request.
+const CIRCUIT_BREAKER_TTL_MS = 30 * 60 * 1000; // 30 minutes
+let circuitOpenedAt = 0; // 0 = circuit closed (never tripped)
+
 // ── Delimiter-agnostic parser ─────────────────────────────────────────────────
 
 /**
@@ -396,19 +401,29 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
     return adpCache;
   }
 
+  // Circuit breaker: skip live fetch for 30 min after a full failure to avoid
+  // log spam and unnecessary latency when the endpoint is known-broken.
+  const circuitOpen = circuitOpenedAt > 0 && (now - circuitOpenedAt < CIRCUIT_BREAKER_TTL_MS);
+  if (circuitOpen && !forceRefresh) {
+    if (adpCache) return adpCache;
+    return STATIC_FALLBACK_PLAYERS;
+  }
+
   try {
     const players = await fetchNFBCADP();
     adpCache = players;
     lastFetched = now;
+    circuitOpenedAt = 0; // reset circuit on success
     return players;
   } catch (err) {
     console.error('[v0] [ADP] Failed to fetch NFBC ADP data:', err);
+    circuitOpenedAt = now; // open circuit — suppress retries for 30 min
     // Return stale cache if available — better than nothing
     if (adpCache) {
       console.warn('[v0] [ADP] Returning stale cached data');
       return adpCache;
     }
-    console.warn(`[v0] [ADP] Returning static fallback dataset (${STATIC_FALLBACK_PLAYERS.length} players, 2026 pre-season consensus)`);
+    console.warn(`[v0] [ADP] Using static fallback dataset (${STATIC_FALLBACK_PLAYERS.length} players). Live endpoint will retry in 30 min.`);
     return STATIC_FALLBACK_PLAYERS;
   }
 }

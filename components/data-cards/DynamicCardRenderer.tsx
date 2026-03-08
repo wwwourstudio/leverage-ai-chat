@@ -10,6 +10,7 @@ import { CardSkeleton } from './CardSkeleton';
 import { StatcastCard } from './StatcastCard';
 import { ADPCard } from './ADPCard';
 import { MLBProjectionCard } from './MLBProjectionCard';
+import { VPECard } from './VPECard';
 
 interface CardData {
   type: string;
@@ -171,6 +172,16 @@ export function DynamicCardRenderer({
         onAnalyze={handleAnalyze}
         error={error}
         isHero={isHero}
+      />
+    );
+  }
+
+  // Vortex Projection Engine (VPE 3.0) — Baseball only
+  if (cardType === 'vpe_projection_card') {
+    return (
+      <VPECard
+        card={{ ...safeCard, ...(card as any) } as any}
+        onAnalyze={handleAnalyze}
       />
     );
   }

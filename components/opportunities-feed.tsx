@@ -32,18 +32,19 @@ export function OpportunitiesFeed() {
     fetchOpportunities();
   }, []);
 
-  // Subscribe to real-time updates for edge opportunities
-  useRealtimeSubscription('arbitrage_opportunities', (payload: any) => {
+  // Subscribe to edge/value-bet updates from bet_allocations
+  useRealtimeSubscription('bet_allocations', (payload: any) => {
     console.log('[OpportunitiesFeed] Edge update:', payload);
-    if (payload.eventType === 'INSERT') {
+    if (payload.eventType === 'INSERT' && payload.new.edge > 0) {
+      const parts = (payload.new.matchup ?? ' @ ').split(' @ ');
       const newOpp: Opportunity = {
         id: payload.new.id,
         type: 'value_bet',
         sport: payload.new.sport,
-        event: payload.new.event,
-        homeTeam: payload.new.home_team,
-        awayTeam: payload.new.away_team,
-        gameTime: payload.new.game_time,
+        event: payload.new.matchup,
+        homeTeam: parts[1] ?? '',
+        awayTeam: parts[0] ?? '',
+        gameTime: payload.new.created_at,
         edge: payload.new.edge,
         description: `${(payload.new.edge * 100).toFixed(2)}% edge detected`,
         bookmaker: payload.new.bookmaker,
@@ -59,18 +60,19 @@ export function OpportunitiesFeed() {
   useRealtimeSubscription('arbitrage_opportunities', (payload: any) => {
     console.log('[OpportunitiesFeed] Arbitrage update:', payload);
     if (payload.eventType === 'INSERT') {
+      const profitPct = payload.new.profit_percentage ?? payload.new.roi_percentage ?? 0;
       const newOpp: Opportunity = {
         id: payload.new.id,
         type: 'arbitrage',
         sport: payload.new.sport,
-        event: payload.new.event,
-        homeTeam: payload.new.home_team,
-        awayTeam: payload.new.away_team,
-        gameTime: payload.new.game_time,
-        profitPercentage: payload.new.profit_percentage,
-        description: `${payload.new.profit_percentage.toFixed(2)}% potential profit`,
+        event: `${payload.new.away_team ?? ''} @ ${payload.new.home_team ?? ''}`,
+        homeTeam: payload.new.home_team ?? '',
+        awayTeam: payload.new.away_team ?? '',
+        gameTime: payload.new.game_time ?? payload.new.detected_at,
+        profitPercentage: profitPct,
+        description: `${profitPct.toFixed(2)}% potential profit`,
         confidence: 'high',
-        created_at: payload.new.created_at
+        created_at: payload.new.detected_at ?? new Date().toISOString()
       };
       setOpportunities(prev => [newOpp, ...prev]);
     }
@@ -129,6 +131,26 @@ export function OpportunitiesFeed() {
             description: `${opp.profitPercentage.toFixed(2)}% potential profit`,
             confidence: 'high',
             created_at: new Date().toISOString()
+          });
+        });
+      }
+
+      // Add player prop opportunities
+      if (propsData.props && Array.isArray(propsData.props)) {
+        propsData.props.forEach((prop: any) => {
+          allOpps.push({
+            id: `${prop.player_name}-${prop.stat_type}-prop`,
+            type: 'player_prop',
+            sport: prop.sport ?? 'Unknown',
+            event: prop.game ?? '',
+            homeTeam: '',
+            awayTeam: prop.player_name ?? '',
+            gameTime: prop.game_time ?? new Date().toISOString(),
+            description: `${prop.player_name}: ${prop.stat_type} ${prop.line} (${prop.bookmaker})`,
+            bookmaker: prop.bookmaker,
+            odds: prop.over_price,
+            confidence: 'medium',
+            created_at: prop.updated_at ?? new Date().toISOString(),
           });
         });
       }

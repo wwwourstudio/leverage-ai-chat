@@ -37,6 +37,20 @@ export const API_ENDPOINTS = {
   INSIGHTS: '/api/insights',
   ODDS: '/api/odds',
   HEALTH: '/api/health',
+  KALSHI: '/api/kalshi',
+  WEATHER: '/api/weather',
+  ARBITRAGE: '/api/arbitrage',
+  OPPORTUNITIES: '/api/opportunities',
+  PROPS: '/api/props',
+  LINE_MOVEMENT: '/api/line-movement',
+  METRICS_HISTORICAL: '/api/metrics/historical',
+  CHATS: '/api/chats',
+  CREDITS: '/api/credits',
+  USER_PROFILE: '/api/user/profile',
+  USER_INSTRUCTIONS: '/api/user/instructions',
+  USER_FILES: '/api/user/files',
+  FEEDBACK: '/api/feedback',
+  ALERTS_CHECK: '/api/alerts/check',
 } as const;
 
 // External API Configuration

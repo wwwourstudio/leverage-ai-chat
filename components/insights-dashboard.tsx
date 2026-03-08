@@ -100,15 +100,18 @@ export function InsightsDashboard({ userId }: InsightsDashboardProps) {
     );
   }
 
+  // Map historical metrics API fields (winRate 0–1, averageConfidence 0–1) to percentages
+  const winRatePct = historical ? Math.round((historical.winRate ?? 0) * 100) : 0;
+  const avgConfPct = historical ? Math.round((historical.averageConfidence ?? 0) * 100) : 0;
   const trustMetrics = historical ? {
-    benfordIntegrity: historical.avgBenford,
-    oddsAlignment: historical.avgOdds,
-    marketConsensus: historical.avgConsensus,
-    historicalAccuracy: historical.avgConfidence,
-    finalConfidence: historical.recentAvg,
-    trustLevel: (historical.recentAvg >= 80 ? 'high' : historical.recentAvg >= 60 ? 'medium' : 'low') as 'high' | 'medium' | 'low',
+    benfordIntegrity: avgConfPct,
+    oddsAlignment: winRatePct,
+    marketConsensus: winRatePct,
+    historicalAccuracy: winRatePct,
+    finalConfidence: avgConfPct,
+    trustLevel: (avgConfPct >= 80 ? 'high' : avgConfPct >= 60 ? 'medium' : 'low') as 'high' | 'medium' | 'low',
     flags: [] as { type: string; message: string; severity: 'error' | 'info' | 'warning' }[],
-    riskLevel: (historical.recentAvg >= 80 ? 'low' : historical.recentAvg >= 60 ? 'medium' : 'high') as 'high' | 'medium' | 'low'
+    riskLevel: (avgConfPct >= 80 ? 'low' : avgConfPct >= 60 ? 'medium' : 'high') as 'high' | 'medium' | 'low'
   } : null;
 
   return (
@@ -121,7 +124,7 @@ export function InsightsDashboard({ userId }: InsightsDashboardProps) {
           value={`$${insights?.totalValue?.toLocaleString() || '0'}`}
           change={insights?.roi > 0 ? `+${insights.roi}%` : `${insights?.roi || 0}%`}
           positive={insights?.roi >= 0}
-          trend={historical?.valueTrend ?? [40, 45, 42, 50, 55, 58, 62]}
+          trend={[40, 45, 42, 50, 55, 58, 62]}
         />
         <StatCard
           icon={Target}
@@ -129,23 +132,22 @@ export function InsightsDashboard({ userId }: InsightsDashboardProps) {
           value={`${insights?.winRate || 0}%`}
           subtitle={`${insights?.activeContests || 0} active`}
           positive={(insights?.winRate || 0) >= 50}
-          trend={historical?.winRateTrend ?? [50, 52, 48, 55, 57, 54, 60]}
+          trend={historical?.dailyBreakdown?.slice(-7).map((d: any) => Math.round((d.winRate ?? 0) * 100)) ?? [50, 52, 48, 55, 57, 54, 60]}
         />
         <StatCard
           icon={TrendingUp}
           label="ROI"
           value={`${insights?.roi >= 0 ? '+' : ''}${insights?.roi || 0}%`}
-          change={historical?.trend || 'stable'}
           positive={insights?.roi >= 0}
-          trend={historical?.roiTrend ?? [0, 2, -1, 3, 5, 4, 7]}
+          trend={[0, 2, -1, 3, 5, 4, 7]}
         />
         <StatCard
           icon={Activity}
           label="Confidence"
-          value={`${insights?.avgConfidence || 0}%`}
+          value={`${avgConfPct || insights?.avgConfidence || 0}%`}
           subtitle={`${historical?.totalPredictions || 0} predictions`}
-          positive={(insights?.avgConfidence || 0) >= 70}
-          trend={historical?.confidenceTrend ?? [72, 75, 73, 78, 80, 77, 82]}
+          positive={(avgConfPct || insights?.avgConfidence || 0) >= 70}
+          trend={[72, 75, 73, 78, 80, 77, 82]}
         />
       </div>
 

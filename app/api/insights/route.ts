@@ -29,7 +29,10 @@ export async function GET(request: NextRequest) {
         const { createClient } = await import('@/lib/supabase/server');
         const supabase = await createClient();
 
-        const userId = request.headers.get('x-user-id');
+        // Prefer cookie-based session auth; fall back to x-user-id header for
+        // legacy callers (e.g. InsightsDashboard passing userId as a header).
+        const { data: { user } } = await supabase.auth.getUser();
+        const userId = user?.id ?? request.headers.get('x-user-id');
 
         if (userId) {
           const { data, error } = await supabase

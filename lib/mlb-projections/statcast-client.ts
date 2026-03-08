@@ -64,7 +64,7 @@ function setCached<T>(key: string, data: T) {
 }
 
 const SAVANT_BASE = 'https://baseballsavant.mlb.com';
-const SEASON = 2025;
+const SEASON = 2025; // Last complete MLB season (2026 hasn't started)
 
 /**
  * Fetch Statcast hitter leaderboard (top batters by xwOBA).
@@ -84,8 +84,26 @@ export async function fetchStatcastHitters(limit = 50): Promise<StatcastHitterSt
     });
     if (!res.ok) throw new Error(`Savant ${res.status}`);
 
-    const json = await res.json();
-    const rows: any[] = json ?? [];
+    // Use text() first — Baseball Savant sometimes wraps the array in an object
+    // or appends trailing content that breaks res.json() at parse time.
+    const rawText = await res.text();
+    let rows: any[] = [];
+    try {
+      const parsed = JSON.parse(rawText.trim());
+      if (Array.isArray(parsed)) {
+        rows = parsed;
+      } else if (parsed && typeof parsed === 'object') {
+        // Wrapped response like {"stats": [...]} — find the first array value
+        const found = Object.values(parsed as Record<string, unknown>).find(v => Array.isArray(v));
+        rows = (found as any[]) ?? [];
+      }
+    } catch {
+      // Try extracting the first JSON array literal from the response text
+      const match = rawText.match(/\[[\s\S]+\]/);
+      if (match) {
+        try { rows = JSON.parse(match[0]); } catch { /* fall through to defaults */ }
+      }
+    }
 
     const hitters: StatcastHitterStats[] = rows.slice(0, limit).map((r: any) => {
       const xBA  = parseFloat(r.est_ba)   || 0.250;
@@ -137,8 +155,22 @@ export async function fetchStatcastPitchers(limit = 30): Promise<StatcastPitcher
     });
     if (!res.ok) throw new Error(`Savant pitcher ${res.status}`);
 
-    const json = await res.json();
-    const rows: any[] = json ?? [];
+    const rawText = await res.text();
+    let rows: any[] = [];
+    try {
+      const parsed = JSON.parse(rawText.trim());
+      if (Array.isArray(parsed)) {
+        rows = parsed;
+      } else if (parsed && typeof parsed === 'object') {
+        const found = Object.values(parsed as Record<string, unknown>).find(v => Array.isArray(v));
+        rows = (found as any[]) ?? [];
+      }
+    } catch {
+      const match = rawText.match(/\[[\s\S]+\]/);
+      if (match) {
+        try { rows = JSON.parse(match[0]); } catch { /* fall through to defaults */ }
+      }
+    }
 
     const pitchers: StatcastPitcherStats[] = rows.slice(0, limit).map((r: any) => ({
       playerId:       parseInt(r.player_id) || 0,

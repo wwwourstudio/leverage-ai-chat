@@ -862,6 +862,41 @@ DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE chat_threads; EXCEPTIO
 
 -- ============================================================================
 -- ROLE GRANTS (explicit grants for all tables created above)
+-- ============================================================================
+-- ADP CACHE TABLE (nfbc_adp)
+-- Stores NFBC MLB and NFFC NFL Average Draft Position data fetched from live
+-- endpoints. Acts as a fast, durable cache so the AI can read player rankings
+-- without incurring an external HTTP call on every request.
+-- sport: 'mlb' | 'nfl'
+-- fetched_at: timestamp of the most recent live-endpoint refresh for this row.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS api.nfbc_adp (
+  id           SERIAL PRIMARY KEY,
+  sport        TEXT        NOT NULL DEFAULT 'mlb' CHECK (sport IN ('mlb', 'nfl')),
+  rank         INTEGER     NOT NULL,
+  player_name  TEXT        NOT NULL,
+  display_name TEXT        NOT NULL,
+  adp          NUMERIC(7,2) NOT NULL,
+  positions    TEXT        NOT NULL DEFAULT '',
+  team         TEXT        NOT NULL DEFAULT '',
+  value_delta  NUMERIC(7,2) NOT NULL DEFAULT 0,
+  is_value_pick BOOLEAN    NOT NULL DEFAULT false,
+  auction_value NUMERIC(7,2),
+  fetched_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (sport, rank)
+);
+
+-- Index for fast lookups by sport (the primary access pattern)
+CREATE INDEX IF NOT EXISTS idx_nfbc_adp_sport ON api.nfbc_adp (sport, rank);
+-- Index for player name search (AI tool filters by display_name)
+CREATE INDEX IF NOT EXISTS idx_nfbc_adp_display_name ON api.nfbc_adp USING gin (to_tsvector('english', display_name));
+
+-- RLS: allow server (service_role) to upsert; allow authenticated/anon to read
+ALTER TABLE api.nfbc_adp ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "nfbc_adp_read" ON api.nfbc_adp FOR SELECT USING (true);
+CREATE POLICY "nfbc_adp_service_write" ON api.nfbc_adp FOR ALL TO service_role USING (true) WITH CHECK (true);
+
 -- ALTER DEFAULT PRIVILEGES only covers future tables; existing tables need GRANT.
 -- ============================================================================
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA api TO authenticated;

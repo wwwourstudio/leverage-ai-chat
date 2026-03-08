@@ -14,6 +14,7 @@ export type { NFBCPlayer, ADPQueryParams } from '@/lib/adp-data';
 export { queryADP } from '@/lib/adp-data';
 
 import type { NFBCPlayer } from '@/lib/adp-data';
+import { saveADPToSupabase, loadADPFromSupabase } from '@/lib/adp-data';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -345,16 +346,35 @@ export async function getNFLADPData(forceRefresh = false): Promise<NFBCPlayer[]>
     return nflAdpCache;
   }
 
+  // Try Supabase first — faster than a live external HTTP call
+  if (!forceRefresh) {
+    const dbData = await loadADPFromSupabase('nfl');
+    if (dbData && dbData.length > 0) {
+      console.log(`[v0] [NFL ADP] Serving ${dbData.length} NFL players from Supabase cache`);
+      nflAdpCache = dbData;
+      nflLastFetched = now;
+      return dbData;
+    }
+  }
+
   try {
     const players = await fetchNFFCNFLADP();
     nflAdpCache = players;
     nflLastFetched = now;
+    // Persist to Supabase (fire-and-forget)
+    void saveADPToSupabase(players, 'nfl');
     return players;
   } catch (err) {
     console.error('[v0] [NFL ADP] Failed to fetch NFFC NFL ADP data:', err);
     if (nflAdpCache) {
       console.warn('[v0] [NFL ADP] Returning stale cached data');
       return nflAdpCache;
+    }
+    // Try stale Supabase data before returning static fallback
+    const dbData = await loadADPFromSupabase('nfl', true);
+    if (dbData && dbData.length > 0) {
+      console.warn(`[v0] [NFL ADP] Returning ${dbData.length} players from stale Supabase data`);
+      return dbData;
     }
     console.warn(`[v0] [NFL ADP] Returning static fallback dataset (${NFL_STATIC_FALLBACK.length} players, 2026 pre-season consensus)`);
     return NFL_STATIC_FALLBACK;

@@ -161,17 +161,17 @@ export function InsightsDashboard({ userId }: InsightsDashboardProps) {
         </div>
       )}
 
-      {/* User Profile Summary */}
-      {profile && (
+      {/* User Performance — uses insights + historical data (profile only has auth metadata) */}
+      {(insights?.totalInvested > 0 || (historical?.resolvedPredictions ?? 0) > 0) && (
         <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-5">
           <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-4">
             Your Performance
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <ProfileStat label="Invested" value={`$${profile.total_invested || 0}`} />
-            <ProfileStat label="Profit" value={`$${profile.total_profit || 0}`} />
-            <ProfileStat label="Wins" value={profile.win_count || 0} />
-            <ProfileStat label="Losses" value={profile.loss_count || 0} />
+            <ProfileStat label="Invested" value={`$${insights?.totalInvested || 0}`} />
+            <ProfileStat label="ROI" value={`${(insights?.roi ?? 0) >= 0 ? '+' : ''}${insights?.roi || 0}%`} />
+            <ProfileStat label="Wins" value={historical?.correctPredictions ?? 0} />
+            <ProfileStat label="Losses" value={Math.max(0, (historical?.resolvedPredictions ?? 0) - (historical?.correctPredictions ?? 0))} />
           </div>
         </div>
       )}

@@ -15,3 +15,4 @@ export { StatsSummary } from './StatsSummary';
 export { EmptyState } from './EmptyState';
 export { NoDataCard } from './NoDataCard';
 export { MLBProjectionCard } from './MLBProjectionCard';
+export { VPECard } from './VPECard';

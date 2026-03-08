@@ -326,6 +326,129 @@ export interface InsightCard {
   metadata?: any;
 }
 
+// ============================================================================
+// Vortex Projection Engine (VPE 3.0) — Baseball-only card builder
+// Generates hitter, pitcher, and team projection cards with optional Kalshi
+// prediction market enrichment and Benford validation.
+// ============================================================================
+async function buildVPECards(limit: number): Promise<InsightCard[]> {
+  const { Hitter, Pitcher, Team, LEAGUE_AVG_HITTER, LEAGUE_STD_HITTER, validateBenfordForVPE } =
+    await Promise.all([
+      import('@/lib/vpe'),
+      import('@/lib/benford-validator'),
+    ]).then(([vpe, benford]) => ({ ...vpe, validateBenfordForVPE: benford.validateBenford }));
+
+  // Representative 2026 MLB players with Statcast-derived stats
+  const hitterRoster = [
+    { name: 'Aaron Judge',    age: 32, pos: 'RF', stats: { PA: 700, EV50: 99.2, PullAirPercent: 0.38, BarrelPercent: 0.21, HardHitPercent: 0.57, LaunchAngle: 18.2, BatSpeed: 77.4, ContactRate: 0.73, SwingLength: 6.8 } },
+    { name: 'Shohei Ohtani',  age: 30, pos: 'DH', stats: { PA: 660, EV50: 96.8, PullAirPercent: 0.34, BarrelPercent: 0.17, HardHitPercent: 0.51, LaunchAngle: 16.1, BatSpeed: 75.2, ContactRate: 0.77, SwingLength: 7.1 } },
+    { name: 'Mookie Betts',   age: 32, pos: 'OF', stats: { PA: 620, EV50: 92.1, PullAirPercent: 0.27, BarrelPercent: 0.13, HardHitPercent: 0.47, LaunchAngle: 14.8, BatSpeed: 73.5, ContactRate: 0.82, SwingLength: 7.4 } },
+    { name: 'Freddie Freeman', age: 35, pos: '1B', stats: { PA: 640, EV50: 91.4, PullAirPercent: 0.29, BarrelPercent: 0.12, HardHitPercent: 0.44, LaunchAngle: 13.5, BatSpeed: 72.1, ContactRate: 0.84, SwingLength: 7.6 } },
+    { name: 'Juan Soto',      age: 26, pos: 'OF', stats: { PA: 650, EV50: 93.7, PullAirPercent: 0.28, BarrelPercent: 0.14, HardHitPercent: 0.49, LaunchAngle: 15.3, BatSpeed: 74.0, ContactRate: 0.80, SwingLength: 7.3 } },
+  ];
+
+  const pitcherRoster = [
+    { name: 'Gerrit Cole',    age: 34, pos: 'SP', stats: { velocity: 97.2, verticalBreak: 12.4, horizontalBreak: 4.1, spinRate: 2480, extension: 6.8, releaseVariance: 0.15, KPer9: 11.2, CSW: 0.33 } },
+    { name: 'Zack Wheeler',   age: 34, pos: 'SP', stats: { velocity: 95.8, verticalBreak: 11.2, horizontalBreak: 3.8, spinRate: 2350, extension: 6.5, releaseVariance: 0.18, KPer9: 10.4, CSW: 0.31 } },
+    { name: 'Paul Skenes',    age: 22, pos: 'SP', stats: { velocity: 99.1, verticalBreak: 13.8, horizontalBreak: 4.6, spinRate: 2590, extension: 7.0, releaseVariance: 0.12, KPer9: 12.8, CSW: 0.36 } },
+  ];
+
+  // Fetch Kalshi MLB markets for enrichment — fail gracefully
+  let kalshiMarkets: Array<{ title: string; yesPrice: number; ticker: string }> = [];
+  try {
+    const { fetchKalshiMarkets } = await import('@/lib/kalshi/index');
+    const rawMarkets = await Promise.race([
+      fetchKalshiMarkets({ category: 'MLB', limit: 10 }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
+    ]);
+    kalshiMarkets = rawMarkets.slice(0, 6).map((m) => ({
+      title: m.title,
+      yesPrice: m.yesPrice,
+      ticker: m.ticker,
+    }));
+  } catch {
+    // Kalshi unavailable — VPE cards still render without markets
+  }
+
+  const cards: InsightCard[] = [];
+  const slotLimit = Math.max(limit, 2);
+
+  // Hitter projection cards
+  const hitterSlots = Math.ceil(slotLimit * 0.5);
+  for (let i = 0; i < Math.min(hitterSlots, hitterRoster.length); i++) {
+    const h = hitterRoster[i];
+    const hitter = new Hitter(h.name, h.age, h.pos, h.stats);
+    const vpeScore = hitter.vpeValHit();
+    const powerIndex = hitter.powerBreakoutIndex(LEAGUE_AVG_HITTER, LEAGUE_STD_HITTER);
+
+    const numericValues = [vpeScore, powerIndex, h.stats.BarrelPercent * 100, h.stats.EV50, h.stats.BatSpeed];
+    const benford = validateBenfordForVPE(numericValues);
+
+    cards.push({
+      type: CARD_TYPES.VPE_PROJECTION,
+      title: `VPE: ${h.name}`,
+      icon: 'TrendingUp',
+      category: 'MLB',
+      subcategory: 'Hitter Projection',
+      gradient: 'from-emerald-500 to-teal-600',
+      status: powerIndex > 0.5 ? 'hot' : 'value',
+      data: {
+        playerName: h.name,
+        role: 'Hitter',
+        vpeScore: Math.round(vpeScore * 100) / 100,
+        powerIndex: Math.round(powerIndex * 100) / 100,
+        BarrelPct: `${(h.stats.BarrelPercent * 100).toFixed(1)}%`,
+        EV50: `${h.stats.EV50} mph`,
+        BatSpeed: `${h.stats.BatSpeed} mph`,
+        benfordValid: benford.isValid,
+        benfordScore: Math.round(benford.score * 100) / 100,
+        kalshiMarkets: kalshiMarkets.slice(0, 2),
+      },
+      metadata: { realData: false, source: 'VPE 3.0' },
+    });
+  }
+
+  // Pitcher projection cards
+  const pitcherSlots = Math.floor(slotLimit * 0.4);
+  for (let i = 0; i < Math.min(pitcherSlots, pitcherRoster.length); i++) {
+    const p = pitcherRoster[i];
+    const pitcher = new Pitcher(p.name, p.age, p.pos, p.stats);
+    const vpeScore = pitcher.vpeValPitch();
+    const stuffScore = pitcher.stuffScore();
+    const kSkill = pitcher.kSkill();
+
+    const numericValues = [vpeScore, stuffScore, kSkill, p.stats.velocity, p.stats.KPer9];
+    const benford = validateBenfordForVPE(numericValues);
+
+    cards.push({
+      type: CARD_TYPES.VPE_PROJECTION,
+      title: `VPE: ${p.name}`,
+      icon: 'Activity',
+      category: 'MLB',
+      subcategory: 'Pitcher Projection',
+      gradient: 'from-violet-500 to-purple-600',
+      status: stuffScore > 0.5 ? 'elite' : 'optimal',
+      data: {
+        playerName: p.name,
+        role: 'Pitcher',
+        vpeScore: Math.round(vpeScore * 100) / 100,
+        stuffScore: Math.round(stuffScore * 100) / 100,
+        kSkill: Math.round(kSkill * 100) / 100,
+        Velocity: `${p.stats.velocity} mph`,
+        KPer9: p.stats.KPer9.toFixed(1),
+        CSW: `${(p.stats.CSW * 100).toFixed(1)}%`,
+        benfordValid: benford.isValid,
+        benfordScore: Math.round(benford.score * 100) / 100,
+        kalshiMarkets: kalshiMarkets.slice(2, 4),
+      },
+      metadata: { realData: false, source: 'VPE 3.0' },
+    });
+  }
+
+  console.log(`[v0] [VPE] Generated ${cards.length} VPE cards (${kalshiMarkets.length} Kalshi markets attached)`);
+  return cards;
+}
+
 /**
  * Generate contextual cards based on category and sport
  * @param category - Type of analysis (betting, kalshi, dfs, fantasy)
@@ -1010,13 +1133,13 @@ async function _generateContextualCards(
   // ── LeverageMetrics MLB Projection Engine ──────────────────────────────────
   // Intercepts all MLB categories and routes to the projection pipeline.
   // On failure, falls through to the existing Odds API-based handlers below.
-  if (normalizedSport === 'baseball_mlb' && cards.length < actualCount) {
+  if (normalizedSport === 'baseball_mlb' && cards.length < count) {
     try {
       if (category === 'dfs') {
         // Full DK MLB slate with Monte Carlo projections
         const { buildDFSSlate } = await import('@/lib/mlb-projections/slate-builder');
         const dfsRaw = await Promise.race([
-          buildDFSSlate({ limit: actualCount }),
+          buildDFSSlate({ limit: count }),
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000)),
         ]);
         for (const c of dfsRaw) {
@@ -1036,7 +1159,7 @@ async function _generateContextualCards(
         // ROS projections, waiver wire, streaming pitchers
         const { buildFantasyCards } = await import('@/lib/mlb-projections/fantasy-adapter');
         const fantasyRaw = await Promise.race([
-          buildFantasyCards({ limit: actualCount }),
+          buildFantasyCards({ limit: count }),
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000)),
         ]);
         for (const c of fantasyRaw) {
@@ -1056,7 +1179,7 @@ async function _generateContextualCards(
         // HR/K prop betting edges with Kelly fractions (StatcastCard format)
         const { buildBettingEdgeCards } = await import('@/lib/mlb-projections/betting-edges');
         const edgeRaw = await Promise.race([
-          buildBettingEdgeCards({ limit: actualCount }),
+          buildBettingEdgeCards({ limit: count }),
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000)),
         ]);
         for (const c of edgeRaw) {
@@ -1066,11 +1189,15 @@ async function _generateContextualCards(
             metadata: { realData: true, source: 'LeverageMetrics' },
           });
         }
+      } else if (category === 'vpe' || category === 'projections') {
+        // VPE 3.0 — Vortex Projection Engine (Baseball only)
+        const vpeCards = await buildVPECards(count);
+        cards.push(...vpeCards);
       } else {
-        // Default (projections / all / undefined): full MLB projection cards (MLBProjectionCard)
+        // Default (all / undefined): run MLB projection pipeline then supplement with VPE cards
         const { runProjectionPipeline } = await import('@/lib/mlb-projections/projection-pipeline');
         const projCards = await Promise.race([
-          runProjectionPipeline({ limit: actualCount }),
+          runProjectionPipeline({ limit: count }),
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000)),
         ]);
         for (const c of projCards) {
@@ -1079,6 +1206,15 @@ async function _generateContextualCards(
             icon: 'TrendingUp',
             metadata: { realData: true, source: 'LeverageMetrics' },
           });
+        }
+        // Supplement with VPE cards if pipeline returned fewer than requested
+        if (cards.length < count) {
+          try {
+            const vpeCards = await buildVPECards(count - cards.length);
+            cards.push(...vpeCards);
+          } catch {
+            // VPE supplemental failure is non-fatal
+          }
         }
       }
 

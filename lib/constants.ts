@@ -249,6 +249,8 @@ export const CARD_TYPES = {
   PITCH_ANALYSIS:    'pitch_analysis_card',
   // LeverageMetrics MLB Projection Engine
   MLB_PROJECTION:    'mlb_projection_card',
+  // Vortex Projection Engine (VPE 3.0) — Baseball only
+  VPE_PROJECTION:    'vpe_projection_card',
 } as const;
 
 // Card Status Values

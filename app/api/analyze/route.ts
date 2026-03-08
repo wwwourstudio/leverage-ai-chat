@@ -19,6 +19,7 @@ import { getNFLADPData } from '@/lib/nfl-adp-data';
 import { getStatcastData, queryStatcast } from '@/lib/baseball-savant';
 import { generateContextualCards, type InsightCard } from '@/lib/cards-generator';
 import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-detector';
+import { getGrokApiKey } from '@/lib/config';
 
 // ============================================================================
 // Types
@@ -345,7 +346,7 @@ export async function POST(request: NextRequest) {
     // ── AI generation starts now (concurrently with card generation above) ──────
 
     // Attempt AI generation via Vercel AI Gateway
-    const xaiApiKey = process.env.XAI_API_KEY;
+    const xaiApiKey = getGrokApiKey() ?? process.env.XAI_API_KEY;
     const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
     const kalshiApiKey = process.env.KALSHI_API_KEY_ID || process.env.KALSHI_API_KEY;
     const hasClientOddsData = !!(context.oddsData?.events?.length);

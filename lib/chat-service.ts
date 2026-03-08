@@ -29,7 +29,12 @@ export interface PersistedMessage {
   isWelcome?: boolean;
 }
 
-// ── API helpers ───────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** True when `id` is a real Supabase UUID, not a client placeholder like "chat-1". */
+function isUUID(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
 
 async function apiCall(path: string, options?: RequestInit): Promise<any> {
   const res = await fetch(path, {
@@ -99,6 +104,7 @@ export async function updateThread(
   id: string,
   updates: Partial<Pick<ChatThread, 'title' | 'preview' | 'starred' | 'category' | 'tags'>>
 ): Promise<void> {
+  if (!isUUID(id)) return; // placeholder IDs (e.g. "chat-1") are not persisted yet
   try {
     await apiCall(`/api/chats/${id}`, {
       method: 'PATCH',
@@ -114,6 +120,7 @@ export async function updateThread(
  * Fire-and-forget.
  */
 export async function deleteThread(id: string): Promise<void> {
+  if (!isUUID(id)) return;
   try {
     await apiCall(`/api/chats/${id}`, { method: 'DELETE' });
   } catch (err) {
@@ -128,6 +135,7 @@ export async function deleteThread(id: string): Promise<void> {
  * Returns [] on failure.
  */
 export async function loadMessages(threadId: string): Promise<PersistedMessage[]> {
+  if (!isUUID(threadId)) return [];
   try {
     const json = await apiCall(`/api/chats/${threadId}/messages`);
     return (json.messages ?? []).map((m: any) => ({
@@ -153,6 +161,7 @@ export async function saveMessage(
   threadId: string,
   msg: { role: 'user' | 'assistant'; content: string; model_used?: string; confidence?: number; is_welcome?: boolean }
 ): Promise<void> {
+  if (!isUUID(threadId)) return;
   try {
     await apiCall(`/api/chats/${threadId}/messages`, {
       method: 'POST',

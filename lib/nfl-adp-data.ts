@@ -24,7 +24,23 @@ const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 // pre-season ADP. Update annually before each NFL draft season (July/August).
 // Covers top 120 picks across all positions: QB, RB, WR, TE, K, DEF.
 
-const NFL_STATIC_FALLBACK: NFBCPlayer[] = [
+/**
+ * Ensures the static fallback array has monotonically non-decreasing ADP values
+ * when sorted by rank. Recalculates valueDelta and isValuePick automatically.
+ * Eliminates all ADP backtracks that creep in when rows are edited by hand.
+ */
+function normalizeADPOrder(players: NFBCPlayer[]): NFBCPlayer[] {
+  const sorted = [...players].sort((a, b) => a.rank - b.rank);
+  let prevAdp = 0;
+  return sorted.map(p => {
+    const adp = Math.max(p.adp, prevAdp + 0.5);
+    prevAdp = adp;
+    const valueDelta = Math.round((adp - p.rank) * 10) / 10;
+    return { ...p, adp, valueDelta, isValuePick: valueDelta > 15 };
+  });
+}
+
+const NFL_STATIC_FALLBACK: NFBCPlayer[] = normalizeADPOrder([
   // ── Round 1 (1–12) ──────────────────────────────────────────────────────────
   { rank: 1,   playerName: 'McCaffrey, Christian',    displayName: 'Christian McCaffrey',    adp: 1.2,   positions: 'RB',  team: 'SF',   valueDelta: 0.2,  isValuePick: false },
   { rank: 2,   playerName: 'Hill, Tyreek',            displayName: 'Tyreek Hill',            adp: 2.5,   positions: 'WR',  team: 'MIA',  valueDelta: 0.5,  isValuePick: false },
@@ -155,7 +171,7 @@ const NFL_STATIC_FALLBACK: NFBCPlayer[] = [
   { rank: 118, playerName: 'Chiefs, KC',              displayName: 'KC Chiefs D/ST',         adp: 128.5, positions: 'DEF', team: 'KC',   valueDelta: 10.5, isValuePick: false },
   { rank: 119, playerName: 'Reynolds, Josh',          displayName: 'Josh Reynolds',          adp: 126.5, positions: 'WR',  team: 'DET',  valueDelta: 7.5,  isValuePick: false },
   { rank: 120, playerName: 'White, Jamaal',           displayName: 'Jamaal White',           adp: 130.0, positions: 'RB',  team: 'NO',   valueDelta: 10.0, isValuePick: false },
-];
+]);
 
 // ── Module-level cache ────────────────────────────────────────────────────────
 

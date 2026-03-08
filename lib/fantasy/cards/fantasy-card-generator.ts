@@ -16,6 +16,7 @@
 
 import type { InsightCard } from '@/lib/cards-generator';
 import { getProjections, currentSeasonFor } from '@/lib/fantasy/projections-cache';
+import { getADPData } from '@/lib/adp-data';
 
 // ============================================================================
 // Archived 2025 NFL season data (PPR, final season projections)
@@ -717,7 +718,22 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
   if (isMLB) {
     const mlbSeason = currentSeasonFor('mlb');
     const mlbRaw = await getProjections('mlb', mlbSeason, () => MLB_PROJECTIONS_2025);
-    const mlbVBD = computeVBDGeneric(mlbRaw, MLB_REPLACEMENT_RANKS);
+
+    // Enrich mlbRaw with live NFBC ADP values so VBD uses current draft positions,
+    // not the stale values baked into MLB_PROJECTIONS_2025.
+    let mlbAdpMap: Map<string, number> = new Map();
+    try {
+      const nfbcPlayers = await getADPData();
+      for (const p of nfbcPlayers) {
+        mlbAdpMap.set(p.displayName.toLowerCase(), p.adp);
+      }
+    } catch { /* silently fall back to static adp values */ }
+    const mlbEnriched = mlbRaw.map(p => {
+      const liveAdp = mlbAdpMap.get(p.name.toLowerCase());
+      return liveAdp != null ? { ...p, adp: liveAdp } : p;
+    });
+
+    const mlbVBD = computeVBDGeneric(mlbEnriched, MLB_REPLACEMENT_RANKS);
     const mlbCliffs = detectCliffs(mlbVBD);
     const mlbTeams = leagueOptions?.teamCount ?? 12;
     const mlbFmt = formatLabel(leagueOptions?.scoringFormat, 'mlb');
@@ -831,6 +847,43 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
         },
         metadata: { realData: false, dataSource: `MLB ${mlbSeason} Draft Engine` },
       });
+    }
+
+    // ── VPE card — Vortex Projection Engine rankings from live Statcast ──────
+    if (cards.length < count) {
+      try {
+        const { getStatcastData } = await import('@/lib/baseball-savant');
+        const { rankByVPE } = await import('@/lib/fantasy/vpe');
+        const statcastAll = await getStatcastData();
+        const vpeRanked = rankByVPE(statcastAll).slice(0, 8);
+        if (vpeRanked.length > 0) {
+          cards.push({
+            type: 'FANTASY_VBD',
+            title: 'MLB VPE Rankings — Vortex Engine',
+            icon: 'Zap',
+            category: 'FANTASY',
+            subcategory: `MLB ${mlbSeason} • VPE-Val Score`,
+            gradient: 'from-violet-600 to-purple-800',
+            data: {
+              fantasyCardType: 'vbd_rankings',
+              position: 'OVERALL',
+              sport: 'MLB',
+              players: vpeRanked.map((p, i) => ({
+                name: p.name,
+                pos: p.playerType === 'batter' ? 'BAT' : 'PIT',
+                vbd: p.vpeVal,
+                pts: p.vpeVal,
+                adp: i + 1,
+                tier: Math.floor(i / 3) + 1,
+                rank: i + 1,
+              })),
+              description: 'VPE-Val weights Barrel%, HardHit%, air-ball tendency for hitters; xwOBA allowed, K/9 proxy, WHIP suppression for pitchers.',
+              status: 'target',
+            },
+            metadata: { realData: true, dataSource: `Baseball Savant + VPE ${mlbSeason}` },
+          });
+        }
+      } catch { /* VPE unavailable — skip card, other cards already filled */ }
     }
 
     return cards.slice(0, count);
@@ -966,9 +1019,13 @@ export async function generateFantasyCards(
   const msg = userMessage.toLowerCase();
   const cards: InsightCard[] = [];
 
+  // Fetch NFL players through the cache (seeds from NFL_PROJECTIONS_2025 if empty,
+  // or from Supabase if seedProjectionsCache() was called by the analyze route)
+  const nflSeason = currentSeasonFor('nfl');
+  const nflPlayers = await getProjections('nfl', nflSeason, () => NFL_PROJECTIONS_2025);
+
   // Check for player-specific query first
-  const allPlayerNames = NFL_PROJECTIONS_2025.map(p => p.name.toLowerCase());
-  const mentionedPlayer = NFL_PROJECTIONS_2025.find(p =>
+  const mentionedPlayer = nflPlayers.find(p =>
     msg.includes(p.name.toLowerCase()) ||
     msg.includes(p.name.toLowerCase().split(' ')[1] || '__nomatch__')
   );

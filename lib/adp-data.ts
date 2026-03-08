@@ -303,6 +303,87 @@ function parseTSV(raw: string): NFBCPlayer[] {
   return players;
 }
 
+// ── Supabase ADP persistence ──────────────────────────────────────────────────
+// Saves fetched ADP to Supabase so the AI can read it directly from the DB.
+// Uses the service role key (bypasses RLS) so no user session is needed.
+// Falls back silently — persistence failures never break the ADP tool.
+
+async function getADPSupabaseClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+  const { createClient } = await import('@supabase/supabase-js');
+  return createClient(url, key, { db: { schema: 'api' } });
+}
+
+export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): Promise<void> {
+  try {
+    const supabase = await getADPSupabaseClient();
+    if (!supabase) return;
+    const now = new Date().toISOString();
+    const rows = players.map(p => ({
+      rank: p.rank,
+      player_name: p.playerName,
+      display_name: p.displayName,
+      adp: p.adp,
+      positions: p.positions,
+      team: p.team,
+      value_delta: p.valueDelta,
+      is_value_pick: p.isValuePick,
+      auction_value: p.auctionValue ?? null,
+      sport,
+      fetched_at: now,
+    }));
+    // Upsert in batches of 50 to stay well within payload limits
+    const BATCH = 50;
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const { error } = await supabase
+        .from('nfbc_adp')
+        .upsert(rows.slice(i, i + BATCH), { onConflict: 'sport,rank' });
+      if (error) {
+        console.warn('[v0] [ADP] Supabase upsert batch failed:', error.message);
+        return;
+      }
+    }
+    console.log(`[v0] [ADP] Saved ${players.length} ${sport.toUpperCase()} ADP players to Supabase`);
+  } catch (err) {
+    console.warn('[v0] [ADP] saveADPToSupabase failed (non-critical):', err);
+  }
+}
+
+export async function loadADPFromSupabase(sport = 'mlb', allowStale = false): Promise<NFBCPlayer[] | null> {
+  try {
+    const supabase = await getADPSupabaseClient();
+    if (!supabase) return null;
+    const { data, error } = await supabase
+      .from('nfbc_adp')
+      .select('*')
+      .eq('sport', sport)
+      .order('rank', { ascending: true })
+      .limit(300);
+    if (error || !data || data.length === 0) return null;
+    // Check freshness unless allowStale — compare against cache TTL (4 hours)
+    if (!allowStale) {
+      const latestFetch = data[0]?.fetched_at ? new Date(data[0].fetched_at).getTime() : 0;
+      if (Date.now() - latestFetch > CACHE_TTL_MS) return null;
+    }
+    return data.map((r: any) => ({
+      rank: r.rank as number,
+      playerName: r.player_name as string,
+      displayName: r.display_name as string,
+      adp: r.adp as number,
+      positions: r.positions as string,
+      team: r.team as string,
+      valueDelta: r.value_delta as number,
+      isValuePick: r.is_value_pick as boolean,
+      auctionValue: r.auction_value != null ? (r.auction_value as number) : undefined,
+    }));
+  } catch (err) {
+    console.warn('[v0] [ADP] loadADPFromSupabase failed (non-critical):', err);
+    return null;
+  }
+}
+
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 
 // NFBC distributes ADP as tab-separated (.tsv) files, not CSV.
@@ -407,7 +488,25 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
   const circuitOpen = circuitOpenedAt > 0 && (now - circuitOpenedAt < CIRCUIT_BREAKER_TTL_MS);
   if (circuitOpen && !forceRefresh) {
     if (adpCache) return adpCache;
+    // Try Supabase (even stale) before returning static fallback
+    const dbData = await loadADPFromSupabase('mlb', true);
+    if (dbData && dbData.length > 0) {
+      console.log(`[v0] [ADP] Circuit open — serving ${dbData.length} MLB players from Supabase`);
+      adpCache = dbData;
+      return dbData;
+    }
     return STATIC_FALLBACK_PLAYERS;
+  }
+
+  // Try Supabase first — faster than a live external HTTP call
+  if (!forceRefresh) {
+    const dbData = await loadADPFromSupabase('mlb');
+    if (dbData && dbData.length > 0) {
+      console.log(`[v0] [ADP] Serving ${dbData.length} MLB players from Supabase cache`);
+      adpCache = dbData;
+      lastFetched = now;
+      return dbData;
+    }
   }
 
   try {
@@ -415,6 +514,8 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
     adpCache = players;
     lastFetched = now;
     circuitOpenedAt = 0; // reset circuit on success
+    // Persist to Supabase (fire-and-forget) so future requests can skip live fetch
+    void saveADPToSupabase(players, 'mlb');
     return players;
   } catch (err) {
     console.error('[v0] [ADP] Failed to fetch NFBC ADP data:', err);
@@ -423,6 +524,12 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
     if (adpCache) {
       console.warn('[v0] [ADP] Returning stale cached data');
       return adpCache;
+    }
+    // Last resort: try Supabase with stale data allowed
+    const dbData = await loadADPFromSupabase('mlb', true);
+    if (dbData && dbData.length > 0) {
+      console.warn(`[v0] [ADP] Returning ${dbData.length} players from stale Supabase data`);
+      return dbData;
     }
     console.warn(`[v0] [ADP] Using static fallback dataset (${STATIC_FALLBACK_PLAYERS.length} players). Live endpoint will retry in 30 min.`);
     return STATIC_FALLBACK_PLAYERS;

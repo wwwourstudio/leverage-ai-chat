@@ -84,7 +84,7 @@ export class KalshiClient {
     this.apiKeyId = options?.apiKeyId || process.env.KALSHI_API_KEY_ID || '';
     this.baseUrl = options?.demo
       ? 'https://demo-api.kalshi.co/trade-api/v2'
-      : 'https://trading.kalshi.com/trade-api/v2';
+      : 'https://api.kalshi.com/trade-api/v2';
   }
 
   // ─── HMAC-SHA256 Signature ────────────────────────────────────────────────

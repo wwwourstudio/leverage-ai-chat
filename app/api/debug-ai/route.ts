@@ -69,7 +69,7 @@ export async function GET() {
 
   try {
     const res = await fetch(
-      'https://trading.kalshi.com/trade-api/v2/markets?limit=1&status=open',
+      'https://api.kalshi.com/trade-api/v2/markets?limit=1&status=open',
       { headers: kalshiHeaders, signal: AbortSignal.timeout(8000) }
     );
     if (res.ok) {

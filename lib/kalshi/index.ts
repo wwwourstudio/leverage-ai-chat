@@ -8,7 +8,8 @@
 
 import crypto from 'crypto';
 
-const KALSHI_TRADING_URL = 'https://trading.kalshi.com/trade-api/v2';
+const KALSHI_TRADING_URL = 'https://api.kalshi.com/trade-api/v2';
+const KALSHI_FALLBACK_URL = 'https://api.elections.kalshi.com/trade-api/v2';
 
 export interface KalshiMarket {
   ticker: string;
@@ -245,43 +246,62 @@ function parseMarket(m: any): KalshiMarket {
 
 /**
  * Fetch a single page of markets.
- * Tries the main trading API first; falls back to the elections mirror.
+ * Tries the canonical api.kalshi.com first; falls back to api.elections.kalshi.com.
  * Returns parsed markets and the next cursor (null when done).
  */
 async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage> {
-  const url = `${KALSHI_TRADING_URL}/markets?${queryParams}`;
-  const response = await fetch(url, {
-    headers: buildHeaders(url),
-    signal: AbortSignal.timeout(10000),
-  });
+  const urls = [
+    `${KALSHI_TRADING_URL}/markets?${queryParams}`,
+    `${KALSHI_FALLBACK_URL}/markets?${queryParams}`,
+  ];
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    const hasKey = !!process.env.KALSHI_API_KEY_ID;
-    console.error(`[KALSHI] API error ${response.status} ${response.statusText} (KALSHI_API_KEY_ID set: ${hasKey}) — ${errorText.substring(0, 200)}`);
-    throw new Error(`Kalshi API error: ${response.status} ${response.statusText}`);
+  let lastError: Error | null = null;
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {
+        headers: buildHeaders(url),
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const host = new URL(url).hostname;
+        console.error(`[KALSHI] API error ${response.status} at ${host} — ${errorText.substring(0, 200)}`);
+        lastError = new Error(`Kalshi API error: ${response.status} ${response.statusText}`);
+        continue; // try fallback URL
+      }
+
+      const data = await response.json();
+
+      if (!data.markets || !Array.isArray(data.markets)) {
+        console.warn('[KALSHI] Unexpected response format, keys:', Object.keys(data).join(', '));
+        return { markets: [], cursor: null };
+      }
+
+      // Reject titles shorter than 10 chars or that look like raw ticker symbols
+      // (all-caps + digits + dashes/dots/%, e.g. "KXBT-25DEC25-T45000")
+      const TICKER_RE = /^[A-Z0-9\-\.%]+$/;
+      const markets = data.markets
+        .map(parseMarket)
+        .filter((m: KalshiMarket) => {
+          if (!m.title || m.title.length < 10) return false;
+          if (TICKER_RE.test(m.title)) return false;
+          return true;
+        });
+
+      const cursor = data.cursor && data.cursor !== '' ? data.cursor : null;
+      return { markets, cursor };
+    } catch (err) {
+      const host = new URL(url).hostname;
+      const cause = (err as any)?.cause;
+      console.warn(`[KALSHI] ${host} failed: ${(err as Error).message}${cause ? ` (${cause.code ?? cause.message ?? cause})` : ''}`);
+      lastError = err as Error;
+      continue; // try fallback URL
+    }
   }
 
-  const data = await response.json();
-
-  if (!data.markets || !Array.isArray(data.markets)) {
-    console.warn('[KALSHI] Unexpected response format, keys:', Object.keys(data).join(', '));
-    return { markets: [], cursor: null };
-  }
-
-  // Reject titles shorter than 10 chars or that look like raw ticker symbols
-  // (all-caps + digits + dashes/dots/%, e.g. "KXBT-25DEC25-T45000")
-  const TICKER_RE = /^[A-Z0-9\-\.%]+$/;
-  const markets = data.markets
-    .map(parseMarket)
-    .filter((m: KalshiMarket) => {
-      if (!m.title || m.title.length < 10) return false;
-      if (TICKER_RE.test(m.title)) return false;
-      return true;
-    });
-
-  const cursor = data.cursor && data.cursor !== '' ? data.cursor : null;
-  return { markets, cursor };
+  throw lastError ?? new Error('All Kalshi endpoints failed');
 }
 
 /**
@@ -385,10 +405,12 @@ export async function fetchKalshiMarkets(params?: {
 
       return meaningfulMarkets;
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.error('[KALSHI] ❌ Request timeout after 10s');
+      const err = error instanceof Error ? error : new Error(String(error));
+      const cause = (err as any).cause;
+      if (err.name === 'AbortError') {
+        console.error('[KALSHI] ❌ Request timeout after 15s');
       } else {
-        console.error('[KALSHI] ❌ Failed to fetch markets:', error instanceof Error ? error.message : error);
+        console.error(`[KALSHI] ❌ Failed to fetch markets: ${err.message}${cause ? ` (cause: ${cause.code ?? cause.message ?? cause})` : ''}`);
       }
       return [];
     } finally {

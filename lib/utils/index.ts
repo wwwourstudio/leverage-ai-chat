@@ -155,7 +155,7 @@ export function isNodeEnvironment(): boolean {
 
 export function isEdgeRuntime(): boolean {
   return (
-    typeof EdgeRuntime !== 'undefined' ||
+    typeof (globalThis as any).EdgeRuntime !== 'undefined' ||
     (typeof process !== 'undefined' && process.env.NEXT_RUNTIME === 'edge')
   );
 }

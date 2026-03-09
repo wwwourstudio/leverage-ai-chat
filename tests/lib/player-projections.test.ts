@@ -217,7 +217,7 @@ describe('calculateDerivedStats', () => {
 
   it('maps statType to projection value', () => {
     const projections: PlayerProjection[] = [
-      { player: 'Test', team: 'TB', position: 'SP', statType: 'strikeouts', projection: 7.5, source: 'api' as any },
+      { player: 'Test', team: 'TB', position: 'SP', statType: 'strikeouts', projection: 7.5 },
     ];
     const stats = calculateDerivedStats(projections);
     expect(stats['strikeouts']).toBe(7.5);

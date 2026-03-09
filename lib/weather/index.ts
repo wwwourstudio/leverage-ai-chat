@@ -13,6 +13,7 @@ interface Stadium {
   longitude: number;
   timezone: string;
   roofType: 'open' | 'dome' | 'retractable';
+  fieldOrientation?: string;
 }
 
 const STADIUM_DATABASE: Stadium[] = [

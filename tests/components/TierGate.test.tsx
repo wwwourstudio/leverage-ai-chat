@@ -99,7 +99,7 @@ describe('TierGate', () => {
 
     it('shows default "Premium Feature" label when featureLabel is not provided', () => {
       render(
-        <TierGate tier="free" requiredFeature="draft_simulation" />
+        <TierGate tier="free" requiredFeature="draft_simulation">{/* locked */}</TierGate>
       );
       expect(screen.getByText('Premium Feature')).toBeTruthy();
     });
@@ -110,7 +110,7 @@ describe('TierGate', () => {
           tier="free"
           requiredFeature="draft_simulation"
           featureLabel="AI Draft Simulator"
-        />
+        >{/* locked */}</TierGate>
       );
       expect(screen.getByText('AI Draft Simulator')).toBeTruthy();
       expect(screen.queryByText('Premium Feature')).toBeNull();

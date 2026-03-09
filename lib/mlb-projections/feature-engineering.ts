@@ -45,6 +45,7 @@ export interface PitcherFeatures {
   spinRate: number;        // rpm
   pitchMixEntropy: number; // Shannon entropy of pitch mix (0–1.5)
   releaseExtension: number;// ft
+  whiffPct?: number;       // Whiff % (swings-and-misses / total swings, 0–100)
   // Computed
   parkFactor: number;
   weatherAdjustment: number;

@@ -50,6 +50,9 @@ interface AnalyzeRequestBody {
     previousMessages?: Array<{ role: string; content: string }>;
     kalshiSubcategory?: string;
     selectedCategory?: string;
+    oddsKeyMissing?: boolean;
+    leagueSize?: number;
+    leagueScoringFormat?: string;
   };
 }
 
@@ -359,7 +362,7 @@ export async function POST(request: NextRequest) {
       sport: context.sport || 'none',
     });
     let aiText: string;
-    let modelUsed = AI_CONFIG.MODEL_DISPLAY_NAME;
+    let modelUsed: string = AI_CONFIG.MODEL_DISPLAY_NAME;
     let usedFallback = false;
     let pendingADPCard: InsightCard | null = null;
     let skipStatcastJSON = false; // set true when statcast tool returned empty players

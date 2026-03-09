@@ -163,6 +163,7 @@ export function DynamicCardRenderer({
   if (cardType.includes('weather') || cardType.includes('climate')) {
     return (
       <WeatherCard
+        type={safeCard.type}
         title={safeCard.title}
         category={safeCard.category}
         subcategory={safeCard.subcategory}

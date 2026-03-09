@@ -692,7 +692,7 @@ function ArbitrageAlert({ count, onScan, loading }: { count: number; onScan: () 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function TradingPage() {
-  const [selectedSport, setSelectedSport] = useState(SPORTS[0].key);
+  const [selectedSport, setSelectedSport] = useState<string>(SPORTS[0].key);
   const [events, setEvents] = useState<OddsEvent[]>([]);
   const [oddsLoading, setOddsLoading] = useState(true);
   const [oddsError, setOddsError] = useState<string | null>(null);

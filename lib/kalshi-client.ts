@@ -18,5 +18,8 @@ export {
   getMarketByTicker,
   generateKalshiCards,
   kalshiMarketToCard,
+  analyzeKalshiVolatility,
   type KalshiMarket,
+  type KalshiVolatilityInput,
+  type KalshiAnalysis,
 } from './kalshi/index';

@@ -48,7 +48,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
   const [saved, setSaved] = useState(false);
 
   // Betting profile state
-  const [primarySport, setPrimarySport] = useState(SPORT_NAMES[0]);
+  const [primarySport, setPrimarySport] = useState<string>(SPORT_NAMES[0]);
   const [riskTolerance, setRiskTolerance] = useState<'Conservative' | 'Medium' | 'Aggressive'>('Medium');
   const [stakeStyle, setStakeStyle] = useState('Flat');
 

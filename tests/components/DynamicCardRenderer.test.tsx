@@ -179,6 +179,7 @@ describe('DynamicCardRenderer', () => {
             subcategory: 'HR Projection',
             gradient: 'from-green-600 to-emerald-900',
             data: {},
+            status: 'neutral',
           }}
         />
       );
@@ -196,6 +197,7 @@ describe('DynamicCardRenderer', () => {
             subcategory: 'HR Prop',
             gradient: 'from-green-600 to-emerald-900',
             data: {},
+            status: 'neutral',
           }}
         />
       );
@@ -212,6 +214,7 @@ describe('DynamicCardRenderer', () => {
             subcategory: 'HR Projection',
             gradient: 'from-green-600 to-emerald-900',
             data: {},
+            status: 'neutral',
           }}
         />
       );

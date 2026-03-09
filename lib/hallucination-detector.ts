@@ -245,13 +245,28 @@ function scoreCoherence(aiText: string, userMessage: string): number {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+export interface DetectOptions {
+  /** Query category — 'dfs' and 'fantasy' skip live-odds alignment weighting */
+  category?: string;
+  /** False when the query has no betting intent (e.g. pure DFS/fantasy) */
+  hasBettingIntent?: boolean;
+}
+
 export function detectHallucinations(
   aiText: string,
   userMessage: string,
   oddsData?: any,
+  options?: DetectOptions,
 ): HallucinationReport {
   const flags: HallucinationFlag[] = [];
-  const hasRealOdds = (oddsData?.events?.length ?? 0) > 0;
+
+  // DFS/fantasy queries don't cite live moneylines — force no-odds weights even
+  // when oddsData is present in context to avoid false-positive retry triggers.
+  const isDfsOrFantasy =
+    options?.category === 'dfs' ||
+    options?.category === 'fantasy' ||
+    options?.hasBettingIntent === false;
+  const hasRealOdds = (oddsData?.events?.length ?? 0) > 0 && !isDfsOrFantasy;
 
   const benfordIntegrity = scoreBenford(aiText);
   const oddsAlignment = scoreOddsAlignment(aiText, oddsData, flags);

@@ -631,7 +631,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Hallucination-detection retry loop (with timeout awareness)
-        let detection = detectHallucinations(aiText, userMessage, context.oddsData);
+        let detection = detectHallucinations(aiText, userMessage, context.oddsData, { category, hasBettingIntent: context.hasBettingIntent });
         let retryAttempt = 0;
 
         while (detection.shouldRetry && !isMLBQuery && !hasADPIntent && retryAttempt < MAX_HALLUCINATION_RETRIES) {
@@ -671,7 +671,7 @@ export async function POST(request: NextRequest) {
               retryTimeoutPromise
             ]);
             aiText = retryResult.text;
-            detection = detectHallucinations(aiText, userMessage, context.oddsData);
+            detection = detectHallucinations(aiText, userMessage, context.oddsData, { category, hasBettingIntent: context.hasBettingIntent });
           } catch (retryError) {
             console.error(`[API/analyze] Retry ${retryAttempt} failed:`, retryError);
             break;
@@ -826,7 +826,7 @@ export async function POST(request: NextRequest) {
           adjustedTone: 'Limited data — AI unavailable',
           flags: [{ type: 'info', message: 'Using fallback mode — AI temporarily unavailable', severity: 'info' as const }],
         }
-      : detectHallucinations(aiText, userMessage, context.oddsData);
+      : detectHallucinations(aiText, userMessage, context.oddsData, { category, hasBettingIntent: context.hasBettingIntent });
 
     // Boost trust metrics when real live odds data was provided
     const trustMetrics = (hasRealOdds && !usedFallback)

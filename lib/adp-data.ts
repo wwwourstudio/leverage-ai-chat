@@ -206,10 +206,54 @@ const STATIC_FALLBACK_PLAYERS: NFBCPlayer[] = [
 let adpCache: NFBCPlayer[] | null = null;
 let lastFetched = 0;
 
-// Circuit breaker: after a full fetch failure, don't retry for 30 minutes to
-// avoid hammering a broken endpoint and flooding logs on every ADP request.
+// Circuit breaker: after a full fetch failure, don't retry for 30 minutes.
+// circuitOpenedAt is stored in Supabase (key: adp_circuit_open_until) so it
+// survives serverless cold starts — module-level var is only a warm-instance cache.
 const CIRCUIT_BREAKER_TTL_MS = 30 * 60 * 1000; // 30 minutes
-let circuitOpenedAt = 0; // 0 = circuit closed (never tripped)
+let circuitOpenedAt = 0; // 0 = circuit closed (warm-instance only)
+
+// ── Supabase-backed circuit breaker ──────────────────────────────────────────
+async function getCircuitOpenUntil(): Promise<number> {
+  if (circuitOpenedAt > 0) return circuitOpenedAt; // warm-instance fast path
+  try {
+    const supabase = await getADPSupabaseClient();
+    if (!supabase) return 0;
+    const { data } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'adp_circuit_open_until')
+      .maybeSingle();
+    const ts = data ? Number((data as { value: string }).value) : 0;
+    circuitOpenedAt = ts; // cache in memory for warm instances
+    return ts;
+  } catch {
+    return 0;
+  }
+}
+
+async function openCircuit(until: number): Promise<void> {
+  circuitOpenedAt = until;
+  try {
+    const supabase = await getADPSupabaseClient();
+    if (!supabase) return;
+    await supabase.from('app_settings').upsert(
+      { key: 'adp_circuit_open_until', value: String(until) },
+      { onConflict: 'key' },
+    );
+  } catch { /* non-critical */ }
+}
+
+async function clearCircuit(): Promise<void> {
+  circuitOpenedAt = 0;
+  try {
+    const supabase = await getADPSupabaseClient();
+    if (!supabase) return;
+    await supabase.from('app_settings').upsert(
+      { key: 'adp_circuit_open_until', value: '0' },
+      { onConflict: 'key' },
+    );
+  } catch { /* non-critical */ }
+}
 
 // ── Delimiter-agnostic parser ─────────────────────────────────────────────────
 
@@ -483,22 +527,8 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
     return adpCache;
   }
 
-  // Circuit breaker: skip live fetch for 30 min after a full failure to avoid
-  // log spam and unnecessary latency when the endpoint is known-broken.
-  const circuitOpen = circuitOpenedAt > 0 && (now - circuitOpenedAt < CIRCUIT_BREAKER_TTL_MS);
-  if (circuitOpen && !forceRefresh) {
-    if (adpCache) return adpCache;
-    // Try Supabase (even stale) before returning static fallback
-    const dbData = await loadADPFromSupabase('mlb', true);
-    if (dbData && dbData.length > 0) {
-      console.log(`[v0] [ADP] Circuit open — serving ${dbData.length} MLB players from Supabase`);
-      adpCache = dbData;
-      return dbData;
-    }
-    return STATIC_FALLBACK_PLAYERS;
-  }
-
-  // Try Supabase first — faster than a live external HTTP call
+  // Try Supabase first — faster than a live external HTTP call and survives cold starts.
+  // This also catches the case where static fallback was previously seeded to Supabase.
   if (!forceRefresh) {
     const dbData = await loadADPFromSupabase('mlb');
     if (dbData && dbData.length > 0) {
@@ -509,29 +539,50 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
     }
   }
 
+  // Circuit breaker: skip live fetch for 30 min after a full failure to avoid
+  // log spam and unnecessary latency when the endpoint is known-broken.
+  // Persisted in Supabase so cold-starts respect the open circuit.
+  const circuitOpenUntil = await getCircuitOpenUntil();
+  const circuitOpen = circuitOpenUntil > 0 && (now < circuitOpenUntil);
+  if (circuitOpen && !forceRefresh) {
+    if (adpCache) return adpCache;
+    // Try Supabase (even stale) before returning static fallback
+    const dbData = await loadADPFromSupabase('mlb', true);
+    if (dbData && dbData.length > 0) {
+      console.log(`[v0] [ADP] Circuit open — serving ${dbData.length} MLB players from Supabase`);
+      adpCache = dbData;
+      return dbData;
+    }
+    // Seed Supabase with static fallback so future cold-starts use Supabase
+    void saveADPToSupabase(STATIC_FALLBACK_PLAYERS, 'mlb');
+    return STATIC_FALLBACK_PLAYERS;
+  }
+
   try {
     const players = await fetchNFBCADP();
     adpCache = players;
     lastFetched = now;
-    circuitOpenedAt = 0; // reset circuit on success
+    void clearCircuit(); // reset circuit on success
     // Persist to Supabase (fire-and-forget) so future requests can skip live fetch
     void saveADPToSupabase(players, 'mlb');
     return players;
   } catch (err) {
-    console.error('[v0] [ADP] Failed to fetch NFBC ADP data:', err);
-    circuitOpenedAt = now; // open circuit — suppress retries for 30 min
+    console.error('[v0] [ADP] Failed to fetch live ADP data:', err);
+    void openCircuit(now + CIRCUIT_BREAKER_TTL_MS); // persist open circuit across cold starts
     // Return stale cache if available — better than nothing
     if (adpCache) {
       console.warn('[v0] [ADP] Returning stale cached data');
       return adpCache;
     }
-    // Last resort: try Supabase with stale data allowed
+    // Try Supabase with stale data allowed
     const dbData = await loadADPFromSupabase('mlb', true);
     if (dbData && dbData.length > 0) {
       console.warn(`[v0] [ADP] Returning ${dbData.length} players from stale Supabase data`);
       return dbData;
     }
-    console.warn(`[v0] [ADP] Using static fallback dataset (${STATIC_FALLBACK_PLAYERS.length} players). Live endpoint will retry in 30 min.`);
+    // Last resort: use static fallback and seed Supabase so next cold-start avoids URLs
+    console.warn(`[v0] [ADP] Using static fallback dataset (${STATIC_FALLBACK_PLAYERS.length} players). Seeding Supabase to skip retries.`);
+    void saveADPToSupabase(STATIC_FALLBACK_PLAYERS, 'mlb');
     return STATIC_FALLBACK_PLAYERS;
   }
 }

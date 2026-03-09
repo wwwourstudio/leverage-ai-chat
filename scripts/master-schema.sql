@@ -897,6 +897,27 @@ ALTER TABLE api.nfbc_adp ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "nfbc_adp_read" ON api.nfbc_adp FOR SELECT USING (true);
 CREATE POLICY "nfbc_adp_service_write" ON api.nfbc_adp FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+-- APP SETTINGS TABLE (app_settings)
+-- Generic key-value store for server-side runtime flags (e.g. ADP circuit-breaker state).
+-- Survives serverless cold starts because it lives in Supabase, not process memory.
+CREATE TABLE IF NOT EXISTS api.app_settings (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL DEFAULT '',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Trigger to keep updated_at current
+CREATE OR REPLACE FUNCTION api.set_app_settings_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN NEW.updated_at = now(); RETURN NEW; END $$;
+DROP TRIGGER IF EXISTS trg_app_settings_updated_at ON api.app_settings;
+CREATE TRIGGER trg_app_settings_updated_at
+  BEFORE UPDATE ON api.app_settings
+  FOR EACH ROW EXECUTE FUNCTION api.set_app_settings_updated_at();
+
+ALTER TABLE api.app_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "app_settings_read" ON api.app_settings FOR SELECT USING (true);
+CREATE POLICY "app_settings_service_write" ON api.app_settings FOR ALL TO service_role USING (true) WITH CHECK (true);
+
 -- ALTER DEFAULT PRIVILEGES only covers future tables; existing tables need GRANT.
 -- ============================================================================
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA api TO authenticated;

@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true });
   }
 
-  const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-12-18.acacia' });
+  const stripe = new Stripe(stripeSecretKey, { apiVersion: '2026-02-25.clover' });
 
   const body = await request.text();
   const sig = request.headers.get('stripe-signature');

@@ -9,7 +9,7 @@ import { hasFeatureAccess } from '@/lib/fantasy/types';
 interface TierGateProps {
   tier: SubscriptionTier;
   requiredFeature: FantasyFeature;
-  children: ReactNode;
+  children?: ReactNode;
   featureLabel?: string;
   onUpgradeClick?: () => void;
 }

@@ -305,7 +305,7 @@ function Lightbox({
             </p>
           </div>
           <div className="flex items-center gap-2 ml-3 shrink-0">
-            {rawData && (
+            {!!rawData && (
               <button
                 onClick={handleCopy}
                 className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white text-[10px] font-bold transition-colors border border-white/10"

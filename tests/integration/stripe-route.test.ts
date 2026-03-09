@@ -12,6 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { NextRequest } from 'next/server';
 
 // ── Next.js server mock ──────────────────────────────────────────────────────
 vi.mock('next/server', () => ({
@@ -43,7 +44,7 @@ const { POST } = await import('@/app/api/stripe/checkout/route');
 function makePostRequest(
   body: Record<string, unknown>,
   origin = 'http://localhost:3000',
-): Request {
+): NextRequest {
   return new Request(`${origin}/api/stripe/checkout`, {
     method: 'POST',
     headers: {
@@ -51,7 +52,7 @@ function makePostRequest(
       origin,
     },
     body: JSON.stringify(body),
-  });
+  }) as unknown as NextRequest;
 }
 
 // ── Setup ─────────────────────────────────────────────────────────────────────

@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-12-18.acacia' });
+    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2026-02-25.clover' });
     const origin = request.headers.get('origin') || 'http://localhost:3000';
     // After embedded checkout completes, Stripe redirects to return_url
     const returnUrl = `${origin}?session_id={CHECKOUT_SESSION_ID}`;

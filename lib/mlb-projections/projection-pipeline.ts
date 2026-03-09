@@ -424,6 +424,7 @@ async function buildWeatherConditions(game: MLBGame): Promise<WeatherConditions>
     const { fetchWeatherForLocation } = await import('@/lib/weather-service');
     if (!game.venueLat || !game.venueLon) throw new Error('No coordinates');
     const w = await fetchWeatherForLocation(game.venueLat, game.venueLon);
+    if (!w) throw new Error('No weather data returned');
     // Open-Meteo returns temperature in °C, wind in km/h
     const tempF = w.temperature * 9 / 5 + 32;
     const windMph = w.windSpeed * 0.621371;

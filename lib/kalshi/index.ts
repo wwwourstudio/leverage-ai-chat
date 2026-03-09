@@ -1089,3 +1089,82 @@ export function kalshiMarketToCard(market: KalshiMarket): any {
     realData: true,
   };
 }
+
+// ============================================================================
+// Kalshi Volatility Analysis
+// ============================================================================
+
+export interface KalshiVolatilityInput {
+  ticker: string;
+  title: string;
+  yesPrice: number;     // Current yes price (0–100 cents)
+  noPrice: number;      // Current no price (0–100 cents)
+  volume24h?: number;
+  spread?: number;
+  priceChange?: number;
+  closeTime?: string;
+}
+
+export interface KalshiAnalysis {
+  ticker: string;
+  title: string;
+  impliedProbability: number;   // yesPrice / 100
+  modelProbability: number;     // Provided by caller
+  edge: number;                 // modelProbability - impliedProbability
+  signal: 'YES' | 'NO' | 'PASS';
+  confidence: number;           // 0–100
+  spreadPct: number;            // spread as % of midpoint
+  isLiquid: boolean;
+  recommendation: string;
+}
+
+/**
+ * Analyze a Kalshi prediction market for edge vs a model probability.
+ * Returns a buy/pass signal and confidence score.
+ */
+export function analyzeKalshiVolatility(
+  market: KalshiVolatilityInput,
+  modelProbability: number,
+): KalshiAnalysis {
+  const impliedProbability = market.yesPrice / 100;
+  const edge = modelProbability - impliedProbability;
+
+  const spread = market.spread ?? (market.noPrice - (100 - market.yesPrice));
+  const midpoint = market.yesPrice;
+  const spreadPct = midpoint > 0 ? Math.abs(spread) / midpoint : 1;
+  const isLiquid = spreadPct < 0.1 && (market.volume24h ?? 0) > 1000;
+
+  // Confidence: penalize illiquid markets and small edges
+  const edgeConfidence = Math.min(100, Math.abs(edge) * 200);
+  const liquidityPenalty = isLiquid ? 0 : 20;
+  const confidence = Math.max(0, Math.round(edgeConfidence - liquidityPenalty));
+
+  let signal: 'YES' | 'NO' | 'PASS';
+  if (Math.abs(edge) < 0.03 || !isLiquid) {
+    signal = 'PASS';
+  } else if (edge > 0) {
+    signal = 'YES';
+  } else {
+    signal = 'NO';
+  }
+
+  const recommendation =
+    signal === 'PASS'
+      ? `No edge — spread too wide or model close to market (edge: ${(edge * 100).toFixed(1)}¢)`
+      : signal === 'YES'
+      ? `Buy YES — model (${(modelProbability * 100).toFixed(1)}%) > implied (${market.yesPrice}¢)`
+      : `Buy NO — model (${(modelProbability * 100).toFixed(1)}%) < implied (${market.yesPrice}¢)`;
+
+  return {
+    ticker: market.ticker,
+    title: market.title,
+    impliedProbability,
+    modelProbability,
+    edge,
+    signal,
+    confidence,
+    spreadPct,
+    isLiquid,
+    recommendation,
+  };
+}

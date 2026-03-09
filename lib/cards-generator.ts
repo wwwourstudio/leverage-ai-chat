@@ -324,6 +324,7 @@ export interface InsightCard {
   status?: string;
   data?: any;
   metadata?: any;
+  realData?: boolean;
 }
 
 // ============================================================================

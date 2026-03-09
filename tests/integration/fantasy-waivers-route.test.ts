@@ -14,6 +14,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { NextRequest } from 'next/server';
 
 // ── Next.js server mock ──────────────────────────────────────────────────────
 vi.mock('next/server', () => ({
@@ -50,18 +51,18 @@ const { POST, GET } = await import('@/app/api/fantasy/waivers/route');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makePostRequest(body: Record<string, unknown>): Request {
+function makePostRequest(body: Record<string, unknown>): NextRequest {
   return new Request('http://localhost/api/fantasy/waivers', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }) as unknown as NextRequest;
 }
 
-function makeGetRequest(params: Record<string, string> = {}): Request {
+function makeGetRequest(params: Record<string, string> = {}): NextRequest {
   const url = new URL('http://localhost/api/fantasy/waivers');
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  return new Request(url.toString());
+  return new Request(url.toString()) as unknown as NextRequest;
 }
 
 /** Build a thenable Supabase query chain that resolves to `result`. */

@@ -16,6 +16,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { NextRequest } from 'next/server';
 
 // ── Next.js server mock ──────────────────────────────────────────────────────
 vi.mock('next/server', () => ({
@@ -78,12 +79,12 @@ const { POST: SIMULATE } = await import('@/app/api/fantasy/draft/simulate/route'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeRequest(body: Record<string, unknown>): Request {
+function makeRequest(body: Record<string, unknown>): NextRequest {
   return new Request('http://localhost/api/fantasy/draft', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }) as unknown as NextRequest;
 }
 
 /** Build a thenable Supabase query chain that resolves to `result`. */

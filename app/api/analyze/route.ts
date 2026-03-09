@@ -50,6 +50,9 @@ interface AnalyzeRequestBody {
     previousMessages?: Array<{ role: string; content: string }>;
     kalshiSubcategory?: string;
     selectedCategory?: string;
+    oddsKeyMissing?: boolean;
+    leagueSize?: number;
+    leagueScoringFormat?: string;
   };
 }
 
@@ -359,7 +362,7 @@ export async function POST(request: NextRequest) {
       sport: context.sport || 'none',
     });
     let aiText: string;
-    let modelUsed = AI_CONFIG.MODEL_DISPLAY_NAME;
+    let modelUsed: string = AI_CONFIG.MODEL_DISPLAY_NAME;
     let usedFallback = false;
     let pendingADPCard: InsightCard | null = null;
     let skipStatcastJSON = false; // set true when statcast tool returned empty players
@@ -395,22 +398,23 @@ export async function POST(request: NextRequest) {
     }
 
     // ── ADP tool (injected when hasADPIntent) ────────────────────────────────────
+    const adpParams = z.object({
+      player:    z.string().optional().describe('Partial player name — case-insensitive (e.g. "Judge", "Ohtani", "Trout")'),
+      position:  z.string().optional().describe('Position filter: SP | RP | 1B | 2B | 3B | SS | OF | DH | C'),
+      rankMin:   z.number().optional().describe('Minimum overall NFBC rank (inclusive)'),
+      rankMax:   z.number().optional().describe('Maximum overall NFBC rank (inclusive)'),
+      limit:     z.number().optional().describe('Number of players to return (default 10, max 25)'),
+      team:      z.string().optional().describe('MLB team abbreviation — e.g. "NYY", "LAD", "BOS", "CHC"'),
+      valueOnly: z.boolean().optional().describe('Return only value picks: players drafted 15+ spots later than their rank (sleepers)'),
+    });
     const adpTool = tool({
       description:
         'Query NFBC MLB or NFFC NFL Average Draft Position (ADP) data. ' +
         'Use for any question about player draft rankings, average draft position (ADP), ' +
         'positional scarcity in fantasy drafts, or where a specific player is being drafted. ' +
         'Works for both baseball (NFBC) and football (NFFC).',
-      parameters: z.object({
-        player:    z.string().optional().describe('Partial player name — case-insensitive (e.g. "Judge", "Ohtani", "Trout")'),
-        position:  z.string().optional().describe('Position filter: SP | RP | 1B | 2B | 3B | SS | OF | DH | C'),
-        rankMin:   z.number().optional().describe('Minimum overall NFBC rank (inclusive)'),
-        rankMax:   z.number().optional().describe('Maximum overall NFBC rank (inclusive)'),
-        limit:     z.number().optional().describe('Number of players to return (default 10, max 25)'),
-        team:      z.string().optional().describe('MLB team abbreviation — e.g. "NYY", "LAD", "BOS", "CHC"'),
-        valueOnly: z.boolean().optional().describe('Return only value picks: players drafted 15+ spots later than their rank (sleepers)'),
-      }),
-      execute: async ({ player, position, rankMin, rankMax, limit, team, valueOnly }) => {
+      inputSchema: adpParams,
+      execute: async ({ player, position, rankMin, rankMax, limit, team, valueOnly }: z.infer<typeof adpParams>) => {
         console.log('[API/analyze] ADP tool called:', { player, position, rankMin, rankMax, limit, team, valueOnly });
         const isNFL = context?.sport?.includes('football') || context?.sport === 'nfl' ||
           msgLower.includes('football') || msgLower.includes('nfl') || msgLower.includes('nffc');
@@ -434,18 +438,19 @@ export async function POST(request: NextRequest) {
     });
 
     // ── Statcast tool (injected when isMLBStatcastMode) ──────────────────────────
+    const statcastParams = z.object({
+      player:     z.string().optional().describe('Partial player name — case-insensitive (e.g. "Judge", "Ohtani")'),
+      playerType: z.enum(['batter', 'pitcher']).optional().describe('Restrict to batters or pitchers only'),
+      limit:      z.number().optional().describe('Number of players to return (default 10, max 25)'),
+    });
     const statcastTool = tool({
       description:
         'Query REAL 2025 Baseball Savant Statcast metrics (barrel rate, exit velocity, ' +
         'xwOBA, hard-hit %, sweet-spot %, xBA, xSLG). ' +
         'Use for any MLB player question about Statcast performance or HR probability. ' +
         'Always call this tool FIRST — never invent Statcast numbers.',
-      parameters: z.object({
-        player:     z.string().optional().describe('Partial player name — case-insensitive (e.g. "Judge", "Ohtani")'),
-        playerType: z.enum(['batter', 'pitcher']).optional().describe('Restrict to batters or pitchers only'),
-        limit:      z.number().optional().describe('Number of players to return (default 10, max 25)'),
-      }),
-      execute: async ({ player, playerType, limit }) => {
+      inputSchema: statcastParams,
+      execute: async ({ player, playerType, limit }: z.infer<typeof statcastParams>) => {
         console.log('[API/analyze] Statcast tool called:', { player, playerType, limit });
         const data = await getStatcastData();
         if (data.length === 0) {
@@ -466,6 +471,18 @@ export async function POST(request: NextRequest) {
     });
 
     // ── MLB Projection Engine tool (injected when hasMLBProjectionIntent) ────────
+    const mlbProjectionParams = z.object({
+      playerType: z.enum(['hitter', 'pitcher', 'all']).optional()
+        .describe('Filter by player type: hitter, pitcher, or all (default: all)'),
+      player:     z.string().optional()
+        .describe('Specific player name — partial match (e.g. "Judge", "Cole")'),
+      limit:      z.number().optional()
+        .describe('Max cards to return (1–15, default 9)'),
+      date:       z.string().optional()
+        .describe('Date in YYYY-MM-DD format (default: today)'),
+      outputFor:  z.enum(['projections', 'dfs', 'fantasy', 'betting']).optional()
+        .describe('Output format: projections (MLBProjectionCard), dfs (DFSCard), fantasy (FantasyCard), betting (hr_prop_card edge cards)'),
+    });
     const mlbProjectionTool = tool({
       description:
         'Run the LeverageMetrics MLB projection engine (Monte Carlo N=1,000, HR Super Model, ' +
@@ -473,19 +490,8 @@ export async function POST(request: NextRequest) {
         'Use for ANY MLB question about DFS lineups, fantasy advice (waiver/streaming/ROS), ' +
         'HR prop betting edges, or player projections. ' +
         'Always call this tool FIRST — NEVER invent salaries, projections, or odds.',
-      parameters: z.object({
-        playerType: z.enum(['hitter', 'pitcher', 'all']).optional()
-          .describe('Filter by player type: hitter, pitcher, or all (default: all)'),
-        player:     z.string().optional()
-          .describe('Specific player name — partial match (e.g. "Judge", "Cole")'),
-        limit:      z.number().optional()
-          .describe('Max cards to return (1–15, default 9)'),
-        date:       z.string().optional()
-          .describe('Date in YYYY-MM-DD format (default: today)'),
-        outputFor:  z.enum(['projections', 'dfs', 'fantasy', 'betting']).optional()
-          .describe('Output format: projections (MLBProjectionCard), dfs (DFSCard), fantasy (FantasyCard), betting (hr_prop_card edge cards)'),
-      }),
-      execute: async ({ playerType, player, limit, date, outputFor }) => {
+      inputSchema: mlbProjectionParams,
+      execute: async ({ playerType, player, limit, date, outputFor }: z.infer<typeof mlbProjectionParams>) => {
         console.log('[API/analyze] MLB projection tool called:', { playerType, player, limit, date, outputFor });
         try {
           const resolvedOutputFor = outputFor ?? 'projections';
@@ -840,7 +846,7 @@ export async function POST(request: NextRequest) {
       : baseMetrics;
 
     // Build sources list reflecting actual data used
-    const sources = [
+    const sources: Array<{ name: string; type: string; reliability: number }> = [
       usedFallback
         ? { name: 'Fallback Mode', type: 'cache' as const, reliability: 65 }
         : DEFAULT_SOURCES.GROK_AI,

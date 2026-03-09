@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { NextRequest } from 'next/server';
 
 // ── Next.js server mock ────────────────────────────────────────────────────
 vi.mock('next/server', () => ({
@@ -50,18 +51,18 @@ const SAMPLE_FORECAST = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function makePostRequest(body: Record<string, unknown>): Request {
+function makePostRequest(body: Record<string, unknown>): NextRequest {
   return new Request('http://localhost/api/weather', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }) as unknown as NextRequest;
 }
 
-function makeGetRequest(params: Record<string, string> = {}): Request {
+function makeGetRequest(params: Record<string, string> = {}): NextRequest {
   const url = new URL('http://localhost/api/weather');
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  return new Request(url.toString());
+  return new Request(url.toString()) as unknown as NextRequest;
 }
 
 // ── Setup ──────────────────────────────────────────────────────────────────

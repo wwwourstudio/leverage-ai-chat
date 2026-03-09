@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true });
   }
 
-  const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-12-18.acacia' });
+  const stripe = new Stripe(stripeSecretKey, { apiVersion: '2026-02-25.clover' });
 
   const body = await request.text();
   const sig = request.headers.get('stripe-signature');
@@ -107,8 +107,9 @@ export async function POST(request: NextRequest) {
 
           if (creditAmount > 0 && customerEmail) {
             // Look up user id by email via auth schema (service role required)
-            const { data: userData } = await supabase.auth.admin.getUserByEmail(customerEmail).catch(() => ({ data: null }));
-            const userId = userData?.user?.id;
+            // Note: getUserByEmail does not exist; listUsers + filter is the correct approach
+            const { data: listData } = await supabase.auth.admin.listUsers({ perPage: 1000 }).catch(() => ({ data: { users: [] } }));
+            const userId = (listData?.users ?? []).find((u: { email?: string; id: string }) => u.email === customerEmail)?.id;
 
             if (userId) {
               await supabase.rpc('increment_user_credits', {

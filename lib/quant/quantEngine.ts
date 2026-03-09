@@ -233,7 +233,6 @@ export function runMonteCarlo(input: MonteCarloInput): MonteCarloResult {
       let roundPnL = 0;
       input.positions.forEach((pos, i) => {
         const u = uniforms[i];
-        const win = u < pos.stake > 0 ? pos.stake > 0 && u < (pos.edge + pos.impliedProb) : false;
         // Simulate bet outcome: win with modelProb probability
         const modelP = pos.edge + pos.impliedProb;
         const won = uniforms[i] < modelP;

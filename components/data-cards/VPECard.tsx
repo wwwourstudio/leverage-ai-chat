@@ -4,7 +4,7 @@ import { memo } from 'react';
 import { TrendingUp, Activity, Users, CheckCircle, AlertTriangle } from 'lucide-react';
 import { BaseCard } from './BaseCard';
 import { DataRow } from './DataRow';
-import type { InsightCard } from '@/lib/types';
+import type { InsightCard } from '@/lib/cards-generator';
 
 interface KalshiMarketRef {
   title: string;

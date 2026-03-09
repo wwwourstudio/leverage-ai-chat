@@ -86,8 +86,17 @@ export async function POST(request: NextRequest) {
           // Try to find user by customer email
           const customerEmail = session.customer_details?.email ?? session.customer_email;
           if (customerEmail) {
+            // Resolve email → Supabase user_id so RLS (auth.uid() = user_id) works
+            const { data: listData } = await supabase.auth.admin
+              .listUsers({ perPage: 1000 })
+              .catch(() => ({ data: { users: [] } }));
+            const userId = (listData?.users ?? []).find(
+              (u: { email?: string; id: string }) => u.email === customerEmail
+            )?.id;
+
             await supabase.from('subscription_tiers').upsert(
               {
+                user_id: userId ?? null,
                 stripe_customer_id: customerId,
                 stripe_subscription_id: subscriptionId,
                 tier,
@@ -98,7 +107,7 @@ export async function POST(request: NextRequest) {
               },
               { onConflict: 'stripe_customer_id' }
             );
-            console.log(`[Stripe/Webhook] Subscription activated for ${customerEmail} — tier: ${tier}`);
+            console.log(`[Stripe/Webhook] Subscription activated for ${customerEmail} (user: ${userId ?? 'unknown'}) — tier: ${tier}`);
           }
         } else if (metadata.type === 'credits') {
           // One-time credit purchase — increment user_credits balance

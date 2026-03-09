@@ -253,7 +253,14 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (week) {
-      query = query.eq('week', parseInt(week, 10));
+      const weekNum = parseInt(week, 10);
+      if (!Number.isInteger(weekNum) || weekNum < 1) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid week parameter' },
+          { status: HTTP_STATUS.BAD_REQUEST }
+        );
+      }
+      query = query.eq('week', weekNum);
     }
 
     if (status) {

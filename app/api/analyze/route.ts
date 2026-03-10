@@ -454,20 +454,20 @@ export async function POST(request: NextRequest) {
       inputSchema: statcastParams,
       execute: async ({ player, playerType, limit }: z.infer<typeof statcastParams>) => {
         console.log('[API/analyze] Statcast tool called:', { player, playerType, limit });
-        const data = await getStatcastData();
-        if (data.length === 0) {
+        const { players: allPlayers, isLiveData, season } = await getStatcastData();
+        if (allPlayers.length === 0) {
           return {
             players: [],
             total_in_dataset: 0,
-            source: 'Baseball Savant 2025',
+            source: 'Baseball Savant',
             error: 'Statcast data temporarily unavailable. Use model knowledge for analysis.',
           };
         }
-        const results = queryStatcast(data, { player, playerType, limit });
+        const results = queryStatcast(allPlayers, { player, playerType, limit });
         return {
           players: results,
-          total_in_dataset: data.length,
-          source: 'Baseball Savant 2025 (real data)',
+          total_in_dataset: allPlayers.length,
+          source: isLiveData ? `Baseball Savant ${season} (real data)` : `Baseball Savant ${season} (cached fallback)`,
         };
       },
     });

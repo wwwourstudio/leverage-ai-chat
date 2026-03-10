@@ -51,7 +51,22 @@ export const API_ENDPOINTS = {
   USER_FILES: '/api/user/files',
   FEEDBACK: '/api/feedback',
   ALERTS_CHECK: '/api/alerts/check',
+  ALERTS: '/api/alerts',
+  ALERTS_SUGGEST: '/api/alerts/suggest',
+  SETTINGS: '/api/settings',
+  SETTINGS_SUGGEST: '/api/settings/suggest',
 } as const;
+
+// AI Prompt for settings-based personalization suggestions
+export const SETTINGS_SUGGEST_PROMPT = `You are a sports betting AI coach. Given a user's betting profile and stats, return a JSON array of 3-4 actionable personalization suggestions.
+
+User profile context: {CONTEXT}
+
+Return ONLY a valid JSON array with objects like:
+[{"id":"s1","icon":"📊","title":"Short title","description":"One sentence tip.","action":{"field":"risk_tolerance","value":"conservative"}}]
+The "action" key is optional — only include it when a specific setting should change.
+Valid action fields: risk_tolerance, tracked_sports (array), preferred_books (array), arbitrage_alerts (bool), odds_alerts (bool), line_movement_alerts (bool), bankroll (number).
+No prose, no markdown, just the JSON array.` as const;
 
 // External API Configuration
 export const EXTERNAL_APIS = {

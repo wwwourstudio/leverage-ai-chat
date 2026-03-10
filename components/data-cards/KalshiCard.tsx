@@ -363,9 +363,10 @@ export const KalshiCard = memo(function KalshiCard({
         {/* Market title */}
         <h3
           className={cn(
-            'font-black text-white leading-snug text-balance',
+            'font-black text-white leading-snug line-clamp-2',
             isHero ? 'text-base' : 'text-sm',
           )}
+          title={title}
         >
           {title}
         </h3>

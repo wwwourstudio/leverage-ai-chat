@@ -306,20 +306,19 @@ function IconRail({
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* User avatar — tappable on mobile to open profile lightbox */}
-      <div
-        className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 mb-1 cursor-pointer hover:ring-2 hover:ring-blue-400/50 active:scale-95 transition-all"
-        title={user?.name ?? 'Sign in'}
-        onClick={onUserClick}
-      >
-        {user ? (
-          user.avatar
+      {/* User avatar — only shown when logged in */}
+      {user && (
+        <div
+          className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 mb-1 cursor-pointer hover:ring-2 hover:ring-blue-400/50 active:scale-95 transition-all"
+          title={user.name}
+          onClick={onUserClick}
+        >
+          {user.avatar
             ? <img src={user.avatar} className="w-8 h-8 rounded-full object-cover" alt="" />
             : <span className="text-[11px] font-black text-white">{user.name[0]?.toUpperCase()}</span>
-        ) : (
-          <UserCircle className="w-5 h-5 text-white/70" />
-        )}
-      </div>
+          }
+        </div>
+      )}
     </div>
   );
 }

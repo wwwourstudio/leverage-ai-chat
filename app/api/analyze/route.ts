@@ -427,14 +427,20 @@ export async function POST(request: NextRequest) {
             players: [],
             total_players_in_dataset: 0,
             source,
+            is_static_fallback: true,
             error: 'ADP data is temporarily unavailable. Please try again shortly or consult nfc.shgn.com.',
           };
         }
+        // Live NFBC/NFFC boards typically have 300+ players. If we have ≤150, we are
+        // serving the 120-player static fallback (seeded directly or via Supabase after
+        // the live endpoint failed) — flag this so the AI warns the user.
+        const adpIsStatic = data.length <= 150;
         const results = queryADP(data, { player, position, rankMin, rankMax, limit, team, valueOnly });
         return {
           players: results,
           total_players_in_dataset: data.length,
           source,
+          is_static_fallback: adpIsStatic,
         };
       },
     });
@@ -616,7 +622,7 @@ export async function POST(request: NextRequest) {
                 ? 'from-green-600/80 via-emerald-700/60 to-green-900/40'
                 : 'from-cyan-600/80 via-teal-700/60 to-cyan-900/40',
               status: 'value',
-              realData: true,
+              realData: !tr.is_static_fallback,
               icon: isNFLResult ? '🏈' : '⚾',
               data: {
                 players: JSON.stringify(tr.players),

@@ -65,7 +65,7 @@ function currentMLBSeason(): number {
   return month >= 4 ? new Date().getFullYear() : new Date().getFullYear() - 1;
 }
 const SEASON = currentMLBSeason();
-const MIN_PA = 10; // minimum PA/BF to appear in leaderboard
+const MIN_PA = 100; // minimum PA/BF to appear in leaderboard (100 ≈ 1 month of regular playing time)
 const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
@@ -256,9 +256,10 @@ export function queryStatcast(players: StatcastPlayer[], params: StatcastQueryPa
 
   let results = players;
 
-  if (playerType) {
-    results = results.filter(p => p.playerType === playerType);
-  }
+  // Default to batters when no type specified — matches JSDoc contract and prevents
+  // pitchers (with xwOBA-against stats) from polluting batter leaderboards.
+  const effectiveType = playerType ?? 'batter';
+  results = results.filter(p => p.playerType === effectiveType);
 
   if (player) {
     const needle = player.trim().toLowerCase();

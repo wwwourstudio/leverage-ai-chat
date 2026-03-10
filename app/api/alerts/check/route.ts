@@ -34,17 +34,22 @@ export async function GET() {
 
   try {
     // Fetch active alerts scoped to the authenticated user
-    const { data: alerts, error: fetchError } = await supabase
+    // NOTE: PostgREST cannot compare two columns in .or(), so we filter by trigger limit in JS
+    const { data: allAlerts, error: fetchError } = await supabase
       .from('user_alerts')
       .select('id, user_id, alert_type, sport, team, player, condition, threshold, trigger_count, max_triggers, title')
       .eq('is_active', true)
-      .eq('user_id', user.id)
-      .or('max_triggers.is.null,trigger_count.lt.max_triggers');
+      .eq('user_id', user.id);
 
-    if (fetchError || !alerts) {
+    if (fetchError || !allAlerts) {
       console.error('[Alerts] Failed to fetch alerts:', fetchError);
       return NextResponse.json({ triggered: [] });
     }
+
+    // Filter out alerts that have already hit their max trigger count
+    const alerts = allAlerts.filter(a =>
+      a.max_triggers === null || a.trigger_count < a.max_triggers
+    );
 
     const triggered: { id: string; title: string }[] = [];
 

@@ -324,7 +324,9 @@ export async function POST(request: NextRequest) {
               seedProjectionsFromSupabase(fantSport as 'nfl' | 'mlb' | 'nba', season)
             );
           })
-          .catch(() => { /* hardcoded fallback used automatically */ });
+          .catch((err: unknown) => {
+            console.warn('[API/analyze] Projection seeding failed (fallback data in use):', err instanceof Error ? err.message : String(err));
+          });
       }
       cardPromise = import('@/lib/fantasy/cards/fantasy-card-generator')
         .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 3, context.sport ?? undefined, {

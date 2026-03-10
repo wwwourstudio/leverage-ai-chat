@@ -118,6 +118,10 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       console.error('[API/fantasy/draft/pick] Update error:', updateError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to advance draft' },
+        { status: HTTP_STATUS.INTERNAL_ERROR }
+      );
     }
 
     // Also add to roster
@@ -134,6 +138,10 @@ export async function POST(request: NextRequest) {
 
     if (rosterError) {
       console.error('[API/fantasy/draft/pick] Roster error:', rosterError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to update roster' },
+        { status: HTTP_STATUS.INTERNAL_ERROR }
+      );
     }
 
     return NextResponse.json({

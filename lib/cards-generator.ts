@@ -542,8 +542,10 @@ async function _generateContextualCards(
     
     for (let i = 0; i < orderedSports.length; i += BATCH_SIZE) {
       const collectedSoFar = allSportCards.reduce((sum, r) => sum + r.cards.filter(c => c.data?.realData).length, 0);
-      if (collectedSoFar >= count) {
-        console.log(`[v0] [MULTI-SPORT] Early exit: ${collectedSoFar} cards collected`);
+      const sportsWithData = allSportCards.filter(r => r.cards.some(c => c.data?.realData)).length;
+      const diversityTarget = Math.min(count, inSeasonSports.length);
+      if (collectedSoFar >= count && sportsWithData >= diversityTarget) {
+        console.log(`[v0] [MULTI-SPORT] Early exit: ${collectedSoFar} cards from ${sportsWithData} sports`);
         break;
       }
       
@@ -565,16 +567,23 @@ async function _generateContextualCards(
       console.log(`[v0] [MULTI-SPORT] Batch ${Math.floor(i / BATCH_SIZE) + 1} (${batch.map(s => apiToSport(s).toUpperCase()).join('/')}): ${batchCardCount} cards`);
     }
     
-    // Collect cards from sports that returned data
-    for (const { sport: sportKey, cards: sportCards } of allSportCards) {
-      if (cards.length >= count) break;
-      
-      if (sportCards.length > 0) {
-        const cardsNeeded = count - cards.length;
-        const cardsToAdd = sportCards.slice(0, cardsNeeded);
-        cards.push(...cardsToAdd);
-        console.log(`[v0] [MULTI-SPORT] Added ${cardsToAdd.length} ${apiToSport(sportKey).toUpperCase()} cards`);
+    // Round-robin selection: 1 card per sport per pass to ensure diversity
+    const sportsWithCards = allSportCards.filter(r => r.cards.length > 0);
+    const pointers = new Map<string, number>(sportsWithCards.map(r => [r.sport, 0]));
+
+    while (cards.length < count) {
+      let anyAdded = false;
+      for (const { sport: sportKey, cards: sportCards } of sportsWithCards) {
+        if (cards.length >= count) break;
+        const idx = pointers.get(sportKey)!;
+        if (idx < sportCards.length) {
+          cards.push(sportCards[idx]);
+          pointers.set(sportKey, idx + 1);
+          console.log(`[v0] [MULTI-SPORT] Added ${apiToSport(sportKey).toUpperCase()} card (slot ${cards.length})`);
+          anyAdded = true;
+        }
       }
+      if (!anyAdded) break; // All sport queues exhausted
     }
     
     // Try to add player props if we still need more cards

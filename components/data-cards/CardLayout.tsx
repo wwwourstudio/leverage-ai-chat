@@ -104,10 +104,10 @@ export const CardLayout = memo(function CardLayout({
       {suggestedCards.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-1.5 px-0.5">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-[oklch(0.38_0.01_280)]">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-blue-500/70">
               More Markets
             </p>
-            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[oklch(0.15_0.015_280)] text-[8px] font-black text-[oklch(0.50_0.01_280)]">
+            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-900/60 text-[8px] font-black text-blue-400/80">
               {suggestedCards.length}
             </span>
           </div>

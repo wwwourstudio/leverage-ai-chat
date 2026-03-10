@@ -97,7 +97,7 @@ function MiniTeamLogo({ name, sport }: { name: string; sport?: string }) {
     );
   }
   return (
-    <div className="w-5 h-5 rounded-md bg-[oklch(0.18_0.015_280)] flex items-center justify-center shrink-0 text-[7px] font-black text-[oklch(0.55_0.015_280)]">
+    <div className="w-5 h-5 rounded-md bg-[oklch(0.14_0.06_240)] flex items-center justify-center shrink-0 text-[7px] font-black text-[oklch(0.55_0.12_240)]">
       {abbr}
     </div>
   );
@@ -106,7 +106,7 @@ function MiniTeamLogo({ name, sport }: { name: string; sport?: string }) {
 /** Mini probability bar for Kalshi subcards */
 function MiniProbBar({ yesPct }: { yesPct: number }) {
   return (
-    <div className="h-1 rounded-full overflow-hidden bg-[oklch(0.16_0.01_280)] mt-1">
+    <div className="h-1 rounded-full overflow-hidden bg-[oklch(0.14_0.05_240)] mt-1">
       <div
         className="h-full rounded-full"
         style={{
@@ -141,17 +141,17 @@ export const CompactCard = memo(function CompactCard({ card, index, isActive, on
       onClick={onClick}
       className={cn(
         'group relative flex flex-col gap-2 p-3 rounded-xl border text-left transition-all duration-200 w-full hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50',
-        'bg-[#0f0f11] hover:bg-[oklch(0.14_0.014_280)]',
+        'bg-[oklch(0.09_0.03_240)] hover:bg-[oklch(0.13_0.04_240)]',
         isActive
-          ? 'border-[#00c47c40] shadow-[0_0_16px_#00c47c18]'
-          : 'border-[oklch(0.18_0.014_280)] hover:border-[oklch(0.26_0.018_280)] hover:shadow-[0_2px_16px_oklch(0.3_0.08_240/0.10)]',
+          ? 'border-blue-500/50 shadow-[0_0_16px_oklch(0.55_0.2_240/0.25)]'
+          : 'border-[oklch(0.20_0.06_240)] hover:border-blue-500/40 hover:shadow-[0_2px_20px_oklch(0.55_0.2_240/0.18)]',
       )}
       aria-pressed={isActive}
       title={card.title}
     >
       {/* Active indicator — Kalshi teal left bar */}
       {isActive && (
-        <div className="absolute left-0 top-2.5 bottom-2.5 w-[2px] rounded-full bg-[#00c47c]" />
+        <div className="absolute left-0 top-2.5 bottom-2.5 w-[2px] rounded-full bg-blue-400" />
       )}
 
       {/* Top row: icon/logos + key stat */}
@@ -166,11 +166,11 @@ export const CompactCard = memo(function CompactCard({ card, index, isActive, on
         ) : (
           <div className={cn(
             'flex items-center justify-center w-6 h-6 rounded-md shrink-0',
-            isKalshi ? 'bg-[#00c47c15] border border-[#00c47c25]' : 'bg-[oklch(0.14_0.018_280)] border border-[oklch(0.20_0.018_280)]',
+            isKalshi ? 'bg-[#00c47c15] border border-[#00c47c25]' : 'bg-[oklch(0.14_0.06_240)] border border-[oklch(0.24_0.08_240)]',
           )}>
             <Icon
               className="w-3 h-3"
-              style={{ color: isKalshi ? YES_COLOR : 'oklch(0.55 0.015 280)' }}
+              style={{ color: isKalshi ? YES_COLOR : 'oklch(0.60 0.15 240)' }}
               aria-hidden="true"
             />
           </div>
@@ -192,7 +192,7 @@ export const CompactCard = memo(function CompactCard({ card, index, isActive, on
       </div>
 
       {/* Title */}
-      <p className="text-[11px] font-semibold text-[oklch(0.78_0.005_280)] leading-tight line-clamp-2 text-balance">
+      <p className="text-[11px] font-semibold text-[oklch(0.82_0.008_240)] leading-tight line-clamp-2 text-balance">
         {card.title}
       </p>
 
@@ -200,7 +200,7 @@ export const CompactCard = memo(function CompactCard({ card, index, isActive, on
       {yesPct !== null && <MiniProbBar yesPct={yesPct} />}
 
       {/* Category label */}
-      <span className="text-[9px] font-bold uppercase tracking-wider text-[oklch(0.35_0.01_280)] truncate">
+      <span className="text-[9px] font-bold uppercase tracking-wider text-[oklch(0.45_0.08_240)] truncate">
         {displayCategory}
       </span>
     </button>

@@ -430,9 +430,11 @@ export async function loadADPFromSupabase(sport = 'mlb', allowStale = false): Pr
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 
-// NFBC distributes ADP as tab-separated (.tsv) files, not CSV.
-// Tried in sequence; first successful TSV response wins.
+// NFBC distributes ADP as tab-separated (.tsv) or CSV files.
+// ?download=1 matches the Download button on nfc.shgn.com/adp/baseball (mirrors football).
+// Remaining entries are fallback guesses; tried in sequence, first non-HTML response wins.
 const NFBC_ADP_URLS: string[] = [
+  'https://nfc.shgn.com/adp/baseball?download=1',
   'https://nfc.shgn.com/adp/baseball?export=tsv',
   'https://nfc.shgn.com/adp/baseball?format=tsv',
   'https://nfc.shgn.com/adp/baseball?download=tsv',

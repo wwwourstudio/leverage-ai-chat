@@ -373,7 +373,16 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       localStorage.setItem('userCredits', JSON.stringify(initial));
       return initial;
     }
-    const parsed = JSON.parse(data);
+    let parsed: { credits: number; resetTime: number };
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      // Corrupted localStorage — reset to defaults
+      localStorage.removeItem('userCredits');
+      const initial = { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
+      localStorage.setItem('userCredits', JSON.stringify(initial));
+      return initial;
+    }
     if (Date.now() > parsed.resetTime) {
       const reset = { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
       localStorage.setItem('userCredits', JSON.stringify(reset));
@@ -476,7 +485,16 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       localStorage.setItem('chatRateLimit', JSON.stringify(initial));
       return initial;
     }
-    const parsed = JSON.parse(data);
+    let parsed: { count: number; resetTime: number };
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      // Corrupted localStorage — reset to defaults
+      localStorage.removeItem('chatRateLimit');
+      const initial = { count: 0, resetTime: Date.now() + LIMIT_DURATION };
+      localStorage.setItem('chatRateLimit', JSON.stringify(initial));
+      return initial;
+    }
     if (Date.now() > parsed.resetTime) {
       const reset = { count: 0, resetTime: Date.now() + LIMIT_DURATION };
       localStorage.setItem('chatRateLimit', JSON.stringify(reset));

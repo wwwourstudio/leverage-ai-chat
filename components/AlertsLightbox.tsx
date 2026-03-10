@@ -1,10 +1,15 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { X, Bell, Plus, Trash2, AlertTriangle, TrendingUp, Target, Activity, Zap, Loader2, CheckCircle, ToggleLeft, ToggleRight } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  X, Bell, Plus, Trash2, TrendingUp, Target, Activity, Zap,
+  Loader2, CheckCircle, ToggleLeft, ToggleRight, Sparkles,
+  RotateCcw, Filter, AlertCircle, Clock, ChevronRight,
+} from 'lucide-react';
 import { useToast } from '@/components/toast-provider';
 import { SPORT_KEYS } from '@/lib/constants';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AlertsLightboxProps {
   isOpen: boolean;
@@ -19,11 +24,11 @@ interface UserAlert {
   sport: string | null;
   team: string | null;
   player: string | null;
-  condition: Record<string, any>;
+  condition: Record<string, unknown>;
   threshold: number | null;
   is_active: boolean;
   trigger_count: number;
-  max_triggers: number;
+  max_triggers: number | null;
   last_triggered_at: string | null;
   title: string;
   description: string | null;
@@ -31,16 +36,36 @@ interface UserAlert {
   updated_at: string | null;
 }
 
+interface AiSuggestion {
+  title: string;
+  alert_type: string;
+  threshold: number | null;
+  description: string | null;
+  sport: string | null;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const ALERT_TYPES = [
-  { value: 'odds_change', label: 'Odds Change', icon: TrendingUp, color: 'text-orange-400' },
-  { value: 'line_movement', label: 'Line Movement', icon: Activity, color: 'text-blue-400' },
-  { value: 'player_prop', label: 'Player Prop', icon: Target, color: 'text-green-400' },
-  { value: 'arbitrage', label: 'Arbitrage', icon: Zap, color: 'text-yellow-400' },
-  { value: 'kalshi_price', label: 'Kalshi Price', icon: TrendingUp, color: 'text-purple-400' },
-  { value: 'game_start', label: 'Game Start', icon: Bell, color: 'text-cyan-400' },
-];
+  { value: 'odds_change',    label: 'Odds Change',    icon: TrendingUp, color: 'text-orange-400', bg: 'bg-orange-500/15', border: 'border-orange-500/30' },
+  { value: 'line_movement',  label: 'Line Movement',  icon: Activity,   color: 'text-blue-400',   bg: 'bg-blue-500/15',   border: 'border-blue-500/30'   },
+  { value: 'player_prop',    label: 'Player Prop',    icon: Target,     color: 'text-green-400',  bg: 'bg-green-500/15',  border: 'border-green-500/30'  },
+  { value: 'arbitrage',      label: 'Arbitrage',      icon: Zap,        color: 'text-yellow-400', bg: 'bg-yellow-500/15', border: 'border-yellow-500/30' },
+  { value: 'kalshi_price',   label: 'Kalshi Price',   icon: TrendingUp, color: 'text-purple-400', bg: 'bg-purple-500/15', border: 'border-purple-500/30' },
+  { value: 'game_start',     label: 'Game Start',     icon: Bell,       color: 'text-cyan-400',   bg: 'bg-cyan-500/15',   border: 'border-cyan-500/30'   },
+] as const;
 
 const SPORTS = Object.values(SPORT_KEYS).map(s => s.NAME);
+
+const MAX_TRIGGERS_OPTIONS = [
+  { value: '1',    label: '1×' },
+  { value: '3',    label: '3×' },
+  { value: '5',    label: '5×' },
+  { value: '10',   label: '10×' },
+  { value: 'null', label: '∞ Unlimited' },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatRelativeTime(isoString: string): string {
   const diff = Date.now() - new Date(isoString).getTime();
@@ -52,17 +77,44 @@ function formatRelativeTime(isoString: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+function getThresholdLabel(alertType: string): string | null {
+  switch (alertType) {
+    case 'line_movement':
+    case 'odds_change':    return 'Min movement (pts)';
+    case 'arbitrage':      return 'Min ROI %';
+    case 'kalshi_price':   return 'Price threshold (0–100)';
+    default:               return null;
+  }
+}
+
+function getAlertPreview(form: {
+  alert_type: string; sport: string; team: string; player: string; threshold: string;
+}): string {
+  const type = ALERT_TYPES.find(t => t.value === form.alert_type);
+  const typeName = type?.label ?? form.alert_type;
+  const context = [form.sport, form.team, form.player].filter(Boolean).join(' · ');
+  const thresh = form.threshold ? ` ≥ ${form.threshold}` : '';
+  return `Fire when ${typeName}${thresh} is detected${context ? ` for ${context}` : ''}`;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsLightboxProps) {
   const toast = useToast();
+
+  // Tab + filter state
+  const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
+  const [filterType, setFilterType] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'paused'>('all');
+
+  // Data state
   const [alerts, setAlerts] = useState<UserAlert[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [authUserId, setAuthUserId] = useState<string | null>(null);
-  const [authReady, setAuthReady] = useState(false);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
-  // New alert form state
+  // Create form state
+  const [saving, setSaving] = useState(false);
   const [newAlert, setNewAlert] = useState({
     alert_type: 'odds_change',
     sport: '',
@@ -74,400 +126,779 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
     max_triggers: '1',
   });
 
-  // Wait for auth to initialize before loading alerts
+  // AI suggestion state
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
+
+  // Inline action state
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [resettingId, setResettingId] = useState<string | null>(null);
+
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Auth check ──────────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!isOpen) return;
-    
-    const initAuth = async () => {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        setAuthUserId(session.user.id);
-        setAuthReady(true);
-      } else {
-        setAuthReady(true);
-        setLoading(false);
+
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/alerts');
+        setIsAuthenticated(res.status !== 401);
+      } catch {
+        setIsAuthenticated(false);
       }
+      setAuthChecked(true);
     };
 
-    initAuth();
+    checkAuth();
   }, [isOpen]);
 
-  // Load alerts only after auth is ready
-  useEffect(() => {
-    if (authReady && authUserId) {
-      loadAlerts();
-    }
-  }, [authReady, authUserId]);
+  // ── Load alerts ─────────────────────────────────────────────────────────────
 
-  // Poll /api/alerts/check every 60 s; fire toasts for newly triggered alerts
+  const loadAlerts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/alerts');
+      if (!res.ok) {
+        if (res.status === 401) setIsAuthenticated(false);
+        setAlerts([]);
+        onAlertsCountChange?.(0);
+        return;
+      }
+      const json = await res.json();
+      const data: UserAlert[] = json.data ?? [];
+      setAlerts(data);
+      onAlertsCountChange?.(data.filter(a => a.is_active).length);
+    } catch (err) {
+      console.error('[Alerts] Failed to load:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [onAlertsCountChange]);
+
   useEffect(() => {
-    if (!authUserId || !isOpen) return;
+    if (authChecked && isAuthenticated) {
+      loadAlerts();
+    } else if (authChecked && !isAuthenticated) {
+      setLoading(false);
+    }
+  }, [authChecked, isAuthenticated, loadAlerts]);
+
+  // ── Polling ─────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!isAuthenticated || !isOpen) return;
 
     const checkAlerts = async () => {
       try {
         const res = await fetch('/api/alerts/check');
         if (!res.ok) return;
         const data = await res.json();
-        if (data.triggered && Array.isArray(data.triggered)) {
-          for (const alert of data.triggered as { title: string }[]) {
-            toast.success(`Alert fired: ${alert.title}`);
+        if (data.triggered?.length > 0) {
+          for (const a of data.triggered as { title: string }[]) {
+            toast.success(`Alert fired: ${a.title}`);
           }
-          if (data.triggered.length > 0) {
-            await loadAlerts(); // refresh counts
-          }
+          await loadAlerts();
         }
       } catch {
-        // silent — polling failures are non-fatal
+        // non-fatal
       }
     };
 
     pollingRef.current = setInterval(checkAlerts, 60_000);
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
-  }, [authUserId, isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+  }, [isAuthenticated, isOpen, loadAlerts, toast]);
 
-  const loadAlerts = async () => {
-    if (!authUserId) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const supabase = createClient();
-
-      // Load alerts from user_alerts table (RLS uses auth.uid())
-      const { data: alertsData, error: alertsError } = await supabase
-        .from('user_alerts')
-        .select('*')
-        .eq('user_id', authUserId)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (alertsError) {
-        // Suppress missing-table errors (schema not migrated yet)
-        const isMissingTable = alertsError.message?.toLowerCase().includes('does not exist')
-          || (alertsError as any).code === '42P01'
-          || (alertsError as any).code === 'PGRST200';
-        // Suppress RLS 403: user_alerts policy not yet applied in Supabase dashboard
-        const isRLSDenied = (alertsError as any).code === '42501'
-          || alertsError.message?.toLowerCase().includes('permission denied')
-          || (alertsError as any).status === 403;
-        if (!isMissingTable && !isRLSDenied) {
-          console.error('[Alerts] Failed to load alerts:', alertsError);
-        }
-      }
-
-      setAlerts(alertsData || []);
-      onAlertsCountChange?.(alertsData?.length ?? 0);
-    } catch (err) {
-      console.error('[Alerts] Failed to load:', err);
-    }
-    setLoading(false);
-  };
+  // ── CRUD handlers ────────────────────────────────────────────────────────────
 
   const handleCreateAlert = async () => {
-    if (!authUserId || !newAlert.title) return;
+    if (!newAlert.title.trim()) return;
     setSaving(true);
     try {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from('user_alerts')
-        .insert({
-          user_id: authUserId,
+      const res = await fetch('/api/alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newAlert.title.trim(),
           alert_type: newAlert.alert_type,
           sport: newAlert.sport || null,
           team: newAlert.team || null,
           player: newAlert.player || null,
-          title: newAlert.title,
           description: newAlert.description || null,
           threshold: newAlert.threshold ? parseFloat(newAlert.threshold) : null,
-          max_triggers: parseInt(newAlert.max_triggers) || 1,
-          condition: {
-            marketType: newAlert.alert_type,
-            threshold: newAlert.threshold ? parseFloat(newAlert.threshold) : null,
-          },
-          is_active: true,
-        });
+          max_triggers: newAlert.max_triggers === 'null' ? null : parseInt(newAlert.max_triggers) || 1,
+        }),
+      });
 
-      if (error) {
-        console.error('[Alerts] Failed to create alert:', error);
-      } else {
-        setShowCreateForm(false);
-        setNewAlert({
-          alert_type: 'odds_change',
-          sport: '',
-          team: '',
-          player: '',
-          title: '',
-          description: '',
-          threshold: '',
-          max_triggers: '1',
-        });
+      if (res.ok) {
         toast.success('Alert created');
+        setNewAlert({ alert_type: 'odds_change', sport: '', team: '', player: '', title: '', description: '', threshold: '', max_triggers: '1' });
+        setAiSuggestion(null);
+        setActiveTab('list');
         await loadAlerts();
+      } else {
+        const json = await res.json();
+        toast.error(json.error ?? 'Failed to create alert');
       }
     } catch (err) {
-      console.error('[Alerts] Failed to create:', err);
+      console.error('[Alerts] Create failed:', err);
+      toast.error('Failed to create alert');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const toggleAlert = async (alertId: string, isActive: boolean) => {
+    // Optimistic update
+    setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, is_active: !isActive } : a));
     try {
-      const supabase = createClient();
-      await supabase
-        .from('user_alerts')
-        .update({ is_active: !isActive, updated_at: new Date().toISOString() })
-        .eq('id', alertId);
-      setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, is_active: !isActive } : a));
-    } catch (err) {
-      console.error('[Alerts] Toggle failed:', err);
+      const res = await fetch(`/api/alerts/${alertId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: !isActive }),
+      });
+      if (!res.ok) {
+        // revert
+        setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, is_active: isActive } : a));
+        toast.error('Failed to update alert');
+      } else {
+        onAlertsCountChange?.(alerts.filter(a => a.id === alertId ? !isActive : a.is_active).length);
+      }
+    } catch {
+      setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, is_active: isActive } : a));
     }
   };
 
   const deleteAlert = async (alertId: string) => {
+    setDeletingId(alertId);
     try {
-      const supabase = createClient();
-      await supabase.from('user_alerts').delete().eq('id', alertId);
-      setAlerts(prev => prev.filter(a => a.id !== alertId));
-    } catch (err) {
-      console.error('[Alerts] Delete failed:', err);
+      const res = await fetch(`/api/alerts/${alertId}`, { method: 'DELETE' });
+      if (res.ok) {
+        const updated = alerts.filter(a => a.id !== alertId);
+        setAlerts(updated);
+        onAlertsCountChange?.(updated.filter(a => a.is_active).length);
+        toast.success('Alert deleted');
+      } else {
+        toast.error('Failed to delete alert');
+      }
+    } catch {
+      toast.error('Failed to delete alert');
+    } finally {
+      setDeletingId(null);
     }
   };
 
+  const resetTriggerCount = async (alertId: string) => {
+    setResettingId(alertId);
+    try {
+      const res = await fetch(`/api/alerts/${alertId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trigger_count: 0 }),
+      });
+      if (res.ok) {
+        setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, trigger_count: 0, last_triggered_at: null } : a));
+        toast.success('Trigger count reset');
+      } else {
+        toast.error('Failed to reset');
+      }
+    } catch {
+      toast.error('Failed to reset');
+    } finally {
+      setResettingId(null);
+    }
+  };
+
+  // ── AI Suggestions ──────────────────────────────────────────────────────────
+
+  const fetchAiSuggestion = async () => {
+    if (newAlert.title.trim().length < 3) return;
+    setAiLoading(true);
+    setAiSuggestion(null);
+    try {
+      const res = await fetch('/api/alerts/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input: newAlert.title,
+          alert_type: newAlert.alert_type || undefined,
+          sport: newAlert.sport || undefined,
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setAiSuggestion(json.suggestion);
+      } else {
+        toast.error('AI suggestion unavailable');
+      }
+    } catch {
+      toast.error('AI suggestion failed');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const applySuggestion = (suggestion: AiSuggestion) => {
+    setNewAlert(prev => ({
+      ...prev,
+      title: suggestion.title || prev.title,
+      alert_type: suggestion.alert_type || prev.alert_type,
+      threshold: suggestion.threshold != null ? String(suggestion.threshold) : prev.threshold,
+      description: suggestion.description || prev.description,
+      sport: suggestion.sport || prev.sport,
+    }));
+    setAiSuggestion(null);
+    toast.success('Suggestion applied');
+  };
+
+  // ── Derived state ────────────────────────────────────────────────────────────
+
+  const filteredAlerts = alerts.filter(a => {
+    if (filterType && a.alert_type !== filterType) return false;
+    if (filterStatus === 'active' && !a.is_active) return false;
+    if (filterStatus === 'paused' && a.is_active) return false;
+    return true;
+  });
+
+  const activeCount = alerts.filter(a => a.is_active).length;
+  const triggeredCount = alerts.filter(a => a.trigger_count > 0).length;
+
+  const getTypeInfo = (type: string) => ALERT_TYPES.find(t => t.value === type) ?? ALERT_TYPES[0];
+  const thresholdLabel = getThresholdLabel(newAlert.alert_type);
+
   if (!isOpen) return null;
 
-  const getAlertTypeInfo = (type: string) => ALERT_TYPES.find(t => t.value === type) || ALERT_TYPES[0];
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm animate-backdrop-in" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/70 backdrop-blur-sm animate-backdrop-in"
+      onClick={onClose}
+    >
       <div
-        className="relative w-full md:max-w-2xl max-h-[90vh] md:max-h-[85vh] md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slide-up md:animate-scale-in"
-        onClick={(e) => e.stopPropagation()}
+        className="relative w-full md:max-w-2xl max-h-[92vh] md:max-h-[88vh] md:mx-4 rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slide-up md:animate-scale-in"
+        style={{ background: 'oklch(0.12 0.015 280)', border: '1px solid oklch(0.22 0.02 280)' }}
+        onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-800">
+
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-4" style={{ borderBottom: '1px solid oklch(0.20 0.02 280)' }}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg">
               <Bell className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Alerts</h2>
-              <p className="text-xs text-gray-500">{alerts.filter(a => a.is_active).length} active alerts</p>
+              <h2 className="text-lg font-bold text-white leading-tight">Alerts</h2>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[11px] text-gray-500">{alerts.length} total</span>
+                {activeCount > 0 && (
+                  <>
+                    <span className="text-gray-700">·</span>
+                    <span className="text-[11px] text-green-400">{activeCount} active</span>
+                  </>
+                )}
+                {triggeredCount > 0 && (
+                  <>
+                    <span className="text-gray-700">·</span>
+                    <span className="text-[11px] text-yellow-400">{triggeredCount} triggered</span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
+
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowCreateForm(!showCreateForm)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              New Alert
-            </button>
+            {/* Tab toggle */}
+            <div className="flex items-center rounded-lg p-0.5" style={{ background: 'oklch(0.18 0.015 280)' }}>
+              <button
+                onClick={() => setActiveTab('list')}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  activeTab === 'list'
+                    ? 'bg-white/10 text-white'
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                My Alerts
+              </button>
+              <button
+                onClick={() => setActiveTab('create')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  activeTab === 'create'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                New Alert
+              </button>
+            </div>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+              className="p-2 rounded-lg text-gray-500 hover:text-gray-300 transition-colors"
+              style={{ background: 'oklch(0.18 0.015 280)' }}
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {/* Create Form */}
-          {showCreateForm && (
-            <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 space-y-4">
-              <h3 className="text-sm font-bold text-white">Create New Alert</h3>
+        {/* ── Content ── */}
+        <div className="flex-1 overflow-y-auto">
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-400 mb-2">Alert Type</label>
-                <div className="flex flex-wrap gap-2">
-                  {ALERT_TYPES.map(type => (
+          {/* ── My Alerts Tab ── */}
+          {activeTab === 'list' && (
+            <div className="p-5 space-y-4">
+
+              {/* Filter bar */}
+              {alerts.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Filter className="w-3.5 h-3.5 text-gray-600 shrink-0" />
+                  {/* Type filters */}
+                  {ALERT_TYPES.map(type => {
+                    const TypeIcon = type.icon;
+                    const active = filterType === type.value;
+                    return (
+                      <button
+                        key={type.value}
+                        onClick={() => setFilterType(active ? null : type.value)}
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                          active ? `${type.bg} ${type.color} border ${type.border}` : 'text-gray-500 hover:text-gray-300'
+                        }`}
+                        style={active ? {} : { background: 'oklch(0.17 0.015 280)' }}
+                      >
+                        <TypeIcon className="w-3 h-3" />
+                        {type.label}
+                      </button>
+                    );
+                  })}
+                  {/* Divider */}
+                  <span className="w-px h-4 bg-gray-800" />
+                  {/* Status filter */}
+                  {(['all', 'active', 'paused'] as const).map(s => (
                     <button
-                      key={type.value}
-                      onClick={() => setNewAlert(prev => ({ ...prev, alert_type: type.value }))}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                        newAlert.alert_type === type.value
-                          ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                          : 'bg-gray-800 text-gray-400 border border-gray-700'
+                      key={s}
+                      onClick={() => setFilterStatus(s)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold capitalize transition-all ${
+                        filterStatus === s
+                          ? s === 'active' ? 'bg-green-500/15 text-green-400 border border-green-500/30'
+                            : s === 'paused' ? 'bg-gray-500/15 text-gray-400 border border-gray-500/30'
+                            : 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                          : 'text-gray-500 hover:text-gray-300'
                       }`}
+                      style={filterStatus !== s ? { background: 'oklch(0.17 0.015 280)' } : {}}
                     >
-                      <type.icon className="w-3 h-3" />
-                      {type.label}
+                      {s}
                     </button>
                   ))}
                 </div>
-              </div>
+              )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 mb-1">Title</label>
-                  <input
-                    type="text"
-                    value={newAlert.title}
-                    onChange={(e) => setNewAlert(prev => ({ ...prev, title: e.target.value }))}
-                    placeholder="e.g., Lakers spread alert"
-                    className="w-full px-3 py-2 bg-gray-950 border border-gray-800 rounded-lg text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500/50 transition-all"
-                  />
+              {/* Loading */}
+              {(!authChecked || loading) ? (
+                <div className="flex flex-col items-center justify-center h-52 gap-3">
+                  <Loader2 className="w-7 h-7 text-blue-400 animate-spin" />
+                  <p className="text-sm text-gray-500">{!authChecked ? 'Initializing...' : 'Loading alerts...'}</p>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 mb-1">Sport</label>
-                  <select
-                    value={newAlert.sport}
-                    onChange={(e) => setNewAlert(prev => ({ ...prev, sport: e.target.value }))}
-                    className="w-full px-3 py-2 bg-gray-950 border border-gray-800 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500/50 transition-all"
-                  >
-                    <option value="">Any sport</option>
-                    {SPORTS.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 mb-1">Team (optional)</label>
-                  <input
-                    type="text"
-                    value={newAlert.team}
-                    onChange={(e) => setNewAlert(prev => ({ ...prev, team: e.target.value }))}
-                    placeholder="e.g., Lakers"
-                    className="w-full px-3 py-2 bg-gray-950 border border-gray-800 rounded-lg text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500/50 transition-all"
-                  />
+              ) : !isAuthenticated ? (
+                <div className="flex flex-col items-center justify-center h-52 text-center gap-3">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'oklch(0.17 0.015 280)' }}>
+                    <Bell className="w-7 h-7 text-gray-600" />
+                  </div>
+                  <div>
+                    <p className="text-gray-300 font-semibold">Sign in to use alerts</p>
+                    <p className="text-xs text-gray-600 mt-1">Get notified about odds changes, line movement, and more</p>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 mb-1">Player (optional)</label>
-                  <input
-                    type="text"
-                    value={newAlert.player}
-                    onChange={(e) => setNewAlert(prev => ({ ...prev, player: e.target.value }))}
-                    placeholder="e.g., LeBron James"
-                    className="w-full px-3 py-2 bg-gray-950 border border-gray-800 rounded-lg text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500/50 transition-all"
-                  />
+
+              ) : filteredAlerts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-52 text-center gap-3">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'oklch(0.17 0.015 280)' }}>
+                    <Bell className="w-7 h-7 text-gray-600" />
+                  </div>
+                  <div>
+                    <p className="text-gray-300 font-semibold">
+                      {alerts.length > 0 ? 'No alerts match your filters' : 'No alerts yet'}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      {alerts.length > 0
+                        ? 'Try clearing the filters above'
+                        : 'Create your first alert to stay ahead of the market'}
+                    </p>
+                  </div>
+                  {alerts.length === 0 && (
+                    <button
+                      onClick={() => setActiveTab('create')}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all mt-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Create First Alert
+                    </button>
+                  )}
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-400 mb-1">Description (optional)</label>
-                <input
-                  type="text"
-                  value={newAlert.description}
-                  onChange={(e) => setNewAlert(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Additional notes about this alert"
-                  className="w-full px-3 py-2 bg-gray-950 border border-gray-800 rounded-lg text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500/50 transition-all"
-                />
-              </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {filteredAlerts.map(alert => {
+                    const typeInfo = getTypeInfo(alert.alert_type);
+                    const TypeIcon = typeInfo.icon;
+                    const isDeleting = deletingId === alert.id;
+                    const isResetting = resettingId === alert.id;
+                    const hasMaxTriggers = alert.max_triggers != null && alert.max_triggers > 0;
+                    const triggerProgress = hasMaxTriggers ? (alert.trigger_count / (alert.max_triggers!)) : null;
 
-              <div className="flex gap-3">
-                <button
-                  onClick={handleCreateAlert}
-                  disabled={saving || !newAlert.title}
-                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-800 disabled:text-gray-600 text-white text-sm font-bold transition-all"
-                >
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                  {saving ? 'Creating...' : 'Create Alert'}
-                </button>
-                <button
-                  onClick={() => setShowCreateForm(false)}
-                  className="px-5 py-2 rounded-xl border border-gray-700 text-gray-400 hover:text-gray-300 text-sm font-semibold transition-all"
-                >
-                  Cancel
-                </button>
-              </div>
+                    return (
+                      <div
+                        key={alert.id}
+                        className={`rounded-xl p-4 transition-all ${
+                          alert.is_active ? 'opacity-100' : 'opacity-55'
+                        }`}
+                        style={{ background: 'oklch(0.16 0.015 280)', border: `1px solid oklch(${alert.is_active ? '0.24' : '0.19'} 0.02 280)` }}
+                      >
+                        <div className="flex items-start gap-3">
+                          {/* Icon */}
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${typeInfo.bg}`}>
+                            <TypeIcon className={`w-4 h-4 ${typeInfo.color}`} />
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-bold text-white">{alert.title}</p>
+                              {/* Status badge */}
+                              {alert.is_active ? (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-500/15 text-green-400">Active</span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-500/20 text-gray-500">Paused</span>
+                              )}
+                              {alert.trigger_count > 0 && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-yellow-500/15 text-yellow-400">
+                                  {alert.trigger_count}× triggered
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Meta row */}
+                            <p className="text-xs text-gray-500 mt-0.5 truncate">
+                              {typeInfo.label}
+                              {alert.sport && ` · ${alert.sport}`}
+                              {alert.team && ` · ${alert.team}`}
+                              {alert.player && ` · ${alert.player}`}
+                              {alert.description && ` — ${alert.description}`}
+                            </p>
+
+                            {/* Trigger progress */}
+                            {triggerProgress !== null && (
+                              <div className="mt-2 flex items-center gap-2">
+                                <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: 'oklch(0.22 0.02 280)' }}>
+                                  <div
+                                    className={`h-full rounded-full transition-all ${triggerProgress >= 1 ? 'bg-yellow-500' : 'bg-blue-500'}`}
+                                    style={{ width: `${Math.min(triggerProgress * 100, 100)}%` }}
+                                  />
+                                </div>
+                                <span className="text-[10px] text-gray-600 shrink-0">
+                                  {alert.trigger_count}/{alert.max_triggers}
+                                </span>
+                              </div>
+                            )}
+                            {!hasMaxTriggers && alert.trigger_count > 0 && (
+                              <p className="text-[10px] text-gray-600 mt-1">∞ unlimited triggers</p>
+                            )}
+
+                            {/* Timestamps */}
+                            <div className="flex items-center gap-3 mt-1.5">
+                              <p className="text-[10px] text-gray-700">
+                                Created {new Date(alert.created_at).toLocaleDateString()}
+                              </p>
+                              {alert.last_triggered_at && (
+                                <p className="flex items-center gap-1 text-[10px] text-gray-600">
+                                  <Clock className="w-2.5 h-2.5" />
+                                  Last fired {formatRelativeTime(alert.last_triggered_at)}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {/* Reset trigger count */}
+                            {alert.trigger_count > 0 && (
+                              <button
+                                onClick={() => resetTriggerCount(alert.id)}
+                                disabled={isResetting}
+                                className="p-1.5 rounded-lg text-gray-600 hover:text-blue-400 transition-colors"
+                                style={{ background: 'oklch(0.19 0.015 280)' }}
+                                title="Reset trigger count"
+                              >
+                                {isResetting
+                                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  : <RotateCcw className="w-3.5 h-3.5" />
+                                }
+                              </button>
+                            )}
+                            {/* Toggle */}
+                            <button
+                              onClick={() => toggleAlert(alert.id, alert.is_active)}
+                              className="p-1.5 rounded-lg transition-colors"
+                              style={{ background: 'oklch(0.19 0.015 280)' }}
+                              title={alert.is_active ? 'Pause alert' : 'Activate alert'}
+                            >
+                              {alert.is_active
+                                ? <ToggleRight className="w-5 h-5 text-blue-400" />
+                                : <ToggleLeft className="w-5 h-5 text-gray-600" />
+                              }
+                            </button>
+                            {/* Delete */}
+                            <button
+                              onClick={() => deleteAlert(alert.id)}
+                              disabled={isDeleting}
+                              className="p-1.5 rounded-lg text-gray-600 hover:text-red-400 transition-colors"
+                              style={{ background: 'oklch(0.19 0.015 280)' }}
+                              title="Delete alert"
+                            >
+                              {isDeleting
+                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                : <Trash2 className="w-3.5 h-3.5" />
+                              }
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
-          {/* Loading */}
-          {!authReady || loading ? (
-            <div className="flex flex-col items-center justify-center h-48 gap-3">
-              <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
-              <p className="text-sm text-gray-500">
-                {!authReady ? 'Initializing...' : 'Loading alerts...'}
-              </p>
-            </div>
-          ) : !authUserId ? (
-            /* Not logged in */
-            <div className="flex flex-col items-center justify-center h-48 text-center">
-              <Bell className="w-12 h-12 text-gray-700 mb-3" />
-              <p className="text-gray-400 font-semibold">Sign in to create alerts</p>
-              <p className="text-xs text-gray-600 mt-1">Get notified about odds changes, line movement, and more</p>
-            </div>
-          ) : alerts.length === 0 ? (
-            /* Empty State */
-            <div className="flex flex-col items-center justify-center h-48 text-center">
-              <Bell className="w-12 h-12 text-gray-700 mb-3" />
-              <p className="text-gray-400 font-semibold">No alerts yet</p>
-              <p className="text-xs text-gray-600 mt-1">Create your first alert to get notified about odds changes, line movement, and more</p>
-            </div>
-          ) : (
-            /* Alert List */
-            alerts.map(alert => {
-              const typeInfo = getAlertTypeInfo(alert.alert_type);
-              const TypeIcon = typeInfo.icon;
-              return (
-                <div
-                  key={alert.id}
-                  className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${
-                    alert.is_active
-                      ? 'bg-gray-800/30 border-gray-800 hover:border-gray-700'
-                      : 'bg-gray-900/50 border-gray-800/50 opacity-60'
-                  }`}
-                >
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    alert.is_active ? 'bg-gray-800' : 'bg-gray-900'
-                  }`}>
-                    <TypeIcon className={`w-5 h-5 ${typeInfo.color}`} />
-                  </div>
+          {/* ── Create Alert Tab ── */}
+          {activeTab === 'create' && (
+            <div className="p-5 space-y-5">
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-bold text-white truncate">{alert.title}</p>
-                      {alert.sport && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-800 text-gray-400">{alert.sport}</span>
-                      )}
-                      {alert.trigger_count > 0 && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-500/20 text-green-400">Triggered</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 truncate mt-0.5">
-                      {alert.description || typeInfo.label}
-                      {alert.team && ` · ${alert.team}`}
-                      {alert.player && ` · ${alert.player}`}
-                    </p>
-                    <p className="text-[10px] text-gray-600 mt-0.5">
-                      Created {new Date(alert.created_at).toLocaleDateString()}
-                      {alert.trigger_count > 0 && ` · Triggered ${alert.trigger_count}×`}
-                      {alert.last_triggered_at && ` · last ${formatRelativeTime(alert.last_triggered_at)}`}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => toggleAlert(alert.id, alert.is_active)}
-                      className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors"
-                      title={alert.is_active ? 'Pause alert' : 'Activate alert'}
-                    >
-                      {alert.is_active ? (
-                        <ToggleRight className="w-6 h-6 text-blue-400" />
-                      ) : (
-                        <ToggleLeft className="w-6 h-6 text-gray-600" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => deleteAlert(alert.id)}
-                      className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition-all"
-                      title="Delete alert"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+              {!isAuthenticated ? (
+                <div className="flex flex-col items-center justify-center h-52 text-center gap-3">
+                  <AlertCircle className="w-10 h-10 text-gray-600" />
+                  <p className="text-gray-400 font-semibold">Sign in to create alerts</p>
                 </div>
-              );
-            })
+              ) : (
+                <>
+                  {/* Alert type */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 mb-2.5 uppercase tracking-wider">Alert Type</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {ALERT_TYPES.map(type => {
+                        const TypeIcon = type.icon;
+                        const selected = newAlert.alert_type === type.value;
+                        return (
+                          <button
+                            key={type.value}
+                            onClick={() => setNewAlert(prev => ({ ...prev, alert_type: type.value }))}
+                            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                              selected
+                                ? `${type.bg} ${type.color} border ${type.border}`
+                                : 'text-gray-500 hover:text-gray-300 border border-transparent'
+                            }`}
+                            style={selected ? {} : { background: 'oklch(0.17 0.015 280)' }}
+                          >
+                            <TypeIcon className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{type.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Title + AI Suggest */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 mb-1.5 uppercase tracking-wider">Title</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newAlert.title}
+                        onChange={e => setNewAlert(prev => ({ ...prev, title: e.target.value }))}
+                        placeholder="e.g., Lakers spread moves 2+ points"
+                        className="flex-1 px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
+                        style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
+                        onFocus={e => (e.currentTarget.style.borderColor = 'oklch(0.45 0.18 260)')}
+                        onBlur={e => (e.currentTarget.style.borderColor = 'oklch(0.22 0.02 280)')}
+                      />
+                      <button
+                        onClick={fetchAiSuggestion}
+                        disabled={aiLoading || newAlert.title.trim().length < 3}
+                        className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-40"
+                        style={{ background: 'oklch(0.17 0.015 280)', border: '1px solid oklch(0.30 0.08 280)' }}
+                        title="Get AI suggestion"
+                      >
+                        {aiLoading ? <Loader2 className="w-3.5 h-3.5 text-purple-400 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-purple-400" />}
+                        <span className="text-purple-400 hidden sm:block">AI Suggest</span>
+                      </button>
+                    </div>
+
+                    {/* AI Suggestion card */}
+                    {aiSuggestion && (
+                      <div className="mt-2.5 p-3 rounded-xl" style={{ background: 'oklch(0.14 0.02 290)', border: '1px solid oklch(0.30 0.08 290)' }}>
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                            <span className="text-xs font-bold text-purple-300">AI Suggestion</span>
+                          </div>
+                          <button onClick={() => setAiSuggestion(null)} className="text-gray-600 hover:text-gray-400">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="space-y-1 mb-3">
+                          <p className="text-sm font-semibold text-white">{aiSuggestion.title}</p>
+                          {aiSuggestion.description && (
+                            <p className="text-xs text-gray-400">{aiSuggestion.description}</p>
+                          )}
+                          <div className="flex flex-wrap gap-1.5 mt-1.5">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/15 text-purple-400">
+                              {ALERT_TYPES.find(t => t.value === aiSuggestion.alert_type)?.label ?? aiSuggestion.alert_type}
+                            </span>
+                            {aiSuggestion.threshold != null && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/15 text-blue-400">
+                                Threshold: {aiSuggestion.threshold}
+                              </span>
+                            )}
+                            {aiSuggestion.sport && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-700 text-gray-400">
+                                {aiSuggestion.sport}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => applySuggestion(aiSuggestion)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all"
+                        >
+                          <ChevronRight className="w-3.5 h-3.5" />
+                          Apply Suggestion
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Sport + Team + Player */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 mb-1.5 uppercase tracking-wider">Sport</label>
+                      <select
+                        value={newAlert.sport}
+                        onChange={e => setNewAlert(prev => ({ ...prev, sport: e.target.value }))}
+                        className="w-full px-3 py-2.5 rounded-xl text-white text-sm focus:outline-none transition-all"
+                        style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
+                      >
+                        <option value="">Any</option>
+                        {SPORTS.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 mb-1.5 uppercase tracking-wider">Team</label>
+                      <input
+                        type="text"
+                        value={newAlert.team}
+                        onChange={e => setNewAlert(prev => ({ ...prev, team: e.target.value }))}
+                        placeholder="e.g., Lakers"
+                        className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
+                        style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 mb-1.5 uppercase tracking-wider">Player</label>
+                      <input
+                        type="text"
+                        value={newAlert.player}
+                        onChange={e => setNewAlert(prev => ({ ...prev, player: e.target.value }))}
+                        placeholder="e.g., LeBron"
+                        className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
+                        style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Threshold (conditional) */}
+                  {thresholdLabel && (
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 mb-1.5 uppercase tracking-wider">
+                        {thresholdLabel}
+                      </label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        value={newAlert.threshold}
+                        onChange={e => setNewAlert(prev => ({ ...prev, threshold: e.target.value }))}
+                        placeholder="Leave blank to trigger on any change"
+                        className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
+                        style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Description */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 mb-1.5 uppercase tracking-wider">Notes (optional)</label>
+                    <input
+                      type="text"
+                      value={newAlert.description}
+                      onChange={e => setNewAlert(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Any additional context"
+                      className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
+                      style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
+                    />
+                  </div>
+
+                  {/* Max triggers */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Max Triggers</label>
+                    <div className="flex gap-2 flex-wrap">
+                      {MAX_TRIGGERS_OPTIONS.map(opt => (
+                        <button
+                          key={opt.value}
+                          onClick={() => setNewAlert(prev => ({ ...prev, max_triggers: opt.value }))}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            newAlert.max_triggers === opt.value
+                              ? 'bg-blue-600/20 text-blue-400 border border-blue-500/40'
+                              : 'text-gray-500 hover:text-gray-300 border border-transparent'
+                          }`}
+                          style={newAlert.max_triggers !== opt.value ? { background: 'oklch(0.17 0.015 280)' } : {}}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Preview */}
+                  {newAlert.title && (
+                    <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: 'oklch(0.15 0.015 280)', border: '1px solid oklch(0.21 0.02 280)' }}>
+                      <AlertCircle className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                      <p className="text-xs text-gray-400">{getAlertPreview(newAlert)}</p>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex gap-3 pt-1">
+                    <button
+                      onClick={handleCreateAlert}
+                      disabled={saving || !newAlert.title.trim()}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-sm font-bold transition-all"
+                    >
+                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                      {saving ? 'Creating...' : 'Create Alert'}
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('list')}
+                      className="px-5 py-2.5 rounded-xl text-gray-400 hover:text-gray-300 text-sm font-semibold transition-all"
+                      style={{ background: 'oklch(0.17 0.015 280)' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
       </div>

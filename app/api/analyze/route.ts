@@ -17,6 +17,7 @@ import {
 import { getADPData, queryADP } from '@/lib/adp-data';
 import { getNFLADPData } from '@/lib/nfl-adp-data';
 import { getStatcastData, queryStatcast } from '@/lib/baseball-savant';
+import type { StatcastPlayer } from '@/lib/baseball-savant';
 import { generateContextualCards, type InsightCard } from '@/lib/cards-generator';
 import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-detector';
 import { getGrokApiKey } from '@/lib/config';
@@ -367,7 +368,14 @@ export async function POST(request: NextRequest) {
     let modelUsed: string = AI_CONFIG.MODEL_DISPLAY_NAME;
     let usedFallback = false;
     let pendingADPCard: InsightCard | null = null;
+    let pendingStatcastCard: InsightCard | null = null;
     let skipStatcastJSON = false; // set true when statcast tool returned empty players
+
+    // Card types that can come from the MLB_ANALYSIS_ADDENDUM JSON output
+    const STATCAST_CARD_TYPES = new Set([
+      'statcast_summary_card', 'hr_prop_card', 'game_simulation_card',
+      'leaderboard_card', 'pitch_analysis_card',
+    ]);
 
     const MAX_HALLUCINATION_RETRIES = 2;
 
@@ -633,14 +641,55 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // If statcast tool returned zero players, skip JSON card parsing.
-        // The AI will have output prose (per the addendum instructions) rather than a broken N/A card.
+        // Capture Statcast tool result: set skipStatcastJSON when empty, and build
+        // a pendingStatcastCard for single-player queries so there is always a relevant
+        // card even when the AI outputs prose instead of structured JSON.
         if (isMLBStatcastMode) {
           const toolResults: any[] = (result as any).toolResults ?? [];
           const statcastResult = toolResults.find((tr: any) => tr.toolName === 'query_statcast');
-          if (statcastResult && statcastResult.result?.players?.length === 0) {
-            skipStatcastJSON = true;
-            console.warn('[API/analyze] Statcast tool returned no players — skipping JSON card mode');
+          if (statcastResult) {
+            const srPlayers: StatcastPlayer[] = statcastResult.result?.players ?? [];
+            if (srPlayers.length === 0) {
+              skipStatcastJSON = true;
+              console.warn('[API/analyze] Statcast tool returned no players — skipping JSON card mode');
+            } else {
+              const srSource: string = statcastResult.result?.source ?? 'Baseball Savant';
+              // Build a fallback card for single-player lookups (≤3 results = targeted query)
+              if (srPlayers.length <= 3) {
+                const p = srPlayers[0];
+                const fmt = (n: number | undefined, decimals = 1) =>
+                  n != null ? n.toFixed(decimals) : 'N/A';
+                const fmtAvg = (n: number | undefined) =>
+                  n != null ? n.toFixed(3).replace(/^0/, '') : 'N/A';
+                pendingStatcastCard = {
+                  type: 'statcast_summary_card',
+                  title: `${p.name} — Statcast Profile`,
+                  category: 'MLB',
+                  subcategory: p.playerType === 'pitcher' ? 'Pitcher Metrics' : 'Contact Quality',
+                  gradient: 'from-indigo-600/80 via-violet-700/60 to-indigo-900/40',
+                  status: 'edge',
+                  icon: '⚾',
+                  realData: srSource.includes('real data'),
+                  summary_metrics: p.playerType === 'pitcher'
+                    ? [
+                        { label: 'xwOBA Against', value: fmtAvg(p.xwoba) },
+                        { label: 'Barrel % Against', value: `${fmt(p.barrelRate)}%` },
+                        { label: 'Hard Hit % Against', value: `${fmt(p.hardHitPct)}%` },
+                        { label: 'Exit Velo Against', value: `${fmt(p.exitVelocity)} mph` },
+                        { label: 'Sweet Spot % Against', value: `${fmt(p.sweetSpotPct)}%` },
+                      ]
+                    : [
+                        { label: 'xBA', value: fmtAvg(p.xba) },
+                        { label: 'xwOBA', value: fmtAvg(p.xwoba) },
+                        { label: 'Sweet Spot %', value: `${fmt(p.sweetSpotPct)}%` },
+                        { label: 'Hard Hit %', value: `${fmt(p.hardHitPct)}%` },
+                        { label: 'Barrel %', value: `${fmt(p.barrelRate)}%` },
+                      ],
+                  last_updated: srSource,
+                  data: { source: srSource },
+                };
+              }
+            }
           }
         }
 
@@ -771,20 +820,18 @@ export async function POST(request: NextRequest) {
     // Parse it here, inject it as a StatcastCard, and replace aiText with
     // human-readable prose so the chat doesn't display raw JSON to the user.
     if (isMLBStatcastMode && !usedFallback && !skipStatcastJSON) {
-      const STATCAST_TYPES = new Set([
-        'statcast_summary_card', 'hr_prop_card', 'game_simulation_card',
-        'leaderboard_card', 'pitch_analysis_card',
-      ]);
       // Extract the first {...} block — handles code fences, preamble text, and bare JSON
       const jsonMatch = aiText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         try {
           const parsed = JSON.parse(jsonMatch[0]);
-          if (parsed && typeof parsed.type === 'string' && STATCAST_TYPES.has(parsed.type)) {
+          if (parsed && typeof parsed.type === 'string' && STATCAST_CARD_TYPES.has(parsed.type)) {
             // Spread ALL parsed fields at card top level so DynamicCardRenderer passes
             // summary_metrics + lightbox through to StatcastCard unchanged
             const statcastCard: InsightCard = { icon: '⚾', ...parsed };
             cards = [statcastCard, ...cards.slice(0, 5)];
+            // Mark pendingStatcastCard as used so we don't double-inject below
+            pendingStatcastCard = null;
 
             // Replace raw JSON with readable prose for the chat message
             const metricLines = (parsed.summary_metrics ?? [])
@@ -800,6 +847,17 @@ export async function POST(request: NextRequest) {
         } catch {
           console.warn('[API/analyze] MLB JSON parse failed — returning raw text');
         }
+      }
+    }
+
+    // ── Statcast fallback card: inject when AI returned prose instead of JSON ──
+    // Ensures a player-relevant card is always shown even when the AI didn't follow
+    // the JSON format (e.g. hits/contact prop queries where hr_prop_card doesn't fit).
+    if (pendingStatcastCard) {
+      const firstCardIsStatcast = STATCAST_CARD_TYPES.has(cards[0]?.type as string);
+      if (!firstCardIsStatcast) {
+        cards = [pendingStatcastCard, ...cards.slice(0, 5)];
+        console.log('[API/analyze] Injected Statcast fallback card:', pendingStatcastCard.title);
       }
     }
 

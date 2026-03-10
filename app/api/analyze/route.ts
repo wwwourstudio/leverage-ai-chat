@@ -697,12 +697,19 @@ export async function POST(request: NextRequest) {
         // it would just time out a second time and waste the remaining budget.
         const fallbackModel = AI_CONFIG.FAST_MODEL_NAME;
         const alreadyFast = useFastPath;
-        // Log the full error object (not just message) so model-not-found / 401 / 404
-        // errors from the xAI API are visible in Vercel logs — not silently swallowed.
+        // Log the error concisely. For HTTP errors (520, 502, etc.) the full responseBody
+        // is a multi-KB Cloudflare HTML page — strip it to keep logs readable.
+        const errSummary = (() => {
+          if (aiError && typeof aiError === 'object') {
+            const e = aiError as Record<string, unknown>;
+            if (e.statusCode) {
+              return `HTTP ${e.statusCode} from ${e.url ?? 'xAI'}`;
+            }
+          }
+          return aiError instanceof Error ? aiError.message : String(aiError);
+        })();
         console.error(
-          `[API/analyze] Primary model "${primaryModel}" failed — full error:`,
-          aiError,
-          '| Retrying with:',
+          `[API/analyze] Primary model "${primaryModel}" failed — ${errSummary} | Retrying with:`,
           alreadyFast ? AI_CONFIG.MODEL_NAME : fallbackModel,
         );
         // Regardless of whether we were on the fast path, always try the other model

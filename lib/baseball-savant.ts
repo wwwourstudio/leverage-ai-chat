@@ -65,7 +65,7 @@ function currentMLBSeason(): number {
   return month >= 4 ? new Date().getFullYear() : new Date().getFullYear() - 1;
 }
 const SEASON = currentMLBSeason();
-const MIN_PA = 10; // minimum PA/BF to appear in leaderboard
+const MIN_PA = 100; // minimum PA/BF to appear in leaderboard (100 ≈ 1 month of regular playing time)
 const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
@@ -210,16 +210,23 @@ async function fetchStatcastType(playerType: 'batter' | 'pitcher'): Promise<Stat
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+export interface StatcastResult {
+  players: StatcastPlayer[];
+  /** true = live Baseball Savant API data; false = static 2024 fallback */
+  isLiveData: boolean;
+  season: number;
+}
+
 /**
  * Returns cached Baseball Savant Statcast data (batters + pitchers merged),
  * refreshing when the cache is stale. Safe to call on every request.
  */
-export async function getStatcastData(forceRefresh = false): Promise<StatcastPlayer[]> {
+export async function getStatcastData(forceRefresh = false): Promise<StatcastResult> {
   const now = Date.now();
   const isStale = now - lastFetched > CACHE_TTL_MS;
 
   if (statcastCache && !isStale && !forceRefresh) {
-    return statcastCache;
+    return { players: statcastCache, isLiveData: true, season: SEASON };
   }
 
   try {
@@ -234,15 +241,15 @@ export async function getStatcastData(forceRefresh = false): Promise<StatcastPla
     statcastCache = merged;
     lastFetched = now;
     console.log(`[v0] [Statcast] Fetched ${batters.length} batters + ${pitchers.length} pitchers from Baseball Savant`);
-    return merged;
+    return { players: merged, isLiveData: true, season: SEASON };
   } catch (err) {
     console.error('[v0] [Statcast] Failed to fetch Baseball Savant data:', err);
     if (statcastCache) {
       console.warn('[v0] [Statcast] Returning stale cached data');
-      return statcastCache;
+      return { players: statcastCache, isLiveData: true, season: SEASON };
     }
     console.warn('[v0] [Statcast] Baseball Savant unavailable — returning static fallback (2024 data)');
-    return STATIC_FALLBACK_PLAYERS;
+    return { players: STATIC_FALLBACK_PLAYERS, isLiveData: false, season: 2024 };
   }
 }
 
@@ -256,9 +263,10 @@ export function queryStatcast(players: StatcastPlayer[], params: StatcastQueryPa
 
   let results = players;
 
-  if (playerType) {
-    results = results.filter(p => p.playerType === playerType);
-  }
+  // Default to batters when no type specified — matches JSDoc contract and prevents
+  // pitchers (with xwOBA-against stats) from polluting batter leaderboards.
+  const effectiveType = playerType ?? 'batter';
+  results = results.filter(p => p.playerType === effectiveType);
 
   if (player) {
     const needle = player.trim().toLowerCase();

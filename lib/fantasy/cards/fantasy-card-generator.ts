@@ -773,7 +773,7 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
       let statcastRealData = false;
       try {
         const { getStatcastData } = await import('@/lib/baseball-savant');
-        const statcastPlayers = await getStatcastData();
+        const { players: statcastPlayers } = await getStatcastData();
         const batters = statcastPlayers
           .filter(p => p.playerType === 'batter' && p.xwoba > 0)
           .sort((a, b) => b.xwoba - a.xwoba)
@@ -854,7 +854,7 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
       try {
         const { getStatcastData } = await import('@/lib/baseball-savant');
         const { rankByVPE } = await import('@/lib/fantasy/vpe');
-        const statcastAll = await getStatcastData();
+        const { players: statcastAll } = await getStatcastData();
         const vpeRanked = rankByVPE(statcastAll).slice(0, 8);
         if (vpeRanked.length > 0) {
           cards.push({

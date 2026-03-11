@@ -57,7 +57,8 @@ export interface ADPQueryParams {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
+// Short TTL so newly-uploaded data propagates quickly across serverless instances
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
 
@@ -206,55 +207,6 @@ const STATIC_FALLBACK_PLAYERS: NFBCPlayer[] = [
 let adpCache: NFBCPlayer[] | null = null;
 let lastFetched = 0;
 
-// Circuit breaker: after a full fetch failure, don't retry for 30 minutes.
-// circuitOpenedAt is stored in Supabase (key: adp_circuit_open_until) so it
-// survives serverless cold starts — module-level var is only a warm-instance cache.
-const CIRCUIT_BREAKER_TTL_MS = 30 * 60 * 1000; // 30 minutes
-let circuitOpenedAt = 0; // 0 = circuit closed (warm-instance only)
-
-// ── Supabase-backed circuit breaker ──────────────────────────────────────────
-async function getCircuitOpenUntil(): Promise<number> {
-  if (circuitOpenedAt > 0) return circuitOpenedAt; // warm-instance fast path
-  try {
-    const supabase = await getADPSupabaseClient();
-    if (!supabase) return 0;
-    const { data } = await supabase
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'adp_circuit_open_until')
-      .maybeSingle();
-    const ts = data ? Number((data as { value: string }).value) : 0;
-    circuitOpenedAt = ts; // cache in memory for warm instances
-    return ts;
-  } catch {
-    return 0;
-  }
-}
-
-async function openCircuit(until: number): Promise<void> {
-  circuitOpenedAt = until;
-  try {
-    const supabase = await getADPSupabaseClient();
-    if (!supabase) return;
-    await supabase.from('app_settings').upsert(
-      { key: 'adp_circuit_open_until', value: String(until) },
-      { onConflict: 'key' },
-    );
-  } catch { /* non-critical */ }
-}
-
-async function clearCircuit(): Promise<void> {
-  circuitOpenedAt = 0;
-  try {
-    const supabase = await getADPSupabaseClient();
-    if (!supabase) return;
-    await supabase.from('app_settings').upsert(
-      { key: 'adp_circuit_open_until', value: '0' },
-      { onConflict: 'key' },
-    );
-  } catch { /* non-critical */ }
-}
-
 // ── Delimiter-agnostic parser ─────────────────────────────────────────────────
 
 /**
@@ -285,7 +237,7 @@ function stripQuotes(s: string): string {
  * Expected columns (names may vary slightly): Rank, Player, ADP / Overall ADP,
  * Position(s) / Pos, Team
  */
-function parseTSV(raw: string): NFBCPlayer[] {
+export function parseTSV(raw: string): NFBCPlayer[] {
   const lines = raw.split('\n').filter(l => l.trim().length > 0);
   if (lines.length < 2) return [];
 
@@ -428,165 +380,40 @@ export async function loadADPFromSupabase(sport = 'mlb', allowStale = false): Pr
   }
 }
 
-// ── Fetch ─────────────────────────────────────────────────────────────────────
-
-// NFBC distributes ADP as tab-separated (.tsv) or CSV files.
-// ?download=1 matches the Download button on nfc.shgn.com/adp/baseball (mirrors football).
-// Remaining entries are fallback guesses; tried in sequence, first non-HTML response wins.
-const NFBC_ADP_URLS: string[] = [
-  'https://nfc.shgn.com/adp/baseball?download=1',
-  'https://nfc.shgn.com/adp/baseball?export=tsv',
-  'https://nfc.shgn.com/adp/baseball?format=tsv',
-  'https://nfc.shgn.com/adp/baseball?download=tsv',
-  'https://nfc.shgn.com/adp/baseball.tsv',
-];
-
-async function tryFetchURL(url: string): Promise<NFBCPlayer[]> {
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-      'Accept': 'text/tab-separated-values, text/plain, application/vnd.ms-excel, */*',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Referer': 'https://nfc.shgn.com/adp/baseball',
-      'Origin': 'https://nfc.shgn.com',
-      'Sec-Fetch-Dest': 'document',
-      'Sec-Fetch-Mode': 'navigate',
-      'Sec-Fetch-Site': 'same-origin',
-    },
-    signal: AbortSignal.timeout(8000),
-  });
-
-  if (!res.ok) {
-    throw new Error(`NFBC ADP fetch failed: HTTP ${res.status}`);
-  }
-
-  const contentType = res.headers.get('content-type') ?? '';
-  const body = await res.text();
-
-  // Detect HTML response — endpoint returned a webpage instead of a TSV file
-  if (contentType.includes('text/html') || body.trimStart().startsWith('<')) {
-    throw new Error(`NFBC ADP endpoint returned HTML instead of TSV — URL may be wrong or require auth`);
-  }
-
-  // JSON API response (e.g. FantasyPros JSON endpoint)
-  if (contentType.includes('application/json') || contentType.includes('json') || body.trimStart().startsWith('{') || body.trimStart().startsWith('[')) {
-    const json = JSON.parse(body) as Record<string, unknown>;
-    const raw = (json.players ?? json.data ?? json) as Array<Record<string, unknown>>;
-    if (!Array.isArray(raw) || raw.length === 0) throw new Error('JSON response has no player array');
-    const parsed = raw.map((p, i) => {
-      const rank = Number(p.rank ?? p.overall_rank ?? i + 1);
-      const adp  = Number(p.adp ?? p.average_draft_position ?? rank);
-      const name = String(p.player_name ?? p.name ?? '');
-      const pos  = String(p.pos ?? p.position ?? '');
-      const team = String(p.team ?? '');
-      const valueDelta = Math.round((adp - rank) * 10) / 10;
-      return {
-        rank, playerName: name, displayName: normalisePlayerName(name),
-        adp, positions: pos, team, valueDelta, isValuePick: valueDelta > 15,
-      } satisfies NFBCPlayer;
-    }).filter(p => p.displayName.length > 0);
-    if (parsed.length === 0) throw new Error('JSON response parsed to 0 valid players');
-    return parsed;
-  }
-
-  const players = parseTSV(body);
-
-  if (players.length === 0) {
-    throw new Error('NFBC ADP response parsed to 0 players — unexpected format');
-  }
-
-  return players;
-}
-
-async function fetchNFBCADP(): Promise<NFBCPlayer[]> {
-  let lastError: Error | null = null;
-
-  for (const url of NFBC_ADP_URLS) {
-    try {
-      const players = await tryFetchURL(url);
-      console.log(`[v0] [ADP] Fetched ${players.length} players from NFBC (${url})`);
-      return players;
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      console.warn(`[v0] [ADP] URL failed (${url}): ${lastError.message}`);
-    }
-  }
-
-  throw lastError ?? new Error('No NFBC ADP URLs configured');
-}
-
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Returns the cached NFBC ADP player list, refreshing when the cache is stale.
- * Safe to call on every request — fetches only once per TTL period.
+ * Clears the in-memory cache, forcing the next call to re-read from Supabase.
+ * Called by the upload route after a successful TSV import.
+ */
+export function clearADPCache(): void {
+  adpCache = null;
+  lastFetched = 0;
+}
+
+/**
+ * Returns the NFBC MLB ADP player list.
+ * Data comes exclusively from Supabase (populated by user TSV uploads).
+ * Falls back to the static pre-season dataset when no upload exists yet.
  */
 export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
   const now = Date.now();
-  const isStale = now - lastFetched > CACHE_TTL_MS;
 
-  if (adpCache && !isStale && !forceRefresh) {
+  if (adpCache && !forceRefresh && now - lastFetched < CACHE_TTL_MS) {
     return adpCache;
   }
 
-  // Try Supabase first — faster than a live external HTTP call and survives cold starts.
-  // This also catches the case where static fallback was previously seeded to Supabase.
-  if (!forceRefresh) {
-    const dbData = await loadADPFromSupabase('mlb');
-    if (dbData && dbData.length > 0) {
-      console.log(`[v0] [ADP] Serving ${dbData.length} MLB players from Supabase cache`);
-      adpCache = dbData;
-      lastFetched = now;
-      return dbData;
-    }
-  }
-
-  // Circuit breaker: skip live fetch for 30 min after a full failure to avoid
-  // log spam and unnecessary latency when the endpoint is known-broken.
-  // Persisted in Supabase so cold-starts respect the open circuit.
-  const circuitOpenUntil = await getCircuitOpenUntil();
-  const circuitOpen = circuitOpenUntil > 0 && (now < circuitOpenUntil);
-  if (circuitOpen && !forceRefresh) {
-    if (adpCache) return adpCache;
-    // Try Supabase (even stale) before returning static fallback
-    const dbData = await loadADPFromSupabase('mlb', true);
-    if (dbData && dbData.length > 0) {
-      console.log(`[v0] [ADP] Circuit open — serving ${dbData.length} MLB players from Supabase`);
-      adpCache = dbData;
-      return dbData;
-    }
-    // Seed Supabase with static fallback so future cold-starts use Supabase
-    void saveADPToSupabase(STATIC_FALLBACK_PLAYERS, 'mlb');
-    return STATIC_FALLBACK_PLAYERS;
-  }
-
-  try {
-    const players = await fetchNFBCADP();
-    adpCache = players;
+  // User-uploaded data lives in Supabase — always authoritative, no TTL check
+  const dbData = await loadADPFromSupabase('mlb', true);
+  if (dbData && dbData.length > 0) {
+    console.log(`[v0] [ADP] Serving ${dbData.length} MLB players from Supabase (user upload)`);
+    adpCache = dbData;
     lastFetched = now;
-    void clearCircuit(); // reset circuit on success
-    // Persist to Supabase (fire-and-forget) so future requests can skip live fetch
-    void saveADPToSupabase(players, 'mlb');
-    return players;
-  } catch (err) {
-    console.error('[v0] [ADP] Failed to fetch live ADP data:', err);
-    void openCircuit(now + CIRCUIT_BREAKER_TTL_MS); // persist open circuit across cold starts
-    // Return stale cache if available — better than nothing
-    if (adpCache) {
-      console.warn('[v0] [ADP] Returning stale cached data');
-      return adpCache;
-    }
-    // Try Supabase with stale data allowed
-    const dbData = await loadADPFromSupabase('mlb', true);
-    if (dbData && dbData.length > 0) {
-      console.warn(`[v0] [ADP] Returning ${dbData.length} players from stale Supabase data`);
-      return dbData;
-    }
-    // Last resort: use static fallback and seed Supabase so next cold-start avoids URLs
-    console.warn(`[v0] [ADP] Using static fallback dataset (${STATIC_FALLBACK_PLAYERS.length} players). Seeding Supabase to skip retries.`);
-    void saveADPToSupabase(STATIC_FALLBACK_PLAYERS, 'mlb');
-    return STATIC_FALLBACK_PLAYERS;
+    return dbData;
   }
+
+  console.log(`[v0] [ADP] No MLB ADP upload found — serving static fallback (${STATIC_FALLBACK_PLAYERS.length} players)`);
+  return STATIC_FALLBACK_PLAYERS;
 }
 
 /**

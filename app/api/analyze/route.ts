@@ -298,7 +298,9 @@ export async function POST(request: NextRequest) {
     const hasExistingCards = Array.isArray(existingCards) && existingCards.length > 0
       && !context.sport
       && !context.isSportsQuery
-      && !context.hasBettingIntent;
+      && !context.hasBettingIntent
+      && !context.isPoliticalMarket
+      && context.selectedCategory !== 'kalshi';
     let cardPromise: Promise<InsightCard[]>;
     if (isAmbiguous) {
       // Ambiguous query — don't show random cards, wait for clarification

@@ -660,7 +660,10 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
       try {
         const { fetchDynamicCards: fetchCards } = await import('@/lib/data-service');
-        const freshCards = await fetchCards({ userContext: lastUserQuery, category: selectedCategory, limit: 4 });
+        const msgLow = (lastUserQuery || '').toLowerCase();
+        const detectedCategory = (msgLow.includes('kalshi') || msgLow.includes('prediction market'))
+          ? 'kalshi' : selectedCategory;
+        const freshCards = await fetchCards({ userContext: lastUserQuery, category: detectedCategory, limit: 4 });
         if (freshCards.length === 0) return;
 
         const converted = freshCards.map(convertToInsightCard);
@@ -1240,9 +1243,12 @@ No preamble. Start directly with section 1.`;
       const politicalKeywords = ['kalshi', 'election', 'politics', 'cpi', 'inflation', 'fed', 'approval rating', 'recession', 'polymarket', 'prediction market'];
       const isPoliticalMarket = politicalKeywords.some(k => lowerMsg.includes(k));
       
-      // Sports detection - pass conversation history for context
+      // Sports detection - pass conversation history for context, but not for Kalshi queries
       const conversationHistory = messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }));
-      const detectedSport = extractSport(userMessage, conversationHistory);
+      const detectedSport = extractSport(
+        userMessage,
+        (selectedCategory === 'kalshi' || isPoliticalMarket) ? undefined : conversationHistory
+      );
 
       // Normalize the UI-selected sport to the same format extractSport() returns
       // (e.g. 'ncaa-football' → 'ncaaf', 'ncaa-basketball' → 'ncaab', others unchanged)
@@ -1686,9 +1692,10 @@ No preamble. Start directly with section 1.`;
     }
     
     // Baseball - enhanced detection for fantasy baseball
-    if (msgLower.includes('mlb') || msgLower.includes('baseball') || 
-        msgLower.includes('nfbc') || msgLower.includes('nffc') || 
-        msgLower.includes('nfbkc') || msgLower.includes('tgfbi')) {
+    if (msgLower.includes('mlb') || msgLower.includes('baseball') ||
+        msgLower.includes('nfbc') || msgLower.includes('nffc') ||
+        msgLower.includes('nfbkc') || msgLower.includes('tgfbi') ||
+        msgLower.includes('adp')) {
       console.log('[v0] Detected sport: MLB (baseball/fantasy baseball)');
       return 'mlb';
     }

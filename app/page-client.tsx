@@ -37,6 +37,7 @@ import { SettingsLightbox } from '@/components/SettingsLightbox';
 import { AlertsLightbox } from '@/components/AlertsLightbox';
 import { StripeLightbox } from '@/components/StripeLightbox';
 import { UserLightbox } from '@/components/UserLightbox';
+import { TSVUploadDialog } from '@/components/TSVUploadDialog';
 import { useToast } from '@/components/toast-provider';
 import { Sidebar } from '@/components/Sidebar';
 import { ChatHeader } from '@/components/chat-header';
@@ -269,6 +270,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [showStripeLightbox, setShowStripeLightbox] = useState(false);
   const [showUserLightbox, setShowUserLightbox] = useState(false);
   const [customInstructions, setCustomInstructions] = useState('');
+  const [showTSVUploadDialog, setShowTSVUploadDialog] = useState(false);
+  const [tsvUploadSport, setTsvUploadSport] = useState<'mlb' | 'nfl'>('mlb');
+  const [lastUploadDates, setLastUploadDates] = useState<{ mlb?: string; nfl?: string }>({});
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(!!serverData?.userSession);
   const [user, setUser] = useState<{ name: string; email: string; avatar?: string } | null>(
@@ -325,6 +329,33 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       prev[0]?.id === 'chat-1' ? [{ ...prev[0], timestamp: now }, ...prev.slice(1)] : prev
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fetch ADP upload metadata on mount
+  useEffect(() => {
+    const fetchUploadMetadata = async () => {
+      try {
+        const [mlbRes, nflRes] = await Promise.all([
+          fetch('/api/adp/metadata?sport=mlb'),
+          fetch('/api/adp/metadata?sport=nfl'),
+        ]);
+
+        const mlbData = mlbRes.ok ? await mlbRes.json() : null;
+        const nflData = nflRes.ok ? await nflRes.json() : null;
+
+        setLastUploadDates({
+          mlb: mlbData?.lastUploadDate,
+          nfl: nflData?.lastUploadDate,
+        });
+      } catch (error) {
+        console.error('[v0] Failed to fetch ADP upload metadata:', error);
+      }
+    };
+
+    fetchUploadMetadata();
+    // Refresh metadata every 5 minutes
+    const interval = setInterval(fetchUploadMetadata, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   // Personalize the welcome message client-side after hydration (and when user logs in).
@@ -3425,6 +3456,11 @@ No preamble. Start directly with section 1.`;
                           generateCardAnalysis(card as InsightCard, `${index}-${cardIndex}`);
                         }}
                         messageIndex={index}
+                        onADPUploadClick={(sport) => {
+                          setTsvUploadSport(sport);
+                          setShowTSVUploadDialog(true);
+                        }}
+                        lastUploadDates={lastUploadDates}
                       />
 
                       {/* Analysis panels — full width below the card grid */}
@@ -4187,6 +4223,32 @@ No preamble. Start directly with section 1.`;
         onCreditsAdded={addCredits}
         creditsRemaining={creditsRemaining}
         userEmail={user?.email}
+      />
+
+      {/* TSV Upload Dialog */}
+      <TSVUploadDialog
+        isOpen={showTSVUploadDialog}
+        onClose={() => setShowTSVUploadDialog(false)}
+        sport={tsvUploadSport}
+        lastUploadDate={lastUploadDates[tsvUploadSport]}
+        onUploadSuccess={() => {
+          // Refresh upload metadata after successful upload
+          const fetchMetadata = async () => {
+            try {
+              const res = await fetch(`/api/adp/metadata?sport=${tsvUploadSport}`);
+              if (res.ok) {
+                const data = await res.json();
+                setLastUploadDates(prev => ({
+                  ...prev,
+                  [tsvUploadSport]: data.lastUploadDate,
+                }));
+              }
+            } catch (error) {
+              console.error('[v0] Failed to refresh upload metadata:', error);
+            }
+          };
+          fetchMetadata();
+        }}
       />
 
       <style>

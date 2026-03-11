@@ -30,6 +30,8 @@ interface DynamicCardRendererProps {
   isLoading?: boolean;
   error?: string;
   isHero?: boolean;
+  onADPUploadClick?: (sport: 'mlb' | 'nfl') => void;
+  lastUploadDates?: { mlb?: string; nfl?: string };
 }
 
 export function DynamicCardRenderer({
@@ -39,6 +41,8 @@ export function DynamicCardRenderer({
   isLoading,
   error,
   isHero = false,
+  onADPUploadClick,
+  lastUploadDates,
 }: DynamicCardRendererProps) {
   // Loading state
   if (isLoading) {
@@ -247,6 +251,10 @@ export function DynamicCardRenderer({
 
   // ADP leaderboard cards (NFBC ADP tool results)
   if (cardType === 'adp-analysis' || cardType.includes('adp')) {
+    // Determine sport from card data or category
+    const sport: 'mlb' | 'nfl' = card.category?.toLowerCase().includes('nfl') || card.title?.toLowerCase().includes('football') ? 'nfl' : 'mlb';
+    const lastUploadDate = lastUploadDates?.[sport];
+
     return (
       <ADPCard
         type={safeCard.type}
@@ -259,6 +267,8 @@ export function DynamicCardRenderer({
         onAnalyze={handleAnalyze}
         error={error}
         isHero={isHero}
+        lastUploadDate={lastUploadDate}
+        onUploadClick={() => onADPUploadClick?.(sport)}
       />
     );
   }
@@ -342,9 +352,11 @@ interface CardListProps {
   onAnalyze?: (card: CardData) => void;
   isLoading?: boolean;
   className?: string;
+  onADPUploadClick?: (sport: 'mlb' | 'nfl') => void;
+  lastUploadDates?: { mlb?: string; nfl?: string };
 }
 
-export function CardList({ cards, onAnalyze, isLoading, className = '' }: CardListProps) {
+export function CardList({ cards, onAnalyze, isLoading, className = '', onADPUploadClick, lastUploadDates }: CardListProps) {
   if (isLoading) {
     return (
       <div className={`flex flex-col gap-4 w-full ${className}`}>
@@ -372,6 +384,8 @@ export function CardList({ cards, onAnalyze, isLoading, className = '' }: CardLi
           card={card}
           index={index}
           onAnalyze={onAnalyze}
+          onADPUploadClick={onADPUploadClick}
+          lastUploadDates={lastUploadDates}
         />
       ))}
     </div>

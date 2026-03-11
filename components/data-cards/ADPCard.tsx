@@ -1,6 +1,6 @@
 'use client';
 
-import { BarChart2, ChevronRight, TrendingUp } from 'lucide-react';
+import { BarChart2, ChevronRight, TrendingUp, Upload, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -16,6 +16,8 @@ interface ADPCardProps {
   onAnalyze?: () => void;
   error?: string;
   isHero?: boolean;
+  lastUploadDate?: string;
+  onUploadClick?: () => void;
 }
 
 interface ADPPlayerRow {
@@ -99,6 +101,8 @@ export function ADPCard({
   status,
   onAnalyze,
   isHero,
+  lastUploadDate,
+  onUploadClick,
 }: ADPCardProps) {
   const s = STATUS_CFG[status] ?? STATUS_CFG.value;
 
@@ -228,14 +232,22 @@ export function ADPCard({
             </p>
           )}
 
-          {/* Footer: source + dataset size */}
-          <div className="flex items-center justify-between pt-1">
-            <div className="flex items-center gap-1">
-              <TrendingUp className="w-3 h-3 text-[oklch(0.32_0.01_280)]" />
-              <span className="text-[9px] font-bold text-[oklch(0.32_0.01_280)]">
+          {/* Footer: source + dataset size + upload info */}
+          <div className="flex items-center justify-between pt-1 gap-3">
+            <div className="flex items-center gap-1 flex-1 min-w-0">
+              <TrendingUp className="w-3 h-3 text-[oklch(0.32_0.01_280)] flex-shrink-0" />
+              <span className="text-[9px] font-bold text-[oklch(0.32_0.01_280)] truncate">
                 {source}{totalInDataset ? ` · ${totalInDataset} players ranked` : ''}
               </span>
             </div>
+            {lastUploadDate && (
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <Calendar className="w-3 h-3 text-emerald-400" />
+                <span className="text-[8px] font-bold text-emerald-400 tabular-nums whitespace-nowrap">
+                  {new Date(lastUploadDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+              </div>
+            )}
           </div>
 
           {onAnalyze && (
@@ -245,6 +257,17 @@ export function ADPCard({
             >
               <TrendingUp className="w-3.5 h-3.5" />
               Full Analysis
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {onUploadClick && (
+            <button
+              onClick={onUploadClick}
+              className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-blue-600/15 border border-blue-500/40 text-xs font-semibold text-blue-300 hover:text-blue-100 hover:bg-blue-600/25 hover:border-blue-500/60 transition-all duration-150"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Update TSV
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           )}

@@ -23,6 +23,8 @@ interface CardLayoutProps {
   aiInsight?: string;
   onAnalyze?: (card: CardData) => void;
   messageIndex?: number;
+  onADPUploadClick?: (sport: 'mlb' | 'nfl') => void;
+  lastUploadDates?: { mlb?: string; nfl?: string };
 }
 
 /** Extract a short 1–2 sentence blurb from a longer AI message */
@@ -47,6 +49,8 @@ export const CardLayout = memo(function CardLayout({
   aiInsight,
   onAnalyze,
   messageIndex = 0,
+  onADPUploadClick,
+  lastUploadDates,
 }: CardLayoutProps) {
   const [heroIndex, setHeroIndex] = useState(0);
   const [transitioning, setTransitioning] = useState(false);
@@ -88,6 +92,8 @@ export const CardLayout = memo(function CardLayout({
             index={heroIndex}
             isHero
             onAnalyze={onAnalyze ? () => onAnalyze(heroCard) : undefined}
+            onADPUploadClick={onADPUploadClick}
+            lastUploadDates={lastUploadDates}
           />
         </div>
 

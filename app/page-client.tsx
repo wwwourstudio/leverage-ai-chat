@@ -111,6 +111,7 @@ interface TrustMetrics {
 }
 
 interface Message {
+  id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
@@ -227,6 +228,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
   const [messages, setMessages] = useState<Message[]>([
     {
+      id: 'welcome',
       role: 'assistant',
       content: STATIC_WELCOME,
       // Fixed epoch fallback keeps SSR and client hydration identical (no #418 mismatch).
@@ -1020,6 +1022,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       }
 
       const aiMessage: Message = {
+        id: crypto.randomUUID(),
         role: 'assistant',
         content: responseText,
         timestamp: new Date(),
@@ -1214,7 +1217,7 @@ No preamble. Start directly with section 1.`;
   useEffect(() => {
     const handler = (e: Event) => {
       const { query } = (e as CustomEvent<{ query: string }>).detail;
-      const userMsg: Message = { role: 'user', content: query, timestamp: new Date() };
+      const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: query, timestamp: new Date() };
       setMessages((prev: Message[]) => [...prev, userMsg]);
       setInput('');
       generateRealResponseRef.current?.(query);
@@ -1498,6 +1501,7 @@ No preamble. Start directly with section 1.`;
         const errorMessage = analysisResult.error || 'API temporarily unavailable';
         
         newMessage = {
+          id: crypto.randomUUID(),
           role: 'assistant',
           content: `Here's what I can tell you based on available data:`,
           timestamp: new Date(),
@@ -1563,6 +1567,7 @@ No preamble. Start directly with section 1.`;
             };
 
         newMessage = {
+          id: crypto.randomUUID(),
           role: 'assistant',
           content: analysisResult.text || 'Analysis complete.',
           timestamp: new Date(),
@@ -1637,6 +1642,7 @@ No preamble. Start directly with section 1.`;
 
       // Fallback to basic response with error indication — no random cards
       setMessages((prev: Message[]) => [...prev, {
+        id: crypto.randomUUID(),
         role: 'assistant',
         content: `I'm currently experiencing connectivity issues with live data sources. Here's an analysis based on available information:\n\n**Note:** Some real-time data may be limited. ${error instanceof Error ? `(${error.message})` : ''}`,
         timestamp: new Date(),
@@ -2085,6 +2091,7 @@ No preamble. Start directly with section 1.`;
     const currentFiles = [...uploadedFiles];
 
     const userMessage: Message = {
+      id: crypto.randomUUID(),
       role: 'user',
       content: input || '📎 Attached files',
       timestamp: new Date(),
@@ -2203,6 +2210,7 @@ No preamble. Start directly with section 1.`;
     setActiveChat(newChatId);
     setMessages([
       {
+        id: 'welcome',
         role: 'assistant',
         content: welcomeMessage,
         timestamp: new Date(),
@@ -2241,6 +2249,7 @@ No preamble. Start directly with section 1.`;
       loadMessages(chatId).then(msgs => {
         if (msgs.length > 0) {
           setMessages(msgs.map(m => ({
+            id: m.id || crypto.randomUUID(),
             role: m.role,
             content: m.content,
             timestamp: m.timestamp,
@@ -2252,6 +2261,7 @@ No preamble. Start directly with section 1.`;
         } else {
           const chat = chats.find((c: Chat) => c.id === chatId);
           setMessages([{
+            id: 'welcome',
             role: 'assistant',
             content: `**${chat?.title || 'Chat'}**\n\nNo saved messages found. Start a new message to continue.`,
             timestamp: new Date(),
@@ -2264,6 +2274,7 @@ No preamble. Start directly with section 1.`;
       // Not logged in — keep showing current in-memory welcome
       const chat = chats.find((c: Chat) => c.id === chatId);
       setMessages([{
+        id: 'welcome',
         role: 'assistant',
         content: `**${chat?.title || 'Analysis Restored'}**\n\nSign in to save and restore your conversation history.\n\n**Ready to continue optimizing your strategy.**`,
         timestamp: new Date(),
@@ -3000,7 +3011,7 @@ No preamble. Start directly with section 1.`;
                 
                 return (
                   <div
-                    key={`message-${index}`}
+                    key={message.id}
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn ${isGrouped ? 'mt-1.5' : 'mt-5'}`}
                   >
                 <div className={message.role === 'user' ? 'max-w-[85%] md:max-w-[75%]' : 'w-full max-w-4xl lg:max-w-3xl'}>
@@ -3432,6 +3443,8 @@ No preamble. Start directly with section 1.`;
                           generateCardAnalysis(card as InsightCard, `${index}-${cardIndex}`);
                         }}
                         messageIndex={index}
+                        trustScore={message.trustMetrics?.finalConfidence}
+                        trustLevel={message.trustMetrics?.trustLevel}
                       />
 
                       {/* Analysis panels — full width below the card grid */}
@@ -3941,7 +3954,7 @@ No preamble. Start directly with section 1.`;
             <SuggestedPrompts
               showWelcomeGrid={messages.length === 1 && !!messages[0]?.isWelcome && suggestedPrompts.length === 0}
               onWelcomeAction={(query) => {
-                const userMessage: Message = { role: 'user', content: query, timestamp: new Date() };
+                const userMessage: Message = { id: crypto.randomUUID(), role: 'user', content: query, timestamp: new Date() };
                 setMessages((prev: Message[]) => [...prev, userMessage]);
                 setInput('');
                 generateRealResponse(query);
@@ -3955,7 +3968,7 @@ No preamble. Start directly with section 1.`;
               onPromptClick={(submitText) => {
                 setInput(submitText);
                 setTimeout(() => {
-                  const userMessage: Message = { role: 'user', content: submitText, timestamp: new Date() };
+                  const userMessage: Message = { id: crypto.randomUUID(), role: 'user', content: submitText, timestamp: new Date() };
                   setMessages((prev: Message[]) => [...prev, userMessage]);
                   setChats((prevChats: Chat[]) => prevChats.map((chat: Chat) => {
                     if (chat.id === activeChat) {

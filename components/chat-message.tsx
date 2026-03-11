@@ -147,7 +147,7 @@ function formatRelativeTime(date: Date): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-export function ChatMessage({ message, onEdit, onCopy }: ChatMessageProps) {
+export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, onCopy }: ChatMessageProps) {
   const [isEditing, setIsEditing] = React.useState(false);
   const [editContent, setEditContent] = React.useState(message.content);
   const [showTrust, setShowTrust] = React.useState(false);
@@ -279,4 +279,4 @@ export function ChatMessage({ message, onEdit, onCopy }: ChatMessageProps) {
       </div>
     </div>
   );
-}
+});

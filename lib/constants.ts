@@ -691,7 +691,7 @@ For ANY question about player draft rankings, average draft position, positional
 4. When isValuePick is true (valueDelta > 15), call the player a "sleeper" or "value pick" and highlight the gap.
 5. Always cite "NFBC ${NFBC_DRAFT_YEAR} ADP" as the source.
 6. NEVER invent ADP values — if the tool returns no results, say so and offer to broaden the search.
-7. If the tool result contains \`is_static_fallback: true\`, the live NFBC feed is unavailable and pre-season consensus data is being used. You MUST begin your response with: "⚠️ Note: Live NFBC ADP data is temporarily unavailable. The rankings below are ${NFBC_DRAFT_YEAR} pre-season consensus estimates and may not reflect current draft trends." Never present static fallback values as live NFBC data.
+7. If the tool result contains \`is_static_fallback: true\`, no NFBC/NFFC TSV has been uploaded yet. You MUST begin your response with: "⚠️ No live ADP data uploaded yet. The rankings below are ${NFBC_DRAFT_YEAR} pre-season consensus estimates. To get real NFBC/NFFC ADP: download the TSV from nfc.shgn.com/adp/baseball (or /football) and upload it using the Upload ADP card." Never present static fallback values as live NFBC data.
 
 Tool parameter guide:
 - \`player\`: partial name (e.g. "Ohtani", "Judge") — case-insensitive

@@ -14,11 +14,12 @@ export type { NFBCPlayer, ADPQueryParams } from '@/lib/adp-data';
 export { queryADP } from '@/lib/adp-data';
 
 import type { NFBCPlayer } from '@/lib/adp-data';
-import { saveADPToSupabase, loadADPFromSupabase } from '@/lib/adp-data';
+import { saveADPToSupabase, loadADPFromSupabase, clearADPCache as clearMLBCache } from '@/lib/adp-data';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
+// Short TTL so newly-uploaded data propagates quickly across serverless instances
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 // ── Static fallback dataset ───────────────────────────────────────────────────
 // Used when the NFFC live endpoint is unreachable. Values are 2026 NFFC consensus
@@ -179,204 +180,38 @@ const NFL_STATIC_FALLBACK: NFBCPlayer[] = normalizeADPOrder([
 let nflAdpCache: NFBCPlayer[] | null = null;
 let nflLastFetched = 0;
 
-// ── Fetch helpers ─────────────────────────────────────────────────────────────
-
-// URL patterns to try in order — matches the Download button on nfc.shgn.com/adp/football.
-const NFFC_NFL_ADP_URLS: string[] = [
-  'https://nfc.shgn.com/adp/football?download=1',
-  'https://nfc.shgn.com/adp/football?export=csv',
-  'https://nfc.shgn.com/adp/football?format=csv',
-];
-
-// Delimiter-agnostic parser (same logic as in adp-data.ts, applied to football data)
-function stripQuotes(s: string): string {
-  return s.replace(/^"|"$/g, '').trim();
-}
-
-function normalisePlayerName(raw: string): string {
-  const trimmed = raw.trim();
-  const commaIdx = trimmed.indexOf(',');
-  if (commaIdx === -1) return trimmed;
-  const last = trimmed.slice(0, commaIdx).trim();
-  const first = trimmed.slice(commaIdx + 1).trim();
-  return first ? `${first} ${last}` : last;
-}
-
-function parseTSV(raw: string): NFBCPlayer[] {
-  const lines = raw.split('\n').filter(l => l.trim().length > 0);
-  if (lines.length < 2) return [];
-
-  const delimiter = lines[0].includes('\t') ? '\t' : ',';
-  const headers = lines[0].split(delimiter).map(h => stripQuotes(h).toLowerCase());
-
-  const col = (candidates: string[]): number => {
-    for (const c of candidates) {
-      const idx = headers.findIndex(h => h.includes(c));
-      if (idx !== -1) return idx;
-    }
-    return -1;
-  };
-
-  const rankIdx    = col(['rank']);
-  const playerIdx  = col(['player', 'name']);
-  const adpIdx     = col(['overall adp', 'adp', 'overall', 'avg']);
-  const posIdx     = col(['position(s)', 'positions', 'pos']);
-  const teamIdx    = col(['team']);
-  const auctionIdx = col(['auction value', 'auction', 'value', 'salary', 'cost', '$']);
-
-  const players: NFBCPlayer[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(delimiter).map(stripQuotes);
-    if (cols.length < 2) continue;
-
-    const rawName = playerIdx !== -1 ? (cols[playerIdx] ?? '').trim() : '';
-    if (!rawName) continue;
-
-    const rank      = rankIdx  !== -1 ? parseInt(cols[rankIdx]  ?? '', 10) : i;
-    const adp       = adpIdx   !== -1 ? parseFloat(cols[adpIdx] ?? '')     : rank;
-    const positions = posIdx   !== -1 ? (cols[posIdx]  ?? '').trim()       : '';
-    const team      = teamIdx  !== -1 ? (cols[teamIdx] ?? '').trim()       : '';
-
-    const safeRank  = isNaN(rank) ? i : rank;
-    const safeAdp   = isNaN(adp)  ? safeRank : adp;
-    const valueDelta = Math.round((safeAdp - safeRank) * 10) / 10;
-
-    const rawAuction   = auctionIdx !== -1 ? parseFloat(cols[auctionIdx] ?? '') : NaN;
-    const auctionValue = !isNaN(rawAuction) && rawAuction > 0 ? rawAuction : undefined;
-
-    players.push({
-      rank:         safeRank,
-      playerName:   rawName,
-      displayName:  normalisePlayerName(rawName),
-      adp:          safeAdp,
-      positions,
-      team,
-      valueDelta,
-      isValuePick:  valueDelta > 15,
-      auctionValue,
-    });
-  }
-
-  return players;
-}
-
-async function tryFetchURL(url: string): Promise<NFBCPlayer[]> {
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-      'Accept': 'text/tab-separated-values, text/csv, text/plain, application/vnd.ms-excel, */*',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Referer': 'https://nfc.shgn.com/adp/football',
-      'Origin': 'https://nfc.shgn.com',
-      'Sec-Fetch-Dest': 'document',
-      'Sec-Fetch-Mode': 'navigate',
-      'Sec-Fetch-Site': 'same-origin',
-    },
-    signal: AbortSignal.timeout(8000),
-  });
-
-  if (!res.ok) {
-    throw new Error(`NFFC NFL ADP fetch failed: HTTP ${res.status}`);
-  }
-
-  const contentType = res.headers.get('content-type') ?? '';
-  const body = await res.text();
-
-  if (contentType.includes('text/html') || body.trimStart().startsWith('<')) {
-    throw new Error('NFFC NFL ADP endpoint returned HTML (not TSV) — format may have changed');
-  }
-
-  if (contentType.includes('application/json') || contentType.includes('json') || body.trimStart().startsWith('{') || body.trimStart().startsWith('[')) {
-    const json = JSON.parse(body) as Record<string, unknown>;
-    const raw = (json.players ?? json.data ?? json) as Array<Record<string, unknown>>;
-    if (!Array.isArray(raw) || raw.length === 0) throw new Error('JSON response has no player array');
-    const parsed = raw.map((p, i) => {
-      const rank = Number(p.rank ?? p.overall_rank ?? i + 1);
-      const adp  = Number(p.adp ?? p.average_draft_position ?? rank);
-      const name = String(p.player_name ?? p.name ?? '');
-      const pos  = String(p.pos ?? p.position ?? '');
-      const team = String(p.team ?? '');
-      const valueDelta = Math.round((adp - rank) * 10) / 10;
-      return {
-        rank, playerName: name, displayName: normalisePlayerName(name),
-        adp, positions: pos, team, valueDelta, isValuePick: valueDelta > 15,
-      } satisfies NFBCPlayer;
-    }).filter(p => p.displayName.length > 0);
-    if (parsed.length === 0) throw new Error('JSON response parsed to 0 valid players');
-    return parsed;
-  }
-
-  const players = parseTSV(body);
-  if (players.length === 0) {
-    throw new Error('NFFC NFL ADP response parsed to 0 players — unexpected format');
-  }
-
-  return players;
-}
-
-async function fetchNFFCNFLADP(): Promise<NFBCPlayer[]> {
-  let lastError: Error | null = null;
-
-  for (const url of NFFC_NFL_ADP_URLS) {
-    try {
-      const players = await tryFetchURL(url);
-      console.log(`[v0] [NFL ADP] Fetched ${players.length} players from NFFC (${url})`);
-      return players;
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      console.warn(`[v0] [NFL ADP] URL failed (${url}): ${lastError.message}`);
-    }
-  }
-
-  throw lastError ?? new Error('No NFFC NFL ADP URLs configured');
-}
-
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Returns the cached NFFC NFL ADP player list, refreshing when the cache is stale.
- * Safe to call on every request — fetches only once per TTL period.
+ * Clears the in-memory NFL cache, forcing the next call to re-read from Supabase.
+ * Called by the upload route after a successful TSV import.
+ */
+export function clearNFLADPCache(): void {
+  nflAdpCache = null;
+  nflLastFetched = 0;
+}
+
+/**
+ * Returns the NFFC NFL ADP player list.
+ * Data comes exclusively from Supabase (populated by user TSV uploads).
+ * Falls back to the static pre-season dataset when no upload exists yet.
  */
 export async function getNFLADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
   const now = Date.now();
-  const isStale = now - nflLastFetched > CACHE_TTL_MS;
 
-  if (nflAdpCache && !isStale && !forceRefresh) {
+  if (nflAdpCache && !forceRefresh && now - nflLastFetched < CACHE_TTL_MS) {
     return nflAdpCache;
   }
 
-  // Try Supabase first — faster than a live external HTTP call
-  if (!forceRefresh) {
-    const dbData = await loadADPFromSupabase('nfl');
-    if (dbData && dbData.length > 0) {
-      console.log(`[v0] [NFL ADP] Serving ${dbData.length} NFL players from Supabase cache`);
-      nflAdpCache = dbData;
-      nflLastFetched = now;
-      return dbData;
-    }
+  // User-uploaded data lives in Supabase — always authoritative, no TTL check
+  const dbData = await loadADPFromSupabase('nfl', true);
+  if (dbData && dbData.length > 0) {
+    console.log(`[v0] [NFL ADP] Serving ${dbData.length} NFL players from Supabase (user upload)`);
+    nflAdpCache = dbData;
+    nflLastFetched = now;
+    return dbData;
   }
 
-  try {
-    const players = await fetchNFFCNFLADP();
-    nflAdpCache = players;
-    nflLastFetched = now;
-    // Persist to Supabase (fire-and-forget)
-    void saveADPToSupabase(players, 'nfl');
-    return players;
-  } catch (err) {
-    console.error('[v0] [NFL ADP] Failed to fetch NFFC NFL ADP data:', err);
-    if (nflAdpCache) {
-      console.warn('[v0] [NFL ADP] Returning stale cached data');
-      return nflAdpCache;
-    }
-    // Try stale Supabase data before returning static fallback
-    const dbData = await loadADPFromSupabase('nfl', true);
-    if (dbData && dbData.length > 0) {
-      console.warn(`[v0] [NFL ADP] Returning ${dbData.length} players from stale Supabase data`);
-      return dbData;
-    }
-    console.warn(`[v0] [NFL ADP] Returning static fallback dataset (${NFL_STATIC_FALLBACK.length} players, 2026 pre-season consensus)`);
-    return NFL_STATIC_FALLBACK;
-  }
+  console.log(`[v0] [NFL ADP] No NFL ADP upload found — serving static fallback (${NFL_STATIC_FALLBACK.length} players)`);
+  return NFL_STATIC_FALLBACK;
 }

@@ -9,6 +9,7 @@ import { ArbitrageCard } from './ArbitrageCard';
 import { CardSkeleton } from './CardSkeleton';
 import { StatcastCard } from './StatcastCard';
 import { ADPCard } from './ADPCard';
+import { ADPUploadModal } from '@/components/ADPUploadModal';
 import { MLBProjectionCard } from './MLBProjectionCard';
 import { VPECard } from './VPECard';
 
@@ -243,6 +244,12 @@ export function DynamicCardRenderer({
         </div>
       </div>
     );
+  }
+
+  // ADP upload card — shown when no TSV has been uploaded yet
+  if (cardType === 'adp-upload') {
+    const sport = (safeCard.data?.sport as 'mlb' | 'nfl' | undefined) ?? 'mlb';
+    return <ADPUploadModal sport={sport} />;
   }
 
   // ADP leaderboard cards (NFBC ADP tool results)

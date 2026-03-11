@@ -368,6 +368,7 @@ export async function POST(request: NextRequest) {
     let modelUsed: string = AI_CONFIG.MODEL_DISPLAY_NAME;
     let usedFallback = false;
     let pendingADPCard: InsightCard | null = null;
+    let pendingADPUploadCard: InsightCard | null = null;
     let pendingStatcastCard: InsightCard | null = null;
     let skipStatcastJSON = false; // set true when statcast tool returned empty players
 
@@ -638,6 +639,21 @@ export async function POST(request: NextRequest) {
                 totalInDataset: tr.total_players_in_dataset,
               },
             };
+
+            // When serving static fallback, also emit an upload card so the user
+            // can provide the real TSV without leaving the chat.
+            if (tr.is_static_fallback) {
+              pendingADPUploadCard = {
+                type: 'adp-upload',
+                title: isNFLResult ? 'Upload NFFC Football ADP' : 'Upload NFBC Baseball ADP',
+                category: isNFLResult ? 'NFL' : 'MLB',
+                subcategory: isNFLResult ? 'NFFC ADP Upload' : 'NFBC ADP Upload',
+                gradient: 'from-violet-600/80 via-purple-700/60 to-violet-900/40',
+                status: 'pending',
+                realData: false,
+                data: { sport: isNFLResult ? 'nfl' : 'mlb' },
+              };
+            }
           }
         }
 
@@ -810,9 +826,13 @@ export async function POST(request: NextRequest) {
     // to render (they come from the live Odds/Kalshi APIs, not the AI model).
     let cards: InsightCard[] = await cardPromise.catch(() => []);
 
-    // Inject ADP card at the front when the tool returned results
+    // Inject ADP card at the front when the tool returned results.
+    // When using static fallback, also append an upload card so the user can supply real data.
     if (pendingADPCard) {
       cards = [pendingADPCard, ...cards.slice(0, 5)];
+    }
+    if (pendingADPUploadCard) {
+      cards = [...cards, pendingADPUploadCard];
     }
 
     // ── MLB Statcast: parse Grok's JSON response into a card ──────────────────

@@ -3432,6 +3432,8 @@ No preamble. Start directly with section 1.`;
                           generateCardAnalysis(card as InsightCard, `${index}-${cardIndex}`);
                         }}
                         messageIndex={index}
+                        trustScore={message.trustMetrics?.finalConfidence}
+                        trustLevel={message.trustMetrics?.trustLevel}
                       />
 
                       {/* Analysis panels — full width below the card grid */}

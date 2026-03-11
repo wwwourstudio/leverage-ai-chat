@@ -31,6 +31,8 @@ interface DynamicCardRendererProps {
   isLoading?: boolean;
   error?: string;
   isHero?: boolean;
+  trustScore?: number;
+  trustLevel?: 'high' | 'medium' | 'low';
 }
 
 export function DynamicCardRenderer({
@@ -40,6 +42,8 @@ export function DynamicCardRenderer({
   isLoading,
   error,
   isHero = false,
+  trustScore,
+  trustLevel,
 }: DynamicCardRendererProps) {
   // Loading state
   if (isLoading) {
@@ -75,6 +79,36 @@ export function DynamicCardRenderer({
 
   const handleAnalyze = onAnalyze ? () => onAnalyze(card) : undefined;
 
+  // Whether this card has real live data or is estimated/fallback
+  const isEstimated = safeCard.realData === false;
+  const hasTrustOverlay = trustScore !== undefined;
+
+  // Wraps any card element with ESTIMATED badge (when realData===false)
+  // and a per-card trust score chip (when trustScore is provided).
+  function withOverlays(el: React.ReactElement): React.ReactElement {
+    if (!isEstimated && !hasTrustOverlay) return el;
+    return (
+      <div className="relative">
+        {el}
+        {isEstimated && (
+          <span className="absolute top-2 right-10 z-10 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-gray-900/80 text-gray-400 border border-gray-700/50 backdrop-blur-sm pointer-events-none">
+            ESTIMATED
+          </span>
+        )}
+        {hasTrustOverlay && (
+          <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-sm border border-white/10 pointer-events-none">
+            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+              trustLevel === 'high' ? 'bg-emerald-400' :
+              trustLevel === 'medium' ? 'bg-yellow-400' :
+              'bg-red-400'
+            }`} />
+            <span className="text-[8px] font-bold text-white/60">{trustScore}%</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // Determine card type and render appropriate component
   const cardType = safeCard.type.toLowerCase();
 
@@ -86,7 +120,7 @@ export function DynamicCardRenderer({
     cardType.includes('spread') ||
     cardType.includes('totals')
   ) {
-    return (
+    return withOverlays(
       <BettingCard
         type={safeCard.type}
         title={safeCard.title}
@@ -104,7 +138,7 @@ export function DynamicCardRenderer({
 
   // DFS-related cards
   if (cardType.includes('dfs') || cardType.includes('lineup')) {
-    return (
+    return withOverlays(
       <DFSCard
         type={safeCard.type}
         title={safeCard.title}
@@ -126,7 +160,7 @@ export function DynamicCardRenderer({
     cardType.includes('draft') ||
     cardType.includes('sleeper')
   ) {
-    return (
+    return withOverlays(
       <FantasyCard
         type={safeCard.type}
         title={safeCard.title}
@@ -144,7 +178,7 @@ export function DynamicCardRenderer({
 
   // Kalshi-related cards
   if (cardType.includes('kalshi') || cardType.includes('prediction')) {
-    return (
+    return withOverlays(
       <KalshiCard
         type={safeCard.type}
         title={safeCard.title}
@@ -162,7 +196,7 @@ export function DynamicCardRenderer({
 
   // Weather-related cards
   if (cardType.includes('weather') || cardType.includes('climate')) {
-    return (
+    return withOverlays(
       <WeatherCard
         type={safeCard.type}
         title={safeCard.title}
@@ -180,7 +214,7 @@ export function DynamicCardRenderer({
 
   // Vortex Projection Engine (VPE 3.0) — Baseball only
   if (cardType === 'vpe_projection_card') {
-    return (
+    return withOverlays(
       <VPECard
         card={{ ...safeCard, ...(card as any) } as any}
         onAnalyze={handleAnalyze}
@@ -190,7 +224,7 @@ export function DynamicCardRenderer({
 
   // LeverageMetrics MLB Projection cards (HR/K/Breakout/Monte Carlo)
   if (cardType === 'mlb_projection_card') {
-    return (
+    return withOverlays(
       <MLBProjectionCard
         data={{ ...safeCard, ...(card as any) } as any}
         onAnalyze={handleAnalyze}
@@ -208,7 +242,7 @@ export function DynamicCardRenderer({
     cardType === 'leaderboard_card' ||
     cardType === 'pitch_analysis_card'
   ) {
-    return (
+    return withOverlays(
       <StatcastCard
         data={{ ...safeCard, ...(card as any) } as any}
         onAnalyze={handleAnalyze}
@@ -224,7 +258,7 @@ export function DynamicCardRenderer({
     };
     const sportKey = safeCard.category?.toLowerCase() ?? '';
     const emoji = sportEmojis[sportKey] ?? '📊';
-    return (
+    return withOverlays(
       <div className={`group relative bg-gradient-to-br ${safeCard.gradient || 'from-blue-600/20 to-purple-900/10'} rounded-2xl p-5 border border-gray-700/40 hover:border-gray-600/60 transition-all duration-300 shadow-lg hover:shadow-xl`}>
         <div className="flex items-start gap-3 mb-3">
           <div className="text-2xl leading-none mt-0.5">{emoji}</div>
@@ -254,7 +288,7 @@ export function DynamicCardRenderer({
 
   // ADP leaderboard cards (NFBC ADP tool results)
   if (cardType === 'adp-analysis' || cardType.includes('adp')) {
-    return (
+    return withOverlays(
       <ADPCard
         type={safeCard.type}
         title={safeCard.title}
@@ -279,7 +313,7 @@ export function DynamicCardRenderer({
     const underNum = parseFloat(underRaw);
     const overStr  = !isNaN(overNum)  ? (overNum  > 0 ? `+${overNum}`  : String(overNum))  : overRaw;
     const underStr = !isNaN(underNum) ? (underNum > 0 ? `+${underNum}` : String(underNum)) : underRaw;
-    return (
+    return withOverlays(
       <div className={`group relative bg-gradient-to-br ${safeCard.gradient} rounded-2xl p-5 border border-gray-700/40 hover:border-gray-600/60 transition-all duration-300 shadow-lg hover:shadow-xl`}>
         <div className="flex items-start justify-between mb-3">
           <div>
@@ -317,7 +351,7 @@ export function DynamicCardRenderer({
 
   // Arbitrage cards
   if (cardType.includes('arbitrage')) {
-    return (
+    return withOverlays(
       <ArbitrageCard
         data={safeCard.data as any}
         gradient={safeCard.gradient}
@@ -328,7 +362,7 @@ export function DynamicCardRenderer({
   }
 
   // Default fallback - use betting card as generic card
-  return (
+  return withOverlays(
     <BettingCard
       type={safeCard.type}
       title={safeCard.title}

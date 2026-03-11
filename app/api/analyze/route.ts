@@ -18,7 +18,7 @@ import { getADPData, queryADP, parseTSV, saveADPToSupabase, clearADPCache } from
 import { getNFLADPData, clearNFLADPCache } from '@/lib/nfl-adp-data';
 import { getStatcastData, queryStatcast } from '@/lib/baseball-savant';
 import type { StatcastPlayer } from '@/lib/baseball-savant';
-import { generateContextualCards, type InsightCard } from '@/lib/cards-generator';
+import { generateContextualCards, oddsEventsToBettingCards, type InsightCard } from '@/lib/cards-generator';
 import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-detector';
 import { getGrokApiKey } from '@/lib/config';
 
@@ -377,10 +377,21 @@ export async function POST(request: NextRequest) {
         .catch(() => generateContextualCards('fantasy', context.sport ?? undefined, 3).catch(() => []));
     } else if (!context.isPoliticalMarket && (context.isSportsQuery || context.hasBettingIntent)) {
       const sportKey = context.sport || undefined;
-      cardPromise = Promise.race([
-        generateContextualCards('betting', sportKey, 6),
-        new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 6000)),
-      ]);
+      // If the client already fetched live odds and sent them in context.oddsData,
+      // build cards directly from that data so AI and cards show the exact same games.
+      if (context.oddsData?.events?.length > 0) {
+        const builtCards = oddsEventsToBettingCards(
+          context.oddsData.events,
+          context.oddsData.sport || sportKey || 'sports',
+          6
+        );
+        cardPromise = Promise.resolve(builtCards);
+      } else {
+        cardPromise = Promise.race([
+          generateContextualCards('betting', sportKey, 6),
+          new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 6000)),
+        ]);
+      }
     } else {
       // General query — try to return cached/fresh multi-sport cards so the
       // response always has data cards rather than falling back to empty.

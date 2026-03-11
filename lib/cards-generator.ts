@@ -54,6 +54,109 @@ function setCachedCards(cards: InsightCard[], category: string, sport?: string):
 }
 
 /**
+ * Convert raw Odds API event objects into BettingCards with realData: true.
+ * Used by the /api/analyze route to build cards directly from context.oddsData
+ * (the odds already fetched by the client) so the AI and cards show the same games.
+ */
+export function oddsEventsToBettingCards(
+  events: any[],
+  sport: string,
+  maxCards = 6
+): InsightCard[] {
+  const cards: InsightCard[] = [];
+  const displaySport = apiToSport(sport).toUpperCase();
+  const PREFERRED_BOOKS = [
+    'DraftKings', 'FanDuel', 'BetMGM', 'Caesars', 'PointsBet',
+    'BetRivers', 'ESPN BET', 'Hard Rock Bet', 'Fanatics', 'bet365',
+  ];
+
+  // First pass: completed games with scores
+  for (const game of events) {
+    if (cards.length >= maxCards) break;
+    if (!game.completed || !game.scores) continue;
+    const homeScore = game.scores?.find((s: any) => s.name === game.home_team);
+    const awayScore = game.scores?.find((s: any) => s.name === game.away_team);
+    cards.push({
+      type: CARD_TYPES.LIVE_ODDS,
+      title: `${game.away_team} @ ${game.home_team}`,
+      icon: 'CheckCircle',
+      category: displaySport,
+      subcategory: 'Final Score',
+      gradient: getSportGradient(sport),
+      data: {
+        matchup: `${game.away_team} @ ${game.home_team}`,
+        sport,
+        gameTime: new Date(game.commence_time).toLocaleString(),
+        finalScore: `${game.away_team} ${awayScore?.score ?? '?'} — ${homeScore?.score ?? '?'} ${game.home_team}`,
+        homeScore: homeScore?.score ?? '?',
+        awayScore: awayScore?.score ?? '?',
+        completed: true,
+        realData: true,
+        status: 'FINAL',
+      },
+      metadata: { realData: true, dataSource: 'The Odds API Scores', gameId: game.id },
+    });
+  }
+
+  // Second pass: upcoming games with bookmaker odds
+  for (const game of events) {
+    if (cards.length >= maxCards) break;
+    if (game.completed) continue;
+    const bookmakers: any[] = game.bookmakers || [];
+    if (bookmakers.length === 0) continue;
+    const sorted = [...bookmakers].sort((a, b) => {
+      const ai = PREFERRED_BOOKS.findIndex(n => a.title?.includes(n));
+      const bi = PREFERRED_BOOKS.findIndex(n => b.title?.includes(n));
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+    const book = sorted[0];
+    const h2hMarket = book?.markets?.find((m: any) => m.key === 'h2h');
+    const spreadsMarket = book?.markets?.find((m: any) => m.key === 'spreads');
+    const totalsMarket = book?.markets?.find((m: any) => m.key === 'totals');
+    const h2hOutcomes = h2hMarket?.outcomes || [];
+    const homeOdds = h2hOutcomes.find((o: any) => o.name === game.home_team);
+    const awayOdds = h2hOutcomes.find((o: any) => o.name === game.away_team);
+    const spreadOutcomes = spreadsMarket?.outcomes || [];
+    const homeSpread = spreadOutcomes.find((o: any) => o.name === game.home_team);
+    const awaySpread = spreadOutcomes.find((o: any) => o.name === game.away_team);
+    const totalOutcomes = totalsMarket?.outcomes || [];
+    const over = totalOutcomes.find((o: any) => o.name === 'Over');
+    const under = totalOutcomes.find((o: any) => o.name === 'Under');
+    const hasOdds = !!(homeOdds || awayOdds || homeSpread || over);
+    const gameDate = new Date(game.commence_time);
+    const isToday = new Date().toDateString() === gameDate.toDateString();
+    const gameTimeStr = isToday
+      ? `Today ${gameDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+      : gameDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    cards.push({
+      type: CARD_TYPES.LIVE_ODDS,
+      title: `${game.away_team} @ ${game.home_team}`,
+      icon: hasOdds ? 'TrendingUp' : 'Calendar',
+      category: displaySport,
+      subcategory: hasOdds ? `${book?.title ?? 'Odds'} Lines` : 'Upcoming',
+      gradient: getSportGradient(sport),
+      data: {
+        matchup: `${game.away_team} @ ${game.home_team}`,
+        sport,
+        gameTime: gameTimeStr,
+        homeOdds: homeOdds ? (homeOdds.price > 0 ? `+${homeOdds.price}` : `${homeOdds.price}`) : (hasOdds ? 'N/A' : '—'),
+        awayOdds: awayOdds ? (awayOdds.price > 0 ? `+${awayOdds.price}` : `${awayOdds.price}`) : (hasOdds ? 'N/A' : '—'),
+        homeSpread: homeSpread ? `${homeSpread.point > 0 ? '+' : ''}${homeSpread.point} (${homeSpread.price > 0 ? '+' : ''}${homeSpread.price})` : 'N/A',
+        awaySpread: awaySpread ? `${awaySpread.point > 0 ? '+' : ''}${awaySpread.point} (${awaySpread.price > 0 ? '+' : ''}${awaySpread.price})` : 'N/A',
+        overUnder: over && under ? `O/U ${over.point}: Over ${over.price > 0 ? '+' : ''}${over.price} / Under ${under.price > 0 ? '+' : ''}${under.price}` : 'N/A',
+        bookmaker: book?.title ?? (hasOdds ? 'Multiple Books' : 'Upcoming'),
+        bookmakerCount: game.bookmakers?.length || 0,
+        realData: true,
+        status: hasOdds ? 'VALUE' : 'UPCOMING',
+      },
+      metadata: { realData: true, dataSource: 'The Odds API', gameId: game.id },
+    });
+  }
+
+  return cards;
+}
+
+/**
  * Generate sport-specific cards with REAL odds data
  */
 // FORCE REFRESH: 2026-02-21-v5
@@ -649,13 +752,11 @@ async function _generateContextualCards(
     return finalCards;
   }
 
-  // Single-sport betting path — user has selected a specific sport (e.g. NBA).
+  // Single-sport betting path — user has selected a specific sport (e.g. NBA, MLB, NFL).
   // The multi-sport block above is skipped when sport is set, so we must call
   // generateSportSpecificCards directly here to get real game odds with moneylines,
-  // spreads, and totals instead of falling through to the arbitrage placeholder.
-  // NOTE: baseball_mlb is EXCLUDED — all MLB cards come from the LeverageMetrics
-  // projection engine below (line ~1006), not the Odds API.
-  if (!multiSport && normalizedSport && normalizedSport !== 'baseball_mlb' && (category === 'betting' || category === 'all' || !category)) {
+  // spreads, and totals instead of falling through to the projection engine.
+  if (!multiSport && normalizedSport && (category === 'betting' || category === 'all' || !category)) {
     console.log(`[v0] [CARDS-GEN] Single-sport mode: fetching ${normalizedSport} odds directly`);
     const sportCards = await generateSportSpecificCards(normalizedSport, count, category);
     if (sportCards.length > 0) {

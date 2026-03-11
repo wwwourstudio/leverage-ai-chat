@@ -23,6 +23,8 @@ interface CardLayoutProps {
   aiInsight?: string;
   onAnalyze?: (card: CardData) => void;
   messageIndex?: number;
+  trustScore?: number;
+  trustLevel?: 'high' | 'medium' | 'low';
 }
 
 /** Extract a short 1–2 sentence blurb from a longer AI message */
@@ -47,6 +49,8 @@ export const CardLayout = memo(function CardLayout({
   aiInsight,
   onAnalyze,
   messageIndex = 0,
+  trustScore,
+  trustLevel,
 }: CardLayoutProps) {
   const [heroIndex, setHeroIndex] = useState(0);
   const [transitioning, setTransitioning] = useState(false);
@@ -88,6 +92,8 @@ export const CardLayout = memo(function CardLayout({
             index={heroIndex}
             isHero
             onAnalyze={onAnalyze ? () => onAnalyze(heroCard) : undefined}
+            trustScore={trustScore}
+            trustLevel={trustLevel}
           />
         </div>
 

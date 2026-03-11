@@ -14,8 +14,8 @@ import {
   ERROR_MESSAGES,
   NFBC_DRAFT_YEAR,
 } from '@/lib/constants';
-import { getADPData, queryADP } from '@/lib/adp-data';
-import { getNFLADPData } from '@/lib/nfl-adp-data';
+import { getADPData, queryADP, parseTSV, saveADPToSupabase, clearADPCache } from '@/lib/adp-data';
+import { getNFLADPData, clearNFLADPCache } from '@/lib/nfl-adp-data';
 import { getStatcastData, queryStatcast } from '@/lib/baseball-savant';
 import type { StatcastPlayer } from '@/lib/baseball-savant';
 import { generateContextualCards, type InsightCard } from '@/lib/cards-generator';
@@ -155,6 +155,44 @@ export async function POST(request: NextRequest) {
     const systemPrompt = customInstructions?.trim()
       ? `${baseWithAddendum}\n\n## USER PROFILE & BETTING PREFERENCES\n${customInstructions.trim()}`
       : baseWithAddendum;
+
+    // ── Auto-save inline TSV/CSV ADP uploads ─────────────────────────────────────
+    // When a user drags a TSV file into the chat, the content is embedded inline
+    // as "[File: ADP.tsv (N rows)]\nCol1\tCol2\t...\n...". If this message has
+    // ADP intent we extract and save to Supabase right now so that the query_adp
+    // tool (called later) returns the real uploaded data instead of static fallback.
+    if (hasADPIntent && userMessage.includes('[File:')) {
+      // Find all inline file blocks: "[File: name (N rows)]\n<content up to next [File: or end>"
+      const fileBlockRe = /\[File:\s*([^\]]+\.(?:tsv|csv))[^\]]*\]\n([\s\S]*?)(?=\n\[File:|$)/gi;
+      let fileMatch;
+      while ((fileMatch = fileBlockRe.exec(userMessage)) !== null) {
+        const fileName = (fileMatch[1] ?? '').toLowerCase();
+        const rawContent = fileMatch[2] ?? '';
+        if (!rawContent.trim()) continue;
+
+        // Reconstruct minimal TSV with header from page-client's format:
+        // The first line IS the header (tab-joined), subsequent lines are rows.
+        const players = parseTSV(rawContent);
+        if (players.length < 5) continue; // not a real ADP board
+
+        const isNFLFile = fileName.includes('nfl') || fileName.includes('football') ||
+          msgLower.includes('nfl') || msgLower.includes('nffc') || msgLower.includes('football');
+        const sport = isNFLFile ? 'nfl' : 'mlb';
+
+        try {
+          await saveADPToSupabase(players, sport);
+          if (sport === 'nfl') {
+            clearNFLADPCache();
+          } else {
+            clearADPCache();
+          }
+          console.log(`[API/analyze] Auto-saved ${players.length} ${sport.toUpperCase()} ADP players from inline file upload`);
+        } catch (saveErr) {
+          console.warn('[API/analyze] Failed to auto-save inline ADP upload:', saveErr);
+        }
+        break; // only process the first valid ADP file
+      }
+    }
 
     // Detect ambiguous queries with no sport/intent context — ask a clarifying question
     const isAmbiguous = !context?.sport

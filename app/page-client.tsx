@@ -1467,6 +1467,17 @@ No preamble. Start directly with section 1.`;
           const decoder = new TextDecoder();
           let buf = '';
           let donePayload: APIResponse | null = null;
+          // rAF batching: accumulate token text between frames instead of calling
+          // setMessages on every single token (~100-300 per response).
+          let streamContent = '';
+          let rafHandle: ReturnType<typeof requestAnimationFrame> | null = null;
+          const flushToState = () => {
+            const snapshot = streamContent;
+            setMessages(prev => prev.map(m =>
+              m.id === streamingMessageId ? { ...m, content: snapshot } : m
+            ));
+            rafHandle = null;
+          };
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -1478,17 +1489,28 @@ No preamble. Start directly with section 1.`;
               let ev: { type: string; delta?: string; text?: string; [k: string]: any };
               try { ev = JSON.parse(part.slice(6)); } catch { continue; }
               if (ev.type === 'text') {
-                setMessages(prev => prev.map(m =>
-                  m.id === streamingMessageId ? { ...m, content: m.content + (ev.delta ?? '') } : m
-                ));
+                streamContent += ev.delta ?? '';
+                if (rafHandle === null) {
+                  rafHandle = requestAnimationFrame(flushToState);
+                }
               } else if (ev.type === 'replace') {
+                // Intentional direct update — fires once, not per-token
+                streamContent = ev.text ?? streamContent;
+                if (rafHandle !== null) { cancelAnimationFrame(rafHandle); rafHandle = null; }
                 setMessages(prev => prev.map(m =>
-                  m.id === streamingMessageId ? { ...m, content: ev.text ?? m.content } : m
+                  m.id === streamingMessageId ? { ...m, content: streamContent } : m
                 ));
               } else if (ev.type === 'done') {
                 donePayload = ev as unknown as APIResponse;
               }
             }
+          }
+          // Flush any tokens buffered in the last partial frame
+          if (rafHandle !== null) { cancelAnimationFrame(rafHandle); rafHandle = null; }
+          if (streamContent) {
+            setMessages(prev => prev.map(m =>
+              m.id === streamingMessageId ? { ...m, content: streamContent } : m
+            ));
           }
           return donePayload ?? { success: false, error: 'Stream ended without done event' };
         }

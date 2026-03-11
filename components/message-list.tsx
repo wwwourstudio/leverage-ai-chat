@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Sparkles, User } from 'lucide-react';
 import { TrustMetricsBadge } from './trust-metrics-display';
 
@@ -58,7 +58,7 @@ function TypingIndicator() {
   );
 }
 
-export function MessageList({ messages, isTyping }: MessageListProps) {
+export const MessageList = memo(function MessageList({ messages, isTyping }: MessageListProps) {
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
       {messages.map((message, index) => (
@@ -102,4 +102,4 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
       {isTyping && <TypingIndicator />}
     </div>
   );
-}
+});

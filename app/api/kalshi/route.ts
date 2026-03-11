@@ -93,10 +93,10 @@ export async function GET(request: Request) {
         markets = await fetchKalshiMarkets({ search: subcategory, limit });
       }
 
-      // Fallback to trending markets when a category fetch yields nothing
       if (markets.length === 0) {
-        console.log(`[v0] [API] [KALSHI] subcategory=${subcategory} returned 0 — falling back to trending`);
-        markets = await fetchTopMarketsByVolume(limit);
+        console.log(`[v0] [API] [KALSHI] subcategory=${subcategory} returned 0 markets`);
+        // Removed: fallback to trending. When the API is unreachable the trending
+        // fetch also returns [] and just wastes time. Empty result is returned as-is.
       }
 
       markets = markets.sort((a, b) => (b.volume24h || b.volume) - (a.volume24h || a.volume));

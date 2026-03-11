@@ -646,6 +646,7 @@ export async function POST(request: NextRequest) {
               pendingADPUploadCard = {
                 type: 'adp-upload',
                 title: isNFLResult ? 'Upload NFFC Football ADP' : 'Upload NFBC Baseball ADP',
+                icon: isNFLResult ? '🏈' : '⚾',
                 category: isNFLResult ? 'NFL' : 'MLB',
                 subcategory: isNFLResult ? 'NFFC ADP Upload' : 'NFBC ADP Upload',
                 gradient: 'from-violet-600/80 via-purple-700/60 to-violet-900/40',

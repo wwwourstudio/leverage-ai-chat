@@ -62,7 +62,7 @@ Respond ONLY with a JSON object (no markdown, no explanation):
     const { text } = await generateText({
       model: xai('grok-3-fast'),
       prompt,
-      maxTokens: 200,
+      maxOutputTokens: 200,
     });
 
     // Parse the JSON response

@@ -230,10 +230,12 @@ describe('GET /api/health', () => {
     delete process.env.ODDS_API_KEY;
   });
 
-  it('returns degraded (not unhealthy) when KALSHI_API_KEY is absent', async () => {
+  it('returns degraded (not unhealthy) when KALSHI_API_KEY_ID is absent', async () => {
     process.env.ODDS_API_KEY = 'test-key';
-    const origKalshi = process.env.KALSHI_API_KEY;
-    delete process.env.KALSHI_API_KEY;
+    const origKalshiId = process.env.KALSHI_API_KEY_ID;
+    const origKalshiKey = process.env.KALSHI_PRIVATE_KEY;
+    delete process.env.KALSHI_API_KEY_ID;
+    delete process.env.KALSHI_PRIVATE_KEY;
     mockFetch();
 
     const res = await GET();
@@ -244,7 +246,8 @@ describe('GET /api/health', () => {
     // (depends on other services)
     expect(['healthy', 'degraded']).toContain(body.status);
 
-    if (origKalshi !== undefined) process.env.KALSHI_API_KEY = origKalshi;
+    if (origKalshiId !== undefined) process.env.KALSHI_API_KEY_ID = origKalshiId;
+    if (origKalshiKey !== undefined) process.env.KALSHI_PRIVATE_KEY = origKalshiKey;
     delete process.env.ODDS_API_KEY;
   });
 

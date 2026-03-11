@@ -325,6 +325,10 @@ export interface InsightCard {
   data?: any;
   metadata?: any;
   realData?: boolean;
+  /** Statcast summary card metrics — rendered by StatcastCard */
+  summary_metrics?: Array<{ label: string; value: string }>;
+  /** Source/timestamp label for Statcast cards */
+  last_updated?: string;
 }
 
 // ============================================================================

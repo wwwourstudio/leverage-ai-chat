@@ -16,10 +16,11 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data-service';
 import { API_ENDPOINTS } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/client';
-import { AuthModals } from '@/components/AuthModals';
+const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ default: m.AuthModals })), { ssr: false });
 import { MessageList } from '@/components/message-list';
 import { MobileChatInput } from '@/components/mobile-chat-input';
 import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2, Bookmark } from 'lucide-react';
@@ -33,10 +34,10 @@ import { AIProgressIndicator } from '@/components/ai-progress-indicator';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { DataFallback } from '@/components/data-fallback';
 import { ChatMessage } from '@/components/chat-message';
-import { SettingsLightbox } from '@/components/SettingsLightbox';
-import { AlertsLightbox } from '@/components/AlertsLightbox';
-import { StripeLightbox } from '@/components/StripeLightbox';
-import { UserLightbox } from '@/components/UserLightbox';
+const SettingsLightbox = dynamic(() => import('@/components/SettingsLightbox').then(m => ({ default: m.SettingsLightbox })), { ssr: false });
+const AlertsLightbox = dynamic(() => import('@/components/AlertsLightbox').then(m => ({ default: m.AlertsLightbox })), { ssr: false });
+const StripeLightbox = dynamic(() => import('@/components/StripeLightbox').then(m => ({ default: m.StripeLightbox })), { ssr: false });
+const UserLightbox = dynamic(() => import('@/components/UserLightbox').then(m => ({ default: m.UserLightbox })), { ssr: false });
 import { useToast } from '@/components/toast-provider';
 import { Sidebar } from '@/components/Sidebar';
 import { ChatHeader } from '@/components/chat-header';
@@ -141,6 +142,7 @@ interface Message {
   trustMetrics?: TrustMetrics;
   attachments?: FileAttachment[];
   voted?: 'up' | 'down';
+  isStreaming?: boolean;
 }
 
 interface Chat {
@@ -1440,46 +1442,65 @@ No preamble. Start directly with section 1.`;
         contextualUserMessage = `[Fantasy League Context: ${leagueCtx}]\n\n${userMessage}`;
       }
 
-      // Fetch real data from our API routes
-      const fetchAnalysis = () =>
-        fetch('/api/analyze', {
+      // Fetch real data — streams SSE tokens as they arrive, falls back to JSON
+      let streamingMessageId: string | undefined;
+      const fetchAnalysis = async (): Promise<APIResponse> => {
+        const res = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userMessage: contextualUserMessage, existingCards: availableCards, context, customInstructions: customInstructions || undefined, imageAttachments: imageAttachments?.length ? imageAttachments : undefined }),
           signal: controller.signal,
-        }).then(async (res) => {
-          if (!res.ok) {
-            const text = await res.text().catch(() => '');
-            const snippet = text.slice(0, 200);
-            console.error('[v0] /api/analyze non-OK response:', res.status, snippet);
-            return { success: false, error: `Server error ${res.status}` } as APIResponse;
-          }
-          return res.json().catch((e: unknown) => {
-            console.error('[v0] /api/analyze JSON parse error:', e);
-            return { success: false, error: 'Invalid response from server' } as APIResponse;
-          }) as Promise<APIResponse>;
         });
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          console.error('[v0] /api/analyze non-OK response:', res.status, text.slice(0, 200));
+          return { success: false, error: `Server error ${res.status}` } as APIResponse;
+        }
+        if (res.headers.get('Content-Type')?.includes('text/event-stream')) {
+          // ── Streaming path ───────────────────────────────────────────────
+          streamingMessageId = crypto.randomUUID();
+          setMessages(prev => [...prev, {
+            id: streamingMessageId!, role: 'assistant' as const, content: '',
+            timestamp: new Date(), cards: [], isStreaming: true,
+          }]);
+          const reader = res.body!.getReader();
+          const decoder = new TextDecoder();
+          let buf = '';
+          let donePayload: APIResponse | null = null;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const parts = buf.split('\n\n');
+            buf = parts.pop() ?? '';
+            for (const part of parts) {
+              if (!part.startsWith('data: ')) continue;
+              let ev: { type: string; delta?: string; text?: string; [k: string]: any };
+              try { ev = JSON.parse(part.slice(6)); } catch { continue; }
+              if (ev.type === 'text') {
+                setMessages(prev => prev.map(m =>
+                  m.id === streamingMessageId ? { ...m, content: m.content + (ev.delta ?? '') } : m
+                ));
+              } else if (ev.type === 'replace') {
+                setMessages(prev => prev.map(m =>
+                  m.id === streamingMessageId ? { ...m, content: ev.text ?? m.content } : m
+                ));
+              } else if (ev.type === 'done') {
+                donePayload = ev as unknown as APIResponse;
+              }
+            }
+          }
+          return donePayload ?? { success: false, error: 'Stream ended without done event' };
+        }
+        // ── JSON fallback path ───────────────────────────────────────────
+        return res.json().catch((e: unknown) => {
+          console.error('[v0] /api/analyze JSON parse error:', e);
+          return { success: false, error: 'Invalid response from server' } as APIResponse;
+        }) as Promise<APIResponse>;
+      };
 
       setVerifyStage('analyzing');
-      let analysisResult = await fetchAnalysis();
-
-      // Client-side final-safety retry: if the server couldn't lift integrity above 40
-      // even after its own server-side retries, try once more from the client side.
-      const CLIENT_RETRY_THRESHOLD = 40;
-      if (
-        analysisResult.success &&
-        !analysisResult.useFallback &&
-        (analysisResult.trustMetrics?.finalConfidence ?? 100) < CLIENT_RETRY_THRESHOLD
-      ) {
-        console.warn(
-          '[v0] Integrity below client threshold (' +
-            analysisResult.trustMetrics?.finalConfidence +
-            '%) — client-side re-verify',
-        );
-        setVerifyStage('reverifying');
-        analysisResult = await fetchAnalysis();
-        setVerifyStage('analyzing');
-      }
+      const analysisResult = await fetchAnalysis();
 
       console.log('[v0] Analysis:', {
         ok: analysisResult.success,
@@ -1579,9 +1600,21 @@ No preamble. Start directly with section 1.`;
           trustMetrics: enrichedTrustMetrics,
         };
       }
-      
-      // Add message to state
-      setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
+
+      // Add or update message in state
+      if (streamingMessageId) {
+        // Streaming: message already in state — update with final metadata
+        setMessages((prev: Message[]) => prev.map(m =>
+          m.id === streamingMessageId
+            ? { ...m, isStreaming: false, cards: newMessage.cards, confidence: newMessage.confidence,
+                sources: newMessage.sources, modelUsed: newMessage.modelUsed,
+                processingTime: newMessage.processingTime, trustMetrics: newMessage.trustMetrics,
+                content: newMessage.content || m.content }
+            : m
+        ).slice(-30));
+      } else {
+        setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
+      }
 
       // Persist both messages to Supabase (fire-and-forget).
       // Guard: only save when we have a real Supabase UUID — not a placeholder like
@@ -3704,7 +3737,7 @@ No preamble. Start directly with section 1.`;
                       <h3 className="text-sm font-bold text-white mb-1">
                         Chat Limit Reached
                       </h3>
-                      <p className="text-xs text-gray-400 leading-relaxed">
+                      <p className="text-xs text-gray-400 leading-relaxed" suppressHydrationWarning>
                         You've reached your limit of {CHAT_LIMIT} chats per 24 hours. Your limit will reset in{' '}
                         {Math.ceil((getRateLimitData().resetTime - Date.now()) / (1000 * 60 * 60))} hours.
                       </p>

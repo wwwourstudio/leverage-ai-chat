@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { generateText, tool, stepCountIs } from 'ai';
+import { streamText, generateText, tool, stepCountIs } from 'ai';
 import { createXai } from '@ai-sdk/xai';
 import { z } from 'zod';
 import {
@@ -402,11 +402,8 @@ export async function POST(request: NextRequest) {
     }
     // ── AI generation starts now (concurrently with card generation above) ──────
 
-    // Attempt AI generation via Vercel AI Gateway
     const xaiApiKey = getGrokApiKey();
     const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
-    // Kalshi public market data requires no API key — always available.
-    // KALSHI_API_KEY_ID + KALSHI_PRIVATE_KEY are only needed for authenticated trading.
     const hasClientOddsData = !!(context.oddsData?.events?.length);
     console.log('[API/analyze] Keys configured:', {
       XAI_API_KEY: !!xaiApiKey,
@@ -416,13 +413,13 @@ export async function POST(request: NextRequest) {
       category,
       sport: context.sport || 'none',
     });
-    let aiText: string;
+    let aiText = '';
     let modelUsed: string = AI_CONFIG.MODEL_DISPLAY_NAME;
     let usedFallback = false;
     let pendingADPCard: InsightCard | null = null;
     let pendingADPUploadCard: InsightCard | null = null;
     let pendingStatcastCard: InsightCard | null = null;
-    let skipStatcastJSON = false; // set true when statcast tool returned empty players
+    let skipStatcastJSON = false;
 
     // Card types that can come from the MLB_ANALYSIS_ADDENDUM JSON output
     const STATCAST_CARD_TYPES = new Set([
@@ -619,44 +616,54 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (xaiApiKey) {
-      try {
-        // Per-call timeout — only covers AI generation, not card fetches or JSON parsing
-        const primaryTimeoutMs = PRIMARY_TIMEOUT_MS(useFastPath);
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Request timeout - analysis taking too long')), primaryTimeoutMs);
-        });
-        // Initial generation with timeout protection
-        const result = await Promise.race([
-          generateText({
-            model: createXai({ apiKey: xaiApiKey })(primaryModel),
-            system: systemPrompt,
-            ...buildGenOptions(enrichedPrompt, hasImages ? body.imageAttachments : undefined),
-            temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-            maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
-            maxRetries: 0, // No internal SDK retries — our outer Promise.race handles fallback
-            // Inject ADP tool only when user is asking about NFBC draft positions.
-            // stopWhen: stepCountIs(3) allows: step1=tool-call, step2=final-response, step3=safety
-            // (default is stepCountIs(1) which would stop before the model sees tool results)
-            ...(hasADPIntent && { tools: { query_adp: adpTool }, stopWhen: stepCountIs(3) }),
-            // Inject MLB Projection Engine tool — supersedes Statcast for projection/DFS/fantasy/betting queries.
-            ...(hasMLBProjectionIntent && { tools: { query_mlb_projections: mlbProjectionTool }, stopWhen: stepCountIs(3) }),
-            // Inject Statcast tool for non-projection MLB queries (raw Statcast stats, barrel rates, etc.)
-            ...(!hasMLBProjectionIntent && isMLBStatcastMode && { tools: { query_statcast: statcastTool }, stopWhen: stepCountIs(3) }),
-          }),
-          timeoutPromise
-        ]);
-        aiText = result.text;
-        modelUsed = useFastPath ? 'Grok 3 Mini' : AI_CONFIG.MODEL_DISPLAY_NAME;
+    // ── SSE streaming response — wraps AI generation + post-processing ──────────
+    const encoder = new TextEncoder();
+    const sseChunk = (data: object) => encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
 
-        // ── Capture ADP tool result for card injection (done after cards await) ──
-        if (hasADPIntent) {
-          const toolResults: any[] = (result as any).toolResults ?? [];
-          const adpResult = toolResults.find((tr: any) => tr.toolName === 'query_adp');
-          if (adpResult?.result?.players?.length > 0) {
-            const tr = adpResult.result;
-            const callArgs =
-              ((result as any).toolCalls ?? []).find((tc: any) => tc.toolName === 'query_adp')?.args ?? {};
+    const responseStream = new ReadableStream({
+      async start(controller) {
+        try {
+          if (xaiApiKey) {
+            const primaryTimeoutMs = PRIMARY_TIMEOUT_MS(useFastPath);
+            const abortCtrl = new AbortController();
+
+            // streamText returns immediately; tokens arrive via textStream async iterable
+            const streamResult = streamText({
+              model: createXai({ apiKey: xaiApiKey })(primaryModel),
+              system: systemPrompt,
+              ...buildGenOptions(enrichedPrompt, hasImages ? body.imageAttachments : undefined),
+              temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
+              maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
+              maxRetries: 0,
+              abortSignal: abortCtrl.signal,
+              ...(hasADPIntent && { tools: { query_adp: adpTool }, stopWhen: stepCountIs(3) }),
+              ...(hasMLBProjectionIntent && { tools: { query_mlb_projections: mlbProjectionTool }, stopWhen: stepCountIs(3) }),
+              ...(!hasMLBProjectionIntent && isMLBStatcastMode && { tools: { query_statcast: statcastTool }, stopWhen: stepCountIs(3) }),
+            });
+
+            // Abort if the first token doesn't arrive within the timeout budget
+            const firstTokenTimer = setTimeout(() => abortCtrl.abort(new Error('Primary timeout')), primaryTimeoutMs);
+
+            try {
+              let gotFirstToken = false;
+              for await (const delta of streamResult.textStream) {
+                if (!gotFirstToken) { gotFirstToken = true; clearTimeout(firstTokenTimer); }
+                aiText += delta;
+                controller.enqueue(sseChunk({ type: 'text', delta }));
+              }
+              clearTimeout(firstTokenTimer);
+              modelUsed = useFastPath ? 'Grok 3 Mini' : AI_CONFIG.MODEL_DISPLAY_NAME;
+
+              // ── Capture tool results after streaming completes ──────────────────
+              const allToolResults: any[] = await (streamResult as any).toolResults ?? [];
+              const allToolCalls: any[] = await (streamResult as any).toolCalls ?? [];
+
+              // ADP tool results
+              if (hasADPIntent) {
+                const adpResult = allToolResults.find((tr: any) => tr.toolName === 'query_adp');
+                if (adpResult?.result?.players?.length > 0) {
+                  const tr = adpResult.result;
+                  const callArgs = allToolCalls.find((tc: any) => tc.toolName === 'query_adp')?.args ?? {};
             const adpSource = tr.source ?? `NFBC ${NFBC_DRAFT_YEAR} ADP`;
             const isNFLResult = adpSource.includes('NFFC') || adpSource.includes('NFL');
             const adpBrand = isNFLResult ? 'NFFC' : 'NFBC';
@@ -707,321 +714,263 @@ export async function POST(request: NextRequest) {
                 data: { sport: isNFLResult ? 'nfl' : 'mlb' },
               };
             }
-          }
-        }
+                }
+              }
 
-        // Capture Statcast tool result: set skipStatcastJSON when empty, and build
-        // a pendingStatcastCard for single-player queries so there is always a relevant
-        // card even when the AI outputs prose instead of structured JSON.
-        if (isMLBStatcastMode) {
-          const toolResults: any[] = (result as any).toolResults ?? [];
-          const statcastResult = toolResults.find((tr: any) => tr.toolName === 'query_statcast');
-          if (statcastResult) {
-            const srPlayers: StatcastPlayer[] = statcastResult.result?.players ?? [];
-            if (srPlayers.length === 0) {
-              skipStatcastJSON = true;
-              console.warn('[API/analyze] Statcast tool returned no players — skipping JSON card mode');
-            } else {
-              const srSource: string = statcastResult.result?.source ?? 'Baseball Savant';
-              // Build a fallback card for single-player lookups (≤3 results = targeted query)
-              if (srPlayers.length <= 3) {
-                const p = srPlayers[0];
-                const fmt = (n: number | undefined, decimals = 1) =>
-                  n != null ? n.toFixed(decimals) : 'N/A';
-                const fmtAvg = (n: number | undefined) =>
-                  n != null ? n.toFixed(3).replace(/^0/, '') : 'N/A';
-                pendingStatcastCard = {
-                  type: 'statcast_summary_card',
-                  title: `${p.name} — Statcast Profile`,
-                  category: 'MLB',
-                  subcategory: p.playerType === 'pitcher' ? 'Pitcher Metrics' : 'Contact Quality',
-                  gradient: 'from-indigo-600/80 via-violet-700/60 to-indigo-900/40',
-                  status: 'edge',
-                  icon: '⚾',
-                  realData: srSource.includes('real data'),
-                  summary_metrics: p.playerType === 'pitcher'
-                    ? [
-                        { label: 'xwOBA Against', value: fmtAvg(p.xwoba) },
-                        { label: 'Barrel % Against', value: `${fmt(p.barrelRate)}%` },
-                        { label: 'Hard Hit % Against', value: `${fmt(p.hardHitPct)}%` },
-                        { label: 'Exit Velo Against', value: `${fmt(p.exitVelocity)} mph` },
-                        { label: 'Sweet Spot % Against', value: `${fmt(p.sweetSpotPct)}%` },
-                      ]
-                    : [
-                        { label: 'xBA', value: fmtAvg(p.xba) },
-                        { label: 'xwOBA', value: fmtAvg(p.xwoba) },
-                        { label: 'Sweet Spot %', value: `${fmt(p.sweetSpotPct)}%` },
-                        { label: 'Hard Hit %', value: `${fmt(p.hardHitPct)}%` },
-                        { label: 'Barrel %', value: `${fmt(p.barrelRate)}%` },
-                      ],
-                  last_updated: srSource,
-                  data: { source: srSource },
-                };
+              // Statcast tool results
+              if (isMLBStatcastMode) {
+                const statcastResult = allToolResults.find((tr: any) => tr.toolName === 'query_statcast');
+                if (statcastResult) {
+                  const srPlayers: StatcastPlayer[] = statcastResult.result?.players ?? [];
+                  if (srPlayers.length === 0) {
+                    skipStatcastJSON = true;
+                    console.warn('[API/analyze] Statcast tool returned no players — skipping JSON card mode');
+                  } else {
+                    const srSource: string = statcastResult.result?.source ?? 'Baseball Savant';
+                    // Build a fallback card for single-player lookups (≤3 results = targeted query)
+                    if (srPlayers.length <= 3) {
+                      const p = srPlayers[0];
+                      const fmt = (n: number | undefined, decimals = 1) =>
+                        n != null ? n.toFixed(decimals) : 'N/A';
+                      const fmtAvg = (n: number | undefined) =>
+                        n != null ? n.toFixed(3).replace(/^0/, '') : 'N/A';
+                      pendingStatcastCard = {
+                        type: 'statcast_summary_card',
+                        title: `${p.name} — Statcast Profile`,
+                        category: 'MLB',
+                        subcategory: p.playerType === 'pitcher' ? 'Pitcher Metrics' : 'Contact Quality',
+                        gradient: 'from-indigo-600/80 via-violet-700/60 to-indigo-900/40',
+                        status: 'edge',
+                        icon: '⚾',
+                        realData: srSource.includes('real data'),
+                        summary_metrics: p.playerType === 'pitcher'
+                          ? [
+                              { label: 'xwOBA Against', value: fmtAvg(p.xwoba) },
+                              { label: 'Barrel % Against', value: `${fmt(p.barrelRate)}%` },
+                              { label: 'Hard Hit % Against', value: `${fmt(p.hardHitPct)}%` },
+                              { label: 'Exit Velo Against', value: `${fmt(p.exitVelocity)} mph` },
+                              { label: 'Sweet Spot % Against', value: `${fmt(p.sweetSpotPct)}%` },
+                            ]
+                          : [
+                              { label: 'xBA', value: fmtAvg(p.xba) },
+                              { label: 'xwOBA', value: fmtAvg(p.xwoba) },
+                              { label: 'Sweet Spot %', value: `${fmt(p.sweetSpotPct)}%` },
+                              { label: 'Hard Hit %', value: `${fmt(p.hardHitPct)}%` },
+                              { label: 'Barrel %', value: `${fmt(p.barrelRate)}%` },
+                            ],
+                        last_updated: srSource,
+                        data: { source: srSource },
+                      };
+                    }
+                  }
+                }
+              }
+
+            } catch (streamErr) {
+              clearTimeout(firstTokenTimer);
+              // Primary stream failed — fall back to generateText (no streaming for fallback)
+              const alreadyFast = useFastPath;
+              const actualFallbackModel = alreadyFast ? AI_CONFIG.MODEL_NAME : AI_CONFIG.FAST_MODEL_NAME;
+              const errSummary = (() => {
+                if (streamErr && typeof streamErr === 'object') {
+                  const e = streamErr as Record<string, unknown>;
+                  if (e.statusCode) return `HTTP ${e.statusCode} from ${e.url ?? 'xAI'}`;
+                }
+                return streamErr instanceof Error ? streamErr.message : String(streamErr);
+              })();
+              console.error(`[API/analyze] Primary stream failed — ${errSummary} | Retrying with ${actualFallbackModel}`);
+              try {
+                const fallbackResult = await generateText({
+                  model: createXai({ apiKey: xaiApiKey })(actualFallbackModel),
+                  system: systemPrompt,
+                  prompt: enrichedPrompt,
+                  temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
+                  maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
+                  maxRetries: 0,
+                });
+                aiText = fallbackResult.text;
+                modelUsed = alreadyFast ? `${AI_CONFIG.MODEL_DISPLAY_NAME} (fallback)` : 'Grok 3 Mini (fallback)';
+                console.log(`[API/analyze] Fallback succeeded with ${actualFallbackModel}`);
+                controller.enqueue(sseChunk({ type: 'text', delta: aiText }));
+              } catch (fallbackErr) {
+                const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+                console.error('[API/analyze] Fallback also failed:', fallbackMsg);
+                aiText = generateFallbackResponse(userMessage, context);
+                modelUsed = fallbackMsg.includes('timeout') ? 'Fallback (timeout)' : 'Fallback (API error — check XAI_API_KEY)';
+                usedFallback = true;
+                controller.enqueue(sseChunk({ type: 'text', delta: aiText }));
+              }
+            }
+          } else {
+            // No API key — use static fallback
+            aiText = generateFallbackResponse(userMessage, context);
+            modelUsed = 'Fallback';
+            usedFallback = true;
+            controller.enqueue(sseChunk({ type: 'text', delta: aiText }));
+          }
+
+          // ── Post-processing: cards, trust metrics, done event ─────────────────
+          let cards: InsightCard[] = await cardPromise.catch(() => []);
+
+          if (pendingADPCard) cards = [pendingADPCard, ...cards.slice(0, 5)];
+          if (pendingADPUploadCard) cards = [...cards, pendingADPUploadCard];
+
+          // MLB Statcast: parse Grok's JSON response into a card
+          if (isMLBStatcastMode && !usedFallback && !skipStatcastJSON) {
+            const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              try {
+                const parsed = JSON.parse(jsonMatch[0]);
+                if (parsed && typeof parsed.type === 'string' && STATCAST_CARD_TYPES.has(parsed.type)) {
+                  const statcastCard: InsightCard = { icon: '⚾', ...parsed };
+                  cards = [statcastCard, ...cards.slice(0, 5)];
+                  pendingStatcastCard = null;
+                  const metricLines = (parsed.summary_metrics ?? [])
+                    .slice(0, 3)
+                    .map((m: { label: string; value: string }) => `**${m.label}:** ${m.value}`)
+                    .join(' · ');
+                  const cleanText = [
+                    `**${parsed.title}** — MLB Statcast Analysis`,
+                    metricLines,
+                    'See the card below for the full breakdown and splits.',
+                  ].filter(Boolean).join('\n');
+                  aiText = cleanText;
+                  // Replace the raw JSON the client already received with readable prose
+                  controller.enqueue(sseChunk({ type: 'replace', text: cleanText }));
+                }
+              } catch {
+                console.warn('[API/analyze] MLB JSON parse failed — returning raw text');
               }
             }
           }
-        }
 
-        // Hallucination-detection retry loop (with timeout awareness)
-        let detection = detectHallucinations(aiText, userMessage, context.oddsData, { category, hasBettingIntent: context.hasBettingIntent });
-        let retryAttempt = 0;
-
-        while (detection.shouldRetry && !isMLBQuery && !hasADPIntent && retryAttempt < MAX_HALLUCINATION_RETRIES) {
-          // Limit retries to 8s remaining budget (using a fixed cap since TIMEOUT_MS is now per-call)
-          const elapsed = Date.now() - startTime;
-          if (elapsed > 20000) break; // >20s total elapsed — not safe to retry
-          retryAttempt++;
-          console.warn(
-            `[API/analyze] Hallucination detected (attempt ${retryAttempt}/${MAX_HALLUCINATION_RETRIES}):`,
-            detection.retryReason,
-          );
-
-          const retryPrompt = buildRetryPrompt(
-            enrichedPrompt,
-            detection,
-            retryAttempt,
-            (context.oddsData?.events?.length ?? 0) > 0,
-          );
-
-          try {
-            const retryTimeoutPromise = new Promise<never>((_, reject) => {
-              setTimeout(() => reject(new Error('Retry timeout')), 12000); // 12s per retry
-            });
-
-            const retryResult = await Promise.race([
-              generateText({
-                // Always use the fast model for retries — avoids double-timeout when
-                // the primary model already consumed most of the time budget.
-                model: createXai({ apiKey: xaiApiKey })(AI_CONFIG.FAST_MODEL_NAME),
-                system: systemPrompt,
-                prompt: retryPrompt,
-                // Lower temperature on retries to reduce hallucination likelihood
-                temperature: Math.max(0.1, (AI_CONFIG.DEFAULT_TEMPERATURE ?? 0.7) - retryAttempt * 0.2),
-                maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
-                maxRetries: 0, // No retries within retry
-              }),
-              retryTimeoutPromise
-            ]);
-            aiText = retryResult.text;
-            detection = detectHallucinations(aiText, userMessage, context.oddsData, { category, hasBettingIntent: context.hasBettingIntent });
-          } catch (retryError) {
-            console.error(`[API/analyze] Retry ${retryAttempt} failed:`, retryError);
-            break;
-          }
-        }
-
-        if (retryAttempt > 0) {
-          console.log(
-            `[API/analyze] Final integrity after ${retryAttempt} retry(ies): ${detection.finalConfidence}%`,
-          );
-        }
-      } catch (aiError) {
-        // If primary model fails (e.g. timeout or API error), try the fast model before giving up.
-        // IMPORTANT: If we're already on the fast path, skip the fallback retry entirely —
-        // it would just time out a second time and waste the remaining budget.
-        const fallbackModel = AI_CONFIG.FAST_MODEL_NAME;
-        const alreadyFast = useFastPath;
-        // Log the error concisely. For HTTP errors (520, 502, etc.) the full responseBody
-        // is a multi-KB Cloudflare HTML page — strip it to keep logs readable.
-        const errSummary = (() => {
-          if (aiError && typeof aiError === 'object') {
-            const e = aiError as Record<string, unknown>;
-            if (e.statusCode) {
-              return `HTTP ${e.statusCode} from ${e.url ?? 'xAI'}`;
+          if (pendingStatcastCard) {
+            if (!STATCAST_CARD_TYPES.has(cards[0]?.type as string)) {
+              cards = [pendingStatcastCard, ...cards.slice(0, 5)];
+              console.log('[API/analyze] Injected Statcast fallback card:', pendingStatcastCard.title);
             }
           }
-          return aiError instanceof Error ? aiError.message : String(aiError);
-        })();
-        console.error(
-          `[API/analyze] Primary model "${primaryModel}" failed — ${errSummary} | Retrying with:`,
-          alreadyFast ? AI_CONFIG.MODEL_NAME : fallbackModel,
-        );
-        // Regardless of whether we were on the fast path, always try the other model
-        // before giving up. Fast path (grok-3-mini) failure → retry with grok-4.
-        // Slow path (grok-4) failure → retry with grok-3-mini.
-        const actualFallbackModel = alreadyFast ? AI_CONFIG.MODEL_NAME : fallbackModel;
-        try {
-          const fallbackTimeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('Fallback timeout')), 12000);
-          });
 
-          const fallbackResult = await Promise.race([
-            generateText({
-              model: createXai({ apiKey: xaiApiKey })(actualFallbackModel),
-              system: systemPrompt,
-              prompt: enrichedPrompt,
-              temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
-              maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
-              maxRetries: 0,
-            }),
-            fallbackTimeoutPromise
-          ]);
-          aiText = fallbackResult.text;
-          modelUsed = alreadyFast ? `${AI_CONFIG.MODEL_DISPLAY_NAME} (fallback)` : 'Grok 3 Mini (fallback)';
-          console.log(`[API/analyze] ${actualFallbackModel} fallback succeeded`);
-        } catch (fallbackError) {
-          const fallbackMsg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
-          console.error('[API/analyze] Fallback model also failed:', fallbackMsg);
-          aiText = generateFallbackResponse(userMessage, context);
-          // Surface the underlying API error in the model label so it's visible in the UI
-          modelUsed = fallbackMsg.includes('timeout') ? 'Fallback (timeout)' : 'Fallback (API error — check XAI_API_KEY)';
-          usedFallback = true;
-        }
-      }
-    } else {
-      aiText = generateFallbackResponse(userMessage, context);
-      modelUsed = 'Fallback';
-      usedFallback = true;
-    }
-
-    // Cards run concurrently with AI — always await regardless of AI outcome.
-    // When AI falls back to static text, we still want contextual data cards
-    // to render (they come from the live Odds/Kalshi APIs, not the AI model).
-    let cards: InsightCard[] = await cardPromise.catch(() => []);
-
-    // Inject ADP card at the front when the tool returned results.
-    // When using static fallback, also append an upload card so the user can supply real data.
-    if (pendingADPCard) {
-      cards = [pendingADPCard, ...cards.slice(0, 5)];
-    }
-    if (pendingADPUploadCard) {
-      cards = [...cards, pendingADPUploadCard];
-    }
-
-    // ── MLB Statcast: parse Grok's JSON response into a card ──────────────────
-    // The MLB_ANALYSIS_ADDENDUM instructs Grok to return ONLY JSON for MLB queries.
-    // Parse it here, inject it as a StatcastCard, and replace aiText with
-    // human-readable prose so the chat doesn't display raw JSON to the user.
-    if (isMLBStatcastMode && !usedFallback && !skipStatcastJSON) {
-      // Extract the first {...} block — handles code fences, preamble text, and bare JSON
-      const jsonMatch = aiText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          const parsed = JSON.parse(jsonMatch[0]);
-          if (parsed && typeof parsed.type === 'string' && STATCAST_CARD_TYPES.has(parsed.type)) {
-            // Spread ALL parsed fields at card top level so DynamicCardRenderer passes
-            // summary_metrics + lightbox through to StatcastCard unchanged
-            const statcastCard: InsightCard = { icon: '⚾', ...parsed };
-            cards = [statcastCard, ...cards.slice(0, 5)];
-            // Mark pendingStatcastCard as used so we don't double-inject below
-            pendingStatcastCard = null;
-
-            // Replace raw JSON with readable prose for the chat message
-            const metricLines = (parsed.summary_metrics ?? [])
-              .slice(0, 3)
-              .map((m: { label: string; value: string }) => `**${m.label}:** ${m.value}`)
-              .join(' · ');
-            aiText = [
-              `**${parsed.title}** — MLB Statcast Analysis`,
-              metricLines,
-              'See the card below for the full breakdown and splits.',
-            ].filter(Boolean).join('\n');
+          if (cards.length === 0 && !isAmbiguous && !usedFallback && context.sport) {
+            const bullets = (aiText.match(/^[-•]\s+(.+)$/gm) ?? []).slice(0, 3);
+            if (bullets.length > 0) {
+              const sportGradients: Record<string, string> = {
+                nba: 'from-orange-600/20 to-orange-900/10',
+                nfl: 'from-blue-600/20 to-blue-900/10',
+                mlb: 'from-red-600/20 to-red-900/10',
+                nhl: 'from-cyan-600/20 to-cyan-900/10',
+                ncaab: 'from-indigo-600/20 to-indigo-900/10',
+                ncaaf: 'from-yellow-600/20 to-yellow-900/10',
+              };
+              const sport = context.sport.toLowerCase();
+              cards = bullets.map(b => ({
+                type: 'betting-insight',
+                title: `${sport.toUpperCase()} Analysis`,
+                category: sport,
+                subcategory: 'AI Analysis',
+                gradient: sportGradients[sport] ?? 'from-blue-600/20 to-purple-900/10',
+                data: { insight: b.replace(/^[-•]\s+/, ''), source: 'Grok 4' },
+                status: 'neutral',
+                realData: false,
+              } as InsightCard));
+            }
           }
-        } catch {
-          console.warn('[API/analyze] MLB JSON parse failed — returning raw text');
+
+          console.log(`[API/analyze] Returning ${cards.length} cards (clarification: ${isAmbiguous})`);
+          const processingTime = Date.now() - startTime;
+
+          const hasRealOdds = !!(context.oddsData?.events?.length > 0);
+          const baseMetrics = usedFallback
+            ? {
+                benfordIntegrity: 65,
+                oddsAlignment: 65,
+                marketConsensus: 65,
+                historicalAccuracy: 68,
+                finalConfidence: 65,
+                trustLevel: 'medium' as const,
+                riskLevel: 'medium' as const,
+                adjustedTone: 'Limited data — AI unavailable',
+                flags: [{ type: 'info', message: 'Using fallback mode — AI temporarily unavailable', severity: 'info' as const }],
+              }
+            : detectHallucinations(aiText, userMessage, context.oddsData, { category, hasBettingIntent: context.hasBettingIntent });
+
+          const trustMetrics = (hasRealOdds && !usedFallback)
+            ? {
+                ...baseMetrics,
+                oddsAlignment: Math.min(99, (baseMetrics.oddsAlignment ?? 80) + 8),
+                marketConsensus: Math.min(99, (baseMetrics.marketConsensus ?? 80) + 6),
+                finalConfidence: Math.min(99, (baseMetrics.finalConfidence ?? 80) + 5),
+                adjustedTone: baseMetrics.finalConfidence >= 85 ? 'Strong signal — live data verified' : baseMetrics.adjustedTone,
+              }
+            : baseMetrics;
+
+          const sources: Array<{ name: string; type: string; reliability: number }> = [
+            usedFallback
+              ? { name: 'Fallback Mode', type: 'cache' as const, reliability: 65 }
+              : DEFAULT_SOURCES.GROK_AI,
+          ];
+          if (hasRealOdds) sources.push(DEFAULT_SOURCES.ODDS_API);
+          if (context.isPoliticalMarket) sources.push(DEFAULT_SOURCES.KALSHI);
+          if (context.hasFantasyIntent && !context.hasBettingIntent) {
+            sources.push({ name: 'Fantasy Projections Engine', type: 'database' as const, reliability: 91 });
+          }
+          if (hasADPIntent) {
+            const isNFLContext = context?.sport?.includes('football') || context?.sport === 'nfl' || msgLower.includes('nffc') || msgLower.includes('nfl draft') || msgLower.includes('fantasy football');
+            const adpBoardName = isNFLContext
+              ? `NFFC ${new Date().getFullYear()} NFL ADP Board`
+              : `NFBC ${new Date().getFullYear()} ADP Board`;
+            sources.push({ name: adpBoardName, type: 'api' as const, reliability: 97 });
+          }
+
+          // Send done event with full metadata
+          controller.enqueue(sseChunk({
+            type: 'done',
+            text: aiText,
+            cards,
+            confidence: trustMetrics.finalConfidence,
+            sources,
+            modelUsed,
+            trustMetrics,
+            processingTime,
+            useFallback: usedFallback,
+            clarificationNeeded: isAmbiguous,
+            clarificationOptions,
+          }));
+
+        } catch (innerError) {
+          console.error('[API/analyze] Stream controller error:', innerError);
+          try {
+            controller.enqueue(sseChunk({
+              type: 'done',
+              text: generateFallbackResponse(userMessage, context),
+              cards: [],
+              confidence: 65,
+              sources: [{ name: 'Fallback Mode', type: 'cache', reliability: 65 }],
+              modelUsed: 'Fallback',
+              trustMetrics: {
+                benfordIntegrity: 65, oddsAlignment: 65, marketConsensus: 65,
+                historicalAccuracy: 68, finalConfidence: 65,
+                trustLevel: 'medium', riskLevel: 'medium',
+                adjustedTone: 'Error occurred — showing fallback', flags: [],
+              },
+              processingTime: Date.now() - startTime,
+              useFallback: true,
+              clarificationNeeded: false,
+              clarificationOptions: [],
+            }));
+          } catch { /* ignore if controller already errored */ }
+        } finally {
+          try { controller.close(); } catch { /* ignore */ }
         }
-      }
-    }
+      },
+    });
 
-    // ── Statcast fallback card: inject when AI returned prose instead of JSON ──
-    // Ensures a player-relevant card is always shown even when the AI didn't follow
-    // the JSON format (e.g. hits/contact prop queries where hr_prop_card doesn't fit).
-    if (pendingStatcastCard) {
-      const firstCardIsStatcast = STATCAST_CARD_TYPES.has(cards[0]?.type as string);
-      if (!firstCardIsStatcast) {
-        cards = [pendingStatcastCard, ...cards.slice(0, 5)];
-        console.log('[API/analyze] Injected Statcast fallback card:', pendingStatcastCard.title);
-      }
-    }
-
-    // When sport is known but no live games returned — build insight cards from AI bullets
-    if (cards.length === 0 && !isAmbiguous && !usedFallback && context.sport) {
-      const bullets = (aiText.match(/^[-•]\s+(.+)$/gm) ?? []).slice(0, 3);
-      if (bullets.length > 0) {
-        const sportGradients: Record<string, string> = {
-          nba: 'from-orange-600/20 to-orange-900/10',
-          nfl: 'from-blue-600/20 to-blue-900/10',
-          mlb: 'from-red-600/20 to-red-900/10',
-          nhl: 'from-cyan-600/20 to-cyan-900/10',
-          ncaab: 'from-indigo-600/20 to-indigo-900/10',
-          ncaaf: 'from-yellow-600/20 to-yellow-900/10',
-        };
-        const sport = context.sport.toLowerCase();
-        cards = bullets.map(b => ({
-          type: 'betting-insight',
-          title: `${sport.toUpperCase()} Analysis`,
-          category: sport,
-          subcategory: 'AI Analysis',
-          gradient: sportGradients[sport] ?? 'from-blue-600/20 to-purple-900/10',
-          data: { insight: b.replace(/^[-•]\s+/, ''), source: 'Grok 4' },
-          status: 'neutral',
-          realData: false,
-        } as InsightCard));
-      }
-    }
-
-    console.log(`[API/analyze] Returning ${cards.length} cards (clarification: ${isAmbiguous})`);
-
-    const processingTime = Date.now() - startTime;
-
-    // Compute real trust metrics from the final AI text
-    const hasRealOdds = !!(context.oddsData?.events?.length > 0);
-    const baseMetrics = usedFallback
-      ? {
-          benfordIntegrity: 65,
-          oddsAlignment: 65,
-          marketConsensus: 65,
-          historicalAccuracy: 68,
-          finalConfidence: 65,
-          trustLevel: 'medium' as const,
-          riskLevel: 'medium' as const,
-          adjustedTone: 'Limited data — AI unavailable',
-          flags: [{ type: 'info', message: 'Using fallback mode — AI temporarily unavailable', severity: 'info' as const }],
-        }
-      : detectHallucinations(aiText, userMessage, context.oddsData, { category, hasBettingIntent: context.hasBettingIntent });
-
-    // Boost trust metrics when real live odds data was provided
-    const trustMetrics = (hasRealOdds && !usedFallback)
-      ? {
-          ...baseMetrics,
-          oddsAlignment: Math.min(99, (baseMetrics.oddsAlignment ?? 80) + 8),
-          marketConsensus: Math.min(99, (baseMetrics.marketConsensus ?? 80) + 6),
-          finalConfidence: Math.min(99, (baseMetrics.finalConfidence ?? 80) + 5),
-          adjustedTone: baseMetrics.finalConfidence >= 85 ? 'Strong signal — live data verified' : baseMetrics.adjustedTone,
-        }
-      : baseMetrics;
-
-    // Build sources list reflecting actual data used
-    const sources: Array<{ name: string; type: string; reliability: number }> = [
-      usedFallback
-        ? { name: 'Fallback Mode', type: 'cache' as const, reliability: 65 }
-        : DEFAULT_SOURCES.GROK_AI,
-    ];
-    if (hasRealOdds) sources.push(DEFAULT_SOURCES.ODDS_API);
-    if (context.isPoliticalMarket) sources.push(DEFAULT_SOURCES.KALSHI);
-    if (context.hasFantasyIntent && !context.hasBettingIntent) {
-      sources.push({ name: 'Fantasy Projections Engine', type: 'database' as const, reliability: 91 });
-    }
-    if (hasADPIntent) {
-      const isNFLContext = context?.sport?.includes('football') || context?.sport === 'nfl' || msgLower.includes('nffc') || msgLower.includes('nfl draft') || msgLower.includes('fantasy football');
-      const adpBoardName = isNFLContext
-        ? `NFFC ${new Date().getFullYear()} NFL ADP Board`
-        : `NFBC ${new Date().getFullYear()} ADP Board`;
-      sources.push({ name: adpBoardName, type: 'api' as const, reliability: 97 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      text: aiText,
-      cards,
-      confidence: trustMetrics.finalConfidence,
-      sources,
-      modelUsed,
-      trustMetrics,
-      processingTime,
-      useFallback: usedFallback,
-      clarificationNeeded: isAmbiguous,
-      clarificationOptions,
+    return new Response(responseStream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
     });
   } catch (error) {
     console.error('[API/analyze] Unhandled error:', error);

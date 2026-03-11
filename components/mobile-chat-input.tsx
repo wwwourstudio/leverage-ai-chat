@@ -39,7 +39,7 @@ export function MobileChatInput({
     if (!isImage && !isText) return null;
 
     const attachment: MobileFileAttachment = {
-      id: `${Date.now()}-${Math.random()}`,
+      id: crypto.randomUUID(),
       name: file.name,
       type: isImage ? 'image' : 'text',
       size: file.size,

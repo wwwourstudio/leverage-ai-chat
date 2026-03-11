@@ -295,8 +295,11 @@ async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage
     } catch (err) {
       const host = new URL(url).hostname;
       const cause = (err as any)?.cause;
-      console.warn(`[KALSHI] ${host} failed: ${(err as Error).message}${cause ? ` (${cause.code ?? cause.message ?? cause})` : ''}`);
+      const errCode = cause?.code ?? '';
+      console.warn(`[KALSHI] ${host} failed: ${(err as Error).message}${cause ? ` (${errCode || cause.message || cause})` : ''}`);
       lastError = err as Error;
+      // DNS failure: both URLs resolve in the same environment — skip fallback immediately
+      if (errCode === 'ENOTFOUND' || errCode === 'EAI_AGAIN') break;
       continue; // try fallback URL
     }
   }
@@ -520,10 +523,16 @@ export async function fetchKalshiMarketsWithRetry(params?: {
     } catch (error) {
       console.error(`[KALSHI] Attempt ${attempt} failed:`, error);
 
-      // Auth failures won't succeed on retry — abort immediately
+      // Permanent failures won't succeed on retry — abort immediately
       const msg = error instanceof Error ? error.message : String(error);
+      const cause = (error as any)?.cause;
+      const errCode = cause?.code ?? '';
       if (msg.includes('401') || msg.includes('Unauthorized')) {
         console.error('[KALSHI] Auth failure (401) — aborting retries');
+        return [];
+      }
+      if (errCode === 'ENOTFOUND' || errCode === 'EAI_AGAIN' || msg.includes('ENOTFOUND')) {
+        console.error('[KALSHI] DNS failure (ENOTFOUND) — aborting retries');
         return [];
       }
 

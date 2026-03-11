@@ -967,27 +967,13 @@ async function _generateContextualCards(
         return cards;
       }
 
-      console.warn('[v0] [CARDS-GEN] Kalshi API returned 0 markets');
+      console.warn('[v0] [CARDS-GEN] Kalshi API returned 0 markets — returning no cards');
     } catch (error) {
       console.error('[v0] [CARDS-GEN] Kalshi API error:', error);
     }
-
-    // Fallback placeholder — use canonical CARD_TYPES.KALSHI_MARKET so DynamicCardRenderer
-    // routes this correctly, rather than a bare 'PREDICTION_MARKET' string literal.
-    cards.push({
-      type: CARD_TYPES.KALSHI_MARKET,
-      title: 'Kalshi Markets Unavailable',
-      icon: 'BarChart',
-      category: 'KALSHI',
-      subcategory: 'Connection Issue',
-      gradient: 'from-purple-600 to-indigo-700',
-      data: {
-        description: 'Unable to fetch Kalshi markets',
-        note: 'Check API connectivity and try again',
-        marketType: 'All Categories',
-        realData: false,
-      },
-    });
+    // Kalshi unavailable — return empty array rather than a placeholder card with
+    // missing price fields that KalshiCard would render as garbage (NaN/undefined).
+    return cards;
   }
 
   // Portfolio/Kelly Sizing - when user asks about bet sizing, bankroll management, Kelly criterion

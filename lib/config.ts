@@ -161,8 +161,11 @@ export const isSupabaseConfigured = () =>
 export const isGrokConfigured = () => 
   !!getGrokApiKey();
 
-export const isOddsApiConfigured = () => 
+export const isOddsApiConfigured = () =>
   !!getOddsApiKey();
+
+export const isKalshiConfigured = () =>
+  !!(process.env.KALSHI_API_KEY_ID && process.env.KALSHI_PRIVATE_KEY);
 
 /**
  * Check if Supabase is properly configured (detailed status)
@@ -440,7 +443,8 @@ const OPTIONAL_ENV_VARS: Record<string, string> = {
   WEATHER_API_KEY:       'Weather API key for outdoor sports',
   STRIPE_SECRET_KEY:     'Stripe secret key for payments',
   STRIPE_PUBLISHABLE_KEY:'Stripe publishable key for payments',
-  KALSHI_API_KEY:        'Kalshi API key for prediction markets',
+  KALSHI_API_KEY_ID:     'Kalshi API key ID (for authenticated trading)',
+  KALSHI_PRIVATE_KEY:    'Kalshi RSA private key (for authenticated trading)',
 };
 
 export function validateServerEnv(): EnvValidationResult {

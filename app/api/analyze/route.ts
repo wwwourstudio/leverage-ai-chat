@@ -354,12 +354,13 @@ export async function POST(request: NextRequest) {
     // Attempt AI generation via Vercel AI Gateway
     const xaiApiKey = getGrokApiKey();
     const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
-    const kalshiApiKey = process.env.KALSHI_API_KEY_ID || process.env.KALSHI_API_KEY;
+    // Kalshi public market data requires no API key — always available.
+    // KALSHI_API_KEY_ID + KALSHI_PRIVATE_KEY are only needed for authenticated trading.
     const hasClientOddsData = !!(context.oddsData?.events?.length);
     console.log('[API/analyze] Keys configured:', {
       XAI_API_KEY: !!xaiApiKey,
       ODDS_API_KEY: !!oddsApiKey,
-      KALSHI_API_KEY: !!kalshiApiKey,
+      KALSHI_API_KEY: true,
       hasOddsData: hasClientOddsData,
       category,
       sport: context.sport || 'none',

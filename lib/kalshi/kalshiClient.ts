@@ -1,13 +1,13 @@
 /**
  * KalshiClient — Authenticated Kalshi REST API client.
  *
- * Handles HMAC-SHA256 request signing per Kalshi's authentication spec.
- * All trading operations require a valid API key + private key.
+ * Handles RSA-SHA256 request signing per Kalshi's authentication spec.
+ * All trading operations require a valid API key ID + RSA private key.
  *
  * Docs: https://trading-api.readme.io/reference/getting-started
  */
 
-import { createHmac } from 'crypto';
+import { createSign, constants } from 'crypto';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -87,12 +87,18 @@ export class KalshiClient {
       : 'https://api.kalshi.com/trade-api/v2';
   }
 
-  // ─── HMAC-SHA256 Signature ────────────────────────────────────────────────
+  // ─── RSA-SHA256 Signature ─────────────────────────────────────────────────
 
   private buildSignature(method: string, path: string, timestampMs: number): string {
-    // Kalshi signature: HMAC-SHA256(key, timestamp_ms + method.toUpperCase() + path)
+    const rawKey = this.apiKey.replace(/\\n/g, '\n');
+    const privateKey = rawKey && !rawKey.includes('-----')
+      ? `-----BEGIN RSA PRIVATE KEY-----\n${rawKey.match(/.{1,64}/g)?.join('\n') ?? rawKey}\n-----END RSA PRIVATE KEY-----`
+      : rawKey;
     const msg = `${timestampMs}${method.toUpperCase()}${path}`;
-    return createHmac('sha256', this.apiKey).update(msg).digest('base64');
+    const sign = createSign('RSA-SHA256');
+    sign.update(msg);
+    sign.end();
+    return sign.sign({ key: privateKey, padding: constants.RSA_PKCS1_PADDING }, 'base64');
   }
 
   private authHeaders(method: string, path: string): HeadersInit {

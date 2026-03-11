@@ -3,7 +3,9 @@
  * Tests API endpoints, verifies credentials, and diagnoses connection issues
  */
 
-const KALSHI_BASE_URL = 'https://api.elections.kalshi.com/trade-api/v2';
+import { createSign, constants } from 'crypto';
+
+const KALSHI_BASE_URL = 'https://api.kalshi.com/trade-api/v2';
 const DEMO_BASE_URL = 'https://demo-api.kalshi.co/trade-api/v2';
 
 interface TestResult {
@@ -187,28 +189,47 @@ async function testElectionMarkets() {
 async function testAuthentication() {
   console.log('\n=== Test 4: Authentication Check ===');
   
-  const apiKey = process.env.KALSHI_API_KEY;
-  const apiSecret = process.env.KALSHI_API_SECRET;
-  
-  if (!apiKey || !apiSecret) {
+  const apiKeyId = process.env.KALSHI_API_KEY_ID;
+  const privateKeyRaw = process.env.KALSHI_PRIVATE_KEY;
+
+  if (!apiKeyId || !privateKeyRaw) {
     results.push({
       name: 'Authentication',
       status: 'warning',
       message: 'No API credentials configured',
-      details: 'KALSHI_API_KEY and KALSHI_API_SECRET not set',
+      details: 'KALSHI_API_KEY_ID and KALSHI_PRIVATE_KEY not set',
     });
     console.log('⚠ No API credentials found');
     console.log('  Public endpoints only - trading features unavailable');
     return;
   }
-  
+
+  // Build RSA-SHA256 auth headers (matching lib/kalshi/index.ts)
+  function buildAuthHeaders(url: string): Record<string, string> {
+    const rawKey = privateKeyRaw!.replace(/\\n/g, '\n');
+    const pem = rawKey.includes('-----')
+      ? rawKey
+      : `-----BEGIN RSA PRIVATE KEY-----\n${rawKey.match(/.{1,64}/g)?.join('\n') ?? rawKey}\n-----END RSA PRIVATE KEY-----`;
+    const { pathname, search } = new URL(url);
+    const timestamp = Date.now().toString();
+    const message = `${timestamp}GET${pathname}${search}`;
+    const sign = createSign('RSA-SHA256');
+    sign.update(message);
+    sign.end();
+    const signature = sign.sign({ key: pem, padding: constants.RSA_PKCS1_PADDING }, 'base64');
+    return {
+      'Accept': 'application/json',
+      'KALSHI-ACCESS-KEY': apiKeyId!,
+      'KALSHI-ACCESS-TIMESTAMP': timestamp,
+      'KALSHI-ACCESS-SIGNATURE': signature,
+    };
+  }
+
   // Try authenticated request
   try {
-    const response = await fetch(`${KALSHI_BASE_URL}/portfolio/balance`, {
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
+    const balanceUrl = `${KALSHI_BASE_URL}/portfolio/balance`;
+    const response = await fetch(balanceUrl, {
+      headers: buildAuthHeaders(balanceUrl),
     });
     
     if (response.ok) {
@@ -314,7 +335,7 @@ function printSummary() {
   }
   
   if (warnings > 0) {
-    console.log('1. Add KALSHI_API_KEY and KALSHI_API_SECRET for authenticated features');
+    console.log('1. Add KALSHI_API_KEY_ID and KALSHI_PRIVATE_KEY (RSA) for authenticated trading features');
     console.log('2. Verify election markets are available for 2026');
     console.log('3. Check Kalshi documentation for updated endpoints');
   }

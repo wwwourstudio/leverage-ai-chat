@@ -15,13 +15,12 @@
 
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data-service';
 import { API_ENDPOINTS } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/client';
 const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ default: m.AuthModals })), { ssr: false });
-import { MessageList } from '@/components/message-list';
 import { MobileChatInput } from '@/components/mobile-chat-input';
 import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2, Bookmark } from 'lucide-react';
 import { DynamicCardRenderer, CardList, EmptyState } from '@/components/data-cards';
@@ -2352,15 +2351,15 @@ No preamble. Start directly with section 1.`;
     toast.info('Chat deleted');
   };
 
-  const handleEditMessage = (index: number) => {
+  const handleEditMessage = useCallback((index: number) => {
     const message = messages[index];
     if (message.role === 'user') {
       setEditingMessageIndex(index);
       setEditingContent(message.content);
     }
-  };
+  }, [messages]);
 
-  const handleSaveEdit = (index: number) => {
+  const handleSaveEdit = useCallback((index: number) => {
     if (editingContent.trim()) {
       setMessages((prev: Message[]) => prev.map((msg, i) => {
         if (i === index) {
@@ -2378,7 +2377,7 @@ No preamble. Start directly with section 1.`;
       }));
       setEditingMessageIndex(null);
       setEditingContent('');
-      
+
   // Re-generate response after editing user message
   if (messages[index].role === 'user') {
     const newMessages = messages.slice(0, index + 1);
@@ -2386,29 +2385,29 @@ No preamble. Start directly with section 1.`;
     generateRealResponse(editingContent);
   }
   }
-  };
+  }, [editingContent, messages, generateRealResponse]);
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = useCallback(() => {
     setEditingMessageIndex(null);
     setEditingContent('');
-  };
+  }, []);
 
-  const handleCopyMessage = (content: string) => {
+  const handleCopyMessage = useCallback((content: string) => {
     navigator.clipboard.writeText(content);
     toast.success('Copied to clipboard');
     console.log('[v0] Message copied to clipboard');
-  };
+  }, []);
 
-  const handleRegenerateResponse = (index: number) => {
+  const handleRegenerateResponse = useCallback((index: number) => {
     if (index > 0 && messages[index - 1].role === 'user') {
       const userMessage = messages[index - 1].content;
       const newMessages = messages.slice(0, index);
       setMessages(newMessages);
       generateRealResponse(userMessage);
     }
-  };
+  }, [messages, generateRealResponse]);
 
-  const handleVote = async (index: number, direction: 'up' | 'down') => {
+  const handleVote = useCallback(async (index: number, direction: 'up' | 'down') => {
     // Optimistic UI update
     setMessages(prev => prev.map((m, i) => i === index ? { ...m, voted: direction } : m));
     toast.success(direction === 'up' ? 'Marked helpful — thanks!' : "Got it, we'll improve this");
@@ -2425,7 +2424,7 @@ No preamble. Start directly with section 1.`;
     } catch {
       // Non-blocking — feedback is best-effort
     }
-  };
+  }, [messages, activeChat]);
 
   const handleEditChatTitle = (chatId: string, currentTitle: string, e: React.MouseEvent) => {
     e.stopPropagation();

@@ -98,8 +98,37 @@ function shouldUseFastModel(
 // POST /api/analyze
 // ============================================================================
 
+// ── Server-side rate limiter (in-memory, resets on cold start) ──────────────
+// Adequate for single-region Vercel deployment. For multi-instance scale,
+// replace with Upstash Redis: https://github.com/upstash/ratelimit
+const _rateMap = new Map<string, { count: number; resetAt: number }>();
+const _RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const _RATE_LIMIT = 30; // requests per IP per window
+
+function _checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = _rateMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    _rateMap.set(ip, { count: 1, resetAt: now + _RATE_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= _RATE_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
+
+  // Server-side rate limit check (bypasses client-side localStorage spoofing)
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  if (!_checkRateLimit(ip)) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Rate limit exceeded. Try again in an hour.' }),
+      { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': '3600' } },
+    );
+  }
+
   // Per-AI-call timeouts (independent from each other and from card generation):
   //   grok-4 primary: 45s | grok-3-mini primary: 25s | fallback: 12s
   // Total worst-case sequential: 45 + 12 = 57s (card generation runs concurrently so adds ~0s).

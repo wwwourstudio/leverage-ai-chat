@@ -8,8 +8,8 @@
 
 import crypto from 'crypto';
 
-const KALSHI_TRADING_URL = 'https://api.kalshi.com/trade-api/v2';
-const KALSHI_FALLBACK_URL = 'https://api.elections.kalshi.com/trade-api/v2';
+const KALSHI_TRADING_URL = 'https://trading-api.kalshi.com/trade-api/v2';
+const KALSHI_FALLBACK_URL = 'https://trading-api.kalshi.com/trade-api/v2'; // same host; path-based fallback handled below
 
 export interface KalshiMarket {
   ticker: string;

@@ -52,6 +52,39 @@ const marketCache = new Map<string, CacheEntry>();
 // Tracks in-flight requests by cache key so concurrent callers share one HTTP request
 const pendingRequests = new Map<string, Promise<KalshiMarket[]>>();
 
+// ─── Global Rate Limiter ───────────────────────────────────────────────────────
+// Kalshi has strict rate limits (~10 requests per minute for unauthenticated).
+// This ensures we never exceed that, even with concurrent callers.
+const RATE_LIMIT_MS = 6000; // 6 seconds between requests (10 req/min max)
+let lastRequestTime = 0;
+let rateLimitedUntil = 0; // Timestamp when we can make requests again after 429
+
+async function waitForRateLimit(): Promise<void> {
+  const now = Date.now();
+  
+  // If we're in a rate-limited cooldown period, wait it out
+  if (rateLimitedUntil > now) {
+    const cooldownMs = rateLimitedUntil - now;
+    console.log(`[KALSHI] Rate limit cooldown: waiting ${Math.ceil(cooldownMs / 1000)}s`);
+    await new Promise(r => setTimeout(r, cooldownMs));
+  }
+  
+  // Enforce minimum gap between requests
+  const elapsed = now - lastRequestTime;
+  if (elapsed < RATE_LIMIT_MS) {
+    const waitMs = RATE_LIMIT_MS - elapsed;
+    console.log(`[KALSHI] Rate limiting: waiting ${waitMs}ms before next request`);
+    await new Promise(r => setTimeout(r, waitMs));
+  }
+  
+  lastRequestTime = Date.now();
+}
+
+function markRateLimited(retryAfterMs: number = 30000): void {
+  rateLimitedUntil = Date.now() + retryAfterMs;
+  console.warn(`[KALSHI] Marked rate-limited for ${retryAfterMs / 1000}s`);
+}
+
 /**
  * Generate cache key from parameters
  */
@@ -87,8 +120,9 @@ function getCachedMarkets(cacheKey: string): KalshiMarket[] | null {
 
 /**
  * Store markets in cache with TTL
+ * Default 10 minutes to minimize API calls (Kalshi has strict rate limits)
  */
-function cacheMarkets(cacheKey: string, markets: KalshiMarket[], ttlMs: number = 60000): void {
+function cacheMarkets(cacheKey: string, markets: KalshiMarket[], ttlMs: number = 600000): void {
   marketCache.set(cacheKey, {
     data: markets,
     timestamp: Date.now(),
@@ -246,43 +280,44 @@ function parseMarket(m: any): KalshiMarket {
 
 /**
  * Fetch a single page of markets.
- * Tries the canonical api.kalshi.com first; falls back to api.elections.kalshi.com.
+ * Rate-limited to avoid 429 errors. Only uses one URL since both point to same server.
  * Returns parsed markets and the next cursor (null when done).
  */
 async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage> {
-  const urls = [
-    `${KALSHI_TRADING_URL}/markets?${queryParams}`,
-    `${KALSHI_FALLBACK_URL}/markets?${queryParams}`,
-  ];
+  // Check if we're in rate-limit cooldown before even trying
+  const now = Date.now();
+  if (rateLimitedUntil > now) {
+    console.log(`[KALSHI] Skipping request - rate limited for ${Math.ceil((rateLimitedUntil - now) / 1000)}s more`);
+    return { markets: [], cursor: null };
+  }
 
-  let lastError: Error | null = null;
+  // Wait for rate limit before making request
+  await waitForRateLimit();
 
-  for (const url of urls) {
-    try {
-      const response = await fetch(url, {
-        headers: buildHeaders(url),
-        signal: AbortSignal.timeout(15000),
-      });
+  const url = `${KALSHI_TRADING_URL}/markets?${queryParams}`;
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        const host = new URL(url).hostname;
-        console.error(`[KALSHI] API error ${response.status} at ${host} — ${errorText.substring(0, 200)}`);
-        
-        // Handle 429 rate limiting specially — don't try fallback URL (same rate limit)
-        // Instead, wait and signal caller to back off
-        if (response.status === 429) {
-          const retryAfter = response.headers.get('Retry-After');
-          const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 2000;
-          console.warn(`[KALSHI] Rate limited — waiting ${waitMs}ms before continuing`);
-          await new Promise(r => setTimeout(r, waitMs));
-          // Don't try fallback for 429 — both URLs share same rate limit
-          throw new Error(`Kalshi API error: 429 Too Many Requests`);
-        }
-        
-        lastError = new Error(`Kalshi API error: ${response.status} ${response.statusText}`);
-        continue; // try fallback URL
+  try {
+    const response = await fetch(url, {
+      headers: buildHeaders(url),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      const host = new URL(url).hostname;
+      console.error(`[KALSHI] API error ${response.status} at ${host} — ${errorText.substring(0, 200)}`);
+      
+      // Handle 429 rate limiting — mark as rate-limited and return empty
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('Retry-After');
+        const cooldownMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 60000; // Default 60s cooldown
+        markRateLimited(cooldownMs);
+        // Return empty instead of throwing — let caller handle gracefully
+        return { markets: [], cursor: null };
       }
+      
+      throw new Error(`Kalshi API error: ${response.status} ${response.statusText}`);
+    }
 
       const data = await response.json();
 
@@ -304,19 +339,14 @@ async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage
 
       const cursor = data.cursor && data.cursor !== '' ? data.cursor : null;
       return { markets, cursor };
-    } catch (err) {
-      const host = new URL(url).hostname;
-      const cause = (err as any)?.cause;
-      const errCode = cause?.code ?? '';
-      console.warn(`[KALSHI] ${host} failed: ${(err as Error).message}${cause ? ` (${errCode || cause.message || cause})` : ''}`);
-      lastError = err as Error;
-      // DNS failure: both URLs resolve in the same environment — skip fallback immediately
-      if (errCode === 'ENOTFOUND' || errCode === 'EAI_AGAIN') break;
-      continue; // try fallback URL
-    }
+  } catch (err) {
+    const host = new URL(url).hostname;
+    const cause = (err as any)?.cause;
+    const errCode = cause?.code ?? '';
+    console.warn(`[KALSHI] ${host} failed: ${(err as Error).message}${cause ? ` (${errCode || cause.message || cause})` : ''}`);
+    // Return empty on error instead of throwing — graceful degradation
+    return { markets: [], cursor: null };
   }
-
-  throw lastError ?? new Error('All Kalshi endpoints failed');
 }
 
 /**
@@ -336,7 +366,7 @@ export async function fetchKalshiMarkets(params?: {
   useCache?: boolean;
   cacheTtlMs?: number;
 }): Promise<KalshiMarket[]> {
-  const { category, status = 'open', limit = 200, search, cursor, useCache = true, cacheTtlMs = 60000 } = params || {};
+  const { category, status = 'open', limit = 200, search, cursor, useCache = true, cacheTtlMs = 600000 } = params || {};
   const cacheKey = getCacheKey({ category, status, limit, search });
 
   // Check cache first (only when not mid-pagination)

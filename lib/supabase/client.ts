@@ -1,11 +1,15 @@
 import { createBrowserClient } from '@supabase/ssr'
 
-let client: ReturnType<typeof createBrowserClient> | undefined
+// Use globalThis to persist the singleton across HMR reloads in development
+const GLOBAL_KEY = '__supabase_browser_client__' as const
 
-export function createClient() {
+type BrowserClient = ReturnType<typeof createBrowserClient>
 
-  if (client) {
-    return client
+export function createClient(): BrowserClient {
+  // Check globalThis first (survives HMR)
+  const cached = (globalThis as Record<string, unknown>)[GLOBAL_KEY] as BrowserClient | undefined
+  if (cached) {
+    return cached
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -17,12 +21,12 @@ export function createClient() {
     )
   }
 
-  client = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+  const client = createBrowserClient(supabaseUrl, supabaseAnonKey, {
     db: { schema: 'api' },
-    cookieOptions: {
-      name: 'sb-leverage-auth', // Unique name to avoid conflicts
-    },
   })
+
+  // Store in globalThis to survive HMR
+  ;(globalThis as Record<string, unknown>)[GLOBAL_KEY] = client
 
   return client
 }

@@ -304,25 +304,36 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 // Uses the service role key (bypasses RLS) so no user session is needed.
 // Falls back silently — persistence failures never break the ADP tool.
 
-// Singleton client to avoid "Multiple GoTrueClient instances" warning
+// Singleton client with promise lock to avoid race conditions and "Multiple GoTrueClient instances" warning
 let adpSupabaseClient: Awaited<ReturnType<typeof import('@supabase/supabase-js').createClient>> | null = null;
+let adpClientInitPromise: Promise<typeof adpSupabaseClient> | null = null;
 
 async function getADPSupabaseClient() {
+  // Return existing client if already initialized
   if (adpSupabaseClient) return adpSupabaseClient;
   
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
+  // If initialization is in progress, wait for it
+  if (adpClientInitPromise) return adpClientInitPromise;
   
-  const { createClient } = await import('@supabase/supabase-js');
-  adpSupabaseClient = createClient(url, key, {
-    db: { schema: 'api' },
-    auth: {
-      persistSession: false, // Server-side: no session storage needed
-      autoRefreshToken: false,
-    },
-  });
-  return adpSupabaseClient;
+  // Start initialization and store the promise to prevent concurrent creates
+  adpClientInitPromise = (async () => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return null;
+    
+    const { createClient } = await import('@supabase/supabase-js');
+    adpSupabaseClient = createClient(url, key, {
+      db: { schema: 'api' },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
+    return adpSupabaseClient;
+  })();
+  
+  return adpClientInitPromise;
 }
 
 export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): Promise<void> {
@@ -393,7 +404,7 @@ export async function loadADPFromSupabase(sport = 'mlb', allowStale = false): Pr
   }
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
+// ── Public API ──────────────────────────────────────────��─────────────────────
 
 /**
  * Clears the in-memory cache, forcing the next call to re-read from Supabase.

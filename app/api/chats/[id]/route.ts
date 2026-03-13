@@ -22,7 +22,18 @@ export async function PATCH(
       );
     }
 
-    const body = await request.json().catch(() => ({}));
+    // Reject oversized payloads before parsing
+    const contentLength = Number(request.headers.get('content-length') ?? 0);
+    if (contentLength > 10_000) {
+      return NextResponse.json({ success: false, error: 'Request too large' }, { status: 413 });
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: HTTP_STATUS.BAD_REQUEST });
+    }
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
     if (typeof body.title === 'string') updates.title = body.title.slice(0, 200);

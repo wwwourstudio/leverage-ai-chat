@@ -181,8 +181,27 @@ export async function POST(request: NextRequest) {
         : hasADPIntent
           ? `${baseSystemPrompt}${NFBC_ADP_ADDENDUM}`
           : baseSystemPrompt;
+    // ── Prompt-injection guard ────────────────────────────────────────────────
+    // Strip common jailbreak patterns from user-controlled custom instructions
+    // before injecting them into the system prompt.
+    const sanitizeCustomInstructions = (raw: string): string => {
+      const sanitized = raw
+        .slice(0, 2000) // hard character cap
+        .replace(/ignore\s+(all\s+)?(previous|above|prior)\s+instructions?/gi, '[filtered]')
+        .replace(/forget\s+(all\s+)?(previous|above|prior)\s+instructions?/gi, '[filtered]')
+        .replace(/disregard\s+(all\s+)?(previous|above|prior)\s+instructions?/gi, '[filtered]')
+        .replace(/\bsystem\s*prompt\b/gi, '[filtered]')
+        .replace(/\[INST\]|\[\/INST\]|<s>|<\/s>|<\|im_start\|>|<\|im_end\|>/g, '') // LLM escape tokens
+        .replace(/\bDAN\b|\bjailbreak\b/gi, '[filtered]') // common jailbreak keywords
+        .trim();
+      if (sanitized !== raw.trim().slice(0, 2000)) {
+        console.warn('[API/analyze] Custom instructions sanitized — potential injection attempt filtered');
+      }
+      return sanitized;
+    };
+
     const systemPrompt = customInstructions?.trim()
-      ? `${baseWithAddendum}\n\n## USER PROFILE & BETTING PREFERENCES\n${customInstructions.trim()}`
+      ? `${baseWithAddendum}\n\n## USER PROFILE & BETTING PREFERENCES\n${sanitizeCustomInstructions(customInstructions)}`
       : baseWithAddendum;
 
     // ── Auto-save inline TSV/CSV ADP uploads ─────────────────────────────────────
@@ -445,6 +464,7 @@ export async function POST(request: NextRequest) {
     let aiText = '';
     let modelUsed: string = AI_CONFIG.MODEL_DISPLAY_NAME;
     let usedFallback = false;
+    let tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number } | null = null;
     let pendingADPCard: InsightCard | null = null;
     let pendingADPUploadCard: InsightCard | null = null;
     let pendingStatcastCard: InsightCard | null = null;
@@ -458,7 +478,24 @@ export async function POST(request: NextRequest) {
 
     const MAX_HALLUCINATION_RETRIES = 2;
 
-    const hasImages = (body.imageAttachments?.length ?? 0) > 0;
+    // ── Image attachment validation ───────────────────────────────────────────
+    // Validate MIME type and estimated file size before forwarding to Grok.
+    const ALLOWED_IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+    const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+    const validatedImageAttachments = (body.imageAttachments ?? []).filter((img: ImageAttachment) => {
+      if (!ALLOWED_IMAGE_MIMES.has(img.mimeType)) {
+        console.warn(`[API/analyze] Rejected image with unsupported MIME type: ${img.mimeType}`);
+        return false;
+      }
+      // base64 encodes ~4/3 of raw bytes; multiply length × 0.75 to estimate bytes
+      const estimatedBytes = (img.base64?.length ?? 0) * 0.75;
+      if (estimatedBytes > MAX_IMAGE_BYTES) {
+        console.warn(`[API/analyze] Rejected image exceeding size limit: ~${Math.round(estimatedBytes / 1024)}KB`);
+        return false;
+      }
+      return true;
+    });
+    const hasImages = validatedImageAttachments.length > 0;
 
     /** Build the generateText call options supporting both text-only and multimodal */
     const buildGenOptions = (prompt: string, imgs?: ImageAttachment[]) => {
@@ -660,7 +697,7 @@ export async function POST(request: NextRequest) {
             const streamResult = streamText({
               model: createXai({ apiKey: xaiApiKey })(primaryModel),
               system: systemPrompt,
-              ...buildGenOptions(enrichedPrompt, hasImages ? body.imageAttachments : undefined),
+              ...buildGenOptions(enrichedPrompt, hasImages ? validatedImageAttachments : undefined),
               temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
               maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
               maxRetries: 0,
@@ -682,6 +719,20 @@ export async function POST(request: NextRequest) {
               }
               clearTimeout(firstTokenTimer);
               modelUsed = useFastPath ? 'Grok 3 Mini' : AI_CONFIG.MODEL_DISPLAY_NAME;
+
+              // ── Capture token usage ────────────────────────────────────────────
+              try {
+                const usage = await streamResult.usage;
+                if (usage) {
+                  tokenUsage = {
+                    promptTokens: usage.promptTokens ?? 0,
+                    completionTokens: usage.completionTokens ?? 0,
+                    totalTokens: usage.totalTokens ?? 0,
+                  };
+                }
+              } catch {
+                // Non-fatal — usage may not be available for all model configurations
+              }
 
               // ── Capture tool results after streaming completes ──────────────────
               const allToolResults: any[] = await (streamResult as any).toolResults ?? [];
@@ -964,6 +1015,7 @@ export async function POST(request: NextRequest) {
             useFallback: usedFallback,
             clarificationNeeded: isAmbiguous,
             clarificationOptions,
+            ...(tokenUsage && { tokenUsage }),
           }));
 
         } catch (innerError) {

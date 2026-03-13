@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
 
 /**
  * GET /api/user/instructions
@@ -63,7 +64,18 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Reject oversized payloads before parsing
+    const contentLength = Number(request.headers.get('content-length') ?? 0);
+    if (contentLength > 10_000) {
+      return NextResponse.json({ success: false, error: 'Request too large' }, { status: 413 });
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    }
     const instructions: string = typeof body?.instructions === 'string'
       ? body.instructions.slice(0, 2000)
       : '';
@@ -73,6 +85,15 @@ export async function PUT(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ success: false, error: 'Unauthenticated' });
+    }
+
+    // Rate limit: 10 instruction saves per minute per user
+    const rl = checkRateLimit('instructions-put', getRateLimitId(request, user.id), { limit: 10, windowMs: 60_000 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+      );
     }
 
     const { error } = await supabase.from('user_preferences').upsert(
@@ -88,7 +109,7 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ success: true, migrationPending: true });
       }
       console.error('[API/user/instructions] Upsert error:', error.message);
-      return NextResponse.json({ success: false, error: error.message });
+      return NextResponse.json({ success: false, error: 'Failed to save instructions' });
     }
 
     return NextResponse.json({ success: true });

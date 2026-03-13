@@ -1,6 +1,7 @@
 'use client';
 
-import { X } from 'lucide-react';
+import { useState } from 'react';
+import { X, AlertCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 interface AuthModalsProps {
@@ -12,6 +13,15 @@ interface AuthModalsProps {
   setUser: (v: { name: string; email: string } | null) => void;
 }
 
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <div className="flex items-start gap-2 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-xl text-sm text-red-400">
+      <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
 export function AuthModals({
   showLoginModal,
   showSignupModal,
@@ -20,72 +30,85 @@ export function AuthModals({
   setIsLoggedIn,
   setUser,
 }: AuthModalsProps) {
-  const handleLogin = async () => {
-    const emailInput = document.getElementById('login-email') as HTMLInputElement;
-    const email = emailInput?.value || '';
-    const passwordInput = document.getElementById('login-password') as HTMLInputElement;
-    const password = passwordInput?.value || '';
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
 
-    if (!email || !password) {
-      alert('Please enter email and password');
+  const [signupName, setSignupName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [signupError, setSignupError] = useState('');
+  const [signupLoading, setSignupLoading] = useState(false);
+
+  const handleLogin = async () => {
+    setLoginError('');
+    if (!loginEmail || !loginPassword) {
+      setLoginError('Please enter your email and password');
       return;
     }
-
+    setLoginLoading(true);
     try {
       const supabase = createClient();
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password: loginPassword,
+      });
 
       if (error) {
-        alert(error.message);
+        setLoginError(error.message);
         return;
       }
 
       if (data.user) {
         setIsLoggedIn(true);
         setUser({
-          name: data.user.user_metadata?.full_name || email.split('@')[0],
-          email: data.user.email || email,
+          name: data.user.user_metadata?.full_name || loginEmail.split('@')[0],
+          email: data.user.email || loginEmail,
         });
+        setLoginEmail('');
+        setLoginPassword('');
         setShowLoginModal(false);
       }
     } catch (err: any) {
-      alert(err.message || 'Login failed');
+      setLoginError(err?.message || 'Login failed. Please try again.');
+    } finally {
+      setLoginLoading(false);
     }
   };
 
   const handleSignup = async () => {
-    const nameInput = document.getElementById('signup-name') as HTMLInputElement;
-    const emailInput = document.getElementById('signup-email') as HTMLInputElement;
-    const passwordInput = document.getElementById('signup-password') as HTMLInputElement;
-    const name = nameInput?.value || '';
-    const email = emailInput?.value || '';
-    const password = passwordInput?.value || '';
-
-    if (!email || !password) {
-      alert('Please enter email and password');
+    setSignupError('');
+    if (!signupEmail || !signupPassword) {
+      setSignupError('Please enter your email and password');
       return;
     }
-
+    setSignupLoading(true);
     try {
       const supabase = createClient();
       const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { full_name: name } },
+        email: signupEmail,
+        password: signupPassword,
+        options: { data: { full_name: signupName } },
       });
 
       if (error) {
-        alert(error.message);
+        setSignupError(error.message);
         return;
       }
 
       if (data.user) {
         setIsLoggedIn(true);
-        setUser({ name: name || email.split('@')[0], email });
+        setUser({ name: signupName || signupEmail.split('@')[0], email: signupEmail });
+        setSignupName('');
+        setSignupEmail('');
+        setSignupPassword('');
         setShowSignupModal(false);
       }
     } catch (err: any) {
-      alert(err.message || 'Signup failed');
+      setSignupError(err?.message || 'Signup failed. Please try again.');
+    } finally {
+      setSignupLoading(false);
     }
   };
 
@@ -97,7 +120,7 @@ export function AuthModals({
         options: { redirectTo: `${window.location.origin}/auth/callback` },
       });
     } catch (err: any) {
-      alert(err.message || 'Google auth failed');
+      setLoginError(err?.message || 'Google auth failed');
     }
   };
 
@@ -126,11 +149,14 @@ export function AuthModals({
               </div>
 
               <div className="space-y-4">
+                {loginError && <ErrorBanner message={loginError} />}
+
                 <div>
                   <label className="block text-sm font-semibold text-gray-400 mb-2">Email</label>
                   <input
-                    id="login-email"
                     type="email"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
                     placeholder="your@email.com"
                     className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
@@ -139,8 +165,10 @@ export function AuthModals({
                 <div>
                   <label className="block text-sm font-semibold text-gray-400 mb-2">Password</label>
                   <input
-                    id="login-password"
                     type="password"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
                     placeholder="Enter password"
                     className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
@@ -148,9 +176,10 @@ export function AuthModals({
 
                 <button
                   onClick={handleLogin}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all"
+                  disabled={loginLoading}
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all"
                 >
-                  Sign In
+                  {loginLoading ? 'Signing in\u2026' : 'Sign In'}
                 </button>
 
                 <div className="relative">
@@ -210,11 +239,14 @@ export function AuthModals({
               </div>
 
               <div className="space-y-4">
+                {signupError && <ErrorBanner message={signupError} />}
+
                 <div>
                   <label className="block text-sm font-semibold text-gray-400 mb-2">Full Name</label>
                   <input
-                    id="signup-name"
                     type="text"
+                    value={signupName}
+                    onChange={(e) => setSignupName(e.target.value)}
                     placeholder="John Doe"
                     className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
@@ -223,8 +255,9 @@ export function AuthModals({
                 <div>
                   <label className="block text-sm font-semibold text-gray-400 mb-2">Email</label>
                   <input
-                    id="signup-email"
                     type="email"
+                    value={signupEmail}
+                    onChange={(e) => setSignupEmail(e.target.value)}
                     placeholder="your@email.com"
                     className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
@@ -233,8 +266,10 @@ export function AuthModals({
                 <div>
                   <label className="block text-sm font-semibold text-gray-400 mb-2">Password</label>
                   <input
-                    id="signup-password"
                     type="password"
+                    value={signupPassword}
+                    onChange={(e) => setSignupPassword(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSignup()}
                     placeholder="Create a password"
                     className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
@@ -242,9 +277,10 @@ export function AuthModals({
 
                 <button
                   onClick={handleSignup}
-                  className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl transition-all shadow-lg"
+                  disabled={signupLoading}
+                  className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all shadow-lg"
                 >
-                  Create Account
+                  {signupLoading ? 'Creating account\u2026' : 'Create Account'}
                 </button>
 
                 <div className="relative">

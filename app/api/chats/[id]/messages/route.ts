@@ -67,8 +67,19 @@ export async function POST(
       );
     }
 
-    const body = await request.json().catch(() => ({}));
-    const { role, content, model_used, confidence, is_welcome = false } = body;
+    // Reject oversized payloads before parsing
+    const contentLength = Number(request.headers.get('content-length') ?? 0);
+    if (contentLength > 200_000) { // 200KB — generous for large messages
+      return NextResponse.json({ success: false, error: 'Request too large' }, { status: 413 });
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: HTTP_STATUS.BAD_REQUEST });
+    }
+    const { role, content, model_used, confidence, is_welcome = false } = body as any;
 
     if (!role || !content) {
       return NextResponse.json(

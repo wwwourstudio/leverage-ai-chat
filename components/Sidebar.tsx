@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Plus, Search, Star, Trash2, MessageSquare, Edit3, CheckCircle, LayoutGrid, TrendingUp, Trophy, Award, BarChart3, UserCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -107,8 +107,10 @@ const RAIL_ICONS: Record<string, React.FC<{ className?: string }>> = {
 };
 
 // ── Chat Card ─────────────────────────────────────────────────────────────────
+// Memoized so that only the active/editing card re-renders during search input
+// changes — prevents all 50+ cards from reconciling on every keystroke.
 
-function ChatCard({
+const ChatCard = memo(function ChatCard({
   chat,
   isActive,
   editingChatId,
@@ -236,7 +238,7 @@ function ChatCard({
       </div>
     </div>
   );
-}
+});
 
 /** Format timestamp relative to now */
 function formatRelativeTime(date: Date): string {

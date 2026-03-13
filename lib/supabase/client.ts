@@ -18,7 +18,10 @@ export function createClient() {
   }
 
   client = createBrowserClient(supabaseUrl, supabaseAnonKey, {
-    db: { schema: 'api' }
+    db: { schema: 'api' },
+    cookieOptions: {
+      name: 'sb-leverage-auth', // Unique name to avoid conflicts
+    },
   })
 
   return client

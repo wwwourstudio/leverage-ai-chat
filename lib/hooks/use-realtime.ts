@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
@@ -18,7 +18,8 @@ export function useRealtime<T>(
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const supabase = createClient();
+  // Use useMemo to ensure client is only created once per component instance
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     let channel: RealtimeChannel;

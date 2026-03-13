@@ -3093,10 +3093,12 @@ No preamble. Start directly with section 1.`;
                 const prevMessage = index > 0 ? messages[index - 1] : null;
                 const isGrouped = prevMessage && prevMessage.role === message.role;
                 const _showTimestamp = !isGrouped || index === messages.length - 1;
+                // Ensure unique key: prefer message.id, fallback to role+index+timestamp
+                const messageKey = message.id || `${message.role}-${index}-${message.timestamp || Date.now()}`;
                 
                 return (
                   <div
-                    key={message.id ?? `msg-${index}`}
+                    key={messageKey}
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn ${isGrouped ? 'mt-1.5' : 'mt-5'}`}
                   >
                 <div className={message.role === 'user' ? 'max-w-[85%] md:max-w-[75%]' : 'w-full max-w-4xl lg:max-w-3xl'}>

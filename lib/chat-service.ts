@@ -156,6 +156,7 @@ export async function loadMessages(threadId: string): Promise<PersistedMessage[]
 /**
  * Append a single message to a thread.
  * Fire-and-forget — never blocks the UI.
+ * Silently returns if thread doesn't exist (handles race conditions gracefully).
  */
 export async function saveMessage(
   threadId: string,
@@ -168,6 +169,13 @@ export async function saveMessage(
       body: JSON.stringify(msg),
     });
   } catch (err) {
+    // "Thread not found" is expected in race conditions (thread creation in progress or
+    // user's session referencing a deleted thread). Don't spam console for this case.
+    const errMsg = err instanceof Error ? err.message : String(err);
+    if (errMsg.includes('Thread not found')) {
+      // Silent — thread may have been deleted or not yet committed
+      return;
+    }
     console.warn('[v0] [Chat] saveMessage failed:', err);
   }
 }

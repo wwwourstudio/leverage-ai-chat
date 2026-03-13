@@ -268,6 +268,18 @@ async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage
         const errorText = await response.text();
         const host = new URL(url).hostname;
         console.error(`[KALSHI] API error ${response.status} at ${host} — ${errorText.substring(0, 200)}`);
+        
+        // Handle 429 rate limiting specially — don't try fallback URL (same rate limit)
+        // Instead, wait and signal caller to back off
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('Retry-After');
+          const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 2000;
+          console.warn(`[KALSHI] Rate limited — waiting ${waitMs}ms before continuing`);
+          await new Promise(r => setTimeout(r, waitMs));
+          // Don't try fallback for 429 — both URLs share same rate limit
+          throw new Error(`Kalshi API error: 429 Too Many Requests`);
+        }
+        
         lastError = new Error(`Kalshi API error: ${response.status} ${response.statusText}`);
         continue; // try fallback URL
       }
@@ -619,12 +631,23 @@ export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
 
 /**
  * Fetch election-related markets from Kalshi
+ * Rate-limited to avoid 429 errors — uses batching + delays between requests.
  */
 export async function fetchElectionMarkets(options?: {
   year?: number;
   limit?: number;
 }): Promise<KalshiMarket[]> {
   const { year = 2026, limit = 20 } = options || {};
+
+  // Check combined election cache first to avoid re-fetching
+  const ELECTION_CACHE_KEY = `kalshi:elections:${year}:${limit}`;
+  const ELECTION_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes (up from 60s)
+  
+  const cached = getCachedMarkets(ELECTION_CACHE_KEY);
+  if (cached) {
+    console.log(`[KALSHI] Election markets cache hit: ${cached.length} markets`);
+    return cached;
+  }
 
   console.log('[KALSHI] Fetching election markets for year:', year);
 
@@ -639,44 +662,64 @@ export async function fetchElectionMarkets(options?: {
     return ELECTION_KEYWORDS.some(k => text.includes(k)) || text.includes(year.toString());
   }
 
-  // Apply the election filter INSIDE the collection loop so the early-break
-  // condition (`electionMarkets.length >= limit`) counts only matching markets,
-  // not raw API results.  The Kalshi `title` search param does not reliably act
-  // as a substring filter — it often returns the top-50 open markets regardless —
-  // so we must filter client-side before deciding whether to try the next strategy.
+  // Reduced from 7 strategies to 3 high-yield ones to minimize API calls
+  // Each strategy fetches 50 markets, so 3 strategies = max 150 raw results
   const searchStrategies: Array<Parameters<typeof fetchKalshiMarkets>[0]> = [
-    { search: `senate ${year}` },
-    { search: `house ${year}` },
-    { search: `governor ${year}` },
-    { search: 'midterm' },
-    { category: 'politics' },
+    { category: 'politics' },  // Most reliable for political markets
     { search: `election ${year}` },
-    { search: 'congress' },
+    { search: 'senate house congress' },  // Combined search to reduce requests
   ];
 
   const seen = new Set<string>();
   const electionMarkets: KalshiMarket[] = [];
 
-  for (const strategy of searchStrategies) {
+  // Rate limit: 1 request at a time with 800ms delay between each
+  const REQUEST_DELAY_MS = 800;
+
+  for (let i = 0; i < searchStrategies.length; i++) {
+    const strategy = searchStrategies[i];
     if (electionMarkets.length >= limit) break;
 
-    const markets = await fetchKalshiMarkets({ ...strategy, limit: 50 });
+    // Add delay before each request (except the first)
+    if (i > 0) {
+      await new Promise(r => setTimeout(r, REQUEST_DELAY_MS));
+    }
 
-    for (const market of markets) {
-      if (seen.has(market.ticker)) continue;
-      seen.add(market.ticker);
-      if (isElectionMarket(market)) {
-        electionMarkets.push(market);
+    try {
+      const markets = await fetchKalshiMarkets({ 
+        ...strategy, 
+        limit: 50, 
+        useCache: true,
+        cacheTtlMs: ELECTION_CACHE_TTL_MS,
+      });
+
+      for (const market of markets) {
+        if (seen.has(market.ticker)) continue;
+        seen.add(market.ticker);
+        if (isElectionMarket(market)) {
+          electionMarkets.push(market);
+        }
       }
+      
+      console.log(`[KALSHI] Strategy ${i + 1}/${searchStrategies.length}: +${markets.length} raw, ${electionMarkets.length} election matches`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // On 429, stop trying more strategies — we've hit the rate limit
+      if (msg.includes('429')) {
+        console.warn('[KALSHI] Rate limited (429) — stopping election fetch early');
+        break;
+      }
+      console.warn(`[KALSHI] Strategy ${i + 1} failed:`, msg);
     }
   }
 
   // Fallback: if no matches after all strategies, fetch a broad set and filter.
-  // This handles the case where the Kalshi API returns unrelated markets for all searches.
+  // Only attempt if we haven't been rate-limited.
   if (electionMarkets.length === 0) {
     console.log('[KALSHI] No election markets from targeted searches — falling back to broad fetch');
+    await new Promise(r => setTimeout(r, REQUEST_DELAY_MS)); // Rate limit delay
     try {
-      const broad = await fetchKalshiMarketsWithRetry({ limit: 200, maxRetries: 2 });
+      const broad = await fetchKalshiMarketsWithRetry({ limit: 100, maxRetries: 1 }); // Reduced from 200/2
       for (const market of broad) {
         if (!seen.has(market.ticker) && isElectionMarket(market)) {
           electionMarkets.push(market);
@@ -685,6 +728,11 @@ export async function fetchElectionMarkets(options?: {
     } catch {
       // Non-critical fallback
     }
+  }
+
+  // Cache the combined results
+  if (electionMarkets.length > 0) {
+    cacheMarkets(ELECTION_CACHE_KEY, electionMarkets, ELECTION_CACHE_TTL_MS);
   }
 
   console.log(`[KALSHI] Found ${electionMarkets.length} election markets for ${year}`);

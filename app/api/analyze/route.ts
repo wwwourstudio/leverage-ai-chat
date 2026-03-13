@@ -1021,6 +1021,7 @@ export async function POST(request: NextRequest) {
           // Send done event with full metadata
           controller.enqueue(sseChunk({
             type: 'done',
+            success: true,
             text: aiText,
             cards,
             confidence: trustMetrics.finalConfidence,
@@ -1039,6 +1040,7 @@ export async function POST(request: NextRequest) {
           try {
             controller.enqueue(sseChunk({
               type: 'done',
+              success: true,
               text: generateFallbackResponse(userMessage, context),
               cards: [],
               confidence: 65,

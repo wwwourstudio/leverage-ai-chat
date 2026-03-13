@@ -328,6 +328,7 @@ async function getADPSupabaseClient() {
         persistSession: false,
         autoRefreshToken: false,
         detectSessionInUrl: false,
+        storageKey: 'sb-adp-data-isolated', // Unique key to avoid GoTrueClient conflicts
       },
     });
     return adpSupabaseClient;

@@ -29,6 +29,7 @@ const SERVICES: Omit<ServiceCheck, 'status' | 'latency' | 'message'>[] = [
   { name: 'Insights API', endpoint: '/api/insights', icon: Database },
   { name: 'Cards Generator', endpoint: '/api/cards', icon: BarChart3 },
   { name: 'Live Odds API', endpoint: '/api/odds', icon: Activity },
+  { name: 'Sports Metadata', endpoint: '/api/sports', icon: Activity },
 ];
 
 function StatusIcon({ status }: { status: ServiceCheck['status'] }) {

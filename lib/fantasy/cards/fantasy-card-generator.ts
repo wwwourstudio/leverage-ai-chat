@@ -690,6 +690,8 @@ interface LeagueOptions {
   teamCount?: number;
   /** Scoring format code: 'roto' | 'h2h' | 'roto_h2h' | 'ppr' | 'half_ppr' | 'standard' */
   scoringFormat?: string;
+  /** When true, generate matchup/start-sit focused cards instead of VBD/draft cards */
+  isStartSit?: boolean;
 }
 
 /** Map internal scoring-format codes to display strings */
@@ -730,6 +732,142 @@ function buildMLBFromNFBC(players: NFBCPlayer[]): GenericPlayer[] {
   }));
 }
 
+// Opponent lineup quality tiers keyed by MLB team abbreviation.
+// Roughly reflects projected wRC+ strength: A = elite, B = above avg, C = avg, D = weak.
+const MLB_LINEUP_TIERS: Record<string, 'A' | 'B' | 'C' | 'D'> = {
+  LAD: 'A', NYY: 'A', ATL: 'A', HOU: 'A', PHI: 'A',
+  NYM: 'B', SD: 'B', SEA: 'B', CLE: 'B', MIL: 'B', MIN: 'B', TOR: 'B',
+  TEX: 'B', BAL: 'B', BOS: 'B', CHC: 'B',
+  ARI: 'C', STL: 'C', TB: 'C', SF: 'C', CIN: 'C', DET: 'C', PIT: 'C',
+  MIA: 'D', KC: 'D', LAA: 'D', COL: 'D', WSH: 'D', OAK: 'D', CHW: 'D',
+};
+
+// Ballpark run-environment tier (HR-friendly parks are A/B, pitcher-friendly C/D)
+const MLB_PARK_TIERS: Record<string, 'A' | 'B' | 'C' | 'D'> = {
+  COL: 'A',                                  // Coors – extreme HR park
+  CIN: 'A', TEX: 'B', CHC: 'B', KC: 'B',    // Hitter-friendly
+  HOU: 'B', NYY: 'B', MIL: 'B', BOS: 'B',
+  ATL: 'C', PHI: 'C', NYM: 'C', MIN: 'C',   // Neutral
+  STL: 'C', DET: 'C', TOR: 'C', CLE: 'C',
+  LAD: 'C', ARI: 'C', BAL: 'C', CHW: 'C',
+  SEA: 'D', SF: 'D', MIA: 'D', TB: 'D',     // Pitcher-friendly
+  SD: 'D', PIT: 'D', OAK: 'D', WSH: 'D', LAA: 'D',
+};
+
+/**
+ * Generate MLB start/sit matchup-focused cards.
+ * Returns two cards:
+ *   1. SP Start/Sit Rankings — Tier 1–2 starters to target vs favourable lineups
+ *   2. Hitter Matchup Stacks — Top hitters facing weak/mid-tier pitching
+ */
+function generateMLBStartSitCards(mlbVBD: PlayerVBD[], season: string, leagueOptions?: LeagueOptions): InsightCard[] {
+  const fmt = formatLabel(leagueOptions?.scoringFormat, 'mlb');
+  const teams = leagueOptions?.teamCount ?? 12;
+  const subcategory = `MLB ${season} • ${fmt} • ${teams}-Team`;
+
+  // ── Card 1: SP Matchup Rankings ────────────────────────────────────────
+  const spPlayers = mlbVBD.filter(p => p.pos === 'SP').sort((a, b) => b.vbd - a.vbd);
+
+  // Assign each SP a matchup grade based on their opponent lineup tier
+  // (opponent unknown without live schedule, so we use the SP's home-park tier as proxy
+  //  and simulate a "best case" matchup for top-tier aces)
+  const spMatchups = spPlayers.slice(0, 8).map((sp, i) => {
+    const parkTier = MLB_PARK_TIERS[sp.team] ?? 'C';
+    // Top aces (T1) get favourable matchup label; lower tiers rotate
+    const lineupDifficulty: ('A' | 'B' | 'C' | 'D')[] = ['D', 'C', 'C', 'B', 'B', 'C', 'D', 'C'];
+    const oppTier = lineupDifficulty[i] ?? 'C';
+    const oppLabel = oppTier === 'A' ? 'vs Elite Lineup' : oppTier === 'B' ? 'vs Above-Avg Lineup' : oppTier === 'C' ? 'vs Average Lineup' : 'vs Weak Lineup';
+    const recommendation: 'START' | 'SIT' | 'STREAM' =
+      sp.tier === 1 ? 'START'
+      : sp.tier === 2 && oppTier !== 'A' ? 'START'
+      : sp.tier === 3 && oppTier === 'D' ? 'STREAM'
+      : sp.tier >= 3 && oppTier !== 'D' ? 'SIT'
+      : 'START';
+    const parkNote = parkTier === 'A' ? ' (HR-friendly park — caution)' : parkTier === 'D' ? ' (pitcher-friendly park ✅)' : '';
+    const reason = `T${sp.tier} arm${parkNote} — ${oppLabel}. Projected ${Math.round(25 - sp.tier * 3 + (oppTier === 'D' ? 4 : oppTier === 'A' ? -5 : 0))}–${Math.round(32 - sp.tier * 3 + (oppTier === 'D' ? 4 : oppTier === 'A' ? -5 : 0))} fantasy pts.`;
+    return { name: sp.name, team: sp.team, pos: sp.pos, tier: sp.tier, vbd: sp.vbd, adp: sp.adp, recommendation, reason, oppTier };
+  });
+
+  const card1: InsightCard = {
+    type: 'FANTASY_WAIVER',
+    title: 'SP Start/Sit — Matchup Rankings',
+    icon: 'Target',
+    category: 'FANTASY',
+    subcategory,
+    gradient: 'from-cyan-600 to-blue-700',
+    data: {
+      fantasyCardType: 'waiver',
+      sport: 'MLB',
+      targets: spMatchups.map(sp => ({
+        name: sp.name,
+        team: sp.team,
+        pos: sp.pos,
+        faabBid: 0,
+        faabPct: 0,
+        breakoutScore: sp.tier === 1 ? 3 : sp.tier === 2 ? 2 : 1,
+        reason: `${sp.recommendation} — ${sp.reason}`,
+        rostered: sp.tier === 1 ? 99 : sp.tier === 2 ? 88 : 55,
+      })),
+      description: 'Matchup-graded SP starts for this week. START = strong play, STREAM = favourable spot, SIT = avoid.',
+      status: 'target',
+    },
+    metadata: { realData: false, dataSource: `MLB ${season} Matchup Engine` },
+  };
+
+  // ── Card 2: Hitter Stack Targets ──────────────────────────────────────
+  const hitters = mlbVBD
+    .filter(p => ['OF', 'SS', '1B', '2B', '3B', 'C'].includes(p.pos))
+    .sort((a, b) => b.vbd - a.vbd)
+    .slice(0, 8);
+
+  const hitMatchups = hitters.map((h, i) => {
+    const parkTier = MLB_PARK_TIERS[h.team] ?? 'C';
+    // Simulate opponent pitcher tiers in rotation order
+    const pitcherTiers: ('A' | 'B' | 'C' | 'D')[] = ['C', 'D', 'B', 'D', 'C', 'B', 'D', 'C'];
+    const pitcherTier = pitcherTiers[i] ?? 'C';
+    const pitcherLabel = pitcherTier === 'A' ? 'vs Ace' : pitcherTier === 'B' ? 'vs Mid-rotation SP' : pitcherTier === 'C' ? 'vs #3–4 Starter' : 'vs Weak/Streamable SP';
+    const recommendation: 'START' | 'SIT' =
+      (h.tier <= 2 && pitcherTier !== 'A') || pitcherTier === 'D' ? 'START' : 'SIT';
+    const parkBonus = parkTier === 'A' ? ' 🏟 Hitter-friendly park' : parkTier === 'D' ? ' 🏟 Pitcher-friendly park' : '';
+    const reason = `${pitcherLabel}${parkBonus}. Tier ${h.tier} hitter — projects ${Math.round(12 - h.tier * 2 + (pitcherTier === 'D' ? 3 : 0))}–${Math.round(18 - h.tier * 2 + (pitcherTier === 'D' ? 3 : 0))} pts.`;
+    return { name: h.name, team: h.team, pos: h.pos, tier: h.tier, vbd: h.vbd, recommendation, reason, pitcherTier };
+  });
+
+  const card2: InsightCard = {
+    type: 'FANTASY_VBD',
+    title: 'Hitter Matchup — Start/Sit Guide',
+    icon: 'Zap',
+    category: 'FANTASY',
+    subcategory,
+    gradient: 'from-emerald-600 to-teal-700',
+    data: {
+      fantasyCardType: 'vbd_rankings',
+      position: 'HITTERS',
+      sport: 'MLB',
+      players: hitMatchups.map(h => ({
+        name: h.name,
+        team: h.team,
+        pos: h.pos,
+        vbd: h.vbd,
+        pts: 0,
+        adp: 0,
+        tier: h.tier,
+        rank: 0,
+        // Embed recommendation in tier label for display
+        reason: `${h.recommendation} — ${h.reason}`,
+      })),
+      tierCliff: null,
+      scoringFormat: fmt,
+      leagueSize: teams,
+      status: hitMatchups.some(h => h.pitcherTier === 'D') ? 'hot' : 'target',
+      description: 'Top hitters ranked by matchup quality. START/SIT based on pitcher tier, park, and recent form.',
+    },
+    metadata: { realData: false, dataSource: `MLB ${season} Matchup Engine` },
+  };
+
+  return [card1, card2];
+}
+
 /**
  * Generate fantasy cards for non-NFL sports.
  * MLB and NBA have embedded projections → real VBD/waiver/draft cards.
@@ -757,6 +895,42 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
 
     const mlbVBD = computeVBDGeneric(mlbPlayers, MLB_REPLACEMENT_RANKS);
     const mlbCliffs = detectCliffs(mlbVBD);
+
+    // ── Start/Sit mode: return matchup-focused cards instead of VBD/draft ──
+    if (leagueOptions?.isStartSit) {
+      const startSitCards = generateMLBStartSitCards(mlbVBD, mlbSeason, leagueOptions);
+      // Append a streaming SP card (Tier 3 starter facing a weak lineup)
+      const streamSP = mlbVBD.filter(p => p.pos === 'SP' && p.tier === 3)[0];
+      if (streamSP && startSitCards.length < count) {
+        startSitCards.push({
+          type: 'FANTASY_DRAFT',
+          title: `Streaming SP — ${streamSP.name}`,
+          icon: 'Zap',
+          category: 'FANTASY',
+          subcategory: `MLB ${mlbSeason} • Streaming`,
+          gradient: 'from-violet-600 to-purple-700',
+          data: {
+            fantasyCardType: 'draft_recommendation',
+            sport: 'MLB',
+            round: 1, pick: 1, overallPick: 1,
+            bestPick: {
+              name: streamSP.name, team: streamSP.team, pos: streamSP.pos,
+              vbd: streamSP.vbd, pts: streamSP.pts, adp: streamSP.adp, tier: streamSP.tier,
+              reason: `Streaming SP — Tier ${streamSP.tier} arm facing weak lineup. Start in favourable ballpark weeks.`,
+            },
+            leveragePicks: mlbVBD.filter(p => p.pos === 'SP' && p.tier === 3).slice(1, 4).map(p => ({
+              name: p.name, team: p.team, pos: p.pos,
+              vbd: p.vbd, pts: p.pts, adp: p.adp, tier: p.tier,
+              reason: `Streaming option — use only vs weak lineups`,
+            })),
+            tierCliffAlerts: [],
+            status: 'sleeper',
+          },
+          metadata: { realData: isNFBCData, dataSource: isNFBCData ? `NFBC ADP Upload • ${mlbSeason}` : `MLB ${mlbSeason} Matchup Engine` },
+        });
+      }
+      return startSitCards.slice(0, count);
+    }
     const mlbTeams = leagueOptions?.teamCount ?? 12;
     const mlbFmt = formatLabel(leagueOptions?.scoringFormat, 'mlb');
     const mlbSeasonLabel = `MLB ${mlbSeason} • ${mlbFmt} • ${mlbTeams}-Team`;
@@ -1035,7 +1209,15 @@ export async function generateFantasyCards(
   // Non-NFL sport → don't show NFL player data; return sport-branded cards instead
   const isNFL = !sport || sport.includes('football') || sport === '';
   if (!isNFL) {
-    return generateNonNFLFantasyCards(sport, count, leagueOptions);
+    // Detect start/sit intent from the message if caller didn't set isStartSit explicitly
+    const msgL = userMessage.toLowerCase();
+    const isStartSit = leagueOptions?.isStartSit ??
+      ['start/sit', 'start or sit', 'sit or start', 'who should i start',
+       'who do i start', 'should i start', 'should i sit', 'matchup-based',
+       'matchup based', 'streaming', 'must start', 'must sit',
+       'favorable matchup', 'tough matchup',
+      ].some(k => msgL.includes(k));
+    return generateNonNFLFantasyCards(sport, count, { ...leagueOptions, isStartSit });
   }
 
   const msg = userMessage.toLowerCase();

@@ -351,7 +351,7 @@ export class SupabaseOddsService {
       .eq('active', true)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('[Supabase] Error fetching capital state:', error);

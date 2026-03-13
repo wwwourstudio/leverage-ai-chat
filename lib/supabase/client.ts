@@ -23,6 +23,7 @@ export function createClient(): BrowserClient {
 
   const client = createBrowserClient(supabaseUrl, supabaseAnonKey, {
     db: { schema: 'api' },
+    isSingleton: true, // Tells Supabase this is the only client instance - suppresses GoTrueClient warning
   })
 
   // Store in globalThis to survive HMR

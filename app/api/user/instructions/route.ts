@@ -63,7 +63,18 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Reject oversized payloads before parsing
+    const contentLength = Number(request.headers.get('content-length') ?? 0);
+    if (contentLength > 10_000) {
+      return NextResponse.json({ success: false, error: 'Request too large' }, { status: 413 });
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    }
     const instructions: string = typeof body?.instructions === 'string'
       ? body.instructions.slice(0, 2000)
       : '';
@@ -88,7 +99,7 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ success: true, migrationPending: true });
       }
       console.error('[API/user/instructions] Upsert error:', error.message);
-      return NextResponse.json({ success: false, error: error.message });
+      return NextResponse.json({ success: false, error: 'Failed to save instructions' });
     }
 
     return NextResponse.json({ success: true });

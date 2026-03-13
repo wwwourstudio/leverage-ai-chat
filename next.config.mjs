@@ -6,7 +6,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Allow iframe embedding for v0 preview
+  // Allow iframe embedding for v0 preview.
+  // X-Frame-Options SAMEORIGIN is a legacy fallback — modern browsers use
+  // Content-Security-Policy frame-ancestors (which takes precedence).
   async headers() {
     return [
       {
@@ -14,11 +16,19 @@ const nextConfig = {
         headers: [
           {
             key: 'X-Frame-Options',
-            value: 'ALLOWALL',
+            value: 'SAMEORIGIN',
           },
           {
             key: 'Content-Security-Policy',
-            value: "frame-ancestors 'self' https://*.v0.dev https://v0.dev",
+            value: "frame-ancestors 'self' https://v0.dev https://*.v0.dev",
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
           },
         ],
       },

@@ -104,7 +104,18 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => ({}));
+    // Reject oversized payloads before parsing
+    const contentLength = Number(req.headers.get('content-length') ?? 0);
+    if (contentLength > 50_000) {
+      return NextResponse.json({ success: false, error: 'Request too large' }, { status: 413 });
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    }
 
     // Update display name via Supabase auth metadata
     if (typeof body.name === 'string' && body.name.trim()) {
@@ -162,6 +173,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error('[v0] [API/settings] PATCH error:', err);
-    return NextResponse.json({ success: false, error: err?.message || 'Failed to save settings' }, { status: 500 });
+    // Return a generic message to avoid leaking internal schema details
+    return NextResponse.json({ success: false, error: 'Failed to save settings' }, { status: 500 });
   }
 }

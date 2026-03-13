@@ -6,6 +6,7 @@ import { AuthModals } from '@/components/AuthModals';
 // Mock lucide-react
 vi.mock('lucide-react', () => ({
   X: () => <span data-testid="close-icon">X</span>,
+  AlertCircle: () => <span data-testid="alert-circle-icon" />,
 }));
 
 // Mock Supabase client
@@ -188,24 +189,22 @@ describe('AuthModals', () => {
   });
 
   describe('login form validation', () => {
-    it('shows alert when email is empty', async () => {
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    it('shows inline error when email is empty', async () => {
       render(<AuthModals {...defaultProps} showLoginModal />);
       fireEvent.click(screen.getByRole('button', { name: 'Sign In' }));
       await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith('Please enter email and password');
+        expect(screen.getByText('Please enter your email and password')).toBeTruthy();
       });
     });
 
-    it('shows alert when password is empty but email is filled', async () => {
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    it('shows inline error when password is empty but email is filled', async () => {
       render(<AuthModals {...defaultProps} showLoginModal />);
       fireEvent.change(screen.getByPlaceholderText('your@email.com'), {
         target: { value: 'user@example.com' },
       });
       fireEvent.click(screen.getByRole('button', { name: 'Sign In' }));
       await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith('Please enter email and password');
+        expect(screen.getByText('Please enter your email and password')).toBeTruthy();
       });
     });
   });
@@ -254,12 +253,11 @@ describe('AuthModals', () => {
       });
     });
 
-    it('shows alert on login error', async () => {
+    it('shows inline error on login failure', async () => {
       mockSignInWithPassword.mockResolvedValue({
         data: {},
         error: { message: 'Invalid credentials' },
       });
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
       render(<AuthModals {...defaultProps} showLoginModal />);
 
@@ -272,18 +270,17 @@ describe('AuthModals', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Sign In' }));
 
       await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith('Invalid credentials');
+        expect(screen.getByText('Invalid credentials')).toBeTruthy();
       });
     });
   });
 
   describe('signup form validation', () => {
-    it('shows alert when email is empty in signup form', async () => {
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    it('shows inline error when email is empty in signup form', async () => {
       render(<AuthModals {...defaultProps} showSignupModal />);
       fireEvent.click(screen.getByRole('button', { name: 'Create Account' }));
       await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith('Please enter email and password');
+        expect(screen.getByText('Please enter your email and password')).toBeTruthy();
       });
     });
   });

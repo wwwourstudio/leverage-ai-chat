@@ -67,7 +67,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json().catch(() => ({}));
+    // Reject oversized payloads before parsing
+    const contentLength = Number(request.headers.get('content-length') ?? 0);
+    if (contentLength > 10_000) {
+      return NextResponse.json({ success: false, error: 'Request too large' }, { status: 413 });
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: HTTP_STATUS.BAD_REQUEST });
+    }
     const { title = 'New Chat', category = 'all', tags = [] } = body;
 
     const { data: thread, error } = await supabase

@@ -1,6 +1,8 @@
 'use client';
 
-import { Menu, TrendingUp, Bell, Settings, LogIn, UserPlus } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { Menu, TrendingUp, Bell, Settings, LogIn, UserPlus, Download, Share2, Check, Copy } from 'lucide-react';
+import { exportChatAsMarkdown, exportChatAsJSON, downloadFile, chatFilename, type ExportMessage, type ExportChat } from '@/lib/chat-export';
 
 interface ChatHeaderProps {
   sidebarOpen: boolean;
@@ -13,6 +15,9 @@ interface ChatHeaderProps {
   onOpenSettings: () => void;
   onOpenLogin: () => void;
   onOpenSignup: () => void;
+  // Export / share props (optional — hidden when not provided)
+  activeChat?: ExportChat | null;
+  messages?: ExportMessage[];
 }
 
 export function ChatHeader({
@@ -26,7 +31,49 @@ export function ChatHeader({
   onOpenSettings,
   onOpenLogin,
   onOpenSignup,
+  activeChat,
+  messages = [],
 }: ChatHeaderProps) {
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [shareState, setShareState] = useState<'idle' | 'loading' | 'copied'>('idle');
+
+  const hasMessages = messages.filter((m) => !('isWelcome' in m && (m as any).isWelcome)).length > 0;
+
+  const handleExportMarkdown = useCallback(() => {
+    if (!activeChat) return;
+    const md = exportChatAsMarkdown(activeChat, messages);
+    downloadFile(md, chatFilename(activeChat.title, 'md'), 'text/markdown');
+    setShowExportMenu(false);
+  }, [activeChat, messages]);
+
+  const handleExportJSON = useCallback(() => {
+    if (!activeChat) return;
+    const json = exportChatAsJSON(activeChat, messages);
+    downloadFile(json, chatFilename(activeChat.title, 'json'), 'application/json');
+    setShowExportMenu(false);
+  }, [activeChat, messages]);
+
+  const handleShare = useCallback(async () => {
+    if (!activeChat || shareState !== 'idle') return;
+    setShareState('loading');
+    try {
+      const res = await fetch(`/api/chats/${activeChat.id}/share`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success && data.shareToken) {
+        const shareUrl = `${window.location.origin}/share/${data.shareToken}`;
+        await navigator.clipboard.writeText(shareUrl);
+        setShareState('copied');
+        setTimeout(() => setShareState('idle'), 2500);
+      } else {
+        console.error('[ChatHeader] Share failed:', data.error);
+        setShareState('idle');
+      }
+    } catch (err) {
+      console.error('[ChatHeader] Share error:', err);
+      setShareState('idle');
+    }
+  }, [activeChat, shareState]);
+
   return (
     <div className="relative bg-[var(--bg-overlay)] border-b border-[var(--border-subtle)] px-3 py-3 md:px-6 md:py-4 shadow-2xl backdrop-blur-xl">
       <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-transparent to-transparent pointer-events-none"></div>
@@ -56,11 +103,61 @@ export function ChatHeader({
           </div>
         </div>
 
-        {/* Right: user card (desktop only) + bell + settings / auth buttons */}
+        {/* Right: export/share + user actions */}
         <div className="flex items-center gap-2 md:gap-3">
+          {/* Export dropdown — shown when there are messages */}
+          {hasMessages && activeChat && (
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu((v) => !v)}
+                className="p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
+                title="Export chat"
+              >
+                <Download className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
+              </button>
+              {showExportMenu && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setShowExportMenu(false)} />
+                  <div className="absolute right-0 top-full mt-2 z-40 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden min-w-[160px]">
+                    <button
+                      onClick={handleExportMarkdown}
+                      className="w-full px-4 py-3 text-sm text-left text-gray-200 hover:bg-gray-800 transition-colors flex items-center gap-2"
+                    >
+                      <span>Export as Markdown</span>
+                    </button>
+                    <button
+                      onClick={handleExportJSON}
+                      className="w-full px-4 py-3 text-sm text-left text-gray-200 hover:bg-gray-800 transition-colors flex items-center gap-2"
+                    >
+                      <span>Export as JSON</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Share button — shown when logged in and has messages */}
+          {isLoggedIn && hasMessages && activeChat && (
+            <button
+              onClick={handleShare}
+              disabled={shareState === 'loading'}
+              className="p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent disabled:opacity-50"
+              title={shareState === 'copied' ? 'Link copied!' : 'Share chat'}
+            >
+              {shareState === 'copied' ? (
+                <Check className="w-5 h-5 text-green-400 transition-colors" />
+              ) : shareState === 'loading' ? (
+                <Copy className="w-5 h-5 text-[var(--text-muted)] animate-pulse" />
+              ) : (
+                <Share2 className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
+              )}
+            </button>
+          )}
+
           {isLoggedIn && user ? (
             <>
-              {/* User profile card — hidden on mobile, use sidebar avatar instead */}
+              {/* User profile card — hidden on mobile */}
               <div
                 className="hidden md:flex items-center gap-3 px-3 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] cursor-pointer hover:border-[var(--border-hover,oklch(0.30_0.02_280))] hover:bg-[var(--bg-elevated)] transition-all"
                 onClick={onOpenUserLightbox}

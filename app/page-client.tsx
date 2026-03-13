@@ -15,7 +15,7 @@
 
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data-service';
 import { API_ENDPOINTS } from '@/lib/constants';
@@ -3401,7 +3401,7 @@ No preamble. Start directly with section 1.`;
                                               } else if (part.trim()) {
                                                 return <span key={partIdx} className="text-gray-300">{part}</span>;
                                               }
-                                              return null;
+                                              return <React.Fragment key={partIdx} />;
                                             })}
                                           </div>
                                         );
@@ -3537,7 +3537,7 @@ No preamble. Start directly with section 1.`;
                         const cardKey = `${index}-${cardIndex}`;
                         const analysis = cardAnalysisMap[cardKey];
                         const isOpen = analysis?.loading || !!analysis?.content || !!analysis?.error;
-                        if (!isOpen) return null;
+                        if (!isOpen) return <React.Fragment key={cardKey} />;
                         return (
                           <div key={cardKey} className="mt-2 rounded-xl border border-gray-700/50 bg-gray-900/95 backdrop-blur-xl overflow-hidden w-full">
                             {analysis.loading ? (

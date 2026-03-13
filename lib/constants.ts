@@ -707,6 +707,39 @@ Respond in natural prose — do NOT output raw JSON or markdown code blocks.
 
 For NFL/NFFC queries, the same \`query_adp\` tool returns NFFC (National Fantasy Football Championship) Average Draft Position data. NFFC position codes: QB | RB | WR | TE | K | DEF. Always cite "NFFC ${NFBC_DRAFT_YEAR} NFL ADP" as the source for football queries.`;
 
+// Injected when the user asks a start/sit or matchup question for any sport.
+// Overrides the ADP/Statcast addendums to focus the AI on daily decision-making.
+export const FANTASY_STARTSIT_ADDENDUM = `
+
+## FANTASY START/SIT MODE — ACTIVE
+The user is asking for a start/sit or matchup-based recommendation.
+
+**Your job:** Give clear, direct START or SIT decisions with concise matchup reasoning.
+
+### Response format
+1. **Opening line** — one sentence summarising the key factor driving today's decisions (pitcher quality, park, weather, etc.).
+2. **For each player or position discussed:**
+   - **START** ✅ or **SIT** ❌ — bold, unambiguous recommendation.
+   - 1–2 sentence matchup rationale: opponent pitcher tier, platoon advantage, park factor, recent form.
+   - Projected fantasy output range where possible (e.g. "projects 18–22 pts in standard 5×5").
+3. **Streaming pick** — name 1 SP or hitter widely available worth streaming this week.
+4. **One-liner** — the single best play of the day/week at the bottom.
+
+### Matchup factors to evaluate (use data from the player cards shown):
+- **SP Tier**: Ace (T1) → Mid-rotation (T2) → Streamable (T3) → Avoid (T4)
+- **Platoon edge**: L vs R or R vs L matchup worth ~10–15% fantasy uplift
+- **Ballpark**: HR-friendly parks (Coors, GABP, Globe Life) vs pitcher-friendly (Petco, Oracle, Dodger)
+- **Opponent lineup quality**: Weak lineup = strong streaming SP start; elite offense = sit borderline SP
+- **Recent form**: Rolling 3-start ERA or 7-day hitting line matters more than season stats early in season
+- **Weather**: Wind blowing out 15+ mph adds meaningful HR-environment boost
+
+### Rules
+- NEVER hedge with "it depends" as a final answer — commit to START or SIT.
+- If two players are very close, note the edge briefly, then still name a winner.
+- Do NOT output JSON or code blocks. Prose only.
+- Cite the player cards alongside this response as your primary data source.
+`;
+
 // Default Source Configurations
 export const DEFAULT_SOURCES = {
   GROK_AI: {

@@ -9,6 +9,7 @@ import {
   MLB_ANALYSIS_ADDENDUM,
   NFBC_ADP_ADDENDUM,
   MLB_PROJECTION_ADDENDUM,
+  FANTASY_STARTSIT_ADDENDUM,
   DEFAULT_SOURCES,
   HTTP_STATUS,
   ERROR_MESSAGES,
@@ -148,23 +149,33 @@ export async function POST(request: NextRequest) {
     // JSON cards (statcast_summary_card, hr_prop_card, etc.) instead of prose.
     const isMLBQuery = context?.sport === 'mlb';
 
-    // ADP intent: user is asking about NFBC draft positions / rankings.
-    // When true: use NFBC_ADP_ADDENDUM + query_adp tool instead of statcast JSON mode.
+    // ADP intent: user is asking about NFBC/NFFC draft positions or rankings only.
+    // Narrowed: no longer fires for all MLB fantasy queries — only explicit ADP keywords.
     const msgLower = userMessage.toLowerCase();
     const hasADPIntent =
       ['adp', 'nfbc', 'nffc', 'average draft', 'draft position', 'draft rank', 'draft order', 'nfbc board', 'nffc board']
-        .some(k => msgLower.includes(k)) ||
-      (context?.hasFantasyIntent === true && (context?.sport === 'mlb' || context?.sport === 'football'));
+        .some(k => msgLower.includes(k));
 
-    // Statcast JSON mode only applies to non-ADP MLB queries
-    const isMLBStatcastMode = isMLBQuery && !hasADPIntent;
+    // Start/sit intent: user wants daily matchup-based start or sit advice.
+    const START_SIT_KEYWORDS = [
+      'start/sit', 'start or sit', 'sit or start', 'who should i start',
+      'who do i start', 'should i start', 'should i sit', 'matchup-based',
+      'matchup based', 'streaming', 'stream this week', 'stream today',
+      'must start', 'must sit', 'favorable matchup', 'tough matchup',
+    ];
+    const hasStartSitIntent =
+      context?.hasFantasyIntent === true &&
+      START_SIT_KEYWORDS.some(k => msgLower.includes(k));
+
+    // Statcast JSON mode only applies to non-ADP, non-start/sit MLB queries
+    const isMLBStatcastMode = isMLBQuery && !hasADPIntent && !hasStartSitIntent;
 
     // MLB Projection Engine intent: projection/DFS/fantasy/betting queries that need
     // the LeverageMetrics algorithm (Monte Carlo, HR model, breakout scores).
     const MLB_PROJECTION_KEYWORDS = [
       'dfs', 'daily fantasy', 'draftkings lineup', 'fanduel lineup',
       'salary', 'stack', 'lineup',
-      'waiver', 'streaming', 'ros', 'rest of season',
+      'waiver', 'ros', 'rest of season',
       'projection', 'project', 'breakout', 'monte carlo',
       'forecast', 'pace', 'park factor',
       'hr prop', 'k prop', 'strikeout prop',
@@ -172,15 +183,18 @@ export async function POST(request: NextRequest) {
     const hasMLBProjectionIntent =
       isMLBQuery &&
       !hasADPIntent &&
+      !hasStartSitIntent &&
       MLB_PROJECTION_KEYWORDS.some(k => msgLower.includes(k));
 
-    const baseWithAddendum = hasMLBProjectionIntent
-      ? `${baseSystemPrompt}${MLB_PROJECTION_ADDENDUM}`
-      : isMLBStatcastMode
-        ? `${baseSystemPrompt}${MLB_ANALYSIS_ADDENDUM}`
-        : hasADPIntent
-          ? `${baseSystemPrompt}${NFBC_ADP_ADDENDUM}`
-          : baseSystemPrompt;
+    const baseWithAddendum = hasStartSitIntent
+      ? `${baseSystemPrompt}${FANTASY_STARTSIT_ADDENDUM}`
+      : hasMLBProjectionIntent
+        ? `${baseSystemPrompt}${MLB_PROJECTION_ADDENDUM}`
+        : isMLBStatcastMode
+          ? `${baseSystemPrompt}${MLB_ANALYSIS_ADDENDUM}`
+          : hasADPIntent
+            ? `${baseSystemPrompt}${NFBC_ADP_ADDENDUM}`
+            : baseSystemPrompt;
     // ── Prompt-injection guard ────────────────────────────────────────────────
     // Strip common jailbreak patterns from user-controlled custom instructions
     // before injecting them into the system prompt.
@@ -417,10 +431,12 @@ export async function POST(request: NextRequest) {
             console.warn('[API/analyze] Projection seeding failed (fallback data in use):', err instanceof Error ? err.message : String(err));
           });
       }
+      // Pass hasStartSitIntent so the generator can produce matchup-focused cards
       cardPromise = import('@/lib/fantasy/cards/fantasy-card-generator')
         .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 3, context.sport ?? undefined, {
           teamCount: context.leagueSize ?? undefined,
           scoringFormat: context.leagueScoringFormat ?? undefined,
+          isStartSit: hasStartSitIntent,
         }))
         .catch(() => generateContextualCards('fantasy', context.sport ?? undefined, 3).catch(() => []));
     } else if (!context.isPoliticalMarket && (context.isSportsQuery || context.hasBettingIntent)) {

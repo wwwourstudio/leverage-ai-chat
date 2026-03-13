@@ -304,37 +304,39 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 // Uses the service role key (bypasses RLS) so no user session is needed.
 // Falls back silently — persistence failures never break the ADP tool.
 
-// Singleton client with promise lock to avoid race conditions and "Multiple GoTrueClient instances" warning
-let adpSupabaseClient: Awaited<ReturnType<typeof import('@supabase/supabase-js').createClient>> | null = null;
-let adpClientInitPromise: Promise<typeof adpSupabaseClient> | null = null;
+// Use globalThis to persist singleton across HMR reloads in dev mode
+const GLOBAL_KEY = '__adp_supabase_client__' as const;
+
+// No-op storage to completely disable GoTrueClient session management
+const noopStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
 
 async function getADPSupabaseClient() {
-  // Return existing client if already initialized
-  if (adpSupabaseClient) return adpSupabaseClient;
+  // Check global cache first (survives HMR)
+  const cached = (globalThis as Record<string, unknown>)[GLOBAL_KEY];
+  if (cached) return cached as Awaited<ReturnType<typeof import('@supabase/supabase-js').createClient>>;
   
-  // If initialization is in progress, wait for it
-  if (adpClientInitPromise) return adpClientInitPromise;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
   
-  // Start initialization and store the promise to prevent concurrent creates
-  adpClientInitPromise = (async () => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return null;
-    
-    const { createClient } = await import('@supabase/supabase-js');
-    adpSupabaseClient = createClient(url, key, {
-      db: { schema: 'api' },
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-        storageKey: 'sb-adp-data-isolated', // Unique key to avoid GoTrueClient conflicts
-      },
-    });
-    return adpSupabaseClient;
-  })();
+  const { createClient } = await import('@supabase/supabase-js');
+  const client = createClient(url, key, {
+    db: { schema: 'api' },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      storage: noopStorage, // Completely disable storage to prevent GoTrueClient conflicts
+    },
+  });
   
-  return adpClientInitPromise;
+  // Store in global to survive HMR
+  (globalThis as Record<string, unknown>)[GLOBAL_KEY] = client;
+  return client;
 }
 
 export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): Promise<void> {

@@ -898,7 +898,7 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
 
     // ── Start/Sit mode: return matchup-focused cards instead of VBD/draft ──
     if (leagueOptions?.isStartSit) {
-      const startSitCards = generateMLBStartSitCards(mlbVBD, mlbSeason, leagueOptions);
+      const startSitCards = generateMLBStartSitCards(mlbVBD, String(mlbSeason), leagueOptions);
       // Append a streaming SP card (Tier 3 starter facing a weak lineup)
       const streamSP = mlbVBD.filter(p => p.pos === 'SP' && p.tier === 3)[0];
       if (streamSP && startSitCards.length < count) {

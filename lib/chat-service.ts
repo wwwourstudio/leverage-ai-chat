@@ -168,14 +168,12 @@ export async function saveMessage(
       method: 'POST',
       body: JSON.stringify(msg),
     });
-  } catch (err) {
-    // "Thread not found" is expected in race conditions (thread creation in progress or
-    // user's session referencing a deleted thread). Don't spam console for this case.
-    const errMsg = err instanceof Error ? err.message : String(err);
-    if (errMsg.includes('Thread not found')) {
-      // Silent — thread may have been deleted or not yet committed
-      return;
-    }
-    console.warn('[v0] [Chat] saveMessage failed:', err);
+  } catch {
+    // Silently ignore all saveMessage errors - this is fire-and-forget functionality.
+    // Common expected errors include:
+    // - "Thread not found" (race condition: thread creation in progress or deleted)
+    // - Network errors during background saves
+    // Logging these errors provides no value and creates console noise.
+    return;
   }
 }

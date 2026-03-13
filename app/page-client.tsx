@@ -1738,23 +1738,29 @@ No preamble. Start directly with section 1.`;
     const msgLower = message.toLowerCase();
     
     console.log('[v0] Extracting sport from:', message);
-    
+
+    // NFBC/NFFC fantasy baseball platforms must be checked BEFORE NBA —
+    // TSV uploads may contain strings like "nba" inside player/team data
+    if (msgLower.includes('nfbc') || msgLower.includes('nffc') ||
+        msgLower.includes('nfbkc') || msgLower.includes('tgfbi')) {
+      console.log('[v0] Detected sport: MLB (NFBC/NFFC fantasy platform)');
+      return 'mlb';
+    }
+
     // Basketball
     if (msgLower.includes('nba') || msgLower.includes('basketball')) {
       console.log('[v0] Detected sport: NBA');
       return 'nba';
     }
-    
+
     // Football
     if (msgLower.includes('nfl') || msgLower.includes('football')) {
       console.log('[v0] Detected sport: NFL');
       return 'nfl';
     }
-    
+
     // Baseball - enhanced detection for fantasy baseball
     if (msgLower.includes('mlb') || msgLower.includes('baseball') ||
-        msgLower.includes('nfbc') || msgLower.includes('nffc') ||
-        msgLower.includes('nfbkc') || msgLower.includes('tgfbi') ||
         msgLower.includes('adp')) {
       console.log('[v0] Detected sport: MLB (baseball/fantasy baseball)');
       return 'mlb';
@@ -1815,11 +1821,11 @@ No preamble. Start directly with section 1.`;
   const extractSportFromText = (text: string): string | null => {
     const textLower = text.toLowerCase();
     
+    if (textLower.includes('nfbc') || textLower.includes('nffc') ||
+        textLower.includes('nfbkc') || textLower.includes('tgfbi')) return 'mlb';
     if (textLower.includes('nba') || textLower.includes('basketball')) return 'nba';
     if (textLower.includes('nfl') || textLower.includes('football')) return 'nfl';
-    if (textLower.includes('mlb') || textLower.includes('baseball') || 
-        textLower.includes('nfbc') || textLower.includes('nffc') || 
-        textLower.includes('nfbkc') || textLower.includes('tgfbi')) return 'mlb';
+    if (textLower.includes('mlb') || textLower.includes('baseball')) return 'mlb';
     if (textLower.includes('nhl') || textLower.includes('hockey')) return 'nhl';
     if (textLower.includes('ncaa')) {
       return textLower.includes('basketball') ? 'ncaab' : 'ncaaf';

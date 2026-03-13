@@ -5,7 +5,7 @@
 
 import { createSign, constants } from 'crypto';
 
-const KALSHI_BASE_URL = 'https://api.kalshi.com/trade-api/v2';
+const KALSHI_BASE_URL = 'https://api.elections.kalshi.com/trade-api/v2';
 const DEMO_BASE_URL = 'https://demo-api.kalshi.co/trade-api/v2';
 
 interface TestResult {

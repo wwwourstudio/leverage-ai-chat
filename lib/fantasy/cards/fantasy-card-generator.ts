@@ -16,7 +16,7 @@
 
 import type { InsightCard } from '@/lib/cards-generator';
 import { getProjections, currentSeasonFor } from '@/lib/fantasy/projections-cache';
-import { getADPData } from '@/lib/adp-data';
+import { getADPData, type NFBCPlayer } from '@/lib/adp-data';
 
 // ============================================================================
 // Archived 2025 NFL season data (PPR, final season projections)
@@ -705,6 +705,31 @@ function formatLabel(code: string | undefined, sport: 'mlb' | 'nba'): string {
   return '9-Cat'; // default NBA
 }
 
+// ── NFBC → GenericPlayer conversion helpers ──────────────────────────────────
+
+/** Map the primary NFBC position to a VBD-compatible position label */
+function mapNFBCPos(positions: string): string {
+  const primary = positions.split(',')[0].trim().toUpperCase();
+  if (primary === 'DH') return 'OF'; // DH-only → treat as OF for VBD
+  const valid = ['OF', 'SS', '1B', '2B', '3B', 'C', 'SP', 'RP'];
+  return valid.includes(primary) ? primary : 'OF';
+}
+
+/**
+ * Convert NFBC ADP upload data to GenericPlayer[] for use in VBD calculations.
+ * pts is synthesised from overall rank (rank 1 ≈ 55, rank 120 ≈ 7) so VBD
+ * comparisons are rank-accurate relative to one another.
+ */
+function buildMLBFromNFBC(players: NFBCPlayer[]): GenericPlayer[] {
+  return players.map(p => ({
+    name: p.displayName,
+    team: p.team || 'MLB',
+    pos: mapNFBCPos(p.positions),
+    pts: Math.max(5, 55 - (p.rank - 1) * 0.4),
+    adp: p.adp,
+  }));
+}
+
 /**
  * Generate fantasy cards for non-NFL sports.
  * MLB and NBA have embedded projections → real VBD/waiver/draft cards.
@@ -717,28 +742,25 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
   // ── MLB ──────────────────────────────────────────────────────────────────
   if (isMLB) {
     const mlbSeason = currentSeasonFor('mlb');
-    const mlbRaw = await getProjections('mlb', mlbSeason, () => MLB_PROJECTIONS_2025);
 
-    // Enrich mlbRaw with live NFBC ADP values so VBD uses current draft positions,
-    // not the stale values baked into MLB_PROJECTIONS_2025.
-    let mlbAdpMap: Map<string, number> = new Map();
+    // 1. Try to use the user-uploaded NFBC ADP board as the primary player list.
+    //    If unavailable fall back to the static MLB_PROJECTIONS_2025 snapshot.
+    let mlbPlayers: GenericPlayer[] = MLB_PROJECTIONS_2025;
+    let isNFBCData = false;
     try {
       const nfbcPlayers = await getADPData();
-      for (const p of nfbcPlayers) {
-        mlbAdpMap.set(p.displayName.toLowerCase(), p.adp);
+      if (nfbcPlayers.length > 10) {
+        mlbPlayers = buildMLBFromNFBC(nfbcPlayers);
+        isNFBCData = true;
       }
-    } catch { /* silently fall back to static adp values */ }
-    const mlbEnriched = mlbRaw.map(p => {
-      const liveAdp = mlbAdpMap.get(p.name.toLowerCase());
-      return liveAdp != null ? { ...p, adp: liveAdp } : p;
-    });
+    } catch { /* fall back to static snapshot */ }
 
-    const mlbVBD = computeVBDGeneric(mlbEnriched, MLB_REPLACEMENT_RANKS);
+    const mlbVBD = computeVBDGeneric(mlbPlayers, MLB_REPLACEMENT_RANKS);
     const mlbCliffs = detectCliffs(mlbVBD);
     const mlbTeams = leagueOptions?.teamCount ?? 12;
     const mlbFmt = formatLabel(leagueOptions?.scoringFormat, 'mlb');
     const mlbSeasonLabel = `MLB ${mlbSeason} • ${mlbFmt} • ${mlbTeams}-Team`;
-    const mlbDataSource = `MLB ${mlbSeason} Projections`;
+    const mlbDataSource = isNFBCData ? `NFBC ADP Upload • ${mlbSeason}` : `MLB ${mlbSeason} Projections`;
 
     const cards: InsightCard[] = [];
     const topPlayers = mlbVBD
@@ -764,7 +786,7 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
         leagueSize: mlbTeams,
         status: 'target',
       },
-      metadata: { realData: false, dataSource: mlbDataSource },
+      metadata: { realData: isNFBCData, dataSource: mlbDataSource },
     });
 
     if (cards.length < count) {
@@ -821,7 +843,7 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
             budgetNote: 'FAAB bids shown as % of $100 budget. Scale to your actual budget.',
             status: 'hot',
           },
-          metadata: { realData: false, dataSource: `MLB ${mlbSeason} Waiver Engine` },
+          metadata: { realData: isNFBCData, dataSource: isNFBCData ? mlbDataSource : `MLB ${mlbSeason} Waiver Engine` },
         });
       }
     }
@@ -845,7 +867,7 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
           tierCliffAlerts: mlbCliffs.slice(0, 2).map(c => `${c.pos}: ${c.dropPct.toFixed(1)}% drop after ${c.cliffAfterName}`),
           status: 'target',
         },
-        metadata: { realData: false, dataSource: `MLB ${mlbSeason} Draft Engine` },
+        metadata: { realData: isNFBCData, dataSource: isNFBCData ? mlbDataSource : `MLB ${mlbSeason} Draft Engine` },
       });
     }
 

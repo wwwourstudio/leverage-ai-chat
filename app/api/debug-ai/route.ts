@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { generateText } from 'ai';
 import { createXai } from '@ai-sdk/xai';
+import { getOddsApiKey } from '@/lib/config';
 
 export async function GET() {
   const results: Record<string, any> = {};
@@ -27,7 +28,7 @@ export async function GET() {
   }
 
   // ── 2. Odds API ────────────────────────────────────────────────────────────
-  const oddsKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+  const oddsKey = getOddsApiKey();
   if (!oddsKey) {
     results.odds = { status: 'missing', message: 'ODDS_API_KEY not set in Vercel environment variables' };
   } else {
@@ -69,7 +70,7 @@ export async function GET() {
 
   try {
     const res = await fetch(
-      'https://api.kalshi.com/trade-api/v2/markets?limit=1&status=open',
+      'https://api.elections.kalshi.com/trade-api/v2/markets?limit=1&status=open',
       { headers: kalshiHeaders, signal: AbortSignal.timeout(8000) }
     );
     if (res.ok) {

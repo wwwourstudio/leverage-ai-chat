@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getOddsApiKey, isOddsApiConfigured } from '@/lib/config';
 
 interface ServiceHealth {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -29,8 +30,8 @@ async function checkOddsAPI(): Promise<ServiceHealth> {
   const startTime = Date.now();
   
   try {
-    const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
-    
+    const apiKey = getOddsApiKey();
+
     if (!apiKey) {
       return {
         status: 'unhealthy',
@@ -134,7 +135,7 @@ async function checkKalshiAPI(): Promise<ServiceHealth> {
 
     // Basic connectivity check via public endpoint
     const response = await fetch(
-      'https://api.kalshi.com/trade-api/v2/markets?limit=1&status=open',
+      'https://api.elections.kalshi.com/trade-api/v2/markets?limit=1&status=open',
       {
         headers: {
           'Accept': 'application/json'
@@ -256,7 +257,7 @@ export async function GET() {
       database
     },
     environment: {
-      oddsApiConfigured: !!(process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY),
+      oddsApiConfigured: isOddsApiConfigured(),
       weatherApiConfigured: true, // Open-Meteo doesn't require API key
       kalshiApiConfigured: !!(process.env.KALSHI_API_KEY_ID && process.env.KALSHI_PRIVATE_KEY),
       databaseConfigured: !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)

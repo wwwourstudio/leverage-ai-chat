@@ -94,8 +94,9 @@ export async function GET() {
 
 /**
  * PATCH /api/settings
- * Saves profile and preferences. Handles missing arbitrage_alerts column gracefully:
- * on error code 42703 (unknown column), retries without that field.
+ * Saves profile and preferences. Handles missing columns (bankroll, arbitrage_alerts, etc.)
+ * on stale DB instances by iteratively stripping the offending column and retrying
+ * (up to 5 times) on PGRST204 / 42703 errors.
  */
 export async function PATCH(req: NextRequest) {
   try {
@@ -137,12 +138,11 @@ export async function PATCH(req: NextRequest) {
         .eq('user_id', user.id);
     }
 
-    // Base preferences payload (columns that always exist)
+    // Base preferences payload — only columns guaranteed to exist in all DB versions
     const basePayload: Record<string, unknown> = {
       user_id:              user.id,
       tracked_sports:       Array.isArray(body.tracked_sports)  ? body.tracked_sports  : ['NBA', 'NFL'],
       preferred_books:      Array.isArray(body.preferred_books) ? body.preferred_books : [],
-      bankroll:             typeof body.bankroll === 'number'    ? Math.max(0, body.bankroll) : 0,
       risk_tolerance:       ['conservative','medium','aggressive'].includes(body.risk_tolerance) ? body.risk_tolerance : 'medium',
       theme:                ['dark','light','system'].includes(body.theme) ? body.theme : 'dark',
       default_sport:        (Array.isArray(body.tracked_sports) && body.tracked_sports[0]) || 'NBA',
@@ -153,29 +153,45 @@ export async function PATCH(req: NextRequest) {
       updated_at:           new Date().toISOString(),
     };
 
-    // Try with arbitrage_alerts first
-    const fullPayload = {
+    // Start with the full payload including optional newer columns
+    let payload: Record<string, unknown> = {
       ...basePayload,
+      bankroll:         typeof body.bankroll === 'number' ? Math.max(0, body.bankroll) : 0,
       arbitrage_alerts: typeof body.arbitrage_alerts === 'boolean' ? body.arbitrage_alerts : true,
     };
 
-    const { error: prefsError } = await supabase
-      .from('user_preferences')
-      .upsert(fullPayload, { onConflict: 'user_id' });
+    // Retry loop: strip any column the DB says it doesn't know about (PGRST204 / 42703)
+    // and retry up to 5 times so we degrade gracefully on stale DB instances.
+    const MAX_RETRIES = 5;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      const { error: prefsError } = await supabase
+        .from('user_preferences')
+        .upsert(payload, { onConflict: 'user_id' });
 
-    if (prefsError) {
-      // 42703 = column does not exist; PGRST204 = column not found in schema cache
-      const isMissingColumn = prefsError.code === '42703'
-        || prefsError.message?.includes('arbitrage_alerts')
-        || (prefsError as any).code === 'PGRST204';
+      if (!prefsError) break; // success
 
-      if (isMissingColumn) {
-        console.warn('[v0] [API/settings] arbitrage_alerts column missing — retrying without it');
-        const { error: retryError } = await supabase
-          .from('user_preferences')
-          .upsert(basePayload, { onConflict: 'user_id' });
-        if (retryError) throw retryError;
+      const isMissingColumn =
+        prefsError.code === '42703' ||
+        (prefsError as any).code === 'PGRST204';
+
+      if (!isMissingColumn) throw prefsError; // unrelated error — surface it
+
+      // Extract the offending column name from the error message
+      // PostgREST: "Could not find the 'col' column of 'table' in the schema cache"
+      // PostgreSQL: column "col" of relation "table" does not exist
+      const match =
+        prefsError.message?.match(/Could not find the '(\w+)' column/) ||
+        prefsError.message?.match(/column "(\w+)"/) ||
+        prefsError.message?.match(/'(\w+)' column/);
+
+      const missingCol = match?.[1];
+      if (missingCol && missingCol in payload) {
+        console.warn(`[v0] [API/settings] column '${missingCol}' missing in DB — dropping and retrying`);
+        const next = { ...payload };
+        delete next[missingCol];
+        payload = next;
       } else {
+        // Can't identify or strip the column; give up
         throw prefsError;
       }
     }

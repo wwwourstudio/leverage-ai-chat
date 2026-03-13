@@ -8,7 +8,7 @@ import type { SubscriptionTier, FantasyFeature } from '@/lib/fantasy/types';
 // GET /api/fantasy/subscription — Get user's subscription tier
 // ============================================================================
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();

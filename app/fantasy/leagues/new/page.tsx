@@ -40,7 +40,7 @@ export default function NewLeaguePage() {
       } else {
         setError(data.error || 'Failed to create league');
       }
-    } catch (err) {
+    } catch {
       setError('Failed to create league. Please try again.');
     } finally {
       setIsLoading(false);

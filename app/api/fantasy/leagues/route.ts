@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { HTTP_STATUS } from '@/lib/constants';
-import type { FantasyLeague, FantasySport, ScoringFormat, DraftType } from '@/lib/fantasy/types';
+import type { FantasySport } from '@/lib/fantasy/types';
 
 // ============================================================================
 // POST /api/fantasy/leagues — Create a new fantasy league
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
 // GET /api/fantasy/leagues — List user's leagues
 // ============================================================================
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();

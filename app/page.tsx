@@ -15,9 +15,7 @@ import { logEnvValidation, validateServerEnv } from '@/lib/config';
 import UnifiedAIPlatform from './page-client';
 import { CardGrid } from '@/components/data-cards/CardSkeleton';
 
-export interface ServerDataProps extends ServerDataResult {
-  // Extended with data source tracking
-}
+export type ServerDataProps = ServerDataResult;
 
 async function fetchInitialServerData(): Promise<ServerDataProps> {
   console.log('[v0] Server: === Page Load - Fetching All Data ===');

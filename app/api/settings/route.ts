@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
 
 /**
  * GET /api/settings
@@ -102,6 +103,15 @@ export async function PATCH(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
+    }
+
+    // Rate limit: 10 settings updates per minute per user
+    const rl = checkRateLimit('settings-patch', getRateLimitId(req, user.id), { limit: 10, windowMs: 60_000 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+      );
     }
 
     // Reject oversized payloads before parsing

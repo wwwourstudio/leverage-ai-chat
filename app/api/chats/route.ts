@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { HTTP_STATUS } from '@/lib/constants';
+import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
 
 // ============================================================================
 // GET /api/chats — List authenticated user's chat threads
@@ -64,6 +65,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: HTTP_STATUS.UNAUTHORIZED }
+      );
+    }
+
+    // Rate limit: 30 new chats per minute per user
+    const rl = checkRateLimit('chats-post', getRateLimitId(request, user.id), { limit: 30, windowMs: 60_000 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
       );
     }
 

@@ -248,6 +248,12 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
+  // Client-side odds cache: key = sportKey, TTL = 5 minutes
+  const oddsCacheRef = useRef<Map<string, { data: unknown; ts: number }>>(new Map());
+
   const abortControllerRef = useRef<AbortController | null>(null);
   const [verifyStage, setVerifyStage] = useState<'analyzing' | 'reverifying'>('analyzing');
   const [cardAnalysisMap, setCardAnalysisMap] = useState<Record<string, { loading: boolean; content: string | null; error: string | null }>>({});
@@ -1363,25 +1369,38 @@ No preamble. Start directly with section 1.`;
           }
           
           try {
-            const oddsResponse = await fetch('/api/odds', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sport: sportKey, marketType: context.marketType || 'h2h' })
-            });
-            
-            if (!oddsResponse.ok) {
-              const errorBody = await oddsResponse.json().catch(() => ({ error: `HTTP ${oddsResponse.status}` }));
-              if (isDev) console.error(`[v0] Odds API error (${oddsResponse.status}):`, errorBody);
-              if (oddsResponse.status === 503) {
-                context.oddsKeyMissing = true;
-                context.oddsErrorMessage = 'ODDS_API_KEY is not configured. Live odds are unavailable.';
-              } else {
-                context.oddsError = errorBody.error;
-                context.oddsErrorMessage = errorBody.message || `Unable to fetch ${context.sport?.toUpperCase() || ''} odds (${oddsResponse.status}).`;
-              }
+            // Check 5-minute client-side cache before hitting the API
+            const ODDS_TTL = 5 * 60 * 1000;
+            const cached = oddsCacheRef.current.get(sportKey);
+            let oddsResult: any;
+            if (cached && Date.now() - cached.ts < ODDS_TTL) {
+              if (isDev) console.log(`[v0] Odds cache hit for ${sportKey}`);
+              oddsResult = cached.data;
             } else {
-              const oddsResult = await oddsResponse.json();
-              
+              const oddsResponse = await fetch('/api/odds', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sport: sportKey, marketType: context.marketType || 'h2h' })
+              });
+              if (!oddsResponse.ok) {
+                const errorBody = await oddsResponse.json().catch(() => ({ error: `HTTP ${oddsResponse.status}` }));
+                if (isDev) console.error(`[v0] Odds API error (${oddsResponse.status}):`, errorBody);
+                if (oddsResponse.status === 503) {
+                  context.oddsKeyMissing = true;
+                  context.oddsErrorMessage = 'ODDS_API_KEY is not configured. Live odds are unavailable.';
+                } else {
+                  context.oddsError = errorBody.error;
+                  context.oddsErrorMessage = errorBody.message || `Unable to fetch ${context.sport?.toUpperCase() || ''} odds (${oddsResponse.status}).`;
+                }
+                oddsResult = null;
+              } else {
+                oddsResult = await oddsResponse.json();
+                // Store in cache
+                oddsCacheRef.current.set(sportKey, { data: oddsResult, ts: Date.now() });
+              }
+            }
+
+            if (oddsResult) {
               if (oddsResult?.events?.length > 0) {
                 const sportName = sportKey.replace('_', ' ').toUpperCase();
                 if (isDev) console.log(`[v0] ✅ Found ${oddsResult.events.length} live games in ${sportName}`);
@@ -1472,9 +1491,11 @@ No preamble. Start directly with section 1.`;
           let rafHandle: ReturnType<typeof requestAnimationFrame> | null = null;
           const flushToState = () => {
             const snapshot = streamContent;
-            setMessages(prev => prev.map(m =>
-              m.id === streamingMessageId ? { ...m, content: snapshot } : m
-            ));
+            if (mountedRef.current) {
+              setMessages(prev => prev.map(m =>
+                m.id === streamingMessageId ? { ...m, content: snapshot } : m
+              ));
+            }
             rafHandle = null;
           };
           while (true) {
@@ -1496,9 +1517,11 @@ No preamble. Start directly with section 1.`;
                 // Intentional direct update — fires once, not per-token
                 streamContent = ev.text ?? streamContent;
                 if (rafHandle !== null) { cancelAnimationFrame(rafHandle); rafHandle = null; }
-                setMessages(prev => prev.map(m =>
-                  m.id === streamingMessageId ? { ...m, content: streamContent } : m
-                ));
+                if (mountedRef.current) {
+                  setMessages(prev => prev.map(m =>
+                    m.id === streamingMessageId ? { ...m, content: streamContent } : m
+                  ));
+                }
               } else if (ev.type === 'done') {
                 donePayload = ev as unknown as APIResponse;
               }
@@ -1506,7 +1529,7 @@ No preamble. Start directly with section 1.`;
           }
           // Flush any tokens buffered in the last partial frame
           if (rafHandle !== null) { cancelAnimationFrame(rafHandle); rafHandle = null; }
-          if (streamContent) {
+          if (streamContent && mountedRef.current) {
             setMessages(prev => prev.map(m =>
               m.id === streamingMessageId ? { ...m, content: streamContent } : m
             ));

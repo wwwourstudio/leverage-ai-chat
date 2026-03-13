@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
 
 /**
  * GET /api/user/instructions
@@ -84,6 +85,15 @@ export async function PUT(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ success: false, error: 'Unauthenticated' });
+    }
+
+    // Rate limit: 10 instruction saves per minute per user
+    const rl = checkRateLimit('instructions-put', getRateLimitId(request, user.id), { limit: 10, windowMs: 60_000 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+      );
     }
 
     const { error } = await supabase.from('user_preferences').upsert(

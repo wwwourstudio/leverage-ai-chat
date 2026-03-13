@@ -43,6 +43,7 @@ import { ChatHeader } from '@/components/chat-header';
 import { SuggestedPrompts, type SuggestedAction } from '@/components/suggested-prompts';
 import { ChatInput, type FileAttachment as ChatFileAttachment } from '@/components/chat-input';
 import { loadThreads, createThread, updateThread, deleteThread, loadMessages, saveMessage } from '@/lib/chat-service';
+import { generateNoDataMessage } from '@/lib/seasonal-context';
 
 interface FileAttachment {
   id: string;
@@ -1410,7 +1411,8 @@ No preamble. Start directly with section 1.`;
                 if (isDev) console.log('[NO GAMES FOUND]', context.sport);
                 // NO fallback - return status indicating no games
                 context.noGamesAvailable = true;
-                context.noGamesMessage = `No live ${context.sport.toUpperCase()} games scheduled at this time. Games typically appear 24-48 hours before start time.`;
+                const _noDataMsg = generateNoDataMessage(sportKey);
+                context.noGamesMessage = `${_noDataMsg.title}: ${_noDataMsg.description} ${_noDataMsg.suggestion}`;
               }
             }
           } catch (err) {

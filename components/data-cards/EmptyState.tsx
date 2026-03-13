@@ -1,10 +1,13 @@
 'use client';
 
-import { Info, Search, TrendingUp, DollarSign, Trophy, BarChart3, Cloud } from 'lucide-react';
+import { Info, Search, TrendingUp, DollarSign, Trophy, BarChart3, Cloud, Calendar } from 'lucide-react';
+import { getSeasonInfo } from '@/lib/seasonal-context';
 
 interface EmptyStateProps {
   message?: string;
   className?: string;
+  /** Optional sport API key (e.g. 'basketball_nba') to show season-aware context */
+  sport?: string;
 }
 
 const suggestions = [
@@ -15,10 +18,20 @@ const suggestions = [
   { icon: Cloud, text: 'Weather impact on Sunday NFL games', category: 'Weather' },
 ];
 
-export function EmptyState({ 
-  message = 'No live data cards available for this query.',
-  className = ''
+export function EmptyState({
+  message,
+  className = '',
+  sport,
 }: EmptyStateProps) {
+  const seasonInfo = sport ? getSeasonInfo(sport) : null;
+  const isOffseason = seasonInfo !== null && !seasonInfo.isInSeason;
+
+  const displayMessage = message ?? (
+    isOffseason
+      ? `${seasonInfo!.context.split('.')[0]}.`
+      : 'No live data cards available for this query.'
+  );
+
   return (
     <div className={`ml-11 ${className}`}>
       {/* Main empty state card */}
@@ -27,28 +40,47 @@ export function EmptyState({
         <div className="absolute inset-0 opacity-5">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(59,130,246,0.2),transparent_50%)]" />
         </div>
-        
+
         {/* Content */}
         <div className="relative space-y-6">
           {/* Icon and message */}
           <div className="flex flex-col items-center text-center space-y-4">
             <div className="relative">
-              <div className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-full" />
-              <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 flex items-center justify-center">
-                <Search className="w-8 h-8 text-blue-400" />
+              <div className={`absolute inset-0 blur-2xl rounded-full ${isOffseason ? 'bg-orange-500/20' : 'bg-blue-500/20'}`} />
+              <div className={`relative w-16 h-16 rounded-2xl bg-gradient-to-br border flex items-center justify-center ${
+                isOffseason
+                  ? 'from-orange-500/20 to-orange-600/20 border-orange-500/30'
+                  : 'from-blue-500/20 to-blue-600/20 border-blue-500/30'
+              }`}>
+                {isOffseason
+                  ? <Calendar className="w-8 h-8 text-orange-400" />
+                  : <Search className="w-8 h-8 text-blue-400" />}
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <h3 className="text-lg font-bold text-white">
-                {message}
+                {displayMessage}
               </h3>
-              <p className="text-sm text-gray-400 max-w-md mx-auto leading-relaxed">
-                {'Try asking about specific sports, markets, or events to get real-time insights and data-driven recommendations.'}
-              </p>
+              {isOffseason ? (
+                <div className="space-y-1">
+                  {seasonInfo!.seasonStart && (
+                    <p className="text-sm font-semibold text-orange-300/80">
+                      Next season starts: {seasonInfo!.seasonStart}
+                    </p>
+                  )}
+                  {seasonInfo!.nextGameEstimate && (
+                    <p className="text-xs text-gray-500">{seasonInfo!.nextGameEstimate}</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 max-w-md mx-auto leading-relaxed">
+                  {'Try asking about specific sports, markets, or events to get real-time insights and data-driven recommendations.'}
+                </p>
+              )}
             </div>
           </div>
-          
+
           {/* Divider */}
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
@@ -56,11 +88,11 @@ export function EmptyState({
             </div>
             <div className="relative flex justify-center">
               <span className="px-4 text-xs font-semibold text-gray-500 bg-gray-900/95 uppercase tracking-wider">
-                Example Queries
+                {isOffseason ? 'Try These Instead' : 'Example Queries'}
               </span>
             </div>
           </div>
-          
+
           {/* Suggestion chips */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {suggestions.map((suggestion, index) => {
@@ -70,7 +102,6 @@ export function EmptyState({
                   key={index}
                   className="group relative flex items-start gap-3 p-4 rounded-xl bg-gray-800/30 hover:bg-gray-800/50 border border-gray-700/40 hover:border-gray-600/60 transition-all duration-300 text-left"
                   onClick={() => {
-                    // This would trigger a query with the suggestion text
                     console.log('[v0] Empty state suggestion clicked:', suggestion.text);
                   }}
                 >
@@ -89,16 +120,20 @@ export function EmptyState({
               );
             })}
           </div>
-          
+
           {/* Help text */}
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-500/5 border border-blue-500/20">
-            <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+          <div className={`flex items-start gap-3 p-4 rounded-xl border ${
+            isOffseason ? 'bg-orange-500/5 border-orange-500/20' : 'bg-blue-500/5 border-blue-500/20'
+          }`}>
+            <Info className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isOffseason ? 'text-orange-400' : 'text-blue-400'}`} />
             <div className="space-y-1">
-              <p className="text-sm font-semibold text-blue-300">
-                {'Pro Tip'}
+              <p className={`text-sm font-semibold ${isOffseason ? 'text-orange-300' : 'text-blue-300'}`}>
+                {isOffseason ? 'Off-Season Mode' : 'Pro Tip'}
               </p>
               <p className="text-sm text-gray-400 leading-relaxed">
-                {'Be specific with your queries by mentioning sport names (NFL, NBA, MLB), specific teams, player names, or market types (DFS, betting, fantasy, Kalshi) for the most relevant insights.'}
+                {isOffseason
+                  ? 'While the season is paused, you can still explore futures markets, player news, DFS contests, and Kalshi prediction markets.'
+                  : 'Be specific with your queries by mentioning sport names (NFL, NBA, MLB), specific teams, player names, or market types (DFS, betting, fantasy, Kalshi) for the most relevant insights.'}
               </p>
             </div>
           </div>

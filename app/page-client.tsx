@@ -276,6 +276,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [showUserLightbox, setShowUserLightbox] = useState(false);
   const [customInstructions, setCustomInstructions] = useState('');
   const [purchaseAmount, setPurchaseAmount] = useState('');
+  const [isMounted, setIsMounted] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(!!serverData?.userSession);
   const [user, setUser] = useState<{ name: string; email: string; avatar?: string } | null>(
     serverData?.userSession ? {
@@ -515,6 +516,10 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     localStorage.setItem('chatRateLimit', JSON.stringify(updated));
     return updated;
   };
+
+  // Set mounted after first client render to prevent hydration mismatches
+  // from dynamic components (Stripe, modals) that inject <style> tags
+  useEffect(() => { setIsMounted(true); }, []);
 
   // Check Supabase auth session on mount and sync credits
   useEffect(() => {
@@ -4239,15 +4244,63 @@ No preamble. Start directly with section 1.`;
         </div>
       )}
 
-      {/* Auth Modals - extracted to separate component */}
-      <AuthModals
-        showLoginModal={showLoginModal}
-        showSignupModal={showSignupModal}
-        setShowLoginModal={setShowLoginModal}
-        setShowSignupModal={setShowSignupModal}
-        setIsLoggedIn={setIsLoggedIn}
-        setUser={setUser}
-      />
+      {/* Modals — rendered only after hydration to prevent <style> injection mismatch */}
+      {isMounted && (
+        <>
+          {/* Auth Modals - extracted to separate component */}
+          <AuthModals
+            showLoginModal={showLoginModal}
+            showSignupModal={showSignupModal}
+            setShowLoginModal={setShowLoginModal}
+            setShowSignupModal={setShowSignupModal}
+            setIsLoggedIn={setIsLoggedIn}
+            setUser={setUser}
+          />
+
+          {/* User Lightbox */}
+          <UserLightbox
+            isOpen={showUserLightbox}
+            onClose={() => setShowUserLightbox(false)}
+            user={user}
+            onLogout={() => { setUser(null); setIsLoggedIn(false); setFantasyLeague(null); localStorage.removeItem('leverage_fantasy_league'); }}
+            onInstructionsChange={setCustomInstructions}
+            onAttachFile={(file) => setUploadedFiles(prev => [...prev, { ...file, url: '' }])}
+          />
+
+          {/* Settings Lightbox */}
+          <SettingsLightbox
+            isOpen={showSettingsLightbox}
+            onClose={() => setShowSettingsLightbox(false)}
+            user={user}
+            onUserUpdate={setUser}
+            onOpenStripe={() => setShowStripeLightbox(true)}
+          />
+
+          {/* Alerts Lightbox */}
+          <AlertsLightbox
+            isOpen={showAlertsLightbox}
+            onClose={() => setShowAlertsLightbox(false)}
+            user={user}
+            onAlertsCountChange={setAlertCount}
+          />
+
+          {/* Stripe Purchase Lightbox */}
+          <StripeLightbox
+            isOpen={showStripeLightbox}
+            onClose={() => setShowStripeLightbox(false)}
+            onCreditsAdded={addCredits}
+            creditsRemaining={creditsRemaining}
+            userEmail={user?.email}
+          />
+
+          {/* Market Intelligence Panel */}
+          <MarketIntelligencePanel
+            isOpen={showIntelPanel}
+            onClose={() => setShowIntelPanel(false)}
+            sport={selectedSport ?? undefined}
+          />
+        </>
+      )}
 
       {/* User Lightbox */}
       <UserLightbox

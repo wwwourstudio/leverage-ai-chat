@@ -4291,46 +4291,6 @@ No preamble. Start directly with section 1.`;
         sport={selectedSport ?? undefined}
       />
 
-      <style>
-        {`
-          @keyframes fadeIn {
-            from {
-              opacity: 0;
-              transform: translateY(15px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-          .animate-fadeIn {
-            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-          }
-          .animate-pulse-slow {
-            animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-          }
-          .scrollbar-hide::-webkit-scrollbar {
-            display: none;
-          }
-          .scrollbar-hide {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-          }
-          .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-track {
-            background: rgba(17, 24, 39, 0.3);
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: rgba(75, 85, 99, 0.5);
-            border-radius: 3px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: rgba(107, 114, 128, 0.7);
-          }
-        `}
-      </style>
     </div>
   );
 }

@@ -6,10 +6,12 @@
  * survives warm serverless invocations (cold-start cost ≈ 1 network round-trip).
  *
  * Cache TTL: 4 hours — NFBC updates ADP daily, so this is a good balance.
+ *
+ * NOTE: All Supabase access is intentionally kept out of this file.
+ * This module is imported by client-bundled code (page-client.tsx → fantasy-card-generator.ts),
+ * so importing @supabase/supabase-js here would break HMR. Supabase reads/writes
+ * go through API routes (/api/adp/load, /api/adp/upload) which are server-only.
  */
-
-// Static import so the bundler can tree-shake it and it never breaks on HMR
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -302,111 +304,32 @@ export function parseTSV(raw: string): NFBCPlayer[] {
   return players;
 }
 
-// ── Supabase ADP persistence ──────────────────────────────────────────────────
-// Saves fetched ADP to Supabase so the AI can read it directly from the DB.
-// Uses the service role key (bypasses RLS) so no user session is needed.
-// Falls back silently — persistence failures never break the ADP tool.
-
-// Use globalThis to persist singleton across HMR reloads in dev mode
-const GLOBAL_KEY = '__adp_supabase_client__' as const;
-
-// No-op storage to completely disable GoTrueClient session management
-const noopStorage = {
-  getItem: () => null,
-  setItem: () => {},
-  removeItem: () => {},
-};
-
-function getADPSupabaseClient(): SupabaseClient | null {
-  // Must only run server-side — browser has no service role key and
-  // we must not instantiate a second GoTrueClient in the browser context.
-  if (typeof window !== 'undefined') return null;
-
-  // Check global cache first (survives HMR)
-  const cached = (globalThis as Record<string, unknown>)[GLOBAL_KEY];
-  if (cached) return cached as SupabaseClient;
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
-
-  // Static createClient — no dynamic import, so HMR never invalidates it
-  const client = createClient(url, key, {
-    db: { schema: 'api' },
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-      storage: noopStorage,
-    },
-  });
-
-  (globalThis as Record<string, unknown>)[GLOBAL_KEY] = client;
-  return client;
-}
+// ── Supabase ADP persistence (via API routes) ─────────────────────────────────
+// All Supabase access goes through server-side API routes to keep @supabase/supabase-js
+// out of the client bundle. This file is imported by client-bundled code, so any
+// direct Supabase import here would break HMR.
 
 export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): Promise<void> {
-  try {
-    const supabase = getADPSupabaseClient();
-    if (!supabase) return;
-    const now = new Date().toISOString();
-    const rows = players.map(p => ({
-      rank: p.rank,
-      player_name: p.playerName,
-      display_name: p.displayName,
-      adp: p.adp,
-      positions: p.positions,
-      team: p.team,
-      value_delta: p.valueDelta,
-      is_value_pick: p.isValuePick,
-      auction_value: p.auctionValue ?? null,
-      sport,
-      fetched_at: now,
-    }));
-    // Upsert in batches of 50 to stay well within payload limits
-    const BATCH = 50;
-    for (let i = 0; i < rows.length; i += BATCH) {
-      const { error } = await supabase
-        .from('nfbc_adp')
-        .upsert(rows.slice(i, i + BATCH), { onConflict: 'sport,rank' });
-      if (error) {
-        console.warn('[v0] [ADP] Supabase upsert batch failed:', error.message);
-        return;
-      }
-    }
-    console.log(`[v0] [ADP] Saved ${players.length} ${sport.toUpperCase()} ADP players to Supabase`);
-  } catch (err) {
-    console.warn('[v0] [ADP] saveADPToSupabase failed (non-critical):', err);
-  }
+  // saveADPToSupabase is only called from the /api/adp/upload route (server-side).
+  // That route has its own direct Supabase access. This function is a no-op here
+  // to keep the public API stable for the upload route import.
+  void players; void sport;
 }
 
 export async function loadADPFromSupabase(sport = 'mlb', allowStale = false): Promise<NFBCPlayer[] | null> {
   try {
-    const supabase = getADPSupabaseClient();
-    if (!supabase) return null;
-    const { data, error } = await supabase
-      .from('nfbc_adp')
-      .select('*')
-      .eq('sport', sport)
-      .order('rank', { ascending: true })
-      .limit(300);
-    if (error || !data || data.length === 0) return null;
-    // Check freshness unless allowStale — compare against cache TTL (4 hours)
-    if (!allowStale) {
-      const latestFetch = data[0]?.fetched_at ? new Date(data[0].fetched_at).getTime() : 0;
-      if (Date.now() - latestFetch > CACHE_TTL_MS) return null;
-    }
-    return data.map((r: any) => ({
-      rank: r.rank as number,
-      playerName: r.player_name as string,
-      displayName: r.display_name as string,
-      adp: r.adp as number,
-      positions: r.positions as string,
-      team: r.team as string,
-      valueDelta: r.value_delta as number,
-      isValuePick: r.is_value_pick as boolean,
-      auctionValue: r.auction_value != null ? (r.auction_value as number) : undefined,
-    }));
+    // In a server context (API routes, RSCs), call the load route directly.
+    // In a browser context, this falls through gracefully — the caller handles null.
+    const baseUrl = typeof window === 'undefined'
+      ? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+      : '';
+    const params = new URLSearchParams({ sport, allowStale: String(allowStale) });
+    const res = await fetch(`${baseUrl}/api/adp/load?${params}`, {
+      next: { revalidate: 0 },
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return (json.players as NFBCPlayer[]) ?? null;
   } catch (err) {
     console.warn('[v0] [ADP] loadADPFromSupabase failed (non-critical):', err);
     return null;

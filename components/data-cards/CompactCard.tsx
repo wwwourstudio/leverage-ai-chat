@@ -28,7 +28,8 @@ const NO_COLOR  = '#f43f5e';
 /** Derive a compact stat to show on the subcard thumbnail */
 function getKeyStat(card: CompactCardData): { label: string; value: string; color?: string } | null {
   const d = card.data;
-  const t = card.type.toLowerCase();
+  if (!d) return null;
+  const t = card.type?.toLowerCase() ?? '';
 
   if (t.includes('kalshi') || t.includes('prediction')) {
     if (d.yesPct != null) {
@@ -120,6 +121,9 @@ function MiniProbBar({ yesPct }: { yesPct: number }) {
 }
 
 export const CompactCard = memo(function CompactCard({ card, index, isActive, onClick }: CompactCardProps) {
+  // Guard against malformed card data (e.g. card generated before data fetch completes)
+  if (!card || !card.data) return null;
+
   const keyStat = getKeyStat(card);
   const Icon = cardIcon(card.type);
   const isKalshi = card.type.toLowerCase().includes('kalshi') || card.type.toLowerCase().includes('prediction');

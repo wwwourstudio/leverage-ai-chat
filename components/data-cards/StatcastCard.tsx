@@ -345,7 +345,6 @@ function Lightbox({
 
         {/* Footer */}
         <div className="px-5 pb-5 pt-3 border-t border-white/10 shrink-0 flex items-center gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/statcast-logo.png" alt="Statcast" className="h-3.5 w-auto opacity-60" />
           <button
             onClick={onClose}
@@ -443,7 +442,6 @@ export function StatcastCard({ data, onAnalyze, isHero = false }: StatcastCardPr
         <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between gap-2">
           {/* Statcast logo + recency note */}
           <div className="flex items-center gap-1.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/statcast-logo.png" alt="Statcast" className="h-3.5 w-auto opacity-75" />
             {data.last_updated && (
               <span className="text-[9px] text-gray-600">· {data.last_updated}</span>

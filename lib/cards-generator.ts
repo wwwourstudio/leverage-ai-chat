@@ -12,6 +12,18 @@
 import { unstable_cache } from 'next/cache';
 import { CARD_TYPES, SPORT_KEYS, sportToApi, apiToSport, getSportGradient } from '@/lib/constants';
 import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
+import { logger, LogCategory } from '@/lib/logger';
+
+// ============================================================================
+// Deterministic card ID — djb2 hash over the card's key dimensions.
+// Produces a stable 7-char base-36 string for use as React key and cache key.
+// ============================================================================
+function cardId(...parts: (string | number | undefined | null)[]): string {
+  const str = parts.filter(Boolean).join('|');
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = (h * 33) ^ str.charCodeAt(i);
+  return (h >>> 0).toString(36);
+}
 
 // ============================================================================
 // In-memory card cache (shared between SSR page load and /api/analyze)
@@ -153,7 +165,8 @@ export function oddsEventsToBettingCards(
     });
   }
 
-  return cards;
+  // Assign stable deterministic IDs to all generated cards
+  return cards.map((c, i) => c.id ? c : { ...c, id: cardId(c.type, c.category, c.title, String(i)) });
 }
 
 /**
@@ -418,6 +431,8 @@ async function generateSportSpecificCards(
 // getSportGradient imported from @/lib/constants (centralized)
 
 export interface InsightCard {
+  /** Deterministic stable ID for React key and cache identity */
+  id?: string;
   type: string;
   title: string;
   icon: string;
@@ -577,13 +592,13 @@ async function _generateContextualCards(
   // (SSR page load populates this, /api/analyze reuses it)
   const cached = getCachedCards(category, sport, count);
   if (cached && cached.length > 0) {
-    console.log(`[v0] [CARDS-GEN] Cache HIT: returning ${cached.length} cached cards`);
+    logger.debug(LogCategory.CACHE, 'cards_cache_hit', { metadata: { count: cached.length, category, sport } });
     return cached;
   }
 
   const cards: InsightCard[] = [];
   
-  console.log(`[v0] [CARDS-GEN] Cache MISS: fetching fresh data (multiSport=${multiSport}, sport=${sport}, category=${category})`);
+  logger.debug(LogCategory.CACHE, 'cards_cache_miss', { metadata: { multiSport, sport, category } });
 
   // Fantasy with no sport: default to MLB — MLB draft season runs Jan–Apr (NFBC / TGFBI)
   const effectiveSport = (category === 'fantasy' || category === 'draft' || category === 'waiver') && !sport
@@ -1083,12 +1098,12 @@ async function _generateContextualCards(
     try {
       const supabase = (await import('@/lib/supabase/client')).createClient();
       
-      // Get current capital state
+      // Get current capital state — maybeSingle() returns null (not 406) when absent
       const { data: capitalState } = await supabase
         .from('capital_state')
         .select('*')
         .eq('active', true)
-        .single();
+        .maybeSingle();
       
       if (capitalState) {
         // Get current bet allocations
@@ -1582,7 +1597,11 @@ async function _generateContextualCards(
     }
   }
 
-  return cards.slice(0, count);
+  // Assign stable deterministic IDs to all cards before returning
+  const final = cards.slice(0, count);
+  const stamped = final.map((c, i) => c.id ? c : { ...c, id: cardId(c.type, c.category, c.title, String(i)) });
+  logger.info(LogCategory.API, 'cards_generated', { metadata: { count: stamped.length, sport, category, multiSport } });
+  return stamped;
 }
 
 // ============================================================================

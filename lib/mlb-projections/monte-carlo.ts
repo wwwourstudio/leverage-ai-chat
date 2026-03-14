@@ -146,7 +146,8 @@ export function simulatePitcher(probs: PitcherProjectedStats, N = 1000): Pitcher
   for (let i = 0; i < N; i++) {
     const inningsPitched = Math.max(1, INNINGS_STARTED + (Math.random() - 0.5) * 3);
     const batsFaced = Math.round(inningsPitched * 3.3);
-    let gameK = 0, gameH = 0, gameW = 0, gameER = 0;
+    let gameK = 0, gameH = 0, gameER = 0;
+    const gameW = 0; // walks tracked at game level (always 0 — per-AB walk tracking not yet implemented)
 
     for (let ab = 0; ab < batsFaced; ab++) {
       if (Math.random() < probs.kPerAB)       gameK++;

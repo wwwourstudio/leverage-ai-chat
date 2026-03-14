@@ -91,7 +91,7 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
       onCreditsAdded?.(pendingCredits);
     }
     handleClose();
-  }, [pendingCredits]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pendingCredits]);
 
   if (!isOpen) return null;
 

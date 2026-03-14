@@ -17,31 +17,26 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import { fetchDynamicCards, fetchUserInsights, type DynamicCard } from '@/lib/data-service';
+import { fetchDynamicCards, type DynamicCard } from '@/lib/data-service';
 import { API_ENDPOINTS } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/client';
 const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ default: m.AuthModals })), { ssr: false });
-import { MobileChatInput } from '@/components/mobile-chat-input';
-import { Send, TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, Menu, Plus, MessageSquare, Clock, Star, Trash2, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, Settings, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Calendar, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, ExternalLink, X, CheckCheck, AlertTriangle, XCircle, TrendingUpIcon, BarChart, Info, Paperclip, FileText, ImageIcon, MoveIcon as RemoveIcon, Loader2, Bookmark } from 'lucide-react';
-import { DynamicCardRenderer, CardList, EmptyState } from '@/components/data-cards';
+import { TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, MessageSquare, Clock, Star, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, X, CheckCheck, AlertTriangle, BarChart, Info, FileText, ImageIcon, Loader2 } from 'lucide-react';
 import { CardLayout } from '@/components/data-cards/CardLayout';
 import { CardAnalysisSkeleton } from '@/components/data-cards/CardSkeleton';
 import { DatabaseStatusBanner } from '@/components/database-status-banner';
-import { TrustMetricsDisplay, TrustMetricsBadge } from '@/components/trust-metrics-display';
-import { InsightsDashboard } from '@/components/insights-dashboard';
+import { TrustMetricsDisplay } from '@/components/trust-metrics-display';
 import { AIProgressIndicator } from '@/components/ai-progress-indicator';
-import { ErrorBoundary } from '@/components/error-boundary';
-import { DataFallback } from '@/components/data-fallback';
-import { ChatMessage } from '@/components/chat-message';
 const SettingsLightbox = dynamic(() => import('@/components/SettingsLightbox').then(m => ({ default: m.SettingsLightbox })), { ssr: false });
 const AlertsLightbox = dynamic(() => import('@/components/AlertsLightbox').then(m => ({ default: m.AlertsLightbox })), { ssr: false });
 const StripeLightbox = dynamic(() => import('@/components/StripeLightbox').then(m => ({ default: m.StripeLightbox })), { ssr: false });
 const UserLightbox = dynamic(() => import('@/components/UserLightbox').then(m => ({ default: m.UserLightbox })), { ssr: false });
+const MarketIntelligencePanel = dynamic(() => import('@/components/market-intelligence/MarketIntelligencePanel').then(m => ({ default: m.MarketIntelligencePanel })), { ssr: false });
 import { useToast } from '@/components/toast-provider';
 import { Sidebar } from '@/components/Sidebar';
 import { ChatHeader } from '@/components/chat-header';
-import { SuggestedPrompts, type SuggestedAction } from '@/components/suggested-prompts';
-import { ChatInput, type FileAttachment as ChatFileAttachment } from '@/components/chat-input';
+import { SuggestedPrompts } from '@/components/suggested-prompts';
+import { ChatInput } from '@/components/chat-input';
 import { loadThreads, createThread, updateThread, deleteThread, loadMessages, saveMessage } from '@/lib/chat-service';
 import { generateNoDataMessage } from '@/lib/seasonal-context';
 
@@ -267,7 +262,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editingChatTitle, setEditingChatTitle] = useState('');
   const [showLimitNotification, setShowLimitNotification] = useState(false);
-  const [chatsRemaining, setChatsRemaining] = useState(5);
+  const [_chatsRemaining, setChatsRemaining] = useState(5);
   const [creditsRemaining, setCreditsRemaining] = useState(15);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
@@ -275,6 +270,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [showSignupModal, setShowSignupModal] = useState(false);
   const [showSettingsLightbox, setShowSettingsLightbox] = useState(false);
   const [showAlertsLightbox, setShowAlertsLightbox] = useState(false);
+  const [showIntelPanel, setShowIntelPanel] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
   const [showStripeLightbox, setShowStripeLightbox] = useState(false);
   const [showUserLightbox, setShowUserLightbox] = useState(false);
@@ -288,12 +284,11 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     } : null
   );
   const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
-  const [isDragOver, setIsDragOver] = useState(false);
   const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string; query?: string }>>([]);
   const [isClarificationPills, setIsClarificationPills] = useState(false);
   const [lastUserQuery, setLastUserQuery] = useState<string>('');
   const [selectedSport, setSelectedSport] = useState<string>('');
-  const [cardsRefreshedAt, setCardsRefreshedAt] = useState<Date | null>(null);
+  const [_cardsRefreshedAt, setCardsRefreshedAt] = useState<Date | null>(null);
   const cardsRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // Tracks an in-flight createThread() call so saveMessage can await it instead of
   // firing against a placeholder ID ('chat-1' or 'chat-{timestamp}').
@@ -334,7 +329,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     setChats(prev =>
       prev[0]?.id === 'chat-1' ? [{ ...prev[0], timestamp: now }, ...prev.slice(1)] : prev
     );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Personalize the welcome message client-side after hydration (and when user logs in).
@@ -348,7 +342,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       }
       return prev;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.name]);
 
   // Re-personalize + refresh cards when category or sport filter changes (only while welcome is still visible).
@@ -362,8 +355,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       }
       return prev;
     });
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, selectedSport]);
 
 
@@ -599,7 +590,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         console.error('[v0] Auth check failed:', err);
       }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle Stripe checkout success: verify session server-side before adding credits
@@ -635,7 +625,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         if (amount > 0) addCredits(amount);
       }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Initialize credits and load real insights on mount
@@ -697,7 +686,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current);
     cardsRefreshIntervalRef.current = setInterval(refreshCards, REFRESH_INTERVAL);
     return () => { if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, lastUserQuery]);
 
   // Start with empty chat history - user creates real chats
@@ -779,7 +767,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     const firstAway = teams[0] ?? '';
     const firstHome = teams[1] ?? '';
     const playerName = responseCards.find(c => c.data?.player)?.data?.player as string | undefined;
-    const sport = responseCards[0]?.category ?? '';
+    const _sport = responseCards[0]?.category ?? '';
 
     // Analyze card types in the response
     const cardTypes = responseCards.map(card => card.type);
@@ -3062,6 +3050,8 @@ No preamble. Start directly with section 1.`;
           onOpenAlerts={() => setShowAlertsLightbox(true)}
           alertCount={alertCount}
           onOpenSettings={() => setShowSettingsLightbox(true)}
+          onOpenIntelPanel={() => setShowIntelPanel(v => !v)}
+          intelPanelOpen={showIntelPanel}
           onOpenLogin={() => setShowLoginModal(true)}
           onOpenSignup={() => setShowSignupModal(true)}
         />
@@ -3251,8 +3241,8 @@ No preamble. Start directly with section 1.`;
                                   </h3>
                                   <div className="grid grid-cols-2 gap-2">
                                     {metrics.map((metric: { label: string; value: string }, idx: number) => (
-                                      <div 
-                                        key={idx}
+                                      <div
+                                        key={`metric-${idx}-${metric.label}`}
                                         className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-3 hover:border-[oklch(0.25_0.02_280)] transition-colors"
                                       >
                                         <div className="text-[9px] font-bold text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-1">{metric.label}</div>
@@ -3302,8 +3292,8 @@ No preamble. Start directly with section 1.`;
                                   </h3>
                                   <div className="space-y-2">
                                     {recommendations.map((rec: { label: string; value: string }, idx: number) => (
-                                      <div 
-                                        key={idx}
+                                      <div
+                                        key={`rec-${idx}-${rec.label}`}
                                         className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-3.5 hover:border-[oklch(0.25_0.02_280)] transition-colors"
                                       >
                                         <div className="flex items-start gap-3">
@@ -3388,13 +3378,13 @@ No preamble. Start directly with section 1.`;
                               if (paragraph.includes('\n**') && paragraph.includes('**')) {
                                 const lines = paragraph.split('\n');
                                 return (
-                                  <div key={pIdx} className="space-y-2">
+                                  <div key={`p-${pIdx}-${paragraph.slice(0, 12)}`} className="space-y-2">
                                     {lines.map((line, lIdx) => {
                                       // Bold text with ** **
                                       if (line.includes('**')) {
                                         const parts = line.split('**');
                                         return (
-                                          <div key={lIdx} className="flex items-start gap-2">
+                                          <div key={`l-${lIdx}-${line.slice(0, 12)}`} className="flex items-start gap-2">
                                             {parts.map((part, partIdx) => {
                                               if (partIdx % 2 === 1) {
                                                 return <span key={partIdx} className="font-black text-white">{part}</span>;
@@ -3406,7 +3396,7 @@ No preamble. Start directly with section 1.`;
                                           </div>
                                         );
                                       }
-                                      return <div key={lIdx}>{line}</div>;
+                                      return <div key={`l-${lIdx}-${line.slice(0, 12)}`}>{line}</div>;
                                     })}
                                   </div>
                                 );
@@ -3416,18 +3406,18 @@ No preamble. Start directly with section 1.`;
                               if (paragraph.includes('**')) {
                                 const parts = paragraph.split('**');
                                 return (
-                                  <p key={pIdx}>
+                                  <p key={`p-${pIdx}-${paragraph.slice(0, 12)}`}>
                                     {parts.map((part, partIdx) => {
                                       if (partIdx % 2 === 1) {
-                                        return <span key={partIdx} className="font-black text-white">{part}</span>;
+                                        return <span key={`b-${partIdx}`} className="font-black text-white">{part}</span>;
                                       }
-                                      return <span key={partIdx}>{part}</span>;
+                                      return <span key={`s-${partIdx}`}>{part}</span>;
                                     })}
                                   </p>
                                 );
                               }
-                              
-                              return <p key={pIdx}>{paragraph}</p>;
+
+                              return <p key={`p-${pIdx}-${paragraph.slice(0, 12)}`}>{paragraph}</p>;
                             })}
                           </div>
                         )}
@@ -3468,7 +3458,7 @@ No preamble. Start directly with section 1.`;
                                         <thead className="sticky top-0 bg-gray-800/80 backdrop-blur-sm">
                                           <tr>
                                             {attachment.data.headers.map((header: string, idx: number) => (
-                                              <th key={idx} className="px-4 py-2.5 text-left font-bold text-gray-300 border-b border-gray-700/50">
+                                              <th key={`hdr-${idx}-${header}`} className="px-4 py-2.5 text-left font-bold text-gray-300 border-b border-gray-700/50">
                                                 {header}
                                               </th>
                                             ))}
@@ -3567,16 +3557,16 @@ No preamble. Start directly with section 1.`;
                                     if (para.includes('**')) {
                                       const parts = para.split('**');
                                       return (
-                                        <p key={pIdx}>
+                                        <p key={`ap-${pIdx}-${para.slice(0, 12)}`}>
                                           {parts.map((part, partIdx) =>
                                             partIdx % 2 === 1
-                                              ? <span key={partIdx} className="font-bold text-white">{part}</span>
-                                              : <span key={partIdx}>{part}</span>
+                                              ? <span key={`ab-${partIdx}`} className="font-bold text-white">{part}</span>
+                                              : <span key={`as-${partIdx}`}>{part}</span>
                                           )}
                                         </p>
                                       );
                                     }
-                                    return <p key={pIdx}>{para}</p>;
+                                    return <p key={`ap-${pIdx}-${para.slice(0, 12)}`}>{para}</p>;
                                   })}
                                 </div>
                               </div>
@@ -3626,7 +3616,7 @@ No preamble. Start directly with section 1.`;
                                           RefreshCw;
                               return (
                                 <div
-                                  key={idx}
+                                  key={source.name ?? `src-${idx}`}
                                   className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border bg-gray-900/30 ${reliabilityColor} text-[11px]`}
                                   title={`${source.name} - ${source.reliability}% reliability`}
                                 >
@@ -4292,6 +4282,13 @@ No preamble. Start directly with section 1.`;
         onCreditsAdded={addCredits}
         creditsRemaining={creditsRemaining}
         userEmail={user?.email}
+      />
+
+      {/* Market Intelligence Panel */}
+      <MarketIntelligencePanel
+        isOpen={showIntelPanel}
+        onClose={() => setShowIntelPanel(false)}
+        sport={selectedSport ?? undefined}
       />
 
       <style>

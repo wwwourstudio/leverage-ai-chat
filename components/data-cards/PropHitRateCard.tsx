@@ -90,7 +90,6 @@ export function PropHitRateCard({
             <div className="flex items-center gap-1.5">
               <p className="text-[11px] text-gray-500 truncate">{statType}</p>
               {(sport === 'mlb' || sport === 'baseball') && (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img src="/statcast-logo.png" alt="Statcast" className="h-3 w-auto opacity-50 flex-shrink-0" />
               )}
             </div>

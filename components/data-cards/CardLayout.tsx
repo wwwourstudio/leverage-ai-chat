@@ -128,7 +128,7 @@ export const CardLayout = memo(function CardLayout({
               const originalIndex = cards.indexOf(card);
               return (
                 <CompactCard
-                  key={`${card.type}-${originalIndex}`}
+                  key={card.id ?? `${card.type}-${originalIndex}`}
                   card={card}
                   index={i}
                   isActive={false}

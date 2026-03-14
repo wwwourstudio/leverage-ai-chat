@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { streamText, generateText, tool, stepCountIs } from 'ai';
 import { createXai } from '@ai-sdk/xai';
 import { z } from 'zod';
@@ -20,8 +19,10 @@ import { getNFLADPData, clearNFLADPCache } from '@/lib/nfl-adp-data';
 import { getStatcastData, queryStatcast } from '@/lib/baseball-savant';
 import type { StatcastPlayer } from '@/lib/baseball-savant';
 import { generateContextualCards, oddsEventsToBettingCards, type InsightCard } from '@/lib/cards-generator';
-import { detectHallucinations, buildRetryPrompt } from '@/lib/hallucination-detector';
+import { detectHallucinations } from '@/lib/hallucination-detector';
 import { getGrokApiKey } from '@/lib/config';
+import { logger, LogCategory } from '@/lib/logger';
+import { getMarketIntelligenceSummary } from '@/lib/market-intelligence';
 
 // ============================================================================
 // Types
@@ -152,6 +153,41 @@ export async function POST(request: NextRequest) {
     // ADP intent: user is asking about NFBC/NFFC draft positions or rankings only.
     // Narrowed: no longer fires for all MLB fantasy queries — only explicit ADP keywords.
     const msgLower = userMessage.toLowerCase();
+
+    // ── Team-name → sport inference ──────────────────────────────────────────
+    // When context.sport is absent or 'none', scan the user message for known
+    // team nicknames and infer the sport so card generation and model routing
+    // use the correct sport context instead of falling through to 'all'.
+    const TEAM_TO_SPORT: Record<string, string> = {
+      // NBA
+      cavaliers: 'nba', cavs: 'nba', mavericks: 'nba', mavs: 'nba',
+      lakers: 'nba', celtics: 'nba', warriors: 'nba', bucks: 'nba',
+      heat: 'nba', knicks: 'nba', nets: 'nba', sixers: 'nba',
+      suns: 'nba', nuggets: 'nba', clippers: 'nba', thunder: 'nba',
+      // NFL
+      cowboys: 'nfl', patriots: 'nfl', chiefs: 'nfl', eagles: 'nfl',
+      packers: 'nfl', ravens: 'nfl', bills: 'nfl', rams: 'nfl',
+      niners: 'nfl', broncos: 'nfl', steelers: 'nfl', bengals: 'nfl',
+      // MLB
+      yankees: 'mlb', dodgers: 'mlb', cubs: 'mlb', astros: 'mlb',
+      braves: 'mlb', mets: 'mlb', 'red sox': 'mlb', cardinals: 'mlb',
+      giants: 'mlb', phillies: 'mlb', padres: 'mlb', mariners: 'mlb',
+      // NHL
+      penguins: 'nhl', rangers: 'nhl', bruins: 'nhl', lightning: 'nhl',
+      oilers: 'nhl', avalanche: 'nhl', panthers: 'nhl', maple: 'nhl',
+    };
+
+    let inferredSport = context?.sport && context.sport !== 'none' ? context.sport : undefined;
+    if (!inferredSport) {
+      for (const [team, sportName] of Object.entries(TEAM_TO_SPORT)) {
+        if (msgLower.includes(team)) { inferredSport = sportName; break; }
+      }
+    }
+    // Merge inferred sport back into context so downstream handlers pick it up
+    if (inferredSport && !context.sport) {
+      context.sport = inferredSport;
+    }
+
     const hasADPIntent =
       ['adp', 'nfbc', 'nffc', 'average draft', 'draft position', 'draft rank', 'draft order', 'nfbc board', 'nffc board']
         .some(k => msgLower.includes(k));
@@ -371,6 +407,26 @@ export async function POST(request: NextRequest) {
       enrichedPrompt += `\n\n[Context: General question — answer with your full expert knowledge about sports betting, fantasy, DFS, or prediction markets as appropriate.]`;
     }
 
+    // Market Intelligence signal injection (non-blocking, 2s timeout)
+    // Only injected when we have a primary event in live odds data
+    if (context.sport && context.oddsData?.events?.length > 0) {
+      try {
+        const primaryEvent = context.oddsData.events[0];
+        const primaryEventId = primaryEvent?.id;
+        if (primaryEventId) {
+          const intel = await Promise.race([
+            getMarketIntelligenceSummary(primaryEventId, context.sport),
+            new Promise<null>(resolve => setTimeout(() => resolve(null), 2000)),
+          ]);
+          if (intel && intel.severity !== 'none') {
+            enrichedPrompt += `\n\n[Market Intelligence Signals]\nAnomaly Score: ${intel.anomalyScore.toFixed(2)} (${intel.severity} severity)\nSurface Probability: ${(intel.surfaceProbability * 100).toFixed(1)}%\nLine Movement: ${intel.movementType} (velocity ${intel.velocityScore.toFixed(0)}/100)\nBenford Trust Score: ${intel.benfordTrust.toFixed(0)}/100\nComposite Signal Strength: ${intel.signalStrength.toFixed(0)}/100\n[Use these signals to contextualize your analysis. High anomaly scores may indicate smart-money movement or cross-market mispricing worth highlighting.]`;
+          }
+        }
+      } catch {
+        // Non-blocking — intelligence signals are additive, never block the AI response
+      }
+    }
+
     // Fantasy-specific context injection
     if (context.hasFantasyIntent) {
       const sport = context.sport || '';
@@ -403,8 +459,11 @@ export async function POST(request: NextRequest) {
       && context.selectedCategory !== 'kalshi';
     let cardPromise: Promise<InsightCard[]>;
     if (isAmbiguous) {
-      // Ambiguous query — don't show random cards, wait for clarification
-      cardPromise = Promise.resolve([]);
+      // Ambiguous query — return trending multi-sport cards as fallback so UI is never empty
+      cardPromise = Promise.race([
+        generateContextualCards('all', undefined, 6),
+        new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 8000)),
+      ]).catch(() => []);
     } else if (hasExistingCards) {
       cardPromise = Promise.resolve(existingCards as InsightCard[]);
     } else if (!context.isPoliticalMarket && context.selectedCategory === 'dfs') {
@@ -492,7 +551,7 @@ export async function POST(request: NextRequest) {
       'leaderboard_card', 'pitch_analysis_card',
     ]);
 
-    const MAX_HALLUCINATION_RETRIES = 2;
+    const _MAX_HALLUCINATION_RETRIES = 2; // reserved for future retry logic
 
     // ── Image attachment validation ───────────────────────────────────────────
     // Validate MIME type and estimated file size before forwarding to Grok.
@@ -534,10 +593,9 @@ export async function POST(request: NextRequest) {
     const useFastPath = hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context));
     const primaryModel = useFastPath ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.MODEL_NAME;
     // Always log the resolved model so failures are immediately traceable in Vercel logs
-    console.log(`[API/analyze] Model selected: ${primaryModel} (fastPath=${useFastPath}, hasADPIntent=${hasADPIntent})`);
-    if (useFastPath) {
-      console.log(`[API/analyze] Fast-path routing → ${AI_CONFIG.FAST_MODEL_NAME} (intent: DFS/fantasy/file/offseason)`);
-    }
+    logger.info(LogCategory.AI, 'model_selected', {
+      metadata: { model: primaryModel, fastPath: useFastPath, hasADPIntent, sport: context?.sport ?? null },
+    });
 
     // ── ADP tool (injected when hasADPIntent) ────────────────────────────────────
     const adpParams = z.object({
@@ -972,8 +1030,10 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          console.log(`[API/analyze] Returning ${cards.length} cards (clarification: ${isAmbiguous})`);
           const processingTime = Date.now() - startTime;
+          logger.info(LogCategory.AI, 'response_complete', {
+            metadata: { cardCount: cards.length, clarification: isAmbiguous, sport: context?.sport ?? null, latencyMs: processingTime },
+          });
 
           const hasRealOdds = !!(context.oddsData?.events?.length > 0);
           const baseMetrics = usedFallback

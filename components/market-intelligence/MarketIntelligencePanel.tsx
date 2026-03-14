@@ -82,6 +82,15 @@ export function MarketIntelligencePanel({
   const [error, setError] = useState<string | null>(null);
   const [lastFetch, setLastFetch] = useState<Date | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Tracks whether the panel has ever been opened so we keep DOM nodes alive
+  // for the CSS slide transition. Until first open the panel renders null,
+  // matching the server render (ssr:false → no server HTML) and avoiding the
+  // React hydration mismatch.
+  const [hasEverOpened, setHasEverOpened] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) setHasEverOpened(true);
+  }, [isOpen]);
 
   const fetchSnapshot = useCallback(async () => {
     if (!eventId || !sport || !oddsEvent) return;
@@ -122,6 +131,11 @@ export function MarketIntelligencePanel({
   }, [isOpen, fetchSnapshot, eventId, sport, oddsEvent]);
 
   const timeline: TimelineEvent[] = report?.timeline ?? [];
+
+  // Don't render anything until the panel has been opened at least once.
+  // This keeps the server HTML (null) and the initial client render (null) in sync,
+  // preventing React hydration mismatches from the always-in-DOM <aside> pattern.
+  if (!hasEverOpened) return null;
 
   return (
     <>

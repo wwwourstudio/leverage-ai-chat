@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import type { NFBCPlayer } from '@/lib/adp-data';
+import type { NFBCPlayer } from '@/lib/adp-data-service';
 
 export const runtime = 'nodejs';
 

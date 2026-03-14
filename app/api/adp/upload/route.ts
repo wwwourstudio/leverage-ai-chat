@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { parseTSV, clearADPCache } from '@/lib/adp-data';
+import { parseTSV, clearADPCache } from '@/lib/adp-data-service';
 import { clearNFLADPCache } from '@/lib/nfl-adp-data';
-import type { NFBCPlayer } from '@/lib/adp-data';
+import type { NFBCPlayer } from '@/lib/adp-data-service';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;

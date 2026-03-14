@@ -892,7 +892,7 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
     let isNFBCData = false;
     try {
       if (typeof window === 'undefined') {
-        const { getADPData } = await import('@/lib/adp-data');
+        const { getADPData } = await import('@/lib/adp-data-service');
         const nfbcPlayers = await getADPData();
         if (nfbcPlayers.length > 10) {
           mlbPlayers = buildMLBFromNFBC(nfbcPlayers);

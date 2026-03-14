@@ -10,11 +10,11 @@
 
 // Re-export shared types and query logic from the MLB ADP module.
 // NFL and MLB share identical player shape (rank, displayName, adp, positions, team, etc.)
-export type { NFBCPlayer, ADPQueryParams } from '@/lib/adp-data';
-export { queryADP } from '@/lib/adp-data';
+export type { NFBCPlayer, ADPQueryParams } from '@/lib/adp-data-service';
+export { queryADP } from '@/lib/adp-data-service';
 
-import type { NFBCPlayer } from '@/lib/adp-data';
-import { saveADPToSupabase, loadADPFromSupabase, clearADPCache as clearMLBCache } from '@/lib/adp-data';
+import type { NFBCPlayer } from '@/lib/adp-data-service';
+import { saveADPToSupabase, loadADPFromSupabase, clearADPCache as clearMLBCache } from '@/lib/adp-data-service';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 

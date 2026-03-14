@@ -7,6 +7,7 @@
  *
  * Cache TTL: 4 hours — NFBC updates ADP daily, so this is a good balance.
  */
+import 'server-only';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -315,6 +316,9 @@ const noopStorage = {
 };
 
 async function getADPSupabaseClient() {
+  // Guard: this function must only run server-side
+  if (typeof window !== 'undefined') return null;
+
   // Check global cache first (survives HMR)
   const cached = (globalThis as Record<string, unknown>)[GLOBAL_KEY];
   if (cached) return cached as Awaited<ReturnType<typeof import('@supabase/supabase-js').createClient>>;

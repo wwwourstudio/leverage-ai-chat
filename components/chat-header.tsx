@@ -185,11 +185,16 @@ export function ChatHeader({
                 </div>
               </div>
 
-              {/* Market Intelligence — always in DOM to keep sibling order stable during SSR */}
+              {/* Market Intelligence — rendered unconditionally so sibling order never
+                  differs between SSR and client. Invisible + inert when prop not provided. */}
               <button
-                onClick={onOpenIntelPanel}
-                className={`p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent ${intelPanelOpen ? 'bg-blue-500/20' : ''} ${!onOpenIntelPanel ? 'hidden' : ''}`}
-                title="Market Intelligence"
+                onClick={onOpenIntelPanel ?? undefined}
+                className={[
+                  'p-2.5 rounded-xl transition-all duration-300 group active:scale-95 bg-transparent',
+                  'hover:bg-[var(--bg-elevated)]',
+                  intelPanelOpen ? 'bg-blue-500/20' : '',
+                  onOpenIntelPanel ? 'visible' : 'invisible pointer-events-none w-0 p-0 overflow-hidden',
+                ].join(' ')}
                 aria-hidden={!onOpenIntelPanel}
                 tabIndex={onOpenIntelPanel ? 0 : -1}
               >

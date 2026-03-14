@@ -185,15 +185,16 @@ export function ChatHeader({
                 </div>
               </div>
 
-              {onOpenIntelPanel && (
-                <button
-                  onClick={onOpenIntelPanel}
-                  className={`p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent ${intelPanelOpen ? 'bg-blue-500/20' : ''}`}
-                  title="Market Intelligence"
-                >
-                  <BarChart2 className={`w-5 h-5 transition-colors ${intelPanelOpen ? 'text-blue-400' : 'text-[var(--text-muted)] group-hover:text-white'}`} />
-                </button>
-              )}
+              {/* Market Intelligence — always in DOM to keep sibling order stable during SSR */}
+              <button
+                onClick={onOpenIntelPanel}
+                className={`p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent ${intelPanelOpen ? 'bg-blue-500/20' : ''} ${!onOpenIntelPanel ? 'hidden' : ''}`}
+                title="Market Intelligence"
+                aria-hidden={!onOpenIntelPanel}
+                tabIndex={onOpenIntelPanel ? 0 : -1}
+              >
+                <BarChart2 className={`w-5 h-5 transition-colors ${intelPanelOpen ? 'text-blue-400' : 'text-[var(--text-muted)] group-hover:text-white'}`} />
+              </button>
               <button
                 onClick={onOpenAlerts}
                 className="relative p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"

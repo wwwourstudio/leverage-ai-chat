@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Menu, TrendingUp, Bell, Settings, LogIn, UserPlus, Download, Share2, Check, Copy } from 'lucide-react';
+import { Menu, TrendingUp, Bell, Settings, LogIn, UserPlus, Download, Share2, Check, Copy, BarChart2 } from 'lucide-react';
 import { exportChatAsMarkdown, exportChatAsJSON, downloadFile, chatFilename, type ExportMessage, type ExportChat } from '@/lib/chat-export';
 
 interface ChatHeaderProps {
@@ -18,6 +18,9 @@ interface ChatHeaderProps {
   // Export / share props (optional — hidden when not provided)
   activeChat?: ExportChat | null;
   messages?: ExportMessage[];
+  // Market Intelligence Panel toggle (optional)
+  onOpenIntelPanel?: () => void;
+  intelPanelOpen?: boolean;
 }
 
 export function ChatHeader({
@@ -33,6 +36,8 @@ export function ChatHeader({
   onOpenSignup,
   activeChat,
   messages = [],
+  onOpenIntelPanel,
+  intelPanelOpen = false,
 }: ChatHeaderProps) {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [shareState, setShareState] = useState<'idle' | 'loading' | 'copied'>('idle');
@@ -180,6 +185,15 @@ export function ChatHeader({
                 </div>
               </div>
 
+              {onOpenIntelPanel && (
+                <button
+                  onClick={onOpenIntelPanel}
+                  className={`p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent ${intelPanelOpen ? 'bg-blue-500/20' : ''}`}
+                  title="Market Intelligence"
+                >
+                  <BarChart2 className={`w-5 h-5 transition-colors ${intelPanelOpen ? 'text-blue-400' : 'text-[var(--text-muted)] group-hover:text-white'}`} />
+                </button>
+              )}
               <button
                 onClick={onOpenAlerts}
                 className="relative p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"

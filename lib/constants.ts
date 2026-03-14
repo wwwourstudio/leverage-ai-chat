@@ -55,6 +55,10 @@ export const API_ENDPOINTS = {
   ALERTS_SUGGEST: '/api/alerts/suggest',
   SETTINGS: '/api/settings',
   SETTINGS_SUGGEST: '/api/settings/suggest',
+  MARKET_INTELLIGENCE_SNAPSHOT: '/api/market-intelligence/snapshot',
+  MARKET_INTELLIGENCE_ANOMALIES: '/api/market-intelligence/anomalies',
+  MARKET_INTELLIGENCE_SIGNALS: '/api/market-intelligence/signals',
+  MARKET_INTELLIGENCE_RETRAIN: '/api/market-intelligence/retrain',
 } as const;
 
 // AI Prompt for settings-based personalization suggestions

@@ -22,6 +22,7 @@ import { generateContextualCards, oddsEventsToBettingCards, type InsightCard } f
 import { detectHallucinations } from '@/lib/hallucination-detector';
 import { getGrokApiKey } from '@/lib/config';
 import { logger, LogCategory } from '@/lib/logger';
+import { getMarketIntelligenceSummary } from '@/lib/market-intelligence';
 
 // ============================================================================
 // Types
@@ -404,6 +405,26 @@ export async function POST(request: NextRequest) {
     } else if (!context.hasBettingIntent && !context.sport && !context.isPoliticalMarket) {
       // General question — answer from knowledge
       enrichedPrompt += `\n\n[Context: General question — answer with your full expert knowledge about sports betting, fantasy, DFS, or prediction markets as appropriate.]`;
+    }
+
+    // Market Intelligence signal injection (non-blocking, 2s timeout)
+    // Only injected when we have a primary event in live odds data
+    if (context.sport && context.oddsData?.events?.length > 0) {
+      try {
+        const primaryEvent = context.oddsData.events[0];
+        const primaryEventId = primaryEvent?.id;
+        if (primaryEventId) {
+          const intel = await Promise.race([
+            getMarketIntelligenceSummary(primaryEventId, context.sport),
+            new Promise<null>(resolve => setTimeout(() => resolve(null), 2000)),
+          ]);
+          if (intel && intel.severity !== 'none') {
+            enrichedPrompt += `\n\n[Market Intelligence Signals]\nAnomaly Score: ${intel.anomalyScore.toFixed(2)} (${intel.severity} severity)\nSurface Probability: ${(intel.surfaceProbability * 100).toFixed(1)}%\nLine Movement: ${intel.movementType} (velocity ${intel.velocityScore.toFixed(0)}/100)\nBenford Trust Score: ${intel.benfordTrust.toFixed(0)}/100\nComposite Signal Strength: ${intel.signalStrength.toFixed(0)}/100\n[Use these signals to contextualize your analysis. High anomaly scores may indicate smart-money movement or cross-market mispricing worth highlighting.]`;
+          }
+        }
+      } catch {
+        // Non-blocking — intelligence signals are additive, never block the AI response
+      }
     }
 
     // Fantasy-specific context injection

@@ -272,7 +272,44 @@ export const KalshiCard = memo(function KalshiCard({
   status,
   onAnalyze,
   isHero,
+  isLoading,
+  error,
 }: KalshiCardProps) {
+  // Loading skeleton
+  if (isLoading) {
+    return (
+      <article className="relative w-full rounded-2xl overflow-hidden bg-[#0f0f11] border border-[oklch(0.17_0.015_280)] animate-pulse">
+        <div className="px-4 pt-4 pb-3 border-b border-[oklch(0.14_0.012_280)]">
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="h-3 w-24 bg-[oklch(0.18_0.01_280)] rounded" />
+            <div className="h-3 w-8 bg-[oklch(0.18_0.01_280)] rounded" />
+          </div>
+          <div className="h-4 w-3/4 bg-[oklch(0.18_0.01_280)] rounded mb-1" />
+          <div className="h-3 w-1/2 bg-[oklch(0.15_0.01_280)] rounded" />
+        </div>
+        <div className="px-4 py-4 space-y-4">
+          <div className="flex justify-between">
+            <div className="h-12 w-16 bg-[oklch(0.18_0.01_280)] rounded" />
+            <div className="h-12 w-16 bg-[oklch(0.18_0.01_280)] rounded" />
+          </div>
+          <div className="h-2.5 w-full bg-[oklch(0.15_0.01_280)] rounded-full" />
+          <div className="h-1.5 w-full bg-[oklch(0.15_0.01_280)] rounded-full" />
+        </div>
+      </article>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <article className="relative w-full rounded-2xl overflow-hidden bg-[#0f0f11] border border-[oklch(0.17_0.015_280)]">
+        <div className="px-4 py-6 flex flex-col items-center gap-2 text-center">
+          <Globe className="w-6 h-6 text-[oklch(0.35_0.01_280)]" />
+          <p className="text-xs text-[oklch(0.40_0.01_280)]">{error}</p>
+        </div>
+      </article>
+    );
+  }
   // yesPct: use explicit null-check so a genuine 0% market is honoured, not coerced to 50.
   // The || 50 pattern treats 0 as falsy and replaces a legitimately resolved market with 50/50.
   const yesPct: number = (() => {
@@ -486,7 +523,7 @@ export const KalshiCard = memo(function KalshiCard({
         {/* ── Kalshi link ──────────────────────────────────────────────── */}
         {d.ticker && (
           <a
-            href={`https://kalshi.com/markets/${d.eventTicker || d.ticker}`}
+            href={`https://kalshi.com/markets/${d.seriesTicker || d.eventTicker || d.ticker}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-1.5 w-full py-1.5 text-[10px] font-semibold text-[oklch(0.38_0.01_280)] hover:text-[oklch(0.60_0.01_280)] transition-colors duration-150"

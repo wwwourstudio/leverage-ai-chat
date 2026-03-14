@@ -998,44 +998,13 @@ export async function fetchTopMarketsByVolume(
 }
 
 /**
- * Generate Kalshi market cards for display
+ * Generate Kalshi market cards for display.
+ * Delegates to kalshiMarketToCard so the card data shape always matches
+ * what KalshiCard expects (yesPct, edgeScore, yesBid/yesAsk, etc.).
  */
 export function generateKalshiCards(markets: KalshiMarket[]): any[] {
   console.log('[KALSHI] Generating cards for', markets.length, 'markets');
-
-  return markets.slice(0, 3).map((market, index) => {
-    const yesProb = market.yesPrice / 100;
-    const noProb = market.noPrice / 100;
-    const confidence = Math.abs(yesProb - 0.5) * 2;
-    const status = confidence > 0.3 ? 'edge' : confidence > 0.15 ? 'opportunity' : 'neutral';
-
-    return {
-      type: 'kalshi-market',
-      title: market.title,
-      icon: 'TrendingUp',
-      category: 'KALSHI',
-      subcategory: market.category || 'Prediction Market',
-      gradient: 'from-purple-600 to-indigo-700',
-      status,
-      data: {
-        ticker: market.ticker,
-        subtitle: market.subtitle || '',
-        yesPrice: `${(yesProb * 100).toFixed(1)}¢`,
-        noPrice: `${(noProb * 100).toFixed(1)}¢`,
-        yesProbability: `${(yesProb * 100).toFixed(1)}%`,
-        noProbability: `${(noProb * 100).toFixed(1)}%`,
-        volume: `$${(market.volume / 100).toLocaleString()}`,
-        openInterest: `$${(market.openInterest / 100).toLocaleString()}`,
-        closingTime: new Date(market.closeTime).toLocaleDateString(),
-        marketType: 'Binary Outcome',
-      },
-      metadata: {
-        source: 'Kalshi API',
-        fetchedAt: new Date().toISOString(),
-        marketIndex: index + 1,
-      },
-    };
-  });
+  return markets.slice(0, 3).map(market => kalshiMarketToCard(market));
 }
 
 /**

@@ -16,7 +16,11 @@
 
 import type { InsightCard } from '@/lib/cards-generator';
 import { getProjections, currentSeasonFor } from '@/lib/fantasy/projections-cache';
-import { getADPData, type NFBCPlayer } from '@/lib/adp-data';
+// NOTE: adp-data is intentionally NOT statically imported here.
+// This file is bundled for the client (page-client.tsx → fantasy-card-generator.ts).
+// A static import of adp-data would pull @supabase/supabase-js into the client bundle,
+// causing HMR module factory errors. Instead, getADPData is loaded dynamically at
+// runtime only in server contexts (typeof window === 'undefined').
 
 // ============================================================================
 // Archived 2025 NFL season data (PPR, final season projections)
@@ -883,13 +887,17 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
 
     // 1. Try to use the user-uploaded NFBC ADP board as the primary player list.
     //    If unavailable fall back to the static MLB_PROJECTIONS_2025 snapshot.
+    //    Dynamic import keeps adp-data (and @supabase/supabase-js) out of the client bundle.
     let mlbPlayers: GenericPlayer[] = MLB_PROJECTIONS_2025;
     let isNFBCData = false;
     try {
-      const nfbcPlayers = await getADPData();
-      if (nfbcPlayers.length > 10) {
-        mlbPlayers = buildMLBFromNFBC(nfbcPlayers);
-        isNFBCData = true;
+      if (typeof window === 'undefined') {
+        const { getADPData } = await import('@/lib/adp-data');
+        const nfbcPlayers = await getADPData();
+        if (nfbcPlayers.length > 10) {
+          mlbPlayers = buildMLBFromNFBC(nfbcPlayers);
+          isNFBCData = true;
+        }
       }
     } catch { /* fall back to static snapshot */ }
 

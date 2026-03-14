@@ -31,6 +31,10 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
  */
 export async function loadADPFromSupabase(sport = 'mlb', allowStale = false): Promise<NFBCPlayer[] | null> {
   if (typeof window !== 'undefined') return null;
-  const { loadADPFromSupabase: _load } = await import('@/lib/adp-data-service');
-  return _load(sport, allowStale);
+  try {
+    const { loadADPFromSupabase: _load } = await import('@/lib/adp-data-service');
+    return _load(sport, allowStale);
+  } catch {
+    return null;
+  }
 }

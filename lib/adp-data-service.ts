@@ -95,7 +95,7 @@ const STATIC_FALLBACK_PLAYERS: NFBCPlayer[] = [
   { rank: 18,  playerName: 'Cole, Gerrit',              displayName: 'Gerrit Cole',              adp: 22.0,  positions: 'SP',      team: 'NYY', valueDelta: 4.0,  isValuePick: false },
   { rank: 19,  playerName: 'Webb, Logan',               displayName: 'Logan Webb',               adp: 24.5,  positions: 'SP',      team: 'SF',  valueDelta: 5.5,  isValuePick: false },
   { rank: 20,  playerName: 'Strider, Spencer',          displayName: 'Spencer Strider',          adp: 26.8,  positions: 'SP',      team: 'ATL', valueDelta: 6.8,  isValuePick: false },
-  // ── Round 3 (21–30) ────────────────────────�����────────────────────────────────
+  // ── Round 3 (21–30) ────────────────────────�������────────────────────────────────
   { rank: 21,  playerName: 'Burnes, Corbin',            displayName: 'Corbin Burnes',            adp: 29.2,  positions: 'SP',      team: 'ARI', valueDelta: 8.2,  isValuePick: false },
   { rank: 22,  playerName: 'Brown, Hunter',             displayName: 'Hunter Brown',             adp: 33.5,  positions: 'SP',      team: 'HOU', valueDelta: 11.5, isValuePick: false },
   { rank: 23,  playerName: 'Clase, Emmanuel',           displayName: 'Emmanuel Clase',           adp: 37.0,  positions: 'RP',      team: 'CLE', valueDelta: 14.0, isValuePick: false },
@@ -139,7 +139,7 @@ const STATIC_FALLBACK_PLAYERS: NFBCPlayer[] = [
   { rank: 58,  playerName: 'Muncy, Max',                displayName: 'Max Muncy',                adp: 66.5,  positions: '1B,2B,3B',team: 'LAD', valueDelta: 8.5,  isValuePick: false },
   { rank: 59,  playerName: 'Montgomery, Jordan',        displayName: 'Jordan Montgomery',        adp: 68.0,  positions: 'SP',      team: 'ARI', valueDelta: 9.0,  isValuePick: false },
   { rank: 60,  playerName: 'Pressly, Ryan',             displayName: 'Ryan Pressly',             adp: 72.0,  positions: 'RP',      team: 'HOU', valueDelta: 12.0, isValuePick: false },
-  // ── Round 7 (61–70) ──────────────��─��────────────────────────────────────────
+  // ── Round 7 (61–70) ────────────��─��─��────────────────────────────────────────
   { rank: 61,  playerName: 'Straw, Myles',              displayName: 'Myles Straw',              adp: 69.0,  positions: 'OF',      team: 'CLE', valueDelta: 8.0,  isValuePick: false },
   { rank: 62,  playerName: 'Perez, Salvador',           displayName: 'Salvador Perez',           adp: 70.5,  positions: 'C',       team: 'KC',  valueDelta: 8.5,  isValuePick: false },
   { rank: 63,  playerName: 'Varsho, Daulton',           displayName: 'Daulton Varsho',           adp: 73.0,  positions: 'C,OF',    team: 'TOR', valueDelta: 10.0, isValuePick: false },
@@ -183,7 +183,7 @@ const STATIC_FALLBACK_PLAYERS: NFBCPlayer[] = [
   { rank: 98,  playerName: 'Kwan, Steven',              displayName: 'Steven Kwan',              adp: 107.5, positions: 'OF',      team: 'CLE', valueDelta: 9.5,  isValuePick: false },
   { rank: 99,  playerName: 'Imanaga, Shota',            displayName: 'Shota Imanaga',            adp: 111.0, positions: 'SP',      team: 'CHC', valueDelta: 12.0, isValuePick: false },
   { rank: 100, playerName: 'Berti, Jon',                displayName: 'Jon Berti',                adp: 113.5, positions: '2B,3B,SS',team: 'MIA', valueDelta: 13.5, isValuePick: false },
-  // ── Round 11 (101–110) ───────���──���───────────────────────────────────────────
+  // ── Round 11 (101–110) ────���──���──���───────────────────────────────────────────
   { rank: 101, playerName: 'Cueto, Johnny',             displayName: 'Johnny Cueto',             adp: 110.0, positions: 'SP',      team: 'MIA', valueDelta: 9.0,  isValuePick: false },
   { rank: 102, playerName: 'Anderson, Tim',             displayName: 'Tim Anderson',             adp: 114.0, positions: 'SS',      team: 'CWS', valueDelta: 12.0, isValuePick: false },
   { rank: 103, playerName: 'Sewald, Paul',              displayName: 'Paul Sewald',              adp: 117.5, positions: 'RP',      team: 'ARI', valueDelta: 14.5, isValuePick: false },
@@ -332,9 +332,15 @@ export async function loadADPFromSupabase(sport = 'mlb', _allowStale = false): P
     if (!res.ok) return null;
     const json = await res.json();
     return (json.players as NFBCPlayer[]) ?? null;
-  } catch {
-    // Silently return null — ADP Supabase persistence is non-critical.
-    // Errors include: HMR module factory invalidated, network failures, missing env vars.
+  } catch (err) {
+    // Silently swallow — includes stale Turbopack HMR module factory errors,
+    // network failures, and missing env vars. ADP Supabase persistence is non-critical.
+    if (process.env.NODE_ENV === 'development') {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes('module factory is not available')) {
+        console.warn('[v0] [ADP] loadADPFromSupabase failed (non-critical):', msg);
+      }
+    }
     return null;
   }
 }
@@ -356,6 +362,11 @@ export function clearADPCache(): void {
  * Falls back to the static pre-season dataset when no upload exists yet.
  */
 export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
+  // Never run Supabase logic in the browser — return static fallback immediately.
+  // The stale Turbopack chunk (lib_eb70efe0) may call this from the client;
+  // this guard ensures it never reaches loadADPFromSupabase or @supabase/supabase-js.
+  if (typeof window !== 'undefined') return STATIC_FALLBACK_PLAYERS;
+
   const now = Date.now();
 
   if (adpCache && !forceRefresh && now - lastFetched < CACHE_TTL_MS) {

@@ -4302,48 +4302,6 @@ No preamble. Start directly with section 1.`;
         </>
       )}
 
-      {/* User Lightbox */}
-      <UserLightbox
-        isOpen={showUserLightbox}
-        onClose={() => setShowUserLightbox(false)}
-        user={user}
-        onLogout={() => { setUser(null); setIsLoggedIn(false); setFantasyLeague(null); localStorage.removeItem('leverage_fantasy_league'); }}
-        onInstructionsChange={setCustomInstructions}
-        onAttachFile={(file) => setUploadedFiles(prev => [...prev, { ...file, url: '' }])}
-      />
-
-      {/* Settings Lightbox */}
-      <SettingsLightbox
-        isOpen={showSettingsLightbox}
-        onClose={() => setShowSettingsLightbox(false)}
-        user={user}
-        onUserUpdate={setUser}
-        onOpenStripe={() => setShowStripeLightbox(true)}
-      />
-
-      {/* Alerts Lightbox */}
-      <AlertsLightbox
-        isOpen={showAlertsLightbox}
-        onClose={() => setShowAlertsLightbox(false)}
-        onAlertsCountChange={setAlertCount}
-      />
-
-      {/* Stripe Purchase Lightbox */}
-      <StripeLightbox
-        isOpen={showStripeLightbox}
-        onClose={() => setShowStripeLightbox(false)}
-        onCreditsAdded={addCredits}
-        creditsRemaining={creditsRemaining}
-        userEmail={user?.email}
-      />
-
-      {/* Market Intelligence Panel */}
-      <MarketIntelligencePanel
-        isOpen={showIntelPanel}
-        onClose={() => setShowIntelPanel(false)}
-        sport={selectedSport ?? undefined}
-      />
-
     </div>
   );
 }

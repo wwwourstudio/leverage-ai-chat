@@ -8,6 +8,9 @@
  * Cache TTL: 4 hours — NFBC updates ADP daily, so this is a good balance.
  */
 
+// Static import so the bundler can tree-shake it and it never breaks on HMR
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface NFBCPlayer {
@@ -314,37 +317,37 @@ const noopStorage = {
   removeItem: () => {},
 };
 
-async function getADPSupabaseClient() {
-  // Guard: this function must only run server-side
+function getADPSupabaseClient(): SupabaseClient | null {
+  // Must only run server-side — browser has no service role key and
+  // we must not instantiate a second GoTrueClient in the browser context.
   if (typeof window !== 'undefined') return null;
 
   // Check global cache first (survives HMR)
   const cached = (globalThis as Record<string, unknown>)[GLOBAL_KEY];
-  if (cached) return cached as Awaited<ReturnType<typeof import('@supabase/supabase-js').createClient>>;
-  
+  if (cached) return cached as SupabaseClient;
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
-  
-  const { createClient } = await import('@supabase/supabase-js');
+
+  // Static createClient — no dynamic import, so HMR never invalidates it
   const client = createClient(url, key, {
     db: { schema: 'api' },
     auth: {
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
-      storage: noopStorage, // Completely disable storage to prevent GoTrueClient conflicts
+      storage: noopStorage,
     },
   });
-  
-  // Store in global to survive HMR
+
   (globalThis as Record<string, unknown>)[GLOBAL_KEY] = client;
   return client;
 }
 
 export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): Promise<void> {
   try {
-    const supabase = await getADPSupabaseClient();
+    const supabase = getADPSupabaseClient();
     if (!supabase) return;
     const now = new Date().toISOString();
     const rows = players.map(p => ({
@@ -379,7 +382,7 @@ export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): P
 
 export async function loadADPFromSupabase(sport = 'mlb', allowStale = false): Promise<NFBCPlayer[] | null> {
   try {
-    const supabase = await getADPSupabaseClient();
+    const supabase = getADPSupabaseClient();
     if (!supabase) return null;
     const { data, error } = await supabase
       .from('nfbc_adp')

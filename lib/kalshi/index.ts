@@ -989,7 +989,13 @@ function kalshiCategoryMeta(category: string): { gradient: string; iconLabel: st
 /**
  * Convert Kalshi market to insight card format (enhanced)
  */
-export function kalshiMarketToCard(market: KalshiMarket): any {
+export function kalshiMarketToCard(
+  market: KalshiMarket,
+  orderbook?: {
+    yesBids: Array<{ price: number; quantity: number }>;
+    yesAsks: Array<{ price: number; quantity: number }>;
+  } | null
+): any {
   const yesPct = Math.min(100, Math.max(0, market.yesPrice));  // 0-100 cents = 0-100%
   const noPct = Math.min(100, Math.max(0, market.noPrice));
   const { gradient, iconLabel } = kalshiCategoryMeta(market.category);
@@ -1093,6 +1099,9 @@ export function kalshiMarketToCard(market: KalshiMarket): any {
       // Event/series metadata
       eventTicker: market.eventTicker,
       seriesTicker: market.seriesTicker,
+      // Level 2 orderbook depth (null when not fetched)
+      orderbookBids: orderbook?.yesBids?.slice(0, 5) ?? null,
+      orderbookAsks: orderbook?.yesAsks?.slice(0, 5) ?? null,
     },
     status: market.status === 'open' ? 'active' : 'closed',
     realData: true,

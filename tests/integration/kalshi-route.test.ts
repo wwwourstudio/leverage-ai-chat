@@ -25,6 +25,7 @@ vi.mock('@/lib/kalshi-client', () => ({
   fetchSportsMarkets: vi.fn(),
   fetchElectionMarkets: vi.fn(),
   getMarketByTicker: vi.fn(),
+  fetchMarketOrderbook: vi.fn().mockResolvedValue(null),
   kalshiMarketToCard: vi.fn(),
 }));
 

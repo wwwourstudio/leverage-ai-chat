@@ -218,7 +218,18 @@ export async function POST(request: Request) {
       .sort((a, b) => (b.volume24h || b.volume) - (a.volume24h || a.volume))
       .slice(0, limit);
 
-    const cards = markets.map(kalshiMarketToCard);
+    const orderbookResults = await Promise.allSettled(
+      markets.slice(0, 3).map(m =>
+        Promise.race([
+          fetchMarketOrderbook(m.ticker),
+          new Promise<null>(resolve => setTimeout(() => resolve(null), 5000)),
+        ])
+      )
+    );
+    const cards = markets.map((m, i) => {
+      const ob = orderbookResults[i]?.status === 'fulfilled' ? orderbookResults[i].value : null;
+      return kalshiMarketToCard(m, ob);
+    });
 
     console.log(`[v0] [API] [KALSHI] ✓ Returning ${cards.length} cards`);
 

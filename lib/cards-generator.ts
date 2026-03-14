@@ -1022,6 +1022,7 @@ async function _generateContextualCards(
         fetchWeatherMarkets,
         fetchFinanceMarkets,
         fetchTopMarketsByVolume,
+        fetchMarketOrderbook,
         kalshiMarketToCard,
       } = await import('@/lib/kalshi-client');
 
@@ -1076,7 +1077,20 @@ async function _generateContextualCards(
         markets.sort((a: any, b: any) =>
           ((b.volume24h ?? 0) + (b.volume ?? 0)) - ((a.volume24h ?? 0) + (a.volume ?? 0))
         );
-        const kalshiCards = markets.slice(0, count).map(kalshiMarketToCard);
+        const topMarkets = markets.slice(0, count);
+        // Fetch orderbooks for top 3 only — avoids hammering Kalshi rate limits
+        const orderbookResults = await Promise.allSettled(
+          topMarkets.slice(0, 3).map((m: any) =>
+            Promise.race([
+              fetchMarketOrderbook(m.ticker),
+              new Promise<null>(resolve => setTimeout(() => resolve(null), 5000)),
+            ])
+          )
+        );
+        const kalshiCards = topMarkets.map((m: any, i: number) => {
+          const ob = orderbookResults[i]?.status === 'fulfilled' ? orderbookResults[i].value : null;
+          return kalshiMarketToCard(m, ob);
+        });
         cards.push(...kalshiCards);
         console.log(`[v0] [CARDS-GEN] Added ${kalshiCards.length} Kalshi cards`);
         if (cards.length > 0) setCachedCards(cards, 'kalshi', sport);

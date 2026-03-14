@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { HTTP_STATUS, FANTASY_CONFIG } from '@/lib/constants';
 import { hasFeatureAccess } from '@/lib/fantasy/types';
-import type { SubscriptionTier, WaiverRecommendation } from '@/lib/fantasy/types';
+import type { SubscriptionTier } from '@/lib/fantasy/types';
 import { detectBreakoutCandidates, generateWaiverRecommendations } from '@/lib/fantasy/waiver/waiver-engine';
 
 // ============================================================================

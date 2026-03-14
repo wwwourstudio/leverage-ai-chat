@@ -44,7 +44,6 @@ export function PlayerAvatar({ playerName, photoUrl, sport, size = 'md', classNa
   if (photoUrl && !imgFailed) {
     return (
       <div className={cn('relative rounded-full overflow-hidden border border-white/10 shrink-0', sizes.container, className)}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={photoUrl}
           alt={playerName}

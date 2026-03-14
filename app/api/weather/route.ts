@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   fetchWeatherForLocation,
   getGameTimeForecast,
-  type WeatherData,
-  type GameTimeForecast
 } from '@/lib/weather/index';
 
 const HTTP_STATUS = {

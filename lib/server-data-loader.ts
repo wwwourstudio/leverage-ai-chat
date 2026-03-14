@@ -72,10 +72,20 @@ async function fetchUserInsights(userId?: string): Promise<{
     const supabase = await createClient();
     
     // Fetch user stats, preferences, and history in parallel
+    // Use maybeSingle() instead of single() so new users without rows get null (not 406)
     const [statsResult, preferencesResult] = await Promise.all([
-      supabase.from('user_stats').select('*').eq('user_id', userId).single(),
-      supabase.from('user_preferences').select('*').eq('user_id', userId).single(),
+      supabase.from('user_stats').select('*').eq('user_id', userId).maybeSingle(),
+      supabase.from('user_preferences').select('*').eq('user_id', userId).maybeSingle(),
     ]);
+
+    // Bootstrap missing user_stats row for new users so subsequent reads don't 406
+    if (!statsResult.data && !statsResult.error) {
+      await supabase.from('user_stats').insert({
+        user_id: userId,
+        chats_created: 0,
+        analyses_run: 0,
+      }).select().maybeSingle();
+    }
 
     const insights = {
       stats: statsResult.data || null,

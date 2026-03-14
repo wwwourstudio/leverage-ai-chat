@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { HTTP_STATUS, FANTASY_CONFIG } from '@/lib/constants';
 import { simulateDraftForward } from '@/lib/fantasy/draft/simulation-engine';
-import { buildDefaultProfiles, buildOpponentProfile } from '@/lib/fantasy/draft/opponent-model';
+import { buildDefaultProfiles } from '@/lib/fantasy/draft/opponent-model';
 import { calculateVBD } from '@/lib/fantasy/draft/vbd-calculator';
 import { detectTierCliffs } from '@/lib/fantasy/draft/tier-cliff-detector';
 import { calculateDraftRecommendations, getTopRecommendations } from '@/lib/fantasy/draft/draft-utility';
-import type { DraftState, FantasyProjection, PlayerWithVBD } from '@/lib/fantasy/types';
+import type { DraftState, FantasyProjection } from '@/lib/fantasy/types';
 
 // ============================================================================
 // POST /api/fantasy/draft/simulate — Run Monte Carlo draft simulation

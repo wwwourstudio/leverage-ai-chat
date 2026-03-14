@@ -15,23 +15,23 @@ export async function GET() {
       return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
     }
 
-    // Fetch in parallel — any missing tables return null gracefully
+    // Fetch in parallel — maybeSingle() returns null (not 406) when row is absent
     const [profileResult, prefsResult, statsResult] = await Promise.allSettled([
       supabase
         .from('user_profiles')
         .select('id, display_name, avatar_url, subscription_tier, credits_remaining, created_at')
         .eq('user_id', user.id)
-        .single(),
+        .maybeSingle(),
       supabase
         .from('user_preferences')
         .select('tracked_sports, preferred_books, bankroll, risk_tolerance, theme, email_notifications, push_notifications, odds_alerts, line_movement_alerts, custom_instructions, updated_at')
         .eq('user_id', user.id)
-        .single(),
+        .maybeSingle(),
       supabase
         .from('user_stats')
         .select('total_analyses, wins, losses, roi, favorite_sport, favorite_book')
         .eq('user_id', user.id)
-        .single(),
+        .maybeSingle(),
     ]);
 
     const profileData = profileResult.status === 'fulfilled' ? profileResult.value.data : null;
@@ -45,7 +45,7 @@ export async function GET() {
         .from('user_preferences')
         .select('arbitrage_alerts')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
       if (arbData && typeof arbData.arbitrage_alerts === 'boolean') {
         arbitrage_alerts = arbData.arbitrage_alerts;
       }

@@ -88,7 +88,9 @@ export async function POST(
       );
     }
 
-    // Verify thread ownership before inserting (belt-and-suspenders beyond RLS)
+    // Verify thread ownership before inserting (belt-and-suspenders beyond RLS).
+    // If the thread is missing (e.g. stale UUID from a deleted/migrated session),
+    // auto-create it so messages are never silently dropped.
     const { data: thread } = await supabase
       .from('chat_threads')
       .select('id')
@@ -97,10 +99,25 @@ export async function POST(
       .single();
 
     if (!thread) {
-      return NextResponse.json(
-        { success: false, error: 'Thread not found' },
-        { status: HTTP_STATUS.NOT_FOUND }
-      );
+      // Thread is missing — stale UUID from a deleted or migrated session.
+      // Auto-recreate it under the same UUID so the client state stays valid.
+      // ignoreDuplicates handles the race when two saveMessage calls (user +
+      // assistant) arrive simultaneously before the first insert commits.
+      const { error: createErr } = await supabase
+        .from('chat_threads')
+        .upsert(
+          { id, user_id: user.id, title: String(content).slice(0, 80) },
+          { onConflict: 'id', ignoreDuplicates: true }
+        );
+
+      if (createErr) {
+        console.error('[v0] [API/chats/messages] Could not recreate thread:', createErr);
+        return NextResponse.json(
+          { success: false, error: 'Thread not found' },
+          { status: HTTP_STATUS.NOT_FOUND }
+        );
+      }
+      console.log(`[v0] [API/chats/messages] Auto-recreated stale thread ${id} for user ${user.id}`);
     }
 
     const { data: message, error } = await supabase

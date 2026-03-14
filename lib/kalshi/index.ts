@@ -287,7 +287,7 @@ async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage
   // Check if we're in rate-limit cooldown before even trying
   const now = Date.now();
   if (rateLimitedUntil > now) {
-    console.log(`[KALSHI] Skipping request - rate limited for ${Math.ceil((rateLimitedUntil - now) / 1000)}s more`);
+    console.warn(`[KALSHI] Skipping request - rate limited for ${Math.ceil((rateLimitedUntil - now) / 1000)}s more`);
     return { markets: [], cursor: null };
   }
 
@@ -310,7 +310,7 @@ async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage
       // Handle 429 rate limiting — mark as rate-limited and return empty
       if (response.status === 429) {
         const retryAfter = response.headers.get('Retry-After');
-        const cooldownMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 60000; // Default 60s cooldown
+        const cooldownMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 15000; // Default 15s cooldown (was 60s)
         markRateLimited(cooldownMs);
         // Return empty instead of throwing — let caller handle gracefully
         return { markets: [], cursor: null };

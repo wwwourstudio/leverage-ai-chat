@@ -1031,6 +1031,12 @@ async function _generateContextualCards(
         markets = await fetchSportsMarkets();
       } else if (sub === 'politics' || sub === 'elections' || sub === 'election') {
         markets = await fetchElectionMarkets({ limit: count * 5 });
+        // Fallback: if election-specific fetch returns nothing (e.g. rate-limited),
+        // try a direct title search which uses a single request
+        if (markets.length === 0) {
+          const { fetchKalshiMarkets } = await import('@/lib/kalshi/index');
+          markets = await fetchKalshiMarkets({ search: 'senate election congress', limit: count * 3, useCache: true });
+        }
       } else if (sub === 'weather' || sub === 'climate') {
         markets = await fetchWeatherMarkets(count * 5);
       } else if (['financials', 'finance', 'economics', 'crypto', 'companies'].includes(sub)) {

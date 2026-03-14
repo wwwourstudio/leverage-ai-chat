@@ -6,6 +6,10 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // Explicitly mark adp-data-service and supabase as external for the browser bundle.
+  // This prevents any accidental client-side bundling of @supabase/supabase-js,
+  // which would cause HMR module factory errors in Turbopack.
+  serverExternalPackages: ['@supabase/supabase-js'],
   // Allow iframe embedding for v0 preview.
   // X-Frame-Options SAMEORIGIN is a legacy fallback — modern browsers use
   // Content-Security-Policy frame-ancestors (which takes precedence).

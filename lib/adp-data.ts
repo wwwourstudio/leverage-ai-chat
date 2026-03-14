@@ -7,7 +7,6 @@
  *
  * Cache TTL: 4 hours — NFBC updates ADP daily, so this is a good balance.
  */
-import 'server-only';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

@@ -184,7 +184,7 @@ export async function runRetraining(): Promise<{
     return { newVersion: null, brierImprovement: 0, deployed: false, rolledBack: false, resolvedCount: 0 };
   }
 
-  const eventIds = outcomes.map(o => o.event_id);
+  const eventIds = outcomes.map((o: any) => o.event_id);
   const { data: predictions } = await supabase
     .from('market_predictions')
     .select('event_id, predicted_probability')
@@ -195,7 +195,7 @@ export async function runRetraining(): Promise<{
   }
 
   // Build lookup for fast join
-  const predMap = new Map(predictions.map(p => [p.event_id, p.predicted_probability]));
+  const predMap = new Map<string, number>(predictions.map((p: any) => [p.event_id, p.predicted_probability as number]));
 
   // Compute Brier scores
   let brierSum = 0;

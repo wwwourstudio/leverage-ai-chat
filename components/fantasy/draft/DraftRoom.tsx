@@ -85,10 +85,10 @@ export function DraftRoom({
       if (data.success) {
         // Add pick to local state
         const newPick: DraftPick = data.pick;
-        setPicks(prev => [...prev, newPick]);
+        setPicks((prev: any) => [...prev, newPick]);
 
         // Remove player from available
-        setAvailablePlayers(prev => prev.filter(p => p.playerName !== playerName));
+        setAvailablePlayers((prev: any) => prev.filter((p: any) => p.playerName !== playerName));
 
         // Advance pick
         setCurrentPick(data.nextPick || currentPick + 1);
@@ -128,7 +128,7 @@ export function DraftRoom({
       {/* Tier cliff alerts */}
       {tierCliffs.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {tierCliffs.slice(0, 3).map((cliff, i) => (
+          {tierCliffs.slice(0, 3).map((cliff: any, i: any) => (
             <div
               key={i}
               className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-1.5 text-xs text-yellow-400"

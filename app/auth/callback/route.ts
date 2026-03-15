@@ -28,8 +28,8 @@ export async function GET(request: NextRequest) {
           getAll() {
             return cookieStore.getAll()
           },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
+          setAll(cookiesToSet: any) {
+            cookiesToSet.forEach(({ name, value, options }: { name: string; value: string; options: any }) =>
               cookieStore.set(name, value, options)
             )
           },

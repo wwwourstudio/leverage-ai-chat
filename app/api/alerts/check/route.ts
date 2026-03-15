@@ -47,7 +47,7 @@ export async function GET() {
     }
 
     // Filter out alerts that have already hit their max trigger count
-    const alerts = allAlerts.filter(a =>
+    const alerts = allAlerts.filter((a: any) =>
       a.max_triggers === null || a.trigger_count < a.max_triggers
     );
 

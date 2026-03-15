@@ -245,7 +245,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                     </button>
                     {message.trustMetrics && (
                       <button
-                        onClick={() => setShowTrust(v => !v)}
+                        onClick={() => setShowTrust((v: any) => !v)}
                         title="Trust metrics"
                         className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 transition-all"
                       >

@@ -278,7 +278,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
   const applySuggestion = (s: AiSuggestion) => {
     if (!s.action) return;
     const { field, value } = s.action;
-    setPrefs(p => ({ ...p, [field]: value }));
+    setPrefs((p: any) => ({ ...p, [field]: value }));
     toast.success(`Applied: ${s.title}`);
   };
 
@@ -320,7 +320,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
     >
       <div
         className="relative w-full md:max-w-2xl max-h-[92vh] md:max-h-[88vh] md:mx-4 bg-[oklch(0.10_0.015_280)] border border-[oklch(0.20_0.02_280)] rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slide-up md:animate-scale-in"
-        onClick={e => e.stopPropagation()}
+        onClick={(e: any) => e.stopPropagation()}
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-[oklch(0.18_0.015_280)]">
@@ -391,7 +391,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                         <input
                           type="text"
                           value={name}
-                          onChange={e => setName(e.target.value)}
+                          onChange={(e: any) => setName(e.target.value)}
                           placeholder="Your name"
                           className="w-full px-3 py-2 bg-[oklch(0.13_0.01_280)] border border-[oklch(0.22_0.01_280)] rounded-lg text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20 transition-all"
                         />
@@ -494,7 +494,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                         return (
                           <button
                             key={sport}
-                            onClick={() => setPrefs(p => ({ ...p, tracked_sports: toggleArrayItem(p.tracked_sports, sport) }))}
+                            onClick={() => setPrefs((p: any) => ({ ...p, tracked_sports: toggleArrayItem(p.tracked_sports, sport) }))}
                             className={cn(
                               'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all',
                               active
@@ -521,7 +521,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                         return (
                           <button
                             key={book}
-                            onClick={() => setPrefs(p => ({ ...p, preferred_books: toggleArrayItem(p.preferred_books, book) }))}
+                            onClick={() => setPrefs((p: any) => ({ ...p, preferred_books: toggleArrayItem(p.preferred_books, book) }))}
                             className={cn(
                               'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all',
                               active
@@ -546,7 +546,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                         min="0"
                         step="100"
                         value={prefs.bankroll || ''}
-                        onChange={e => setPrefs(p => ({ ...p, bankroll: parseFloat(e.target.value) || 0 }))}
+                        onChange={(e: any) => setPrefs((p: any) => ({ ...p, bankroll: parseFloat(e.target.value) || 0 }))}
                         placeholder="0"
                         className="w-full pl-7 pr-4 py-2.5 bg-[oklch(0.13_0.01_280)] border border-[oklch(0.22_0.01_280)] rounded-lg text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20 transition-all"
                       />
@@ -567,7 +567,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                         return (
                           <button
                             key={r.value}
-                            onClick={() => setPrefs(p => ({ ...p, risk_tolerance: r.value }))}
+                            onClick={() => setPrefs((p: any) => ({ ...p, risk_tolerance: r.value }))}
                             className={cn(
                               'flex-1 flex flex-col items-center gap-1 py-3 rounded-xl border text-xs font-semibold transition-all',
                               active ? cn(r.bg, r.border, r.color) : 'bg-[oklch(0.13_0.01_280)] text-gray-400 border-[oklch(0.22_0.01_280)] hover:border-gray-500',
@@ -591,7 +591,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                         return (
                           <button
                             key={t.value}
-                            onClick={() => setPrefs(p => ({ ...p, theme: t.value }))}
+                            onClick={() => setPrefs((p: any) => ({ ...p, theme: t.value }))}
                             className={cn(
                               'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-xs font-semibold transition-all',
                               active
@@ -620,7 +620,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                     <button
                       onClick={() => {
                         const allOn = NOTIFICATION_CONFIG.every(n => prefs[n.key]);
-                        setPrefs(p => ({
+                        setPrefs((p: any) => ({
                           ...p,
                           ...Object.fromEntries(NOTIFICATION_CONFIG.map(n => [n.key, !allOn])),
                         }));
@@ -647,7 +647,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                         </div>
                         <ToggleSwitch
                           checked={prefs[item.key]}
-                          onChange={v => setPrefs(p => ({ ...p, [item.key]: v }))}
+                          onChange={(v: any) => setPrefs((p: any) => ({ ...p, [item.key]: v }))}
                         />
                       </div>
                     );
@@ -741,7 +741,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
 
                     {!suggestLoading && suggestions.length > 0 && (
                       <div className="space-y-3">
-                        {suggestions.map(s => (
+                        {suggestions.map((s: any) => (
                           <div
                             key={s.id}
                             className="p-4 bg-[oklch(0.13_0.01_280)] rounded-xl border border-[oklch(0.22_0.01_280)] hover:border-purple-500/30 transition-colors"

@@ -7,6 +7,7 @@ import { CompactCard } from './CompactCard';
 import { cn } from '@/lib/utils';
 
 interface CardData {
+  id?: string;
   type: string;
   title: string;
   category: string;

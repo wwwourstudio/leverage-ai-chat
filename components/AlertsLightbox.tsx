@@ -251,7 +251,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
 
   const toggleAlert = async (alertId: string, isActive: boolean) => {
     // Optimistic update
-    setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, is_active: !isActive } : a));
+    setAlerts((prev: any) => prev.map((a: any) => a.id === alertId ? { ...a, is_active: !isActive } : a));
     try {
       const res = await fetch(`/api/alerts/${alertId}`, {
         method: 'PATCH',
@@ -260,13 +260,13 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
       });
       if (!res.ok) {
         // revert
-        setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, is_active: isActive } : a));
+        setAlerts((prev: any) => prev.map((a: any) => a.id === alertId ? { ...a, is_active: isActive } : a));
         toast.error('Failed to update alert');
       } else {
-        onAlertsCountChange?.(alerts.filter(a => a.id === alertId ? !isActive : a.is_active).length);
+        onAlertsCountChange?.(alerts.filter((a: any) => a.id === alertId ? !isActive : a.is_active).length);
       }
     } catch {
-      setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, is_active: isActive } : a));
+      setAlerts((prev: any) => prev.map((a: any) => a.id === alertId ? { ...a, is_active: isActive } : a));
     }
   };
 
@@ -275,9 +275,9 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
     try {
       const res = await fetch(`/api/alerts/${alertId}`, { method: 'DELETE' });
       if (res.ok) {
-        const updated = alerts.filter(a => a.id !== alertId);
+        const updated = alerts.filter((a: any) => a.id !== alertId);
         setAlerts(updated);
-        onAlertsCountChange?.(updated.filter(a => a.is_active).length);
+        onAlertsCountChange?.(updated.filter((a: any) => a.is_active).length);
         toast.success('Alert deleted');
       } else {
         toast.error('Failed to delete alert');
@@ -298,7 +298,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
         body: JSON.stringify({ trigger_count: 0 }),
       });
       if (res.ok) {
-        setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, trigger_count: 0, last_triggered_at: null } : a));
+        setAlerts((prev: any) => prev.map((a: any) => a.id === alertId ? { ...a, trigger_count: 0, last_triggered_at: null } : a));
         toast.success('Trigger count reset');
       } else {
         toast.error('Failed to reset');
@@ -340,7 +340,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
   };
 
   const applySuggestion = (suggestion: AiSuggestion) => {
-    setNewAlert(prev => ({
+    setNewAlert((prev: any) => ({
       ...prev,
       title: suggestion.title || prev.title,
       alert_type: suggestion.alert_type || prev.alert_type,
@@ -354,15 +354,15 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
 
   // ── Derived state ────────────────────────────────────────────────────────────
 
-  const filteredAlerts = alerts.filter(a => {
+  const filteredAlerts = alerts.filter((a: any) => {
     if (filterType && a.alert_type !== filterType) return false;
     if (filterStatus === 'active' && !a.is_active) return false;
     if (filterStatus === 'paused' && a.is_active) return false;
     return true;
   });
 
-  const activeCount = alerts.filter(a => a.is_active).length;
-  const triggeredCount = alerts.filter(a => a.trigger_count > 0).length;
+  const activeCount = alerts.filter((a: any) => a.is_active).length;
+  const triggeredCount = alerts.filter((a: any) => a.trigger_count > 0).length;
 
   const getTypeInfo = (type: string) => ALERT_TYPES.find(t => t.value === type) ?? ALERT_TYPES[0];
   const thresholdLabel = getThresholdLabel(newAlert.alert_type);
@@ -540,7 +540,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
 
               ) : (
                 <div className="space-y-2.5">
-                  {filteredAlerts.map(alert => {
+                  {filteredAlerts.map((alert: any) => {
                     const typeInfo = getTypeInfo(alert.alert_type);
                     const TypeIcon = typeInfo.icon;
                     const isDeleting = deletingId === alert.id;
@@ -693,7 +693,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                         return (
                           <button
                             key={type.value}
-                            onClick={() => setNewAlert(prev => ({ ...prev, alert_type: type.value }))}
+                            onClick={() => setNewAlert((prev: any) => ({ ...prev, alert_type: type.value }))}
                             className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                               selected
                                 ? `${type.bg} ${type.color} border ${type.border}`
@@ -716,12 +716,12 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                       <input
                         type="text"
                         value={newAlert.title}
-                        onChange={e => setNewAlert(prev => ({ ...prev, title: e.target.value }))}
+                        onChange={(e: any) => setNewAlert((prev: any) => ({ ...prev, title: e.target.value }))}
                         placeholder="e.g., Lakers spread moves 2+ points"
                         className="flex-1 px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
                         style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
-                        onFocus={e => (e.currentTarget.style.borderColor = 'oklch(0.45 0.18 260)')}
-                        onBlur={e => (e.currentTarget.style.borderColor = 'oklch(0.22 0.02 280)')}
+                        onFocus={(e: any) => (e.currentTarget.style.borderColor = 'oklch(0.45 0.18 260)')}
+                        onBlur={(e: any) => (e.currentTarget.style.borderColor = 'oklch(0.22 0.02 280)')}
                       />
                       <button
                         onClick={fetchAiSuggestion}
@@ -785,7 +785,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                       <label className="block text-xs font-bold text-gray-400 mb-1.5 uppercase tracking-wider">Sport</label>
                       <select
                         value={newAlert.sport}
-                        onChange={e => setNewAlert(prev => ({ ...prev, sport: e.target.value }))}
+                        onChange={(e: any) => setNewAlert((prev: any) => ({ ...prev, sport: e.target.value }))}
                         className="w-full px-3 py-2.5 rounded-xl text-white text-sm focus:outline-none transition-all"
                         style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
                       >
@@ -798,7 +798,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                       <input
                         type="text"
                         value={newAlert.team}
-                        onChange={e => setNewAlert(prev => ({ ...prev, team: e.target.value }))}
+                        onChange={(e: any) => setNewAlert((prev: any) => ({ ...prev, team: e.target.value }))}
                         placeholder="e.g., Lakers"
                         className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
                         style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
@@ -809,7 +809,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                       <input
                         type="text"
                         value={newAlert.player}
-                        onChange={e => setNewAlert(prev => ({ ...prev, player: e.target.value }))}
+                        onChange={(e: any) => setNewAlert((prev: any) => ({ ...prev, player: e.target.value }))}
                         placeholder="e.g., LeBron"
                         className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
                         style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
@@ -828,7 +828,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                         step="0.5"
                         min="0"
                         value={newAlert.threshold}
-                        onChange={e => setNewAlert(prev => ({ ...prev, threshold: e.target.value }))}
+                        onChange={(e: any) => setNewAlert((prev: any) => ({ ...prev, threshold: e.target.value }))}
                         placeholder="Leave blank to trigger on any change"
                         className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
                         style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
@@ -842,7 +842,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                     <input
                       type="text"
                       value={newAlert.description}
-                      onChange={e => setNewAlert(prev => ({ ...prev, description: e.target.value }))}
+                      onChange={(e: any) => setNewAlert((prev: any) => ({ ...prev, description: e.target.value }))}
                       placeholder="Any additional context"
                       className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
                       style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
@@ -856,7 +856,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                       {MAX_TRIGGERS_OPTIONS.map(opt => (
                         <button
                           key={opt.value}
-                          onClick={() => setNewAlert(prev => ({ ...prev, max_triggers: opt.value }))}
+                          onClick={() => setNewAlert((prev: any) => ({ ...prev, max_triggers: opt.value }))}
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                             newAlert.max_triggers === opt.value
                               ? 'bg-blue-600/20 text-blue-400 border border-blue-500/40'

@@ -175,7 +175,7 @@ export function ChatInput({
             <input
               type="text"
               value={input}
-              onChange={e => onInputChange(e.target.value)}
+              onChange={(e: any) => onInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={placeholder ?? defaultPlaceholder}
               className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[oklch(0.28_0.02_280)] focus:border-blue-500/40 rounded-2xl px-3 py-2.5 md:px-6 md:pr-32 font-medium text-white placeholder-[var(--text-faint)] focus:outline-none transition-all backdrop-blur-sm shadow-inner text-xs md:text-base"

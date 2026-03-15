@@ -44,14 +44,14 @@ export async function seedProjectionsFromSupabase(sport: Sport, season: number):
     if (error || !data?.length) return 0;
 
     const players: GenericProjection[] = data
-      .map(row => ({
+      .map((row: any) => ({
         name: row.player_name ?? '',
         team: (row.stats as Record<string, string> | null)?.team ?? '',
         pos:  row.position ?? '',
         pts:  (row.fantasy_points as number) ?? 0,
         adp:  (row.adp as number) ?? 999,
       }))
-      .filter(p => p.name.length > 0);
+      .filter((p: GenericProjection) => p.name.length > 0);
 
     if (players.length > 0) {
       seedProjectionsCache(sport, season, players);

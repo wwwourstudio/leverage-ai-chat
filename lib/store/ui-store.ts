@@ -44,7 +44,7 @@ interface UIState {
   closeModal: () => void;
 }
 
-export const useUIStore = create<UIState>((set) => ({
+export const useUIStore = create<UIState>((set: any) => ({
   // ── Initial state ──────────────────────────────────────────────────────────
   sidebarOpen: false, // corrected to true on desktop by useEffect in consuming components
   chatSearch: '',
@@ -55,15 +55,15 @@ export const useUIStore = create<UIState>((set) => ({
   activeModal: 'none',
 
   // ── Sidebar actions ────────────────────────────────────────────────────────
-  setSidebarOpen: (open) => set({ sidebarOpen: open }),
-  toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
-  setChatSearch: (q) => set({ chatSearch: q }),
-  setSelectedCategory: (c) => set({ selectedCategory: c }),
-  setSelectedSport: (s) => set({ selectedSport: s }),
-  setEditingChatId: (id) => set({ editingChatId: id }),
-  setEditingChatTitle: (title) => set({ editingChatTitle: title }),
+  setSidebarOpen: (open: boolean) => set({ sidebarOpen: open }),
+  toggleSidebar: () => set((s: UIState) => ({ sidebarOpen: !s.sidebarOpen })),
+  setChatSearch: (q: string) => set({ chatSearch: q }),
+  setSelectedCategory: (c: string) => set({ selectedCategory: c }),
+  setSelectedSport: (s: string) => set({ selectedSport: s }),
+  setEditingChatId: (id: string | null) => set({ editingChatId: id }),
+  setEditingChatTitle: (title: string) => set({ editingChatTitle: title }),
 
   // ── Modal actions ──────────────────────────────────────────────────────────
-  openModal: (modal) => set({ activeModal: modal }),
+  openModal: (modal: ActiveModal) => set({ activeModal: modal }),
   closeModal: () => set({ activeModal: 'none' }),
 }));

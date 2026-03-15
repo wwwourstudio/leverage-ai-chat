@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
         .select('player_name')
         .in('team_id', teamIds);
 
-      const rosteredNames = new Set((allRosters || []).map((r: any) => r.player_name));
+      const rosteredNames = new Set<string>((allRosters || []).map((r: any) => r.player_name as string));
 
       // Map projections to typed objects
       const mappedProjections = (projections || []).map((p: any) => ({
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
           tier,
           sport: league.sport,
           rosterSize: myRoster.length,
-          availablePlayers: mappedProjections.filter(p => !rosteredNames.has(p.playerName)).length,
+          availablePlayers: mappedProjections.filter((p: any) => !rosteredNames.has(p.playerName)).length,
         },
       });
     }

@@ -449,11 +449,11 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
         <div className="flex items-center justify-between mb-2">
           <label className="block text-xs font-semibold text-[oklch(0.55_0.01_280)] uppercase tracking-wider">Roster Slots</label>
           <span className="text-[10px] text-[oklch(0.40_0.01_280)]">
-            {Object.values(form.rosterSlots).reduce((a, b) => a + b, 0)} total spots
+            {Object.values(form.rosterSlots).reduce((a: number, b: number) => a + b, 0)} total spots
           </span>
         </div>
         <div className="grid grid-cols-2 gap-1.5 max-h-[240px] overflow-y-auto pr-1">
-          {Object.entries(form.rosterSlots).map(([pos, count]) => (
+          {(Object.entries(form.rosterSlots) as [string, number][]).map(([pos, count]) => (
             <div key={pos} className="flex items-center justify-between rounded-lg border border-[oklch(0.18_0.015_280)] bg-[oklch(0.10_0.01_280)] px-2.5 py-1.5">
               <span className="text-xs font-bold text-[oklch(0.75_0.01_280)]">{pos}</span>
               <div className="flex items-center gap-1.5">

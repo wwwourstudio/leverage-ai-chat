@@ -305,7 +305,7 @@ function KellyCalculator({
         <input
           type="number"
           value={bankroll}
-          onChange={e => onBankrollChange(parseFloat(e.target.value) || 1000)}
+          onChange={(e: any) => onBankrollChange(parseFloat(e.target.value) || 1000)}
           className="w-full bg-transparent text-white text-sm font-black tabular-nums focus:outline-none"
           min={1}
         />
@@ -317,20 +317,20 @@ function KellyCalculator({
         <input
           placeholder="Label (e.g. Lakers ML)"
           value={newLabel}
-          onChange={e => setNewLabel(e.target.value)}
+          onChange={(e: any) => setNewLabel(e.target.value)}
           className="w-full bg-[oklch(0.07_0.01_280)] border border-[oklch(0.16_0.015_280)] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-[oklch(0.35_0.01_280)] focus:outline-none focus:border-blue-500/50"
         />
         <div className="flex gap-2">
           <input
             placeholder="Odds (e.g. -180)"
             value={newOdds}
-            onChange={e => setNewOdds(e.target.value)}
+            onChange={(e: any) => setNewOdds(e.target.value)}
             className="flex-1 bg-[oklch(0.07_0.01_280)] border border-[oklch(0.16_0.015_280)] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-[oklch(0.35_0.01_280)] focus:outline-none focus:border-blue-500/50"
           />
           <input
             placeholder="Win % (e.g. 58)"
             value={newProb}
-            onChange={e => setNewProb(e.target.value)}
+            onChange={(e: any) => setNewProb(e.target.value)}
             className="flex-1 bg-[oklch(0.07_0.01_280)] border border-[oklch(0.16_0.015_280)] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-[oklch(0.35_0.01_280)] focus:outline-none focus:border-blue-500/50"
           />
         </div>
@@ -759,7 +759,7 @@ export default function TradingPage() {
         const newPositions: TrackedPosition[] = (data.data.portfolio.positions as any[])
           .filter((p: any) => p.edge > 0)
           .map((p: any) => {
-            const leg = legs.find(l => l.id === p.legId);
+            const leg = legs.find((l: any) => l.id === p.legId);
             return {
               id: p.legId,
               label: p.label,
@@ -769,9 +769,9 @@ export default function TradingPage() {
               addedAt: new Date().toISOString(),
             };
           });
-        setPositions(prev => {
-          const ids = new Set(prev.map(p => p.id));
-          return [...prev, ...newPositions.filter(p => !ids.has(p.id))];
+        setPositions((prev: any) => {
+          const ids = new Set(prev.map((p: any) => p.id));
+          return [...prev, ...newPositions.filter((p: any) => !ids.has(p.id))];
         });
       }
     } catch { /* non-critical */ }
@@ -790,10 +790,10 @@ export default function TradingPage() {
   };
 
   const handleAddLeg = (leg: BetLeg) => {
-    setLegs(prev => prev.some(l => l.id === leg.id) ? prev : [...prev, leg]);
+    setLegs((prev: any) => prev.some((l: any) => l.id === leg.id) ? prev : [...prev, leg]);
   };
   const handleRemoveLeg = (id: string) => {
-    setLegs(prev => prev.filter(l => l.id !== id));
+    setLegs((prev: any) => prev.filter((l: any) => l.id !== id));
   };
 
   return (

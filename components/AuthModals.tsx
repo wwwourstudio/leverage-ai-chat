@@ -133,7 +133,7 @@ export function AuthModals({
         >
           <div
             className="relative w-full md:max-w-md md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto animate-slide-up md:animate-scale-in"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e: any) => e.stopPropagation()}
           >
             <button
               onClick={() => setShowLoginModal(false)}
@@ -156,7 +156,7 @@ export function AuthModals({
                   <input
                     type="email"
                     value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
+                    onChange={(e: any) => setLoginEmail(e.target.value)}
                     placeholder="your@email.com"
                     className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
@@ -167,8 +167,8 @@ export function AuthModals({
                   <input
                     type="password"
                     value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                    onChange={(e: any) => setLoginPassword(e.target.value)}
+                    onKeyDown={(e: any) => e.key === 'Enter' && handleLogin()}
                     placeholder="Enter password"
                     className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
@@ -223,7 +223,7 @@ export function AuthModals({
         >
           <div
             className="relative w-full md:max-w-md md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto animate-slide-up md:animate-scale-in"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e: any) => e.stopPropagation()}
           >
             <button
               onClick={() => setShowSignupModal(false)}
@@ -246,7 +246,7 @@ export function AuthModals({
                   <input
                     type="text"
                     value={signupName}
-                    onChange={(e) => setSignupName(e.target.value)}
+                    onChange={(e: any) => setSignupName(e.target.value)}
                     placeholder="John Doe"
                     className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
@@ -257,7 +257,7 @@ export function AuthModals({
                   <input
                     type="email"
                     value={signupEmail}
-                    onChange={(e) => setSignupEmail(e.target.value)}
+                    onChange={(e: any) => setSignupEmail(e.target.value)}
                     placeholder="your@email.com"
                     className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
@@ -268,8 +268,8 @@ export function AuthModals({
                   <input
                     type="password"
                     value={signupPassword}
-                    onChange={(e) => setSignupPassword(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSignup()}
+                    onChange={(e: any) => setSignupPassword(e.target.value)}
+                    onKeyDown={(e: any) => e.key === 'Enter' && handleSignup()}
                     placeholder="Create a password"
                     className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />

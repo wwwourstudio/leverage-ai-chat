@@ -6,7 +6,13 @@
  * survives warm serverless invocations (cold-start cost ≈ 1 network round-trip).
  *
  * Cache TTL: 4 hours — NFBC updates ADP daily, so this is a good balance.
+ *
+ * SERVER ONLY — this module uses SUPABASE_SERVICE_ROLE_KEY and must never be
+ * imported in client components. The 'server-only' guard below enforces this
+ * at build time and eliminates the "Multiple GoTrueClient instances" browser warning
+ * caused by a second Supabase client being instantiated in the browser bundle.
  */
+import 'server-only';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -304,31 +310,17 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 // Uses the service role key (bypasses RLS) so no user session is needed.
 // Falls back silently — persistence failures never break the ADP tool.
 
-// On the server we need the service-role client (raw createClient from @supabase/supabase-js)
-// because we want to bypass RLS. On the client we MUST reuse the shared browser singleton
-// from lib/supabase/client.ts — creating a second GoTrueClient in the browser causes the
-// "Multiple GoTrueClient instances detected" warning and potential auth state corruption.
-const _GLOBAL_KEY = '__adpSupabaseClient__';
+// Module-level singleton — one client per server process, never in the browser.
+let _adpSupabaseClient: ReturnType<typeof import('@supabase/supabase-js').createClient> | null = null;
 
 async function getADPSupabaseClient() {
-  const g = globalThis as Record<string, unknown>;
-  if (g[_GLOBAL_KEY]) return g[_GLOBAL_KEY] as ReturnType<typeof import('@supabase/supabase-js').createClient>;
-
+  if (_adpSupabaseClient) return _adpSupabaseClient;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
-
-  // In the browser, reuse the existing singleton to avoid spawning a second GoTrueClient.
-  if (typeof window !== 'undefined') {
-    const { createClient: createBrowserClient } = await import('@/lib/supabase/client');
-    g[_GLOBAL_KEY] = createBrowserClient();
-    return g[_GLOBAL_KEY] as ReturnType<typeof import('@supabase/supabase-js').createClient>;
-  }
-
-  // Server-side: create a service-role client (bypasses RLS, never touches the browser).
   const { createClient } = await import('@supabase/supabase-js');
-  g[_GLOBAL_KEY] = createClient(url, key, { db: { schema: 'api' } });
-  return g[_GLOBAL_KEY] as ReturnType<typeof import('@supabase/supabase-js').createClient>;
+  _adpSupabaseClient = createClient(url, key, { db: { schema: 'api' } });
+  return _adpSupabaseClient;
 }
 
 export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): Promise<void> {

@@ -689,10 +689,13 @@ export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
 /**
  * Fetch election-related markets from Kalshi.
  *
- * Uses a single cached API call (search="election") to avoid hammering the
- * rate-limit with the previous 7-strategy sequential loop.  Any additional
- * passes only run when the first fetch genuinely returns nothing, and each
- * subsequent search is cache-keyed independently so re-renders are free.
+ * Strategy (least → most API calls):
+ *   1. Try a single `search="election"` fetch (cached, 5 min TTL).
+ *   2. If that returns 0 or 429s, fall back to a generic no-search fetch
+ *      (same request the "trending" path makes) and filter client-side.
+ *      This is cache-coalesced with any concurrent trending fetch, so in
+ *      the common case it costs 0 extra API calls.
+ *   3. Only if both above fail do we try `search="senate"` as a last resort.
  */
 export async function fetchElectionMarkets(options?: {
   year?: number;
@@ -705,7 +708,7 @@ export async function fetchElectionMarkets(options?: {
   const ELECTION_KEYWORDS = [
     'election', 'senate', 'house', 'congress', 'midterm',
     'governor', 'president', 'harris', 'trump', 'republican',
-    'democrat', 'ballot', 'primary', 'gop',
+    'democrat', 'ballot', 'primary', 'gop', 'vote', 'political',
   ];
 
   function isElectionMarket(market: KalshiMarket): boolean {
@@ -724,39 +727,54 @@ export async function fetchElectionMarkets(options?: {
     }
   }
 
-  // ── Primary fetch: single cached request for "election" keyword ──────────
-  // This replaces the previous 7-sequential-search loop that reliably
-  // triggered 429s when the cache was cold.
+  // ── Step 1: targeted search (single API call, cached) ───────────────────
   try {
     const primary = await fetchKalshiMarkets({
       search: 'election',
       limit: 100,
       useCache: true,
-      cacheTtlMs: 300_000, // 5 min
+      cacheTtlMs: 300_000,
     });
     collect(primary);
+    console.log(`[KALSHI] fetchElectionMarkets: targeted search yielded ${primary.length} raw / ${electionMarkets.length} filtered`);
   } catch (err) {
-    console.warn('[KALSHI] fetchElectionMarkets: primary fetch failed:', (err as Error).message);
+    console.warn('[KALSHI] fetchElectionMarkets: targeted search failed:', (err as Error).message);
   }
 
-  // ── Secondary fetch: "senate" / "congress" only when primary yields < 5 ──
-  // Each of these is independently cached so subsequent renders are free.
-  if (electionMarkets.length < 5) {
-    const fallbackSearches = ['senate', 'congress'];
-    for (const search of fallbackSearches) {
-      if (electionMarkets.length >= limit) break;
-      await sleep(400); // respect rate limit between searches
-      try {
-        const extra = await fetchKalshiMarkets({
-          search,
-          limit: 50,
-          useCache: true,
-          cacheTtlMs: 300_000,
-        });
-        collect(extra);
-      } catch {
-        // non-critical
-      }
+  // ── Step 2: broad no-search fallback (cache-coalesced with trending) ─────
+  // This fires only when Step 1 gives fewer than 3 useful markets.  It reuses
+  // the same cache key as the "trending" (no subcategory) path, so when both
+  // run in the same Lambda invocation we get a cache hit and zero extra HTTP calls.
+  if (electionMarkets.length < 3) {
+    console.log('[KALSHI] fetchElectionMarkets: < 3 from targeted search, trying broad fallback...');
+    try {
+      const broad = await fetchKalshiMarkets({
+        status: 'open',
+        limit: 50,
+        useCache: true,
+        cacheTtlMs: 300_000,
+      });
+      collect(broad);
+      console.log(`[KALSHI] fetchElectionMarkets: broad fallback yielded ${broad.length} raw / ${electionMarkets.length} total filtered`);
+    } catch (err) {
+      console.warn('[KALSHI] fetchElectionMarkets: broad fallback failed:', (err as Error).message);
+    }
+  }
+
+  // ── Step 3: last-resort single-term search ───────────────────────────────
+  if (electionMarkets.length < 3) {
+    console.log('[KALSHI] fetchElectionMarkets: still < 3, trying senate search as last resort...');
+    await sleep(400);
+    try {
+      const extra = await fetchKalshiMarkets({
+        search: 'senate',
+        limit: 50,
+        useCache: true,
+        cacheTtlMs: 300_000,
+      });
+      collect(extra);
+    } catch {
+      // non-critical
     }
   }
 

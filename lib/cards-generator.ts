@@ -1032,6 +1032,23 @@ async function _generateContextualCards(
         markets = await fetchSportsMarkets();
       } else if (sub === 'politics' || sub === 'elections' || sub === 'election') {
         markets = await fetchElectionMarkets({ limit: count * 5 });
+        // If targeted election fetch returned nothing (e.g. rate-limited), fall back
+        // to the same broad trending fetch and filter client-side — zero extra API calls
+        // when the trending path already ran in this Lambda invocation.
+        if (markets.length === 0) {
+          console.log('[v0] [CARDS-GEN] Election fetch returned 0 — falling back to broad fetch with client-side filter');
+          const ELECTION_KW = ['election', 'senate', 'house', 'congress', 'president', 'governor', 'midterm', 'ballot', 'vote', 'gop', 'democrat', 'republican', 'political', 'trump', 'harris'];
+          const broad = await fetchKalshiMarketsWithRetry({ status: 'open', limit: 50, maxRetries: 2 });
+          markets = broad.filter((m: any) => {
+            const text = `${m.title ?? ''} ${m.category ?? ''} ${m.subtitle ?? ''}`.toLowerCase();
+            return ELECTION_KW.some(kw => text.includes(kw));
+          });
+          // If still nothing, just show the top broad markets so the UI isn't blank
+          if (markets.length === 0 && broad.length > 0) {
+            console.log('[v0] [CARDS-GEN] No election matches in broad fetch — showing top trending Kalshi markets');
+            markets = broad;
+          }
+        }
       } else if (sub === 'weather' || sub === 'climate') {
         markets = await fetchWeatherMarkets(count * 5);
       } else if (['financials', 'finance', 'economics', 'crypto', 'companies'].includes(sub)) {

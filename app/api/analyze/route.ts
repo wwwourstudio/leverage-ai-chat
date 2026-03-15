@@ -757,16 +757,20 @@ export async function POST(request: NextRequest) {
       async start(controller) {
         try {
           if (xaiApiKey) {
-            // 25s covers grok-3-fast plain text (3–8s) and tool-call round-trips (8–15s).
-            const primaryTimeoutMs = 25_000;
+            const usesTools = hasADPIntent || hasMLBProjectionIntent || isMLBStatcastMode;
+            // For tool-call paths, don't apply a first-token timer: textStream yields
+            // no tokens until the full tool round-trip completes (model call → tool
+            // execution → second model call), which legitimately takes 10–20s.
+            // A first-token timer on that path fires prematurely and causes the timeout.
+            // For plain-text paths, 20s is generous for grok-3-fast (typical: 2–5s).
             const abortCtrl = new AbortController();
-
-            // Start the abort timer BEFORE calling streamText so the full connection
-            // establishment time is included in the budget.
-            const firstTokenTimer = setTimeout(
-              () => abortCtrl.abort(new Error('Primary timeout')),
-              primaryTimeoutMs,
-            );
+            let firstTokenTimer: ReturnType<typeof setTimeout> | null = null;
+            if (!usesTools) {
+              firstTokenTimer = setTimeout(
+                () => abortCtrl.abort(new Error('Primary timeout')),
+                20_000,
+              );
+            }
 
             // streamText returns immediately; tokens arrive via textStream async iterable
             const streamResult = streamText({
@@ -785,11 +789,11 @@ export async function POST(request: NextRequest) {
             try {
               let gotFirstToken = false;
               for await (const delta of streamResult.textStream) {
-                if (!gotFirstToken) { gotFirstToken = true; clearTimeout(firstTokenTimer); }
+                if (!gotFirstToken) { gotFirstToken = true; if (firstTokenTimer) clearTimeout(firstTokenTimer); }
                 aiText += delta;
                 controller.enqueue(sseChunk({ type: 'text', delta }));
               }
-              clearTimeout(firstTokenTimer);
+              if (firstTokenTimer) clearTimeout(firstTokenTimer);
               modelUsed = AI_CONFIG.FAST_MODEL_DISPLAY_NAME;
 
               // ── Capture token usage ────────────────────────────────────────────

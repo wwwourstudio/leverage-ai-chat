@@ -129,10 +129,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Per-AI-call timeouts (independent from each other and from card generation):
-  //   grok-3-fast primary: 20s | grok-4 ADP power path: 35s | fallback: 12s
-  const PRIMARY_TIMEOUT_MS = (usePowerPath: boolean) => usePowerPath ? 35000 : 20000;
-
   try {
     const body: AnalyzeRequestBody = await request.json();
     const { userMessage, existingCards = [], context = {}, customInstructions } = body;
@@ -761,8 +757,18 @@ export async function POST(request: NextRequest) {
       async start(controller) {
         try {
           if (xaiApiKey) {
-            const primaryTimeoutMs = PRIMARY_TIMEOUT_MS(usePowerPath);
+            const usesTools = hasADPIntent || hasMLBProjectionIntent || isMLBStatcastMode;
+            // For tool-call paths the model makes a round-trip (call → execute → response)
+            // so we allow more time. For plain text paths 20s is generous for grok-3-fast.
+            const primaryTimeoutMs = usePowerPath ? 35_000 : usesTools ? 40_000 : 20_000;
             const abortCtrl = new AbortController();
+
+            // Start the abort timer BEFORE calling streamText so the full connection
+            // establishment time is included in the budget.
+            const firstTokenTimer = setTimeout(
+              () => abortCtrl.abort(new Error('Primary timeout')),
+              primaryTimeoutMs,
+            );
 
             // streamText returns immediately; tokens arrive via textStream async iterable
             const streamResult = streamText({
@@ -777,9 +783,6 @@ export async function POST(request: NextRequest) {
               ...(hasMLBProjectionIntent && { tools: { query_mlb_projections: mlbProjectionTool }, stopWhen: stepCountIs(3) }),
               ...(!hasMLBProjectionIntent && isMLBStatcastMode && { tools: { query_statcast: statcastTool }, stopWhen: stepCountIs(3) }),
             });
-
-            // Abort if the first token doesn't arrive within the timeout budget
-            const firstTokenTimer = setTimeout(() => abortCtrl.abort(new Error('Primary timeout')), primaryTimeoutMs);
 
             try {
               let gotFirstToken = false;

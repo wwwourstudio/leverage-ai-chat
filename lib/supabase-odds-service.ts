@@ -225,7 +225,8 @@ export class SupabaseOddsService {
         return false;
       }
     } catch (err) {
-      // Network or other transient error -- non-blocking
+      // Network or other transient error — log and continue (non-blocking)
+      console.warn(`[Supabase] storeSportOdds transient error (${tableName}):`, err instanceof Error ? err.message : err);
       return false;
     }
     return true;

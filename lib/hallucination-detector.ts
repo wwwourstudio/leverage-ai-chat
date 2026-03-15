@@ -45,9 +45,12 @@ export interface HallucinationReport {
 
 // ── Number extraction ────────────────────────────────────────────────────────
 
+const MAX_NUMBERS_FOR_BENFORD = 500; // prevent excessive processing on large responses
+
 function extractAllNumbers(text: string): number[] {
   const tokens = text.match(/-?\d+(?:\.\d+)?/g) ?? [];
   return tokens
+    .slice(0, MAX_NUMBERS_FOR_BENFORD)
     .map(Number)
     .filter((n) => !isNaN(n) && n !== 0 && Math.abs(n) < 1_000_000);
 }

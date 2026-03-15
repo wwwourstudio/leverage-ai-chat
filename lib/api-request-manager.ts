@@ -130,30 +130,38 @@ export class RequestQueue {
 
     this.processing = true;
 
-    while (this.queue.length > 0) {
-      // Wait if we've hit concurrent limit
-      while (this.activeRequests >= this.maxConcurrent) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+    try {
+      while (this.queue.length > 0) {
+        // Wait if we've hit concurrent limit
+        while (this.activeRequests >= this.maxConcurrent) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        const item = this.queue.shift();
+        if (!item) break;
+
+        // Acquire rate limit token
+        await this.rateLimiter.acquire();
+
+        this.activeRequests++;
+
+        // Execute request without blocking queue processing.
+        // .catch() suppresses the re-throw from inside execute() — the error is
+        // already forwarded to the caller via reject(), so leaving it unhandled
+        // here causes a spurious unhandled-rejection crash in Node 15+.
+        item.execute().catch(() => { /* handled via reject() */ }).finally(() => {
+          this.activeRequests--;
+        });
       }
-
-      const item = this.queue.shift();
-      if (!item) break;
-
-      // Acquire rate limit token
-      await this.rateLimiter.acquire();
-
-      this.activeRequests++;
-      
-      // Execute request without blocking queue processing.
-      // .catch() suppresses the re-throw from inside execute() — the error is
-      // already forwarded to the caller via reject(), so leaving it unhandled
-      // here causes a spurious unhandled-rejection crash in Node 15+.
-      item.execute().catch(() => { /* handled via reject() */ }).finally(() => {
-        this.activeRequests--;
-      });
+    } finally {
+      // Reset flag BEFORE checking for remaining items so any items enqueued
+      // during the await above are not orphaned.
+      this.processing = false;
+      // If items arrived between the last loop check and the flag reset, process them now.
+      if (this.queue.length > 0) {
+        void this.processQueue();
+      }
     }
-
-    this.processing = false;
   }
 
   getQueueLength(): number {

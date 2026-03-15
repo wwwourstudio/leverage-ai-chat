@@ -3,7 +3,6 @@
  * Provides request tracing, performance monitoring, and alerting hooks
  */
 
-import { headers } from 'next/headers';
 
 export enum LogLevel {
   DEBUG = 'debug',
@@ -56,7 +55,6 @@ interface LogEntry {
 
 class Logger {
   private static instance: Logger;
-  private requestIdCounter = 0;
   
   // Performance thresholds (in ms)
   private performanceThresholds: Record<string, PerformanceThreshold> = {
@@ -77,12 +75,11 @@ class Logger {
   }
 
   /**
-   * Generate or retrieve request ID for tracing
-   * Note: headers() is async in Next.js 16 but we call this synchronously,
-   * so we generate a fallback ID and let headers be resolved elsewhere if needed
+   * Generate a unique request ID for tracing.
+   * Uses crypto.randomUUID() for guaranteed uniqueness.
    */
   private getRequestId(): string {
-    return `req_${Date.now()}_${++this.requestIdCounter}`;
+    return crypto.randomUUID();
   }
 
   /**

@@ -106,9 +106,19 @@ function shouldUseFastModel(
 const _rateMap = new Map<string, { count: number; resetAt: number }>();
 const _RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const _RATE_LIMIT = 30; // requests per IP per window
+const _RATE_MAP_MAX_SIZE = 10_000; // prevent unbounded growth from unique IPs
 
 function _checkRateLimit(ip: string): boolean {
   const now = Date.now();
+
+  // Periodically prune expired entries to prevent unbounded memory growth.
+  // Only runs when map is large to minimize overhead on every request.
+  if (_rateMap.size > _RATE_MAP_MAX_SIZE) {
+    for (const [key, val] of _rateMap) {
+      if (now > val.resetAt) _rateMap.delete(key);
+    }
+  }
+
   const entry = _rateMap.get(ip);
   if (!entry || now > entry.resetAt) {
     _rateMap.set(ip, { count: 1, resetAt: now + _RATE_WINDOW_MS });

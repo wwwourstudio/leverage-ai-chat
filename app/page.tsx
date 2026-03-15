@@ -14,7 +14,7 @@ import { Suspense } from 'react';
 import { loadServerData, type ServerDataResult } from '@/lib/server-data-loader';
 import { logEnvValidation, validateServerEnv } from '@/lib/config';
 import { CardGrid } from '@/components/data-cards/CardSkeleton';
-import UnifiedAIPlatform from '@/app/unified-platform';
+import UnifiedAIPlatform from '@/app/page-client';
 
 export type ServerDataProps = ServerDataResult;
 

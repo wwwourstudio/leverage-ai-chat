@@ -986,7 +986,6 @@ export async function POST(request: NextRequest) {
 
           // MLB Statcast: parse Grok's JSON response into a card
           if (isMLBStatcastMode && !usedFallback && !skipStatcastJSON) {
-            console.log('[v0] MLB parse block — raw aiText first 300:', aiText.slice(0, 300));
             // Strip markdown code fences the model sometimes emits despite instructions
             const stripped = aiText
               .replace(/^```(?:json)?\s*/m, '')

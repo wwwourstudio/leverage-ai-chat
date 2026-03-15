@@ -1,11 +1,11 @@
 'use client';
 
-interface DatabaseStatusBannerProps {
+export interface DatabaseStatusBannerProps {
   onDismiss?: () => void;
 }
 
-// This banner is permanently suppressed — the /api/insights health-check route
-// is not required for core app functionality and was causing JSON parse errors.
+// Permanently suppressed. The /api/insights health-check was returning HTML
+// instead of JSON and causing SyntaxError crashes on every page load.
 export function DatabaseStatusBanner(_props: DatabaseStatusBannerProps) {
   return null;
 }

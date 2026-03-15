@@ -23,20 +23,10 @@
         "name": "next"
       }
     ],
-    "typeRoots": [
-      "./node_modules/.pnpm/@types+node@22.19.11/node_modules/@types",
-      "./node_modules/.pnpm/@types+react@19.2.14/node_modules/@types",
-      "./node_modules/.pnpm/@types+react-dom@19.2.3_@types+react@19.2.14/node_modules/@types"
-    ],
     "paths": {
       "@/*": [
         "./*"
-      ],
-      "react": ["./node_modules/.pnpm/@types+react@19.2.14/node_modules/@types/react/index.d.ts"],
-      "react/jsx-runtime": ["./node_modules/.pnpm/@types+react@19.2.14/node_modules/@types/react/jsx-runtime.d.ts"],
-      "react/jsx-dev-runtime": ["./node_modules/.pnpm/@types+react@19.2.14/node_modules/@types/react/jsx-dev-runtime.d.ts"],
-      "@supabase/supabase-js": ["./node_modules/.pnpm/@supabase+supabase-js@2.97.0/node_modules/@supabase/supabase-js/dist/module/index.d.ts"],
-      "@ai-sdk/xai": ["./node_modules/.pnpm/@ai-sdk+xai@3.0.57_zod@3.25.76/node_modules/@ai-sdk/xai/dist/index.d.ts"]
+      ]
     }
   },
   "include": [

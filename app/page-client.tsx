@@ -3054,8 +3054,6 @@ No preamble. Start directly with section 1.`;
           onOpenAlerts={() => setShowAlertsLightbox(true)}
           alertCount={alertCount}
           onOpenSettings={() => setShowSettingsLightbox(true)}
-          onOpenIntelPanel={() => setShowIntelPanel((v: any) => !v)}
-          intelPanelOpen={showIntelPanel}
           onOpenLogin={() => setShowLoginModal(true)}
           onOpenSignup={() => setShowSignupModal(true)}
         />

@@ -75,8 +75,6 @@ function shouldUseFastModel(
   context: AnalyzeRequestBody['context'],
 ): boolean {
   const lower = userMessage.toLowerCase();
-  const dfsKeywords = ['dfs', 'daily fantasy', 'draftkings lineup', 'fanduel lineup', 'optimal lineup'];
-  if (dfsKeywords.some(k => lower.includes(k))) return true;
   if (context?.hasFantasyIntent && !context?.hasBettingIntent) return true;
   if (userMessage.includes('[File:')) return true;   // CSV / file upload
   if (context?.noGamesAvailable) return true;         // off-season
@@ -520,7 +518,7 @@ export async function POST(request: NextRequest) {
       // response always has data cards rather than falling back to empty.
       cardPromise = Promise.race([
         generateContextualCards(category, context.sport ?? undefined, 6, false, context.kalshiSubcategory),
-        new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 5000)),
+        new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 10000)),
       ]).catch(() => []);
     }
     // ── AI generation starts now (concurrently with card generation above) ──────
@@ -792,7 +790,7 @@ export async function POST(request: NextRequest) {
                 controller.enqueue(sseChunk({ type: 'text', delta }));
               }
               clearTimeout(firstTokenTimer);
-              modelUsed = useFastPath ? 'Grok 3 Mini' : AI_CONFIG.MODEL_DISPLAY_NAME;
+              modelUsed = useFastPath ? AI_CONFIG.FAST_MODEL_DISPLAY_NAME : AI_CONFIG.MODEL_DISPLAY_NAME;
 
               // ── Capture token usage ────────────────────────────────────────────
               try {
@@ -943,7 +941,7 @@ export async function POST(request: NextRequest) {
                   maxRetries: 0,
                 });
                 aiText = fallbackResult.text;
-                modelUsed = alreadyFast ? `${AI_CONFIG.MODEL_DISPLAY_NAME} (fallback)` : 'Grok 3 Mini (fallback)';
+                modelUsed = alreadyFast ? `${AI_CONFIG.MODEL_DISPLAY_NAME} (fallback)` : `${AI_CONFIG.FAST_MODEL_DISPLAY_NAME} (fallback)`;
                 console.log(`[API/analyze] Fallback succeeded with ${actualFallbackModel}`);
                 controller.enqueue(sseChunk({ type: 'text', delta: aiText }));
               } catch (fallbackErr) {

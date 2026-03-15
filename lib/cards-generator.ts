@@ -1083,7 +1083,7 @@ async function _generateContextualCards(
           topMarkets.slice(0, 3).map((m: any) =>
             Promise.race([
               fetchMarketOrderbook(m.ticker),
-              new Promise<null>(resolve => setTimeout(() => resolve(null), 5000)),
+              new Promise<null>(resolve => setTimeout(() => resolve(null), 1500)),
             ])
           )
         );

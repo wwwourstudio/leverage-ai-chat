@@ -23,13 +23,22 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
         return null;
       });
       
-      if (!response) {
-        // API route doesn't exist or network error
+      if (!response || !response.ok) {
+        // API route doesn't exist (404) or other non-2xx — treat as client-only mode
         setStatus('connected');
         setMessage('Running in client-only mode');
         setTimeout(() => {
           setDismissed(true);
         }, 2000);
+        return;
+      }
+
+      const contentType = response.headers.get('content-type') ?? '';
+      if (!contentType.includes('application/json')) {
+        // Route exists but returned HTML (e.g. dev error page) — treat as client-only
+        setStatus('connected');
+        setMessage('Running in client-only mode');
+        setTimeout(() => { setDismissed(true); }, 2000);
         return;
       }
 

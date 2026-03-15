@@ -359,6 +359,10 @@ export async function fetchKalshiMarkets(params?: {
       const { markets: meaningfulMarkets } = await fetchKalshiPage(queryParams);
 
       console.log(`[KALSHI] Fetched ${meaningfulMarkets.length} meaningful markets`);
+      // Never cache an empty result — re-throw so unstable_cache doesn't poison future calls.
+      if (meaningfulMarkets.length === 0 && !cursor) {
+        throw new Error('Kalshi returned 0 markets — not caching empty result');
+      }
       return meaningfulMarkets;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
@@ -368,7 +372,8 @@ export async function fetchKalshiMarkets(params?: {
       } else {
         console.error(`[KALSHI] ❌ Failed to fetch markets: ${err.message}${cause ? ` (cause: ${cause.code ?? cause.message ?? cause})` : ''}`);
       }
-      return [];
+      // Re-throw so unstable_cache does NOT store the failure — callers handle []
+      throw err;
     }
   };
 
@@ -384,9 +389,16 @@ export async function fetchKalshiMarkets(params?: {
     return pending;
   }
 
-  const promise = withKalshiCache(cacheKey, doFetch, cacheTtlSec).finally(() => {
-    pendingRequests.delete(cacheKey);
-  });
+  const promise = withKalshiCache(cacheKey, doFetch, cacheTtlSec)
+    .catch((err: Error) => {
+      // doFetch throws on 429 / empty results so unstable_cache skips caching the failure.
+      // Return [] to the caller so the page renders gracefully without crashing.
+      console.log(`[KALSHI] Cache miss / error for key ${cacheKey}: ${err.message}`);
+      return [] as KalshiMarket[];
+    })
+    .finally(() => {
+      pendingRequests.delete(cacheKey);
+    });
   pendingRequests.set(cacheKey, promise);
   return promise;
 }
@@ -402,15 +414,6 @@ export async function fetchAllKalshiMarkets(options?: {
   useCache?: boolean;
 }): Promise<KalshiMarket[]> {
   const { maxMarkets = 2000, status = 'open', useCache = true } = options || {};
-
-  const cacheKey = `kalshi:all:${status}:${maxMarkets}`;
-  if (useCache) {
-    const cached = getCachedMarkets(cacheKey);
-    if (cached) {
-      console.log(`[KALSHI] All-markets cache hit: ${cached.length} markets`);
-      return cached;
-    }
-  }
 
   console.log(`[KALSHI] Fetching ALL markets (cap: ${maxMarkets})...`);
 
@@ -446,7 +449,8 @@ export async function fetchAllKalshiMarkets(options?: {
   console.log(`[KALSHI] Done — ${all.length} markets, ${categories.length} categories: ${categories.slice(0, 15).join(', ')}`);
 
   if (useCache && all.length > 0) {
-    cacheMarkets(cacheKey, all, 120000); // 2-min cache for full fetch
+    // Note: full-market pagination uses the per-page unstable_cache in fetchKalshiMarkets;
+    // no separate caching needed here.
   }
 
   return all;
@@ -486,10 +490,15 @@ export async function fetchKalshiMarketsWithRetry(params?: {
     } catch (error) {
       console.error(`[KALSHI] Attempt ${attempt} failed:`, error);
 
-      // Permanent failures won't succeed on retry — abort immediately
       const msg = error instanceof Error ? error.message : String(error);
       const cause = (error as any)?.cause;
       const errCode = cause?.code ?? '';
+
+      // 429 is already retried with backoff inside fetchKalshiPage — don't re-retry here
+      if (msg.includes('429') || msg.includes('Too Many Requests')) {
+        console.error('[KALSHI] Rate limit hit — not retrying at this layer');
+        return [];
+      }
       if (msg.includes('401') || msg.includes('Unauthorized')) {
         console.error('[KALSHI] Auth failure (401) — aborting retries');
         return [];
@@ -498,7 +507,7 @@ export async function fetchKalshiMarketsWithRetry(params?: {
         console.error('[KALSHI] DNS failure (ENOTFOUND) — aborting retries');
         return [];
       }
-
+      // "0 markets" throw — brief backoff then retry
       if (attempt < maxRetries) {
         const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
         console.log(`[KALSHI] Retrying in ${backoffMs}ms...`);

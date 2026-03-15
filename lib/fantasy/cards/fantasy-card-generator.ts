@@ -16,7 +16,6 @@
 
 import type { InsightCard } from '@/lib/cards-generator';
 import { getProjections, currentSeasonFor } from '@/lib/fantasy/projections-cache';
-import { getADPData, type NFBCPlayer } from '@/lib/adp-data';
 
 // ============================================================================
 // Archived 2025 NFL season data (PPR, final season projections)
@@ -722,7 +721,7 @@ function mapNFBCPos(positions: string): string {
  * pts is synthesised from overall rank (rank 1 ≈ 55, rank 120 ≈ 7) so VBD
  * comparisons are rank-accurate relative to one another.
  */
-function buildMLBFromNFBC(players: NFBCPlayer[]): GenericPlayer[] {
+function buildMLBFromNFBC(players: { name: string; adp: number; pos?: string; team?: string; [key: string]: unknown }[]): GenericPlayer[] {
   return players.map(p => ({
     name: p.displayName,
     team: p.team || 'MLB',
@@ -886,6 +885,9 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
     let mlbPlayers: GenericPlayer[] = MLB_PROJECTIONS_2025;
     let isNFBCData = false;
     try {
+      // Dynamic import keeps adp-data.ts (server-only) out of the client bundle's
+      // static module graph while still allowing server-side usage.
+      const { getADPData } = await import('@/lib/adp-data');
       const nfbcPlayers = await getADPData();
       if (nfbcPlayers.length > 10) {
         mlbPlayers = buildMLBFromNFBC(nfbcPlayers);

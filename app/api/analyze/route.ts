@@ -541,7 +541,7 @@ export async function POST(request: NextRequest) {
     // Card types that can come from the MLB_ANALYSIS_ADDENDUM JSON output
     const STATCAST_CARD_TYPES = new Set([
       'statcast_summary_card', 'hr_prop_card', 'game_simulation_card',
-      'leaderboard_card', 'pitch_analysis_card',
+      'leaderboard_card', 'pitch_analysis_card', 'mlb_projection_card',
     ]);
 
     const _MAX_HALLUCINATION_RETRIES = 2; // reserved for future retry logic
@@ -1039,7 +1039,14 @@ export async function POST(request: NextRequest) {
               // Replace the raw JSON the client already received with readable prose
               controller.enqueue(sseChunk({ type: 'replace', text: cleanText }));
             } else {
-              console.warn('[API/analyze] MLB JSON parse failed — model output did not match expected card schema. Raw length:', aiText.length, 'Candidates tried:', candidates.length);
+              const parsedType = parsed?.type ?? 'no-type';
+              console.warn(
+                '[API/analyze] MLB JSON parse failed — type not in STATCAST_CARD_TYPES.',
+                'Got type:', parsedType,
+                '| Valid types:', [...STATCAST_CARD_TYPES].join(', '),
+                '| Raw length:', aiText.length,
+                '| First 200 chars:', aiText.slice(0, 200),
+              );
             }
           }
 

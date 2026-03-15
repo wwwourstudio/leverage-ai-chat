@@ -305,7 +305,8 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 // Falls back silently — persistence failures never break the ADP tool.
 
 // Module-level singleton — prevents "Multiple GoTrueClient instances" warning
-let _adpSupabase: ReturnType<(typeof import('@supabase/supabase-js'))['createClient']> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _adpSupabase: any = null;
 
 async function getADPSupabaseClient() {
   if (_adpSupabase) return _adpSupabase;

@@ -24,6 +24,7 @@ const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ 
 import { TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, MessageSquare, Clock, Star, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, X, CheckCheck, AlertTriangle, BarChart, Info, FileText, ImageIcon, Loader2 } from 'lucide-react';
 import { CardLayout } from '@/components/data-cards/CardLayout';
 import { CardAnalysisSkeleton } from '@/components/data-cards/CardSkeleton';
+import { DatabaseStatusBanner } from '@/components/database-status-banner';
 import { TrustMetricsDisplay } from '@/components/trust-metrics-display';
 import { AIProgressIndicator } from '@/components/ai-progress-indicator';
 const SettingsLightbox = dynamic(() => import('@/components/SettingsLightbox').then(m => ({ default: m.SettingsLightbox })), { ssr: false });
@@ -3076,6 +3077,7 @@ No preamble. Start directly with section 1.`;
           }}
         >
           <div className="max-w-5xl mx-auto space-y-6">
+            <DatabaseStatusBanner />
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-full min-h-[400px]">
                 <div className="text-center space-y-4">

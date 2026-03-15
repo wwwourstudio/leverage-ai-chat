@@ -54,6 +54,30 @@ const marketCache = new Map<string, CacheEntry>();
 const pendingRequests = new Map<string, Promise<KalshiMarket[]>>();
 
 /**
+ * Global Kalshi request limiter — ensures a minimum gap between API calls to avoid 429s.
+ * All fetchKalshiPage calls are serialized through this queue.
+ * Minimum gap: 400ms between requests (Kalshi allows ~2-3 req/s publicly).
+ */
+const MIN_REQUEST_GAP_MS = 400;
+let lastRequestTime = 0;
+let requestQueue: Promise<void> = Promise.resolve();
+
+function throttledRequest<T>(fn: () => Promise<T>): Promise<T> {
+  const result = requestQueue.then(async () => {
+    const now = Date.now();
+    const gap = now - lastRequestTime;
+    if (gap < MIN_REQUEST_GAP_MS) {
+      await new Promise(r => setTimeout(r, MIN_REQUEST_GAP_MS - gap));
+    }
+    lastRequestTime = Date.now();
+    return fn();
+  });
+  // Advance the queue independently of the result so the next call always waits
+  requestQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
+/**
  * Generate cache key from parameters
  */
 function getCacheKey(params?: {
@@ -247,82 +271,74 @@ function parseMarket(m: any): KalshiMarket {
 
 /**
  * Fetch a single page of markets with 429-aware retry logic.
- * Uses a single endpoint (both TRADING_URL and FALLBACK_URL are the same host).
+ * All requests are serialized through a global throttle queue (min 400ms gap).
  * On 429, waits with exponential backoff + jitter before retrying (up to 3 attempts).
  */
 async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage> {
   const url = `${KALSHI_TRADING_URL}/markets?${queryParams}`;
   const MAX_ATTEMPTS = 3;
 
-  let lastError: Error | null = null;
-
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    try {
-      const response = await fetch(url, {
+    // Run through the global throttle queue — ensures minimum gap between all API calls
+    const response = await throttledRequest(() =>
+      fetch(url, {
         headers: buildHeaders(url),
         signal: AbortSignal.timeout(15000),
+      })
+    );
+
+    if (response.status === 429) {
+      const retryAfterSec = Number(response.headers.get('Retry-After') ?? 0);
+      // Exponential backoff: 2s, 4s, 8s — larger than the previous 1s/2s/4s because
+      // the throttle queue already adds 400ms between calls; if we still hit 429 we need
+      // a meaningful cooldown.
+      const baseDelay = retryAfterSec > 0
+        ? retryAfterSec * 1000
+        : Math.min(2000 * 2 ** attempt, 10000);
+      const jitter = Math.random() * 1000;
+      const waitMs = Math.round(baseDelay + jitter);
+      const host = new URL(url).hostname;
+      const errorText = await response.text().catch(() => '');
+      console.error(`[KALSHI] API error 429 at ${host} — ${errorText.substring(0, 200)}`);
+      if (attempt < MAX_ATTEMPTS - 1) {
+        console.log(`[KALSHI] Rate limited — waiting ${waitMs}ms before retry ${attempt + 1}/${MAX_ATTEMPTS - 1}`);
+        await new Promise(r => setTimeout(r, waitMs));
+        continue; // retry
+      }
+      // All retries exhausted
+      throw new Error(`Kalshi API error: 429 Too Many Requests`);
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      const host = new URL(url).hostname;
+      console.error(`[KALSHI] API error ${response.status} at ${host} — ${errorText.substring(0, 200)}`);
+      throw new Error(`Kalshi API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.markets || !Array.isArray(data.markets)) {
+      console.warn('[KALSHI] Unexpected response format, keys:', Object.keys(data).join(', '));
+      return { markets: [], cursor: null };
+    }
+
+    // Reject titles shorter than 10 chars or that look like raw ticker symbols
+    // (all-caps + digits + dashes/dots/%, e.g. "KXBT-25DEC25-T45000")
+    const TICKER_RE = /^[A-Z0-9\-\.%]+$/;
+    const markets = data.markets
+      .map(parseMarket)
+      .filter((m: KalshiMarket) => {
+        if (!m.title || m.title.length < 10) return false;
+        if (TICKER_RE.test(m.title)) return false;
+        return true;
       });
 
-      if (response.status === 429) {
-        // Respect Retry-After header when present; otherwise use exponential backoff + jitter.
-        const retryAfterSec = Number(response.headers.get('Retry-After') ?? 0);
-        const baseDelay = retryAfterSec > 0
-          ? retryAfterSec * 1000
-          : Math.min(1000 * 2 ** attempt, 8000); // 1s, 2s, 4s
-        const jitter = Math.random() * 500;
-        const waitMs = Math.round(baseDelay + jitter);
-        const host = new URL(url).hostname;
-        const errorText = await response.text().catch(() => '');
-        console.error(`[KALSHI] API error 429 at ${host} — ${errorText.substring(0, 200)}`);
-        console.log(`[KALSHI] Rate limited — waiting ${waitMs}ms before retry ${attempt + 1}/${MAX_ATTEMPTS - 1}`);
-        lastError = new Error(`Kalshi API error: 429 Too Many Requests`);
-        if (attempt < MAX_ATTEMPTS - 1) {
-          await new Promise(r => setTimeout(r, waitMs));
-        }
-        continue;
-      }
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        const host = new URL(url).hostname;
-        console.error(`[KALSHI] API error ${response.status} at ${host} — ${errorText.substring(0, 200)}`);
-        throw new Error(`Kalshi API error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      if (!data.markets || !Array.isArray(data.markets)) {
-        console.warn('[KALSHI] Unexpected response format, keys:', Object.keys(data).join(', '));
-        return { markets: [], cursor: null };
-      }
-
-      // Reject titles shorter than 10 chars or that look like raw ticker symbols
-      // (all-caps + digits + dashes/dots/%, e.g. "KXBT-25DEC25-T45000")
-      const TICKER_RE = /^[A-Z0-9\-\.%]+$/;
-      const markets = data.markets
-        .map(parseMarket)
-        .filter((m: KalshiMarket) => {
-          if (!m.title || m.title.length < 10) return false;
-          if (TICKER_RE.test(m.title)) return false;
-          return true;
-        });
-
-      const cursor = data.cursor && data.cursor !== '' ? data.cursor : null;
-      return { markets, cursor };
-    } catch (err) {
-      // Don't swallow 429 errors we already logged above
-      if (lastError?.message.includes('429')) throw lastError;
-
-      const cause = (err as any)?.cause;
-      const errCode = cause?.code ?? '';
-      console.warn(`[KALSHI] Request failed: ${(err as Error).message}${cause ? ` (${errCode || cause.message || cause})` : ''}`);
-      lastError = err as Error;
-      // DNS / network failure — no point retrying
-      if (errCode === 'ENOTFOUND' || errCode === 'EAI_AGAIN') break;
-    }
+    const cursor = data.cursor && data.cursor !== '' ? data.cursor : null;
+    return { markets, cursor };
   }
 
-  throw lastError ?? new Error('Kalshi endpoint failed after retries');
+  throw new Error('Kalshi endpoint failed after retries');
 }
 
 /**
@@ -658,32 +674,21 @@ export async function fetchElectionMarkets(options?: {
     return ELECTION_KEYWORDS.some(k => text.includes(k)) || text.includes(year.toString());
   }
 
-  // Apply the election filter INSIDE the collection loop so the early-break
-  // condition (`electionMarkets.length >= limit`) counts only matching markets,
-  // not raw API results.  The Kalshi `title` search param does not reliably act
-  // as a substring filter — it often returns the top-50 open markets regardless —
-  // so we must filter client-side before deciding whether to try the next strategy.
+  // Reduced to 3 broad searches (was 7) — each goes through the global throttle queue
+  // (400ms minimum gap), so 7 searches was generating ~3 req/s and reliably hitting 429s.
+  // These 3 terms cover all meaningful election content on Kalshi.
   const searchStrategies: Array<Parameters<typeof fetchKalshiMarkets>[0]> = [
-    { search: `senate ${year}` },
-    { search: `house ${year}` },
-    { search: `governor ${year}` },
-    { search: 'midterm' },
-    { category: 'politics' },
-    { search: `election ${year}` },
+    { search: 'election' },
+    { search: 'senate' },
     { search: 'congress' },
   ];
 
   const seen = new Set<string>();
   const electionMarkets: KalshiMarket[] = [];
-  // 300ms between sequential API calls to avoid exceeding Kalshi's rate limit.
-  const STRATEGY_DELAY_MS = 300;
+  // No manual delay needed — fetchKalshiPage routes through throttledRequest automatically.
 
   for (let si = 0; si < searchStrategies.length; si++) {
     if (electionMarkets.length >= limit) break;
-
-    if (si > 0) {
-      await new Promise(r => setTimeout(r, STRATEGY_DELAY_MS));
-    }
 
     const strategy = searchStrategies[si];
     const markets = await fetchKalshiMarkets({ ...strategy, limit: 50 });
@@ -754,10 +759,14 @@ export async function fetchWeatherMarkets(limit: number = 50): Promise<KalshiMar
  * Fetch finance/economics markets from Kalshi
  */
 export async function fetchFinanceMarkets(limit: number = 50): Promise<KalshiMarket[]> {
+  // Reduced to 5 broad terms (was 14). The throttle queue serializes all API calls
+  // with a 400ms minimum gap, so fewer terms = fewer requests = no 429s.
   const financeSearches = [
-    'stock', 'S&P', 'NASDAQ', 'bitcoin', 'ethereum', 'crypto',
-    'interest rate', 'federal reserve', 'inflation', 'GDP',
-    'recession', 'unemployment', 'economic', 'treasury',
+    'stock market',
+    'bitcoin',
+    'interest rate',
+    'inflation',
+    'economic',
   ];
 
   const seen = new Set<string>();
@@ -765,28 +774,20 @@ export async function fetchFinanceMarkets(limit: number = 50): Promise<KalshiMar
 
   console.log('[KALSHI] Fetching finance markets...');
 
-  const batchSize = 3; // Reduced from 5 to limit burst request count
-  const FINANCE_BATCH_DELAY_MS = 500; // 500ms between batches to stay under Kalshi rate limit
-  for (let i = 0; i < financeSearches.length; i += batchSize) {
-    const batch = financeSearches.slice(i, i + batchSize);
-    const results = await Promise.allSettled(
-      batch.map(search => fetchKalshiMarkets({ search, limit: 50, useCache: true }))
-    );
-
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        for (const market of result.value) {
-          if (!seen.has(market.ticker)) {
-            seen.add(market.ticker);
-            all.push(market);
-          }
+  // Sequential (not batched) — the throttle queue in fetchKalshiPage already enforces
+  // 400ms between requests; running them in parallel would defeat that protection.
+  for (const search of financeSearches) {
+    if (all.length >= limit) break;
+    try {
+      const markets = await fetchKalshiMarkets({ search, limit: 50, useCache: true, cacheTtlMs: 300_000 });
+      for (const market of markets) {
+        if (!seen.has(market.ticker)) {
+          seen.add(market.ticker);
+          all.push(market);
         }
       }
-    }
-
-    // Pause between batches (skip after the final batch) to avoid 429s
-    if (i + batchSize < financeSearches.length) {
-      await new Promise(r => setTimeout(r, FINANCE_BATCH_DELAY_MS));
+    } catch {
+      // Non-critical — skip this search term
     }
   }
 
@@ -796,24 +797,21 @@ export async function fetchFinanceMarkets(limit: number = 50): Promise<KalshiMar
 
 /**
  * Fetch all markets across all categories. Returns categorized results.
+ * Runs sequentially (not parallel) so the throttle queue stays effective.
  */
 export async function fetchAllCategoryMarkets(): Promise<Record<string, KalshiMarket[]>> {
   console.log('[KALSHI] Fetching all category markets...');
 
-  const [sports, elections, weather, finance] = await Promise.allSettled([
-    fetchSportsMarkets(),
-    fetchElectionMarkets({ limit: 50 }),
-    fetchWeatherMarkets(),
-    fetchFinanceMarkets(),
-  ]);
-
-  const result: Record<string, KalshiMarket[]> = {
-    sports: sports.status === 'fulfilled' ? sports.value : [],
-    elections: elections.status === 'fulfilled' ? elections.value : [],
-    weather: weather.status === 'fulfilled' ? weather.value : [],
-    finance: finance.status === 'fulfilled' ? finance.value : [],
+  const safeCall = async <T>(fn: () => Promise<T>, fallback: T): Promise<T> => {
+    try { return await fn(); } catch { return fallback; }
   };
 
+  const sports    = await safeCall(() => fetchSportsMarkets(),              []);
+  const elections = await safeCall(() => fetchElectionMarkets({ limit: 50 }), []);
+  const weather   = await safeCall(() => fetchWeatherMarkets(),             []);
+  const finance   = await safeCall(() => fetchFinanceMarkets(),             []);
+
+  const result: Record<string, KalshiMarket[]> = { sports, elections, weather, finance };
   const total = Object.values(result).reduce((sum, arr) => sum + arr.length, 0);
   console.log(`[KALSHI] All categories total: ${total} markets`);
 

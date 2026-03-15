@@ -15,13 +15,13 @@ export const MLB_SEASON_YEAR: number = _currentMLBSeason();
 export const NFBC_DRAFT_YEAR: number = new Date().getFullYear();
 
 // AI Model Configuration
-// Primary model: grok-3-fast — fast, capable model for all sports/betting/fantasy analysis.
-// Power model: grok-4 — reserved for ADP tool-calling queries that need deeper reasoning.
+// Primary model: grok-3-mini — fast, cheap, supports functions/structured output.
+// Power model: grok-4 — used as fallback when primary stream fails.
 export const AI_CONFIG = {
-  MODEL_NAME: 'grok-3-fast',
-  FAST_MODEL_NAME: 'grok-3-fast',
-  MODEL_DISPLAY_NAME: 'Grok 3 Fast',
-  FAST_MODEL_DISPLAY_NAME: 'Grok 3 Fast',
+  MODEL_NAME: 'grok-3-mini',
+  FAST_MODEL_NAME: 'grok-3-mini',
+  MODEL_DISPLAY_NAME: 'Grok 3 Mini',
+  FAST_MODEL_DISPLAY_NAME: 'Grok 3 Mini',
   POWER_MODEL_NAME: 'grok-4',
   POWER_MODEL_DISPLAY_NAME: 'Grok 4',
   PROVIDER: 'xAI',

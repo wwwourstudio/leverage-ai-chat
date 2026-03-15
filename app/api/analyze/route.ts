@@ -23,6 +23,7 @@ import { detectHallucinations } from '@/lib/hallucination-detector';
 import { getGrokApiKey } from '@/lib/config';
 import { logger, LogCategory } from '@/lib/logger';
 import { getMarketIntelligenceSummary } from '@/lib/market-intelligence';
+import { extractMLBJson } from '@/lib/utils/mlb-json-parser';
 
 // ============================================================================
 // Types
@@ -979,30 +980,49 @@ export async function POST(request: NextRequest) {
 
           // MLB Statcast: parse Grok's JSON response into a card
           if (isMLBStatcastMode && !usedFallback && !skipStatcastJSON) {
-            const jsonMatch = aiText.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
+            // Try all candidate JSON blocks (non-greedy) so we don't merge multiple objects
+            const jsonCandidates = [...aiText.matchAll(/\{[\s\S]*?\}/g)].map(m => m[0]);
+            // Also include the full span as a last-resort candidate
+            const fullSpanMatch = aiText.match(/\{[\s\S]*\}/);
+            if (fullSpanMatch) jsonCandidates.push(fullSpanMatch[0]);
+
+            let parsedStatcast: Record<string, unknown> | null = null;
+            for (const candidate of jsonCandidates) {
               try {
-                const parsed = JSON.parse(jsonMatch[0]);
-                if (parsed && typeof parsed.type === 'string' && STATCAST_CARD_TYPES.has(parsed.type)) {
-                  const statcastCard: InsightCard = { icon: '⚾', ...parsed };
-                  cards = [statcastCard, ...cards.slice(0, 5)];
-                  pendingStatcastCard = null;
-                  const metricLines = (parsed.summary_metrics ?? [])
-                    .slice(0, 3)
-                    .map((m: { label: string; value: string }) => `**${m.label}:** ${m.value}`)
-                    .join(' · ');
-                  const cleanText = [
-                    `**${parsed.title}** — MLB Statcast Analysis`,
-                    metricLines,
-                    'See the card below for the full breakdown and splits.',
-                  ].filter(Boolean).join('\n');
-                  aiText = cleanText;
-                  // Replace the raw JSON the client already received with readable prose
-                  controller.enqueue(sseChunk({ type: 'replace', text: cleanText }));
+                const p = JSON.parse(candidate) as Record<string, unknown>;
+                if (p && typeof p.type === 'string' && STATCAST_CARD_TYPES.has(p.type)) {
+                  parsedStatcast = p;
+                  break;
                 }
               } catch {
-                console.warn('[API/analyze] MLB JSON parse failed — returning raw text');
+                // try next candidate
               }
+            }
+
+            if (parsedStatcast) {
+              const statcastCard: InsightCard = { icon: '⚾', ...parsedStatcast };
+              cards = [statcastCard, ...cards.slice(0, 5)];
+              pendingStatcastCard = null;
+              const metricLines = ((parsedStatcast.summary_metrics as { label: string; value: string }[] | undefined) ?? [])
+                .slice(0, 3)
+                .map((m: { label: string; value: string }) => `**${m.label}:** ${m.value}`)
+                .join(' · ');
+              const cleanText = [
+                `**${parsedStatcast.title}** — MLB Statcast Analysis`,
+                metricLines,
+                'See the card below for the full breakdown and splits.',
+              ].filter(Boolean).join('\n');
+              aiText = cleanText;
+              // Replace the raw JSON the client already received with readable prose
+              controller.enqueue(sseChunk({ type: 'replace', text: cleanText }));
+            } else {
+              // Grok returned markdown/text instead of JSON — extract structured fields
+              const mlbAnalysis = extractMLBJson(aiText);
+              logger.warn(LogCategory.API, '[API/analyze] MLB JSON parse fell back to text extraction', {
+                pick: mlbAnalysis.pick,
+                book: mlbAnalysis.book,
+                odds: mlbAnalysis.odds,
+              });
             }
           }
 

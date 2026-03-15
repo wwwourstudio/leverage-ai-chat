@@ -24,7 +24,6 @@ const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ 
 import { TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, MessageSquare, Clock, Star, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, X, CheckCheck, AlertTriangle, BarChart, Info, FileText, ImageIcon, Loader2 } from 'lucide-react';
 import { CardLayout } from '@/components/data-cards/CardLayout';
 import { CardAnalysisSkeleton } from '@/components/data-cards/CardSkeleton';
-import { DatabaseStatusBanner } from '@/components/database-status-banner';
 import { TrustMetricsDisplay } from '@/components/trust-metrics-display';
 import { AIProgressIndicator } from '@/components/ai-progress-indicator';
 const SettingsLightbox = dynamic(() => import('@/components/SettingsLightbox').then(m => ({ default: m.SettingsLightbox })), { ssr: false });
@@ -3088,7 +3087,8 @@ No preamble. Start directly with section 1.`;
                 </div>
               </div>
             ) : (
-              messages.map((message, index) => {
+              <>
+              {messages.map((message, index) => {
                 // Group messages: Check if this message is from same sender as previous
                 const prevMessage = index > 0 ? messages[index - 1] : null;
                 const isGrouped = prevMessage && prevMessage.role === message.role;
@@ -3753,6 +3753,8 @@ No preamble. Start directly with section 1.`;
               </div>
             );
           })
+              }
+              </>
         )}
 
       {isTyping && (

@@ -1,23 +1,27 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Database, AlertCircle, CheckCircle2, ExternalLink, X, Loader2 } from 'lucide-react';
+import React from 'react';
 
 interface DatabaseStatusBannerProps {
   onDismiss?: () => void;
 }
 
-export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
-  const [status, setStatus] = useState<'checking' | 'connected' | 'missing-schema' | 'error'>('checking');
-  const [dismissed, setDismissed] = useState(false);
-  const [message, setMessage] = useState('');
+// The /api/insights route is not needed for core app functionality.
+// This banner is permanently suppressed to avoid noisy fetch errors on mount.
+export function DatabaseStatusBanner(_props: DatabaseStatusBannerProps) {
+  return null;
+}
 
-  useEffect(() => {
-    // The /api/insights route does not exist in this project.
-    // Skip the check entirely and treat as client-only mode.
-    setStatus('connected');
-    setDismissed(true);
-  }, []);
+interface DatabaseStatusBannerProps {
+  onDismiss?: () => void;
+}
+
+// The /api/insights route is not needed for core app functionality.
+// This banner is permanently suppressed to avoid noisy fetch errors on mount.
+export function DatabaseStatusBanner(_props: DatabaseStatusBannerProps) {
+  return null;
+}
+
 
   const handleDismiss = () => {
     setDismissed(true);

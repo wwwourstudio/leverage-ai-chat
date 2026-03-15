@@ -687,7 +687,12 @@ export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
 }
 
 /**
- * Fetch election-related markets from Kalshi
+ * Fetch election-related markets from Kalshi.
+ *
+ * Uses a single cached API call (search="election") to avoid hammering the
+ * rate-limit with the previous 7-strategy sequential loop.  Any additional
+ * passes only run when the first fetch genuinely returns nothing, and each
+ * subsequent search is cache-keyed independently so re-renders are free.
  */
 export async function fetchElectionMarkets(options?: {
   year?: number;
@@ -708,54 +713,50 @@ export async function fetchElectionMarkets(options?: {
     return ELECTION_KEYWORDS.some(k => text.includes(k)) || text.includes(year.toString());
   }
 
-  // Apply the election filter INSIDE the collection loop so the early-break
-  // condition (`electionMarkets.length >= limit`) counts only matching markets,
-  // not raw API results.  The Kalshi `title` search param does not reliably act
-  // as a substring filter — it often returns the top-50 open markets regardless —
-  // so we must filter client-side before deciding whether to try the next strategy.
-  const searchStrategies: Array<Parameters<typeof fetchKalshiMarkets>[0]> = [
-    { search: `senate ${year}` },
-    { search: `house ${year}` },
-    { search: `governor ${year}` },
-    { search: 'midterm' },
-    { category: 'politics' },
-    { search: `election ${year}` },
-    { search: 'congress' },
-  ];
-
   const seen = new Set<string>();
   const electionMarkets: KalshiMarket[] = [];
 
-  for (let i = 0; i < searchStrategies.length; i++) {
-    if (electionMarkets.length >= limit) break;
-
-    // Brief pause between sequential strategy calls to avoid rate limiting
-    if (i > 0) await sleep(300);
-
-    const markets = await fetchKalshiMarkets({ ...searchStrategies[i], limit: 50 });
-
+  function collect(markets: KalshiMarket[]): void {
     for (const market of markets) {
       if (seen.has(market.ticker)) continue;
       seen.add(market.ticker);
-      if (isElectionMarket(market)) {
-        electionMarkets.push(market);
-      }
+      if (isElectionMarket(market)) electionMarkets.push(market);
     }
   }
 
-  // Fallback: if no matches after all strategies, fetch a broad set and filter.
-  // This handles the case where the Kalshi API returns unrelated markets for all searches.
-  if (electionMarkets.length === 0) {
-    console.log('[KALSHI] No election markets from targeted searches — falling back to broad fetch');
-    try {
-      const broad = await fetchKalshiMarketsWithRetry({ limit: 200, maxRetries: 2 });
-      for (const market of broad) {
-        if (!seen.has(market.ticker) && isElectionMarket(market)) {
-          electionMarkets.push(market);
-        }
+  // ── Primary fetch: single cached request for "election" keyword ──────────
+  // This replaces the previous 7-sequential-search loop that reliably
+  // triggered 429s when the cache was cold.
+  try {
+    const primary = await fetchKalshiMarkets({
+      search: 'election',
+      limit: 100,
+      useCache: true,
+      cacheTtlMs: 300_000, // 5 min
+    });
+    collect(primary);
+  } catch (err) {
+    console.warn('[KALSHI] fetchElectionMarkets: primary fetch failed:', (err as Error).message);
+  }
+
+  // ── Secondary fetch: "senate" / "congress" only when primary yields < 5 ──
+  // Each of these is independently cached so subsequent renders are free.
+  if (electionMarkets.length < 5) {
+    const fallbackSearches = ['senate', 'congress'];
+    for (const search of fallbackSearches) {
+      if (electionMarkets.length >= limit) break;
+      await sleep(400); // respect rate limit between searches
+      try {
+        const extra = await fetchKalshiMarkets({
+          search,
+          limit: 50,
+          useCache: true,
+          cacheTtlMs: 300_000,
+        });
+        collect(extra);
+      } catch {
+        // non-critical
       }
-    } catch {
-      // Non-critical fallback
     }
   }
 
@@ -767,8 +768,8 @@ export async function fetchElectionMarkets(options?: {
  * Fetch weather-related markets from Kalshi
  */
 export async function fetchWeatherMarkets(limit: number = 50): Promise<KalshiMarket[]> {
-  // Trimmed to 3 broad terms to avoid Kalshi rate limits (previously 9 terms → 429 errors).
-  const weatherSearches = ['weather', 'temperature', 'climate'];
+  // Single cached broad request — previously fired 3 concurrent searches which
+  // contributed to rate-limit bursts when the cache was cold.
   const WEATHER_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
   const seen = new Set<string>();
@@ -776,20 +777,35 @@ export async function fetchWeatherMarkets(limit: number = 50): Promise<KalshiMar
 
   console.log('[KALSHI] Fetching weather markets...');
 
-  const results = await Promise.allSettled(
-    weatherSearches.map(search =>
-      fetchKalshiMarkets({ search, limit: 50, useCache: true, cacheTtlMs: WEATHER_CACHE_TTL_MS })
-    )
-  );
-  for (const result of results) {
-    if (result.status === 'fulfilled') {
-      for (const market of result.value) {
-        if (!seen.has(market.ticker)) {
-          seen.add(market.ticker);
-          all.push(market);
-        }
-      }
+  // Primary: single fetch for the broadest term
+  try {
+    const primary = await fetchKalshiMarkets({
+      search: 'weather',
+      limit: 100,
+      useCache: true,
+      cacheTtlMs: WEATHER_CACHE_TTL_MS,
+    });
+    for (const m of primary) {
+      if (!seen.has(m.ticker)) { seen.add(m.ticker); all.push(m); }
     }
+  } catch (err) {
+    console.warn('[KALSHI] fetchWeatherMarkets primary failed:', (err as Error).message);
+  }
+
+  // Secondary: "temperature" only if primary returned less than 5
+  if (all.length < 5) {
+    await sleep(400);
+    try {
+      const secondary = await fetchKalshiMarkets({
+        search: 'temperature',
+        limit: 50,
+        useCache: true,
+        cacheTtlMs: WEATHER_CACHE_TTL_MS,
+      });
+      for (const m of secondary) {
+        if (!seen.has(m.ticker)) { seen.add(m.ticker); all.push(m); }
+      }
+    } catch { /* non-critical */ }
   }
 
   console.log(`[KALSHI] Weather markets total: ${all.length}`);
@@ -801,9 +817,9 @@ export async function fetchWeatherMarkets(limit: number = 50): Promise<KalshiMar
  */
 export async function fetchFinanceMarkets(limit: number = 50): Promise<KalshiMarket[]> {
   const financeSearches = [
-    'stock', 'S&P', 'NASDAQ', 'bitcoin', 'ethereum', 'crypto',
-    'interest rate', 'federal reserve', 'inflation', 'GDP',
-    'recession', 'unemployment', 'economic', 'treasury',
+    // Trimmed to 5 high-signal terms (was 14) to avoid hammering the rate limit.
+    // Each result is cached for 5 min so subsequent renders are free.
+    'bitcoin', 'S&P 500', 'interest rate', 'inflation', 'stock market',
   ];
 
   const seen = new Set<string>();
@@ -813,10 +829,11 @@ export async function fetchFinanceMarkets(limit: number = 50): Promise<KalshiMar
 
   const batchSize = 3;
   const FINANCE_BATCH_DELAY_MS = 500;
+  const FINANCE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
   for (let i = 0; i < financeSearches.length; i += batchSize) {
     const batch = financeSearches.slice(i, i + batchSize);
     const results = await Promise.allSettled(
-      batch.map(search => fetchKalshiMarkets({ search, limit: 50, useCache: true }))
+      batch.map(search => fetchKalshiMarkets({ search, limit: 50, useCache: true, cacheTtlMs: FINANCE_CACHE_TTL_MS }))
     );
 
     for (const result of results) {

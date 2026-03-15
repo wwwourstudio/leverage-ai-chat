@@ -225,7 +225,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: crypto.randomUUID(),
+      id: 'welcome-initial',
       role: 'assistant',
       content: STATIC_WELCOME,
       // Fixed epoch fallback keeps SSR and client hydration identical (no #418 mismatch).

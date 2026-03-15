@@ -3077,7 +3077,6 @@ No preamble. Start directly with section 1.`;
           }}
         >
           <div className="max-w-5xl mx-auto space-y-6">
-            <DatabaseStatusBanner key="db-status" />
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-full min-h-[400px]">
                 <div className="text-center space-y-4">

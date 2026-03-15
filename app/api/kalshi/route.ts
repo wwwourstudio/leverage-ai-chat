@@ -2,10 +2,6 @@ import { NextResponse } from 'next/server';
 import {
   fetchKalshiMarkets,
   fetchAllKalshiMarkets,
-  fetchSportsMarkets,
-  fetchElectionMarkets,
-  fetchWeatherMarkets,
-  fetchFinanceMarkets,
   fetchTopMarketsByVolume,
   fetchMarketOrderbook,
   fetchMarketTrades,
@@ -13,8 +9,14 @@ import {
   getMarketByTicker,
   kalshiMarketToCard,
 } from '@/lib/kalshi-client';
+import {
+  fetchSportsMarketsOptimized,
+  fetchElectionMarketsOptimized,
+  fetchWeatherMarketsOptimized,
+  fetchFinanceMarketsOptimized,
+} from '@/lib/kalshi/single-call';
 
-// No edge runtime — Node.js runtime needed for in-memory cache and full API surface
+// No edge runtime — Node.js runtime needed for full API surface
 
 // ── Route-level response cache (90s TTL) ─────────────────────────────────────
 const ROUTE_CACHE = new Map<string, { data: unknown; expires: number }>();

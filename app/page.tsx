@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 import { Suspense } from 'react';
 import { loadServerData, type ServerDataResult } from '@/lib/server-data-loader';
 import { logEnvValidation, validateServerEnv } from '@/lib/config';
-import UnifiedAIPlatform from './page-client';
+import UnifiedAIPlatform from './unified-platform';
 import { CardGrid } from '@/components/data-cards/CardSkeleton';
 
 export type ServerDataProps = ServerDataResult;

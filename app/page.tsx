@@ -8,13 +8,13 @@
  * @version 5
  */
 
-export const dynamic = 'force-dynamic';
-
 import { Suspense } from 'react';
 import { loadServerData, type ServerDataResult } from '@/lib/server-data-loader';
 import { logEnvValidation, validateServerEnv } from '@/lib/config';
 import { CardGrid } from '@/components/data-cards/CardSkeleton';
 import UnifiedAIPlatform from '@/app/page-client';
+
+export const dynamic = 'force-dynamic';
 
 export type ServerDataProps = ServerDataResult;
 

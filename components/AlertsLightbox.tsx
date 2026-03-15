@@ -5,6 +5,7 @@ import {
   X, Bell, Plus, Trash2, TrendingUp, Target, Activity, Zap,
   Loader2, CheckCircle, ToggleLeft, ToggleRight, Sparkles,
   RotateCcw, Filter, AlertCircle, Clock, ChevronRight,
+  BarChart2, Mail, MessageSquare, Smartphone, Webhook,
 } from 'lucide-react';
 import { useToast } from '@/components/toast-provider';
 import { SPORT_KEYS } from '@/lib/constants';
@@ -34,6 +35,7 @@ interface UserAlert {
   description: string | null;
   created_at: string;
   updated_at: string | null;
+  notify_channels?: string[];
 }
 
 interface AiSuggestion {
@@ -47,12 +49,23 @@ interface AiSuggestion {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ALERT_TYPES = [
-  { value: 'odds_change',    label: 'Odds Change',    icon: TrendingUp, color: 'text-orange-400', bg: 'bg-orange-500/15', border: 'border-orange-500/30' },
-  { value: 'line_movement',  label: 'Line Movement',  icon: Activity,   color: 'text-blue-400',   bg: 'bg-blue-500/15',   border: 'border-blue-500/30'   },
-  { value: 'player_prop',    label: 'Player Prop',    icon: Target,     color: 'text-green-400',  bg: 'bg-green-500/15',  border: 'border-green-500/30'  },
-  { value: 'arbitrage',      label: 'Arbitrage',      icon: Zap,        color: 'text-yellow-400', bg: 'bg-yellow-500/15', border: 'border-yellow-500/30' },
-  { value: 'kalshi_price',   label: 'Kalshi Price',   icon: TrendingUp, color: 'text-purple-400', bg: 'bg-purple-500/15', border: 'border-purple-500/30' },
-  { value: 'game_start',     label: 'Game Start',     icon: Bell,       color: 'text-cyan-400',   bg: 'bg-cyan-500/15',   border: 'border-cyan-500/30'   },
+  { value: 'odds_change',         label: 'Odds Change',    icon: TrendingUp, color: 'text-orange-400', bg: 'bg-orange-500/15', border: 'border-orange-500/30' },
+  { value: 'line_movement',       label: 'Line Movement',  icon: Activity,   color: 'text-blue-400',   bg: 'bg-blue-500/15',   border: 'border-blue-500/30'   },
+  { value: 'player_prop',         label: 'Player Prop',    icon: Target,     color: 'text-green-400',  bg: 'bg-green-500/15',  border: 'border-green-500/30'  },
+  { value: 'arbitrage',           label: 'Arbitrage',      icon: Zap,        color: 'text-yellow-400', bg: 'bg-yellow-500/15', border: 'border-yellow-500/30' },
+  { value: 'kalshi_price',        label: 'Kalshi Price',   icon: TrendingUp, color: 'text-purple-400', bg: 'bg-purple-500/15', border: 'border-purple-500/30' },
+  { value: 'game_start',          label: 'Game Start',     icon: Bell,       color: 'text-cyan-400',   bg: 'bg-cyan-500/15',   border: 'border-cyan-500/30'   },
+  { value: 'market_intelligence', label: 'Market Signal',  icon: BarChart2,  color: 'text-indigo-400', bg: 'bg-indigo-500/15', border: 'border-indigo-500/30' },
+] as const;
+
+// ─── Delivery channels ────────────────────────────────────────────────────────
+
+const DELIVERY_CHANNELS = [
+  { value: 'in_app',  label: 'In-App',  icon: Bell },
+  { value: 'email',   label: 'Email',   icon: Mail },
+  { value: 'sms',     label: 'SMS',     icon: MessageSquare },
+  { value: 'push',    label: 'Push',    icon: Smartphone },
+  { value: 'webhook', label: 'Webhook', icon: Webhook },
 ] as const;
 
 const SPORTS = Object.values(SPORT_KEYS).map(s => s.NAME);
@@ -124,6 +137,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
     description: '',
     threshold: '',
     max_triggers: '1',
+    notify_channels: ['in_app'] as string[],
   });
 
   // AI suggestion state
@@ -140,6 +154,14 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
 
   useEffect(() => {
     if (!isOpen) return;
+
+    // Reset filter + loading state on every open so the list never appears blank
+    // due to stale filterType from a previous session (component stays mounted
+    // when the lightbox is "closed" via isOpen=false → return null).
+    setFilterType(null);
+    setFilterStatus('all');
+    setAuthChecked(false);
+    setLoading(true);
 
     const checkAuth = async () => {
       try {
@@ -228,12 +250,13 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
           description: newAlert.description || null,
           threshold: newAlert.threshold ? parseFloat(newAlert.threshold) : null,
           max_triggers: newAlert.max_triggers === 'null' ? null : parseInt(newAlert.max_triggers) || 1,
+          notify_channels: newAlert.notify_channels.length > 0 ? newAlert.notify_channels : ['in_app'],
         }),
       });
 
       if (res.ok) {
         toast.success('Alert created');
-        setNewAlert({ alert_type: 'odds_change', sport: '', team: '', player: '', title: '', description: '', threshold: '', max_triggers: '1' });
+        setNewAlert({ alert_type: 'odds_change', sport: '', team: '', player: '', title: '', description: '', threshold: '', max_triggers: '1', notify_channels: ['in_app'] });
         setAiSuggestion(null);
         setActiveTab('list');
         await loadAlerts();
@@ -868,6 +891,39 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Delivery Channels */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 mb-2">Delivery Channels</p>
+                    <div className="flex flex-wrap gap-2">
+                      {DELIVERY_CHANNELS.map(ch => {
+                        const selected = newAlert.notify_channels.includes(ch.value);
+                        const Icon = ch.icon;
+                        return (
+                          <button
+                            key={ch.value}
+                            type="button"
+                            onClick={() => setNewAlert(prev => ({
+                              ...prev,
+                              notify_channels: selected
+                                ? prev.notify_channels.filter(c => c !== ch.value)
+                                : [...prev.notify_channels, ch.value],
+                            }))}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+                              selected
+                                ? 'border-blue-400/60 bg-blue-500/15 text-blue-300'
+                                : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600'
+                            }`}
+                            style={!selected ? { background: 'oklch(0.17 0.015 280)' } : {}}
+                          >
+                            <Icon className="w-3 h-3" />
+                            {ch.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10px] text-gray-600 mt-1.5">Email, SMS, and Push require account configuration. Webhook posts to your URL.</p>
                   </div>
 
                   {/* Preview */}

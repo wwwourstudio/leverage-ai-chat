@@ -37,7 +37,7 @@ export async function GET() {
     // NOTE: PostgREST cannot compare two columns in .or(), so we filter by trigger limit in JS
     const { data: allAlerts, error: fetchError } = await supabase
       .from('user_alerts')
-      .select('id, user_id, alert_type, sport, team, player, condition, threshold, trigger_count, max_triggers, title')
+      .select('id, user_id, alert_type, sport, team, player, condition, threshold, trigger_count, max_triggers, title, notify_channels')
       .eq('is_active', true)
       .eq('user_id', user.id);
 
@@ -68,6 +68,25 @@ export async function GET() {
         if (!updateError) {
           triggered.push({ id: alert.id, title: alert.title });
           console.log(`[Alerts] Fired alert "${alert.title}" for user ${alert.user_id}`);
+
+          // Dispatch to non-in_app channels
+          const channels: string[] = (alert as Record<string, unknown>).notify_channels as string[] ?? ['in_app'];
+          for (const ch of channels) {
+            if (ch === 'in_app') continue; // handled client-side via triggered[] response
+            if (ch === 'webhook') {
+              const webhookUrl = (alert.condition as Record<string, unknown>)?.webhook_url as string | undefined;
+              if (webhookUrl) {
+                fetch(webhookUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ alert_id: alert.id, title: alert.title, triggered_at: new Date().toISOString() }),
+                }).catch(e => console.warn('[Alerts] webhook delivery failed:', e));
+              }
+            } else {
+              // email / sms / push — log intent; connect to provider when credentials are available
+              console.log(`[Alerts] ${ch} delivery queued for alert "${alert.title}" (user ${alert.user_id})`);
+            }
+          }
         }
       }
     }
@@ -165,6 +184,18 @@ async function evaluateAlert(
     case 'game_start': {
       // Always fire game_start alerts (they rely on external push; here we just acknowledge)
       return false;
+    }
+
+    case 'market_intelligence': {
+      // Trigger when a high-severity market anomaly was detected in the last 5 minutes
+      const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const { data: anomalies } = await supabase
+        .from('market_anomalies')
+        .select('id')
+        .gte('detected_at', cutoff)
+        .eq('severity', 'high')
+        .limit(1);
+      return (anomalies?.length ?? 0) > 0;
     }
 
     default:

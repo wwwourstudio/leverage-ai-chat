@@ -15,19 +15,19 @@ export const MLB_SEASON_YEAR: number = _currentMLBSeason();
 export const NFBC_DRAFT_YEAR: number = new Date().getFullYear();
 
 // AI Model Configuration
-// Primary model: grok-3-fast — reliable sub-15s responses for all analysis.
-// grok-4 consistently times out (>45s) on the current xAI plan.
-// Fast-path model: grok-3-mini for intent-routing, ADP, and DFS queries.
+// Primary model: grok-4 — xAI's latest model for deep sports analysis.
+// Fast-path model: grok-3-fast for intent-routing, ADP, and off-season queries.
 export const AI_CONFIG = {
-  MODEL_NAME: 'grok-3-fast',
-  FAST_MODEL_NAME: 'grok-3-mini',
-  MODEL_DISPLAY_NAME: 'Grok 3 Fast',
+  MODEL_NAME: 'grok-4',
+  FAST_MODEL_NAME: 'grok-3-fast',
+  MODEL_DISPLAY_NAME: 'Grok 4',
+  FAST_MODEL_DISPLAY_NAME: 'Grok 4 Fast',
   PROVIDER: 'xAI',
   API_ENDPOINT: 'https://api.x.ai/v1/chat/completions',
   DEFAULT_TEMPERATURE: 0.35,
   DEFAULT_MAX_TOKENS: 600,
   DEFAULT_PROCESSING_TIME: 950,
-  FALLBACK_MODEL: 'Grok 3 Fast',
+  FALLBACK_MODEL: 'Grok 4',
 } as const;
 
 // API Endpoints

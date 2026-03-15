@@ -31,7 +31,6 @@ const SettingsLightbox = dynamic(() => import('@/components/SettingsLightbox').t
 const AlertsLightbox = dynamic(() => import('@/components/AlertsLightbox').then(m => ({ default: m.AlertsLightbox })), { ssr: false });
 const StripeLightbox = dynamic(() => import('@/components/StripeLightbox').then(m => ({ default: m.StripeLightbox })), { ssr: false });
 const UserLightbox = dynamic(() => import('@/components/UserLightbox').then(m => ({ default: m.UserLightbox })), { ssr: false });
-const MarketIntelligencePanel = dynamic(() => import('@/components/market-intelligence/MarketIntelligencePanel').then(m => ({ default: m.MarketIntelligencePanel })), { ssr: false });
 import { useToast } from '@/components/toast-provider';
 import { Sidebar } from '@/components/Sidebar';
 import { ChatHeader } from '@/components/chat-header';
@@ -270,7 +269,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [showSignupModal, setShowSignupModal] = useState(false);
   const [showSettingsLightbox, setShowSettingsLightbox] = useState(false);
   const [showAlertsLightbox, setShowAlertsLightbox] = useState(false);
-  const [showIntelPanel, setShowIntelPanel] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
   const [showStripeLightbox, setShowStripeLightbox] = useState(false);
   const [showUserLightbox, setShowUserLightbox] = useState(false);
@@ -2317,6 +2315,12 @@ No preamble. Start directly with section 1.`;
   const handleSelectChat = (chatId: string) => {
     setActiveChat(chatId);
 
+    // Sync platform filter to match the selected chat's category
+    const selectedChat = chats.find((c: Chat) => c.id === chatId);
+    if (selectedChat?.category && selectedChat.category !== 'all') {
+      setSelectedCategory(selectedChat.category);
+    }
+
     if (isLoggedIn) {
       // Load messages from Supabase for logged-in users
       loadMessages(chatId).then(msgs => {
@@ -3086,10 +3090,10 @@ No preamble. Start directly with section 1.`;
                 
                 return (
                   <div
-                    key={message.id}
+                    key={message.id ?? `msg-${index}`}
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn ${isGrouped ? 'mt-1.5' : 'mt-5'}`}
                   >
-                <div className={message.role === 'user' ? 'max-w-[85%] md:max-w-[75%]' : 'w-full max-w-4xl lg:max-w-3xl'}>
+                    <div className={message.role === 'user' ? 'max-w-[85%] md:max-w-[75%]' : 'w-full max-w-4xl lg:max-w-3xl'}>
                   {message.role === 'assistant' && (
                     <div className="flex items-center gap-2.5 mb-2.5 flex-wrap">
                       {/* Logo mark */}
@@ -3739,9 +3743,9 @@ No preamble. Start directly with section 1.`;
                       </div>
                     </div>
                   )}
-                </div>
-              </div>
-            );
+                    </div>
+                  </div>
+                );
           })
         )}
 
@@ -4039,6 +4043,7 @@ No preamble. Start directly with section 1.`;
               hasMessages={messages.length > 1}
               lastUserQuery={lastUserQuery}
               selectedCategory={selectedCategory}
+              selectedSport={selectedSport}
               clarificationMode={isClarificationPills}
               onPromptClick={(submitText) => {
                 setInput(submitText);
@@ -4282,13 +4287,6 @@ No preamble. Start directly with section 1.`;
         onCreditsAdded={addCredits}
         creditsRemaining={creditsRemaining}
         userEmail={user?.email}
-      />
-
-      {/* Market Intelligence Panel */}
-      <MarketIntelligencePanel
-        isOpen={showIntelPanel}
-        onClose={() => setShowIntelPanel(false)}
-        sport={selectedSport ?? undefined}
       />
 
       <style>

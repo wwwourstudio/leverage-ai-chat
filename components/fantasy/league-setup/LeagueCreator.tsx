@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Check, ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Users, Upload, Bot, FileText, X, CheckCircle2, AlertCircle } from 'lucide-react';
 import type { FantasySport, DraftType } from '@/lib/fantasy/types';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -128,12 +128,10 @@ function getSportMeta(sport: FantasySport) {
 // Step indicator
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STEP_LABELS = ['Sport', 'Platform', 'Teams', 'Format', 'Roster'];
-
-function StepIndicator({ step }: { step: number }) {
+function StepIndicator({ step, labels }: { step: number; labels: string[] }) {
   return (
     <div className="flex items-center justify-center gap-1 mb-6">
-      {STEP_LABELS.map((label, i) => {
+      {labels.map((label, i) => {
         const n = i + 1;
         const done = step > n;
         const active = step === n;
@@ -155,7 +153,7 @@ function StepIndicator({ step }: { step: number }) {
                 active ? 'text-blue-300' : done ? 'text-emerald-400' : 'text-[oklch(0.35_0.01_280)]',
               )}>{label}</span>
             </div>
-            {i < STEP_LABELS.length - 1 && (
+            {i < labels.length - 1 && (
               <div className={cn(
                 'w-6 h-px mb-3 transition-all duration-200',
                 step > n ? 'bg-emerald-500/50' : 'bg-[oklch(0.22_0.02_280)]',
@@ -171,6 +169,14 @@ function StepIndicator({ step }: { step: number }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
+
+interface NfbcFileSlot {
+  key: 'adp' | 'freeAgents' | 'tsx';
+  label: string;
+  hint: string;
+  file: File | null;
+  error: string | null;
+}
 
 export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps) {
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
@@ -192,6 +198,107 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
     setForm(prev => ({ ...prev, ...patch }));
 
   const sportMeta = getSportMeta(form.sport);
+
+  // ── NFBC file upload state ─────────────────────────────────────────────────
+  const [nfbcSlots, setNfbcSlots] = useState<NfbcFileSlot[]>([
+    { key: 'adp',        label: 'Draft ADP CSV',            hint: 'Expected columns: Rank, Player, Team, Pos, ADP', file: null, error: null },
+    { key: 'freeAgents', label: 'Free Agents Available CSV', hint: 'Expected columns: Player, Team, Pos, Status',    file: null, error: null },
+    { key: 'tsx',        label: 'TSX Export CSV',            hint: 'Expected columns: Player, Team, Pos, Stats',     file: null, error: null },
+  ]);
+  const [nfbcAiAnalysis, setNfbcAiAnalysis] = useState('');
+  const [nfbcAiLoading, setNfbcAiLoading] = useState(false);
+  const [nfbcDraggingKey, setNfbcDraggingKey] = useState<string | null>(null);
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const hasAnyNfbcFile = nfbcSlots.some(s => s.file !== null);
+
+  const handleNfbcFile = useCallback(async (key: NfbcFileSlot['key'], file: File) => {
+    // Validate type and size
+    if (!file.name.endsWith('.csv')) {
+      setNfbcSlots(prev => prev.map(s => s.key === key ? { ...s, error: 'Only .csv files are accepted' } : s));
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setNfbcSlots(prev => prev.map(s => s.key === key ? { ...s, error: 'File too large (max 5 MB)' } : s));
+      return;
+    }
+
+    setNfbcSlots(prev => prev.map(s => s.key === key ? { ...s, file, error: null } : s));
+
+    // Persist to user files via adp/upload
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('sport', 'mlb');
+      await fetch('/api/adp/upload', { method: 'POST', body: formData });
+    } catch {
+      // non-fatal — file is still stored in component state for AI analysis
+    }
+  }, []);
+
+  const triggerNfbcAiAnalysis = useCallback(async (slots: NfbcFileSlot[]) => {
+    const uploadedSlots = slots.filter(s => s.file !== null);
+    if (uploadedSlots.length === 0) return;
+
+    setNfbcAiLoading(true);
+    setNfbcAiAnalysis('');
+
+    try {
+      // Read uploaded CSV content
+      const fileTexts = await Promise.all(
+        uploadedSlots.map(s => new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = e => resolve(`### ${s.label}\n${(e.target?.result as string).slice(0, 3000)}`);
+          reader.onerror = reject;
+          reader.readAsText(s.file!);
+        }))
+      );
+
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userMessage: `You are analyzing NFBC fantasy baseball data. Based on the uploaded CSV files, provide: 1) Top 20 player rankings, 2) Position scarcity analysis, 3) Draft strategy recommendations, 4) Key sleepers and value picks.\n\n${fileTexts.join('\n\n')}`,
+          context: { sport: 'mlb', selectedCategory: 'fantasy', hasFantasyIntent: true },
+        }),
+      });
+
+      if (!res.ok || !res.body) {
+        setNfbcAiAnalysis('Unable to generate analysis. Please try again.');
+        return;
+      }
+
+      // Parse SSE stream
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const payload = line.slice(6).trim();
+            if (payload === '[DONE]') break;
+            try {
+              const parsed = JSON.parse(payload);
+              const text = parsed.text ?? parsed.content ?? parsed.chunk ?? '';
+              if (text) setNfbcAiAnalysis(prev => prev + text);
+            } catch {
+              // skip unparseable SSE lines
+            }
+          }
+        }
+      }
+    } catch {
+      setNfbcAiAnalysis('Analysis failed. Your files were saved — continue to the next step.');
+    } finally {
+      setNfbcAiLoading(false);
+    }
+  }, []);
 
   // ── Step 1: Sport ──────────────────────────────────────────────────────────
   const StepSport = () => (
@@ -377,7 +484,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
           <span className="text-[11px] text-[oklch(0.50_0.01_280)]">{form.leagueSize}-team league · {form.platform.toUpperCase()} · {sportMeta.icon} {sportMeta.label}</span>
         </div>
 
-        <NavButtons onBack={() => setStep(2)} onNext={() => setStep(form.platform === 'nfbc' ? 5 : 4)} />
+        <NavButtons onBack={() => setStep(2)} onNext={() => setStep(4)} />
       </div>
     );
   };
@@ -431,6 +538,150 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
       </div>
     );
   };
+
+  // ── Step 4 (NFBC only): AI file upload ────────────────────────────────────
+  const StepNFBCUpload = () => (
+    <div className="space-y-4">
+      <p className="text-sm font-bold text-emerald-300 mb-1">Set Up Your Fantasy League with AI</p>
+      <p className="text-xs text-[oklch(0.50_0.01_280)] mb-3">
+        Upload your NFBC CSV exports and our AI will generate draft strategy, rankings, and roster recommendations.
+      </p>
+
+      <div className="flex flex-col lg:flex-row gap-4">
+        {/* ── Left: File upload slots ── */}
+        <div className="flex-1 space-y-3 min-w-0">
+          {nfbcSlots.map(slot => (
+            <div key={slot.key} className="relative">
+              <input
+                type="file"
+                accept=".csv"
+                ref={el => { fileInputRefs.current[slot.key] = el; }}
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f) {
+                    handleNfbcFile(slot.key, f);
+                    setNfbcSlots(prev => {
+                      const updated = prev.map(s => s.key === slot.key ? { ...s, file: f, error: null } : s);
+                      const wasEmpty = prev.every(s => s.file === null);
+                      if (wasEmpty) triggerNfbcAiAnalysis(updated);
+                      return updated;
+                    });
+                  }
+                  e.target.value = '';
+                }}
+              />
+              <div
+                onDragOver={e => { e.preventDefault(); setNfbcDraggingKey(slot.key); }}
+                onDragLeave={() => setNfbcDraggingKey(null)}
+                onDrop={e => {
+                  e.preventDefault();
+                  setNfbcDraggingKey(null);
+                  const f = e.dataTransfer.files[0];
+                  if (f) {
+                    handleNfbcFile(slot.key, f);
+                    setNfbcSlots(prev => {
+                      const updated = prev.map(s => s.key === slot.key ? { ...s, file: f, error: null } : s);
+                      const wasEmpty = prev.every(s => s.file === null);
+                      if (wasEmpty) triggerNfbcAiAnalysis(updated);
+                      return updated;
+                    });
+                  }
+                }}
+                className={cn(
+                  'rounded-xl border-2 border-dashed px-4 py-3 transition-all cursor-pointer',
+                  nfbcDraggingKey === slot.key
+                    ? 'border-emerald-400 bg-emerald-500/10'
+                    : slot.file
+                    ? 'border-emerald-500/50 bg-emerald-500/5'
+                    : 'border-[oklch(0.24_0.02_280)] bg-[oklch(0.11_0.01_280)] hover:border-[oklch(0.32_0.02_280)]',
+                )}
+                onClick={() => !slot.file && fileInputRefs.current[slot.key]?.click()}
+              >
+                <div className="flex items-center gap-3">
+                  {slot.file ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  ) : (
+                    <Upload className="w-4 h-4 text-[oklch(0.45_0.01_280)] shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className={cn('text-xs font-semibold truncate', slot.file ? 'text-emerald-300' : 'text-[oklch(0.75_0.005_85)]')}>{slot.label}</p>
+                    <p className="text-[10px] text-[oklch(0.40_0.01_280)] truncate mt-0.5">
+                      {slot.file ? slot.file.name : slot.hint}
+                    </p>
+                  </div>
+                  {slot.file && (
+                    <button
+                      onClick={e => { e.stopPropagation(); setNfbcSlots(prev => prev.map(s => s.key === slot.key ? { ...s, file: null, error: null } : s)); }}
+                      className="p-1 rounded-lg hover:bg-red-500/15 text-[oklch(0.45_0.01_280)] hover:text-red-400 transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {!slot.file && (
+                    <button
+                      onClick={e => { e.stopPropagation(); fileInputRefs.current[slot.key]?.click(); }}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold text-[oklch(0.65_0.01_280)] border border-[oklch(0.24_0.02_280)] hover:border-emerald-500/50 hover:text-emerald-400 transition-all"
+                    >
+                      Select
+                    </button>
+                  )}
+                </div>
+                {slot.error && (
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />
+                    <p className="text-[10px] text-red-400">{slot.error}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+
+          <p className="text-[10px] text-[oklch(0.35_0.01_280)] px-1">
+            CSV files only · Max 5 MB each · Files are saved to your account
+          </p>
+        </div>
+
+        {/* ── Right: AI panel ── */}
+        <div
+          className="lg:w-56 rounded-xl border flex flex-col overflow-hidden"
+          style={{ background: 'oklch(0.09 0.01 280)', borderColor: 'oklch(0.20 0.02 280)' }}
+        >
+          <div className="flex items-center gap-2 px-3 py-2.5 border-b" style={{ borderColor: 'oklch(0.17 0.015 280)' }}>
+            <Bot className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs font-bold text-emerald-300">AI Analysis</span>
+          </div>
+          <div className="flex-1 p-3 overflow-y-auto max-h-52 text-[11px] text-[oklch(0.65_0.005_85)] leading-relaxed">
+            {nfbcAiLoading ? (
+              <div className="flex items-center gap-2 text-emerald-400">
+                <div className="w-3 h-3 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin" />
+                <span>Analyzing your data…</span>
+              </div>
+            ) : nfbcAiAnalysis ? (
+              <div className="whitespace-pre-wrap">{nfbcAiAnalysis}</div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-28 gap-2 text-center">
+                <FileText className="w-7 h-7 text-[oklch(0.28_0.015_280)]" />
+                <p className="text-[oklch(0.38_0.01_280)]">Upload a CSV to activate AI analysis</p>
+              </div>
+            )}
+          </div>
+          {hasAnyNfbcFile && !nfbcAiLoading && !nfbcAiAnalysis && (
+            <div className="px-3 pb-2.5">
+              <button
+                onClick={() => triggerNfbcAiAnalysis(nfbcSlots)}
+                className="w-full py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold transition-all"
+              >
+                Re-run Analysis
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <NavButtons onBack={() => setStep(3)} onNext={() => setStep(5)} />
+    </div>
+  );
 
   // ── Step 5: Roster + Name ──────────────────────────────────────────────────
   const StepRoster = () => (
@@ -528,13 +779,15 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
   // ─────────────────────────────────────────────────────────────────────────
   // Render
   // ─────────────────────────────────────────────────────────────────────────
-  const stepTitles = [
-    'Choose Your Sport',
-    'Choose Your Platform',
-    'League Size',
-    'Scoring Format',
-    'Roster & Settings',
-  ];
+  const isNfbc = form.platform === 'nfbc';
+
+  const stepLabels = isNfbc
+    ? ['Sport', 'Platform', 'Teams', 'Upload', 'Roster']
+    : ['Sport', 'Platform', 'Teams', 'Format', 'Roster'];
+
+  const stepTitles = isNfbc
+    ? ['Choose Your Sport', 'Choose Your Platform', 'League Size', 'Set Up Your Fantasy League with AI', 'Roster & Settings']
+    : ['Choose Your Sport', 'Choose Your Platform', 'League Size', 'Scoring Format', 'Roster & Settings'];
 
   return (
     <div className="w-full max-w-lg mx-auto rounded-2xl bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.02_280)] overflow-hidden">
@@ -545,7 +798,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
           <h2 className="text-base font-bold text-[oklch(0.92_0.005_85)]">Create Fantasy League</h2>
         </div>
         <p className="text-xs text-[oklch(0.45_0.01_280)] mb-4">{stepTitles[step - 1]}</p>
-        <StepIndicator step={step} />
+        <StepIndicator step={step} labels={stepLabels} />
       </div>
 
       {/* Body */}
@@ -553,7 +806,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
         {step === 1 && <StepSport />}
         {step === 2 && <StepPlatform />}
         {step === 3 && <StepTeams />}
-        {step === 4 && <StepLeagueType />}
+        {step === 4 && (isNfbc ? <StepNFBCUpload /> : <StepLeagueType />)}
         {step === 5 && <StepRoster />}
       </div>
     </div>

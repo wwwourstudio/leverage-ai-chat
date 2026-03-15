@@ -9,7 +9,8 @@
 import crypto from 'crypto';
 
 const KALSHI_TRADING_URL = 'https://api.elections.kalshi.com/trade-api/v2';
-const KALSHI_FALLBACK_URL = 'https://api.elections.kalshi.com/trade-api/v2';
+// No separate fallback — both resolve to the same host, so we use one URL and retry with backoff.
+const KALSHI_FALLBACK_URL = KALSHI_TRADING_URL;
 
 export interface KalshiMarket {
   ticker: string;
@@ -245,31 +246,47 @@ function parseMarket(m: any): KalshiMarket {
 }
 
 /**
- * Fetch a single page of markets.
- * Tries the canonical api.kalshi.com first; falls back to api.elections.kalshi.com.
- * Returns parsed markets and the next cursor (null when done).
+ * Fetch a single page of markets with 429-aware retry logic.
+ * Uses a single endpoint (both TRADING_URL and FALLBACK_URL are the same host).
+ * On 429, waits with exponential backoff + jitter before retrying (up to 3 attempts).
  */
 async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage> {
-  const urls = [
-    `${KALSHI_TRADING_URL}/markets?${queryParams}`,
-    `${KALSHI_FALLBACK_URL}/markets?${queryParams}`,
-  ];
+  const url = `${KALSHI_TRADING_URL}/markets?${queryParams}`;
+  const MAX_ATTEMPTS = 3;
 
   let lastError: Error | null = null;
 
-  for (const url of urls) {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
       const response = await fetch(url, {
         headers: buildHeaders(url),
         signal: AbortSignal.timeout(15000),
       });
 
+      if (response.status === 429) {
+        // Respect Retry-After header when present; otherwise use exponential backoff + jitter.
+        const retryAfterSec = Number(response.headers.get('Retry-After') ?? 0);
+        const baseDelay = retryAfterSec > 0
+          ? retryAfterSec * 1000
+          : Math.min(1000 * 2 ** attempt, 8000); // 1s, 2s, 4s
+        const jitter = Math.random() * 500;
+        const waitMs = Math.round(baseDelay + jitter);
+        const host = new URL(url).hostname;
+        const errorText = await response.text().catch(() => '');
+        console.error(`[KALSHI] API error 429 at ${host} — ${errorText.substring(0, 200)}`);
+        console.log(`[KALSHI] Rate limited — waiting ${waitMs}ms before retry ${attempt + 1}/${MAX_ATTEMPTS - 1}`);
+        lastError = new Error(`Kalshi API error: 429 Too Many Requests`);
+        if (attempt < MAX_ATTEMPTS - 1) {
+          await new Promise(r => setTimeout(r, waitMs));
+        }
+        continue;
+      }
+
       if (!response.ok) {
         const errorText = await response.text();
         const host = new URL(url).hostname;
         console.error(`[KALSHI] API error ${response.status} at ${host} — ${errorText.substring(0, 200)}`);
-        lastError = new Error(`Kalshi API error: ${response.status} ${response.statusText}`);
-        continue; // try fallback URL
+        throw new Error(`Kalshi API error: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -293,18 +310,19 @@ async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage
       const cursor = data.cursor && data.cursor !== '' ? data.cursor : null;
       return { markets, cursor };
     } catch (err) {
-      const host = new URL(url).hostname;
+      // Don't swallow 429 errors we already logged above
+      if (lastError?.message.includes('429')) throw lastError;
+
       const cause = (err as any)?.cause;
       const errCode = cause?.code ?? '';
-      console.warn(`[KALSHI] ${host} failed: ${(err as Error).message}${cause ? ` (${errCode || cause.message || cause})` : ''}`);
+      console.warn(`[KALSHI] Request failed: ${(err as Error).message}${cause ? ` (${errCode || cause.message || cause})` : ''}`);
       lastError = err as Error;
-      // DNS failure: both URLs resolve in the same environment — skip fallback immediately
+      // DNS / network failure — no point retrying
       if (errCode === 'ENOTFOUND' || errCode === 'EAI_AGAIN') break;
-      continue; // try fallback URL
     }
   }
 
-  throw lastError ?? new Error('All Kalshi endpoints failed');
+  throw lastError ?? new Error('Kalshi endpoint failed after retries');
 }
 
 /**
@@ -324,7 +342,8 @@ export async function fetchKalshiMarkets(params?: {
   useCache?: boolean;
   cacheTtlMs?: number;
 }): Promise<KalshiMarket[]> {
-  const { category, status = 'open', limit = 200, search, cursor, useCache = true, cacheTtlMs = 60000 } = params || {};
+  // Default TTL raised to 5 minutes to survive repeated serverless cold-starts and avoid 429s.
+  const { category, status = 'open', limit = 200, search, cursor, useCache = true, cacheTtlMs = 300_000 } = params || {};
   const cacheKey = getCacheKey({ category, status, limit, search });
 
   // Check cache first (only when not mid-pagination)
@@ -656,10 +675,17 @@ export async function fetchElectionMarkets(options?: {
 
   const seen = new Set<string>();
   const electionMarkets: KalshiMarket[] = [];
+  // 300ms between sequential API calls to avoid exceeding Kalshi's rate limit.
+  const STRATEGY_DELAY_MS = 300;
 
-  for (const strategy of searchStrategies) {
+  for (let si = 0; si < searchStrategies.length; si++) {
     if (electionMarkets.length >= limit) break;
 
+    if (si > 0) {
+      await new Promise(r => setTimeout(r, STRATEGY_DELAY_MS));
+    }
+
+    const strategy = searchStrategies[si];
     const markets = await fetchKalshiMarkets({ ...strategy, limit: 50 });
 
     for (const market of markets) {
@@ -739,7 +765,8 @@ export async function fetchFinanceMarkets(limit: number = 50): Promise<KalshiMar
 
   console.log('[KALSHI] Fetching finance markets...');
 
-  const batchSize = 5;
+  const batchSize = 3; // Reduced from 5 to limit burst request count
+  const FINANCE_BATCH_DELAY_MS = 500; // 500ms between batches to stay under Kalshi rate limit
   for (let i = 0; i < financeSearches.length; i += batchSize) {
     const batch = financeSearches.slice(i, i + batchSize);
     const results = await Promise.allSettled(
@@ -755,6 +782,11 @@ export async function fetchFinanceMarkets(limit: number = 50): Promise<KalshiMar
           }
         }
       }
+    }
+
+    // Pause between batches (skip after the final batch) to avoid 429s
+    if (i + batchSize < financeSearches.length) {
+      await new Promise(r => setTimeout(r, FINANCE_BATCH_DELAY_MS));
     }
   }
 

@@ -1,6 +1,6 @@
 /**
- * Main Chat Interface - v2 (analysis overlay fixed)
- * 
+ * Main Chat Interface - v3 (HMR graph reset)
+ *
  * Production-ready AI sports betting assistant with real-time data integration.
  * Features:
  * - Real-time player projections from The Odds API

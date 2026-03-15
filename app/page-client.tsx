@@ -541,6 +541,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
               loadMessages(threads[0].id).then(msgs => {
                 if (msgs.length > 0) {
                   setMessages(msgs.map(m => ({
+                    id: m.id || crypto.randomUUID(),
                     role: m.role,
                     content: m.content,
                     timestamp: m.timestamp,

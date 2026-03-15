@@ -758,21 +758,22 @@ export async function POST(request: NextRequest) {
         try {
           if (xaiApiKey) {
             const usesTools = hasADPIntent || hasMLBProjectionIntent || isMLBStatcastMode;
-            // For tool-call paths, don't apply a first-token timer: textStream yields
-            // no tokens until the full tool round-trip completes (model call → tool
-            // execution → second model call), which legitimately takes 10–20s.
-            // A first-token timer on that path fires prematurely and causes the timeout.
-            // For plain-text paths, 20s is generous for grok-3-fast (typical: 2–5s).
+            // Tool-call paths (ADP, MLB projections, Statcast) don't get a first-token timer
+            // because textStream yields no tokens until the full tool round-trip completes.
+            // Non-tool paths get 30s — grok-3-fast typically responds in 2–8s but can spike
+            // to 20–25s under xAI load. 30s gives headroom without hanging requests forever.
             const abortCtrl = new AbortController();
             let firstTokenTimer: ReturnType<typeof setTimeout> | null = null;
             if (!usesTools) {
               firstTokenTimer = setTimeout(
                 () => abortCtrl.abort(new Error('Primary timeout')),
-                20_000,
+                30_000,
               );
             }
 
             // streamText returns immediately; tokens arrive via textStream async iterable
+            const streamCallStart = Date.now();
+            console.log(`[API/analyze] Calling streamText — model=${primaryModel}, usesTools=${usesTools}, hasADP=${hasADPIntent}`);
             const streamResult = streamText({
               model: createXai({ apiKey: xaiApiKey })(primaryModel),
               system: systemPrompt,
@@ -789,7 +790,11 @@ export async function POST(request: NextRequest) {
             try {
               let gotFirstToken = false;
               for await (const delta of streamResult.textStream) {
-                if (!gotFirstToken) { gotFirstToken = true; if (firstTokenTimer) clearTimeout(firstTokenTimer); }
+                if (!gotFirstToken) {
+                  gotFirstToken = true;
+                  console.log(`[API/analyze] First token received in ${Date.now() - streamCallStart}ms`);
+                  if (firstTokenTimer) clearTimeout(firstTokenTimer);
+                }
                 aiText += delta;
                 controller.enqueue(sseChunk({ type: 'text', delta }));
               }
@@ -923,12 +928,21 @@ export async function POST(request: NextRequest) {
               }
 
             } catch (streamErr) {
-              clearTimeout(firstTokenTimer);
+              if (firstTokenTimer) clearTimeout(firstTokenTimer);
               // Primary stream failed — fall back to generateText (no streaming for fallback)
               const actualFallbackModel = AI_CONFIG.POWER_MODEL_NAME;
               const errSummary = (() => {
                 if (streamErr && typeof streamErr === 'object') {
                   const e = streamErr as Record<string, unknown>;
+                  // Log the full error object to identify the real failure reason
+                  console.error('[API/analyze] Primary stream error detail:', JSON.stringify({
+                    name: (streamErr as Error)?.name,
+                    message: (streamErr as Error)?.message,
+                    statusCode: e.statusCode,
+                    url: e.url,
+                    responseBody: e.responseBody,
+                    cause: (streamErr as Error)?.cause,
+                  }, null, 2));
                   if (e.statusCode) return `HTTP ${e.statusCode} from ${e.url ?? 'xAI'}`;
                 }
                 return streamErr instanceof Error ? streamErr.message : String(streamErr);

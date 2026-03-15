@@ -16,6 +16,23 @@ import {
 
 // No edge runtime — Node.js runtime needed for in-memory cache and full API surface
 
+// ── Route-level response cache (90s TTL) ─────────────────────────────────────
+const ROUTE_CACHE = new Map<string, { data: unknown; expires: number }>();
+const ROUTE_CACHE_TTL = 90_000;
+
+function getRouteCache(key: string): unknown | null {
+  const entry = ROUTE_CACHE.get(key);
+  return entry && entry.expires > Date.now() ? entry.data : null;
+}
+function setRouteCache(key: string, data: unknown): void {
+  ROUTE_CACHE.set(key, { data, expires: Date.now() + ROUTE_CACHE_TTL });
+}
+
+function isRateLimitError(err: unknown): boolean {
+  const msg = String(err);
+  return msg.includes('429') || msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('too_many_requests');
+}
+
 /**
  * GET /api/kalshi
  * Fetch Kalshi prediction markets
@@ -31,6 +48,16 @@ import {
  *  - search:    Free-text title search
  */
 export async function GET(request: Request) {
+  // Serve from route-level cache when available (disabled in test env to preserve mock isolation)
+  const cacheKey = request.url;
+  const isTest = process.env.NODE_ENV === 'test';
+  if (!isTest) {
+    const cached = getRouteCache(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
+    }
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const ticker      = searchParams.get('ticker');
@@ -161,17 +188,27 @@ export async function GET(request: Request) {
 
     console.log(`[v0] [API] [KALSHI] ✓ Returning ${markets.length} markets`);
 
-    return NextResponse.json({
+    const responseData = {
       success: true,
       markets,
       count: markets.length,
       category: finalCategory || type || 'all',
       timestamp: new Date().toISOString(),
-    });
+    };
+    if (!isTest) setRouteCache(cacheKey, responseData);
+    return NextResponse.json(responseData);
 
   } catch (error: any) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[v0] [API] [KALSHI] Error:', msg);
+    if (isRateLimitError(error)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Market data temporarily unavailable — rate limit reached. Try again in a moment.',
+        rateLimited: true,
+        markets: [],
+      }, { status: 503 });
+    }
     return NextResponse.json({ success: false, error: msg, markets: [] }, { status: 500 });
   }
 }

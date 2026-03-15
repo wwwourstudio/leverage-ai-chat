@@ -31,7 +31,6 @@ const SettingsLightbox = dynamic(() => import('@/components/SettingsLightbox').t
 const AlertsLightbox = dynamic(() => import('@/components/AlertsLightbox').then(m => ({ default: m.AlertsLightbox })), { ssr: false });
 const StripeLightbox = dynamic(() => import('@/components/StripeLightbox').then(m => ({ default: m.StripeLightbox })), { ssr: false });
 const UserLightbox = dynamic(() => import('@/components/UserLightbox').then(m => ({ default: m.UserLightbox })), { ssr: false });
-const MarketIntelligencePanel = dynamic(() => import('@/components/market-intelligence/MarketIntelligencePanel').then(m => ({ default: m.MarketIntelligencePanel })), { ssr: false });
 import { useToast } from '@/components/toast-provider';
 import { Sidebar } from '@/components/Sidebar';
 import { ChatHeader } from '@/components/chat-header';
@@ -270,7 +269,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [showSignupModal, setShowSignupModal] = useState(false);
   const [showSettingsLightbox, setShowSettingsLightbox] = useState(false);
   const [showAlertsLightbox, setShowAlertsLightbox] = useState(false);
-  const [showIntelPanel, setShowIntelPanel] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
   const [showStripeLightbox, setShowStripeLightbox] = useState(false);
   const [showUserLightbox, setShowUserLightbox] = useState(false);
@@ -3050,8 +3048,6 @@ No preamble. Start directly with section 1.`;
           onOpenAlerts={() => setShowAlertsLightbox(true)}
           alertCount={alertCount}
           onOpenSettings={() => setShowSettingsLightbox(true)}
-          onOpenIntelPanel={() => setShowIntelPanel(v => !v)}
-          intelPanelOpen={showIntelPanel}
           onOpenLogin={() => setShowLoginModal(true)}
           onOpenSignup={() => setShowSignupModal(true)}
         />
@@ -4282,13 +4278,6 @@ No preamble. Start directly with section 1.`;
         onCreditsAdded={addCredits}
         creditsRemaining={creditsRemaining}
         userEmail={user?.email}
-      />
-
-      {/* Market Intelligence Panel */}
-      <MarketIntelligencePanel
-        isOpen={showIntelPanel}
-        onClose={() => setShowIntelPanel(false)}
-        sport={selectedSport ?? undefined}
       />
 
       <style>

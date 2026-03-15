@@ -65,9 +65,13 @@ interface StoredOddsRow {
 }
 
 /**
- * Get Supabase client with service role key (for writes)
+ * Get Supabase client with service role key (for writes).
+ * Module-level singleton to avoid multiple GoTrueClient instances.
  */
+let _oddsPersistenceClient: ReturnType<typeof createClient> | null = null;
+
 function getSupabaseClient() {
+  if (_oddsPersistenceClient) return _oddsPersistenceClient;
   const supabaseUrl = getSupabaseUrl();
   const serviceKey = getSupabaseServiceKey();
 
@@ -75,7 +79,11 @@ function getSupabaseClient() {
     throw new Error('Supabase not configured. Missing URL or service key.');
   }
 
-  return createClient(supabaseUrl, serviceKey, { db: { schema: 'api' } });
+  _oddsPersistenceClient = createClient(supabaseUrl, serviceKey, {
+    db: { schema: 'api' },
+    auth: { persistSession: false },
+  });
+  return _oddsPersistenceClient;
 }
 
 /**

@@ -304,12 +304,22 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 // Uses the service role key (bypasses RLS) so no user session is needed.
 // Falls back silently — persistence failures never break the ADP tool.
 
+// Module-level singleton — reuse the same client across all calls so only one
+// GoTrueClient is instantiated per server process, avoiding the "Multiple
+// GoTrueClient instances detected" browser/server warning.
+let _adpSupabaseClient: Awaited<ReturnType<typeof import('@supabase/supabase-js')['createClient']>> | null = null;
+
 async function getADPSupabaseClient() {
+  if (_adpSupabaseClient) return _adpSupabaseClient;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
   const { createClient } = await import('@supabase/supabase-js');
-  return createClient(url, key, { db: { schema: 'api' } });
+  _adpSupabaseClient = createClient(url, key, {
+    db: { schema: 'api' },
+    auth: { persistSession: false },
+  });
+  return _adpSupabaseClient;
 }
 
 export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): Promise<void> {

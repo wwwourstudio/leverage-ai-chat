@@ -3087,7 +3087,7 @@ No preamble. Start directly with section 1.`;
                 
                 return (
                   <div
-                    key={message.id}
+                    key={message.id ?? `msg-${index}`}
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn ${isGrouped ? 'mt-1.5' : 'mt-5'}`}
                   >
                 <div className={message.role === 'user' ? 'max-w-[85%] md:max-w-[75%]' : 'w-full max-w-4xl lg:max-w-3xl'}>

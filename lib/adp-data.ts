@@ -304,19 +304,28 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 // Uses the service role key (bypasses RLS) so no user session is needed.
 // Falls back silently — persistence failures never break the ADP tool.
 
-// Store the singleton on globalThis so it survives across module re-evaluations
-// in both the browser (React Fast Refresh, multiple imports) and the server
-// (Next.js module caching edge cases). A plain module-level `let` is reset
-// whenever the module is re-evaluated, which is what triggers the
-// "Multiple GoTrueClient instances" warning.
+// On the server we need the service-role client (raw createClient from @supabase/supabase-js)
+// because we want to bypass RLS. On the client we MUST reuse the shared browser singleton
+// from lib/supabase/client.ts — creating a second GoTrueClient in the browser causes the
+// "Multiple GoTrueClient instances detected" warning and potential auth state corruption.
 const _GLOBAL_KEY = '__adpSupabaseClient__';
 
 async function getADPSupabaseClient() {
   const g = globalThis as Record<string, unknown>;
   if (g[_GLOBAL_KEY]) return g[_GLOBAL_KEY] as ReturnType<typeof import('@supabase/supabase-js').createClient>;
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
+
+  // In the browser, reuse the existing singleton to avoid spawning a second GoTrueClient.
+  if (typeof window !== 'undefined') {
+    const { createClient: createBrowserClient } = await import('@/lib/supabase/client');
+    g[_GLOBAL_KEY] = createBrowserClient();
+    return g[_GLOBAL_KEY] as ReturnType<typeof import('@supabase/supabase-js').createClient>;
+  }
+
+  // Server-side: create a service-role client (bypasses RLS, never touches the browser).
   const { createClient } = await import('@supabase/supabase-js');
   g[_GLOBAL_KEY] = createClient(url, key, { db: { schema: 'api' } });
   return g[_GLOBAL_KEY] as ReturnType<typeof import('@supabase/supabase-js').createClient>;

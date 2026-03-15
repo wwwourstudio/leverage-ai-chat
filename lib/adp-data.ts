@@ -304,18 +304,22 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 // Uses the service role key (bypasses RLS) so no user session is needed.
 // Falls back silently — persistence failures never break the ADP tool.
 
-// Singleton client — reused across all calls to avoid "Multiple GoTrueClient
-// instances detected" warnings caused by calling createClient on every invocation.
-let _adpSupabaseClient: ReturnType<typeof import('@supabase/supabase-js').createClient> | null = null;
+// Store the singleton on globalThis so it survives across module re-evaluations
+// in both the browser (React Fast Refresh, multiple imports) and the server
+// (Next.js module caching edge cases). A plain module-level `let` is reset
+// whenever the module is re-evaluated, which is what triggers the
+// "Multiple GoTrueClient instances" warning.
+const _GLOBAL_KEY = '__adpSupabaseClient__';
 
 async function getADPSupabaseClient() {
-  if (_adpSupabaseClient) return _adpSupabaseClient;
+  const g = globalThis as Record<string, unknown>;
+  if (g[_GLOBAL_KEY]) return g[_GLOBAL_KEY] as ReturnType<typeof import('@supabase/supabase-js').createClient>;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
   const { createClient } = await import('@supabase/supabase-js');
-  _adpSupabaseClient = createClient(url, key, { db: { schema: 'api' } });
-  return _adpSupabaseClient;
+  g[_GLOBAL_KEY] = createClient(url, key, { db: { schema: 'api' } });
+  return g[_GLOBAL_KEY] as ReturnType<typeof import('@supabase/supabase-js').createClient>;
 }
 
 export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): Promise<void> {

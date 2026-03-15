@@ -1017,25 +1017,27 @@ async function _generateContextualCards(
     try {
       const {
         fetchKalshiMarketsWithRetry,
-        fetchSportsMarkets,
-        fetchElectionMarkets,
-        fetchWeatherMarkets,
-        fetchFinanceMarkets,
         fetchTopMarketsByVolume,
         fetchMarketOrderbook,
         kalshiMarketToCard,
       } = await import('@/lib/kalshi-client');
+      const {
+        fetchSportsMarketsOptimized,
+        fetchElectionMarketsOptimized,
+        fetchWeatherMarketsOptimized,
+        fetchFinanceMarketsOptimized,
+      } = await import('@/lib/kalshi/single-call');
 
       let markets: any[] = [];
 
       if (sub === 'sports' || sub === 'sport') {
-        markets = await fetchSportsMarkets();
+        markets = await fetchSportsMarketsOptimized();
       } else if (sub === 'politics' || sub === 'elections' || sub === 'election') {
-        markets = await fetchElectionMarkets({ limit: count * 5 });
+        markets = await fetchElectionMarketsOptimized({ limit: count * 5 });
       } else if (sub === 'weather' || sub === 'climate') {
-        markets = await fetchWeatherMarkets(count * 5);
+        markets = await fetchWeatherMarketsOptimized(count * 5);
       } else if (['financials', 'finance', 'economics', 'crypto', 'companies'].includes(sub)) {
-        markets = await fetchFinanceMarkets(count * 5);
+        markets = await fetchFinanceMarketsOptimized(count * 5);
       } else if (sub === 'trending') {
         markets = await fetchTopMarketsByVolume(count);
       } else {

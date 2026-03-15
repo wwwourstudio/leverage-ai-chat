@@ -18,18 +18,6 @@ import {
 
 // No edge runtime — Node.js runtime needed for full API surface
 
-// ── Route-level response cache (90s TTL) ─────────────────────────────────────
-const ROUTE_CACHE = new Map<string, { data: unknown; expires: number }>();
-const ROUTE_CACHE_TTL = 90_000;
-
-function getRouteCache(key: string): unknown | null {
-  const entry = ROUTE_CACHE.get(key);
-  return entry && entry.expires > Date.now() ? entry.data : null;
-}
-function setRouteCache(key: string, data: unknown): void {
-  ROUTE_CACHE.set(key, { data, expires: Date.now() + ROUTE_CACHE_TTL });
-}
-
 function isRateLimitError(err: unknown): boolean {
   const msg = String(err);
   return msg.includes('429') || msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('too_many_requests');
@@ -50,16 +38,6 @@ function isRateLimitError(err: unknown): boolean {
  *  - search:    Free-text title search
  */
 export async function GET(request: Request) {
-  // Serve from route-level cache when available (disabled in test env to preserve mock isolation)
-  const cacheKey = request.url;
-  const isTest = process.env.NODE_ENV === 'test';
-  if (!isTest) {
-    const cached = getRouteCache(cacheKey);
-    if (cached) {
-      return NextResponse.json(cached);
-    }
-  }
-
   try {
     const { searchParams } = new URL(request.url);
     const ticker      = searchParams.get('ticker');
@@ -109,13 +87,13 @@ export async function GET(request: Request) {
       let markets: Awaited<ReturnType<typeof fetchKalshiMarkets>> = [];
 
       if (subcategory === 'sports' || subcategory === 'sport') {
-        markets = await fetchSportsMarkets();
+        markets = await fetchSportsMarketsOptimized();
       } else if (subcategory === 'politics' || subcategory === 'elections' || subcategory === 'election') {
-        markets = await fetchElectionMarkets({ year, limit: limit * 5 });
+        markets = await fetchElectionMarketsOptimized({ year, limit: limit * 5 });
       } else if (subcategory === 'weather' || subcategory === 'climate') {
-        markets = await fetchWeatherMarkets(limit * 5);
+        markets = await fetchWeatherMarketsOptimized(limit * 5);
       } else if (['financials', 'finance', 'economics', 'crypto', 'companies'].includes(subcategory)) {
-        markets = await fetchFinanceMarkets(limit * 5);
+        markets = await fetchFinanceMarketsOptimized(limit * 5);
       } else if (subcategory === 'trending') {
         markets = await fetchTopMarketsByVolume(limit);
       } else {
@@ -142,7 +120,7 @@ export async function GET(request: Request) {
 
     // ── Legacy type / category routing ───────────────────────────────────────
     if (type === 'election' || category === 'election' || category === 'politics') {
-      const markets = await fetchElectionMarkets({ year, limit });
+      const markets = await fetchElectionMarketsOptimized({ year, limit });
       return NextResponse.json({
         success: true,
         markets,
@@ -173,11 +151,11 @@ export async function GET(request: Request) {
     } else if (type === 'sports') {
       markets = finalCategory
         ? await fetchKalshiMarkets({ category: finalCategory, limit })
-        : await fetchSportsMarkets();
+        : await fetchSportsMarketsOptimized();
     } else if (type === 'weather') {
-      markets = await fetchWeatherMarkets(limit);
+      markets = await fetchWeatherMarketsOptimized(limit);
     } else if (type === 'finance') {
-      markets = await fetchFinanceMarkets(limit);
+      markets = await fetchFinanceMarketsOptimized(limit);
     } else if (type === 'trending') {
       markets = await fetchTopMarketsByVolume(limit);
     } else if (search) {
@@ -197,7 +175,6 @@ export async function GET(request: Request) {
       category: finalCategory || type || 'all',
       timestamp: new Date().toISOString(),
     };
-    if (!isTest) setRouteCache(cacheKey, responseData);
     return NextResponse.json(responseData);
 
   } catch (error: any) {
@@ -230,13 +207,13 @@ export async function POST(request: Request) {
     const sub = (subcategory || '').toLowerCase();
 
     if (sub === 'sports' || sub === 'sport') {
-      markets = await fetchSportsMarkets();
+      markets = await fetchSportsMarketsOptimized();
     } else if (sub === 'politics' || sub === 'elections' || sub === 'election') {
-      markets = await fetchElectionMarkets({ limit: limit * 5 });
+      markets = await fetchElectionMarketsOptimized({ limit: limit * 5 });
     } else if (sub === 'weather' || sub === 'climate') {
-      markets = await fetchWeatherMarkets(limit * 5);
+      markets = await fetchWeatherMarketsOptimized(limit * 5);
     } else if (['financials', 'finance', 'economics', 'crypto', 'companies'].includes(sub)) {
-      markets = await fetchFinanceMarkets(limit * 5);
+      markets = await fetchFinanceMarketsOptimized(limit * 5);
     } else if (sub === 'trending') {
       markets = await fetchTopMarketsByVolume(limit);
     } else {

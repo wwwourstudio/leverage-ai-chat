@@ -5,20 +5,16 @@
  * Passes pre-fetched data to client component for hydration.
  *
  * @module app/page-wrapper
- * @version 3
+ * @version 4
  */
 
 export const dynamic = 'force-dynamic';
 
 import { Suspense } from 'react';
-import dynamicImport from 'next/dynamic';
 import { loadServerData, type ServerDataResult } from '@/lib/server-data-loader';
 import { logEnvValidation, validateServerEnv } from '@/lib/config';
 import { CardGrid } from '@/components/data-cards/CardSkeleton';
-
-// Dynamic import breaks the static SSR chunk reference to page-client,
-// preventing the browser from preloading stale cached chunks.
-const UnifiedAIPlatform = dynamicImport(() => import('@/app/page-client'), { ssr: true });
+import UnifiedAIPlatform from '@/app/page-client';
 
 export type ServerDataProps = ServerDataResult;
 

@@ -7,10 +7,9 @@
  */
 
 import crypto from 'crypto';
+import { unstable_cache } from 'next/cache';
 
 const KALSHI_TRADING_URL = 'https://api.elections.kalshi.com/trade-api/v2';
-// No separate fallback — both resolve to the same host, so we use one URL and retry with backoff.
-const KALSHI_FALLBACK_URL = KALSHI_TRADING_URL;
 
 export interface KalshiMarket {
   ticker: string;
@@ -41,41 +40,33 @@ interface KalshiPage {
   cursor: string | null;
 }
 
-// In-memory cache with TTL
-interface CacheEntry {
-  data: KalshiMarket[];
-  timestamp: number;
-  ttl: number;
-}
-
-const marketCache = new Map<string, CacheEntry>();
-
-// Tracks in-flight requests by cache key so concurrent callers share one HTTP request
-const pendingRequests = new Map<string, Promise<KalshiMarket[]>>();
+// ── Shared cross-instance cache ──────────────────────────────────────────────
+// unstable_cache is shared across ALL serverless instances in the same deployment,
+// unlike a module-level Map which is per-instance. This prevents the burst of
+// duplicate requests that causes 429s when multiple cold-start instances fire
+// simultaneously.
+const KALSHI_CACHE_TTL_SECONDS = 300; // 5 minutes
 
 /**
- * Global Kalshi request limiter — ensures a minimum gap between API calls to avoid 429s.
- * All fetchKalshiPage calls are serialized through this queue.
- * Minimum gap: 400ms between requests (Kalshi allows ~2-3 req/s publicly).
+ * Wrap a Kalshi API fetch in Next.js unstable_cache so the result is shared
+ * across concurrent serverless instances.  Falls back to a direct fetch if
+ * unstable_cache is unavailable (e.g. in unit tests).
  */
-const MIN_REQUEST_GAP_MS = 400;
-let lastRequestTime = 0;
-let requestQueue: Promise<void> = Promise.resolve();
-
-function throttledRequest<T>(fn: () => Promise<T>): Promise<T> {
-  const result = requestQueue.then(async () => {
-    const now = Date.now();
-    const gap = now - lastRequestTime;
-    if (gap < MIN_REQUEST_GAP_MS) {
-      await new Promise(r => setTimeout(r, MIN_REQUEST_GAP_MS - gap));
-    }
-    lastRequestTime = Date.now();
+function withKalshiCache<T>(
+  key: string,
+  fn: () => Promise<T>,
+  ttl: number = KALSHI_CACHE_TTL_SECONDS,
+): Promise<T> {
+  try {
+    return unstable_cache(fn, [key], { revalidate: ttl, tags: ['kalshi'] })();
+  } catch {
+    // unstable_cache unavailable outside Next.js runtime (tests, scripts)
     return fn();
-  });
-  // Advance the queue independently of the result so the next call always waits
-  requestQueue = result.then(() => undefined, () => undefined);
-  return result;
+  }
 }
+
+// ── Simple per-process dedup (last-resort for same-instance concurrent calls) ─
+const pendingRequests = new Map<string, Promise<KalshiMarket[]>>();
 
 /**
  * Generate cache key from parameters
@@ -88,38 +79,6 @@ function getCacheKey(params?: {
 }): string {
   const { category, status, limit, search } = params || {};
   return `kalshi:${category || 'all'}:${status || 'open'}:${limit || 200}:${search || ''}`;
-}
-
-/**
- * Get cached markets if available and not expired
- */
-function getCachedMarkets(cacheKey: string): KalshiMarket[] | null {
-  const cached = marketCache.get(cacheKey);
-
-  if (!cached) return null;
-
-  const now = Date.now();
-  if ((now - cached.timestamp) > cached.ttl) {
-    console.log('[KALSHI] Cache expired for key:', cacheKey);
-    marketCache.delete(cacheKey);
-    return null;
-  }
-
-  const remainingMs = cached.ttl - (now - cached.timestamp);
-  console.log(`[KALSHI] Cache hit! Remaining TTL: ${Math.floor(remainingMs / 1000)}s`);
-  return cached.data;
-}
-
-/**
- * Store markets in cache with TTL
- */
-function cacheMarkets(cacheKey: string, markets: KalshiMarket[], ttlMs: number = 60000): void {
-  marketCache.set(cacheKey, {
-    data: markets,
-    timestamp: Date.now(),
-    ttl: ttlMs,
-  });
-  console.log(`[KALSHI] Cached ${markets.length} markets with ${ttlMs / 1000}s TTL`);
 }
 
 /** Build auth headers with RSA-SHA256 signing when credentials are available */
@@ -271,27 +230,23 @@ function parseMarket(m: any): KalshiMarket {
 
 /**
  * Fetch a single page of markets with 429-aware retry logic.
- * All requests are serialized through a global throttle queue (min 400ms gap).
  * On 429, waits with exponential backoff + jitter before retrying (up to 3 attempts).
+ * Callers should use fetchKalshiMarkets (which wraps this in unstable_cache) rather
+ * than calling fetchKalshiPage directly, to avoid redundant cross-instance requests.
  */
 async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage> {
   const url = `${KALSHI_TRADING_URL}/markets?${queryParams}`;
   const MAX_ATTEMPTS = 3;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    // Run through the global throttle queue — ensures minimum gap between all API calls
-    const response = await throttledRequest(() =>
-      fetch(url, {
-        headers: buildHeaders(url),
-        signal: AbortSignal.timeout(15000),
-      })
-    );
+    const response = await fetch(url, {
+      headers: buildHeaders(url),
+      signal: AbortSignal.timeout(15000),
+    });
 
     if (response.status === 429) {
       const retryAfterSec = Number(response.headers.get('Retry-After') ?? 0);
-      // Exponential backoff: 2s, 4s, 8s — larger than the previous 1s/2s/4s because
-      // the throttle queue already adds 400ms between calls; if we still hit 429 we need
-      // a meaningful cooldown.
+      // Exponential backoff: 2s, 4s, 8s
       const baseDelay = retryAfterSec > 0
         ? retryAfterSec * 1000
         : Math.min(2000 * 2 ** attempt, 10000);
@@ -303,9 +258,8 @@ async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage
       if (attempt < MAX_ATTEMPTS - 1) {
         console.log(`[KALSHI] Rate limited — waiting ${waitMs}ms before retry ${attempt + 1}/${MAX_ATTEMPTS - 1}`);
         await new Promise(r => setTimeout(r, waitMs));
-        continue; // retry
+        continue;
       }
-      // All retries exhausted
       throw new Error(`Kalshi API error: 429 Too Many Requests`);
     }
 
@@ -323,8 +277,6 @@ async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage
       return { markets: [], cursor: null };
     }
 
-    // Reject titles shorter than 10 chars or that look like raw ticker symbols
-    // (all-caps + digits + dashes/dots/%, e.g. "KXBT-25DEC25-T45000")
     const TICKER_RE = /^[A-Z0-9\-\.%]+$/;
     const markets = data.markets
       .map(parseMarket)
@@ -343,11 +295,8 @@ async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage
 
 /**
  * Fetch active markets from Kalshi.
- *
- * Supports keyword title searches:
- * - 'election' → election markets
- * - 'politics' → political markets
- * - 'NFL', 'NBA', 'MLB', 'NHL' → sport markets
+ * Results are cached via Next.js unstable_cache (shared across all serverless instances)
+ * with a 5-minute TTL to prevent burst 429s on concurrent cold starts.
  */
 export async function fetchKalshiMarkets(params?: {
   category?: string;
@@ -358,27 +307,9 @@ export async function fetchKalshiMarkets(params?: {
   useCache?: boolean;
   cacheTtlMs?: number;
 }): Promise<KalshiMarket[]> {
-  // Default TTL raised to 5 minutes to survive repeated serverless cold-starts and avoid 429s.
   const { category, status = 'open', limit = 200, search, cursor, useCache = true, cacheTtlMs = 300_000 } = params || {};
   const cacheKey = getCacheKey({ category, status, limit, search });
-
-  // Check cache first (only when not mid-pagination)
-  if (useCache && !cursor) {
-    const cached = getCachedMarkets(cacheKey);
-    if (cached) {
-      console.log('[KALSHI] Returning cached markets');
-      return cached;
-    }
-
-    // Coalesce: if an identical request is already in-flight, await that promise
-    const pending = pendingRequests.get(cacheKey);
-    if (pending) {
-      console.log('[KALSHI] Request already in-flight, coalescing:', cacheKey);
-      return pending;
-    }
-  }
-
-  console.log('[KALSHI] Cache miss, fetching from API...');
+  const cacheTtlSec = Math.ceil(cacheTtlMs / 1000);
 
   const doFetch = async (): Promise<KalshiMarket[]> => {
     try {
@@ -387,35 +318,27 @@ export async function fetchKalshiMarkets(params?: {
         status,
       });
 
-      // Use title keyword search (series_ticker expects exact IDs like "KXBT", not names)
       const categorySearchMap: Record<string, string> = {
-        // Elections & Politics
         'election': 'election', 'elections': 'election', 'politics': 'senate',
         'political': 'senate', '2026': '2026', 'president': 'president',
         'presidential': 'president', 'congress': 'congress', 'senate': 'senate',
         'house': 'house representatives', 'governor': 'governor',
-        // Finance & Economics
         'finance': 'stock', 'financial': 'stock market', 'stocks': 'stock',
         'crypto': 'bitcoin', 'bitcoin': 'bitcoin', 'ethereum': 'ethereum',
         'interest_rate': 'interest rate', 'fed': 'federal reserve',
         'inflation': 'inflation', 'gdp': 'GDP', 'recession': 'recession',
         'unemployment': 'unemployment', 'sp500': 'S&P', 'nasdaq': 'NASDAQ',
         'economy': 'economic',
-        // Weather & Climate
         'weather': 'temperature', 'climate': 'climate', 'hurricane': 'hurricane',
         'tornado': 'tornado', 'temperature': 'temperature', 'snow': 'snow',
         'rain': 'rainfall', 'wildfire': 'wildfire', 'earthquake': 'earthquake',
-        // Sports
         'sports': 'game', 'nfl': 'NFL', 'nba': 'NBA', 'mlb': 'MLB',
         'nhl': 'NHL', 'soccer': 'soccer', 'mma': 'UFC', 'boxing': 'boxing',
         'golf': 'golf', 'tennis': 'tennis', 'f1': 'Formula',
-        // Entertainment & Culture
         'entertainment': 'award', 'oscars': 'Oscar', 'grammys': 'Grammy',
         'emmys': 'Emmy', 'movies': 'box office', 'tv': 'ratings',
-        // Tech & Science
         'tech': 'technology', 'ai': 'artificial intelligence', 'spacex': 'SpaceX',
         'space': 'space', 'nasa': 'NASA',
-        // Global Events
         'war': 'conflict', 'global': 'global', 'china': 'China', 'russia': 'Russia',
         'ukraine': 'Ukraine', 'trade': 'trade', 'tariff': 'tariff',
       };
@@ -436,11 +359,6 @@ export async function fetchKalshiMarkets(params?: {
       const { markets: meaningfulMarkets } = await fetchKalshiPage(queryParams);
 
       console.log(`[KALSHI] Fetched ${meaningfulMarkets.length} meaningful markets`);
-
-      if (useCache && !cursor && meaningfulMarkets.length > 0) {
-        cacheMarkets(cacheKey, meaningfulMarkets, cacheTtlMs);
-      }
-
       return meaningfulMarkets;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
@@ -451,16 +369,26 @@ export async function fetchKalshiMarkets(params?: {
         console.error(`[KALSHI] ❌ Failed to fetch markets: ${err.message}${cause ? ` (cause: ${cause.code ?? cause.message ?? cause})` : ''}`);
       }
       return [];
-    } finally {
-      pendingRequests.delete(cacheKey);
     }
   };
 
-  const fetchPromise = doFetch();
-  if (useCache && !cursor) {
-    pendingRequests.set(cacheKey, fetchPromise);
+  // When caching is disabled or paginating, fetch directly
+  if (!useCache || cursor) {
+    return doFetch();
   }
-  return fetchPromise;
+
+  // Dedup same-instance concurrent calls while unstable_cache is resolving
+  const pending = pendingRequests.get(cacheKey);
+  if (pending) {
+    console.log('[KALSHI] Request already in-flight, coalescing:', cacheKey);
+    return pending;
+  }
+
+  const promise = withKalshiCache(cacheKey, doFetch, cacheTtlSec).finally(() => {
+    pendingRequests.delete(cacheKey);
+  });
+  pendingRequests.set(cacheKey, promise);
+  return promise;
 }
 
 /**
@@ -587,64 +515,36 @@ export async function fetchKalshiMarketsWithRetry(params?: {
 
 /**
  * Fetch sports-related markets from Kalshi.
- * Searches across all supported sports using keyword title searches, deduplicated by ticker.
+ * Uses 2 broad API calls ('sports' + 'championship') with client-side dedup,
+ * down from 12 batched calls that reliably triggered 429s on concurrent cold starts.
  */
 export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
-  // Trimmed to the 12 most consistently active sports to avoid hammering Kalshi's
-  // rate limit (previously 29 searches → 429 errors on batches 2+).
-  const sportSearches = [
-    { search: 'NFL',          label: 'NFL' },
-    { search: 'Super Bowl',   label: 'Super Bowl' },
-    { search: 'NBA',          label: 'NBA' },
-    { search: 'March Madness',label: 'March Madness' },
-    { search: 'NCAAB',        label: 'NCAAB' },
-    { search: 'MLB',          label: 'MLB' },
-    { search: 'NHL',          label: 'NHL' },
-    { search: 'Stanley Cup',  label: 'Stanley Cup' },
-    { search: 'NASCAR',       label: 'NASCAR' },
-    { search: 'UFC',          label: 'UFC' },
-    { search: 'Masters',      label: 'Masters' },
-    { search: 'Formula 1',    label: 'F1' },
-  ];
+  const SPORTS_KEYWORDS = ['nfl', 'nba', 'mlb', 'nhl', 'super bowl', 'world series', 'stanley cup',
+    'championship', 'playoff', 'march madness', 'ncaa', 'ufc', 'formula', 'nascar',
+    'golf', 'masters', 'tennis', 'soccer', 'mls', 'world cup', 'boxing'];
+
+  console.log('[KALSHI] Fetching sports markets...');
+
+  // Two broad searches cover the full sports catalogue; each result is unstable_cache'd
+  // for 5 minutes so concurrent instances share the same HTTP response.
+  const [sportsMarkets, champMarkets] = await Promise.allSettled([
+    fetchKalshiMarkets({ search: 'sports', limit: 200, cacheTtlMs: 300_000 }),
+    fetchKalshiMarkets({ search: 'championship', limit: 200, cacheTtlMs: 300_000 }),
+  ]);
 
   const seen = new Set<string>();
   const allMarkets: KalshiMarket[] = [];
 
-  console.log(`[KALSHI] Fetching sports markets across ${sportSearches.length} categories...`);
-
-  // Batch into groups of 3 with a 400 ms pause between batches to stay within
-  // Kalshi's rate limit.  Results are cached for 5 minutes to reduce re-fetches
-  // across warm Lambda invocations.
-  const batchSize = 3;
-  const BATCH_DELAY_MS = 400;
-  const SPORTS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-  for (let i = 0; i < sportSearches.length; i += batchSize) {
-    const batch = sportSearches.slice(i, i + batchSize);
-    const results = await Promise.allSettled(
-      batch.map(({ search }) =>
-        fetchKalshiMarkets({ search, limit: 100, useCache: true, cacheTtlMs: SPORTS_CACHE_TTL_MS })
-      )
-    );
-
-    for (let j = 0; j < results.length; j++) {
-      const result = results[j];
-      if (result.status === 'fulfilled') {
-        for (const market of result.value) {
-          if (!seen.has(market.ticker)) {
-            seen.add(market.ticker);
-            allMarkets.push(market);
-          }
+  for (const result of [sportsMarkets, champMarkets]) {
+    if (result.status === 'fulfilled') {
+      for (const market of result.value) {
+        if (seen.has(market.ticker)) continue;
+        seen.add(market.ticker);
+        const text = `${market.title} ${market.category} ${market.subtitle}`.toLowerCase();
+        if (SPORTS_KEYWORDS.some(k => text.includes(k))) {
+          allMarkets.push(market);
         }
-        console.log(`[KALSHI] ${batch[j].label}: ${result.value.length} markets`);
-      } else {
-        console.warn(`[KALSHI] ${batch[j].label} failed:`, result.reason);
       }
-    }
-
-    // Pause between batches (skip after the final batch)
-    if (i + batchSize < sportSearches.length) {
-      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
     }
   }
 
@@ -653,7 +553,10 @@ export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
 }
 
 /**
- * Fetch election-related markets from Kalshi
+ * Fetch election-related markets from Kalshi.
+ * Uses a SINGLE broad API call (search: 'election') and filters client-side.
+ * This is critical — multiple sequential API calls to the same serverless endpoint
+ * each trigger a separate cold-start and independently burst Kalshi's rate limit.
  */
 export async function fetchElectionMarkets(options?: {
   year?: number;
@@ -674,85 +577,39 @@ export async function fetchElectionMarkets(options?: {
     return ELECTION_KEYWORDS.some(k => text.includes(k)) || text.includes(year.toString());
   }
 
-  // Reduced to 3 broad searches (was 7) — each goes through the global throttle queue
-  // (400ms minimum gap), so 7 searches was generating ~3 req/s and reliably hitting 429s.
-  // These 3 terms cover all meaningful election content on Kalshi.
-  const searchStrategies: Array<Parameters<typeof fetchKalshiMarkets>[0]> = [
-    { search: 'election' },
-    { search: 'senate' },
-    { search: 'congress' },
-  ];
+  // Single broad API call — client-side filtering handles subcategory matching.
+  // Previously 3+ calls ('election', 'senate', 'congress') which burst 429s on
+  // concurrent cold-start instances.
+  const markets = await fetchKalshiMarkets({
+    search: 'election',
+    limit: Math.max(200, limit * 10),
+    cacheTtlMs: 300_000,
+  });
 
-  const seen = new Set<string>();
-  const electionMarkets: KalshiMarket[] = [];
-  // No manual delay needed — fetchKalshiPage routes through throttledRequest automatically.
-
-  for (let si = 0; si < searchStrategies.length; si++) {
-    if (electionMarkets.length >= limit) break;
-
-    const strategy = searchStrategies[si];
-    const markets = await fetchKalshiMarkets({ ...strategy, limit: 50 });
-
-    for (const market of markets) {
-      if (seen.has(market.ticker)) continue;
-      seen.add(market.ticker);
-      if (isElectionMarket(market)) {
-        electionMarkets.push(market);
-      }
-    }
-  }
-
-  // Fallback: if no matches after all strategies, fetch a broad set and filter.
-  // This handles the case where the Kalshi API returns unrelated markets for all searches.
-  if (electionMarkets.length === 0) {
-    console.log('[KALSHI] No election markets from targeted searches — falling back to broad fetch');
-    try {
-      const broad = await fetchKalshiMarketsWithRetry({ limit: 200, maxRetries: 2 });
-      for (const market of broad) {
-        if (!seen.has(market.ticker) && isElectionMarket(market)) {
-          electionMarkets.push(market);
-        }
-      }
-    } catch {
-      // Non-critical fallback
-    }
-  }
+  const electionMarkets = markets.filter(isElectionMarket);
 
   console.log(`[KALSHI] Found ${electionMarkets.length} election markets for ${year}`);
   return electionMarkets.slice(0, limit);
 }
 
 /**
- * Fetch weather-related markets from Kalshi
+ * Fetch weather-related markets from Kalshi.
+ * Single API call — broader client-side filtering covers all weather subcategories.
  */
 export async function fetchWeatherMarkets(limit: number = 50): Promise<KalshiMarket[]> {
-  // Trimmed to 3 broad terms to avoid Kalshi rate limits (previously 9 terms → 429 errors).
-  const weatherSearches = ['weather', 'temperature', 'climate'];
-  const WEATHER_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-  const seen = new Set<string>();
-  const all: KalshiMarket[] = [];
+  const WEATHER_KEYWORDS = ['weather', 'temperature', 'hurricane', 'tornado', 'snow', 'rain', 'wildfire', 'climate', 'storm', 'flood'];
 
   console.log('[KALSHI] Fetching weather markets...');
 
-  const results = await Promise.allSettled(
-    weatherSearches.map(search =>
-      fetchKalshiMarkets({ search, limit: 50, useCache: true, cacheTtlMs: WEATHER_CACHE_TTL_MS })
-    )
-  );
-  for (const result of results) {
-    if (result.status === 'fulfilled') {
-      for (const market of result.value) {
-        if (!seen.has(market.ticker)) {
-          seen.add(market.ticker);
-          all.push(market);
-        }
-      }
-    }
-  }
+  const markets = await fetchKalshiMarkets({ search: 'weather', limit: 200, cacheTtlMs: 300_000 });
 
-  console.log(`[KALSHI] Weather markets total: ${all.length}`);
-  return all.slice(0, limit);
+  const weatherMarkets = markets.filter(m => {
+    const text = `${m.title} ${m.category} ${m.subtitle}`.toLowerCase();
+    return WEATHER_KEYWORDS.some(k => text.includes(k));
+  });
+
+  console.log(`[KALSHI] Weather markets total: ${weatherMarkets.length}`);
+  return weatherMarkets.slice(0, limit);
 }
 
 /**

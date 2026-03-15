@@ -986,30 +986,60 @@ export async function POST(request: NextRequest) {
 
           // MLB Statcast: parse Grok's JSON response into a card
           if (isMLBStatcastMode && !usedFallback && !skipStatcastJSON) {
-            const jsonMatch = aiText.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              try {
-                const parsed = JSON.parse(jsonMatch[0]);
-                if (parsed && typeof parsed.type === 'string' && STATCAST_CARD_TYPES.has(parsed.type)) {
-                  const statcastCard: InsightCard = { icon: '⚾', ...parsed };
-                  cards = [statcastCard, ...cards.slice(0, 5)];
-                  pendingStatcastCard = null;
-                  const metricLines = (parsed.summary_metrics ?? [])
-                    .slice(0, 3)
-                    .map((m: { label: string; value: string }) => `**${m.label}:** ${m.value}`)
-                    .join(' · ');
-                  const cleanText = [
-                    `**${parsed.title}** — MLB Statcast Analysis`,
-                    metricLines,
-                    'See the card below for the full breakdown and splits.',
-                  ].filter(Boolean).join('\n');
-                  aiText = cleanText;
-                  // Replace the raw JSON the client already received with readable prose
-                  controller.enqueue(sseChunk({ type: 'replace', text: cleanText }));
-                }
-              } catch {
-                console.warn('[API/analyze] MLB JSON parse failed — returning raw text');
+            // Strip markdown code fences the model sometimes emits despite instructions
+            const stripped = aiText
+              .replace(/^```(?:json)?\s*/m, '')
+              .replace(/\s*```\s*$/m, '')
+              .trim();
+
+            // Try to extract the outermost JSON object robustly:
+            // 1. If the entire stripped text is valid JSON, use it directly.
+            // 2. Otherwise, find the first { and last } and try that substring.
+            const candidates: string[] = [];
+            try {
+              JSON.parse(stripped); // validate
+              candidates.push(stripped);
+            } catch {
+              const first = stripped.indexOf('{');
+              const last = stripped.lastIndexOf('}');
+              if (first !== -1 && last > first) {
+                candidates.push(stripped.slice(first, last + 1));
               }
+              // Also try non-greedy innermost match in case of nested extra text
+              const innerMatch = stripped.match(/\{[\s\S]+?\}/);
+              if (innerMatch && !candidates.includes(innerMatch[0])) {
+                candidates.push(innerMatch[0]);
+              }
+            }
+
+            let parsed: Record<string, unknown> | null = null;
+            for (const candidate of candidates) {
+              try {
+                const p = JSON.parse(candidate);
+                if (p && typeof p.type === 'string') { parsed = p; break; }
+              } catch {
+                // try next candidate
+              }
+            }
+
+            if (parsed && STATCAST_CARD_TYPES.has(parsed.type as string)) {
+              const statcastCard: InsightCard = { icon: '⚾', ...parsed };
+              cards = [statcastCard, ...cards.slice(0, 5)];
+              pendingStatcastCard = null;
+              const metricLines = ((parsed.summary_metrics as Array<{ label: string; value: string }>) ?? [])
+                .slice(0, 3)
+                .map((m) => `**${m.label}:** ${m.value}`)
+                .join(' · ');
+              const cleanText = [
+                `**${parsed.title}** — MLB Statcast Analysis`,
+                metricLines,
+                'See the card below for the full breakdown and splits.',
+              ].filter(Boolean).join('\n');
+              aiText = cleanText;
+              // Replace the raw JSON the client already received with readable prose
+              controller.enqueue(sseChunk({ type: 'replace', text: cleanText }));
+            } else {
+              console.warn('[API/analyze] MLB JSON parse failed — model output did not match expected card schema. Raw length:', aiText.length, 'Candidates tried:', candidates.length);
             }
           }
 

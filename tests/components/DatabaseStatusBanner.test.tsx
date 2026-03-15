@@ -7,7 +7,7 @@
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { DatabaseStatusBanner } from '@/components/database-status-banner';
+import { DatabaseStatusBanner } from '@/components/db-status-banner';
 
 // ── Mock lucide-react icons ───────────────────────────────────────────────────
 vi.mock('lucide-react', () => ({

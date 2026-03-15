@@ -24,13 +24,13 @@ describe('Odds API Route – Live Integration', () => {
       sports = await res.json();
     });
 
-    it('returns a non-empty array of sports', ({ skip }) => {
+    it('returns a non-empty array of sports', ({ skip }: any) => {
       if (!reachable) skip();
       expect(Array.isArray(sports)).toBe(true);
       expect(sports.length).toBeGreaterThan(0);
     });
 
-    it('each sport has the expected shape', ({ skip }) => {
+    it('each sport has the expected shape', ({ skip }: any) => {
       if (!reachable) skip();
       for (const sport of sports.slice(0, 5)) {
         expect(sport).toHaveProperty('key');
@@ -43,7 +43,7 @@ describe('Odds API Route – Live Integration', () => {
       }
     });
 
-    it('contains at least one active sport', ({ skip }) => {
+    it('contains at least one active sport', ({ skip }: any) => {
       if (!reachable) skip();
       const activeSports = sports.filter((s: any) => s.active);
       expect(activeSports.length).toBeGreaterThan(0);
@@ -66,12 +66,12 @@ describe('Odds API Route – Live Integration', () => {
       oddsData = await oddsResponse.json();
     });
 
-    it('returns an array of events', ({ skip }) => {
+    it('returns an array of events', ({ skip }: any) => {
       if (!reachable) skip();
       expect(Array.isArray(oddsData)).toBe(true);
     });
 
-    it('includes rate-limit headers', ({ skip }) => {
+    it('includes rate-limit headers', ({ skip }: any) => {
       if (!reachable) skip();
       const remaining = oddsResponse.headers.get('x-requests-remaining');
       const used = oddsResponse.headers.get('x-requests-used');
@@ -79,7 +79,7 @@ describe('Odds API Route – Live Integration', () => {
       expect(used).not.toBeNull();
     });
 
-    it('each event has required fields', ({ skip }) => {
+    it('each event has required fields', ({ skip }: any) => {
       if (!reachable) skip();
       for (const event of oddsData.slice(0, 5)) {
         expect(event).toHaveProperty('id');
@@ -91,7 +91,7 @@ describe('Odds API Route – Live Integration', () => {
       }
     });
 
-    it('events with bookmakers have well-formed market data', ({ skip }) => {
+    it('events with bookmakers have well-formed market data', ({ skip }: any) => {
       if (!reachable) skip();
       const eventsWithBooks = oddsData.filter(
         (e: any) => e.bookmakers && e.bookmakers.length > 0
@@ -141,7 +141,7 @@ describe('Odds API Route – Live Integration', () => {
       expect(calculateImpliedProbability(-110)).toBeCloseTo(0.5238, 3);
     });
 
-    it('produces valid probabilities from live odds data', async ({ skip }) => {
+    it('produces valid probabilities from live odds data', async ({ skip }: any) => {
       if (!reachable) skip();
       const res = await fetch(
         `${BASE_URL}/sports/upcoming/odds?apiKey=${ODDS_API_KEY}&regions=us&markets=h2h`
@@ -167,7 +167,7 @@ describe('Odds API Route – Live Integration', () => {
    * Spreads market
    */
   describe('GET /sports/{sport}/odds with spreads market', () => {
-    it('returns spread data with point values', async ({ skip }) => {
+    it('returns spread data with point values', async ({ skip }: any) => {
       if (!reachable) skip();
       const res = await fetch(
         `${BASE_URL}/sports/upcoming/odds?apiKey=${ODDS_API_KEY}&regions=us&markets=spreads`
@@ -202,7 +202,7 @@ describe('Odds API Route – Live Integration', () => {
    * Error handling
    */
   describe('error handling', () => {
-    it('returns an error for an invalid sport key', async ({ skip }) => {
+    it('returns an error for an invalid sport key', async ({ skip }: any) => {
       if (!reachable) skip();
       const res = await fetch(
         `${BASE_URL}/sports/invalid_sport_xyz/odds?apiKey=${ODDS_API_KEY}&regions=us`
@@ -211,7 +211,7 @@ describe('Odds API Route – Live Integration', () => {
       expect(res.status).toBe(404);
     });
 
-    it('returns 401 for an invalid API key', async ({ skip }) => {
+    it('returns 401 for an invalid API key', async ({ skip }: any) => {
       if (!reachable) skip();
       const res = await fetch(
         `${BASE_URL}/sports/upcoming/odds?apiKey=invalid_key_12345&regions=us`

@@ -195,7 +195,7 @@ describe('Analyze Route – Live Integration', () => {
     liveOddsData = await res.json();
   });
 
-  it('works with numbers extracted from live odds data', ({ skip }) => {
+  it('works with numbers extracted from live odds data', ({ skip }: any) => {
     if (!reachable) skip();
     const allNumbers: number[] = [];
     for (const event of liveOddsData.slice(0, 20)) {
@@ -216,7 +216,7 @@ describe('Analyze Route – Live Integration', () => {
     }
   });
 
-  it('returns a high score when AI probabilities align with market', ({ skip }) => {
+  it('returns a high score when AI probabilities align with market', ({ skip }: any) => {
     if (!reachable) skip();
     const event = liveOddsData.find((e: any) =>
       e.bookmakers?.[0]?.markets?.some((m: any) => m.key === 'h2h')
@@ -245,7 +245,7 @@ describe('Analyze Route – Live Integration', () => {
     }
   });
 
-  it('returns a lower score when AI probabilities diverge from market', ({ skip }) => {
+  it('returns a lower score when AI probabilities diverge from market', ({ skip }: any) => {
     if (!reachable) skip();
     const event = liveOddsData.find((e: any) =>
       e.bookmakers?.[0]?.markets?.some((m: any) => m.key === 'h2h')
@@ -262,7 +262,7 @@ describe('Analyze Route – Live Integration', () => {
     }
   });
 
-  it('computes end-to-end trust metrics with live odds', ({ skip }) => {
+  it('computes end-to-end trust metrics with live odds', ({ skip }: any) => {
     if (!reachable) skip();
     const simulatedAIResponse = `
       Based on current NBA lines, the home team has a 58% win probability.

@@ -44,16 +44,29 @@ const CACHE_DURATION = {
 };
 
 const cache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_MAX_SIZE = 100; // prevent unbounded growth
+
+/** Evict expired entries; if still over max, remove oldest first. */
+function evictCache(): void {
+  const now = Date.now();
+  // Remove stale entries
+  for (const [key, entry] of cache) {
+    const maxTtl = Math.max(CACHE_DURATION.CARDS, CACHE_DURATION.INSIGHTS, CACHE_DURATION.ODDS);
+    if (now - entry.timestamp > maxTtl) cache.delete(key);
+  }
+  // If still over limit, evict oldest
+  while (cache.size > CACHE_MAX_SIZE) {
+    const oldest = [...cache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
+    if (oldest) cache.delete(oldest[0]);
+  }
+}
 
 /**
  * Safely parse JSON with error handling
  */
 async function safeJsonParse(response: Response): Promise<any> {
   try {
-    // Clone the response so we can read it multiple times if needed
-    const clonedResponse = response.clone();
-    
-    // First, get the text
+    // Get the text from the response (read once — clone removed as it was unused)
     const text = await response.text();
     
     console.log(`${LOG_PREFIXES.DATA_SERVICE} Response length: ${text.length} bytes`);
@@ -117,18 +130,23 @@ export async function fetchDynamicCards(params: {
 
   console.log(`${LOG_PREFIXES.DATA_SERVICE} Fetching cards:`, JSON.stringify(params));
   
-  const cacheKey = `cards:${JSON.stringify(params)}`;
+  // Sort keys for a deterministic cache key regardless of object property order
+  const cacheKey = `cards:${JSON.stringify(params, Object.keys(params).sort())}`;
   const cached = cache.get(cacheKey);
 
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION.CARDS) {
     return cached.data;
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
   try {
     const response = await fetch(API_ENDPOINTS.CARDS, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params)
+      body: JSON.stringify(params),
+      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -162,6 +180,7 @@ export async function fetchDynamicCards(params: {
       console.log(`${LOG_PREFIXES.DATA_SERVICE} Full API response:`, JSON.stringify(result, null, 2));
     }
 
+    evictCache();
     cache.set(cacheKey, { data: cards, timestamp: Date.now() });
     console.log(`${LOG_PREFIXES.DATA_SERVICE} ✓ Cached ${cards.length} cards`);
     console.log(`${LOG_PREFIXES.DATA_SERVICE} ========================================`);
@@ -174,6 +193,8 @@ export async function fetchDynamicCards(params: {
     console.log(`${LOG_PREFIXES.DATA_SERVICE} Returning empty array as fallback`);
     console.log(`${LOG_PREFIXES.DATA_SERVICE} ========================================`);
     return [];
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -204,10 +225,14 @@ export async function fetchUserInsights(): Promise<UserInsights> {
     return cached.data;
   }
 
+  const insightsController = new AbortController();
+  const insightsTimeoutId = setTimeout(() => insightsController.abort(), 10000); // 10s timeout
+
   try {
     console.log(`${LOG_PREFIXES.DATA_SERVICE} Fetching fresh insights from API`);
     const response = await fetch(API_ENDPOINTS.INSIGHTS, {
       method: 'GET',
+      signal: insightsController.signal,
     });
 
     if (!response.ok) {
@@ -221,7 +246,7 @@ export async function fetchUserInsights(): Promise<UserInsights> {
     }
 
     const result = await safeJsonParse(response);
-    
+
     if (!result || typeof result !== 'object') {
       throw new Error('Invalid response format from insights API');
     }
@@ -236,6 +261,7 @@ export async function fetchUserInsights(): Promise<UserInsights> {
       message: 'No insights available'
     };
 
+    evictCache();
     cache.set(cacheKey, { data: insights, timestamp: Date.now() });
     return insights;
   } catch (error) {
@@ -250,6 +276,8 @@ export async function fetchUserInsights(): Promise<UserInsights> {
       dataSource: DATA_SOURCES.ERROR,
       message: ERROR_MESSAGES.SERVICE_UNAVAILABLE
     };
+  } finally {
+    clearTimeout(insightsTimeoutId);
   }
 }
 
@@ -277,12 +305,16 @@ export async function fetchLiveOdds(sport: string, marketType: string = 'h2h') {
     return cached.data;
   }
 
+  const oddsController = new AbortController();
+  const oddsTimeoutId = setTimeout(() => oddsController.abort(), 10000); // 10s timeout
+
   try {
     console.log(`${LOG_PREFIXES.DATA_SERVICE} Fetching fresh odds from API`);
     const response = await fetch(API_ENDPOINTS.ODDS, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sport, marketType })
+      body: JSON.stringify({ sport, marketType }),
+      signal: oddsController.signal,
     });
 
     if (!response.ok) {
@@ -296,17 +328,20 @@ export async function fetchLiveOdds(sport: string, marketType: string = 'h2h') {
     }
 
     const result = await safeJsonParse(response);
+    evictCache();
     cache.set(cacheKey, { data: result, timestamp: Date.now() });
     return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.log(`${LOG_PREFIXES.DATA_SERVICE} Error fetching odds:`, errorMessage);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: errorMessage,
       events: [],
       timestamp: new Date().toISOString()
     };
+  } finally {
+    clearTimeout(oddsTimeoutId);
   }
 }
 

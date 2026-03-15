@@ -63,7 +63,7 @@ function kalshiOkResponse() {
 
 /** Create a fetch spy that dispatches by URL. */
 function mockFetch(overrides: Record<string, Response> = {}) {
-  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
     const url = String(input);
     for (const [pattern, resp] of Object.entries(overrides)) {
       if (url.includes(pattern)) return resp;

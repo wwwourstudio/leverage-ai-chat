@@ -21,13 +21,13 @@ export async function POST(request: NextRequest) {
     );
 
     // Run Benford's Law validation on all numeric values across the card batch
-    const allNums = cards.flatMap((c) =>
+    const allNums = cards.flatMap((c: any) =>
       Object.values(c.data ?? {}).filter((v): v is number => typeof v === 'number')
     );
     const benford = validateBenford(allNums);
 
     // Attach Benford result to each card's metadata
-    const validatedCards = cards.map((c) => ({
+    const validatedCards = cards.map((c: any) => ({
       ...c,
       metadata: {
         ...c.metadata,

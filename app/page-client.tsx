@@ -321,10 +321,10 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // Runs once on mount — safe because it's client-only (no server/client mismatch).
   useEffect(() => {
     const now = new Date();
-    setMessages(prev =>
+    setMessages((prev: any) =>
       prev[0]?.isWelcome ? [{ ...prev[0], timestamp: now }, ...prev.slice(1)] : prev
     );
-    setChats(prev =>
+    setChats((prev: any) =>
       prev[0]?.id === 'chat-1' ? [{ ...prev[0], timestamp: now }, ...prev.slice(1)] : prev
     );
   }, []);
@@ -334,7 +334,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // date/time calls are safe here (no server/client mismatch).
   useEffect(() => {
     const firstName = user?.name?.split(' ')[0] || undefined;
-    setMessages(prev => {
+    setMessages((prev: any) => {
       if (prev[0]?.isWelcome) {
         return [{ ...prev[0], content: getWelcomeMessage('all', undefined, firstName) }, ...prev.slice(1)];
       }
@@ -347,7 +347,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     const firstName = user?.name?.split(' ')[0] || undefined;
 
     // Update message text immediately
-    setMessages(prev => {
+    setMessages((prev: any) => {
       if (prev[0]?.isWelcome) {
         return [{ ...prev[0], content: getWelcomeMessage(selectedCategory, selectedSport || undefined, firstName) }, ...prev.slice(1)];
       }
@@ -538,7 +538,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
               // Load messages for the most recent thread
               loadMessages(threads[0].id).then(msgs => {
                 if (msgs.length > 0) {
-                  setMessages(msgs.map(m => ({
+                  setMessages(msgs.map((m: any) => ({
                     role: m.role,
                     content: m.content,
                     timestamp: m.timestamp,
@@ -546,7 +546,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
                     modelUsed: m.modelUsed,
                     confidence: m.confidence,
                     isWelcome: m.isWelcome,
-                  })));
+                  })) as any);
                 }
               });
             }
@@ -652,7 +652,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
     const refreshCards = async () => {
       // Only refresh if there are messages with cards showing
-      const hasCards = messages.some(m => m.role === 'assistant' && m.cards && m.cards.length > 0);
+      const hasCards = messages.some((m: any) => m.role === 'assistant' && m.cards && m.cards.length > 0);
       if (!hasCards || !lastUserQuery) return;
 
       try {
@@ -664,7 +664,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         if (freshCards.length === 0) return;
 
         const converted = freshCards.map(convertToInsightCard);
-        setMessages(prev => {
+        setMessages((prev: any) => {
           const updated = [...prev];
           // Update the last assistant message that has cards
           for (let i = updated.length - 1; i >= 0; i--) {
@@ -1052,11 +1052,11 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const generateCardAnalysis = async (card: InsightCard, cardKey: string) => {
     // Toggle: collapse if already open
     if (cardAnalysisMap[cardKey]?.content || cardAnalysisMap[cardKey]?.error) {
-      setCardAnalysisMap(prev => { const n = { ...prev }; delete n[cardKey]; return n; });
+      setCardAnalysisMap((prev: any) => { const n = { ...prev }; delete n[cardKey]; return n; });
       return;
     }
 
-    setCardAnalysisMap(prev => ({ ...prev, [cardKey]: { loading: true, content: null, error: null } }));
+    setCardAnalysisMap((prev: any) => ({ ...prev, [cardKey]: { loading: true, content: null, error: null } }));
 
     const d = card.data as any;
     const cardType = (card.type ?? '').toLowerCase();
@@ -1183,12 +1183,12 @@ No preamble. Start directly with section 1.`;
         result = await res.json().catch(() => ({ success: false, error: 'Invalid JSON response' })) as APIResponse;
       }
       if (!result.success) {
-        setCardAnalysisMap(prev => ({ ...prev, [cardKey]: { loading: false, content: null, error: result.error ?? 'Analysis failed' } }));
+        setCardAnalysisMap((prev: any) => ({ ...prev, [cardKey]: { loading: false, content: null, error: result.error ?? 'Analysis failed' } }));
         return;
       }
-      setCardAnalysisMap(prev => ({ ...prev, [cardKey]: { loading: false, content: result.text ?? null, error: null } }));
+      setCardAnalysisMap((prev: any) => ({ ...prev, [cardKey]: { loading: false, content: result.text ?? null, error: null } }));
     } catch {
-      setCardAnalysisMap(prev => ({ ...prev, [cardKey]: { loading: false, content: null, error: 'Network error — please try again' } }));
+      setCardAnalysisMap((prev: any) => ({ ...prev, [cardKey]: { loading: false, content: null, error: 'Network error — please try again' } }));
     }
   };
 
@@ -1241,7 +1241,7 @@ No preamble. Start directly with section 1.`;
       const isPoliticalMarket = politicalKeywords.some(k => lowerMsg.includes(k));
       
       // Sports detection - pass conversation history for context, but not for Kalshi queries
-      const conversationHistory = messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }));
+      const conversationHistory = messages.slice(-5).map((m: any) => ({ role: m.role, content: m.content || '' }));
       const detectedSport = extractSport(
         userMessage,
         (selectedCategory === 'kalshi' || isPoliticalMarket) ? undefined : conversationHistory
@@ -1286,7 +1286,7 @@ No preamble. Start directly with section 1.`;
         isPoliticalMarket: finalIsPoliticalMarket,
         hasBettingIntent,
         hasFantasyIntent,
-        previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' })),
+        previousMessages: messages.slice(-5).map((m: any) => ({ role: m.role, content: m.content || '' })),
         // Pass Kalshi sub-category pill value when in Kalshi mode
         kalshiSubcategory: selectedCategory === 'kalshi' && selectedSport ? selectedSport : undefined,
         // Pass selected tab so the API can route DFS vs fantasy correctly
@@ -1465,7 +1465,7 @@ No preamble. Start directly with section 1.`;
         if (res.headers.get('Content-Type')?.includes('text/event-stream')) {
           // ── Streaming path ───────────────────────────────────────────────
           streamingMessageId = crypto.randomUUID();
-          setMessages(prev => [...prev, {
+          setMessages((prev: any) => [...prev, {
             id: streamingMessageId!, role: 'assistant' as const, content: '',
             timestamp: new Date(), cards: [], isStreaming: true,
           }]);
@@ -1480,7 +1480,7 @@ No preamble. Start directly with section 1.`;
           const flushToState = () => {
             const snapshot = streamContent;
             if (mountedRef.current) {
-              setMessages(prev => prev.map(m =>
+              setMessages((prev: any) => prev.map((m: any) =>
                 m.id === streamingMessageId ? { ...m, content: snapshot } : m
               ));
             }
@@ -1506,7 +1506,7 @@ No preamble. Start directly with section 1.`;
                 streamContent = ev.text ?? streamContent;
                 if (rafHandle !== null) { cancelAnimationFrame(rafHandle); rafHandle = null; }
                 if (mountedRef.current) {
-                  setMessages(prev => prev.map(m =>
+                  setMessages((prev: any) => prev.map((m: any) =>
                     m.id === streamingMessageId ? { ...m, content: streamContent } : m
                   ));
                 }
@@ -1518,7 +1518,7 @@ No preamble. Start directly with section 1.`;
           // Flush any tokens buffered in the last partial frame
           if (rafHandle !== null) { cancelAnimationFrame(rafHandle); rafHandle = null; }
           if (streamContent && mountedRef.current) {
-            setMessages(prev => prev.map(m =>
+            setMessages((prev: any) => prev.map((m: any) =>
               m.id === streamingMessageId ? { ...m, content: streamContent } : m
             ));
           }
@@ -1667,7 +1667,7 @@ No preamble. Start directly with section 1.`;
           const category = selectedCategory === 'all' ? 'betting' : selectedCategory;
           const created = await createThread(category, userMessage.slice(0, 50));
           if (created) {
-            setChats(prev => prev.map(c => c.id === capturedChat ? { ...c, id: created.id } : c));
+            setChats((prev: any) => prev.map((c: any) => c.id === capturedChat ? { ...c, id: created.id } : c));
             setActiveChat(created.id);
           }
           return created?.id ?? null;
@@ -1867,7 +1867,7 @@ No preamble. Start directly with section 1.`;
     const msgLower = userMessage.toLowerCase();
     
     // Extract sport and category from message - use conversation history from context if available
-    const conversationHistory = context?.previousMessages || messages.slice(-5).map(m => ({ role: m.role, content: m.content || '' }));
+    const conversationHistory = context?.previousMessages || messages.slice(-5).map((m: any) => ({ role: m.role, content: m.content || '' }));
     const sport = extractSport(userMessage, conversationHistory);
     let category = 'all';
     
@@ -2300,7 +2300,7 @@ No preamble. Start directly with section 1.`;
         pendingThreadRef.current = null;
         if (created) {
           // Swap the temp ID for the real Supabase UUID
-          setChats(prev => prev.map(c => c.id === newChatId ? { ...c, id: created.id } : c));
+          setChats((prev: any) => prev.map((c: any) => c.id === newChatId ? { ...c, id: created.id } : c));
           setActiveChat(created.id);
         }
       });
@@ -2432,7 +2432,7 @@ No preamble. Start directly with section 1.`;
 
   const handleVote = useCallback(async (index: number, direction: 'up' | 'down') => {
     // Optimistic UI update
-    setMessages(prev => prev.map((m, i) => i === index ? { ...m, voted: direction } : m));
+    setMessages((prev: any) => prev.map((m: any, i: any) => i === index ? { ...m, voted: direction } : m));
     toast.success(direction === 'up' ? 'Marked helpful — thanks!' : "Got it, we'll improve this");
     try {
       await fetch('/api/feedback', {
@@ -2457,7 +2457,7 @@ No preamble. Start directly with section 1.`;
 
   const handleSaveChatTitle = (chatId: string) => {
     if (editingChatTitle.trim()) {
-      setChats(chats.map(chat =>
+      setChats(chats.map((chat: any) =>
         chat.id === chatId ? { ...chat, title: editingChatTitle.trim() } : chat
       ));
     }
@@ -3054,6 +3054,8 @@ No preamble. Start directly with section 1.`;
           onOpenAlerts={() => setShowAlertsLightbox(true)}
           alertCount={alertCount}
           onOpenSettings={() => setShowSettingsLightbox(true)}
+          onOpenIntelPanel={() => setShowIntelPanel((v: any) => !v)}
+          intelPanelOpen={showIntelPanel}
           onOpenLogin={() => setShowLoginModal(true)}
           onOpenSignup={() => setShowSignupModal(true)}
         />
@@ -3080,7 +3082,7 @@ No preamble. Start directly with section 1.`;
                 </div>
               </div>
             ) : (
-              messages.map((message, index) => {
+              messages.map((message: any, index: any) => {
                 // Group messages: Check if this message is from same sender as previous
                 const prevMessage = index > 0 ? messages[index - 1] : null;
                 const isGrouped = prevMessage && prevMessage.role === message.role;
@@ -3147,7 +3149,7 @@ No preamble. Start directly with section 1.`;
               <textarea
                 ref={textareaRef}
                 value={editingContent}
-                onChange={(e) => {
+                onChange={(e: any) => {
                   setEditingContent(e.target.value);
                   adjustTextareaHeight();
                 }}
@@ -3375,19 +3377,19 @@ No preamble. Start directly with section 1.`;
                           })()
                         ) : (
                           <div className="text-sm leading-relaxed font-medium space-y-3">
-                            {message.content.split('\n\n').map((paragraph, pIdx) => {
+                            {message.content.split('\n\n').map((paragraph: any, pIdx: any) => {
                               // Check if paragraph contains bullet points
                               if (paragraph.includes('\n**') && paragraph.includes('**')) {
                                 const lines = paragraph.split('\n');
                                 return (
                                   <div key={`p-${pIdx}-${paragraph.slice(0, 12)}`} className="space-y-2">
-                                    {lines.map((line, lIdx) => {
+                                    {lines.map((line: any, lIdx: any) => {
                                       // Bold text with ** **
                                       if (line.includes('**')) {
                                         const parts = line.split('**');
                                         return (
                                           <div key={`l-${lIdx}-${line.slice(0, 12)}`} className="flex items-start gap-2">
-                                            {parts.map((part, partIdx) => {
+                                            {parts.map((part: any, partIdx: any) => {
                                               if (partIdx % 2 === 1) {
                                                 return <span key={partIdx} className="font-black text-white">{part}</span>;
                                               } else if (part.trim()) {
@@ -3409,7 +3411,7 @@ No preamble. Start directly with section 1.`;
                                 const parts = paragraph.split('**');
                                 return (
                                   <p key={`p-${pIdx}-${paragraph.slice(0, 12)}`}>
-                                    {parts.map((part, partIdx) => {
+                                    {parts.map((part: any, partIdx: any) => {
                                       if (partIdx % 2 === 1) {
                                         return <span key={`b-${partIdx}`} className="font-black text-white">{part}</span>;
                                       }
@@ -3427,7 +3429,7 @@ No preamble. Start directly with section 1.`;
                         {/* File Attachments Display */}
                         {message.attachments && message.attachments.length > 0 && (
                           <div className="mt-4 space-y-3">
-                            {message.attachments.map((attachment) => (
+                            {message.attachments.map((attachment: any) => (
                               <div key={attachment.id}>
                                 {attachment.type === 'image' && (
                                   <div className="relative group/img rounded-xl overflow-hidden border border-gray-700/50 bg-gray-900/50">
@@ -3515,7 +3517,7 @@ No preamble. Start directly with section 1.`;
                       <CardLayout
                         cards={message.cards}
                         aiInsight={message.content}
-                        onAnalyze={(card) => {
+                        onAnalyze={(card: any) => {
                           const cardIndex = message.cards!.indexOf(card as InsightCard);
                           generateCardAnalysis(card as InsightCard, `${index}-${cardIndex}`);
                         }}
@@ -3525,7 +3527,7 @@ No preamble. Start directly with section 1.`;
                       />
 
                       {/* Analysis panels — full width below the card grid */}
-                      {message.cards.map((card, cardIndex) => {
+                      {message.cards.map((card: any, cardIndex: any) => {
                         const cardKey = `${index}-${cardIndex}`;
                         const analysis = cardAnalysisMap[cardKey];
                         const isOpen = analysis?.loading || !!analysis?.content || !!analysis?.error;
@@ -3547,7 +3549,7 @@ No preamble. Start directly with section 1.`;
                                     <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Analysis</span>
                                   </div>
                                   <button
-                                    onClick={() => setCardAnalysisMap(prev => { const n = { ...prev }; delete n[cardKey]; return n; })}
+                                    onClick={() => setCardAnalysisMap((prev: any) => { const n = { ...prev }; delete n[cardKey]; return n; })}
                                     className="text-gray-600 hover:text-gray-300 transition-colors"
                                     aria-label="Close analysis"
                                   >
@@ -3555,12 +3557,12 @@ No preamble. Start directly with section 1.`;
                                   </button>
                                 </div>
                                 <div className="text-xs text-gray-300 leading-relaxed space-y-2.5">
-                                  {(analysis.content ?? '').split('\n\n').map((para, pIdx) => {
+                                  {(analysis.content ?? '').split('\n\n').map((para: any, pIdx: any) => {
                                     if (para.includes('**')) {
                                       const parts = para.split('**');
                                       return (
                                         <p key={`ap-${pIdx}-${para.slice(0, 12)}`}>
-                                          {parts.map((part, partIdx) =>
+                                          {parts.map((part: any, partIdx: any) =>
                                             partIdx % 2 === 1
                                               ? <span key={`ab-${partIdx}`} className="font-bold text-white">{part}</span>
                                               : <span key={`as-${partIdx}`}>{part}</span>
@@ -3608,7 +3610,7 @@ No preamble. Start directly with section 1.`;
                             <ChevronRight className="w-3 h-3 group-open/sources:rotate-90 transition-transform shrink-0" />
                           </summary>
                           <div className="mt-2 flex flex-wrap gap-1.5">
-                            {message.sources.map((source, idx) => {
+                            {message.sources.map((source: any, idx: any) => {
                               const reliabilityColor = source.reliability >= 95 ? 'text-green-500 border-green-600/20' :
                                                       source.reliability >= 90 ? 'text-blue-500 border-blue-600/20' :
                                                       'text-yellow-500 border-yellow-600/20';
@@ -3863,7 +3865,7 @@ No preamble. Start directly with section 1.`;
                             onClick={() => {
                               const defaultPlatform = (SETUP_PLATFORMS[s.value] ?? SETUP_PLATFORMS.nfl)[0].value;
                               const defaultType = (SETUP_TYPES[s.value] ?? SETUP_TYPES.nfl)[0].value;
-                              setFantasySetupData(d => ({ ...d, sport: s.value, platform: defaultPlatform, leagueType: defaultType }));
+                              setFantasySetupData((d: any) => ({ ...d, sport: s.value, platform: defaultPlatform, leagueType: defaultType }));
                               setFantasySetupStep(1);
                             }}
                             className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all ${fantasySetupData.sport === s.value ? btnActive : btnInactive}`}>
@@ -3885,7 +3887,7 @@ No preamble. Start directly with section 1.`;
                             onClick={() => {
                               const sizes = p.value === 'nfbc' ? [12,15] : [8,10,12,14,16,20,24,30];
                               const newSize = sizes.includes(fantasySetupData.teams ?? 12) ? (fantasySetupData.teams ?? 12) : 12;
-                              setFantasySetupData(d => ({ ...d, platform: p.value, teams: newSize }));
+                              setFantasySetupData((d: any) => ({ ...d, platform: p.value, teams: newSize }));
                               setFantasySetupStep(2);
                             }}
                             className={`${btnBase} ${fantasySetupData.platform === p.value ? btnActive : btnInactive}`}>
@@ -3904,7 +3906,7 @@ No preamble. Start directly with section 1.`;
                         <div className="flex gap-3">
                           {[12,15].map(n => (
                             <button key={n}
-                              onClick={() => { setFantasySetupData(d => ({ ...d, teams: n })); setFantasySetupStep(3); }}
+                              onClick={() => { setFantasySetupData((d: any) => ({ ...d, teams: n })); setFantasySetupStep(3); }}
                               className={`flex-1 py-4 rounded-xl border text-2xl font-black transition-all ${(fantasySetupData.teams ?? 12) === n ? btnActive : btnInactive}`}>
                               {n}<span className="block text-[10px] font-normal opacity-60 mt-0.5">teams</span>
                             </button>
@@ -3918,13 +3920,13 @@ No preamble. Start directly with section 1.`;
                           </div>
                           <input type="range" min={8} max={30} step={1}
                             value={fantasySetupData.teams ?? 12}
-                            onChange={e => setFantasySetupData(d => ({ ...d, teams: parseInt(e.target.value) }))}
+                            onChange={(e: any) => setFantasySetupData((d: any) => ({ ...d, teams: parseInt(e.target.value) }))}
                             className="w-full accent-green-400 cursor-pointer" />
                           <div className="flex justify-between text-[9px] text-gray-600"><span>8</span><span>16</span><span>24</span><span>30</span></div>
                           <div className="flex flex-wrap gap-1.5 justify-center">
                             {teamSizes.map(n => (
                               <button key={n}
-                                onClick={() => setFantasySetupData(d => ({ ...d, teams: n }))}
+                                onClick={() => setFantasySetupData((d: any) => ({ ...d, teams: n }))}
                                 className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${(fantasySetupData.teams ?? 12) === n ? btnActive : btnInactive}`}>
                                 {n}
                               </button>
@@ -3946,7 +3948,7 @@ No preamble. Start directly with section 1.`;
                       <div className="space-y-2">
                         {leagueTypes.map(t => (
                           <button key={t.value}
-                            onClick={() => { setFantasySetupData(d => ({ ...d, leagueType: t.value })); setFantasySetupStep(4); }}
+                            onClick={() => { setFantasySetupData((d: any) => ({ ...d, leagueType: t.value })); setFantasySetupStep(4); }}
                             className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all ${fantasySetupData.leagueType === t.value ? btnActive : btnInactive}`}>
                             <span className="font-bold">{t.label}</span>
                           </button>
@@ -3961,12 +3963,12 @@ No preamble. Start directly with section 1.`;
                       <p className="text-xs text-gray-400 mb-1">Almost done! Name your league and team.</p>
                       <input type="text" placeholder="League name (e.g. The Winners Circle)"
                         value={fantasySetupData.leagueName || ''}
-                        onChange={e => setFantasySetupData(d => ({ ...d, leagueName: e.target.value }))}
+                        onChange={(e: any) => setFantasySetupData((d: any) => ({ ...d, leagueName: e.target.value }))}
                         className="w-full bg-gray-900/60 border border-green-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-500/60 transition-all"
                         maxLength={60} />
                       <input type="text" placeholder="Your team name (e.g. Gronk's Hammers)"
                         value={fantasySetupData.teamName || ''}
-                        onChange={e => setFantasySetupData(d => ({ ...d, teamName: e.target.value }))}
+                        onChange={(e: any) => setFantasySetupData((d: any) => ({ ...d, teamName: e.target.value }))}
                         className="w-full bg-gray-900/60 border border-green-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-500/60 transition-all"
                         maxLength={40} />
                       {/* Summary */}
@@ -4008,7 +4010,7 @@ No preamble. Start directly with section 1.`;
                   )}
 
                   {fantasySetupStep > 0 && (
-                    <button onClick={() => setFantasySetupStep(s => Math.max(0, s - 1))}
+                    <button onClick={() => setFantasySetupStep((s: any) => Math.max(0, s - 1))}
                       className="mt-2.5 text-[10px] text-gray-600 hover:text-gray-400 transition-colors">
                       ← Back
                     </button>
@@ -4079,7 +4081,7 @@ No preamble. Start directly with section 1.`;
               onRemoveFile={removeAttachment}
               onSaveFile={saveFileToProfile}
               onFileDrop={processFiles}
-              onFilesAdded={(files) => setUploadedFiles(prev => [...prev, ...files])}
+              onFilesAdded={(files: any) => setUploadedFiles((prev: any) => [...prev, ...files])}
               creditsRemaining={creditsRemaining}
               onOpenStripe={() => setShowStripeLightbox(true)}
               lastUserQuery={lastUserQuery}
@@ -4092,7 +4094,7 @@ No preamble. Start directly with section 1.`;
       {/* Purchase Credits Modal */}
       {showPurchaseModal && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm animate-backdrop-in" onClick={() => setShowPurchaseModal(false)}>
-          <div className="relative w-full md:max-w-md max-h-[90vh] md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl animate-slide-up md:animate-scale-in" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full md:max-w-md max-h-[90vh] md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl animate-slide-up md:animate-scale-in" onClick={(e: any) => e.stopPropagation()}>
             <button
               onClick={() => setShowPurchaseModal(false)}
               className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
@@ -4118,7 +4120,7 @@ No preamble. Start directly with section 1.`;
                       type="number"
                       min="10"
                       value={purchaseAmount}
-                      onChange={(e) => setPurchaseAmount(e.target.value)}
+                      onChange={(e: any) => setPurchaseAmount(e.target.value)}
                       placeholder="10"
                       className="w-full pl-8 pr-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                     />
@@ -4176,7 +4178,7 @@ No preamble. Start directly with section 1.`;
       {/* Subscription Modal */}
       {showSubscriptionModal && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm animate-backdrop-in" onClick={() => setShowSubscriptionModal(false)}>
-          <div className="relative w-full md:max-w-md max-h-[90vh] md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl animate-slide-up md:animate-scale-in" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full md:max-w-md max-h-[90vh] md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl animate-slide-up md:animate-scale-in" onClick={(e: any) => e.stopPropagation()}>
             <button
               onClick={() => setShowSubscriptionModal(false)}
               className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
@@ -4259,7 +4261,7 @@ No preamble. Start directly with section 1.`;
         user={user}
         onLogout={() => { setUser(null); setIsLoggedIn(false); setFantasyLeague(null); localStorage.removeItem('leverage_fantasy_league'); }}
         onInstructionsChange={setCustomInstructions}
-        onAttachFile={(file) => setUploadedFiles(prev => [...prev, { ...file, url: '' }])}
+        onAttachFile={(file: any) => setUploadedFiles((prev: any) => [...prev, { ...file, url: '' }])}
       />
 
       {/* Settings Lightbox */}

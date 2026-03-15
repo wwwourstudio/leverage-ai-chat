@@ -138,15 +138,19 @@ export async function loadMessages(threadId: string): Promise<PersistedMessage[]
   if (!isUUID(threadId)) return [];
   try {
     const json = await apiCall(`/api/chats/${threadId}/messages`);
-    return (json.messages ?? []).map((m: any) => ({
-      id: m.id,
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-      timestamp: new Date(m.created_at),
-      modelUsed: m.model_used ?? undefined,
-      confidence: m.confidence ?? undefined,
-      isWelcome: m.is_welcome ?? false,
-    }));
+    return (json.messages ?? []).map((m: any) => {
+      const role: 'user' | 'assistant' =
+        m.role === 'user' || m.role === 'assistant' ? m.role : 'assistant';
+      return {
+        id: m.id,
+        role,
+        content: m.content,
+        timestamp: new Date(m.created_at),
+        modelUsed: m.model_used ?? undefined,
+        confidence: m.confidence ?? undefined,
+        isWelcome: m.is_welcome ?? false,
+      };
+    });
   } catch (err) {
     console.warn('[v0] [Chat] loadMessages failed:', err);
     return [];

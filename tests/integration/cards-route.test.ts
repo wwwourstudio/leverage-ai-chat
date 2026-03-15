@@ -110,7 +110,7 @@ describe('Cards Route – Live Integration', () => {
   });
 
   describe('calculateImpliedProbability with live data', () => {
-    it('returns values between 0 and 1 for all live odds', ({ skip }) => {
+    it('returns values between 0 and 1 for all live odds', ({ skip }: any) => {
       if (!reachable) skip();
       for (const event of liveOddsData.slice(0, 10)) {
         if (!event.bookmakers) continue;
@@ -126,7 +126,7 @@ describe('Cards Route – Live Integration', () => {
       }
     });
 
-    it('favorite has higher probability than underdog', ({ skip }) => {
+    it('favorite has higher probability than underdog', ({ skip }: any) => {
       if (!reachable) skip();
       const eventsWithH2H = liveOddsData.filter((e: any) =>
         e.bookmakers?.[0]?.markets?.some((m: any) => m.key === 'h2h')
@@ -152,7 +152,7 @@ describe('Cards Route – Live Integration', () => {
   });
 
   describe('calculateMarketEfficiency with live data', () => {
-    it('returns a non-negative finite number', ({ skip }) => {
+    it('returns a non-negative finite number', ({ skip }: any) => {
       if (!reachable) skip();
       for (const event of liveOddsData.slice(0, 10)) {
         if (!event.bookmakers || event.bookmakers.length < 2) continue;
@@ -164,7 +164,7 @@ describe('Cards Route – Live Integration', () => {
   });
 
   describe('card generation from live odds', () => {
-    it('builds spread cards from events with spread markets', ({ skip }) => {
+    it('builds spread cards from events with spread markets', ({ skip }: any) => {
       if (!reachable) skip();
       const eventsWithSpreads = liveOddsData.filter((e: any) =>
         e.bookmakers?.[0]?.markets?.some((m: any) => m.key === 'spreads')
@@ -195,7 +195,7 @@ describe('Cards Route – Live Integration', () => {
       }
     });
 
-    it('builds moneyline cards from events with h2h markets', ({ skip }) => {
+    it('builds moneyline cards from events with h2h markets', ({ skip }: any) => {
       if (!reachable) skip();
       const eventsWithH2H = liveOddsData.filter((e: any) =>
         e.bookmakers?.[0]?.markets?.some((m: any) => m.key === 'h2h')
@@ -227,7 +227,7 @@ describe('Cards Route – Live Integration', () => {
   });
 
   describe('sport-specific odds fetch', () => {
-    it('fetches NBA odds when available', async ({ skip }) => {
+    it('fetches NBA odds when available', async ({ skip }: any) => {
       if (!reachable) skip();
       const sportKey = mapSportToApiKey('nba');
       const res = await fetch(

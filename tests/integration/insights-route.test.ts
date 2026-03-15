@@ -180,7 +180,7 @@ describe('Insights Route – Live Odds Data Pipeline', () => {
     liveOddsData = await res.json();
   });
 
-  it('generates simulated predictions from live odds and calculates insights', ({ skip }) => {
+  it('generates simulated predictions from live odds and calculates insights', ({ skip }: any) => {
     if (!reachable) skip();
 
     const simulatedPredictions = liveOddsData.slice(0, 20).map((event: any) => {

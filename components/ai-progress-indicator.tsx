@@ -37,7 +37,7 @@ export function AIProgressIndicator({ startTime, stage = 'analyzing' }: AIProgre
     reverifying: { label: 'Re-verifying integrity...', color: 'text-amber-400', bar: 'bg-amber-400', glow: 'shadow-amber-500/20' },
   };
 
-  const cfg = statusConfig[status] || statusConfig.analyzing;
+  const cfg = statusConfig[status as keyof typeof statusConfig] || statusConfig.analyzing;
 
   const progressPct = (() => {
     if (status === 'reverifying') return 80;

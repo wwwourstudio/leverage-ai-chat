@@ -151,15 +151,21 @@ export function observeIntersection(
  */
 export function memoize<T extends (...args: any[]) => any>(
   fn: T,
-  getCacheKey?: (...args: Parameters<T>) => string
+  getCacheKey?: (...args: Parameters<T>) => string,
+  maxSize: number = 256
 ): T {
   const cache = new Map<string, ReturnType<T>>();
 
   return ((...args: Parameters<T>) => {
     const key = getCacheKey ? getCacheKey(...args) : JSON.stringify(args);
-    
+
     if (cache.has(key)) {
       return cache.get(key);
+    }
+
+    // Evict oldest entry when at capacity (FIFO)
+    if (cache.size >= maxSize) {
+      cache.delete(cache.keys().next().value!);
     }
 
     const result = fn(...args);

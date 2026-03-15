@@ -161,15 +161,15 @@ const ChatCard = memo(function ChatCard({
                 <input
                   type="text"
                   value={editingChatTitle}
-                  onChange={e => setEditingChatTitle(e.target.value)}
-                  onKeyDown={e => onKeyDownChatTitle(e, chat.id)}
+                  onChange={(e: any) => setEditingChatTitle(e.target.value)}
+                  onKeyDown={(e: any) => onKeyDownChatTitle(e, chat.id)}
                   onBlur={() => onSaveChatTitle(chat.id)}
                   className="flex-1 bg-[oklch(0.14_0.015_280)] border border-blue-500/50 rounded-md px-2 py-0.5 text-xs font-bold text-white focus:outline-none focus:ring-1 focus:ring-blue-500/40"
                   autoFocus
-                  onClick={e => e.stopPropagation()}
+                  onClick={(e: any) => e.stopPropagation()}
                 />
                 <button
-                  onClick={e => { e.stopPropagation(); onSaveChatTitle(chat.id); }}
+                  onClick={(e: any) => { e.stopPropagation(); onSaveChatTitle(chat.id); }}
                   className="p-0.5 hover:bg-[oklch(0.18_0.01_280)] rounded transition-all"
                 >
                   <CheckCircle className="w-3 h-3 text-emerald-400" />
@@ -179,7 +179,7 @@ const ChatCard = memo(function ChatCard({
               <div className="flex-1 flex items-center gap-1 min-w-0">
                 <h3 className="text-xs font-bold text-white truncate flex-1">{chat.title}</h3>
                 <button
-                  onClick={e => onEditChatTitle(chat.id, chat.title, e)}
+                  onClick={(e: any) => onEditChatTitle(chat.id, chat.title, e)}
                   className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-[oklch(0.18_0.01_280)] rounded transition-all flex-shrink-0"
                   title="Edit title"
                 >
@@ -215,7 +215,7 @@ const ChatCard = memo(function ChatCard({
         {/* Action buttons */}
         <div className="flex flex-col gap-0.5 flex-shrink-0">
           <button
-            onClick={e => onStarChat(chat.id, e)}
+            onClick={(e: any) => onStarChat(chat.id, e)}
             className={cn(
               'p-1 rounded-md hover:bg-[oklch(0.16_0.01_280)] transition-all',
               chat.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
@@ -228,7 +228,7 @@ const ChatCard = memo(function ChatCard({
             )} />
           </button>
           <button
-            onClick={e => onDeleteChat(chat.id, e)}
+            onClick={(e: any) => onDeleteChat(chat.id, e)}
             className="p-1 rounded-md hover:bg-[oklch(0.16_0.01_280)] opacity-0 group-hover:opacity-100 transition-all"
             title="Delete"
           >
@@ -408,7 +408,7 @@ export function Sidebar({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[oklch(0.35_0.01_280)] pointer-events-none" />
               <input
                 value={chatSearch}
-                onChange={e => setChatSearch(e.target.value)}
+                onChange={(e: any) => setChatSearch(e.target.value)}
                 placeholder="Search chats…"
                 className="w-full bg-[oklch(0.11_0.015_280)] border border-[oklch(0.20_0.02_280)] rounded-lg py-2 pl-8 pr-3 text-sm text-[oklch(0.75_0.01_280)] placeholder-[oklch(0.32_0.01_280)] focus:outline-none focus:border-blue-500/50 transition-colors"
               />

@@ -44,7 +44,7 @@ export function ArbitrageDashboard() {
 
   const filteredOpportunities = opportunities
     .filter((opp: ArbitrageOpportunity) => filter === 'all' || opp.marketType === filter)
-    .sort((a, b) => {
+    .sort((a: any, b: any) => {
       if (sortBy === 'profit') {
         return b.profitPercentage - a.profitPercentage;
       }
@@ -174,7 +174,7 @@ export function ArbitrageDashboard() {
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredOpportunities.map((opp, idx) => (
+            {filteredOpportunities.map((opp: any, idx: any) => (
               <div
                 key={`${opp.event}-${idx}`}
                 className="rounded-xl border border-border bg-card p-6 transition-all hover:border-primary/50"
@@ -203,7 +203,7 @@ export function ArbitrageDashboard() {
 
                   {/* Bet Recommendations */}
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:w-96">
-                    {opp.bets.map((bet, betIdx) => (
+                    {opp.bets.map((bet: any, betIdx: any) => (
                       <div
                         key={betIdx}
                         className="rounded-lg border border-border bg-background p-3"

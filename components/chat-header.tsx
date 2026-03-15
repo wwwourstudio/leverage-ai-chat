@@ -109,7 +109,7 @@ export function ChatHeader({
           {hasMessages && activeChat && (
             <div className="relative">
               <button
-                onClick={() => setShowExportMenu((v) => !v)}
+                onClick={() => setShowExportMenu((v: any) => !v)}
                 className="p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
                 title="Export chat"
               >

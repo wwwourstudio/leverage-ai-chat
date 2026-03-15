@@ -116,7 +116,7 @@ function makeReq(url: string) {
 
 // ── Global fetch dispatch ────────────────────────────────────────────────────
 beforeEach(() => {
-  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
     const url = String(input);
 
     if (url.includes('statsapi.mlb.com')) {

@@ -10,7 +10,7 @@ import { config } from 'dotenv';
 import path from 'path';
 
 // Load .env.test if present (not committed to git)
-config({ path: path.resolve(__dirname, '..', '.env.test') });
+config({ path: path.resolve(process.cwd(), '.env.test') });
 
 if (!process.env.ODDS_API_KEY) {
   console.warn(

@@ -115,11 +115,11 @@ export default function APIHealthPage() {
     runChecks();
   }, [runChecks]);
 
-  const overallStatus = services.every((s) => s.status === 'healthy')
+  const overallStatus = services.every((s: any) => s.status === 'healthy')
     ? 'healthy'
-    : services.some((s) => s.status === 'unhealthy')
+    : services.some((s: any) => s.status === 'unhealthy')
       ? 'unhealthy'
-      : services.some((s) => s.status === 'degraded')
+      : services.some((s: any) => s.status === 'degraded')
         ? 'degraded'
         : 'checking';
 
@@ -181,7 +181,7 @@ export default function APIHealthPage() {
 
         {/* Service List */}
         <div className="space-y-3">
-          {services.map((service) => (
+          {services.map((service: any) => (
             <div
               key={service.name}
               className="flex items-center gap-4 rounded-xl border border-border bg-card p-4"

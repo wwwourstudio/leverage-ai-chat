@@ -117,7 +117,7 @@ describe('AuthModals', () => {
       const setShowLoginModal = vi.fn();
       render(<AuthModals {...defaultProps} showLoginModal setShowLoginModal={setShowLoginModal} />);
       const closeButton = screen.getAllByRole('button').find(
-        (b) => b.querySelector('[data-testid="close-icon"]')
+        (b: any) => b.querySelector('[data-testid="close-icon"]')
       );
       fireEvent.click(closeButton!);
       expect(setShowLoginModal).toHaveBeenCalledWith(false);
@@ -147,7 +147,7 @@ describe('AuthModals', () => {
       const setShowSignupModal = vi.fn();
       render(<AuthModals {...defaultProps} showSignupModal setShowSignupModal={setShowSignupModal} />);
       const closeButton = screen.getAllByRole('button').find(
-        (b) => b.querySelector('[data-testid="close-icon"]')
+        (b: any) => b.querySelector('[data-testid="close-icon"]')
       );
       fireEvent.click(closeButton!);
       expect(setShowSignupModal).toHaveBeenCalledWith(false);

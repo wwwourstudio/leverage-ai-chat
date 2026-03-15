@@ -95,7 +95,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
   }, [isOpen, user?.email]);
 
   const appendText = (text: string) => {
-    setInstructions(prev => {
+    setInstructions((prev: any) => {
       const separator = prev.trim() ? ' ' : '';
       const next = (prev + separator + text).slice(0, MAX_CHARS);
       return next;
@@ -145,7 +145,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
   };
 
   const handleDeleteSavedFile = (id: string) => {
-    const updated = savedFiles.filter(f => f.id !== id);
+    const updated = savedFiles.filter((f: any) => f.id !== id);
     setSavedFiles(updated);
     localStorage.setItem(SAVED_FILES_KEY, JSON.stringify(updated));
   };
@@ -169,7 +169,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
     >
       <div
         className="relative w-full md:max-w-lg max-h-[90vh] md:max-h-[85vh] md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slide-up md:animate-scale-in"
-        onClick={e => e.stopPropagation()}
+        onClick={(e: any) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-800 flex-shrink-0">
@@ -225,7 +225,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
           ) : (
             <textarea
               value={instructions}
-              onChange={e => setInstructions(e.target.value.slice(0, MAX_CHARS))}
+              onChange={(e: any) => setInstructions(e.target.value.slice(0, MAX_CHARS))}
               maxLength={MAX_CHARS}
               placeholder={`Examples:\n• Sharp bettor, 2–4% Kelly stakes, prioritize ATS value\n• Always give me closing line value analysis\n• I play DraftKings GPPs, prefer high-upside plays\n• Focus on NBA player props, especially over/unders`}
               rows={6}
@@ -246,7 +246,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
                 <label className="text-xs text-gray-400 w-28 shrink-0">Primary sport</label>
                 <select
                   value={primarySport}
-                  onChange={e => setPrimarySport(e.target.value)}
+                  onChange={(e: any) => setPrimarySport(e.target.value)}
                   className="flex-1 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500/50"
                 >
                   {SPORT_NAMES.map(n => (
@@ -280,7 +280,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
                 <label className="text-xs text-gray-400 w-28 shrink-0">Stake style</label>
                 <select
                   value={stakeStyle}
-                  onChange={e => setStakeStyle(e.target.value)}
+                  onChange={(e: any) => setStakeStyle(e.target.value)}
                   className="flex-1 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500/50"
                 >
                   <option>Flat</option>
@@ -313,7 +313,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
                   No saved files. Attach a file to a message and click the bookmark icon to save it here.
                 </p>
               ) : (
-                savedFiles.map(file => (
+                savedFiles.map((file: any) => (
                   <div
                     key={file.id}
                     className="flex items-center gap-2 p-2 rounded-lg bg-gray-900/60 border border-gray-800 hover:border-gray-700 transition-all"

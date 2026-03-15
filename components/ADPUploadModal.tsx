@@ -60,7 +60,7 @@ export function ADPUploadModal({ sport, onSuccess }: ADPUploadModalProps) {
   return (
     <div
       className="group relative bg-gradient-to-br from-violet-600/80 via-purple-700/60 to-violet-900/40 rounded-2xl p-5 border border-gray-700/40 hover:border-violet-500/40 transition-all duration-300 shadow-lg"
-      onDragOver={e => e.preventDefault()}
+      onDragOver={(e: any) => e.preventDefault()}
       onDrop={handleDrop}
     >
       {/* Header */}

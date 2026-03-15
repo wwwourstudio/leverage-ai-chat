@@ -31,8 +31,8 @@ vi.mock('@/components/data-cards/PlayerAvatar', () => ({
 }));
 
 // ── Mock constants functions used by BettingCard ──────────────────────────────
-vi.mock('@/lib/constants', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/constants')>();
+vi.mock('@/lib/constants', async (importOriginal: any) => {
+  const actual = await (importOriginal as any)() as typeof import('@/lib/constants');
   return {
     ...actual,
     getPlayerHeadshotUrl: () => null,

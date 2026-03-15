@@ -141,7 +141,7 @@ function Lightbox({ sections, onClose, title }: { sections: LightboxSection[]; o
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
         className="relative w-full max-w-md max-h-[80vh] overflow-y-auto bg-[oklch(0.07_0.01_280)] border border-[oklch(0.22_0.02_280)] rounded-2xl p-5 shadow-2xl"
-        onClick={e => e.stopPropagation()}
+        onClick={(e: any) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-black text-white">{title}</h2>

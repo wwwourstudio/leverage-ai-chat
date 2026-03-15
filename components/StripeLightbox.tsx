@@ -99,7 +99,7 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm animate-backdrop-in" onClick={handleClose}>
       <div
         className="relative w-full md:max-w-lg max-h-[90vh] md:max-h-[85vh] md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slide-up md:animate-scale-in"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e: any) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-800 flex-shrink-0">
@@ -218,7 +218,7 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
                         type="number"
                         min="5"
                         value={customAmount}
-                        onChange={(e) => { setCustomAmount(e.target.value); setSelectedPackage(null); }}
+                        onChange={(e: any) => { setCustomAmount(e.target.value); setSelectedPackage(null); }}
                         placeholder="Custom"
                         className="w-full pl-7 pr-4 py-2.5 bg-gray-950 border border-gray-800 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none focus:border-green-500/50 transition-all"
                       />

@@ -13,70 +13,11 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    checkDatabaseStatus();
+    // The /api/insights route does not exist in this project.
+    // Skip the check entirely and treat as client-only mode.
+    setStatus('connected');
+    setDismissed(true);
   }, []);
-
-  const checkDatabaseStatus = async () => {
-    try {
-      const response = await fetch('/api/insights').catch(err => {
-        console.warn('[v0] Database status check failed:', err);
-        return null;
-      });
-      
-      if (!response || !response.ok) {
-        // API route doesn't exist (404) or other non-2xx — treat as client-only mode
-        setStatus('connected');
-        setMessage('Running in client-only mode');
-        setTimeout(() => {
-          setDismissed(true);
-        }, 2000);
-        return;
-      }
-
-      const contentType = response.headers.get('content-type') ?? '';
-      if (!contentType.includes('application/json')) {
-        // Route exists but returned HTML (e.g. dev error page) — treat as client-only
-        setStatus('connected');
-        setMessage('Running in client-only mode');
-        setTimeout(() => { setDismissed(true); }, 2000);
-        return;
-      }
-
-      let data: Record<string, unknown>;
-      try {
-        data = await response.json();
-      } catch {
-        // Body wasn't valid JSON despite Content-Type header — treat as client-only
-        setStatus('connected');
-        setMessage('Running in client-only mode');
-        setTimeout(() => { setDismissed(true); }, 2000);
-        return;
-      }
-      
-      if (data.setupRequired) {
-        setStatus('missing-schema');
-        setMessage(data.message || 'Database tables need to be created');
-      } else if (data.success) {
-        setStatus('connected');
-        setMessage('Database connected and ready');
-        // Auto-dismiss success message after 3 seconds
-        setTimeout(() => {
-          setDismissed(true);
-        }, 3000);
-      } else {
-        setStatus('error');
-        setMessage(data.message || 'Unable to connect to database');
-      }
-    } catch (error) {
-      console.error('[v0] Database status check error:', error);
-      // Gracefully handle missing API routes
-      setStatus('connected');
-      setMessage('Running in client-only mode');
-      setTimeout(() => {
-        setDismissed(true);
-      }, 2000);
-    }
-  };
 
   const handleDismiss = () => {
     setDismissed(true);

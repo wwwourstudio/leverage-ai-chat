@@ -42,7 +42,16 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
         return;
       }
 
-      const data = await response.json();
+      let data: Record<string, unknown>;
+      try {
+        data = await response.json();
+      } catch {
+        // Body wasn't valid JSON despite Content-Type header — treat as client-only
+        setStatus('connected');
+        setMessage('Running in client-only mode');
+        setTimeout(() => { setDismissed(true); }, 2000);
+        return;
+      }
       
       if (data.setupRequired) {
         setStatus('missing-schema');

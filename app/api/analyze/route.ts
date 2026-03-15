@@ -130,9 +130,8 @@ export async function POST(request: NextRequest) {
   }
 
   // Per-AI-call timeouts (independent from each other and from card generation):
-  //   grok-4 primary: 45s | grok-3-mini primary: 25s | fallback: 12s
-  // Total worst-case sequential: 45 + 12 = 57s (card generation runs concurrently so adds ~0s).
-  const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 25000 : 45000;
+  //   grok-3-fast primary: 20s | grok-4 ADP power path: 35s | fallback: 12s
+  const PRIMARY_TIMEOUT_MS = (usePowerPath: boolean) => usePowerPath ? 35000 : 20000;
 
   try {
     const body: AnalyzeRequestBody = await request.json();
@@ -584,15 +583,15 @@ export async function POST(request: NextRequest) {
       return { prompt };
     };
 
-    // Route DFS, pure-fantasy, file-upload, off-season, and ambiguous queries directly to
-    // grok-3-mini (3-6s). Reserve grok-4 for live-odds betting analysis only.
-    // ADP queries override to grok-4: reliable tool use requires the stronger model.
-    // isAmbiguous queries only need a short clarification reply — no need for grok-4.
-    const useFastPath = hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context));
-    const primaryModel = useFastPath ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.MODEL_NAME;
+    // Route DFS, pure-fantasy, file-upload, off-season, and ambiguous queries to
+    // grok-3-fast (the default). Use grok-4 only for ADP tool-calling queries where
+    // reliable tool use and deeper reasoning justify the extra latency.
+    const usePowerPath = hasADPIntent;
+    const useFastPath = !usePowerPath; // kept for readability in downstream refs
+    const primaryModel = usePowerPath ? AI_CONFIG.POWER_MODEL_NAME : AI_CONFIG.FAST_MODEL_NAME;
     // Always log the resolved model so failures are immediately traceable in Vercel logs
     logger.info(LogCategory.AI, 'model_selected', {
-      metadata: { model: primaryModel, fastPath: useFastPath, hasADPIntent, sport: context?.sport ?? null },
+      metadata: { model: primaryModel, powerPath: usePowerPath, hasADPIntent, sport: context?.sport ?? null },
     });
 
     // ── ADP tool (injected when hasADPIntent) ────────────────────────────────────
@@ -762,7 +761,7 @@ export async function POST(request: NextRequest) {
       async start(controller) {
         try {
           if (xaiApiKey) {
-            const primaryTimeoutMs = PRIMARY_TIMEOUT_MS(useFastPath);
+            const primaryTimeoutMs = PRIMARY_TIMEOUT_MS(usePowerPath);
             const abortCtrl = new AbortController();
 
             // streamText returns immediately; tokens arrive via textStream async iterable
@@ -790,7 +789,7 @@ export async function POST(request: NextRequest) {
                 controller.enqueue(sseChunk({ type: 'text', delta }));
               }
               clearTimeout(firstTokenTimer);
-              modelUsed = useFastPath ? AI_CONFIG.FAST_MODEL_DISPLAY_NAME : AI_CONFIG.MODEL_DISPLAY_NAME;
+              modelUsed = usePowerPath ? AI_CONFIG.POWER_MODEL_DISPLAY_NAME : AI_CONFIG.FAST_MODEL_DISPLAY_NAME;
 
               // ── Capture token usage ────────────────────────────────────────────
               try {
@@ -921,8 +920,8 @@ export async function POST(request: NextRequest) {
             } catch (streamErr) {
               clearTimeout(firstTokenTimer);
               // Primary stream failed — fall back to generateText (no streaming for fallback)
-              const alreadyFast = useFastPath;
-              const actualFallbackModel = alreadyFast ? AI_CONFIG.MODEL_NAME : AI_CONFIG.FAST_MODEL_NAME;
+              const alreadyPower = usePowerPath;
+              const actualFallbackModel = alreadyPower ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.POWER_MODEL_NAME;
               const errSummary = (() => {
                 if (streamErr && typeof streamErr === 'object') {
                   const e = streamErr as Record<string, unknown>;
@@ -941,7 +940,7 @@ export async function POST(request: NextRequest) {
                   maxRetries: 0,
                 });
                 aiText = fallbackResult.text;
-                modelUsed = alreadyFast ? `${AI_CONFIG.MODEL_DISPLAY_NAME} (fallback)` : `${AI_CONFIG.FAST_MODEL_DISPLAY_NAME} (fallback)`;
+                modelUsed = alreadyPower ? `${AI_CONFIG.FAST_MODEL_DISPLAY_NAME} (fallback)` : `${AI_CONFIG.POWER_MODEL_DISPLAY_NAME} (fallback)`;
                 console.log(`[API/analyze] Fallback succeeded with ${actualFallbackModel}`);
                 controller.enqueue(sseChunk({ type: 'text', delta: aiText }));
               } catch (fallbackErr) {

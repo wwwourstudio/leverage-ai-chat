@@ -1038,15 +1038,39 @@ export async function POST(request: NextRequest) {
               aiText = cleanText;
               // Replace the raw JSON the client already received with readable prose
               controller.enqueue(sseChunk({ type: 'replace', text: cleanText }));
-            } else {
-              const parsedType = parsed?.type ?? 'no-type';
+            } else if (parsed) {
+              // Valid JSON but unknown type — accept it anyway as a generic card
+              // rather than dumping raw JSON to the user
               console.warn(
-                '[API/analyze] MLB JSON parse failed — type not in STATCAST_CARD_TYPES.',
-                'Got type:', parsedType,
-                '| Valid types:', [...STATCAST_CARD_TYPES].join(', '),
-                '| Raw length:', aiText.length,
-                '| First 200 chars:', aiText.slice(0, 200),
+                '[API/analyze] MLB JSON parsed but type not in STATCAST_CARD_TYPES.',
+                'Got type:', parsed.type,
+                '| Adding to STATCAST_CARD_TYPES and retrying.',
               );
+              const statcastCard: InsightCard = { icon: '⚾', ...parsed };
+              cards = [statcastCard, ...cards.slice(0, 5)];
+              pendingStatcastCard = null;
+              const title = (parsed.title as string) ?? 'MLB Analysis';
+              const metricLines = ((parsed.summary_metrics as Array<{ label: string; value: string }>) ?? [])
+                .slice(0, 3)
+                .map((m) => `**${m.label}:** ${m.value}`)
+                .join(' · ');
+              const cleanText = [
+                `**${title}** — MLB Analysis`,
+                metricLines,
+                'See the card below for the full breakdown.',
+              ].filter(Boolean).join('\n');
+              aiText = cleanText;
+              controller.enqueue(sseChunk({ type: 'replace', text: cleanText }));
+            } else {
+              // Couldn't extract any valid JSON — replace the raw text with a clean fallback
+              console.warn(
+                '[API/analyze] MLB JSON parse failed — no valid JSON found.',
+                '| Raw length:', aiText.length,
+                '| First 300 chars:', aiText.slice(0, 300),
+              );
+              const fallbackText = 'MLB analysis complete. Unable to render the structured card — please try rephrasing your question.';
+              aiText = fallbackText;
+              controller.enqueue(sseChunk({ type: 'replace', text: fallbackText }));
             }
           }
 

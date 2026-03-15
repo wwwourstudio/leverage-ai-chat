@@ -884,16 +884,9 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
     //    If unavailable fall back to the static MLB_PROJECTIONS_2025 snapshot.
     let mlbPlayers: GenericPlayer[] = MLB_PROJECTIONS_2025;
     let isNFBCData = false;
-    try {
-      // Dynamic import keeps adp-data.ts (server-only) out of the client bundle's
-      // static module graph while still allowing server-side usage.
-      const { getADPData } = await import('@/lib/adp-data');
-      const nfbcPlayers = await getADPData();
-      if (nfbcPlayers.length > 10) {
-        mlbPlayers = buildMLBFromNFBC(nfbcPlayers);
-        isNFBCData = true;
-      }
-    } catch { /* fall back to static snapshot */ }
+    // Note: ADP data is fetched server-side via cards-generator.ts → adp-data.ts.
+    // This function no longer imports adp-data directly to prevent it from being
+    // bundled into the client when fantasy-card-generator is used in client contexts.
 
     const mlbVBD = computeVBDGeneric(mlbPlayers, MLB_REPLACEMENT_RANKS);
     const mlbCliffs = detectCliffs(mlbVBD);

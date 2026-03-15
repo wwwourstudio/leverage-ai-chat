@@ -10,9 +10,17 @@ import { validateBenford } from '@/lib/benford-validator';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { sport, category, limit = 3 } = body;
+    const { sport, category, limit = 3, query, leagueOptions } = body;
 
     const clampedLimit = Math.min(Math.max(Number(limit) || 3, 1), 15);
+
+    // Fantasy requests use generateFantasyCards directly (server-side only) so that
+    // adp-data.ts and other server-only modules are never bundled into the client.
+    if (category === 'fantasy' && sport) {
+      const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
+      const fantasyCards = await generateFantasyCards(query ?? '', clampedLimit, sport, leagueOptions ?? {});
+      return NextResponse.json({ success: true, cards: fantasyCards, count: fantasyCards.length });
+    }
 
     const cards = await generateContextualCards(
       category ?? undefined,

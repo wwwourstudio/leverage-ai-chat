@@ -1323,15 +1323,31 @@ No preamble. Start directly with section 1.`;
       } else if (context.hasFantasyIntent && (!context.hasBettingIntent || selectedCategory === 'fantasy') && selectedCategory !== 'dfs') {
         // Fantasy intent — only generate cards when we know the sport; otherwise
         // NFL VBD cards would flash for NBA/MLB/etc. queries.
+        // Card generation runs server-side via /api/cards to avoid bundling
+        // server-only modules (adp-data.ts, supabase service role) into the client.
         if (context.sport) {
-          if (isDev) console.log('[FANTASY INTENT] Generating fantasy cards');
+          if (isDev) console.log('[FANTASY INTENT] Requesting fantasy cards via server');
           try {
-            const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
-            const fantasyCards = await generateFantasyCards(userMessage, 3, context.sport, {
-              teamCount: fantasyLeague?.setupComplete ? (fantasyLeague.teams ?? 12) : undefined,
-              scoringFormat: fantasyLeague?.setupComplete ? (fantasyLeague.leagueType ?? undefined) : undefined,
+            const res = await fetch('/api/cards', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                category: 'fantasy',
+                sport: context.sport,
+                query: userMessage,
+                count: 3,
+                leagueOptions: {
+                  teamCount: fantasyLeague?.setupComplete ? (fantasyLeague.teams ?? 12) : undefined,
+                  scoringFormat: fantasyLeague?.setupComplete ? (fantasyLeague.leagueType ?? undefined) : undefined,
+                },
+              }),
             });
-            context.existingCards = fantasyCards;
+            if (res.ok) {
+              const { cards } = await res.json();
+              if (Array.isArray(cards) && cards.length > 0) {
+                context.existingCards = cards;
+              }
+            }
           } catch (err) {
             if (isDev) console.error('[FANTASY INTENT] Card generation failed:', err);
           }

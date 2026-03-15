@@ -38,7 +38,20 @@ export async function updateSession(request: NextRequest) {
 
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser()
+
+  // If the refresh token is invalid/revoked, clear auth cookies so the user is
+  // treated as anonymous instead of being stuck in an error loop on every request.
+  if (authError && (authError as any).code === 'refresh_token_not_found') {
+    const clearResponse = NextResponse.next({ request })
+    supabaseResponse.cookies.getAll().forEach(cookie => {
+      if (cookie.name.startsWith('sb-')) {
+        clearResponse.cookies.delete(cookie.name)
+      }
+    })
+    return clearResponse
+  }
 
   // Optionally protect routes based on authentication
   // if (!user && request.nextUrl.pathname.startsWith('/protected')) {

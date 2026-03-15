@@ -115,8 +115,11 @@ async function fetchUserSession(): Promise<{
     const { data: { user }, error } = await supabase.auth.getUser();
 
     if (error) {
-      // PGRST errors for unauthenticated state are expected — not a real error
-      if (error.message?.includes('Auth session missing')) {
+      // Expected unauthenticated states — treat as anonymous, not an error
+      if (
+        error.message?.includes('Auth session missing') ||
+        (error as any).code === 'refresh_token_not_found'
+      ) {
         return { session: null, errors: [] };
       }
       console.error('[v0] Server: Auth error:', error.message);

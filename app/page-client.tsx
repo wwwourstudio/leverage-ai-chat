@@ -24,7 +24,7 @@ const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ 
 import { TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, MessageSquare, Clock, Star, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, X, CheckCheck, AlertTriangle, BarChart, Info, FileText, ImageIcon, Loader2 } from 'lucide-react';
 import { CardLayout } from '@/components/data-cards/CardLayout';
 import { CardAnalysisSkeleton } from '@/components/data-cards/CardSkeleton';
-import { TrustMetricsDisplay } from '@/components/trust-metrics-display';
+const TrustMetricsDisplay = dynamic(() => import('@/components/trust-metrics-display').then(m => ({ default: m.TrustMetricsDisplay })), { ssr: false });
 import { AIProgressIndicator } from '@/components/ai-progress-indicator';
 const SettingsLightbox = dynamic(() => import('@/components/SettingsLightbox').then(m => ({ default: m.SettingsLightbox })), { ssr: false });
 const AlertsLightbox = dynamic(() => import('@/components/AlertsLightbox').then(m => ({ default: m.AlertsLightbox })), { ssr: false });

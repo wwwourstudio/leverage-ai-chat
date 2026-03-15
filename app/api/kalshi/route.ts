@@ -218,9 +218,17 @@ export async function GET(request: Request) {
  * Fetch Kalshi markets and convert to insight cards
  */
 export async function POST(request: Request) {
+  let postCacheKey = 'POST:unknown';
   try {
     const body = await request.json();
     const { sport, category, subcategory, limit = 3 } = body;
+
+    // Serve from route-level cache when available
+    postCacheKey = `POST:${subcategory ?? ''}:${category ?? ''}:${sport ?? ''}:${limit}`;
+    if (process.env.NODE_ENV !== 'test') {
+      const cached = getRouteCache(postCacheKey);
+      if (cached) return NextResponse.json(cached);
+    }
 
     console.log('[v0] [API] [KALSHI] POST:', { sport, category, subcategory, limit });
 
@@ -270,17 +278,35 @@ export async function POST(request: Request) {
 
     console.log(`[v0] [API] [KALSHI] ✓ Returning ${cards.length} cards`);
 
-    return NextResponse.json({
+    const responseData = {
       success: true,
       cards,
       count: cards.length,
       dataSources: ['Kalshi Prediction Markets (Real-time)'],
       timestamp: new Date().toISOString(),
-    });
+    };
+    if (process.env.NODE_ENV !== 'test') setRouteCache(postCacheKey, responseData);
+    return NextResponse.json(responseData);
 
   } catch (error: any) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[v0] [API] [KALSHI] POST Error:', msg);
+    if (isRateLimitError(error)) {
+      // Serve stale cache if available on rate limit
+      if (process.env.NODE_ENV !== 'test') {
+        const stale = getRouteCache(postCacheKey);
+        if (stale) {
+          console.log('[v0] [API] [KALSHI] Serving stale POST cache on 429');
+          return NextResponse.json(stale);
+        }
+      }
+      return NextResponse.json({
+        success: false,
+        error: 'Market data temporarily unavailable — rate limit reached. Try again in a moment.',
+        rateLimited: true,
+        cards: [],
+      }, { status: 503 });
+    }
     return NextResponse.json({ success: false, error: msg, cards: [] }, { status: 500 });
   }
 }

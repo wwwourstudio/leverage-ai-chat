@@ -1,6 +1,14 @@
 'use client';
 
-// Re-export from the canonical location.
-// This file exists solely to satisfy the Turbopack module cache which has a
-// stale compiled chunk referencing this path. Do not delete this file.
-export { DatabaseStatusBanner } from './db-status-banner';
+// Self-contained stub. No external dependencies to avoid stale module chain.
+// This file must not be deleted — the Turbopack cache has a compiled chunk
+// that references this path. Deleting it causes "module factory not available".
+import React from 'react';
+
+export interface DatabaseStatusBannerProps {
+  onDismiss?: () => void;
+}
+
+export function DatabaseStatusBanner(_props: DatabaseStatusBannerProps): null {
+  return null;
+}

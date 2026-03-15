@@ -1066,9 +1066,10 @@ export async function POST(request: NextRequest) {
               // If the text starts with markdown formatting (**, #, -) or looks like natural
               // language analysis, keep it as-is rather than replacing with a generic error.
               const looksLikeProse = /^(\*\*|#{1,3}\s|[-•]\s|\d+\.\s|[A-Z])/.test(stripped);
+              console.log('[v0] MLB prose check:', { looksLikeProse, strippedLen: stripped.length, first50: stripped.slice(0, 50) });
               if (looksLikeProse && stripped.length > 50) {
                 // Valid prose analysis — keep the original text, no card generated
-                // (aiText is already set correctly from the stream)
+                console.log('[v0] MLB keeping prose analysis as-is');
               } else {
                 // Malformed output — show a clean fallback
                 console.warn(

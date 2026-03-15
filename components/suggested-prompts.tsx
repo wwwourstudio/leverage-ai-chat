@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   TrendingUp,
   Trophy,
@@ -9,6 +10,7 @@ import {
   Award,
   BarChart3,
   Sparkles,
+  ChevronLeft,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -17,6 +19,12 @@ export interface SuggestedAction {
   icon: LucideIcon;
   category: string;
   query?: string;
+}
+
+interface SubCategoryOption {
+  label: string;
+  query: string;
+  icon: LucideIcon;
 }
 
 interface SuggestedPromptsProps {
@@ -30,17 +38,56 @@ interface SuggestedPromptsProps {
   hasMessages: boolean; // messages.length > 1
   lastUserQuery: string;
   selectedCategory: string;
+  selectedSport?: string;
   onPromptClick: (query: string) => void;
   // True when pills are sport-selection prompts needing user clarification
   clarificationMode?: boolean;
 }
 
 const WELCOME_CATEGORIES = [
-  { label: 'Betting', desc: 'Live odds & arbitrage', icon: TrendingUp, color: 'text-blue-400', bg: 'from-blue-600/10 to-blue-900/5', border: 'border-blue-500/20', sample: 'Live arbitrage alerts across sportsbooks', sampleIcon: Zap },
-  { label: 'Fantasy', desc: 'Draft & waiver tools', icon: Trophy, color: 'text-purple-400', bg: 'from-purple-600/10 to-purple-900/5', border: 'border-purple-500/20', sample: 'NFBC draft strategy for my pick position', sampleIcon: Award },
-  { label: 'DFS', desc: 'Optimal lineups', icon: Medal, color: 'text-amber-400', bg: 'from-amber-600/10 to-amber-900/5', border: 'border-amber-500/20', sample: 'DFS NFL optimal lineups for DraftKings', sampleIcon: BarChart3 },
-  { label: 'Predictions', desc: 'Kalshi markets', icon: Activity, color: 'text-cyan-400', bg: 'from-cyan-600/10 to-cyan-900/5', border: 'border-cyan-500/20', sample: 'Show me trending Kalshi prediction markets right now', sampleIcon: Sparkles },
+  { label: 'Betting', desc: 'Live odds & arbitrage', icon: TrendingUp, color: 'text-blue-400', bg: 'from-blue-600/10 to-blue-900/5', border: 'border-blue-500/20' },
+  { label: 'Fantasy', desc: 'Draft & waiver tools', icon: Trophy, color: 'text-purple-400', bg: 'from-purple-600/10 to-purple-900/5', border: 'border-purple-500/20' },
+  { label: 'DFS', desc: 'Optimal lineups', icon: Medal, color: 'text-amber-400', bg: 'from-amber-600/10 to-amber-900/5', border: 'border-amber-500/20' },
+  { label: 'Predictions', desc: 'Kalshi markets', icon: Activity, color: 'text-cyan-400', bg: 'from-cyan-600/10 to-cyan-900/5', border: 'border-cyan-500/20' },
 ];
+
+function getSubCategories(category: string, sport: string): SubCategoryOption[] {
+  const sportDisplay = sport ? sport.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
+  const s = sportDisplay ? `${sportDisplay} ` : '';
+
+  switch (category) {
+    case 'Betting':
+      return [
+        { label: `${s}Live Odds`, query: `Show me ${sport ? sport + ' ' : ''}live odds and best lines across all sportsbooks`, icon: Zap },
+        { label: `${s}Spread Bets`, query: `Best ${sport ? sport + ' ' : ''}point spread bets and value plays today`, icon: TrendingUp },
+        { label: `${s}Player Props`, query: `Top ${sport ? sport + ' ' : ''}player prop bets with hit rate analysis`, icon: Award },
+        { label: 'Arbitrage', query: `Find ${sport ? sport + ' ' : ''}arbitrage opportunities across all sportsbooks`, icon: BarChart3 },
+      ];
+    case 'Fantasy':
+      return [
+        { label: `${s}Waiver Wire`, query: `Best ${sport ? sport + ' ' : ''}waiver wire pickups and free agent adds this week`, icon: Trophy },
+        { label: `${s}Trade Analysis`, query: `${sport ? sport + ' ' : ''}trade value chart and who to target in trades`, icon: TrendingUp },
+        { label: `${s}Start/Sit`, query: `${sport ? sport + ' ' : ''}start or sit recommendations for this week`, icon: Award },
+        { label: `${s}Draft Strategy`, query: `${sport ? sport + ' ' : ''}fantasy draft strategy, ADP analysis, and sleepers`, icon: Medal },
+      ];
+    case 'DFS':
+      return [
+        { label: `${s}DraftKings`, query: `Optimal ${sport ? sport + ' ' : ''}DraftKings lineup for tonight's slate`, icon: Award },
+        { label: `${s}FanDuel`, query: `Best ${sport ? sport + ' ' : ''}FanDuel lineup and top value plays`, icon: Medal },
+        { label: `${s}GPP Plays`, query: `Top ${sport ? sport + ' ' : ''}GPP tournament picks and contrarian plays`, icon: Sparkles },
+        { label: 'Showdown', query: `${sport ? sport + ' ' : ''}DFS showdown slate captain and flex strategy`, icon: BarChart3 },
+      ];
+    case 'Predictions':
+      return [
+        { label: 'Top Trending', query: 'Show me the top trending Kalshi prediction markets right now', icon: Activity },
+        { label: 'Sports Markets', query: 'What are the best sports prediction markets on Kalshi today?', icon: TrendingUp },
+        { label: 'Political Markets', query: 'Show me political prediction markets and election probabilities', icon: BarChart3 },
+        { label: 'High Volume', query: 'Which Kalshi markets have the highest trading volume right now?', icon: Sparkles },
+      ];
+    default:
+      return [];
+  }
+}
 
 export function SuggestedPrompts({
   showWelcomeGrid,
@@ -50,9 +97,12 @@ export function SuggestedPrompts({
   hasMessages,
   lastUserQuery,
   selectedCategory,
+  selectedSport = '',
   onPromptClick,
   clarificationMode = false,
 }: SuggestedPromptsProps) {
+  const [pendingWelcomeCategory, setPendingWelcomeCategory] = useState<string | null>(null);
+
   const isSuggested = suggestedPrompts.length > 0 && hasMessages;
   const pills = isSuggested ? suggestedPrompts : quickActions;
 
@@ -61,28 +111,65 @@ export function SuggestedPrompts({
       {/* Welcome categorized quick-start grid — shown only on fresh session */}
       {showWelcomeGrid && (
         <div className="mb-3 sm:block">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-2 px-1">
-            Get started — choose a category
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2">
-            {WELCOME_CATEGORIES.map(({ label, desc, icon: Icon, color, bg, border, sample, sampleIcon: SampleIcon }) => (
-              <button
-                key={label}
-                onClick={() => onWelcomeAction(sample)}
-                className={`group/cat flex flex-col items-start gap-1 p-2 sm:p-2.5 rounded-xl bg-gradient-to-br ${bg} border ${border} hover:border-opacity-60 transition-all hover:scale-[1.02] active:scale-[0.98] text-left`}
-              >
-                <div className="flex items-center gap-1.5">
-                  <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${color}`} />
-                  <span className={`text-[11px] sm:text-xs font-bold ${color}`}>{label}</span>
-                </div>
-                <p className="text-[9px] sm:text-[10px] text-[oklch(0.45_0.008_280)] leading-tight">{desc}</p>
-                <div className="hidden sm:flex items-center gap-1 mt-0.5 opacity-0 group-hover/cat:opacity-100 transition-opacity">
-                  <SampleIcon className="w-3 h-3 text-[oklch(0.45_0.008_280)]" />
-                  <span className="text-[9px] text-[oklch(0.45_0.008_280)] line-clamp-1">{sample}</span>
-                </div>
-              </button>
-            ))}
-          </div>
+          {pendingWelcomeCategory === null ? (
+            <>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-2 px-1">
+                Get started — choose a category
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2">
+                {WELCOME_CATEGORIES.map(({ label, desc, icon: Icon, color, bg, border }) => (
+                  <button
+                    key={label}
+                    onClick={() => setPendingWelcomeCategory(label)}
+                    className={`group/cat flex flex-col items-start gap-1 p-2 sm:p-2.5 rounded-xl bg-gradient-to-br ${bg} border ${border} hover:border-opacity-60 transition-all hover:scale-[1.02] active:scale-[0.98] text-left`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${color}`} />
+                      <span className={`text-[11px] sm:text-xs font-bold ${color}`}>{label}</span>
+                    </div>
+                    <p className="text-[9px] sm:text-[10px] text-[oklch(0.45_0.008_280)] leading-tight">{desc}</p>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <button
+                  onClick={() => setPendingWelcomeCategory(null)}
+                  className="flex items-center gap-1 text-[10px] font-bold text-[oklch(0.40_0.01_280)] hover:text-white transition-colors"
+                >
+                  <ChevronLeft className="w-3 h-3" />
+                  Back
+                </button>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)]">
+                  {pendingWelcomeCategory}
+                  {selectedSport ? ` · ${selectedSport.replace(/-/g, ' ').toUpperCase()}` : ''}
+                  {' '}— choose a focus
+                </p>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2">
+                {getSubCategories(pendingWelcomeCategory, selectedSport).map((sub) => {
+                  const SubIcon = sub.icon;
+                  return (
+                    <button
+                      key={sub.label}
+                      onClick={() => {
+                        setPendingWelcomeCategory(null);
+                        onWelcomeAction(sub.query);
+                      }}
+                      className="group/sub flex flex-col items-start gap-1 p-2 sm:p-2.5 rounded-xl bg-gradient-to-br from-gray-800/40 to-gray-900/20 border border-gray-700/30 hover:border-blue-500/40 hover:from-blue-900/20 hover:to-gray-900/20 transition-all hover:scale-[1.02] active:scale-[0.98] text-left"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <SubIcon className="w-3.5 h-3.5 text-blue-400 group-hover/sub:text-blue-300" />
+                        <span className="text-[11px] sm:text-xs font-bold text-gray-300 group-hover/sub:text-white">{sub.label}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
 

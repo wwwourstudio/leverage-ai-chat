@@ -225,7 +225,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: 'welcome',
+      id: crypto.randomUUID(),
       role: 'assistant',
       content: STATIC_WELCOME,
       // Fixed epoch fallback keeps SSR and client hydration identical (no #418 mismatch).
@@ -2284,7 +2284,7 @@ No preamble. Start directly with section 1.`;
     setActiveChat(newChatId);
     setMessages([
       {
-        id: 'welcome',
+        id: crypto.randomUUID(),
         role: 'assistant',
         content: welcomeMessage,
         timestamp: new Date(),
@@ -2335,7 +2335,7 @@ No preamble. Start directly with section 1.`;
         } else {
           const chat = chats.find((c: Chat) => c.id === chatId);
           setMessages([{
-            id: 'welcome',
+            id: crypto.randomUUID(),
             role: 'assistant',
             content: `**${chat?.title || 'Chat'}**\n\nNo saved messages found. Start a new message to continue.`,
             timestamp: new Date(),
@@ -2348,7 +2348,7 @@ No preamble. Start directly with section 1.`;
       // Not logged in — keep showing current in-memory welcome
       const chat = chats.find((c: Chat) => c.id === chatId);
       setMessages([{
-        id: 'welcome',
+        id: crypto.randomUUID(),
         role: 'assistant',
         content: `**${chat?.title || 'Analysis Restored'}**\n\nSign in to save and restore your conversation history.\n\n**Ready to continue optimizing your strategy.**`,
         timestamp: new Date(),

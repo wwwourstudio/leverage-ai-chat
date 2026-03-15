@@ -5,6 +5,7 @@
  * Passes pre-fetched data to client component for hydration.
  *
  * @module app/page-wrapper
+ * @version 2
  */
 
 export const dynamic = 'force-dynamic';

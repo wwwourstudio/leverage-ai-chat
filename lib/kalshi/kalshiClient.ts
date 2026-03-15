@@ -68,6 +68,43 @@ export interface KalshiEventMarkets {
   markets: KalshiMarket[];
 }
 
+// ─── Rate limiter (token bucket: 5 tokens, refills 1 token / 200ms) ──────────
+
+const _rateTokens = { count: 5, lastRefill: Date.now() };
+
+function acquireRateToken(): Promise<void> {
+  return new Promise(resolve => {
+    const tryAcquire = () => {
+      const now = Date.now();
+      const refill = Math.floor((now - _rateTokens.lastRefill) / 200);
+      if (refill > 0) {
+        _rateTokens.count = Math.min(5, _rateTokens.count + refill);
+        _rateTokens.lastRefill = now;
+      }
+      if (_rateTokens.count > 0) {
+        _rateTokens.count--;
+        resolve();
+      } else {
+        setTimeout(tryAcquire, 200);
+      }
+    };
+    tryAcquire();
+  });
+}
+
+// ─── GET response cache (keyed by URL, TTL = 60s) ─────────────────────────────
+
+const _requestCache = new Map<string, { data: unknown; expires: number }>();
+
+function getCachedResponse(key: string): unknown | null {
+  const entry = _requestCache.get(key);
+  return entry && entry.expires > Date.now() ? entry.data : null;
+}
+
+function setCachedResponse(key: string, data: unknown): void {
+  _requestCache.set(key, { data, expires: Date.now() + 60_000 });
+}
+
 // ─── Client ───────────────────────────────────────────────────────────────────
 
 export class KalshiClient {
@@ -120,20 +157,55 @@ export class KalshiClient {
     body?: unknown
   ): Promise<T> {
     const path = `/trade-api/v2${endpoint}`;
-    const headers = this.authHeaders(method, path);
+    const cacheKey = method === 'GET' ? `${this.baseUrl}${endpoint}` : '';
 
-    const res = await fetch(`${this.baseUrl}${endpoint}`, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-    });
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(`Kalshi API ${method} ${endpoint} → ${res.status}: ${text}`);
+    // Serve from cache for GET requests
+    if (cacheKey) {
+      const cached = getCachedResponse(cacheKey);
+      if (cached !== null) return cached as T;
     }
 
-    return res.json() as Promise<T>;
+    // Throttle outgoing requests
+    await acquireRateToken();
+
+    let lastErr: Error = new Error('Request failed');
+    for (let attempt = 0; attempt < 4; attempt++) {
+      // Exponential back-off for retries (1s, 2s, 4s)
+      if (attempt > 0) {
+        await new Promise(r => setTimeout(r, Math.min(1000 * 2 ** (attempt - 1), 8000)));
+      }
+
+      const headers = this.authHeaders(method, path);
+      let res: Response;
+      try {
+        res = await fetch(`${this.baseUrl}${endpoint}`, {
+          method,
+          headers,
+          body: body ? JSON.stringify(body) : undefined,
+        });
+      } catch (networkErr) {
+        lastErr = networkErr as Error;
+        continue; // retry on network errors
+      }
+
+      if (res.status === 429) {
+        const retryAfter = Number(res.headers.get('Retry-After') ?? 0);
+        await new Promise(r => setTimeout(r, retryAfter > 0 ? retryAfter * 1000 : 2000));
+        lastErr = new Error(`Kalshi API 429 rate limit on ${endpoint}`);
+        continue; // retry after waiting
+      }
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`Kalshi API ${method} ${endpoint} → ${res.status}: ${text}`);
+      }
+
+      const data = await res.json() as T;
+      if (cacheKey) setCachedResponse(cacheKey, data);
+      return data;
+    }
+
+    throw lastErr;
   }
 
   // ─── Markets ─────────────────────────────────────────────────────────────

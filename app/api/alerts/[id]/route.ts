@@ -30,7 +30,7 @@ export async function PATCH(
   }
 
   // Only allow safe fields to be updated
-  const allowedFields = ['is_active', 'title', 'description', 'threshold', 'max_triggers', 'trigger_count'];
+  const allowedFields = ['is_active', 'title', 'description', 'threshold', 'max_triggers', 'trigger_count', 'notify_channels'];
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   for (const field of allowedFields) {
     if (field in body) {

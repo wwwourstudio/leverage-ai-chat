@@ -24,6 +24,10 @@ const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ 
 import { TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, MessageSquare, Clock, Star, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, X, CheckCheck, AlertTriangle, BarChart, Info, FileText, ImageIcon, Loader2 } from 'lucide-react';
 import { CardLayout } from '@/components/data-cards/CardLayout';
 import { CardAnalysisSkeleton } from '@/components/data-cards/CardSkeleton';
+// Required: keeps the Turbopack HMR factory for database-status-banner registered.
+// The compiled chunk app_page-client_tsx_3d155649._.js references this module by ID;
+// without this import the factory is missing and the app crashes on load.
+import { DatabaseStatusBanner as _DatabaseStatusBanner } from '@/components/database-status-banner';
 const TrustMetricsDisplay = dynamic(() => import('@/components/trust-metrics-display').then(m => ({ default: m.TrustMetricsDisplay })), { ssr: false });
 import { AIProgressIndicator } from '@/components/ai-progress-indicator';
 const SettingsLightbox = dynamic(() => import('@/components/SettingsLightbox').then(m => ({ default: m.SettingsLightbox })), { ssr: false });

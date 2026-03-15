@@ -1062,15 +1062,24 @@ export async function POST(request: NextRequest) {
               aiText = cleanText;
               controller.enqueue(sseChunk({ type: 'replace', text: cleanText }));
             } else {
-              // Couldn't extract any valid JSON — replace the raw text with a clean fallback
-              console.warn(
-                '[API/analyze] MLB JSON parse failed — no valid JSON found.',
-                '| Raw length:', aiText.length,
-                '| First 300 chars:', aiText.slice(0, 300),
-              );
-              const fallbackText = 'MLB analysis complete. Unable to render the structured card — please try rephrasing your question.';
-              aiText = fallbackText;
-              controller.enqueue(sseChunk({ type: 'replace', text: fallbackText }));
+              // No valid JSON found — check if the model returned prose analysis instead.
+              // If the text starts with markdown formatting (**, #, -) or looks like natural
+              // language analysis, keep it as-is rather than replacing with a generic error.
+              const looksLikeProse = /^(\*\*|#{1,3}\s|[-•]\s|\d+\.\s|[A-Z])/.test(stripped);
+              if (looksLikeProse && stripped.length > 50) {
+                // Valid prose analysis — keep the original text, no card generated
+                // (aiText is already set correctly from the stream)
+              } else {
+                // Malformed output — show a clean fallback
+                console.warn(
+                  '[API/analyze] MLB JSON parse failed — no valid JSON or prose found.',
+                  '| Raw length:', aiText.length,
+                  '| First 300 chars:', aiText.slice(0, 300),
+                );
+                const fallbackText = 'MLB analysis complete. Unable to render the structured card — please try rephrasing your question.';
+                aiText = fallbackText;
+                controller.enqueue(sseChunk({ type: 'replace', text: fallbackText }));
+              }
             }
           }
 

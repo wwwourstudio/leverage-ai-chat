@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { TrendingUp, TrendingDown, Minus, Activity, BarChart2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PlayerAvatar } from './PlayerAvatar';
@@ -32,7 +33,7 @@ function parseRecentForm(recentForm?: string): boolean[] {
   });
 }
 
-export function PropHitRateCard({
+export const PropHitRateCard = memo(function PropHitRateCard({
   playerName,
   statType,
   hitRatePercentage,
@@ -173,4 +174,4 @@ export function PropHitRateCard({
       </div>
     </article>
   );
-}
+});

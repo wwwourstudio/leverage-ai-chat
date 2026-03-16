@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { DraftBoard } from './DraftBoard';
 import { PlayerQueue } from './PlayerQueue';
 import { PickRecommendation } from './PickRecommendation';
+import { cn } from '@/lib/utils';
 import type {
   DraftPick,
   DraftRecommendation,
@@ -25,6 +26,14 @@ interface DraftRoomProps {
   initialPlayers: PlayerWithVBD[];
 }
 
+type MobileTab = 'players' | 'board' | 'recs';
+
+const MOBILE_TABS: { id: MobileTab; label: string }[] = [
+  { id: 'players', label: 'Players' },
+  { id: 'board',   label: 'Board' },
+  { id: 'recs',    label: 'AI Recs' },
+];
+
 export function DraftRoom({
   draftRoomId,
   leagueSize,
@@ -42,6 +51,7 @@ export function DraftRoom({
   const [bestPick, setBestPick] = useState<DraftRecommendation | null>(null);
   const [leveragePicks, setLeveragePicks] = useState<DraftRecommendation[]>([]);
   const [tierCliffs, setTierCliffs] = useState<TierCliff[]>([]);
+  const [mobileTab, setMobileTab] = useState<MobileTab>('players');
 
   const runSimulation = useCallback(async () => {
     setIsSimulating(true);
@@ -49,18 +59,16 @@ export function DraftRoom({
       const response = await fetch('/api/fantasy/draft/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          draftRoomId,
-          numSimulations: 1000,
-        }),
+        body: JSON.stringify({ draftRoomId, numSimulations: 1000 }),
       });
-
       const data = await response.json();
       if (data.success) {
         setSimulationResults(data.simulation.topResults);
         setBestPick(data.recommendations.bestPick);
         setLeveragePicks(data.recommendations.leveragePicks);
         setTierCliffs(data.tierCliffs);
+        // Auto-switch to recs tab on mobile after simulation
+        setMobileTab('recs');
       }
     } catch (error) {
       console.error('Simulation error:', error);
@@ -74,29 +82,18 @@ export function DraftRoom({
       const response = await fetch('/api/fantasy/draft/pick', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          draftRoomId,
-          playerName,
-          position,
-        }),
+        body: JSON.stringify({ draftRoomId, playerName, position }),
       });
-
       const data = await response.json();
       if (data.success) {
-        // Add pick to local state
         const newPick: DraftPick = data.pick;
         setPicks((prev: any) => [...prev, newPick]);
-
-        // Remove player from available
         setAvailablePlayers((prev: any) => prev.filter((p: any) => p.playerName !== playerName));
-
-        // Advance pick
         setCurrentPick(data.nextPick || currentPick + 1);
-
-        // Clear simulation results
         setSimulationResults([]);
         setBestPick(null);
         setLeveragePicks([]);
+        setMobileTab('players');
       }
     } catch (error) {
       console.error('Pick error:', error);
@@ -116,11 +113,7 @@ export function DraftRoom({
             Round {round}, Pick {pickInRound} (Overall #{currentPick})
           </p>
         </div>
-        <Button
-          onClick={runSimulation}
-          disabled={isSimulating}
-          variant="default"
-        >
+        <Button onClick={runSimulation} disabled={isSimulating} variant="default">
           {isSimulating ? 'Simulating...' : 'Run AI Simulation'}
         </Button>
       </div>
@@ -141,10 +134,28 @@ export function DraftRoom({
         </div>
       )}
 
-      {/* Main layout: 3-column */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      {/* Mobile tab switcher — visible only on small screens */}
+      <div className="flex lg:hidden border border-[oklch(0.22_0.02_280)] rounded-xl overflow-hidden bg-[oklch(0.09_0.012_280)]">
+        {MOBILE_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setMobileTab(tab.id)}
+            className={cn(
+              'flex-1 py-2.5 text-xs font-bold transition-colors',
+              mobileTab === tab.id
+                ? 'bg-[oklch(0.18_0.025_260)] text-white'
+                : 'text-[oklch(0.50_0.01_280)] hover:text-white hover:bg-[oklch(0.14_0.015_280)]',
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Main layout — CSS Grid: 4fr 5fr 3fr on desktop, single column on mobile */}
+      <div className="grid grid-cols-1 lg:grid-cols-[4fr_5fr_3fr] gap-4">
         {/* Left: Available Players */}
-        <div className="lg:col-span-4">
+        <div className={cn(mobileTab !== 'players' && 'hidden lg:block')}>
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">Available Players</CardTitle>
@@ -160,7 +171,7 @@ export function DraftRoom({
         </div>
 
         {/* Center: Draft Board */}
-        <div className="lg:col-span-5">
+        <div className={cn(mobileTab !== 'board' && 'hidden lg:block')}>
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">Draft Board</CardTitle>
@@ -179,7 +190,7 @@ export function DraftRoom({
         </div>
 
         {/* Right: AI Recommendations */}
-        <div className="lg:col-span-3">
+        <div className={cn(mobileTab !== 'recs' && 'hidden lg:block')}>
           <PickRecommendation
             bestPick={bestPick}
             leveragePicks={leveragePicks}

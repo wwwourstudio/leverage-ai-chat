@@ -279,13 +279,17 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
   const isUser = message.role === 'user';
 
   return (
-    <div className={cn('flex gap-3 animate-fade-in-up', isUser ? 'justify-end' : 'justify-start')}>
+    <div
+      role="article"
+      aria-label={isUser ? 'User message' : 'AI response'}
+      className={cn('flex gap-3 animate-fade-in-up', isUser ? 'justify-end' : 'justify-start')}
+    >
       <div className={cn('max-w-3xl', isUser ? 'order-2' : '')}>
         <div className={cn(
           'rounded-2xl px-5 py-4',
           isUser
-            ? 'bg-linear-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-900/20 min-w-[200px]'
-            : 'bg-[oklch(0.12_0.015_280)] border border-l-[3px] border-[oklch(0.22_0.02_280)] border-l-blue-500/50 shadow-sm',
+            ? 'bg-gradient-to-br from-[oklch(0.30_0.07_260)] to-[oklch(0.24_0.05_265)] text-white shadow-lg shadow-[oklch(0.15_0.04_260)/0.3] min-w-[200px] border border-[oklch(0.38_0.06_260)]'
+            : 'bg-[oklch(0.12_0.015_280)] border border-l-[3px] border-[oklch(0.22_0.02_280)] border-l-[oklch(0.45_0.06_260)] shadow-sm',
         )}>
           {isEditing ? (
             <div className="space-y-3">
@@ -351,14 +355,14 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                     <button
                       onClick={onCopy}
                       title="Copy response"
-                      className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 transition-all"
+                      className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 hover:bg-[oklch(0.18_0.01_280)] rounded px-1 py-0.5 transition-all"
                     >
                       <Copy className="w-3 h-3" />
                     </button>
                     <button
                       onClick={() => setIsEditing(true)}
                       title="Edit"
-                      className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 transition-all"
+                      className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 hover:bg-[oklch(0.18_0.01_280)] rounded px-1 py-0.5 transition-all"
                     >
                       <Edit3 className="w-3 h-3" />
                     </button>
@@ -366,7 +370,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                       <button
                         onClick={() => setShowTrust((v: any) => !v)}
                         title="Trust metrics"
-                        className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 transition-all"
+                        className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 hover:bg-[oklch(0.18_0.01_280)] rounded px-1 py-0.5 transition-all"
                       >
                         <Shield className="w-3 h-3" />
                       </button>

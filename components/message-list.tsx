@@ -41,16 +41,33 @@ function TypingIndicator() {
   }, []);
 
   return (
-    <div className="flex gap-3 justify-start">
+    <div className="flex gap-3 justify-start" role="status" aria-label="AI is thinking">
+      {/* Waveform keyframe — injected once per indicator mount */}
+      <style>{`
+        @keyframes leverageWave {
+          0%, 100% { transform: scaleY(0.35); opacity: 0.5; }
+          50% { transform: scaleY(1); opacity: 1; }
+        }
+      `}</style>
       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-900/30">
         <Sparkles className="w-4 h-4 text-white animate-pulse" />
       </div>
       <div className="bg-[oklch(0.12_0.015_280)] border border-[oklch(0.22_0.02_280)] rounded-2xl px-5 py-3.5 flex items-center gap-3">
-        {/* Animated dots */}
-        <div className="flex gap-1.5 items-center">
-          <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce shadow-sm shadow-blue-400/40" style={{ animationDelay: '0ms' }} />
-          <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce shadow-sm shadow-purple-400/40" style={{ animationDelay: '160ms' }} />
-          <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce shadow-sm shadow-indigo-400/40" style={{ animationDelay: '320ms' }} />
+        {/* Animated waveform — 5 bars with staggered timing */}
+        <div className="flex gap-[3px] items-center" style={{ height: '18px' }}>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              style={{
+                width: '3px',
+                height: '100%',
+                borderRadius: '2px',
+                background: `oklch(0.65 0.15 ${260 + i * 8})`,
+                animation: `leverageWave 1.1s ease-in-out ${i * 0.11}s infinite`,
+                transformOrigin: 'center',
+              }}
+            />
+          ))}
         </div>
         {/* Stage label */}
         <span

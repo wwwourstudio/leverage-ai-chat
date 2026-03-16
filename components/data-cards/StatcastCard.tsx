@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, memo } from 'react';
+import { AnalysisLightbox, type LightboxSection } from './AnalysisLightbox';
 
 // ---------------------------------------------------------------------------
 // Types (mirrors the JSON shape the MLB AI prompt returns)
@@ -246,123 +247,10 @@ function FlatDataMetrics({ data }: { data: Record<string, string | number> }) {
 }
 
 // ---------------------------------------------------------------------------
-// Lightbox — full-screen overlay with keyboard Escape + Copy JSON
-// ---------------------------------------------------------------------------
-
-function Lightbox({
-  open,
-  onClose,
-  title,
-  sections,
-  conf,
-  rawData,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  sections: LightboxSection[];
-  conf: TypeConf;
-  rawData?: unknown;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-
-  const handleCopy = useCallback(() => {
-    if (!rawData) return;
-    navigator.clipboard.writeText(JSON.stringify(rawData, null, 2)).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }, [rawData]);
-
-  if (!open) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      {/* Dim overlay */}
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-
-      {/* Panel */}
-      <div
-        className={`relative z-10 w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl bg-zinc-900 border ${conf.accentBorder} shadow-2xl`}
-        onClick={(e: any) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-white/10 shrink-0">
-          <div className="min-w-0 flex-1">
-            <h3 className="text-base font-black text-white leading-tight truncate">{title}</h3>
-            <p className={`text-[9px] font-extrabold uppercase tracking-widest ${conf.accentText} mt-0.5`}>
-              Full Breakdown · Press Esc to close
-            </p>
-          </div>
-          <div className="flex items-center gap-2 ml-3 shrink-0">
-            {!!rawData && (
-              <button
-                onClick={handleCopy}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white text-[10px] font-bold transition-colors border border-white/10"
-              >
-                {copied ? '✓ Copied' : 'Copy JSON'}
-              </button>
-            )}
-            <button
-              onClick={onClose}
-              className="flex items-center justify-center w-7 h-7 rounded-full bg-white/10 text-gray-400 hover:text-white hover:bg-white/20 transition-colors text-sm font-bold"
-              aria-label="Close"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-
-        {/* Sections */}
-        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
-          {sections.map((section, i) => (
-            <div key={i}>
-              <h4 className={`text-[10px] font-extrabold uppercase tracking-widest ${conf.accentText} mb-2`}>
-                {section.title}
-              </h4>
-              <div className={`rounded-xl ${conf.accentBg} border ${conf.accentBorder} px-3 py-1`}>
-                {section.metrics?.map((m, j) => (
-                  <SmartMetricRow key={j} label={m.label} value={m.value} />
-                ))}
-              </div>
-            </div>
-          ))}
-
-          {sections.length === 0 && (
-            <p className="text-sm text-gray-500 text-center py-6">No breakdown data available.</p>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-5 pb-5 pt-3 border-t border-white/10 shrink-0 flex items-center gap-2">
-          <img src="/statcast-logo.png" alt="Statcast" className="h-3.5 w-auto opacity-60" />
-          <button
-            onClick={onClose}
-            className={`ml-auto px-4 py-2 rounded-xl ${conf.accentBg} hover:opacity-90 ${conf.accentText} text-sm font-bold transition-opacity border ${conf.accentBorder}`}
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Main StatcastCard
 // ---------------------------------------------------------------------------
 
-export function StatcastCard({ data, onAnalyze, isHero = false }: StatcastCardProps) {
+export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero = false }: StatcastCardProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const cardType   = (data.type ?? '').toLowerCase();
@@ -470,16 +358,18 @@ export function StatcastCard({ data, onAnalyze, isHero = false }: StatcastCardPr
       </div>
 
       {/* ── Lightbox ── */}
-      <Lightbox
+      <AnalysisLightbox
         open={lightboxOpen}
         onClose={() => setLightboxOpen(false)}
         title={data.title}
-        sections={sections}
-        conf={conf}
+        sections={sections as LightboxSection[]}
+        accentText={conf.accentText}
+        accentBg={conf.accentBg}
+        accentBorder={conf.accentBorder}
         rawData={data}
       />
     </>
   );
-}
+});
 
 export default StatcastCard;

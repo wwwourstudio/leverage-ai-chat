@@ -1,7 +1,8 @@
-import 'server-only';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Types from adp-data.ts
+// Server-only module for ADP Supabase operations
+// This file should only be dynamically imported on the server (typeof window === 'undefined')
+// We cannot use 'server-only' because the parent module (adp-data.ts) is in the client bundle graph
 export interface NFBCPlayer {
   rank: number;
   playerName: string;

@@ -304,35 +304,17 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 // Uses the service role key (bypasses RLS) so no user session is needed.
 // Falls back silently — persistence failures never break the ADP tool.
 
-// Module-level singleton for server-side only
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _adpSupabaseServer: any = null;
-
-function getADPSupabaseClient() {
-  // ADP operations require service role key and should only run server-side
-  // Return null in browser to prevent "Multiple GoTrueClient instances" warning
+// Returns null on client, Supabase client on server
+// Uses dynamic import to prevent bundling @supabase/supabase-js in client
+async function getADPSupabaseClient() {
   if (typeof window !== 'undefined') {
     return null;
   }
-  
-  if (_adpSupabaseServer) return _adpSupabaseServer;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
-  
-  // Use require() instead of dynamic import to prevent webpack from bundling
-  // @supabase/supabase-js into the client bundle. The typeof window check above
-  // ensures this code path never executes in the browser.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { createClient } = require('@supabase/supabase-js');
-  _adpSupabaseServer = createClient(url, key, {
-    db: { schema: 'api' },
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-  return _adpSupabaseServer;
+  // Dynamic import of server-only module - webpack will not bundle this for client
+  const { getADPSupabaseClient: getClient } = await import(
+    /* webpackIgnore: true */ '@/lib/supabase/adp-client.server'
+  );
+  return getClient();
 }
 
 export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): Promise<void> {

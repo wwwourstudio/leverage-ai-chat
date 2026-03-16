@@ -441,17 +441,20 @@ function TimeBar({ closeTimeIso }: { closeTimeIso?: string | null }) {
 }
 
 // ── Related Markets Link ───────────────────────────────────────────────────────
-function RelatedMarketsLink({ seriesTicker }: { seriesTicker?: string }) {
-  if (!seriesTicker) return null;
+function RelatedMarketsLink({ seriesTicker, eventTicker }: { seriesTicker?: string; eventTicker?: string }) {
+  // Prefer eventTicker for the link since it maps to a real Kalshi page (/markets/{event})
+  const linkTarget = eventTicker || seriesTicker;
+  if (!linkTarget) return null;
+  const label = seriesTicker || eventTicker || '';
   return (
     <a
-      href={`https://kalshi.com/markets/${seriesTicker}`}
+      href={`https://kalshi.com/markets/${linkTarget.toLowerCase()}`}
       target="_blank"
       rel="noopener noreferrer"
       className="flex items-center gap-1.5 text-[10px] text-[oklch(0.38_0.02_260)] hover:text-[oklch(0.55_0.02_260)] transition-colors duration-150 font-medium"
     >
       <Layers className="w-3 h-3 shrink-0" />
-      More markets in {seriesTicker}
+      More markets in {label}
       <ChevronRight className="w-3 h-3" />
     </a>
   );
@@ -525,14 +528,17 @@ export const KalshiCard = memo(function KalshiCard({
 
   const displayTitle = shortenTitle(title);
 
-  // Deep link — correct format: /markets/{seriesTicker}/{ticker}
-  const series    = d.seriesTicker || d.eventTicker || '';
-  const tradeBase = series && d.ticker
-    ? `https://kalshi.com/markets/${series}/${d.ticker}`
-    : d.eventTicker
-    ? `https://kalshi.com/markets/${d.eventTicker}`
-    : d.ticker
-    ? `https://kalshi.com/markets/${d.ticker}`
+  // Deep link — Kalshi URL format: /markets/{event_ticker}/{market_ticker} (lowercase)
+  // seriesTicker is a category grouping (e.g. "KXBTC"), NOT a valid URL path segment
+  // eventTicker is the parent event (e.g. "KXBTCD-25MAR14") used as the first path segment
+  const evt = (d.eventTicker || '').toLowerCase();
+  const mkt = (d.ticker      || '').toLowerCase();
+  const tradeBase = evt && mkt
+    ? `https://kalshi.com/markets/${evt}/${mkt}`
+    : evt
+    ? `https://kalshi.com/markets/${evt}`
+    : mkt
+    ? `https://kalshi.com/markets/${mkt}`
     : null;
 
   // YES/NO buy deep links — Kalshi doesn't have a ?side= param, both link to the same market
@@ -645,8 +651,8 @@ export const KalshiCard = memo(function KalshiCard({
         <TimeBar closeTimeIso={d.closeTimeIso} />
 
         {/* Related markets */}
-        {d.seriesTicker && d.seriesTicker !== d.ticker && (
-          <RelatedMarketsLink seriesTicker={d.seriesTicker} />
+        {(d.seriesTicker || d.eventTicker) && d.seriesTicker !== d.ticker && (
+          <RelatedMarketsLink seriesTicker={d.seriesTicker} eventTicker={d.eventTicker} />
         )}
 
         {/* ── CTAs ──────────────────────────────────────────────────────────── */}

@@ -314,15 +314,20 @@ async function getADPSupabaseClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
   const { createClient } = await import('@supabase/supabase-js');
+  // Use no-op storage to completely prevent GoTrueClient from using browser storage
+  // This avoids "Multiple GoTrueClient instances" warning since this client only needs DB access
+  const noopStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+  };
   _adpSupabase = createClient(url, key, {
     db: { schema: 'api' },
     auth: {
-      // Use a unique storage key to prevent "Multiple GoTrueClient instances" warning
-      // This client only needs DB access, not authentication
-      storageKey: 'adp-data-client',
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
+      storage: noopStorage,
     },
   });
   return _adpSupabase;

@@ -337,34 +337,23 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
     return adpCache;
   }
 
-  // Fetch from API route to avoid bundling @supabase/supabase-js in client
+  // Always fetch via API to completely avoid bundling @supabase/supabase-js
+  // The API route imports adp-data.server.ts which handles Supabase
   try {
     const isServer = typeof window === 'undefined';
-    if (isServer) {
-      // Server-side: use the server module directly
-      const { loadADPFromSupabase: loadFromDB } = await import('@/lib/adp-data.server');
-      const dbData = await loadFromDB('mlb', true);
-      if (dbData && dbData.length > 0) {
-        console.log(`[v0] [ADP] Serving ${dbData.length} MLB players from Supabase (user upload)`);
-        adpCache = dbData;
+    const baseUrl = isServer ? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000') : '';
+    const res = await fetch(`${baseUrl}/api/adp?sport=mlb&allowStale=true`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.data && json.data.length > 0) {
+        console.log(`[v0] [ADP] Serving ${json.data.length} MLB players from API (user upload)`);
+        adpCache = json.data;
         lastFetched = now;
-        return dbData;
-      }
-    } else {
-      // Client-side: fetch via API to avoid Supabase in browser bundle
-      const res = await fetch('/api/adp?sport=mlb&allowStale=true');
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data && json.data.length > 0) {
-          console.log(`[v0] [ADP] Serving ${json.data.length} MLB players from API (user upload)`);
-          adpCache = json.data;
-          lastFetched = now;
-          return json.data;
-        }
+        return json.data;
       }
     }
   } catch (err) {
-    console.warn('[v0] [ADP] Failed to load from Supabase, using static fallback:', err);
+    console.warn('[v0] [ADP] Failed to load from API, using static fallback:', err);
   }
 
   console.log(`[v0] [ADP] No MLB ADP upload found — serving static fallback (${STATIC_FALLBACK_PLAYERS.length} players)`);

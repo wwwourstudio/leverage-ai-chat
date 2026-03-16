@@ -74,11 +74,11 @@ export async function loadThreads(): Promise<ChatThread[]> {
  * Create a new thread in Supabase and return it.
  * Returns null on failure.
  */
-export async function createThread(category: string, title: string): Promise<ChatThread | null> {
+export async function createThread(category: string, title: string, tags?: string[]): Promise<ChatThread | null> {
   try {
     const json = await apiCall('/api/chats', {
       method: 'POST',
-      body: JSON.stringify({ category, title }),
+      body: JSON.stringify({ category, title, ...(tags?.length ? { tags } : {}) }),
     });
     const t = json.thread;
     return {

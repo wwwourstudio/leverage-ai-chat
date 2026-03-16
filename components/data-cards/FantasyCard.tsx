@@ -164,7 +164,7 @@ function VBDCard({ data, isHero, ...p }: FantasyCardProps) {
                 className={cn('flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-colors hover:bg-[oklch(0.12_0.01_280)] cursor-pointer', rowBg)}
                 onClick={() => {
                   const query = `Analyze ${pl.name} (${pl.team} ${pl.pos}) — show recent game stats, season projections, and best prop bets`;
-                  window.dispatchEvent(new CustomEvent('leveragePlayerClick', { detail: { query } }));
+                  window.dispatchEvent(new CustomEvent('leveragePlayerClick', { detail: { query, category: 'fantasy' } }));
                 }}
                 title={`Analyze ${pl.name}`}
               >

@@ -244,12 +244,75 @@ function parseMarket(m: any): KalshiMarket {
   };
 }
 
+// ── Circuit Breaker ───────────────────────────────────────────────────────────
+// Opens after 5 consecutive failures; auto-resets to half-open after 60 s.
+// In half-open state one probe request is allowed — success closes the breaker.
+
+class CircuitBreaker {
+  private failures = 0;
+  private lastFailTime = 0;
+  private state: 'closed' | 'open' | 'half-open' = 'closed';
+  private readonly threshold: number;
+  private readonly resetTimeoutMs: number;
+
+  constructor(threshold = 5, resetTimeoutMs = 60_000) {
+    this.threshold     = threshold;
+    this.resetTimeoutMs = resetTimeoutMs;
+  }
+
+  async execute<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.state === 'open') {
+      if (Date.now() - this.lastFailTime >= this.resetTimeoutMs) {
+        this.state = 'half-open';
+        console.log('[KALSHI] Circuit breaker → half-open (probe)');
+      } else {
+        throw new Error('[KALSHI] Circuit breaker is OPEN — skipping fetch');
+      }
+    }
+
+    try {
+      const result = await fn();
+      this._onSuccess();
+      return result;
+    } catch (err) {
+      this._onFailure();
+      throw err;
+    }
+  }
+
+  private _onSuccess(): void {
+    this.failures = 0;
+    if (this.state !== 'closed') {
+      console.log('[KALSHI] Circuit breaker → closed');
+    }
+    this.state = 'closed';
+  }
+
+  private _onFailure(): void {
+    this.failures++;
+    this.lastFailTime = Date.now();
+    if (this.failures >= this.threshold && this.state === 'closed') {
+      this.state = 'open';
+      console.error(`[KALSHI] Circuit breaker OPENED after ${this.failures} failures`);
+    }
+  }
+
+  get isOpen(): boolean { return this.state === 'open'; }
+  get currentState(): string { return this.state; }
+}
+
+const kalshiCircuitBreaker = new CircuitBreaker();
+
 /**
  * Fetch a single page of markets.
  * Tries the canonical api.kalshi.com first; falls back to api.elections.kalshi.com.
  * Returns parsed markets and the next cursor (null when done).
  */
 async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage> {
+  return kalshiCircuitBreaker.execute(() => _fetchKalshiPageInner(queryParams));
+}
+
+async function _fetchKalshiPageInner(queryParams: URLSearchParams): Promise<KalshiPage> {
   const urls = [
     `${KALSHI_TRADING_URL}/markets?${queryParams}`,
     `${KALSHI_FALLBACK_URL}/markets?${queryParams}`,

@@ -22,11 +22,116 @@ interface ChatMessageProps {
   onCopy?: () => void;
 }
 
-/** Lightweight markdown renderer — handles **bold**, ## headers, - bullets */
+/** Render inline markdown: **bold**, _italic_, `code` */
+function renderInline(text: string): React.ReactNode {
+  // Fast path: no markers present
+  if (!text.includes('**') && !text.includes('_') && !text.includes('`')) return text;
+
+  const parts: React.ReactNode[] = [];
+  let remaining = text;
+  let key = 0;
+
+  while (remaining.length > 0) {
+    // Find the earliest marker
+    const boldIdx = remaining.indexOf('**');
+    const italicIdx = (() => {
+      let idx = remaining.indexOf('_');
+      // Avoid treating mid-word underscores (e.g. snake_case) as italic markers
+      while (idx !== -1) {
+        const before = idx > 0 ? remaining[idx - 1] : ' ';
+        const after = idx + 1 < remaining.length ? remaining[idx + 1] : ' ';
+        if (/\w/.test(before) && /\w/.test(after)) {
+          idx = remaining.indexOf('_', idx + 1);
+        } else {
+          break;
+        }
+      }
+      return idx;
+    })();
+    const codeIdx = remaining.indexOf('`');
+
+    const candidates = [
+      boldIdx !== -1 ? boldIdx : Infinity,
+      italicIdx !== -1 ? italicIdx : Infinity,
+      codeIdx !== -1 ? codeIdx : Infinity,
+    ];
+    const earliest = Math.min(...candidates);
+
+    if (earliest === Infinity) {
+      parts.push(<React.Fragment key={key++}>{remaining}</React.Fragment>);
+      break;
+    }
+
+    // Emit text before the marker
+    if (earliest > 0) {
+      parts.push(<React.Fragment key={key++}>{remaining.slice(0, earliest)}</React.Fragment>);
+      remaining = remaining.slice(earliest);
+    }
+
+    // Bold: **text**
+    if (remaining.startsWith('**')) {
+      const close = remaining.indexOf('**', 2);
+      if (close === -1) {
+        parts.push(<React.Fragment key={key++}>{remaining}</React.Fragment>);
+        break;
+      }
+      parts.push(
+        <strong key={key++} className="font-bold text-white">
+          {remaining.slice(2, close)}
+        </strong>
+      );
+      remaining = remaining.slice(close + 2);
+      continue;
+    }
+
+    // Inline code: `code`
+    if (remaining.startsWith('`')) {
+      const close = remaining.indexOf('`', 1);
+      if (close === -1) {
+        parts.push(<React.Fragment key={key++}>{remaining}</React.Fragment>);
+        break;
+      }
+      parts.push(
+        <code key={key++} className="px-1.5 py-0.5 rounded bg-[oklch(0.18_0.015_280)] text-blue-300 font-mono text-[0.85em]">
+          {remaining.slice(1, close)}
+        </code>
+      );
+      remaining = remaining.slice(close + 1);
+      continue;
+    }
+
+    // Italic: _text_
+    if (remaining.startsWith('_')) {
+      const close = remaining.indexOf('_', 1);
+      if (close === -1) {
+        parts.push(<React.Fragment key={key++}>{remaining}</React.Fragment>);
+        break;
+      }
+      parts.push(
+        <em key={key++} className="italic text-[oklch(0.75_0.005_85)]">
+          {remaining.slice(1, close)}
+        </em>
+      );
+      remaining = remaining.slice(close + 1);
+      continue;
+    }
+
+    // Should not reach here; advance one char to prevent infinite loop
+    parts.push(<React.Fragment key={key++}>{remaining[0]}</React.Fragment>);
+    remaining = remaining.slice(1);
+  }
+
+  return <>{parts}</>;
+}
+
+/** Lightweight markdown renderer — handles **bold**, _italic_, `code`, ``` blocks, ## headers, - bullets */
 function MarkdownContent({ text }: { text: string }) {
   const lines = text.split('\n');
   const elements: React.ReactNode[] = [];
   let bulletBuffer: string[] = [];
+  let codeBuffer: string[] = [];
+  let inCodeBlock = false;
+  let codeLang = '';
 
   const flushBullets = (key: string) => {
     if (bulletBuffer.length === 0) return;
@@ -43,10 +148,57 @@ function MarkdownContent({ text }: { text: string }) {
     bulletBuffer = [];
   };
 
+  const flushCode = (key: string) => {
+    if (codeBuffer.length === 0) return;
+    elements.push(
+      <div key={`code-${key}`} className="my-2 rounded-lg overflow-hidden border border-[oklch(0.22_0.02_280)]">
+        {codeLang && (
+          <div className="px-3 py-1 bg-[oklch(0.16_0.015_280)] text-[10px] font-mono text-[oklch(0.45_0.01_280)] uppercase tracking-wide border-b border-[oklch(0.22_0.02_280)]">
+            {codeLang}
+          </div>
+        )}
+        <pre className="px-4 py-3 bg-[oklch(0.10_0.01_280)] text-sm font-mono text-[oklch(0.78_0.005_280)] overflow-x-auto leading-relaxed">
+          <code>{codeBuffer.join('\n')}</code>
+        </pre>
+      </div>
+    );
+    codeBuffer = [];
+    codeLang = '';
+  };
+
   lines.forEach((line, i) => {
     const trimmed = line.trim();
 
-    // ## Headers
+    // Fenced code block toggle
+    if (trimmed.startsWith('```')) {
+      if (!inCodeBlock) {
+        flushBullets(String(i));
+        inCodeBlock = true;
+        codeLang = trimmed.slice(3).trim();
+      } else {
+        inCodeBlock = false;
+        flushCode(String(i));
+      }
+      return;
+    }
+
+    if (inCodeBlock) {
+      codeBuffer.push(line);
+      return;
+    }
+
+    // ### Headers (h3)
+    if (trimmed.startsWith('### ')) {
+      flushBullets(String(i));
+      elements.push(
+        <p key={i} className="text-[12px] font-bold text-blue-300/80 mt-2 mb-0.5 uppercase tracking-wide">
+          {trimmed.slice(4)}
+        </p>
+      );
+      return;
+    }
+
+    // ## Headers (h2)
     if (trimmed.startsWith('## ')) {
       flushBullets(String(i));
       elements.push(
@@ -99,42 +251,9 @@ function MarkdownContent({ text }: { text: string }) {
   });
 
   flushBullets('end');
+  if (inCodeBlock) flushCode('eof'); // unclosed fence — render what we have
 
   return <div className="space-y-0.5">{elements}</div>;
-}
-
-/** Render inline markdown: **bold**, _italic_ */
-function renderInline(text: string): React.ReactNode {
-  if (!text.includes('**') && !text.includes('_')) return text;
-
-  const parts: React.ReactNode[] = [];
-  let remaining = text;
-  let key = 0;
-
-  while (remaining.length > 0) {
-    const boldIdx = remaining.indexOf('**');
-    if (boldIdx === -1) {
-      parts.push(<React.Fragment key={key++}>{remaining}</React.Fragment>);
-      break;
-    }
-    if (boldIdx > 0) {
-      parts.push(<React.Fragment key={key++}>{remaining.slice(0, boldIdx)}</React.Fragment>);
-    }
-    const closeBold = remaining.indexOf('**', boldIdx + 2);
-    if (closeBold === -1) {
-      parts.push(<React.Fragment key={key++}>{remaining.slice(boldIdx)}</React.Fragment>);
-      break;
-    }
-    const boldText = remaining.slice(boldIdx + 2, closeBold);
-    parts.push(
-      <strong key={key++} className="font-bold text-white">
-        {boldText}
-      </strong>
-    );
-    remaining = remaining.slice(closeBold + 2);
-  }
-
-  return <>{parts}</>;
 }
 
 function formatRelativeTime(date: Date): string {

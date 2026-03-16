@@ -3,6 +3,7 @@
 import { memo, useEffect, useState } from 'react';
 import { Sparkles, User } from 'lucide-react';
 import { TrustMetricsBadge } from './trust-metrics-display';
+import { ChatMessage } from './chat-message';
 
 interface Message {
   id: string;
@@ -11,6 +12,11 @@ interface Message {
   timestamp: Date;
   trustMetrics?: any;
   cards?: any[];
+  confidence?: number;
+  modelUsed?: string;
+  processingTime?: number;
+  sources?: any[];
+  isStreaming?: boolean;
 }
 
 interface MessageListProps {
@@ -58,53 +64,18 @@ function TypingIndicator() {
   );
 }
 
-// Memoized per-item component — skips re-render for messages whose reference hasn't changed.
+// Memoized per-item component — delegates to ChatMessage for consistent rendering.
 // During streaming, only the active streaming message gets a new object reference, so React
 // bails out for all prior messages and only reconciles the one being typed.
-const MessageItem = memo(function MessageItem({ message, index }: { message: Message; index: number }) {
-  return (
-    <div
-      className={`flex gap-3 animate-fade-in-up ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-      style={{ animationDelay: `${index * 40}ms` }}
-    >
-      {message.role === 'assistant' && (
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-900/30">
-          <Sparkles className="w-4 h-4 text-white" />
-        </div>
-      )}
-
-      <div
-        className={`max-w-3xl rounded-2xl px-5 py-4 ${
-          message.role === 'user'
-            ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-900/20'
-            : 'bg-[oklch(0.12_0.015_280)] border border-l-[3px] border-[oklch(0.22_0.02_280)] border-l-blue-500/40 text-slate-100 shadow-sm'
-        }`}
-      >
-        <div className="prose prose-invert max-w-none">
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
-        </div>
-
-        {message.role === 'assistant' && message.trustMetrics && (
-          <div className="mt-3 pt-3 border-t border-[oklch(0.20_0.015_280)]">
-            <TrustMetricsBadge metrics={message.trustMetrics} />
-          </div>
-        )}
-      </div>
-
-      {message.role === 'user' && (
-        <div className="w-8 h-8 rounded-full bg-[oklch(0.20_0.015_280)] flex items-center justify-center flex-shrink-0">
-          <User className="w-4 h-4 text-[oklch(0.60_0.01_280)]" />
-        </div>
-      )}
-    </div>
-  );
+const MessageItem = memo(function MessageItem({ message }: { message: Message }) {
+  return <ChatMessage message={message} />;
 });
 
 export const MessageList = memo(function MessageList({ messages, isTyping }: MessageListProps) {
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
-      {messages.map((message, index) => (
-        <MessageItem key={message.id} message={message} index={index} />
+      {messages.map((message) => (
+        <MessageItem key={message.id} message={message} />
       ))}
 
       {isTyping && <TypingIndicator />}

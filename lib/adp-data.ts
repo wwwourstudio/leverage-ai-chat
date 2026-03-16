@@ -328,14 +328,24 @@ export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): P
       sport,
       fetched_at: now,
     }));
-    // Upsert in batches of 50 to stay well within payload limits
+    // Delete all existing rows for this sport before inserting new data.
+    // Without this, a smaller upload leaves stale rows behind (e.g. old bad data
+    // at ranks 121-300 persists after uploading only 120 fresh players).
+    const { error: deleteError } = await supabase
+      .from('nfbc_adp')
+      .delete()
+      .eq('sport', sport);
+    if (deleteError) {
+      console.warn('[v0] [ADP] Supabase delete failed (non-critical):', deleteError.message);
+    }
+    // Insert in batches of 50 to stay well within payload limits
     const BATCH = 50;
     for (let i = 0; i < rows.length; i += BATCH) {
       const { error } = await supabase
         .from('nfbc_adp')
-        .upsert(rows.slice(i, i + BATCH), { onConflict: 'sport,rank' });
+        .insert(rows.slice(i, i + BATCH));
       if (error) {
-        console.warn('[v0] [ADP] Supabase upsert batch failed:', error.message);
+        console.warn('[v0] [ADP] Supabase insert batch failed:', error.message);
         return;
       }
     }

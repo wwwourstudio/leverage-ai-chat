@@ -103,9 +103,12 @@ export function parseMarkdownBettingText(text: string): MLBAnalysis {
   const pick = pickMatch ? pickMatch[1].trim() : plain.split("\n")[0].trim();
 
   // --- book ---
-  // Find "on <Book>" near the pick
-  const bookMatch = plain.match(/\bon\s+([A-Z][A-Za-z]+(?:[A-Z][A-Za-z]+)*)\b/);
-  const book = bookMatch ? bookMatch[1].trim() : extractBook(plain);
+  // Try known sportsbook names first (prevents matching team names like "San Francisco")
+  const knownBook = extractBook(plain);
+  const bookMatch = knownBook === 'Unknown'
+    ? plain.match(/\bon\s+([A-Z][A-Za-z]+(?:[A-Z][A-Za-z]+)*)\b/)
+    : null;
+  const book = knownBook !== 'Unknown' ? knownBook : (bookMatch ? bookMatch[1].trim() : 'Unknown');
 
   // --- odds ---
   // Look for odds near the pick (e.g. "at -104" or "at +100")

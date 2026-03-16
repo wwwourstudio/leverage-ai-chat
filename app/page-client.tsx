@@ -656,11 +656,12 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       if (!hasCards || !lastUserQuery) return;
 
       try {
-        const { fetchDynamicCards: fetchCards } = await import('@/lib/data-service');
+        // Use the statically imported fetchDynamicCards instead of dynamic import
+        // to avoid HMR issues where the module reference becomes stale
         const msgLow = (lastUserQuery || '').toLowerCase();
         const detectedCategory = (msgLow.includes('kalshi') || msgLow.includes('prediction market'))
           ? 'kalshi' : selectedCategory;
-        const freshCards = await fetchCards({ userContext: lastUserQuery, category: detectedCategory, limit: 4 });
+        const freshCards = await fetchDynamicCards({ userContext: lastUserQuery, category: detectedCategory, limit: 4 });
         if (freshCards.length === 0) return;
 
         const converted = freshCards.map(convertToInsightCard);

@@ -332,7 +332,10 @@ async function _fetchKalshiPageInner(queryParams: URLSearchParams): Promise<Kals
         const host = new URL(url).hostname;
         console.error(`[KALSHI] API error ${response.status} at ${host} — ${errorText.substring(0, 200)}`);
         lastError = new Error(`Kalshi API error: ${response.status} ${response.statusText}`);
-        continue; // try fallback URL
+        // 429: both URLs point to the same host — retrying immediately just logs a second
+        // identical 429. Break and let the caller handle back-off.
+        if (response.status === 429) break;
+        continue; // try fallback URL for other error codes
       }
 
       const data = await response.json();
@@ -698,23 +701,23 @@ export async function fetchElectionMarkets(options?: {
   ];
 
   function isElectionMarket(market: KalshiMarket): boolean {
-    const text = `${market.title} ${market.category} ${market.subtitle}`.toLowerCase();
+    // normalizeCategoryLabel maps political series tickers (KXUSSENATE*, KXUSHOUSE*,
+    // KXUSGOV*, PRES, POTUS) to 'Politics'. Accept those directly — their titles
+    // often won't contain the keyword list but they are definitively election markets.
+    if (market.category === 'Politics') return true;
+    const text = `${market.title} ${market.subtitle}`.toLowerCase();
     return ELECTION_KEYWORDS.some(k => text.includes(k)) || text.includes(year.toString());
   }
 
-  // Apply the election filter INSIDE the collection loop so the early-break
-  // condition (`electionMarkets.length >= limit`) counts only matching markets,
-  // not raw API results.  The Kalshi `title` search param does not reliably act
-  // as a substring filter — it often returns the top-50 open markets regardless —
-  // so we must filter client-side before deciding whether to try the next strategy.
+  // Reduced to 4 targeted strategies (previously 7) to stay within Kalshi rate limits.
+  // The Kalshi `title` search param does not reliably act as a substring filter —
+  // it often returns the top-50 open markets regardless of the search term —
+  // so we filter client-side after each fetch.
   const searchStrategies: Array<Parameters<typeof fetchKalshiMarkets>[0]> = [
     { search: `senate ${year}` },
     { search: `house ${year}` },
     { search: `governor ${year}` },
     { search: 'midterm' },
-    { category: 'politics' },
-    { search: `election ${year}` },
-    { search: 'congress' },
   ];
 
   const seen = new Set<string>();
@@ -731,6 +734,12 @@ export async function fetchElectionMarkets(options?: {
       if (isElectionMarket(market)) {
         electionMarkets.push(market);
       }
+    }
+
+    // Brief pause between strategies to stay within Kalshi's rate limit
+    // (4 rapid sequential requests already saturate the limit in production).
+    if (electionMarkets.length < limit) {
+      await new Promise(r => setTimeout(r, 200));
     }
   }
 

@@ -304,33 +304,34 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 // Uses the service role key (bypasses RLS) so no user session is needed.
 // Falls back silently — persistence failures never break the ADP tool.
 
-// Module-level singleton — prevents "Multiple GoTrueClient instances" warning
+// Module-level singleton for server-side only
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _adpSupabase: any = null;
+let _adpSupabaseServer: any = null;
 
 async function getADPSupabaseClient() {
-  if (_adpSupabase) return _adpSupabase;
+  const isBrowser = typeof window !== 'undefined';
+  
+  // In browser: reuse the existing singleton from lib/supabase/client.ts
+  // This prevents "Multiple GoTrueClient instances" warning
+  if (isBrowser) {
+    const { createClient } = await import('@/lib/supabase/client');
+    return createClient();
+  }
+  
+  // On server: use service role key for elevated permissions
+  if (_adpSupabaseServer) return _adpSupabaseServer;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
   const { createClient } = await import('@supabase/supabase-js');
-  // Use no-op storage to completely prevent GoTrueClient from using browser storage
-  // This avoids "Multiple GoTrueClient instances" warning since this client only needs DB access
-  const noopStorage = {
-    getItem: () => null,
-    setItem: () => {},
-    removeItem: () => {},
-  };
-  _adpSupabase = createClient(url, key, {
+  _adpSupabaseServer = createClient(url, key, {
     db: { schema: 'api' },
     auth: {
       persistSession: false,
       autoRefreshToken: false,
-      detectSessionInUrl: false,
-      storage: noopStorage,
     },
   });
-  return _adpSupabase;
+  return _adpSupabaseServer;
 }
 
 export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): Promise<void> {

@@ -40,13 +40,18 @@ const SIZE_CLASSES = {
 };
 
 export function PlayerAvatar({ playerName, photoUrl, sport, size = 'md', className }: PlayerAvatarProps) {
-  // Initialize from the module-level cache so re-renders don't retry known-bad URLs
-  const [imgFailed, setImgFailed] = useState(() => !!photoUrl && failedPhotoUrls.has(photoUrl));
+  const [imgFailed, setImgFailed] = useState(false);
   const sizes = SIZE_CLASSES[size];
   const colorCls = sportAvatarColor(sport);
   const initials = getInitials(playerName);
 
-  if (photoUrl && !imgFailed) {
+  // Check the module-level cache at render time (not just on mount) so that
+  // once ANY instance with the same URL reports a 404, all other concurrent
+  // instances drop their <img> on the very next render, cancelling in-flight
+  // requests and preventing repeated 404s across simultaneous card renders.
+  const showFallback = imgFailed || (!!photoUrl && failedPhotoUrls.has(photoUrl));
+
+  if (photoUrl && !showFallback) {
     return (
       <div className={cn('relative rounded-full overflow-hidden border border-white/10 shrink-0', sizes.container, className)}>
         <img

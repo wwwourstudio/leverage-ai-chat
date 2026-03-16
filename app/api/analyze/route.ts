@@ -212,9 +212,6 @@ export async function POST(request: NextRequest) {
       context?.hasFantasyIntent === true &&
       START_SIT_KEYWORDS.some(k => msgLower.includes(k));
 
-    // Statcast JSON mode only applies to non-ADP, non-start/sit MLB queries
-    const isMLBStatcastMode = isMLBQuery && !hasADPIntent && !hasStartSitIntent;
-
     // MLB Projection Engine intent: projection/DFS/fantasy/betting queries that need
     // the LeverageMetrics algorithm (Monte Carlo, HR model, breakout scores).
     const MLB_PROJECTION_KEYWORDS = [
@@ -230,6 +227,10 @@ export async function POST(request: NextRequest) {
       !hasADPIntent &&
       !hasStartSitIntent &&
       MLB_PROJECTION_KEYWORDS.some(k => msgLower.includes(k));
+
+    // Statcast JSON mode only applies to non-ADP, non-start/sit, non-projection MLB queries.
+    // Projection queries use a different prompt and return prose, not Statcast JSON cards.
+    const isMLBStatcastMode = isMLBQuery && !hasADPIntent && !hasStartSitIntent && !hasMLBProjectionIntent;
 
     const baseWithAddendum = hasStartSitIntent
       ? `${baseSystemPrompt}${FANTASY_STARTSIT_ADDENDUM}`

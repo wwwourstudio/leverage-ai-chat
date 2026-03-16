@@ -1021,6 +1021,21 @@ export function getTeamLogoUrl(teamName: string, sport?: string): string | null 
   return `https://a.espncdn.com/i/teamlogos/${slug}/500/${abbr}.png`;
 }
 
+// ── Status Badge Config ── Centralized status badge definitions used across all cards ──────────────
+export const STATUS_BADGE_CONFIG = {
+  target:  { label: 'TARGET',  dot: '#14b8a6', bg: 'bg-teal-500/10',    border: 'border-teal-500/20',    text: 'text-teal-400',    headerGrad: 'from-teal-600/75 via-cyan-700/55 to-teal-900/35' },
+  value:   { label: 'VALUE',   dot: '#10b981', bg: 'bg-emerald-500/10',  border: 'border-emerald-500/20',  text: 'text-emerald-400',  headerGrad: 'from-emerald-600/75 via-green-700/55 to-emerald-900/35' },
+  sleeper: { label: 'SLEEPER', dot: '#8b5cf6', bg: 'bg-violet-500/10',   border: 'border-violet-500/20',   text: 'text-violet-400',   headerGrad: 'from-indigo-600/75 via-violet-700/55 to-indigo-900/35' },
+  hot:     { label: 'HOT',     dot: '#ef4444', bg: 'bg-red-500/10',      border: 'border-red-500/20',      text: 'text-red-400',      headerGrad: 'from-red-600/75 via-rose-700/55 to-red-900/35' },
+  alert:   { label: 'ALERT',   dot: '#f59e0b', bg: 'bg-amber-500/10',    border: 'border-amber-500/20',    text: 'text-amber-400',    headerGrad: 'from-amber-600/75 via-yellow-700/55 to-amber-900/35' },
+  optimal: { label: 'OPTIMAL', dot: '#0ea5e9', bg: 'bg-sky-500/10',      border: 'border-sky-500/20',      text: 'text-sky-400',      headerGrad: 'from-sky-600/75 via-blue-700/55 to-sky-900/35' },
+  elite:   { label: 'ELITE',   dot: '#a855f7', bg: 'bg-purple-500/10',   border: 'border-purple-500/20',   text: 'text-purple-400',   headerGrad: 'from-purple-600/75 via-violet-700/55 to-purple-900/35' },
+  edge:    { label: 'EDGE',    dot: '#f97316', bg: 'bg-orange-500/10',   border: 'border-orange-500/20',   text: 'text-orange-400',   headerGrad: 'from-orange-600/75 via-amber-700/55 to-orange-900/35' },
+  neutral: { label: 'PROJ',    dot: '#6b7280', bg: 'bg-gray-500/10',     border: 'border-gray-500/20',     text: 'text-gray-400',     headerGrad: 'from-slate-600/75 via-gray-700/55 to-slate-900/35' },
+} as const;
+
+export type StatusBadgeKey = keyof typeof STATUS_BADGE_CONFIG;
+
 // Type Exports for TypeScript
 export type AIModelName = typeof AI_CONFIG.MODEL_NAME;
 export type AnalysisCategory = typeof ANALYSIS_CATEGORIES[keyof typeof ANALYSIS_CATEGORIES];

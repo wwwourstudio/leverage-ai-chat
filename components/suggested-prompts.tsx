@@ -208,7 +208,8 @@ export function SuggestedPrompts({
               <button
                 key={`${action.label}-${idx}`}
                 onClick={() => onPromptClick(submitText)}
-                className={`group/prompt flex items-center gap-1.5 md:gap-2.5 px-2.5 md:px-4 py-1 md:py-2.5 rounded-full border text-xs md:text-sm font-medium whitespace-nowrap transition-all duration-200 snap-start ${
+                style={{ animationDelay: `${idx * 40}ms` }}
+                className={`group/prompt animate-fade-in-up flex items-center gap-1.5 md:gap-2.5 px-2.5 md:px-4 py-1 md:py-2.5 rounded-full border text-xs md:text-sm font-medium whitespace-nowrap transition-all duration-200 snap-start ${
                   clarificationMode
                     ? 'bg-[var(--bg-overlay)] border-amber-500/50 text-amber-200/80 hover:bg-amber-900/20 hover:border-amber-400/70 hover:text-amber-100'
                     : isSuggested

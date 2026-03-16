@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { TrendingUp, ChevronRight, X, Zap, Target, Activity, BarChart3 } from 'lucide-react';
+import { useState, memo } from 'react';
+import { TrendingUp, ChevronRight, Zap, Target, Activity, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AnalysisLightbox } from './AnalysisLightbox';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -134,46 +135,9 @@ function BreakoutRing({ score }: { score: number }) {
   );
 }
 
-// ─── Lightbox ─────────────────────────────────────────────────────────────────
-
-function Lightbox({ sections, onClose, title }: { sections: LightboxSection[]; onClose: () => void; title: string }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div
-        className="relative w-full max-w-md max-h-[80vh] overflow-y-auto bg-[oklch(0.07_0.01_280)] border border-[oklch(0.22_0.02_280)] rounded-2xl p-5 shadow-2xl"
-        onClick={(e: any) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-black text-white">{title}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="space-y-4">
-          {sections.map((section, i) => (
-            <div key={i} className="space-y-2">
-              <h3 className="text-[9px] font-black uppercase tracking-widest text-gray-500 border-b border-gray-800 pb-1">
-                {section.title}
-              </h3>
-              <div className="grid grid-cols-2 gap-1.5">
-                {section.metrics.map((m, j) => (
-                  <div key={j} className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[oklch(0.11_0.01_280)]">
-                    <span className="text-[10px] text-gray-500 truncate pr-1">{m.label}</span>
-                    <span className="text-[10px] font-black text-white whitespace-nowrap">{m.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function MLBProjectionCard({ data, onAnalyze, isHero = false }: MLBProjectionCardProps) {
+export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnalyze, isHero = false }: MLBProjectionCardProps) {
   const [showLightbox, setShowLightbox] = useState(false);
 
   // Normalize data (handles both flat and nested formats)
@@ -320,16 +284,18 @@ export function MLBProjectionCard({ data, onAnalyze, isHero = false }: MLBProjec
       </article>
 
       {/* Lightbox */}
-      {showLightbox && lightboxSections.length > 0 && (
-        <Lightbox
-          sections={lightboxSections}
-          title={`${playerName} — Full Breakdown`}
-          onClose={() => setShowLightbox(false)}
-        />
-      )}
+      <AnalysisLightbox
+        open={showLightbox && lightboxSections.length > 0}
+        onClose={() => setShowLightbox(false)}
+        title={`${playerName} — Full Breakdown`}
+        sections={lightboxSections}
+        accentText={cfg.text}
+        accentBg={cfg.bg.split(' ')[0]}
+        accentBorder={cfg.bg.split(' ')[1] ?? 'border-blue-500/30'}
+      />
     </>
   );
-}
+});
 
 // ─── Sub-component ────────────────────────────────────────────────────────────
 

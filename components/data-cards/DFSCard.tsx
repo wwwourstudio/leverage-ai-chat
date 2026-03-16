@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { Award, Users, Gamepad2, ChevronRight, TrendingUp, Star, Zap, Link2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -82,7 +83,7 @@ function OwnershipBadge({ pct }: { pct: number }) {
   );
 }
 
-export function DFSCard({
+export const DFSCard = memo(function DFSCard({
   title,
   category,
   subcategory,
@@ -302,4 +303,4 @@ export function DFSCard({
       </div>
     </article>
   );
-}
+});

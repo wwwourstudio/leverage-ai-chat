@@ -214,7 +214,7 @@ export function ChatInput({
             <button
               type="submit"
               disabled={!input.trim() && uploadedFiles.length === 0}
-              className="flex-shrink-0 relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:from-[var(--bg-elevated)] disabled:to-[var(--bg-surface)] disabled:cursor-not-allowed text-white rounded-2xl px-3 md:px-8 transition-all duration-300 shadow-xl shadow-blue-500/25 hover:shadow-blue-500/50 disabled:shadow-none flex items-center gap-2.5 font-bold group overflow-hidden active:scale-95 disabled:hover:scale-100"
+              className="flex-shrink-0 relative bg-gradient-to-r from-[oklch(0.32_0.09_260)] via-[oklch(0.28_0.08_265)] to-[oklch(0.26_0.07_270)] hover:from-[oklch(0.28_0.12_155)] hover:via-[oklch(0.26_0.11_158)] hover:to-[oklch(0.24_0.10_160)] disabled:from-[var(--bg-elevated)] disabled:to-[var(--bg-surface)] disabled:cursor-not-allowed text-white rounded-2xl px-3 md:px-8 transition-all duration-300 shadow-xl shadow-blue-500/20 hover:shadow-[0_0_24px_oklch(0.45_0.18_155/0.4)] disabled:shadow-none flex items-center gap-2.5 font-bold group overflow-hidden active:scale-95 disabled:hover:scale-100"
               style={{ minHeight: '44px' }}
             >
               <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>

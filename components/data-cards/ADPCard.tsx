@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { BarChart2, ChevronRight, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -33,16 +34,16 @@ interface ADPPlayerRow {
 // ── Position badge (matches FantasyCard colours) ───────────────────────────────
 
 const POS_COLORS: Record<string, string> = {
-  SP:  'text-cyan-400   bg-cyan-400/12   border-cyan-400/30',
-  RP:  'text-violet-400 bg-violet-400/12 border-violet-400/30',
-  C:   'text-yellow-400 bg-yellow-400/12 border-yellow-400/30',
-  '1B':'text-pink-400   bg-pink-400/12   border-pink-400/30',
-  '2B':'text-lime-400   bg-lime-400/12   border-lime-400/30',
-  '3B':'text-amber-400  bg-amber-400/12  border-amber-400/30',
-  SS:  'text-teal-400   bg-teal-400/12   border-teal-400/30',
-  OF:  'text-sky-400    bg-sky-400/12    border-sky-400/30',
-  DH:  'text-orange-400 bg-orange-400/12 border-orange-400/30',
-  P:   'text-indigo-400 bg-indigo-400/12 border-indigo-400/30',
+  SP:  'text-cyan-400   bg-cyan-400/20   border-cyan-400/30',
+  RP:  'text-violet-400 bg-violet-400/20 border-violet-400/30',
+  C:   'text-yellow-400 bg-yellow-400/20 border-yellow-400/30',
+  '1B':'text-pink-400   bg-pink-400/20   border-pink-400/30',
+  '2B':'text-lime-400   bg-lime-400/20   border-lime-400/30',
+  '3B':'text-amber-400  bg-amber-400/20  border-amber-400/30',
+  SS:  'text-teal-400   bg-teal-400/20   border-teal-400/30',
+  OF:  'text-sky-400    bg-sky-400/20    border-sky-400/30',
+  DH:  'text-orange-400 bg-orange-400/20 border-orange-400/30',
+  P:   'text-indigo-400 bg-indigo-400/20 border-indigo-400/30',
 };
 
 function PosBadge({ positions }: { positions: string }) {
@@ -91,7 +92,7 @@ const STATUS_CFG: Record<string, { label: string; dot: string; text: string; hea
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function ADPCard({
+export const ADPCard = memo(function ADPCard({
   title,
   category,
   subcategory,
@@ -252,4 +253,4 @@ export function ADPCard({
       </article>
     </div>
   );
-}
+});

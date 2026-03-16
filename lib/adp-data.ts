@@ -317,8 +317,9 @@ async function getADPSupabaseClient() {
   _adpSupabase = createClient(url, key, {
     db: { schema: 'api' },
     auth: {
-      // Disable auth features to prevent multiple GoTrueClient instances
+      // Use a unique storage key to prevent "Multiple GoTrueClient instances" warning
       // This client only needs DB access, not authentication
+      storageKey: 'adp-data-client',
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,

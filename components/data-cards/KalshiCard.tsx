@@ -347,14 +347,10 @@ export const KalshiCard = memo(function KalshiCard({
           {/* Status pill */}
           {isActive ? (
             <div
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded-full shrink-0"
-              style={{ backgroundColor: KALSHI_GREEN + '0d', border: `1px solid ${KALSHI_GREEN}20` }}
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-full shrink-0 bg-[#00d15d0d] border border-[#00d15d20]"
             >
-              <span
-                className="w-1.5 h-1.5 rounded-full animate-pulse"
-                style={{ backgroundColor: KALSHI_GREEN }}
-              />
-              <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: KALSHI_GREEN }}>
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse bg-[#00d15d]" />
+              <span className="text-[8px] font-black uppercase tracking-widest text-[#00d15d]">
                 Live
               </span>
             </div>

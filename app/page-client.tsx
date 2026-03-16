@@ -284,6 +284,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
   const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string; query?: string }>>([]);
   const [isClarificationPills, setIsClarificationPills] = useState(false);
+  const [aiQuickActions, setAiQuickActions] = useState<Array<{ label: string; icon: any; category: string; query: string }> | null>(null);
   const [lastUserQuery, setLastUserQuery] = useState<string>('');
   const [selectedSport, setSelectedSport] = useState<string>('');
   const [_cardsRefreshedAt, setCardsRefreshedAt] = useState<Date | null>(null);
@@ -749,6 +750,30 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     toast.success(wasStarred ? 'Removed from starred' : 'Analysis saved');
   };
 
+  // Fetch AI-generated quick-action prompts from the /api/prompts endpoint.
+  // Refreshes when the selected platform category or sport changes.
+  useEffect(() => {
+    let cancelled = false;
+    setAiQuickActions(null); // reset so fallback shows until new prompts arrive
+    fetch(`/api/prompts?category=${encodeURIComponent(selectedCategory)}&sport=${encodeURIComponent(selectedSport ?? '')}`)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return;
+        if (data.success && Array.isArray(data.prompts) && data.prompts.length > 0) {
+          setAiQuickActions(
+            data.prompts.map((p: { label: string; query: string }) => ({
+              label: p.label,
+              icon: Sparkles,
+              category: selectedCategory,
+              query: p.query,
+            }))
+          );
+        }
+      })
+      .catch(() => { /* network failure — fall back to hardcoded */ });
+    return () => { cancelled = true; };
+  }, [selectedCategory, selectedSport]);
+
   const generateContextualSuggestions = (userMessage: string, responseCards: InsightCard[]) => {
     const msgLower = userMessage.toLowerCase();
     const suggestions: Array<{ label: string; icon: any; category: string }> = [];
@@ -1209,7 +1234,9 @@ No preamble. Start directly with section 1.`;
   const generateRealResponseRef = useRef<typeof generateRealResponse | null>(null);
   useEffect(() => {
     const handler = (e: Event) => {
-      const { query } = (e as CustomEvent<{ query: string }>).detail;
+      const { query, category } = (e as CustomEvent<{ query: string; category?: string }>).detail;
+      // Sync the platform tab so the AI gets the right context and model
+      if (category) setSelectedCategory(category);
       const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: query, timestamp: new Date() };
       setMessages((prev: Message[]) => [...prev, userMsg]);
       setInput('');
@@ -1688,13 +1715,22 @@ No preamble. Start directly with section 1.`;
           }
           // First-ever message — no thread exists yet; create one now
           const category = selectedCategory === 'all' ? 'betting' : selectedCategory;
-          const created = await createThread(category, userMessage.slice(0, 50));
+          const tags = [
+            selectedCategory === 'all' ? 'multi-platform' : selectedCategory,
+            ...(selectedSport ? [selectedSport] : []),
+          ];
+          const created = await createThread(category, userMessage.slice(0, 50), tags);
           if (created) {
-            setChats((prev: any) => prev.map((c: any) => c.id === capturedChat ? { ...c, id: created.id } : c));
+            setChats((prev: any) => prev.map((c: any) => c.id === capturedChat ? { ...c, id: created.id, category, tags } : c));
             setActiveChat(created.id);
           }
           return created?.id ?? null;
         };
+        const finalCategory = selectedCategory === 'all' ? 'betting' : selectedCategory;
+        const finalTags = [
+          selectedCategory === 'all' ? 'multi-platform' : selectedCategory,
+          ...(selectedSport ? [selectedSport] : []),
+        ];
         resolveThreadId().then(threadId => {
           if (!threadId) return;
           saveMessage(threadId, { role: 'user', content: userMessage });
@@ -1704,6 +1740,11 @@ No preamble. Start directly with section 1.`;
             model_used: capturedMsg.modelUsed,
             confidence: capturedMsg.confidence,
           });
+          // Sync category + sport tags so sidebar always shows correct context
+          updateThread(threadId, { category: finalCategory, tags: finalTags });
+          setChats((prev: any) => prev.map((c: any) =>
+            c.id === threadId ? { ...c, category: finalCategory, tags: finalTags } : c
+          ));
         });
       }
 
@@ -2311,7 +2352,10 @@ No preamble. Start directly with section 1.`;
       timestamp: new Date(),
       starred: false,
       category: chatCategory,
-      tags: [selectedCategory === 'all' ? 'multi-platform' : selectedCategory]
+      tags: [
+        selectedCategory === 'all' ? 'multi-platform' : selectedCategory,
+        ...(selectedSport ? [selectedSport] : []),
+      ],
     };
     setChats([newChat, ...chats]);
     setActiveChat(newChatId);
@@ -2330,7 +2374,11 @@ No preamble. Start directly with section 1.`;
     // For logged-in users, persist the new thread to Supabase and swap in the real UUID.
     // Store the promise so saveMessage can await it rather than firing against a temp ID.
     if (isLoggedIn) {
-      const threadPromise = createThread(chatCategory, chatTitle);
+      const threadTags = [
+        selectedCategory === 'all' ? 'multi-platform' : selectedCategory,
+        ...(selectedSport ? [selectedSport] : []),
+      ];
+      const threadPromise = createThread(chatCategory, chatTitle, threadTags);
       pendingThreadRef.current = threadPromise;
       threadPromise.then(created => {
         pendingThreadRef.current = null;
@@ -3001,8 +3049,10 @@ No preamble. Start directly with section 1.`;
     { label: 'MLB DFS',         icon: DollarSign, category: 'dfs', query: 'MLB DFS optimal lineups and pitcher stacks for DraftKings tonight' },
   ];
 
-  // Get dynamic prompts based on selected platform AND sport/topic
-  const quickActions = (() => {
+  // Get dynamic prompts based on selected platform AND sport/topic.
+  // AI-generated prompts (aiQuickActions) take priority when available;
+  // fall back to hardcoded arrays on network failure or while loading.
+  const hardcodedQuickActions = (() => {
     if (selectedCategory === 'kalshi' && selectedSport && kalshiTopicPrompts[selectedSport]) {
       return kalshiTopicPrompts[selectedSport];
     }
@@ -3020,6 +3070,7 @@ No preamble. Start directly with section 1.`;
     }
     return platformPrompts[selectedCategory] || platformPrompts.all;
   })();
+  const quickActions = aiQuickActions ?? hardcodedQuickActions;
 
   return (
     <div className="flex h-screen bg-black text-white overflow-hidden font-sans">

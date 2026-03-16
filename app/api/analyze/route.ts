@@ -14,7 +14,8 @@ import {
   ERROR_MESSAGES,
   NFBC_DRAFT_YEAR,
 } from '@/lib/constants';
-import { getADPData, queryADP, parseTSV, saveADPToSupabase, clearADPCache } from '@/lib/adp-data';
+import { getADPData, queryADP, parseTSV, clearADPCache } from '@/lib/adp-data';
+import { saveADPToSupabase } from '@/lib/adp-data.server';
 import { getNFLADPData, clearNFLADPCache } from '@/lib/nfl-adp-data';
 import { getStatcastData, queryStatcast } from '@/lib/baseball-savant';
 import type { StatcastPlayer } from '@/lib/baseball-savant';

@@ -314,7 +314,16 @@ async function getADPSupabaseClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
   const { createClient } = await import('@supabase/supabase-js');
-  _adpSupabase = createClient(url, key, { db: { schema: 'api' } });
+  _adpSupabase = createClient(url, key, {
+    db: { schema: 'api' },
+    auth: {
+      // Disable auth features to prevent multiple GoTrueClient instances
+      // This client only needs DB access, not authentication
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
   return _adpSupabase;
 }
 

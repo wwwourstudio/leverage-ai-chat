@@ -141,9 +141,10 @@ export async function POST(request: NextRequest) {
   }
 
   // Per-AI-call timeouts (independent from each other and from card generation):
-  //   grok-4 primary: 45s | grok-3-mini primary: 25s | fallback: 12s
-  // Total worst-case sequential: 45 + 12 = 57s (card generation runs concurrently so adds ~0s).
-  const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 25000 : 45000;
+  //   grok-4 primary: 55s | grok-3-mini primary: 30s | fallback: 12s
+  // Total worst-case sequential: 55 + 12 = 67s (card generation runs concurrently so adds ~0s).
+  // Increased primary timeouts to reduce fallback frequency during peak load.
+  const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 30000 : 55000;
 
   try {
     const body: AnalyzeRequestBody = await request.json();
@@ -973,7 +974,7 @@ export async function POST(request: NextRequest) {
             controller.enqueue(sseChunk({ type: 'text', delta: aiText }));
           }
 
-          // ── Post-processing: cards, trust metrics, done event ──────���──────────
+          // ── Post-processing: cards, trust metrics, done event ──────�����──────────
           let cards: InsightCard[] = await cardPromise.catch(() => []);
 
           if (pendingADPCard) cards = [pendingADPCard, ...cards.slice(0, 5)];

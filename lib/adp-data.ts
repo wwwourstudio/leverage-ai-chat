@@ -308,7 +308,7 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _adpSupabaseServer: any = null;
 
-async function getADPSupabaseClient() {
+function getADPSupabaseClient() {
   // ADP operations require service role key and should only run server-side
   // Return null in browser to prevent "Multiple GoTrueClient instances" warning
   if (typeof window !== 'undefined') {
@@ -319,7 +319,12 @@ async function getADPSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
-  const { createClient } = await import('@supabase/supabase-js');
+  
+  // Use require() instead of dynamic import to prevent webpack from bundling
+  // @supabase/supabase-js into the client bundle. The typeof window check above
+  // ensures this code path never executes in the browser.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createClient } = require('@supabase/supabase-js');
   _adpSupabaseServer = createClient(url, key, {
     db: { schema: 'api' },
     auth: {

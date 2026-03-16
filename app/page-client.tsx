@@ -1228,7 +1228,9 @@ No preamble. Start directly with section 1.`;
     setLastUserQuery(userMessage);
     const startTime = Date.now();
     const isDev = process.env.NODE_ENV !== 'production';
-    
+    // Hoisted so catch/AbortError blocks can clean up the in-flight streaming message
+    let streamingMessageId: string | undefined;
+
     try {
       console.log('[v0] Starting real AI analysis for:', userMessage);
       
@@ -1428,10 +1430,11 @@ No preamble. Start directly with section 1.`;
       
       // Collect any existing cards from previous messages (SSR welcome + prior responses)
       // to pass to the analyze endpoint so it can return them without re-fetching.
-      const availableCards = messages
-        .flatMap((m: Message) => m.cards || [])
-        .filter((c: InsightCard) => c.data?.realData !== false)
-        .slice(0, 6);
+      // Collect existing cards from previous messages to reuse where possible.
+      // Prefer real-data cards but keep estimated cards too (needed for offseason).
+      const allPreviousCards = messages.flatMap((m: Message) => m.cards || []);
+      const realCards = allPreviousCards.filter((c: InsightCard) => c.data?.realData !== false);
+      const availableCards = (realCards.length > 0 ? realCards : allPreviousCards).slice(0, 6);
 
       // Inject fantasy league context when in fantasy mode
       let contextualUserMessage = userMessage;
@@ -1448,7 +1451,6 @@ No preamble. Start directly with section 1.`;
       }
 
       // Fetch real data — streams SSE tokens as they arrive, falls back to JSON
-      let streamingMessageId: string | undefined;
       const fetchAnalysis = async (): Promise<APIResponse> => {
         const res = await fetch('/api/analyze', {
           method: 'POST',
@@ -1485,34 +1487,48 @@ No preamble. Start directly with section 1.`;
             }
             rafHandle = null;
           };
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buf += decoder.decode(value, { stream: true });
-            const parts = buf.split('\n\n');
-            buf = parts.pop() ?? '';
-            for (const part of parts) {
-              if (!part.startsWith('data: ')) continue;
-              let ev: { type: string; delta?: string; text?: string; [k: string]: any };
-              try { ev = JSON.parse(part.slice(6)); } catch { continue; }
-              if (ev.type === 'text') {
-                streamContent += ev.delta ?? '';
-                if (rafHandle === null) {
-                  rafHandle = requestAnimationFrame(flushToState);
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buf += decoder.decode(value, { stream: true });
+              const parts = buf.split('\n\n');
+              buf = parts.pop() ?? '';
+              for (const part of parts) {
+                if (!part.startsWith('data: ')) continue;
+                let ev: { type: string; delta?: string; text?: string; [k: string]: any };
+                try { ev = JSON.parse(part.slice(6)); } catch { continue; }
+                if (ev.type === 'text') {
+                  streamContent += ev.delta ?? '';
+                  if (rafHandle === null) {
+                    rafHandle = requestAnimationFrame(flushToState);
+                  }
+                } else if (ev.type === 'replace') {
+                  // Intentional direct update — fires once, not per-token
+                  streamContent = ev.text ?? streamContent;
+                  if (rafHandle !== null) { cancelAnimationFrame(rafHandle); rafHandle = null; }
+                  if (mountedRef.current) {
+                    setMessages((prev: any) => prev.map((m: any) =>
+                      m.id === streamingMessageId ? { ...m, content: streamContent } : m
+                    ));
+                  }
+                } else if (ev.type === 'done') {
+                  donePayload = ev as unknown as APIResponse;
                 }
-              } else if (ev.type === 'replace') {
-                // Intentional direct update — fires once, not per-token
-                streamContent = ev.text ?? streamContent;
-                if (rafHandle !== null) { cancelAnimationFrame(rafHandle); rafHandle = null; }
-                if (mountedRef.current) {
-                  setMessages((prev: any) => prev.map((m: any) =>
-                    m.id === streamingMessageId ? { ...m, content: streamContent } : m
-                  ));
-                }
-              } else if (ev.type === 'done') {
-                donePayload = ev as unknown as APIResponse;
               }
             }
+          } catch (streamErr) {
+            // Network error or reader abort mid-stream — cancel any pending RAF and
+            // finalize the streaming message with whatever content was received so far.
+            if (rafHandle !== null) { cancelAnimationFrame(rafHandle); rafHandle = null; }
+            if (mountedRef.current) {
+              setMessages((prev: any) => prev.map((m: any) =>
+                m.id === streamingMessageId
+                  ? { ...m, isStreaming: false, content: streamContent || m.content }
+                  : m
+              ));
+            }
+            throw streamErr; // re-throw so outer catch can append the error message
           }
           // Flush any tokens buffered in the last partial frame
           if (rafHandle !== null) { cancelAnimationFrame(rafHandle); rafHandle = null; }
@@ -1521,7 +1537,11 @@ No preamble. Start directly with section 1.`;
               m.id === streamingMessageId ? { ...m, content: streamContent } : m
             ));
           }
-          return donePayload ?? { success: false, error: 'Stream ended without done event' };
+          if (!donePayload) {
+            // Stream closed cleanly but no done event — keep streamed content, return partial success
+            return { success: true, text: streamContent, cards: [], confidence: 70, sources: [], modelUsed: 'Grok 4', useFallback: false } as unknown as APIResponse;
+          }
+          return donePayload;
         }
         // ── JSON fallback path ───────────────────────────────────────────
         return res.json().catch((e: unknown) => {
@@ -1569,15 +1589,15 @@ No preamble. Start directly with section 1.`;
           modelUsed: 'Fallback',
           processingTime,
           trustMetrics: {
-            benfordIntegrity: 70,
-            oddsAlignment: 70,
-            marketConsensus: 70,
-            historicalAccuracy: 70,
-            finalConfidence: 70,
-            trustLevel: 'medium',
+            benfordIntegrity: 55,
+            oddsAlignment: 55,
+            marketConsensus: 55,
+            historicalAccuracy: 55,
+            finalConfidence: 55,
+            trustLevel: 'low',
             riskLevel: 'medium',
-            adjustedTone: 'Moderate confidence',
-            flags: []
+            adjustedTone: 'Using cached data — live analysis unavailable',
+            flags: [{ type: 'fallback', message: 'AI unavailable — showing cached market data', severity: 'warning' }]
           }
         };
       } else {
@@ -1634,13 +1654,17 @@ No preamble. Start directly with section 1.`;
 
       // Add or update message in state
       if (streamingMessageId) {
-        // Streaming: message already in state — update with final metadata
+        // Streaming: message already in state — update with final metadata.
+        // Prefer done-event text; fall back to whatever was already streamed (m.content).
+        // Use ?? [] for cards to avoid wiping existing card state with undefined.
         setMessages((prev: Message[]) => prev.map(m =>
           m.id === streamingMessageId
-            ? { ...m, isStreaming: false, cards: newMessage.cards, confidence: newMessage.confidence,
+            ? { ...m, isStreaming: false,
+                cards: newMessage.cards ?? m.cards ?? [],
+                confidence: newMessage.confidence,
                 sources: newMessage.sources, modelUsed: newMessage.modelUsed,
                 processingTime: newMessage.processingTime, trustMetrics: newMessage.trustMetrics,
-                content: newMessage.content || m.content }
+                content: analysisResult.text || m.content || newMessage.content }
             : m
         ).slice(-30));
       } else {
@@ -1700,39 +1724,52 @@ No preamble. Start directly with section 1.`;
     } catch (error) {
       // Ignore abort errors — user intentionally cancelled
       if (error instanceof Error && error.name === 'AbortError') {
+        // Remove any in-flight streaming message so the UI is clean after cancel
+        if (streamingMessageId && mountedRef.current) {
+          setMessages((prev: Message[]) =>
+            prev.filter((m: Message) => m.id !== streamingMessageId).slice(-30)
+          );
+        }
         return;
       }
       console.error('[v0] Error generating real response:', error);
 
-      // Fallback to basic response with error indication — no random cards
+      // Finalize any in-flight streaming message (mark it done, keep partial content)
+      if (streamingMessageId && mountedRef.current) {
+        setMessages((prev: Message[]) => prev.map((m: Message) =>
+          m.id === streamingMessageId ? { ...m, isStreaming: false } : m
+        ));
+      }
+
+      // Append a user-friendly error message — never expose raw error internals
       setMessages((prev: Message[]) => [...prev, {
         id: crypto.randomUUID(),
-        role: 'assistant',
-        content: `I'm currently experiencing connectivity issues with live data sources. Here's an analysis based on available information:\n\n**Note:** Some real-time data may be limited. ${error instanceof Error ? `(${error.message})` : ''}`,
+        role: 'assistant' as const,
+        content: `I'm having trouble connecting to live data sources right now. Please try again in a moment.`,
         timestamp: new Date(),
         cards: [],
-        confidence: 70,
+        confidence: 50,
         sources: [
-          { name: 'Cached Data', type: 'cache', reliability: 75 }
+          { name: 'Cached Data', type: 'cache', reliability: 60 }
         ],
         modelUsed: 'Fallback Mode',
         processingTime: Date.now() - startTime,
         trustMetrics: {
-          benfordIntegrity: 70,
-          oddsAlignment: 70,
-          marketConsensus: 70,
-          historicalAccuracy: 70,
-          finalConfidence: 70,
-          trustLevel: 'medium',
-          riskLevel: 'medium',
-          adjustedTone: 'Limited data',
+          benfordIntegrity: 50,
+          oddsAlignment: 50,
+          marketConsensus: 50,
+          historicalAccuracy: 50,
+          finalConfidence: 50,
+          trustLevel: 'low' as const,
+          riskLevel: 'high' as const,
+          adjustedTone: 'Connection error — please retry',
           flags: [{
             type: 'connectivity',
-            message: 'Using cached data due to API connectivity issues',
-            severity: 'warning'
+            message: 'Live data unavailable due to connectivity issue',
+            severity: 'warning' as const,
           }]
         }
-      }]);
+      } as Message].slice(-30));
 
       setSuggestedPrompts(generateContextualSuggestions(userMessage, []));
       setIsClarificationPills(false);

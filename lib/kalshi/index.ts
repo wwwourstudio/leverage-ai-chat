@@ -640,11 +640,11 @@ export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
 
   console.log(`[KALSHI] Fetching sports markets across ${sportSearches.length} categories...`);
 
-  // Batch into groups of 3 with a 400 ms pause between batches to stay within
+  // Batch into groups of 2 with a 600 ms pause between batches to stay within
   // Kalshi's rate limit.  Results are cached for 5 minutes to reduce re-fetches
   // across warm Lambda invocations.
-  const batchSize = 3;
-  const BATCH_DELAY_MS = 400;
+  const batchSize = 2;
+  const BATCH_DELAY_MS = 600;
   const SPORTS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
   for (let i = 0; i < sportSearches.length; i += batchSize) {

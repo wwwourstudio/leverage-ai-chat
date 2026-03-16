@@ -8,6 +8,9 @@
  * Cache TTL: 4 hours — NFBC updates ADP daily, so this is a good balance.
  */
 
+// Supabase persistence helpers — dynamic import keeps @supabase/supabase-js out of client bundle
+import { getADPSupabaseClient } from '@/lib/supabase/adp-client.server';
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface NFBCPlayer {
@@ -303,8 +306,6 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 // Saves fetched ADP to Supabase so the AI can read it directly from the DB.
 // Uses the service role key (bypasses RLS) so no user session is needed.
 // Falls back silently — persistence failures never break the ADP tool.
-
-import { getADPSupabaseClient } from '@/lib/supabase/adp-client.server';
 
 export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): Promise<void> {
   try {

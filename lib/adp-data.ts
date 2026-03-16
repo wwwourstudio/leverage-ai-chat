@@ -308,6 +308,7 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 // Falls back silently — persistence failures never break the ADP tool.
 
 export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): Promise<void> {
+  if (typeof window !== 'undefined') return; // server-only
   try {
     const supabase = await getADPSupabaseClient();
     if (!supabase) return;
@@ -343,6 +344,7 @@ export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): P
 }
 
 export async function loadADPFromSupabase(sport = 'mlb', allowStale = false): Promise<NFBCPlayer[] | null> {
+  if (typeof window !== 'undefined') return null; // server-only
   try {
     const supabase = await getADPSupabaseClient();
     if (!supabase) return null;

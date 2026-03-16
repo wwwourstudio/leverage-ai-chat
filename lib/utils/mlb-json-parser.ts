@@ -14,45 +14,73 @@ export interface MLBAnalysis {
 
 /**
  * Attempts multiple strategies to extract a valid JSON object from a string:
- * 1. Direct JSON.parse
+ * 1. Direct JSON.parse (object or first element of an array)
  * 2. JSON inside a ```json ... ``` code block
- * 3. First {...} block in the string
- * 4. Structured parsing of markdown betting analysis text
+ * 3. All non-greedy {...} blocks (tries each, picks first valid MLBAnalysis)
+ * 4. Full greedy {...} span as last JSON attempt
+ * 5. Structured parsing of markdown betting analysis text
  */
 export function extractMLBJson(raw: string): MLBAnalysis {
   const trimmed = raw.trim();
 
-  // Strategy 1: direct parse
+  // Strategy 1: direct parse — handles both plain objects and arrays
   try {
     const parsed = JSON.parse(trimmed);
-    if (isMLBAnalysis(parsed)) return parsed;
+    if (Array.isArray(parsed)) {
+      const first = parsed.find(isMLBAnalysis);
+      if (first) return first;
+    } else if (isMLBAnalysis(parsed)) {
+      return parsed;
+    }
   } catch {
     // fall through
   }
 
-  // Strategy 2: ```json code block
+  // Strategy 2: ```json ... ``` or ``` ... ``` code block
   const codeBlockMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (codeBlockMatch) {
     try {
-      const parsed = JSON.parse(codeBlockMatch[1].trim());
-      if (isMLBAnalysis(parsed)) return parsed;
+      const inner = codeBlockMatch[1].trim();
+      const parsed = JSON.parse(inner);
+      if (Array.isArray(parsed)) {
+        const first = parsed.find(isMLBAnalysis);
+        if (first) return first;
+      } else if (isMLBAnalysis(parsed)) {
+        return parsed;
+      }
     } catch {
       // fall through
     }
   }
 
-  // Strategy 3: first { ... } block
-  const jsonObjectMatch = trimmed.match(/\{[\s\S]*\}/);
-  if (jsonObjectMatch) {
+  // Strategy 3: non-greedy {...} blocks — avoids merging adjacent objects
+  const nonGreedyCandidates = [...trimmed.matchAll(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)?\}/g)].map(m => m[0]);
+  for (const candidate of nonGreedyCandidates) {
     try {
-      const parsed = JSON.parse(jsonObjectMatch[0]);
+      const parsed = JSON.parse(candidate);
       if (isMLBAnalysis(parsed)) return parsed;
+    } catch {
+      // try next
+    }
+  }
+
+  // Strategy 4: greedy first {...} span (catches deeply-nested objects)
+  const greedyMatch = trimmed.match(/\{[\s\S]*\}/);
+  if (greedyMatch) {
+    try {
+      const parsed = JSON.parse(greedyMatch[0]);
+      if (Array.isArray(parsed)) {
+        const first = parsed.find(isMLBAnalysis);
+        if (first) return first;
+      } else if (isMLBAnalysis(parsed)) {
+        return parsed;
+      }
     } catch {
       // fall through
     }
   }
 
-  // Strategy 4: parse markdown betting analysis text into structured object
+  // Strategy 5: parse markdown betting analysis text into structured object
   return parseMarkdownBettingText(trimmed);
 }
 

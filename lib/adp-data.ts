@@ -304,23 +304,11 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 // Uses the service role key (bypasses RLS) so no user session is needed.
 // Falls back silently — persistence failures never break the ADP tool.
 
-// Module-level singleton — prevents "Multiple GoTrueClient instances" warning
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _adpSupabase: any = null;
-
-async function getADPSupabaseClient() {
-  if (_adpSupabase) return _adpSupabase;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
-  const { createClient } = await import('@supabase/supabase-js');
-  _adpSupabase = createClient(url, key, { db: { schema: 'api' } });
-  return _adpSupabase;
-}
+import { getADPSupabaseClient } from '@/lib/supabase/adp-client.server';
 
 export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): Promise<void> {
   try {
-    const supabase = await getADPSupabaseClient();
+    const supabase = getADPSupabaseClient();
     if (!supabase) return;
     const now = new Date().toISOString();
     const rows = players.map(p => ({
@@ -355,7 +343,7 @@ export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): P
 
 export async function loadADPFromSupabase(sport = 'mlb', allowStale = false): Promise<NFBCPlayer[] | null> {
   try {
-    const supabase = await getADPSupabaseClient();
+    const supabase = getADPSupabaseClient();
     if (!supabase) return null;
     const { data, error } = await supabase
       .from('nfbc_adp')

@@ -141,9 +141,11 @@ export async function POST(request: NextRequest) {
   }
 
   // Per-AI-call timeouts (independent from each other and from card generation):
-  //   grok-4 primary: 45s | grok-3-mini primary: 25s | fallback: 12s
-  // Total worst-case sequential: 45 + 12 = 57s (card generation runs concurrently so adds ~0s).
-  const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 25000 : 45000;
+  //   grok-4 primary: 52s first-token | grok-3-mini primary: 28s | fallback: 10s
+  // Vercel serverless functions have a 60s wall-clock limit. Keeping primary+fallback
+  // to ≤58s gives a small buffer for the response serialisation overhead.
+  const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 28_000 : 52_000;
+  const FALLBACK_TIMEOUT_MS = 10_000;
 
   try {
     const body: AnalyzeRequestBody = await request.json();
@@ -943,6 +945,8 @@ export async function POST(request: NextRequest) {
               })();
               console.error(`[API/analyze] Primary stream failed — ${errSummary} | Retrying with ${actualFallbackModel}`);
               try {
+                const fallbackAbort = new AbortController();
+                const fallbackTimer = setTimeout(() => fallbackAbort.abort(new Error('Fallback timeout')), FALLBACK_TIMEOUT_MS);
                 const fallbackResult = await generateText({
                   model: createXai({ apiKey: xaiApiKey })(actualFallbackModel),
                   system: systemPrompt,
@@ -950,7 +954,9 @@ export async function POST(request: NextRequest) {
                   temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
                   maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
                   maxRetries: 0,
+                  abortSignal: fallbackAbort.signal,
                 });
+                clearTimeout(fallbackTimer);
                 aiText = fallbackResult.text;
                 modelUsed = alreadyFast ? `${AI_CONFIG.MODEL_DISPLAY_NAME} (fallback)` : `${AI_CONFIG.FAST_MODEL_DISPLAY_NAME} (fallback)`;
                 console.log(`[API/analyze] Fallback succeeded with ${actualFallbackModel}`);

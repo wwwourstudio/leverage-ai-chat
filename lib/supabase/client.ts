@@ -1,11 +1,16 @@
 import { createBrowserClient } from '@supabase/ssr'
 
-let client: ReturnType<typeof createBrowserClient> | undefined
+// Use globalThis to persist the singleton across HMR re-evaluations in
+// development. Without this, every hot-reload creates a new GoTrueClient
+// instance backed by the same localStorage key, triggering the
+// "Multiple GoTrueClient instances" warning.
+const g = globalThis as typeof globalThis & {
+  __supabaseBrowserClient?: ReturnType<typeof createBrowserClient>
+}
 
 export function createClient() {
-
-  if (client) {
-    return client
+  if (g.__supabaseBrowserClient) {
+    return g.__supabaseBrowserClient
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -17,9 +22,9 @@ export function createClient() {
     )
   }
 
-  client = createBrowserClient(supabaseUrl, supabaseAnonKey, {
-    db: { schema: 'api' }
+  g.__supabaseBrowserClient = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    db: { schema: 'api' },
   })
 
-  return client
+  return g.__supabaseBrowserClient
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { parseTSV, saveADPToSupabase, clearADPCache } from '@/lib/adp-data';
+import { parseTSV, clearADPCache } from '@/lib/adp-data';
+import { saveADPToSupabase } from '@/lib/adp-data.server';
 import { clearNFLADPCache } from '@/lib/nfl-adp-data';
 
 export const runtime = 'nodejs';

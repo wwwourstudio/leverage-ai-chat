@@ -309,16 +309,12 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 let _adpSupabaseServer: any = null;
 
 async function getADPSupabaseClient() {
-  const isBrowser = typeof window !== 'undefined';
-  
-  // In browser: reuse the existing singleton from lib/supabase/client.ts
-  // This prevents "Multiple GoTrueClient instances" warning
-  if (isBrowser) {
-    const { createClient } = await import('@/lib/supabase/client');
-    return createClient();
+  // ADP operations require service role key and should only run server-side
+  // Return null in browser to prevent "Multiple GoTrueClient instances" warning
+  if (typeof window !== 'undefined') {
+    return null;
   }
   
-  // On server: use service role key for elevated permissions
   if (_adpSupabaseServer) return _adpSupabaseServer;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

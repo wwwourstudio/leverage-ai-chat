@@ -1170,9 +1170,15 @@ export function kalshiMarketToCard(
       volumeTier,
       isHot: market.volume24h >= 50_000 || market.volume >= 500_000,
       recommendation: signal,
-      // Event/series metadata
+      // Event/series metadata — used for deep links and related markets
       eventTicker: market.eventTicker,
       seriesTicker: market.seriesTicker,
+      // Raw close time ISO string — used by card for time-remaining progress bar
+      closeTimeIso: market.closeTime || null,
+      // Raw volume numbers (contracts) — used for "X contracts" display
+      volumeRaw: market.volume,
+      volume24hRaw: market.volume24h,
+      openInterestRaw: market.openInterest,
       // Level 2 orderbook depth (null when not fetched)
       orderbookBids: orderbook?.yesBids?.slice(0, 5) ?? null,
       orderbookAsks: orderbook?.yesAsks?.slice(0, 5) ?? null,

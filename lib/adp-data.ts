@@ -308,7 +308,7 @@ import { getADPSupabaseClient } from '@/lib/supabase/adp-client.server';
 
 export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): Promise<void> {
   try {
-    const supabase = getADPSupabaseClient();
+    const supabase = await getADPSupabaseClient();
     if (!supabase) return;
     const now = new Date().toISOString();
     const rows = players.map(p => ({
@@ -343,7 +343,7 @@ export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): P
 
 export async function loadADPFromSupabase(sport = 'mlb', allowStale = false): Promise<NFBCPlayer[] | null> {
   try {
-    const supabase = getADPSupabaseClient();
+    const supabase = await getADPSupabaseClient();
     if (!supabase) return null;
     const { data, error } = await supabase
       .from('nfbc_adp')

@@ -197,7 +197,7 @@ async function fetchStatcastType(playerType: 'batter' | 'pitcher'): Promise<Stat
       'Referer': 'https://baseballsavant.mlb.com/expected_statistics',
       'Cache-Control': 'no-cache',
     },
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(15000),
   });
 
   if (!res.ok) {
@@ -221,15 +221,10 @@ export interface StatcastResult {
  * Returns cached Baseball Savant Statcast data (batters + pitchers merged),
  * refreshing when the cache is stale. Safe to call on every request.
  *
- * When called in a browser context, returns static fallback data immediately —
- * direct fetch from baseballsavant.mlb.com is blocked by CORS in browsers.
+ * Falls back to static 2024 data when Baseball Savant is unreachable (e.g. transient
+ * network errors, or when called from a browser where the fetch may be blocked).
  */
 export async function getStatcastData(forceRefresh = false): Promise<StatcastResult> {
-  // Cannot fetch Baseball Savant from a browser (CORS). Return static fallback immediately.
-  if (typeof window !== 'undefined') {
-    return { players: STATIC_FALLBACK_PLAYERS, isLiveData: false, season: 2024 };
-  }
-
   const now = Date.now();
   const isStale = now - lastFetched > CACHE_TTL_MS;
 
@@ -251,12 +246,14 @@ export async function getStatcastData(forceRefresh = false): Promise<StatcastRes
     console.log(`[v0] [Statcast] Fetched ${batters.length} batters + ${pitchers.length} pitchers from Baseball Savant`);
     return { players: merged, isLiveData: true, season: SEASON };
   } catch (err) {
-    console.error('[v0] [Statcast] Failed to fetch Baseball Savant data:', err);
+    // Transient fetch failures (network, timeout, CORS in some browser contexts) are
+    // expected. Degrade silently to static fallback — no need for console.error.
+    const reason = err instanceof Error ? err.message : String(err);
     if (statcastCache) {
-      console.warn('[v0] [Statcast] Returning stale cached data');
+      console.warn(`[v0] [Statcast] Using stale cache (${reason})`);
       return { players: statcastCache, isLiveData: true, season: SEASON };
     }
-    console.warn('[v0] [Statcast] Baseball Savant unavailable — returning static fallback (2024 data)');
+    console.warn(`[v0] [Statcast] Using static fallback (${reason})`);
     return { players: STATIC_FALLBACK_PLAYERS, isLiveData: false, season: 2024 };
   }
 }

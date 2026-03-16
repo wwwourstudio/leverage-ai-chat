@@ -306,6 +306,7 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 
 // ADP persistence (saveADPToSupabase, loadADPFromSupabase) is handled in adp-data.server.ts
 // to avoid bundling @supabase/supabase-js in client code and prevent "Multiple GoTrueClient" warnings
+// Note: This file has NO imports from @supabase/* - all DB access goes through /api/adp
 
 // Client-side stub that always returns null - real implementation is in adp-data.server.ts
 export async function loadADPFromSupabase(_sport = 'mlb', _allowStale = false): Promise<NFBCPlayer[] | null> {

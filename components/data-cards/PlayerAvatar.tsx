@@ -3,6 +3,10 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
+// Module-level cache of photo URLs that returned 404/error — persists across
+// re-renders so the same bad URL is never requested more than once per session.
+const failedPhotoUrls = new Set<string>();
+
 interface PlayerAvatarProps {
   playerName: string;
   photoUrl?: string | null;
@@ -36,7 +40,8 @@ const SIZE_CLASSES = {
 };
 
 export function PlayerAvatar({ playerName, photoUrl, sport, size = 'md', className }: PlayerAvatarProps) {
-  const [imgFailed, setImgFailed] = useState(false);
+  // Initialize from the module-level cache so re-renders don't retry known-bad URLs
+  const [imgFailed, setImgFailed] = useState(() => !!photoUrl && failedPhotoUrls.has(photoUrl));
   const sizes = SIZE_CLASSES[size];
   const colorCls = sportAvatarColor(sport);
   const initials = getInitials(playerName);
@@ -48,7 +53,10 @@ export function PlayerAvatar({ playerName, photoUrl, sport, size = 'md', classNa
           src={photoUrl}
           alt={playerName}
           className={cn('object-cover object-top', sizes.img)}
-          onError={() => setImgFailed(true)}
+          onError={() => {
+            failedPhotoUrls.add(photoUrl);
+            setImgFailed(true);
+          }}
           loading="lazy"
         />
       </div>

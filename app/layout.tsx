@@ -4,6 +4,7 @@ import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { ToastProvider } from '@/components/toast-provider'
 import { PWARegister } from '@/components/pwa-register'
+import { GlobalErrorSuppressor } from '@/components/global-error-suppressor'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -68,6 +69,7 @@ export default function RootLayout({
         </ToastProvider>
         <Analytics />
         <PWARegister />
+        <GlobalErrorSuppressor />
       </body>
     </html>
   )

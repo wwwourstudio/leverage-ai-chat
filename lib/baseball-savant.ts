@@ -220,8 +220,16 @@ export interface StatcastResult {
 /**
  * Returns cached Baseball Savant Statcast data (batters + pitchers merged),
  * refreshing when the cache is stale. Safe to call on every request.
+ *
+ * When called in a browser context, returns static fallback data immediately —
+ * direct fetch from baseballsavant.mlb.com is blocked by CORS in browsers.
  */
 export async function getStatcastData(forceRefresh = false): Promise<StatcastResult> {
+  // Cannot fetch Baseball Savant from a browser (CORS). Return static fallback immediately.
+  if (typeof window !== 'undefined') {
+    return { players: STATIC_FALLBACK_PLAYERS, isLiveData: false, season: 2024 };
+  }
+
   const now = Date.now();
   const isStale = now - lastFetched > CACHE_TTL_MS;
 

@@ -305,16 +305,16 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 // Falls back silently — persistence failures never break the ADP tool.
 
 // Returns null on client, Supabase client on server
-// Uses dynamic import to prevent bundling @supabase/supabase-js in client
-async function getADPSupabaseClient() {
+// Completely avoids any Supabase import in browser context
+function getADPSupabaseClient() {
+  // Early return for browser - no imports, no GoTrueClient
   if (typeof window !== 'undefined') {
     return null;
   }
-  // Dynamic import of server-only module - webpack will not bundle this for client
-  const { getADPSupabaseClient: getClient } = await import(
-    /* webpackIgnore: true */ '@/lib/supabase/adp-client.server'
-  );
-  return getClient();
+  // Server-side only: inline the singleton logic to avoid any dynamic import issues
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+  const mod = require('@/lib/supabase/adp-client.server');
+  return mod.getADPSupabaseClient();
 }
 
 export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): Promise<void> {

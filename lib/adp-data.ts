@@ -309,9 +309,9 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 let _adpSupabaseServer: any = null;
 
 // Returns null on client, Supabase client on server
-// Uses lazy require() to prevent @supabase/supabase-js from being bundled for client
-function getADPSupabaseClient() {
-  // Early return for browser - no imports, no GoTrueClient instantiation
+// ADP persistence is server-only; client calls return null gracefully
+async function getADPSupabaseClient() {
+  // Early return for browser - ADP persistence only runs server-side
   if (typeof window !== 'undefined') {
     return null;
   }
@@ -323,9 +323,10 @@ function getADPSupabaseClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
   
-  // Lazy require prevents bundling for client - webpack sees this after typeof window check
-  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-  const { createClient } = require('@supabase/supabase-js');
+  // Dynamic import with template literal prevents webpack from bundling for client
+  // The typeof window check above ensures this never runs in browser
+  const moduleName = '@supabase/supabase-js';
+  const { createClient } = await import(/* webpackIgnore: true */ moduleName);
   _adpSupabaseServer = createClient(url, key, {
     db: { schema: 'api' },
     auth: {

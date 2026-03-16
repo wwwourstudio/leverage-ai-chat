@@ -272,7 +272,9 @@ export function parseTSV(raw: string): NFBCPlayer[] {
     if (cols.length < 2) continue;
 
     const rawName = playerIdx !== -1 ? (cols[playerIdx] ?? '').trim() : '';
-    if (!rawName) continue;
+    // Skip rows with missing names or purely-numeric values (NFBC player ID columns
+    // sometimes appear in the Player column when the wrong TSV format is uploaded)
+    if (!rawName || /^\d+$/.test(rawName)) continue;
 
     const rank      = rankIdx  !== -1 ? parseInt(cols[rankIdx]  ?? '', 10) : i;
     const adp       = adpIdx   !== -1 ? parseFloat(cols[adpIdx] ?? '')     : rank;
@@ -403,10 +405,17 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
   // User-uploaded data lives in Supabase — always authoritative, no TTL check
   const dbData = await loadADPFromSupabase('mlb', true);
   if (dbData && dbData.length > 0) {
-    console.log(`[v0] [ADP] Serving ${dbData.length} MLB players from Supabase (user upload)`);
-    adpCache = dbData;
-    lastFetched = now;
-    return dbData;
+    // Validate data quality: if the majority of display names are purely numeric
+    // (e.g. NFBC player IDs like "10231") the upload was malformed — fall back to static.
+    const numericCount = dbData.filter(p => /^\d+$/.test((p.displayName ?? '').trim())).length;
+    if (numericCount > dbData.length * 0.3) {
+      console.warn(`[v0] [ADP] Supabase data has ${numericCount}/${dbData.length} numeric display names — upload likely malformed, falling back to static`);
+    } else {
+      console.log(`[v0] [ADP] Serving ${dbData.length} MLB players from Supabase (user upload)`);
+      adpCache = dbData;
+      lastFetched = now;
+      return dbData;
+    }
   }
 
   console.log(`[v0] [ADP] No MLB ADP upload found — serving static fallback (${STATIC_FALLBACK_PLAYERS.length} players)`);

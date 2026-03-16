@@ -30,7 +30,13 @@ function getSupabase() {
     // Server: create a lightweight client without cookies dependency.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { createClient } = require('@supabase/supabase-js');
-    return createClient(url, key, { db: { schema: 'api' } });
+    return createClient(url, key, {
+      db: { schema: 'api' },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
   } catch (err) {
     console.error('[SupabaseOddsService] Failed to create Supabase client:', err);
     return null;

@@ -3,9 +3,9 @@
 import { memo } from 'react';
 import {
   TrendingUp, Vote, Trophy, CloudRain,
-  Cpu, Film, Globe, Clock, ChevronRight, Flame,
-  BarChart3, ArrowUp, ArrowDown, ExternalLink,
-  Zap, Bitcoin, BookOpen,
+  Cpu, Film, Globe, Clock,
+  Bitcoin, ArrowUp, ArrowDown, ExternalLink,
+  Flame, BarChart3, ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -23,23 +23,17 @@ interface KalshiCardProps {
   isHero?: boolean;
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Kalshi brand colors ────────────────────────────────────────────────────────
+const YES_COLOR = '#00d15d';
+const NO_COLOR  = '#f63d58';
 
-/** Shorten very long market titles that list many teams/options separated by · */
-function shortenTitle(title: string, maxLen = 72): string {
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+/** Shorten very long market titles */
+function shortenTitle(title: string, maxLen = 80): string {
   if (title.length <= maxLen) return title;
   if (title.includes('·')) {
     const parts = title.split('·').map(p => p.trim());
-    const header = parts[0];
-    const colonIdx = header.indexOf(':');
-    if (colonIdx > -1) {
-      const prefix = header.slice(0, colonIdx + 1).trim();
-      const firstOption = header.slice(colonIdx + 1).trim();
-      const second = parts[1] ?? '';
-      const remaining = parts.length - 2;
-      if (remaining > 0) return `${prefix} ${firstOption} · ${second} +${remaining} more`;
-      return `${prefix} ${firstOption} · ${second}`;
-    }
     const first = parts[0];
     const second = parts[1] ?? '';
     const remaining = parts.length - 2;
@@ -49,435 +43,220 @@ function shortenTitle(title: string, maxLen = 72): string {
   return title.slice(0, maxLen - 1) + '\u2026';
 }
 
-/** Clean up ticker: hide random hex hashes, show only readable event tickers */
-function cleanTicker(ticker: string): string | null {
-  if (!ticker) return null;
-  if (/[0-9A-F]{8,}/i.test(ticker) && ticker.length > 20) return null;
-  if (ticker.length > 30) return null;
-  return ticker;
-}
-
-/** Map expiryUrgency from API to text/pulse styles */
-function urgencyFromLevel(level?: string) {
-  switch (level) {
-    case 'critical': return { text: 'text-red-400', pulse: true };
-    case 'urgent':   return { text: 'text-red-400',   pulse: false };
-    case 'soon':     return { text: 'text-amber-400', pulse: false };
-    default:         return { text: 'text-[oklch(0.42_0.01_280)]', pulse: false };
-  }
-}
-
-/** Volume tier badge colors */
-function volTierStyles(tier?: string): string {
-  switch (tier) {
-    case 'Deep':     return 'text-[#00c47c] bg-[#00c47c10] border-[#00c47c28]';
-    case 'Active':   return 'text-blue-400 bg-blue-500/10 border-blue-500/25';
-    case 'Moderate': return 'text-amber-400 bg-amber-500/10 border-amber-500/25';
-    default:         return 'text-[oklch(0.38_0.01_280)] bg-[oklch(0.12_0.01_280)] border-[oklch(0.19_0.015_280)]';
-  }
-}
-
-/** Spread quality badge colors */
-function spreadStyles(label?: string): string {
-  switch (label) {
-    case 'Tight':  return 'text-[#00c47c] bg-[#00c47c10] border-[#00c47c28]';
-    case 'Normal': return 'text-amber-400 bg-amber-500/10 border-amber-500/25';
-    case 'Wide':   return 'text-red-400 bg-red-500/10 border-red-500/25';
-    default:       return 'text-[oklch(0.38_0.01_280)] bg-[oklch(0.12_0.01_280)] border-[oklch(0.19_0.015_280)]';
-  }
-}
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-
+/** Map category to icon */
 function CategoryIcon({ label, className }: { label?: string; className?: string }) {
   const cls = cn('w-3.5 h-3.5', className);
-  switch (label) {
-    case 'election':      return <Vote className={cls} />;
-    case 'politics':      return <Vote className={cls} />;
-    case 'sports':        return <Trophy className={cls} />;
-    case 'weather':       return <CloudRain className={cls} />;
-    case 'finance':       return <TrendingUp className={cls} />;
-    case 'crypto':        return <Bitcoin className={cls} />;
-    case 'tech':          return <Cpu className={cls} />;
+  switch ((label || '').toLowerCase()) {
+    case 'election':
+    case 'politics': return <Vote className={cls} />;
+    case 'sports':   return <Trophy className={cls} />;
+    case 'weather':  return <CloudRain className={cls} />;
+    case 'finance':  return <TrendingUp className={cls} />;
+    case 'crypto':   return <Bitcoin className={cls} />;
+    case 'tech':     return <Cpu className={cls} />;
     case 'entertainment': return <Film className={cls} />;
-    default:              return <Globe className={cls} />;
+    default:         return <Globe className={cls} />;
   }
 }
 
-/** Redesigned probability bar with gradient, implied probability and last price */
-function ProbabilityBar({
+// ── Probability Hero ───────────────────────────────────────────────────────────
+function ProbabilityHero({
   yesPct,
   lastPrice,
-  impliedProbability,
+  priceDir,
+  priceChange,
   isHero,
 }: {
   yesPct: number;
   lastPrice?: number;
-  impliedProbability?: string;
+  priceDir?: string;
+  priceChange?: number;
   isHero?: boolean;
 }) {
-  const YES_COLOR = '#00c47c';
-  const NO_COLOR  = '#f43f5e';
-  const noPct     = 100 - yesPct;
-  const yesLeads  = yesPct >= 50;
+  const noPct = 100 - yesPct;
+  const yesLeads = yesPct >= 50;
 
   return (
     <div className="w-full">
-      {/* YES / NO numbers */}
-      <div className="flex items-end justify-between mb-3">
-        {/* YES side */}
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: YES_COLOR }}>Yes</span>
-          <div className="flex items-baseline gap-0.5">
+      {/* Main probability numbers */}
+      <div className="flex items-end justify-between mb-4">
+        {/* YES side — dominant */}
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: YES_COLOR + 'bb' }}>
+            Yes
+          </span>
+          <div className="flex items-baseline gap-1">
             <span
-              className={cn('tabular-nums font-black leading-none', isHero ? 'text-4xl' : 'text-3xl')}
-              style={{ color: yesLeads ? YES_COLOR : 'oklch(0.48 0.01 280)' }}
+              className={cn('tabular-nums font-black leading-none', isHero ? 'text-5xl' : 'text-4xl')}
+              style={{ color: yesLeads ? YES_COLOR : 'oklch(0.50 0.01 280)' }}
             >
               {yesPct}
             </span>
-            <span className="text-sm font-bold" style={{ color: yesLeads ? YES_COLOR : 'oklch(0.35 0.01 280)' }}>¢</span>
-          </div>
-        </div>
-
-        {/* Center: implied probability + last price */}
-        <div className="flex flex-col items-center gap-0.5">
-          {impliedProbability && (
-            <span className="text-[9px] font-semibold text-[oklch(0.42_0.01_280)]">
-              {impliedProbability} implied
+            <span
+              className="text-lg font-bold"
+              style={{ color: yesLeads ? YES_COLOR + 'cc' : 'oklch(0.35 0.01 280)' }}
+            >
+              ¢
             </span>
-          )}
-          {lastPrice != null && lastPrice > 0 && (
-            <span className="text-[9px] text-[oklch(0.30_0.01_280)] font-medium tabular-nums">
+            {/* Price delta */}
+            {priceDir && priceDir !== 'flat' && priceChange && Math.abs(priceChange) > 0 && (
+              <span className={cn(
+                'flex items-center gap-0.5 text-[11px] font-bold ml-1 mb-0.5',
+                priceDir === 'up' ? 'text-[#00d15d]' : 'text-[#f63d58]',
+              )}>
+                {priceDir === 'up' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+                {Math.abs(priceChange)}¢
+              </span>
+            )}
+          </div>
+          {lastPrice != null && lastPrice > 0 && lastPrice !== yesPct && (
+            <span className="text-[10px] text-[oklch(0.38_0.01_280)] tabular-nums">
               Last {lastPrice}¢
             </span>
           )}
         </div>
 
         {/* NO side */}
-        <div className="flex flex-col items-end gap-0.5">
-          <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: NO_COLOR }}>No</span>
-          <div className="flex items-baseline gap-0.5">
+        <div className="flex flex-col items-end gap-1">
+          <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: NO_COLOR + 'bb' }}>
+            No
+          </span>
+          <div className="flex items-baseline gap-1">
             <span
-              className={cn('tabular-nums font-black leading-none', isHero ? 'text-4xl' : 'text-3xl')}
-              style={{ color: !yesLeads ? NO_COLOR : 'oklch(0.48 0.01 280)' }}
+              className={cn('tabular-nums font-black leading-none', isHero ? 'text-5xl' : 'text-4xl')}
+              style={{ color: !yesLeads ? NO_COLOR : 'oklch(0.50 0.01 280)' }}
             >
               {noPct}
             </span>
-            <span className="text-sm font-bold" style={{ color: !yesLeads ? NO_COLOR : 'oklch(0.35 0.01 280)' }}>¢</span>
+            <span
+              className="text-lg font-bold"
+              style={{ color: !yesLeads ? NO_COLOR + 'cc' : 'oklch(0.35 0.01 280)' }}
+            >
+              ¢
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Gradient bar */}
-      <div className="relative h-2.5 rounded-full overflow-hidden bg-[oklch(0.12_0.01_280)]">
-        {/* YES fill */}
+      {/* Horizontal probability bar */}
+      <div className="relative h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'oklch(0.14 0.01 280)' }}>
         <div
-          className="absolute left-0 top-0 h-full rounded-l-full transition-all duration-700"
-          style={{ width: `${yesPct}%`, backgroundColor: YES_COLOR, opacity: 0.85 }}
+          className="absolute left-0 top-0 h-full rounded-full transition-all duration-700"
+          style={{ width: `${yesPct}%`, backgroundColor: YES_COLOR, opacity: 0.9 }}
         />
-        {/* NO fill */}
-        <div
-          className="absolute right-0 top-0 h-full rounded-r-full transition-all duration-700"
-          style={{ width: `${noPct}%`, backgroundColor: NO_COLOR, opacity: 0.6 }}
-        />
-        {/* center marker */}
-        <div className="absolute left-1/2 top-0 h-full w-px bg-[oklch(0.08_0.01_280)]" />
       </div>
 
-      {/* Scale */}
-      <div className="flex justify-between mt-1 text-[8px] font-semibold">
-        <span style={{ color: YES_COLOR + 'aa' }}>0¢</span>
-        <span className="text-[oklch(0.28_0.01_280)]">50¢</span>
-        <span style={{ color: NO_COLOR + 'aa' }}>100¢</span>
+      {/* Scale labels */}
+      <div className="flex justify-between mt-1.5 text-[9px] font-semibold">
+        <span style={{ color: YES_COLOR + '99' }}>0%</span>
+        <span style={{ color: 'oklch(0.30 0.01 280)' }}>50%</span>
+        <span style={{ color: NO_COLOR + '99' }}>100%</span>
       </div>
     </div>
   );
 }
 
-/** 2-column YES/NO bid-ask grid with spread quality badge */
-function BestPrices({
+// ── YES / NO Price Chips ───────────────────────────────────────────────────────
+function PriceChips({
   yesBid,
   yesAsk,
   noBid,
   noAsk,
-  spreadLabel,
 }: {
   yesBid: number | null;
   yesAsk: number | null;
   noBid: number | null;
   noAsk: number | null;
-  spreadLabel?: string;
 }) {
-  const YES_COLOR = '#00c47c';
-  const NO_COLOR  = '#f43f5e';
+  // Show best buy prices: yesAsk (cost to buy YES) and noAsk (cost to buy NO)
+  const yesBuy = yesAsk ?? yesBid;
+  const noBuy  = noAsk  ?? noBid;
 
-  const hasYes = (yesBid !== null && yesBid > 0) || (yesAsk !== null && yesAsk > 0);
-  const hasNo  = (noBid  !== null && noBid  > 0) || (noAsk  !== null && noAsk  > 0);
-
-  if (!hasYes && !hasNo) return null;
+  if (!yesBuy && !noBuy) return null;
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="text-[9px] font-black uppercase tracking-widest text-[oklch(0.32_0.02_260)]">
-          Best Prices
-        </span>
-        {spreadLabel && (
-          <span className={cn(
-            'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-bold',
-            spreadStyles(spreadLabel),
-          )}>
-            {spreadLabel} spread
+    <div className="flex items-center gap-2">
+      <span className="text-[10px] text-[oklch(0.38_0.01_280)] font-medium shrink-0">Buy:</span>
+      <div className="flex items-center gap-2 flex-wrap">
+        {yesBuy != null && yesBuy > 0 && (
+          <span
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-black tabular-nums"
+            style={{
+              color: YES_COLOR,
+              backgroundColor: YES_COLOR + '14',
+              border: `1px solid ${YES_COLOR}30`,
+            }}
+          >
+            YES {yesBuy}¢
+          </span>
+        )}
+        {noBuy != null && noBuy > 0 && (
+          <span
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-black tabular-nums"
+            style={{
+              color: NO_COLOR,
+              backgroundColor: NO_COLOR + '12',
+              border: `1px solid ${NO_COLOR}2e`,
+            }}
+          >
+            NO {noBuy}¢
           </span>
         )}
       </div>
-
-      {/* Prices grid */}
-      <div className="grid grid-cols-2 gap-2">
-        {/* YES column */}
-        {hasYes && (
-          <div className="space-y-1">
-            <div className="text-[8px] font-black uppercase tracking-widest" style={{ color: YES_COLOR + '99' }}>Yes</div>
-            <div className="flex gap-1.5 flex-wrap">
-              {yesBid !== null && yesBid > 0 && (
-                <span
-                  className="px-2 py-0.5 rounded text-[10px] font-black tabular-nums border"
-                  style={{ color: YES_COLOR, backgroundColor: YES_COLOR + '12', borderColor: YES_COLOR + '28' }}
-                >
-                  {yesBid}¢ <span className="font-normal opacity-60">bid</span>
-                </span>
-              )}
-              {yesAsk !== null && yesAsk > 0 && (
-                <span className="px-2 py-0.5 rounded bg-[oklch(0.13_0.01_280)] border border-[oklch(0.19_0.01_280)] text-[oklch(0.55_0.01_280)] text-[10px] font-black tabular-nums">
-                  {yesAsk}¢ <span className="font-normal opacity-60">ask</span>
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* NO column */}
-        {hasNo && (
-          <div className="space-y-1">
-            <div className="text-[8px] font-black uppercase tracking-widest" style={{ color: NO_COLOR + '99' }}>No</div>
-            <div className="flex gap-1.5 flex-wrap">
-              {noBid !== null && noBid > 0 && (
-                <span className="px-2 py-0.5 rounded bg-[oklch(0.13_0.01_280)] border border-[oklch(0.19_0.01_280)] text-[oklch(0.55_0.01_280)] text-[10px] font-black tabular-nums">
-                  {noBid}¢ <span className="font-normal opacity-60">bid</span>
-                </span>
-              )}
-              {noAsk !== null && noAsk > 0 && (
-                <span
-                  className="px-2 py-0.5 rounded text-[10px] font-black tabular-nums border"
-                  style={{ color: NO_COLOR, backgroundColor: NO_COLOR + '10', borderColor: NO_COLOR + '28' }}
-                >
-                  {noAsk}¢ <span className="font-normal opacity-60">ask</span>
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
 
-/** Mini orderbook depth chart — shown when Level 2 data is available */
-function MiniOrderbook({
-  bids,
-  asks,
-}: {
-  bids: Array<{ price: number; quantity: number }>;
-  asks: Array<{ price: number; quantity: number }>;
-}) {
-  if (!bids?.length && !asks?.length) return null;
-
-  const maxQty = Math.max(
-    ...bids.map(b => b.quantity),
-    ...asks.map(a => a.quantity),
-    1,
-  );
-
-  // Take top 4 levels each side
-  const topBids = bids.slice(0, 4);
-  const topAsks = asks.slice(0, 4);
-  const levels  = Math.max(topBids.length, topAsks.length);
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-1.5">
-        <BookOpen className="w-3 h-3 text-[oklch(0.35_0.02_260)]" />
-        <span className="text-[9px] font-black uppercase tracking-widest text-[oklch(0.32_0.02_260)]">Order Depth</span>
-      </div>
-
-      {/* Header */}
-      <div className="grid grid-cols-[1fr_auto_auto_1fr] gap-x-1 mb-1 text-[8px] font-bold uppercase tracking-widest">
-        <div className="text-right text-[#00c47c99]">Qty</div>
-        <div className="text-right text-[#00c47c99]">Bid</div>
-        <div className="text-left text-[#f43f5e99] pl-2">Ask</div>
-        <div className="text-left text-[#f43f5e99]">Qty</div>
-      </div>
-
-      {/* Rows */}
-      <div className="space-y-0.5">
-        {Array.from({ length: levels }, (_, i) => {
-          const bid = topBids[i];
-          const ask = topAsks[i];
-          const bidPct = bid ? (bid.quantity / maxQty) * 100 : 0;
-          const askPct = ask ? (ask.quantity / maxQty) * 100 : 0;
-
-          return (
-            <div key={i} className="grid grid-cols-[1fr_auto_auto_1fr] gap-x-1 items-center h-5">
-              {/* Bid bar + price */}
-              {bid ? (
-                <>
-                  <div className="relative h-full flex items-center justify-end pr-1 overflow-hidden">
-                    <div
-                      className="absolute right-0 top-0 h-full rounded-l-sm opacity-25"
-                      style={{ width: `${bidPct}%`, backgroundColor: '#00c47c' }}
-                    />
-                    <span className="relative text-[9px] font-semibold text-[oklch(0.55_0.01_280)] tabular-nums z-10">
-                      {bid.quantity.toLocaleString()}
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-black tabular-nums text-[#00c47c] text-right">{bid.price}¢</span>
-                </>
-              ) : (
-                <>
-                  <div />
-                  <div />
-                </>
-              )}
-
-              {/* Ask price + bar */}
-              {ask ? (
-                <>
-                  <span className="text-[10px] font-black tabular-nums text-[#f43f5e] text-left pl-2">{ask.price}¢</span>
-                  <div className="relative h-full flex items-center justify-start pl-1 overflow-hidden">
-                    <div
-                      className="absolute left-0 top-0 h-full rounded-r-sm opacity-25"
-                      style={{ width: `${askPct}%`, backgroundColor: '#f43f5e' }}
-                    />
-                    <span className="relative text-[9px] font-semibold text-[oklch(0.55_0.01_280)] tabular-nums z-10">
-                      {ask.quantity.toLocaleString()}
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div />
-                  <div />
-                </>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/** Edge score pill + recommendation signal */
-function EdgeBadge({
-  edgeScore,
-  yesPct,
-  recommendation,
-}: {
-  edgeScore: number;
-  yesPct: number;
-  recommendation?: string;
-}) {
-  const edgeColor =
-    edgeScore >= 60 ? '#00c47c' :
-    edgeScore >= 30 ? '#f59e0b' :
-    'oklch(0.40 0.01 280)';
-
-  const signalStyle =
-    yesPct >= 60 ? 'bg-[#00c47c10] border-[#00c47c28] text-[#00c47c]' :
-    yesPct <= 40 ? 'bg-[#f43f5e10] border-[#f43f5e28] text-[#f43f5e]' :
-    'bg-[oklch(0.11_0.01_280)] border-[oklch(0.17_0.01_280)] text-[oklch(0.45_0.01_280)]';
-
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <div
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold"
-        style={{ color: edgeColor, backgroundColor: `${edgeColor}12`, borderColor: `${edgeColor}28` }}
-      >
-        <Zap className="w-3 h-3" />
-        Edge {edgeScore}
-        <span className="text-[8px] opacity-60 font-normal">/100</span>
-      </div>
-
-      {recommendation && (
-        <span className={cn(
-          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-semibold',
-          signalStyle,
-        )}>
-          <TrendingUp className="w-2.5 h-2.5" />
-          {recommendation.length > 28 ? recommendation.slice(0, 28) + '\u2026' : recommendation}
-        </span>
-      )}
-    </div>
-  );
-}
-
-/** Stats strip: volume tier, volume, OI, expiry */
-function StatsStrip({
-  volumeTier,
+// ── Market Metadata Row ────────────────────────────────────────────────────────
+function MetaRow({
   volume24h,
   volume,
   openInterest,
   expiresLabel,
   expiryUrgency,
+  closeTime,
 }: {
-  volumeTier?: string;
   volume24h?: string;
   volume?: string;
   openInterest?: string;
   expiresLabel?: string;
   expiryUrgency?: string;
+  closeTime?: string;
 }) {
-  const urgency = urgencyFromLevel(expiryUrgency);
+  const vol = volume24h && volume24h !== '' ? volume24h : (volume && volume !== '—' ? volume : null);
+  const isUrgent = expiryUrgency === 'critical' || expiryUrgency === 'urgent';
+  const isSoon = expiryUrgency === 'soon';
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {volumeTier && (
+    <div className="flex items-center justify-between gap-3 text-[11px]">
+      <div className="flex items-center gap-3">
+        {vol && (
+          <span className="text-[oklch(0.42_0.01_280)]">
+            Vol <span className="text-white/75 font-semibold">{vol}</span>
+          </span>
+        )}
+        {openInterest && openInterest !== '—' && (
+          <span className="text-[oklch(0.42_0.01_280)]">
+            OI <span className="text-[oklch(0.60_0.01_280)] font-semibold">{openInterest}</span>
+          </span>
+        )}
+      </div>
+
+      {/* Closes date */}
+      {closeTime && closeTime !== 'TBD' && (
         <span className={cn(
-          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-bold',
-          volTierStyles(volumeTier),
+          'flex items-center gap-1 font-medium',
+          isUrgent ? 'text-red-400' : isSoon ? 'text-amber-400' : 'text-[oklch(0.38_0.01_280)]',
         )}>
-          {volumeTier === 'Deep' && <Flame className="w-2.5 h-2.5" />}
-          {volumeTier}
-        </span>
-      )}
-
-      {volume24h && volume24h !== '' ? (
-        <span className="text-[10px] text-[oklch(0.42_0.01_280)]">
-          24h <span className="text-white/80 font-bold">{volume24h}</span>
-        </span>
-      ) : volume && volume !== '—' ? (
-        <span className="text-[10px] text-[oklch(0.42_0.01_280)]">
-          Vol <span className="text-white/80 font-bold">{volume}</span>
-        </span>
-      ) : null}
-
-      {openInterest && openInterest !== '—' && (
-        <span className="text-[10px] text-[oklch(0.42_0.01_280)]">
-          OI <span className="text-[oklch(0.65_0.01_280)] font-bold">{openInterest}</span>
-        </span>
-      )}
-
-      {expiresLabel && expiresLabel !== 'Closed' && (
-        <span className={cn('ml-auto flex items-center gap-1 text-[10px] font-semibold', urgency.text)}>
-          <Clock className={cn('w-3 h-3', urgency.pulse && 'animate-pulse')} />
-          {expiresLabel}
+          <Clock className={cn('w-3 h-3 shrink-0', isUrgent && 'animate-pulse')} />
+          {expiresLabel === 'Closed' ? 'Closed' : `Closes ${closeTime}`}
         </span>
       )}
     </div>
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// ── Main Component ─────────────────────────────────────────────────────────────
 
 export const KalshiCard = memo(function KalshiCard({
   title,
@@ -489,199 +268,185 @@ export const KalshiCard = memo(function KalshiCard({
   isHero,
 }: KalshiCardProps) {
   const yesPct: number = (() => {
-    if (typeof d.yesPct === 'number') return d.yesPct;
+    if (typeof d.yesPct === 'number') return Math.min(100, Math.max(0, d.yesPct));
     if (typeof d.yesPrice === 'string') {
       const parsed = parseFloat(d.yesPrice);
-      return Number.isFinite(parsed) ? parsed : 50;
+      return Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : 50;
     }
     return 50;
   })();
 
-  const isActive   = status === 'active' || status === 'open' || status === 'live';
-  const edgeScore  = typeof d.edgeScore === 'number' ? d.edgeScore : Math.round(Math.abs(yesPct - 50) * 2);
-  const marketCat  = d.subcategory || subcategory || category || 'Prediction';
+  const isActive  = status === 'active' || status === 'open' || status === 'live';
+  const marketCat = (d.subcategory || subcategory || category || 'Prediction').toUpperCase();
 
-  const yesBid: number | null = typeof d.yesBid === 'number' ? d.yesBid : null;
-  const yesAsk: number | null = typeof d.yesAsk === 'number' ? d.yesAsk : null;
-  const noBid:  number | null = typeof d.noBid  === 'number' ? d.noBid  : null;
-  const noAsk:  number | null = typeof d.noAsk  === 'number' ? d.noAsk  : null;
+  const yesBid: number | null = typeof d.yesBid === 'number' && d.yesBid > 0 ? d.yesBid : null;
+  const yesAsk: number | null = typeof d.yesAsk === 'number' && d.yesAsk > 0 ? d.yesAsk : null;
+  const noBid:  number | null = typeof d.noBid  === 'number' && d.noBid  > 0 ? d.noBid  : null;
+  const noAsk:  number | null = typeof d.noAsk  === 'number' && d.noAsk  > 0 ? d.noAsk  : null;
 
-  const hasPrices = (yesBid !== null && yesBid > 0) || (yesAsk !== null && yesAsk > 0)
-                 || (noBid  !== null && noBid  > 0) || (noAsk  !== null && noAsk  > 0);
+  const hasPrices = yesBid !== null || yesAsk !== null || noBid !== null || noAsk !== null;
 
-  const rawChange  = d.priceChange ?? 0;
+  const rawChange  = typeof d.priceChange === 'number' ? d.priceChange : 0;
   const safeChange = Math.abs(rawChange) <= 99 ? rawChange : 0;
-  const priceDir: 'up' | 'down' | 'flat' =
-    d.priceDirection || (safeChange > 0 ? 'up' : safeChange < 0 ? 'down' : 'flat');
+  const priceDir: string = d.priceDirection || (safeChange > 0 ? 'up' : safeChange < 0 ? 'down' : 'flat');
 
   const displayTitle  = shortenTitle(title);
-  const displayTicker = d.ticker ? cleanTicker(d.ticker) : null;
-
-  // Orderbook Level 2 data
-  const obBids: Array<{ price: number; quantity: number }> | null = Array.isArray(d.orderbookBids) ? d.orderbookBids : null;
-  const obAsks: Array<{ price: number; quantity: number }> | null = Array.isArray(d.orderbookAsks) ? d.orderbookAsks : null;
-  const hasOrderbook = (obBids && obBids.length > 0) || (obAsks && obAsks.length > 0);
+  const tradeUrl = d.eventTicker
+    ? `https://kalshi.com/markets/${d.eventTicker}`
+    : d.ticker
+    ? `https://kalshi.com/markets/${d.ticker}`
+    : null;
 
   return (
     <article
       className={cn(
         'group relative w-full rounded-2xl overflow-hidden transition-all duration-300',
-        'bg-[#090c14] border',
         isHero
-          ? 'border-[#252f4a] shadow-[0_0_40px_#161c2e44]'
-          : 'border-[#161c2e] hover:border-[#1e2a44]',
+          ? 'border shadow-[0_0_48px_#00d15d08]'
+          : 'border hover:shadow-[0_4px_24px_#00000040]',
       )}
+      style={{
+        backgroundColor: '#07090f',
+        borderColor: isHero ? '#1e2840' : '#111827',
+      }}
     >
-      {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="px-4 pt-4 pb-3 border-b border-[#0d1118]">
-        {/* Top row: breadcrumb + badges */}
-        <div className="flex items-center justify-between mb-2.5 gap-2">
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div
+        className="px-4 pt-4 pb-3.5"
+        style={{ borderBottom: '1px solid #0d1017' }}
+      >
+        {/* Breadcrumb + status */}
+        <div className="flex items-center justify-between mb-3 gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
-            <div className="flex items-center justify-center w-5 h-5 rounded bg-[oklch(0.13_0.025_260)] border border-[oklch(0.19_0.025_260)] shrink-0">
-              <CategoryIcon label={d.iconLabel} className="text-[oklch(0.50_0.02_260)]" />
+            <div
+              className="flex items-center justify-center w-5 h-5 rounded"
+              style={{ backgroundColor: '#0e1420', border: '1px solid #1a2035' }}
+            >
+              <CategoryIcon
+                label={d.iconLabel}
+                className="text-[oklch(0.48_0.025_260)]"
+              />
             </div>
-            <span className="text-[9px] font-black uppercase tracking-widest text-[oklch(0.35_0.025_260)] shrink-0">
-              KALSHI
+            <span className="text-[9px] font-black uppercase tracking-[0.14em] text-[oklch(0.32_0.025_260)] shrink-0">
+              Kalshi
             </span>
             <span className="text-[oklch(0.20_0.01_280)] text-[9px]">/</span>
-            <span className="text-[9px] font-semibold text-[oklch(0.45_0.015_270)] truncate">
+            <span className="text-[9px] font-semibold text-[oklch(0.44_0.015_270)] truncate">
               {marketCat}
             </span>
             {d.isHot && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-rose-500/12 border border-rose-500/22 text-[8px] font-black text-rose-400 uppercase tracking-wider shrink-0">
+              <span
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0"
+                style={{ color: '#f97316', backgroundColor: '#f9731610', border: '1px solid #f9731628' }}
+              >
                 <Flame className="w-2.5 h-2.5" /> Hot
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* Price delta */}
-            {priceDir !== 'flat' && safeChange > 0 && (
-              <span className={cn(
-                'flex items-center gap-0.5 text-[10px] font-bold',
-                priceDir === 'up' ? 'text-[#00c47c]' : 'text-[#f43f5e]',
-              )}>
-                {priceDir === 'up' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-                {safeChange}¢
+          {/* Status pill */}
+          {isActive ? (
+            <div
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-full shrink-0"
+              style={{ backgroundColor: KALSHI_GREEN + '0d', border: `1px solid ${KALSHI_GREEN}20` }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full animate-pulse"
+                style={{ backgroundColor: KALSHI_GREEN }}
+              />
+              <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: KALSHI_GREEN }}>
+                Live
               </span>
-            )}
-            {/* Status badge */}
-            {isActive ? (
-              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#00c47c0e] border border-[#00c47c22]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#00c47c] animate-pulse" />
-                <span className="text-[8px] font-black uppercase tracking-widest text-[#00c47c]/80">Live</span>
-              </div>
-            ) : (
-              <span className="text-[9px] font-bold uppercase tracking-widest text-[oklch(0.28_0.01_280)] px-1.5 py-0.5 rounded-full bg-[oklch(0.12_0.01_280)] border border-[oklch(0.17_0.01_280)]">
-                Closed
-              </span>
-            )}
-          </div>
+            </div>
+          ) : (
+            <span
+              className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0"
+              style={{ color: 'oklch(0.30 0.01 280)', backgroundColor: 'oklch(0.11 0.01 280)', border: '1px solid oklch(0.17 0.01 280)' }}
+            >
+              Closed
+            </span>
+          )}
         </div>
 
         {/* Title */}
         <h3
-          className={cn('font-black text-white leading-snug', isHero ? 'text-base' : 'text-sm')}
+          className={cn(
+            'font-bold text-white leading-snug',
+            isHero ? 'text-base' : 'text-[13px]',
+          )}
           title={title}
         >
           {displayTitle}
         </h3>
 
         {d.subtitle && d.subtitle !== title && (
-          <p className="text-[11px] text-[oklch(0.42_0.01_280)] mt-1 line-clamp-1 leading-relaxed">
+          <p className="text-[11px] text-[oklch(0.40_0.01_280)] mt-1 line-clamp-2 leading-relaxed">
             {d.subtitle}
           </p>
         )}
-
-        {displayTicker && (
-          <span className="mt-1.5 inline-block font-mono text-[9px] text-[oklch(0.28_0.02_260)] tracking-wider bg-[oklch(0.11_0.01_280)] px-1.5 py-0.5 rounded">
-            {displayTicker}
-          </span>
-        )}
       </div>
 
-      {/* ── Body ───────────────────────────────────────────────────────── */}
+      {/* ── Body ───────────────────────────────────────────────────────────── */}
       <div className="px-4 py-4 space-y-4">
 
-        {/* Probability bar */}
-        <ProbabilityBar
+        {/* Probability hero */}
+        <ProbabilityHero
           yesPct={yesPct}
           lastPrice={typeof d.lastPrice === 'number' ? d.lastPrice : undefined}
-          impliedProbability={d.impliedProbability}
+          priceDir={priceDir}
+          priceChange={safeChange}
           isHero={isHero}
         />
 
-        <div className="h-px bg-[#0d1118]" />
-
-        {/* Edge score + signal */}
-        <EdgeBadge edgeScore={edgeScore} yesPct={yesPct} recommendation={d.recommendation} />
-
-        {/* Bid/ask prices (YES + NO sides) */}
+        {/* Buy prices */}
         {hasPrices && (
-          <>
-            <div className="h-px bg-[#0d1118]" />
-            <BestPrices
-              yesBid={yesBid}
-              yesAsk={yesAsk}
-              noBid={noBid}
-              noAsk={noAsk}
-              spreadLabel={d.spreadLabel}
-            />
-          </>
+          <PriceChips
+            yesBid={yesBid}
+            yesAsk={yesAsk}
+            noBid={noBid}
+            noAsk={noAsk}
+          />
         )}
 
-        {/* Mini orderbook depth chart */}
-        {hasOrderbook && (
-          <>
-            <div className="h-px bg-[#0d1118]" />
-            <MiniOrderbook bids={obBids ?? []} asks={obAsks ?? []} />
-          </>
-        )}
-
-        <div className="h-px bg-[#0d1118]" />
-
-        {/* Stats strip */}
-        <StatsStrip
-          volumeTier={d.volumeTier}
+        {/* Volume / OI / close date */}
+        <MetaRow
           volume24h={d.volume24h}
           volume={d.volume}
           openInterest={d.openInterest}
           expiresLabel={d.expiresLabel}
           expiryUrgency={d.expiryUrgency}
+          closeTime={d.closeTime}
         />
 
-        {/* Close date */}
-        {d.closeTime && d.closeTime !== 'TBD' && (
-          <div className="flex items-center justify-end text-[9px] text-[oklch(0.26_0.01_280)] pt-1 border-t border-[#0d1118]">
-            <span>Closes {d.closeTime}</span>
-          </div>
-        )}
+        {/* ── CTAs ────────────────────────────────────────────────────────── */}
+        <div className="flex flex-col gap-2 pt-1" style={{ borderTop: '1px solid #0d1017' }}>
 
-        {/* Analyze CTA */}
-        {onAnalyze && (
-          <button
-            onClick={onAnalyze}
-            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-[oklch(0.11_0.018_260)] border border-[oklch(0.18_0.022_260)] text-xs font-semibold text-[oklch(0.52_0.015_260)] hover:text-white hover:bg-[oklch(0.16_0.022_260)] hover:border-[oklch(0.26_0.028_260)] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00c47c]/40"
-            aria-label={`Analyze ${title}`}
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            View Full Analysis
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        )}
+          {/* Analyze */}
+          {onAnalyze && (
+            <button
+              onClick={onAnalyze}
+              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00d15d]/30 bg-[oklch(0.11_0.018_260)] border border-[oklch(0.18_0.022_260)] text-[oklch(0.52_0.015_260)] hover:bg-[oklch(0.16_0.022_260)] hover:text-white hover:border-[oklch(0.26_0.028_260)]"
+              aria-label={`Analyze ${title}`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              Analyze
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
 
-        {/* Trade on Kalshi link */}
-        {(d.ticker || d.eventTicker) && (
-          <a
-            href={`https://kalshi.com/markets/${d.eventTicker || d.ticker}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 w-full py-1.5 text-[10px] font-semibold text-[oklch(0.35_0.01_280)] hover:text-[oklch(0.55_0.01_280)] transition-colors duration-150"
-          >
-            <ExternalLink className="w-3 h-3" />
-            Trade on Kalshi
-          </a>
-        )}
+          {/* Trade on Kalshi — primary CTA */}
+          {tradeUrl && (
+            <a
+              href={tradeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-[12px] font-black tracking-wide transition-all duration-150 bg-[#00d15d14] border border-[#00d15d28] text-[#00d15d] hover:bg-[#00d15d28] hover:border-[#00d15d50]"
+            >
+              Trade on Kalshi
+              <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+            </a>
+          )}
+        </div>
       </div>
     </article>
   );

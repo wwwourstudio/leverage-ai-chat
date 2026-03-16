@@ -973,7 +973,7 @@ export async function POST(request: NextRequest) {
             controller.enqueue(sseChunk({ type: 'text', delta: aiText }));
           }
 
-          // ── Post-processing: cards, trust metrics, done event ─────────────────
+          // ── Post-processing: cards, trust metrics, done event ──────���──────────
           let cards: InsightCard[] = await cardPromise.catch(() => []);
 
           if (pendingADPCard) cards = [pendingADPCard, ...cards.slice(0, 5)];
@@ -1018,9 +1018,10 @@ export async function POST(request: NextRequest) {
               controller.enqueue(sseChunk({ type: 'replace', text: cleanText }));
             } else {
               // Grok returned markdown/text instead of JSON — extract structured fields
+              // This is expected for certain query types; log at info level not warn
               const mlbAnalysis = extractMLBJson(aiText);
-              logger.warn(LogCategory.API, '[API/analyze] MLB JSON parse fell back to text extraction', {
-                pick: mlbAnalysis.pick,
+              logger.info(LogCategory.API, '[API/analyze] MLB response parsed via text extraction', {
+                pick: mlbAnalysis.pick?.slice(0, 80),
                 book: mlbAnalysis.book,
                 odds: mlbAnalysis.odds,
               });

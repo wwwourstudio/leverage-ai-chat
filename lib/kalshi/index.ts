@@ -706,7 +706,9 @@ export async function fetchElectionMarkets(options?: {
     // often won't contain the keyword list but they are definitively election markets.
     if (market.category === 'Politics') return true;
     const text = `${market.title} ${market.subtitle}`.toLowerCase();
-    return ELECTION_KEYWORDS.some(k => text.includes(k)) || text.includes(year.toString());
+    // Do NOT use text.includes(year.toString()) here — that would match any 2026 market
+    // (Grammy Awards, NBA Finals, etc.) and produce completely wrong election cards.
+    return ELECTION_KEYWORDS.some(k => text.includes(k));
   }
 
   // Reduced to 4 targeted strategies (previously 7) to stay within Kalshi rate limits.

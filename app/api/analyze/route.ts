@@ -411,8 +411,34 @@ export async function POST(request: NextRequest) {
       // Sports question without betting intent — give expert analysis
       enrichedPrompt += `\n\n[Context: User is asking about ${context.sport.toUpperCase()} — provide expert analysis using your knowledge. No live odds needed for this question.]`;
     } else if (context.isPoliticalMarket || context.selectedCategory === 'kalshi') {
-      // Kalshi prediction market query — answer directly, no sports clarification needed
-      enrichedPrompt += `\n\n[Context: This is a Kalshi prediction market query. Answer directly with prediction market analysis, probability edge, and trading recommendations. Do NOT ask the user to choose a sports platform or area — the user is already on the Kalshi tab. Analyze the specific market or topic asked about.]`;
+      // Pre-fetch actual Kalshi markets so the AI describes real data, not hallucinated markets.
+      // The 60s in-memory cache means card generation (running in parallel) reuses this data
+      // at zero extra API cost. A 3s timeout prevents blocking the AI call on a slow fetch.
+      try {
+        const { fetchElectionMarkets, fetchKalshiMarketsWithRetry } = await import('@/lib/kalshi/index');
+        const sub = (context.kalshiSubcategory || '').toLowerCase();
+        const fetchMarkets = sub === 'politics' || sub === 'elections' || sub === 'election'
+          ? fetchElectionMarkets({ limit: 10 })
+          : fetchKalshiMarketsWithRetry({ limit: 10, maxRetries: 1 });
+        const markets = await Promise.race([
+          fetchMarkets,
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
+        ]).catch(() => null);
+        if (markets && (markets as any[]).length > 0) {
+          const topMarkets = (markets as any[]).slice(0, 6);
+          const marketSummary = topMarkets.map((m: any, i: number) => {
+            const yesCents = m.yesPrice ?? m.yesBid ?? m.yes_bid ?? 50;
+            const vol = m.volume24h ?? m.volume ?? 0;
+            const volStr = vol > 1_000_000 ? `${(vol / 1_000_000).toFixed(1)}M` : vol > 1000 ? `${(vol / 1000).toFixed(0)}K` : `${vol}`;
+            return `${i + 1}. "${m.title}" — YES: ${yesCents}¢, Vol: ${volStr}`;
+          }).join('\n');
+          enrichedPrompt += `\n\n--- LIVE KALSHI MARKETS (ground your analysis in ONLY these real markets — do not invent tickers, prices, or volumes) ---\n${marketSummary}\n--- END KALSHI DATA ---`;
+        } else {
+          enrichedPrompt += `\n\n[Context: Kalshi prediction market query. No live markets available — provide general prediction market analysis and strategy.]`;
+        }
+      } catch {
+        enrichedPrompt += `\n\n[Context: This is a Kalshi prediction market query. Answer directly with prediction market analysis, probability edge, and trading recommendations. Do NOT ask the user to choose a sports platform or area — the user is already on the Kalshi tab. Analyze the specific market or topic asked about.]`;
+      }
     } else if (!context.hasBettingIntent && !context.sport && !context.isPoliticalMarket) {
       // General question — answer from knowledge
       enrichedPrompt += `\n\n[Context: General question — answer with your full expert knowledge about sports betting, fantasy, DFS, or prediction markets as appropriate.]`;

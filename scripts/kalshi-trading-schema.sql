@@ -68,16 +68,19 @@ ALTER TABLE api.kalshi_positions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE api.kalshi_accounts  ENABLE ROW LEVEL SECURITY;
 
 -- Users can only read/write their own rows
+DROP POLICY IF EXISTS "kalshi_orders_owner" ON api.kalshi_orders;
 CREATE POLICY "kalshi_orders_owner"
   ON api.kalshi_orders FOR ALL
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "kalshi_positions_owner" ON api.kalshi_positions;
 CREATE POLICY "kalshi_positions_owner"
   ON api.kalshi_positions FOR ALL
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "kalshi_accounts_owner" ON api.kalshi_accounts;
 CREATE POLICY "kalshi_accounts_owner"
   ON api.kalshi_accounts FOR ALL
   USING (auth.uid() = user_id)

@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Per-AI-call timeouts (independent from each other and from card generation):
-  //   grok-4 primary: 52s first-token | grok-3-mini primary: 28s | fallback: 10s
+  //   grok-3 primary: 52s first-token | grok-3-mini primary: 28s | fallback: 10s
   // Vercel serverless functions have a 60s wall-clock limit. Keeping primary+fallback
   // to ≤58s gives a small buffer for the response serialisation overhead.
   const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 28_000 : 52_000;
@@ -598,9 +598,9 @@ export async function POST(request: NextRequest) {
     };
 
     // Route DFS, pure-fantasy, file-upload, off-season, and ambiguous queries directly to
-    // grok-3-mini (3-6s). Reserve grok-4 for live-odds betting analysis only.
-    // ADP queries override to grok-4: reliable tool use requires the stronger model.
-    // isAmbiguous queries only need a short clarification reply — no need for grok-4.
+    // grok-3-fast (3-6s). Reserve grok-3 for live-odds betting analysis only.
+    // ADP queries override to grok-3: reliable tool use requires the stronger model.
+    // isAmbiguous queries only need a short clarification reply — no need for grok-3.
     const useFastPath = hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context));
     const primaryModel = useFastPath ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.MODEL_NAME;
     // Always log the resolved model so failures are immediately traceable in Vercel logs

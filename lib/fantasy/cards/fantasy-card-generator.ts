@@ -1150,7 +1150,8 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
               sport: 'MLB',
               players: vpeRanked.map((p, i) => ({
                 name: p.name,
-                pos: p.playerType === 'batter' ? 'BAT' : 'PIT',
+                team: '',  // Statcast CSV does not include team
+                pos: p.playerType === 'batter' ? 'OF' : 'SP',
                 vbd: p.vpeVal,
                 pts: p.vpeVal,
                 adp: i + 1,

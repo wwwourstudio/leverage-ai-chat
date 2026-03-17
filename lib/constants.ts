@@ -284,6 +284,12 @@ export const CARD_TYPES = {
   MLB_PROJECTION:    'mlb_projection_card',
   // Vortex Projection Engine (VPE 3.0) — Baseball only
   VPE_PROJECTION:    'vpe_projection_card',
+  // Quant / portfolio card types
+  LINE_MOVEMENT:          'line_movement',
+  KELLY_BET:              'kelly_bet',
+  PORTFOLIO:              'portfolio',
+  ARBITRAGE_OPPORTUNITY:  'arbitrage',
+  FANTASY_ADVICE:         'fantasy-advice',
 } as const;
 
 // Card Status Values

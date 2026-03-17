@@ -113,12 +113,13 @@ function buildHeaders(url: string = ''): Record<string, string> {
     try {
       const { pathname, search } = new URL(url);
       const timestamp = Date.now().toString();
-      const message   = `${timestamp}GET${pathname}${search}`;
+      // Kalshi docs: sign only the path, NOT query params
+      const message   = `${timestamp}GET${pathname}`;
       const sign      = crypto.createSign('RSA-SHA256');
       sign.update(message);
       sign.end();
       const signature = sign.sign(
-        { key: privateKey, padding: crypto.constants.RSA_PKCS1_PADDING },
+        { key: privateKey, padding: crypto.constants.RSA_PKCS1_PSS_PADDING },
         'base64',
       );
       headers['KALSHI-ACCESS-KEY']       = keyId;
@@ -160,15 +161,43 @@ function normalizeCategoryLabel(raw: string): string {
   return 'Prediction Market';
 }
 
+/**
+ * Parse a dollar string from the Kalshi v2 API into integer cents.
+ * Kalshi transitioned from integer cents (yes_bid=56) to dollar strings
+ * (yes_bid_dollars="0.5600"). Support both to stay backward-compatible.
+ */
+function parseCents(dollarsStr: string | undefined | null, fallbackCents: number): number {
+  if (dollarsStr !== undefined && dollarsStr !== null && dollarsStr !== '') {
+    const v = parseFloat(dollarsStr);
+    if (Number.isFinite(v) && v > 0) return Math.round(v * 100);
+  }
+  return fallbackCents;
+}
+
+/**
+ * Parse a fixed-point volume string from the Kalshi v2 API into a number.
+ * Kalshi transitioned from integer counts (volume=1000) to fp strings
+ * (volume_fp="1000.00"). Support both to stay backward-compatible.
+ */
+function parseFp(fpStr: string | undefined | null, fallbackInt: number): number {
+  if (fpStr !== undefined && fpStr !== null && fpStr !== '') {
+    const v = parseFloat(fpStr);
+    if (Number.isFinite(v) && v > 0) return Math.round(v);
+  }
+  return fallbackInt;
+}
+
 /** Parse a raw Kalshi market response object into a typed KalshiMarket */
 function parseMarket(m: any): KalshiMarket {
-  const yesBid = m.yes_bid ?? 0;
-  const yesAsk = m.yes_ask ?? 0;
-  const noBid  = m.no_bid  ?? 0;
-  const noAsk  = m.no_ask  ?? 0;
-  const lastPrice = m.last_price ?? 0;
+  // Kalshi API v2 uses _dollars string fields; v1 used integer cents.
+  // Prefer the new _dollars fields; fall back to the old integer fields.
+  const yesBid    = parseCents(m.yes_bid_dollars,   m.yes_bid    ?? 0);
+  const yesAsk    = parseCents(m.yes_ask_dollars,   m.yes_ask    ?? 0);
+  const noBid     = parseCents(m.no_bid_dollars,    m.no_bid     ?? 0);
+  const noAsk     = parseCents(m.no_ask_dollars,    m.no_ask     ?? 0);
+  const lastPrice = parseCents(m.last_price_dollars, m.last_price ?? 0);
   // previous_yes_bid is 0 when the market has never had a bid — treat that as absent
-  const prevBid = m.previous_yes_bid ?? 0;
+  const prevBid   = parseCents(m.previous_yes_bid_dollars, m.previous_yes_bid ?? 0);
 
   // Best estimate for YES probability: prefer last traded price, then midpoint, then ask/bid.
   // IMPORTANT: never fall through to floor_strike — it is a numeric strike price (e.g. 45000
@@ -233,12 +262,13 @@ function parseMarket(m: any): KalshiMarket {
     noAsk,
     spread: Math.max(0, yesAsk - yesBid),
     lastPrice,
-    volume24h: m.volume_24h ?? 0,
-    eventTicker: m.event_ticker || '',
+    // Kalshi v2 uses _fp (fixed-point string) for volume fields; v1 used integers.
+    volume24h:    parseFp(m.volume_24h_fp,    m.volume_24h    ?? 0),
+    eventTicker:  m.event_ticker || '',
     seriesTicker: m.series_ticker || '',
     priceChange,
-    volume: m.volume ?? m.volume_24h ?? 0,
-    openInterest: m.open_interest ?? 0,
+    volume:       parseFp(m.volume_fp,        m.volume        ?? m.volume_24h ?? 0),
+    openInterest: parseFp(m.open_interest_fp, m.open_interest ?? 0),
     closeTime: m.close_time || m.expiration_time || m.end_date || '',
     status: m.status || 'active',
   };
@@ -903,13 +933,36 @@ export async function fetchMarketOrderbook(ticker: string): Promise<{
     });
     if (!response.ok) return null;
     const data = await response.json();
-    const ob = data.orderbook || {};
-    const toLevel = (arr: any[] = []) => arr.map((l: any) => ({ price: l[0] ?? 0, quantity: l[1] ?? 0 }));
+
+    // Kalshi v2 returns orderbook_fp with dollar strings: [[price_str, qty_str], ...]
+    // Kalshi v1 returns orderbook with integer cents: [[price_int, qty_int], ...]
+    // The v2 orderbook only contains bids (no asks) — asks are derived from NO bids.
+    const obFp = data.orderbook_fp;
+    const obV1 = data.orderbook || {};
+
+    if (obFp) {
+      // v2 format: price is a dollar string, convert to cents integer
+      const toFpLevel = (arr: any[] = []) =>
+        arr.map((l: any) => ({
+          price:    Math.round(parseFloat(l[0] ?? '0') * 100),
+          quantity: Math.round(parseFloat(l[1] ?? '0')),
+        })).filter(l => l.price > 0);
+
+      const yesBids = toFpLevel(obFp.yes_dollars || []);
+      const noBids  = toFpLevel(obFp.no_dollars  || []);
+      // In Kalshi's binary market: YES ask = 100 - best NO bid, NO ask = 100 - best YES bid
+      const yesAsks = noBids.map(l => ({ price: 100 - l.price, quantity: l.quantity }));
+      const noAsks  = yesBids.map(l => ({ price: 100 - l.price, quantity: l.quantity }));
+      return { yesBids, yesAsks, noBids, noAsks };
+    }
+
+    // v1 fallback
+    const toV1Level = (arr: any[] = []) => arr.map((l: any) => ({ price: l[0] ?? 0, quantity: l[1] ?? 0 }));
     return {
-      yesBids: toLevel(ob.yes),
-      yesAsks: toLevel(ob.yes_ask || []),
-      noBids: toLevel(ob.no),
-      noAsks: toLevel(ob.no_ask || []),
+      yesBids: toV1Level(obV1.yes),
+      yesAsks: toV1Level(obV1.yes_ask || []),
+      noBids:  toV1Level(obV1.no),
+      noAsks:  toV1Level(obV1.no_ask  || []),
     };
   } catch {
     return null;
@@ -936,7 +989,8 @@ export async function fetchMarketTrades(
     const trades: any[] = data.trades || [];
     return trades.map((t: any) => ({
       ts: t.created_time || t.ts || '',
-      price: t.yes_price ?? t.price ?? 0,
+      // v2 API: yes_price_dollars is a string like "0.5600"; v1: yes_price is integer cents
+      price: parseCents(t.yes_price_dollars, t.yes_price ?? t.price ?? 0),
       count: t.count ?? 1,
     }));
   } catch {
@@ -988,9 +1042,11 @@ export async function fetchTopMarketsByVolume(
   status: 'open' | 'closed' = 'open',
 ): Promise<KalshiMarket[]> {
   const markets = await fetchKalshiMarketsWithRetry({ status, limit: Math.max(n * 5, 200), maxRetries: 2 });
-  return markets
-    .sort((a, b) => (b.volume24h || b.volume) - (a.volume24h || a.volume))
-    .slice(0, n);
+  const sorted = markets.sort((a, b) => (b.volume24h || b.volume) - (a.volume24h || a.volume));
+  // Prefer markets that have real price signals (not stuck at the 50¢ fallback with zero volume)
+  const withActivity = sorted.filter(m => (m.volume > 0 || m.volume24h > 0) && (m.yesBid > 0 || m.yesAsk > 0 || m.lastPrice > 0));
+  // Fall back to all sorted markets if not enough active ones
+  return (withActivity.length >= n ? withActivity : sorted).slice(0, n);
 }
 
 /**

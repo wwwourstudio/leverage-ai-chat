@@ -118,19 +118,36 @@ function colIdx(headers: string[], candidates: string[]): number {
   return -1;
 }
 
+/** Quote-aware CSV row parser — handles fields like `"Nelson, Ryne"` correctly */
+function parseCsvRow(line: string): string[] {
+  return line.match(/("(?:[^"]|"")*"|[^,]*)(?:,|$)/g)
+    ?.map(c => c.replace(/,$/, '').replace(/^"|"$/g, '').replace(/""/g, '"').trim())
+    ?? line.split(',').map(c => c.trim());
+}
+
 /**
  * Parse a Baseball Savant Expected Statistics CSV export.
  * Column detection is dynamic so it survives minor format changes.
+ *
+ * Baseball Savant uses a SINGLE quoted column `"last_name, first_name"` whose
+ * values are formatted as `"Last, First"`. Simple comma-split of the header
+ * incorrectly creates a phantom `first_name` column, shifting all subsequent
+ * column indices by one.  We detect this pattern and handle it explicitly.
  */
 function parseCSV(csv: string, playerType: 'batter' | 'pitcher'): StatcastPlayer[] {
   const lines = csv.split('\n').filter(l => l.trim().length > 0);
   if (lines.length < 2) return [];
 
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
+  // Parse header respecting quoted fields so "last_name, first_name" stays as one token
+  const headers = parseCsvRow(lines[0]).map(h => h.toLowerCase());
+
+  // Baseball Savant combined name column: one cell = "Last, First"
+  const combinedNameIdx = headers.findIndex(h => h === 'last_name, first_name' || h === 'player_name');
+  // Separate first/last columns (some older CSV exports use these instead)
+  const lastIdx   = combinedNameIdx === -1 ? colIdx(headers, ['last_name'])  : -1;
+  const firstIdx  = combinedNameIdx === -1 ? colIdx(headers, ['first_name']) : -1;
 
   const idIdx         = colIdx(headers, ['player_id', 'mlbam_id']);
-  const lastIdx       = colIdx(headers, ['last_name']);
-  const firstIdx      = colIdx(headers, ['first_name']);
   const yearIdx       = colIdx(headers, ['year']);
   const paIdx         = colIdx(headers, ['pa', 'b_total_pa', 'p_total_pa']);
   const xbaIdx        = colIdx(headers, ['xba', 'est_ba', 'x_avg']);
@@ -146,16 +163,25 @@ function parseCSV(csv: string, playerType: 'batter' | 'pitcher'): StatcastPlayer
   const players: StatcastPlayer[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    // Handle quoted CSV fields (Baseball Savant sometimes quotes names with commas)
-    const cols = lines[i].match(/(".*?"|[^,]+)(?=,|$)/g)?.map(c => c.replace(/"/g, '').trim()) ?? lines[i].split(',').map(c => c.trim());
-
+    const cols = parseCsvRow(lines[i]);
     if (cols.length < 4) continue;
 
-    const last  = lastIdx  !== -1 ? (cols[lastIdx]  ?? '') : '';
-    const first = firstIdx !== -1 ? (cols[firstIdx] ?? '') : '';
-    if (!last && !first) continue;
+    // Resolve player name
+    let name: string;
+    if (combinedNameIdx !== -1) {
+      // "Last, First" → "First Last"
+      const combined = cols[combinedNameIdx] ?? '';
+      const commaAt = combined.indexOf(',');
+      name = commaAt > 0
+        ? `${combined.slice(commaAt + 1).trim()} ${combined.slice(0, commaAt).trim()}`
+        : combined;
+    } else {
+      const last  = lastIdx  !== -1 ? (cols[lastIdx]  ?? '') : '';
+      const first = firstIdx !== -1 ? (cols[firstIdx] ?? '') : '';
+      name = first && last ? `${first} ${last}` : last || first;
+    }
 
-    const name = first && last ? `${first} ${last}` : last || first;
+    if (!name) continue;
 
     const parseNum = (idx: number, fallback = 0): number => {
       if (idx === -1) return fallback;

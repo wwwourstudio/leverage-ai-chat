@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+// Must match the CHECK constraint in the user_alerts table schema
 const VALID_ALERT_TYPES = [
   'odds_change',
   'line_movement',
@@ -8,7 +9,6 @@ const VALID_ALERT_TYPES = [
   'arbitrage',
   'kalshi_price',
   'game_start',
-  'market_intelligence',
 ] as const;
 
 /**
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { title, alert_type, sport, team, player, description, threshold, max_triggers, notify_channels } = body as {
+  const { title, alert_type, sport, team, player, description, threshold, max_triggers } = body as {
     title?: string;
     alert_type?: string;
     sport?: string;
@@ -66,7 +66,6 @@ export async function POST(req: NextRequest) {
     description?: string;
     threshold?: number | null;
     max_triggers?: number | null;
-    notify_channels?: string[];
   };
 
   if (!title || typeof title !== 'string' || !title.trim()) {
@@ -93,9 +92,6 @@ export async function POST(req: NextRequest) {
         marketType: alert_type,
         threshold: threshold ?? null,
       },
-      notify_channels: Array.isArray(notify_channels) && notify_channels.length > 0
-        ? notify_channels
-        : ['in_app'],
       is_active: true,
       trigger_count: 0,
     })

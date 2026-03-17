@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { Award, Users, Gamepad2, ChevronRight, TrendingUp, Star, Zap, Link2 } from 'lucide-react';
+import { Award, Users, Gamepad2, ChevronRight, TrendingUp, Star, Zap, Link2, BarChart2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DFSCardProps {
@@ -51,7 +51,7 @@ const statusConfig: Record<string, {
   },
 };
 
-/** Letter-grade value badge based on salary efficiency */
+/** Letter-grade value badge based on salary efficiency (proj pts / salary * 1000) */
 function ValueGrade({ score }: { score: number }) {
   const grade = score >= 5.5 ? 'A' : score >= 4.5 ? 'B' : score >= 3.5 ? 'C' : 'D';
   const color = grade === 'A'
@@ -62,24 +62,69 @@ function ValueGrade({ score }: { score: number }) {
     ? 'text-amber-300 bg-amber-500/15 border-amber-500/35'
     : 'text-red-300 bg-red-500/15 border-red-500/35';
   return (
-    <div className={cn('flex flex-col items-center justify-center w-11 h-11 rounded-xl border font-black', color)}>
+    <div className={cn('flex flex-col items-center justify-center w-11 h-11 rounded-xl border font-black shrink-0', color)}>
       <span className="text-xl leading-none">{grade}</span>
       <span className="text-[7px] uppercase tracking-wider opacity-70">grade</span>
     </div>
   );
 }
 
-/** Ownership tier badge */
-function OwnershipBadge({ pct }: { pct: number }) {
-  const tier = pct >= 35 ? { label: 'CHALKY',   cls: 'text-red-400 bg-red-500/10 border-red-500/25' }
-    : pct >= 20          ? { label: 'POPULAR',   cls: 'text-amber-400 bg-amber-500/10 border-amber-500/25' }
-    : pct >= 10          ? { label: 'MODERATE',  cls: 'text-blue-400 bg-blue-500/10 border-blue-500/25' }
-    :                      { label: 'LEVERAGE',  cls: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25' };
+/** Visual ownership progress bar + tier badge */
+function OwnershipBar({ pct }: { pct: number }) {
+  const tier = pct >= 35 ? { label: 'CHALKY',   barCls: 'bg-red-400',    textCls: 'text-red-400',    badgeCls: 'bg-red-500/10 border-red-500/25 text-red-400' }
+    : pct >= 20          ? { label: 'POPULAR',   barCls: 'bg-amber-400',  textCls: 'text-amber-400',  badgeCls: 'bg-amber-500/10 border-amber-500/25 text-amber-400' }
+    : pct >= 10          ? { label: 'MODERATE',  barCls: 'bg-blue-400',   textCls: 'text-blue-400',   badgeCls: 'bg-blue-500/10 border-blue-500/25 text-blue-400' }
+    :                      { label: 'LEVERAGE',  barCls: 'bg-emerald-400', textCls: 'text-emerald-400', badgeCls: 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400' };
+
   return (
-    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider', tier.cls)}>
-      <Star className="w-2.5 h-2.5" />
-      {tier.label}
-    </span>
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Users className="w-3 h-3 text-[oklch(0.45_0.01_280)]" />
+          <span className="text-[9px] font-bold uppercase tracking-wider text-[oklch(0.42_0.01_280)]">Field Ownership</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className={cn('text-[10px] font-black tabular-nums', tier.textCls)}>{pct.toFixed(1)}%</span>
+          <span className={cn('inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-wider', tier.badgeCls)}>
+            <Star className="w-2 h-2" />{tier.label}
+          </span>
+        </div>
+      </div>
+      <div className="h-1.5 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+        <div
+          className={cn('h-full rounded-full transition-all duration-700', tier.barCls)}
+          style={{ width: `${Math.min(100, pct)}%`, opacity: 0.85 }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Value efficiency bar: pts/$1K — cap at 8.0 for full fill */
+function ValueEfficiencyBar({ score }: { score: number }) {
+  const pct = Math.min(100, (score / 8) * 100);
+  const barCls = score >= 5.5 ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+    : score >= 4.5            ? 'bg-gradient-to-r from-blue-500 to-indigo-400'
+    : score >= 3.5            ? 'bg-gradient-to-r from-amber-500 to-yellow-400'
+    :                           'bg-gradient-to-r from-red-500 to-rose-400';
+  const textCls = score >= 5.5 ? 'text-emerald-400' : score >= 4.5 ? 'text-blue-400' : score >= 3.5 ? 'text-amber-400' : 'text-red-400';
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <BarChart2 className="w-3 h-3 text-[oklch(0.45_0.01_280)]" />
+          <span className="text-[9px] font-bold uppercase tracking-wider text-[oklch(0.42_0.01_280)]">Value Efficiency</span>
+        </div>
+        <span className={cn('text-[10px] font-black tabular-nums', textCls)}>{score.toFixed(2)}x pts/$K</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+        <div
+          className={cn('h-full rounded-full transition-all duration-700', barCls)}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -98,19 +143,19 @@ export const DFSCard = memo(function DFSCard({
     player, team, position,
     targetGame, targetPlayers, description,
     platforms, tips, salary, projection, ownership,
-    boomCeiling, bustFloor, ...rest
+    boomCeiling, bustFloor, realData, ...rest
   } = data;
 
-  const projNum     = parseFloat(String(projection  || '').replace(/[^0-9.]/g, ''));
-  const salaryNum   = parseFloat(String(salary      || '').replace(/[^0-9.]/g, ''));
-  const ownershipNum= parseFloat(String(ownership   || '').replace(/[^0-9.]/g, ''));
-  const valueScore  = projNum > 0 && salaryNum > 0 ? projNum / (salaryNum / 1000) : null;
+  const projNum      = parseFloat(String(projection  || '').replace(/[^0-9.]/g, ''));
+  const salaryNum    = parseFloat(String(salary      || '').replace(/[^0-9.]/g, ''));
+  const ownershipNum = parseFloat(String(ownership   || '').replace(/[^0-9.]/g, ''));
+  const valueScore   = projNum > 0 && salaryNum > 0 ? projNum / (salaryNum / 1000) : null;
 
   const hasCorePlay  = Boolean(player && (salary || projection || ownership));
   const stackPlayers = Array.isArray(targetPlayers) ? targetPlayers : targetPlayers ? [targetPlayers] : [];
 
   const extraKeys = Object.keys(rest).filter(k =>
-    !['realData', 'status', 'sport', 'insight', 'source', 'focus', 'value'].includes(k) && rest[k] != null
+    !['status', 'sport', 'insight', 'source', 'focus', 'value'].includes(k) && rest[k] != null
   );
 
   return (
@@ -123,7 +168,13 @@ export const DFSCard = memo(function DFSCard({
 
       {/* ── Gradient header ──────────────────────────────────────────── */}
       <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', cfg.headerGrad)}>
-        <div className="absolute top-3 right-3 flex items-center gap-1">
+        <div className="absolute top-3 right-3 flex items-center gap-1.5">
+          {realData && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[8px] font-bold text-emerald-400/80">
+              <span className="w-1 h-1 rounded-full bg-emerald-400" />
+              LIVE
+            </span>
+          )}
           <span className={cn('w-1.5 h-1.5 rounded-full animate-pulse', cfg.dotCls)} />
           <span className={cn('text-[9px] font-black uppercase tracking-widest', cfg.textCls)}>{cfg.label}</span>
         </div>
@@ -133,7 +184,7 @@ export const DFSCard = memo(function DFSCard({
           <span className="text-white/30">·</span>
           <span className="text-[9px] text-white/50 truncate">{subcategory}</span>
         </div>
-        <h3 className={cn('font-black text-white leading-snug text-balance pr-16', isHero ? 'text-lg' : 'text-sm')}>
+        <h3 className={cn('font-black text-white leading-snug text-balance pr-20', isHero ? 'text-lg' : 'text-sm')}>
           {title}
         </h3>
       </div>
@@ -155,7 +206,7 @@ export const DFSCard = memo(function DFSCard({
               )}
             </div>
             {player && (
-              <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center justify-between gap-2 mb-2.5">
                 <span className={cn('font-black text-white leading-tight', isHero ? 'text-xl' : 'text-lg')}>{player}</span>
                 {valueScore !== null && <ValueGrade score={valueScore} />}
               </div>
@@ -183,14 +234,15 @@ export const DFSCard = memo(function DFSCard({
           </div>
         )}
 
-        {/* ── Ownership risk ────────────────────────────────────────── */}
+        {/* ── Value efficiency bar (when core play shown and value computed) ── */}
+        {hasCorePlay && valueScore !== null && (
+          <ValueEfficiencyBar score={valueScore} />
+        )}
+
+        {/* ── Ownership risk bar ─────────────────────────────────────── */}
         {!isNaN(ownershipNum) && ownershipNum > 0 && (
-          <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)]">
-            <div className="flex items-center gap-1.5">
-              <Users className="w-3 h-3 text-[oklch(0.45_0.01_280)]" />
-              <span className="text-[9px] font-bold uppercase tracking-wider text-[oklch(0.42_0.01_280)]">Ownership Risk</span>
-            </div>
-            <OwnershipBadge pct={ownershipNum} />
+          <div className="px-3 py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)]">
+            <OwnershipBar pct={ownershipNum} />
           </div>
         )}
 
@@ -234,7 +286,7 @@ export const DFSCard = memo(function DFSCard({
           </div>
         )}
 
-        {/* ── Context chips (platforms / game without stack) ─────────── */}
+        {/* ── Context chips (game / platforms when no stack) ─────────── */}
         {!stackPlayers.length && (targetGame || platforms) && (
           <div className="flex flex-wrap gap-1.5">
             {targetGame && (
@@ -269,7 +321,7 @@ export const DFSCard = memo(function DFSCard({
           </div>
         )}
 
-        {/* ── Description fallback (no player data) ─────────────────── */}
+        {/* ── Description fallback ──────────────────────────────────── */}
         {!hasCorePlay && description && (
           <p className="text-xs text-[oklch(0.52_0.01_280)] leading-relaxed mt-3">{description}</p>
         )}

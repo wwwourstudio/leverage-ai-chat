@@ -57,6 +57,8 @@ interface AnalyzeRequestBody {
     oddsKeyMissing?: boolean;
     leagueSize?: number;
     leagueScoringFormat?: string;
+    hasPlayerIntent?: boolean;
+    playerName?: string;
   };
 }
 
@@ -361,15 +363,18 @@ export async function POST(request: NextRequest) {
     // Determine analysis category from context
     // Sports queries (even without explicit betting keywords like "MLB Offseason")
     // should use 'betting' so generateContextualCards fetches real game/odds cards.
+    // Player-specific queries (e.g. "Aaron Judge") take priority before generic sports routing.
     const category = context.isPoliticalMarket
       ? 'kalshi'
       : context.selectedCategory === 'dfs'
         ? 'dfs'
-        : context.hasFantasyIntent && !context.hasBettingIntent
-          ? 'fantasy'
-          : (context.hasBettingIntent || context.isSportsQuery)
-            ? 'betting'
-            : 'all';
+        : context.hasPlayerIntent
+          ? 'player'
+          : context.hasFantasyIntent && !context.hasBettingIntent
+            ? 'fantasy'
+            : (context.hasBettingIntent || context.isSportsQuery)
+              ? 'betting'
+              : 'all';
 
     // Build the enriched prompt with any real odds data or contextual info
     let enrichedPrompt = userMessage;
@@ -535,6 +540,12 @@ export async function POST(request: NextRequest) {
           isStartSit: hasStartSitIntent,
         }))
         .catch(() => generateContextualCards('fantasy', context.sport ?? undefined, 3).catch(() => []));
+    } else if (!context.isPoliticalMarket && context.hasPlayerIntent) {
+      // Player-specific query — build Statcast/VPE cards for this player
+      cardPromise = Promise.race([
+        generateContextualCards('player', context.sport ?? undefined, 3, false, undefined, { playerName: context.playerName }),
+        new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 8000)),
+      ]).catch(() => []);
     } else if (!context.isPoliticalMarket && (context.isSportsQuery || context.hasBettingIntent)) {
       const sportKey = context.sport || undefined;
       // If the client already fetched live odds and sent them in context.oddsData,

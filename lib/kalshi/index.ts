@@ -378,11 +378,18 @@ async function _fetchKalshiPageInner(queryParams: URLSearchParams): Promise<Kals
       // Reject titles shorter than 10 chars or that look like raw ticker symbols
       // (all-caps + digits + dashes/dots/%, e.g. "KXBT-25DEC25-T45000")
       const TICKER_RE = /^[A-Z0-9\-\.%]+$/;
+      // Internal cross-category / multi-leg markets have UUID-like hex segments in their
+      // event_ticker (e.g. "KXMVECROSSCATEGORY-S20269C2BE3773B8"). These markets don't
+      // have public Kalshi web pages, so they produce 404 deep links.
+      const HEX_SEGMENT_RE = /-[0-9a-f]{8,}/i;
       const markets = data.markets
         .map(parseMarket)
         .filter((m: KalshiMarket) => {
           if (!m.title || m.title.length < 10) return false;
           if (TICKER_RE.test(m.title)) return false;
+          // Exclude internal cross-category markets (no public Kalshi URLs)
+          if (m.eventTicker && HEX_SEGMENT_RE.test(m.eventTicker)) return false;
+          if (m.ticker && HEX_SEGMENT_RE.test(m.ticker)) return false;
           return true;
         });
 

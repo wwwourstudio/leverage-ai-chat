@@ -1,21 +1,19 @@
 /**
- * Test setup - loads environment variables and checks network connectivity
- * for live API integration tests.
+ * Test setup - checks network connectivity for live API integration tests.
  *
- * The ODDS_API_KEY must be set either via a .env.test file in the project
- * root or as an environment variable before running the tests.
+ * Environment variables are injected by vitest.config.ts which loads:
+ *   .env.test  (test-specific overrides)
+ *   .env.local (developer local secrets — put ODDS_API_KEY here)
+ *   .env       (shared defaults)
+ *
+ * No action needed: if ODDS_API_KEY is in any of those files, tests run.
+ * If it's absent, live API tests skip gracefully.
  */
-
-import { config } from 'dotenv';
-import path from 'path';
-
-// Load .env.test if present (not committed to git)
-config({ path: path.resolve(process.cwd(), '.env.test') });
 
 if (!process.env.ODDS_API_KEY) {
   console.warn(
     '\n⚠  ODDS_API_KEY is not set. Live API tests will be skipped.\n' +
-    '   Create a .env.test file with ODDS_API_KEY=your_key or export it.\n'
+    '   Add ODDS_API_KEY=your_key to .env.local (or .env.test) to enable them.\n'
   );
 }
 

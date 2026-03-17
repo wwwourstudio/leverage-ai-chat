@@ -520,6 +520,8 @@ export interface InsightCard {
   summary_metrics?: Array<{ label: string; value: string }>;
   /** Source/timestamp label for Statcast cards */
   last_updated?: string;
+  /** Contextual note shown at the bottom of Statcast cards */
+  trend_note?: string;
 }
 
 // ============================================================================
@@ -527,6 +529,83 @@ export interface InsightCard {
 // Generates hitter, pitcher, and team projection cards with optional Kalshi
 // prediction market enrichment and Benford validation.
 // ============================================================================
+
+/**
+ * Build live player cards for a specific MLB player using Baseball Savant Statcast data.
+ * Falls back to VPE cards if the player is not found.
+ */
+async function buildPlayerCards(playerName?: string, sport?: string): Promise<InsightCard[]> {
+  if (!playerName) return [];
+
+  // For non-MLB sports use VPE fallback (Statcast is MLB-only)
+  const normalizedSport = sport ? sportToApi(sport) : undefined;
+  if (normalizedSport && !normalizedSport.includes('baseball')) return [];
+
+  try {
+    const { getStatcastData } = await import('@/lib/baseball-savant');
+    const data = await Promise.race([
+      getStatcastData(),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
+    ]);
+
+    const lowerName = playerName.toLowerCase();
+    const player = (Array.isArray(data) ? data : []).find((p: any) => {
+      const pName = (p.name ?? p.player_name ?? '').toLowerCase();
+      return pName.includes(lowerName) || lowerName.includes(pName);
+    });
+
+    if (!player) {
+      console.log(`[v0] [PLAYER CARDS] Player "${playerName}" not found in Statcast data`);
+      return [];
+    }
+
+    const name: string = player.name ?? player.player_name ?? playerName;
+    const ev = player.avg_exit_velocity ?? player.exit_velocity_avg;
+    const hardHit = player.hard_hit_percent ?? player.hard_hit_pct;
+    const barrel = player.barrel_batted_rate ?? player.barrel_pct ?? player.barrel_rate;
+    const xba = player.xba ?? player.expected_batting_average;
+    const xslg = player.xslg ?? player.expected_slg;
+    const xwoba = player.xwoba ?? player.expected_woba;
+    const sweetSpot = player.sweet_spot_percent ?? player.sweet_spot_pct;
+
+    const metrics = [
+      ev != null ? { label: 'Avg Exit Velocity', value: `${Number(ev).toFixed(1)} mph` } : null,
+      hardHit != null ? { label: 'Hard Hit %', value: `${Number(hardHit).toFixed(1)}%` } : null,
+      barrel != null ? { label: 'Barrel %', value: `${Number(barrel).toFixed(1)}%` } : null,
+      xba != null ? { label: 'xBA', value: String(xba) } : null,
+      xslg != null ? { label: 'xSLG', value: String(xslg) } : null,
+      xwoba != null ? { label: 'xwOBA', value: String(xwoba) } : null,
+      sweetSpot != null ? { label: 'Sweet Spot %', value: `${Number(sweetSpot).toFixed(1)}%` } : null,
+    ].filter(Boolean) as Array<{ label: string; value: string }>;
+
+    // Determine status from quality of metrics
+    const evNum = ev ? Number(ev) : 0;
+    const barrelNum = barrel ? Number(barrel) : 0;
+    const status = evNum >= 92 || barrelNum >= 12 ? 'hot' : evNum >= 88 || barrelNum >= 8 ? 'edge' : 'value';
+
+    const card: InsightCard = {
+      type: CARD_TYPES.STATCAST_SUMMARY,
+      title: name,
+      icon: '⚾',
+      category: 'MLB',
+      subcategory: 'Statcast Player Analysis',
+      gradient: 'from-blue-600/75 via-blue-900/55 to-slate-900/40',
+      status,
+      summary_metrics: metrics,
+      data: { playerName: name, realData: true },
+      trend_note: `Live Statcast data from Baseball Savant`,
+      last_updated: new Date().toLocaleDateString(),
+      metadata: { realData: true, source: 'Baseball Savant Statcast' },
+    };
+
+    console.log(`[v0] [PLAYER CARDS] Built live Statcast card for ${name} (${metrics.length} metrics)`);
+    return [card];
+  } catch (err) {
+    console.warn('[v0] [PLAYER CARDS] Failed to fetch Statcast data:', err);
+    return [];
+  }
+}
+
 async function buildVPECards(limit: number): Promise<InsightCard[]> {
   const { Hitter, Pitcher, Team, LEAGUE_AVG_HITTER, LEAGUE_STD_HITTER, validateBenfordForVPE } =
     await Promise.all([
@@ -659,7 +738,8 @@ async function _generateContextualCards(
   // Multi-sport mode only makes sense for unset or explicit betting category.
   // 'all' has its own mixed-mode block below and must NOT trigger multiSport (betting-only).
   multiSport: boolean = !sport && (!category || category === 'betting'),
-  kalshiSubcategory?: string
+  kalshiSubcategory?: string,
+  options?: { playerName?: string }
 ): Promise<InsightCard[]> {
   // Check in-memory cache first to avoid redundant API calls
   // (SSR page load populates this, /api/analyze reuses it)
@@ -700,6 +780,15 @@ async function _generateContextualCards(
     const mixed = [...betting.slice(0, bettingCount), ...kalshi.slice(0, kalshiCount)].slice(0, count);
     if (mixed.length > 0) setCachedCards(mixed, 'all', sport);
     return mixed;
+  }
+
+  // Player-specific query — fetch live Statcast data for the named player
+  if (category === 'player') {
+    const playerName = options?.playerName;
+    const cards = await buildPlayerCards(playerName, sport);
+    if (cards.length > 0) return cards;
+    // Fallback to VPE overview if player not found
+    return buildVPECards(count);
   }
 
   // If multiSport requested, generate variety from ALL major sports with REAL data

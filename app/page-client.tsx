@@ -18,7 +18,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { fetchDynamicCards, type DynamicCard } from '@/lib/data-service';
-import { API_ENDPOINTS } from '@/lib/constants';
+import { API_ENDPOINTS, PLAYER_HEADSHOT_IDS } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/client';
 const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ default: m.AuthModals })), { ssr: false });
 import { TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, MessageSquare, Clock, Star, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, X, CheckCheck, AlertTriangle, BarChart, Info, FileText, ImageIcon, Loader2 } from 'lucide-react';
@@ -1204,7 +1204,30 @@ No preamble. Start directly with section 1.`;
         const text = await res.text().catch(() => '');
         result = { success: false, error: `Server error ${res.status}: ${text.slice(0, 150)}` };
       } else {
-        result = await res.json().catch(() => ({ success: false, error: 'Invalid JSON response' })) as APIResponse;
+        // /api/analyze returns text/event-stream — must parse SSE events, not JSON
+        const reader = res.body!.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        let donePayload: APIResponse | null = null;
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const parts = buf.split('\n\n');
+            buf = parts.pop() ?? '';
+            for (const part of parts) {
+              if (!part.startsWith('data: ')) continue;
+              try {
+                const ev = JSON.parse(part.slice(6));
+                if (ev.type === 'done') donePayload = ev as APIResponse;
+              } catch { /* ignore malformed chunks */ }
+            }
+          }
+        } finally {
+          reader.releaseLock();
+        }
+        result = donePayload ?? { success: false, error: 'No response from server' } as APIResponse;
       }
       if (!result.success) {
         setCardAnalysisMap((prev: any) => ({ ...prev, [cardKey]: { loading: false, content: null, error: result.error ?? 'Analysis failed' } }));
@@ -1297,6 +1320,12 @@ No preamble. Start directly with section 1.`;
       const fantasyKeywords = ['fantasy', 'draft', 'waiver', 'faab', 'adp', 'vbd', 'tier cliff', 'bestball', 'best ball', 'start sit', 'trade value', 'who should i pick', 'who do i start', 'sleeper', 'rankings', 'projections', 'auction value', 'nfbc', 'nffc', 'tgfbi', 'draft strategy', 'draft slot', 'draft position', 'pick position', 'draft order', 'average draft'];
       const hasFantasyIntent = (fantasyKeywords.some(k => lowerMsg.includes(k)) || selectedCategory === 'fantasy' || selectedCategory === 'dfs') && !isPoliticalMarket;
 
+      // Player-specific query detection — check message against known player roster
+      const detectedPlayerName = Object.keys(PLAYER_HEADSHOT_IDS).find(
+        name => lowerMsg.includes(name.toLowerCase())
+      );
+      const hasPlayerIntent = !!detectedPlayerName && !hasBettingIntent && !hasFantasyIntent;
+
       const detectedPlatform = extractPlatform(userMessage);
 
       // Political market guard — respects the UI platform selection:
@@ -1314,6 +1343,8 @@ No preamble. Start directly with section 1.`;
         isPoliticalMarket: finalIsPoliticalMarket,
         hasBettingIntent,
         hasFantasyIntent,
+        hasPlayerIntent,
+        playerName: detectedPlayerName,
         previousMessages: messages.slice(-5).map((m: any) => ({ role: m.role, content: m.content || '' })),
         // Pass Kalshi sub-category pill value when in Kalshi mode
         kalshiSubcategory: selectedCategory === 'kalshi' && selectedSport ? selectedSport : undefined,

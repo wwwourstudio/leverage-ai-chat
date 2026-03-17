@@ -11,7 +11,7 @@ interface PlayerAvatarProps {
   playerName: string;
   photoUrl?: string | null;
   sport?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   className?: string;
 }
 
@@ -34,6 +34,7 @@ function getInitials(name: string): string {
 }
 
 const SIZE_CLASSES = {
+  xs: { container: 'w-5 h-5', text: 'text-[8px]', img: 'w-5 h-5' },
   sm: { container: 'w-7 h-7', text: 'text-[9px]', img: 'w-7 h-7' },
   md: { container: 'w-9 h-9', text: 'text-[11px]', img: 'w-9 h-9' },
   lg: { container: 'w-12 h-12', text: 'text-sm', img: 'w-12 h-12' },

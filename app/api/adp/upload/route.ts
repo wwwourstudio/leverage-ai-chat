@@ -33,6 +33,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Reject uploads where the majority of display names are purely numeric —
+    // this indicates the wrong column was mapped as the player name column.
+    const numericCount = players.filter(p => /^\d+$/.test((p.displayName ?? '').trim())).length;
+    if (numericCount > players.length * 0.3) {
+      return NextResponse.json(
+        { success: false, error: `Upload rejected: ${numericCount}/${players.length} player names are numeric IDs. Ensure the file has a "Player" or "Name" column with real player names.` },
+        { status: 422 },
+      );
+    }
+
     await saveADPToSupabase(players, sport);
 
     // Clear in-process cache so the next query reads fresh data

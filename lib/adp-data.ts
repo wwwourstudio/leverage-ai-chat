@@ -355,6 +355,18 @@ export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): P
   }
 }
 
+async function purgeADPFromSupabase(sport = 'mlb'): Promise<void> {
+  if (typeof window !== 'undefined') return;
+  try {
+    const supabase = await getADPSupabaseClient();
+    if (!supabase) return;
+    await supabase.from('nfbc_adp').delete().eq('sport', sport);
+    console.log(`[v0] [ADP] Purged malformed ${sport.toUpperCase()} ADP rows from Supabase`);
+  } catch (err) {
+    console.warn('[v0] [ADP] purgeADPFromSupabase failed (non-critical):', err);
+  }
+}
+
 export async function loadADPFromSupabase(sport = 'mlb', allowStale = false): Promise<NFBCPlayer[] | null> {
   if (typeof window !== 'undefined') return null; // server-only
   try {
@@ -416,10 +428,12 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
   const dbData = await loadADPFromSupabase('mlb', true);
   if (dbData && dbData.length > 0) {
     // Validate data quality: if the majority of display names are purely numeric
-    // (e.g. NFBC player IDs like "10231") the upload was malformed — fall back to static.
+    // (e.g. NFBC player IDs like "10231") the upload was malformed — purge and fall back to static.
     const numericCount = dbData.filter(p => /^\d+$/.test((p.displayName ?? '').trim())).length;
     if (numericCount > dbData.length * 0.3) {
-      console.warn(`[v0] [ADP] Supabase data has ${numericCount}/${dbData.length} numeric display names — upload likely malformed, falling back to static`);
+      console.warn(`[v0] [ADP] Supabase data has ${numericCount}/${dbData.length} numeric display names — upload malformed, purging from DB and falling back to static`);
+      // Delete the bad rows so we don't re-check on every request
+      purgeADPFromSupabase('mlb').catch(() => {});
     } else {
       console.log(`[v0] [ADP] Serving ${dbData.length} MLB players from Supabase (user upload)`);
       adpCache = dbData;

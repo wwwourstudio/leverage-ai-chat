@@ -6,9 +6,11 @@ import {
   Cpu, Film, Globe, Clock,
   Bitcoin, ArrowUp, ArrowDown, ExternalLink,
   Flame, BarChart3, ChevronRight, Layers,
-  Activity,
+  Activity, Zap, TrendingDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+// ── Props ──────────────────────────────────────────────────────────────────────
 
 interface KalshiCardProps {
   type: string;
@@ -25,10 +27,12 @@ interface KalshiCardProps {
 }
 
 // ── Brand colors ───────────────────────────────────────────────────────────────
+
 const YES_COLOR = '#00d15d';
 const NO_COLOR  = '#f63d58';
 
-// ── Category accent colors (top border) ───────────────────────────────────────
+// ── Category config ────────────────────────────────────────────────────────────
+
 const CATEGORY_ACCENT: Record<string, string> = {
   election:     '#3b82f6',
   politics:     '#3b82f6',
@@ -38,279 +42,324 @@ const CATEGORY_ACCENT: Record<string, string> = {
   crypto:       '#8b5cf6',
   tech:         '#7c3aed',
   entertainment:'#ec4899',
+  market:       '#6366f1',
 };
+
 function getCategoryAccent(label?: string): string {
   return CATEGORY_ACCENT[(label || '').toLowerCase()] ?? '#6366f1';
 }
 
+function CategoryIcon({ label, size = 14, style }: { label?: string; size?: number; style?: React.CSSProperties }) {
+  const cls = `shrink-0`;
+  const s = { width: size, height: size, ...style };
+  switch ((label || '').toLowerCase()) {
+    case 'election':
+    case 'politics':     return <Vote className={cls} style={s} />;
+    case 'sports':       return <Trophy className={cls} style={s} />;
+    case 'weather':      return <CloudRain className={cls} style={s} />;
+    case 'finance':      return <TrendingUp className={cls} style={s} />;
+    case 'crypto':       return <Bitcoin className={cls} style={s} />;
+    case 'tech':         return <Cpu className={cls} style={s} />;
+    case 'entertainment':return <Film className={cls} style={s} />;
+    default:             return <Globe className={cls} style={s} />;
+  }
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function shortenTitle(title: string, maxLen = 80): string {
+function shortenTitle(title: string, maxLen = 72): string {
   if (title.length <= maxLen) return title;
   if (title.includes('·')) {
     const parts = title.split('·').map(p => p.trim());
-    const remaining = parts.length - 2;
-    if (remaining > 0) return `${parts[0]} · ${parts[1]} +${remaining} more`;
-    return `${parts[0]} · ${parts[1]}`;
+    const extra = parts.length - 2;
+    return extra > 0
+      ? `${parts[0]} · ${parts[1]} +${extra}`
+      : `${parts[0]} · ${parts[1]}`;
   }
-  return title.slice(0, maxLen - 1) + '\u2026';
+  return title.slice(0, maxLen - 1) + '…';
 }
 
-function CategoryIcon({ label, className, style }: { label?: string; className?: string; style?: React.CSSProperties }) {
-  const cls = cn('w-3.5 h-3.5', className);
-  switch ((label || '').toLowerCase()) {
-    case 'election':
-    case 'politics':     return <Vote className={cls} style={style} />;
-    case 'sports':       return <Trophy className={cls} style={style} />;
-    case 'weather':      return <CloudRain className={cls} style={style} />;
-    case 'finance':      return <TrendingUp className={cls} style={style} />;
-    case 'crypto':       return <Bitcoin className={cls} style={style} />;
-    case 'tech':         return <Cpu className={cls} style={style} />;
-    case 'entertainment':return <Film className={cls} style={style} />;
-    default:             return <Globe className={cls} style={style} />;
-  }
-}
-
-/** Format a raw contract count as "1.2M contracts" / "340K contracts" */
-function fmtContracts(n?: number): string | null {
+function fmtVol(n?: number): string | null {
   if (!n || n <= 0) return null;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M contracts`;
-  if (n >= 1_000)     return `${(n / 1_000).toFixed(0)}K contracts`;
-  return `${n.toLocaleString()} contracts`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000)     return `${(n / 1_000).toFixed(0)}K`;
+  return n.toLocaleString();
 }
 
-/** Compute days-remaining and progress pct for time bar */
-function timeRemaining(closeTimeIso?: string | null): {
-  label: string;
-  pctElapsed: number;
+function timeRemaining(iso?: string | null): {
+  label: string; pctElapsed: number;
   urgency: 'critical' | 'urgent' | 'soon' | 'normal' | 'closed';
 } {
-  if (!closeTimeIso) return { label: 'TBD', pctElapsed: 0, urgency: 'normal' };
-  const closeMs = new Date(closeTimeIso).getTime();
-  const nowMs   = Date.now();
-  const msLeft  = closeMs - nowMs;
-  if (msLeft <= 0) return { label: 'Closed', pctElapsed: 100, urgency: 'closed' };
-
-  const daysLeft = msLeft / 86_400_000;
+  if (!iso) return { label: 'TBD', pctElapsed: 0, urgency: 'normal' };
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms <= 0) return { label: 'Closed', pctElapsed: 100, urgency: 'closed' };
+  const days = ms / 86_400_000;
   const label =
-    daysLeft < 1  ? `< 1 day`  :
-    daysLeft < 2  ? `1 day`    :
-    daysLeft < 30 ? `${Math.round(daysLeft)} days` :
-    daysLeft < 365 ? `${Math.round(daysLeft / 30)} mo` :
-    `${(daysLeft / 365).toFixed(1)} yr`;
-
-  const urgency: 'critical' | 'urgent' | 'soon' | 'normal' =
-    daysLeft < 1 ? 'critical' : daysLeft < 3 ? 'urgent' : daysLeft < 7 ? 'soon' : 'normal';
-
-  // Assume typical Kalshi market lifespan of ~90 days for progress bar
-  const assumedLifespanMs = 90 * 86_400_000;
-  const pctElapsed = Math.min(100, Math.max(0, 100 - (msLeft / assumedLifespanMs) * 100));
-
+    days < 1   ? '< 1 day'   :
+    days < 2   ? '1 day'     :
+    days < 30  ? `${Math.round(days)} days` :
+    days < 365 ? `${Math.round(days / 30)} mo` :
+                 `${(days / 365).toFixed(1)} yr`;
+  const urgency =
+    days < 1 ? 'critical' : days < 3 ? 'urgent' : days < 7 ? 'soon' : 'normal';
+  const pctElapsed = Math.min(100, Math.max(0, 100 - (ms / (90 * 86_400_000)) * 100));
   return { label, pctElapsed, urgency };
 }
 
+/** True when the ticker is a real public Kalshi identifier (no UUID/hex segments) */
+const isPublicTicker = (t?: string) =>
+  Boolean(t) && (t as string).length <= 35 && !/-[0-9a-f]{8,}/i.test(t as string);
+
 // ── Sparkline ──────────────────────────────────────────────────────────────────
+
 function Sparkline({
-  trades,
-  width = 100,
-  height = 28,
-}: {
-  trades: Array<{ price: number }>;
-  width?: number;
-  height?: number;
-}) {
+  trades, width = 80, height = 24,
+}: { trades: Array<{ price: number }>; width?: number; height?: number }) {
   const uid = useId();
   if (trades.length < 2) return null;
-  const prices  = trades.map(t => t.price);
-  const min     = Math.min(...prices);
-  const max     = Math.max(...prices);
-  const range   = max - min || 1;
-  const pad     = 3;
-  const innerH  = height - pad * 2;
-
-  const pts = prices.map((p, i) => {
-    const x = (i / (prices.length - 1)) * width;
-    const y = pad + innerH - ((p - min) / range) * innerH;
-    return [x, y] as [number, number];
-  });
-
-  // Smooth cubic bezier path
+  const prices = trades.map(t => t.price);
+  const min = Math.min(...prices), max = Math.max(...prices);
+  const range = max - min || 1;
+  const pad = 2, innerH = height - pad * 2;
+  const pts = prices.map((p, i) => [
+    (i / (prices.length - 1)) * width,
+    pad + innerH - ((p - min) / range) * innerH,
+  ] as [number, number]);
   let d = `M ${pts[0][0]},${pts[0][1]}`;
   for (let i = 1; i < pts.length; i++) {
-    const [x0, y0] = pts[i - 1];
-    const [x1, y1] = pts[i];
+    const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
     const cpx = (x0 + x1) / 2;
     d += ` C ${cpx},${y0} ${cpx},${y1} ${x1},${y1}`;
   }
   const area = `${d} L ${width},${height} L 0,${height} Z`;
-
-  const isUp    = prices[prices.length - 1] >= prices[0];
-  const color   = isUp ? YES_COLOR : NO_COLOR;
-  const gradId  = `spark-${uid.replace(/:/g, '')}`;
-
+  const isUp  = prices[prices.length - 1] >= prices[0];
+  const color = isUp ? YES_COLOR : NO_COLOR;
+  const gid   = `spark-${uid.replace(/:/g, '')}`;
   return (
-    <svg
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      className="overflow-visible"
-      aria-hidden="true"
-    >
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}
+         className="overflow-visible" aria-hidden="true">
       <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor={color} stopOpacity="0.25" />
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor={color} stopOpacity="0.3" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
-      <path d={area} fill={`url(#${gradId})`} />
+      <path d={area} fill={`url(#${gid})`} />
       <path d={d} fill="none" stroke={color} strokeWidth="1.5"
             strokeLinecap="round" strokeLinejoin="round" />
-      {/* Last price dot */}
-      <circle
-        cx={pts[pts.length - 1][0]}
-        cy={pts[pts.length - 1][1]}
-        r="2.5"
-        fill={color}
-      />
+      <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]}
+              r="2.5" fill={color} />
     </svg>
   );
 }
 
+// ── Signal Banner ──────────────────────────────────────────────────────────────
+
+function SignalBanner({ recommendation, edgeScore }: { recommendation?: string; edgeScore?: number }) {
+  if (!recommendation) return null;
+
+  const isStrongYes = recommendation.toLowerCase().includes('strong yes');
+  const isLeanYes   = recommendation.toLowerCase().includes('lean yes');
+  const isStrongNo  = recommendation.toLowerCase().includes('strong no');
+  const isLeanNo    = recommendation.toLowerCase().includes('lean no');
+  const isEfficient = recommendation.toLowerCase().includes('efficient');
+
+  const config =
+    isStrongYes ? { icon: <Zap className="w-3 h-3 shrink-0" />,        color: YES_COLOR, bg: YES_COLOR + '14', border: YES_COLOR + '35' } :
+    isLeanYes   ? { icon: <TrendingUp className="w-3 h-3 shrink-0" />, color: YES_COLOR + 'cc', bg: YES_COLOR + '0a', border: YES_COLOR + '25' } :
+    isStrongNo  ? { icon: <Zap className="w-3 h-3 shrink-0" />,        color: NO_COLOR,  bg: NO_COLOR  + '14', border: NO_COLOR  + '35' } :
+    isLeanNo    ? { icon: <TrendingDown className="w-3 h-3 shrink-0" />, color: NO_COLOR + 'cc', bg: NO_COLOR + '0a', border: NO_COLOR + '25' } :
+    { icon: <Activity className="w-3 h-3 shrink-0" />, color: '#6366f1cc', bg: '#6366f10e', border: '#6366f130' };
+
+  return (
+    <div
+      className="flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-semibold"
+      style={{ color: config.color, backgroundColor: config.bg, border: `1px solid ${config.border}` }}
+    >
+      {config.icon}
+      <span className="flex-1 leading-snug">{recommendation}</span>
+      {typeof edgeScore === 'number' && edgeScore > 0 && !isEfficient && (
+        <span className="tabular-nums font-black text-[10px] shrink-0 opacity-80">
+          {edgeScore}% edge
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ── Probability Hero ───────────────────────────────────────────────────────────
+
 function ProbabilityHero({
-  yesPct,
-  lastPrice,
-  priceDir,
-  priceChange,
-  trades,
-  isHero,
-  animated,
+  yesPct, lastPrice, priceDir, priceChange, trades, isHero, animated,
 }: {
-  yesPct: number;
-  lastPrice?: number;
-  priceDir?: string;
-  priceChange?: number;
-  trades: Array<{ price: number }> | null;
-  isHero?: boolean;
-  animated: boolean;
+  yesPct: number; lastPrice?: number; priceDir?: string; priceChange?: number;
+  trades: Array<{ price: number }> | null; isHero?: boolean; animated: boolean;
 }) {
   const noPct    = 100 - yesPct;
   const yesLeads = yesPct >= 50;
 
   return (
-    <div className="w-full">
-      {/* YES / NO numbers + sparkline */}
-      <div className="flex items-start justify-between mb-3 gap-2">
-        {/* YES side */}
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[10px] font-bold uppercase tracking-[0.12em]"
-                style={{ color: YES_COLOR + 'bb' }}>Yes</span>
-          <div className="flex items-baseline gap-1">
+    <div className="w-full space-y-3">
+      {/* YES / NO price row */}
+      <div className="flex items-end justify-between gap-3">
+
+        {/* YES block */}
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <span className="text-[9px] font-black uppercase tracking-[0.14em]"
+                style={{ color: YES_COLOR + '99' }}>Yes</span>
+          <div className="flex items-baseline gap-1.5">
             <span
-              className={cn('tabular-nums font-black leading-none',
-                isHero ? 'text-5xl' : 'text-4xl')}
-              style={{ color: yesLeads ? YES_COLOR : 'oklch(0.48 0.01 280)' }}
+              className={cn('tabular-nums font-black leading-none tracking-tight',
+                isHero ? 'text-[44px]' : 'text-[38px]')}
+              style={{ color: yesLeads ? YES_COLOR : 'oklch(0.42 0.01 280)' }}
             >
               {yesPct}
             </span>
-            <span className="text-base font-bold"
-                  style={{ color: yesLeads ? YES_COLOR + 'bb' : 'oklch(0.33 0.01 280)' }}>¢</span>
-            {/* Δ arrow */}
+            <span className="text-sm font-bold mb-0.5"
+                  style={{ color: yesLeads ? YES_COLOR + 'aa' : 'oklch(0.28 0.01 280)' }}>¢</span>
+            {/* Δ indicator */}
             {priceDir && priceDir !== 'flat' && !!priceChange && Math.abs(priceChange) > 0 && (
-              <span className={cn('flex items-center gap-0.5 text-[11px] font-bold ml-0.5 mb-0.5',
+              <span className={cn('flex items-center gap-0.5 text-[10px] font-bold mb-1',
                 priceDir === 'up' ? 'text-[#00d15d]' : 'text-[#f63d58]')}>
-                {priceDir === 'up' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+                {priceDir === 'up'
+                  ? <ArrowUp className="w-2.5 h-2.5" />
+                  : <ArrowDown className="w-2.5 h-2.5" />}
                 {Math.abs(priceChange)}¢
               </span>
             )}
           </div>
-          {/* Implied prob */}
-          <span className="text-[10px] font-medium tabular-nums"
-                style={{ color: yesLeads ? YES_COLOR + '88' : 'oklch(0.32 0.01 280)' }}>
+          <span className="text-[9px] font-medium tabular-nums"
+                style={{ color: yesLeads ? YES_COLOR + '70' : 'oklch(0.28 0.01 280)' }}>
             {yesPct}% implied
           </span>
           {lastPrice != null && lastPrice > 0 && lastPrice !== yesPct && (
-            <span className="text-[9px] text-[oklch(0.32_0.01_280)] tabular-nums">
-              Last {lastPrice}¢
+            <span className="text-[9px] text-[oklch(0.28_0.01_280)] tabular-nums">
+              last {lastPrice}¢
             </span>
           )}
         </div>
 
-        {/* Sparkline — right-aligned */}
-        <div className="flex flex-col items-end gap-1 shrink-0">
+        {/* Sparkline — center */}
+        <div className="flex flex-col items-center gap-1 flex-1 pb-1">
           {trades && trades.length >= 2 ? (
             <>
-              <div className="flex items-center gap-1">
-                <Activity className="w-3 h-3 text-[oklch(0.30_0.02_260)]" />
-                <span className="text-[8px] text-[oklch(0.30_0.02_260)] font-semibold uppercase tracking-wider">
-                  24h
-                </span>
-              </div>
-              <Sparkline trades={trades} width={90} height={30} />
+              <Sparkline trades={trades} width={80} height={24} />
+              <span className="text-[8px] font-semibold uppercase tracking-wider"
+                    style={{ color: 'oklch(0.28 0.02 260)' }}>24h</span>
             </>
           ) : (
-            <div className="w-[90px] h-[30px] flex items-center justify-center opacity-20">
-              <Activity className="w-4 h-4 text-[oklch(0.35_0.01_280)]" />
+            <div className="w-20 h-6 rounded-lg flex items-center justify-center opacity-15"
+                 style={{ backgroundColor: 'oklch(0.14 0.01 280)' }}>
+              <Activity className="w-3.5 h-3.5" style={{ color: 'oklch(0.35 0.01 280)' }} />
             </div>
           )}
         </div>
 
-        {/* NO side */}
-        <div className="flex flex-col items-end gap-0.5">
-          <span className="text-[10px] font-bold uppercase tracking-[0.12em]"
-                style={{ color: NO_COLOR + 'bb' }}>No</span>
-          <div className="flex items-baseline gap-1">
+        {/* NO block */}
+        <div className="flex flex-col items-end gap-0.5 min-w-0">
+          <span className="text-[9px] font-black uppercase tracking-[0.14em]"
+                style={{ color: NO_COLOR + '99' }}>No</span>
+          <div className="flex items-baseline gap-1.5">
             <span
-              className={cn('tabular-nums font-black leading-none',
-                isHero ? 'text-5xl' : 'text-4xl')}
-              style={{ color: !yesLeads ? NO_COLOR : 'oklch(0.48 0.01 280)' }}
+              className={cn('tabular-nums font-black leading-none tracking-tight',
+                isHero ? 'text-[44px]' : 'text-[38px]')}
+              style={{ color: !yesLeads ? NO_COLOR : 'oklch(0.42 0.01 280)' }}
             >
               {noPct}
             </span>
-            <span className="text-base font-bold"
-                  style={{ color: !yesLeads ? NO_COLOR + 'bb' : 'oklch(0.33 0.01 280)' }}>¢</span>
+            <span className="text-sm font-bold mb-0.5"
+                  style={{ color: !yesLeads ? NO_COLOR + 'aa' : 'oklch(0.28 0.01 280)' }}>¢</span>
           </div>
-          <span className="text-[10px] font-medium tabular-nums"
-                style={{ color: !yesLeads ? NO_COLOR + '88' : 'oklch(0.32 0.01 280)' }}>
+          <span className="text-[9px] font-medium tabular-nums"
+                style={{ color: !yesLeads ? NO_COLOR + '70' : 'oklch(0.28 0.01 280)' }}>
             {noPct}% implied
           </span>
         </div>
       </div>
 
-      {/* Animated probability bar */}
-      <div className="relative h-2 rounded-full overflow-hidden"
-           style={{ backgroundColor: 'oklch(0.13 0.01 280)' }}>
-        <div
-          className="absolute left-0 top-0 h-full rounded-full"
-          style={{
-            width: animated ? `${yesPct}%` : '0%',
-            backgroundColor: YES_COLOR,
-            opacity: 0.85,
-            transition: animated ? 'width 800ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
-          }}
-        />
-        {/* NO fill from right */}
-        <div
-          className="absolute right-0 top-0 h-full rounded-full"
-          style={{
-            width: animated ? `${noPct}%` : '0%',
-            backgroundColor: NO_COLOR,
-            opacity: 0.45,
-            transition: animated ? 'width 800ms cubic-bezier(0.4, 0, 0.2, 1) 100ms' : 'none',
-          }}
-        />
-        <div className="absolute left-1/2 top-0 h-full w-px bg-[oklch(0.08_0.01_280)]" />
-      </div>
-      <div className="flex justify-between mt-1 text-[8px] font-semibold">
-        <span style={{ color: YES_COLOR + '88' }}>0¢</span>
-        <span className="text-[oklch(0.25_0.01_280)]">50¢</span>
-        <span style={{ color: NO_COLOR + '88' }}>100¢</span>
+      {/* Probability bar */}
+      <div className="space-y-1">
+        <div className="relative h-2.5 rounded-full overflow-hidden"
+             style={{ backgroundColor: 'oklch(0.12 0.01 280)' }}>
+          {/* YES fill */}
+          <div
+            className="absolute left-0 top-0 h-full rounded-full"
+            style={{
+              width: animated ? `${yesPct}%` : '0%',
+              background: `linear-gradient(90deg, ${YES_COLOR}dd, ${YES_COLOR}88)`,
+              transition: animated ? 'width 900ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+            }}
+          />
+          {/* NO fill from right */}
+          <div
+            className="absolute right-0 top-0 h-full rounded-full"
+            style={{
+              width: animated ? `${noPct}%` : '0%',
+              background: `linear-gradient(270deg, ${NO_COLOR}cc, ${NO_COLOR}55)`,
+              transition: animated ? 'width 900ms cubic-bezier(0.4, 0, 0.2, 1) 80ms' : 'none',
+            }}
+          />
+          {/* 50¢ center notch */}
+          <div className="absolute left-1/2 -translate-x-px top-0 h-full w-0.5"
+               style={{ backgroundColor: 'oklch(0.07 0.01 280)' }} />
+        </div>
+        <div className="flex justify-between text-[8px] font-semibold">
+          <span style={{ color: YES_COLOR + '66' }}>0¢</span>
+          <span style={{ color: 'oklch(0.22 0.01 280)' }}>50¢</span>
+          <span style={{ color: NO_COLOR + '66' }}>100¢</span>
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Price Chips + Spread ───────────────────────────────────────────────────────
+// ── Order Book Mini ────────────────────────────────────────────────────────────
+
+function OrderBookMini({
+  bids, asks,
+}: {
+  bids: Array<{ price: number; quantity: number }>;
+  asks: Array<{ price: number; quantity: number }>;
+}) {
+  if ((!bids?.length && !asks?.length)) return null;
+  const top3Bids = (bids ?? []).slice(0, 3);
+  const top3Asks = (asks ?? []).slice(0, 3);
+  const maxQty   = Math.max(...[...top3Bids, ...top3Asks].map(r => r.quantity), 1);
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: 'oklch(0.09 0.01 280)', border: '1px solid oklch(0.14 0.01 280)' }}>
+      <div className="grid grid-cols-2 divide-x" style={{ borderColor: 'oklch(0.12 0.01 280)' }}>
+        {/* Bids (YES) */}
+        <div className="p-2.5 space-y-1">
+          <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: YES_COLOR + '88' }}>Bids</span>
+          {top3Bids.map((row, i) => (
+            <div key={i} className="relative flex items-center justify-between text-[10px] tabular-nums rounded overflow-hidden px-1.5 py-0.5">
+              <div className="absolute inset-0 rounded"
+                   style={{ backgroundColor: YES_COLOR + '0f', width: `${(row.quantity / maxQty) * 100}%`, transition: 'width 600ms' }} />
+              <span className="relative font-bold z-10" style={{ color: YES_COLOR + 'cc' }}>{row.price}¢</span>
+              <span className="relative text-[9px] z-10" style={{ color: 'oklch(0.38 0.01 280)' }}>{row.quantity.toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+        {/* Asks (NO) */}
+        <div className="p-2.5 space-y-1">
+          <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: NO_COLOR + '88' }}>Asks</span>
+          {top3Asks.map((row, i) => (
+            <div key={i} className="relative flex items-center justify-between text-[10px] tabular-nums rounded overflow-hidden px-1.5 py-0.5">
+              <div className="absolute right-0 inset-y-0 rounded"
+                   style={{ backgroundColor: NO_COLOR + '0f', width: `${(row.quantity / maxQty) * 100}%`, transition: 'width 600ms' }} />
+              <span className="relative font-bold z-10" style={{ color: NO_COLOR + 'cc' }}>{row.price}¢</span>
+              <span className="relative text-[9px] z-10" style={{ color: 'oklch(0.38 0.01 280)' }}>{row.quantity.toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Buy Price Chips ────────────────────────────────────────────────────────────
+
 function PriceChips({
   yesBid, yesAsk, noBid, noAsk, spread,
 }: {
@@ -322,42 +371,36 @@ function PriceChips({
   const noBuy  = noAsk  ?? noBid;
   if (!yesBuy && !noBuy) return null;
 
-  const spreadLabel =
+  const spreadConf =
     spread == null ? null :
-    spread <= 1    ? { text: '1¢ spread', cls: 'text-[#00d15d] bg-[#00d15d0e] border-[#00d15d22]' } :
-    spread <= 4    ? { text: `${spread}¢ spread`, cls: 'text-amber-400 bg-amber-500/10 border-amber-500/20' } :
-    { text: `${spread}¢ spread`, cls: 'text-[#f63d58] bg-[#f63d580e] border-[#f63d5822]' };
+    spread <= 1 ? { text: '1¢ spread', style: { color: YES_COLOR, backgroundColor: YES_COLOR + '10', border: `1px solid ${YES_COLOR}28` } } :
+    spread <= 4 ? { text: `${spread}¢ spread`, style: { color: '#f59e0b', backgroundColor: '#f59e0b10', border: '1px solid #f59e0b28' } } :
+    { text: `${spread}¢ spread`, style: { color: NO_COLOR, backgroundColor: NO_COLOR + '0e', border: `1px solid ${NO_COLOR}28` } };
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-[9px] font-bold uppercase tracking-wider text-[oklch(0.30_0.02_260)]">
-          Buy price
-        </span>
-        {spreadLabel && (
-          <span className={cn(
-            'text-[9px] font-semibold px-2 py-0.5 rounded-full border',
-            spreadLabel.cls,
-          )}>
-            {spreadLabel.text}
+        <span className="text-[9px] font-black uppercase tracking-widest"
+              style={{ color: 'oklch(0.28 0.02 260)' }}>Best price to buy</span>
+        {spreadConf && (
+          <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={spreadConf.style}>
+            {spreadConf.text}
           </span>
         )}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {yesBuy != null && yesBuy > 0 && (
-          <div
-            className="flex-1 flex items-center justify-center py-2 rounded-lg text-[13px] font-black tabular-nums border"
-            style={{ color: YES_COLOR, backgroundColor: YES_COLOR + '12', borderColor: YES_COLOR + '2e' }}
-          >
-            YES&nbsp;&nbsp;{yesBuy}¢
+          <div className="flex flex-col items-center py-2.5 px-2 rounded-xl text-[13px] font-black tabular-nums"
+               style={{ color: YES_COLOR, backgroundColor: YES_COLOR + '10', border: `1px solid ${YES_COLOR}28` }}>
+            <span className="text-[8px] font-black uppercase tracking-widest mb-1" style={{ color: YES_COLOR + '88' }}>Yes ask</span>
+            {yesBuy}¢
           </div>
         )}
         {noBuy != null && noBuy > 0 && (
-          <div
-            className="flex-1 flex items-center justify-center py-2 rounded-lg text-[13px] font-black tabular-nums border"
-            style={{ color: NO_COLOR, backgroundColor: NO_COLOR + '0e', borderColor: NO_COLOR + '28' }}
-          >
-            NO&nbsp;&nbsp;{noBuy}¢
+          <div className="flex flex-col items-center py-2.5 px-2 rounded-xl text-[13px] font-black tabular-nums"
+               style={{ color: NO_COLOR, backgroundColor: NO_COLOR + '0d', border: `1px solid ${NO_COLOR}25` }}>
+            <span className="text-[8px] font-black uppercase tracking-widest mb-1" style={{ color: NO_COLOR + '88' }}>No ask</span>
+            {noBuy}¢
           </div>
         )}
       </div>
@@ -365,136 +408,144 @@ function PriceChips({
   );
 }
 
-// ── Market Stats Row ───────────────────────────────────────────────────────────
-function StatsRow({
-  volume24hRaw, volumeRaw, openInterestRaw,
-}: {
-  volume24hRaw?: number; volumeRaw?: number; openInterestRaw?: number;
-}) {
-  const vol24h   = fmtContracts(volume24hRaw);
-  const volTotal = fmtContracts(volumeRaw);
-  const oi       = openInterestRaw && openInterestRaw > 0
-    ? (openInterestRaw >= 1_000_000
-        ? `${(openInterestRaw / 1_000_000).toFixed(1)}M`
-        : openInterestRaw >= 1_000
-        ? `${(openInterestRaw / 1_000).toFixed(0)}K`
-        : `${openInterestRaw}`)
-    : null;
+// ── Market Stats ───────────────────────────────────────────────────────────────
 
-  if (!vol24h && !volTotal && !oi) return null;
+function StatsRow({
+  volume24hRaw, volumeRaw, openInterestRaw, volumeTier,
+}: {
+  volume24hRaw?: number; volumeRaw?: number; openInterestRaw?: number; volumeTier?: string;
+}) {
+  const vol24h = fmtVol(volume24hRaw);
+  const volAll = fmtVol(volumeRaw);
+  const oi     = fmtVol(openInterestRaw);
+  if (!vol24h && !volAll && !oi) return null;
+
+  const tierColor =
+    volumeTier === 'Deep'     ? YES_COLOR    :
+    volumeTier === 'Active'   ? '#f59e0b'    :
+    volumeTier === 'Moderate' ? '#6366f1'    : 'oklch(0.35 0.01 280)';
 
   return (
-    <div className="grid grid-cols-3 gap-2">
-      <div className="flex flex-col gap-0.5">
-        <span className="text-[8px] font-bold uppercase tracking-wider text-[oklch(0.28_0.02_260)]">24h Vol</span>
-        <span className="text-[11px] font-bold text-white/75 tabular-nums">{vol24h ?? '—'}</span>
+    <div className="rounded-xl px-3 py-2.5 space-y-2"
+         style={{ backgroundColor: 'oklch(0.09 0.01 280)', border: '1px solid oklch(0.14 0.01 280)' }}>
+      <div className="flex items-center justify-between">
+        <span className="text-[8px] font-black uppercase tracking-widest"
+              style={{ color: 'oklch(0.28 0.02 260)' }}>Market Depth</span>
+        {volumeTier && (
+          <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full"
+                style={{ color: tierColor, backgroundColor: tierColor + '15', border: `1px solid ${tierColor}28` }}>
+            {volumeTier}
+          </span>
+        )}
       </div>
-      <div className="flex flex-col gap-0.5">
-        <span className="text-[8px] font-bold uppercase tracking-wider text-[oklch(0.28_0.02_260)]">Total Vol</span>
-        <span className="text-[11px] font-bold text-white/75 tabular-nums">{volTotal ?? '—'}</span>
-      </div>
-      <div className="flex flex-col gap-0.5">
-        <span className="text-[8px] font-bold uppercase tracking-wider text-[oklch(0.28_0.02_260)]">Open Int</span>
-        <span className="text-[11px] font-bold text-[oklch(0.55_0.01_280)] tabular-nums">{oi ?? '—'}</span>
+      <div className="grid grid-cols-3 gap-2">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[8px] font-bold uppercase tracking-wider"
+                style={{ color: 'oklch(0.28 0.02 260)' }}>24h Vol</span>
+          <span className="text-[12px] font-black tabular-nums text-white/80">{vol24h ?? '—'}</span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[8px] font-bold uppercase tracking-wider"
+                style={{ color: 'oklch(0.28 0.02 260)' }}>Total</span>
+          <span className="text-[12px] font-black tabular-nums text-white/80">{volAll ?? '—'}</span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[8px] font-bold uppercase tracking-wider"
+                style={{ color: 'oklch(0.28 0.02 260)' }}>Open Int</span>
+          <span className="text-[12px] font-black tabular-nums" style={{ color: '#6366f1' }}>{oi ?? '—'}</span>
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Time Remaining Bar ─────────────────────────────────────────────────────────
+// ── Time Bar ───────────────────────────────────────────────────────────────────
+
 function TimeBar({ closeTimeIso }: { closeTimeIso?: string | null }) {
   const { label, pctElapsed, urgency } = timeRemaining(closeTimeIso);
   if (urgency === 'closed') return null;
 
-  const barColor =
-    urgency === 'critical' ? '#f63d58' :
+  const barColor  =
+    urgency === 'critical' ? NO_COLOR  :
     urgency === 'urgent'   ? '#f97316' :
-    urgency === 'soon'     ? '#f59e0b' :
-    '#6366f1';
-
-  const textColor =
-    urgency === 'critical' ? 'text-[#f63d58]' :
-    urgency === 'urgent'   ? 'text-orange-400' :
-    urgency === 'soon'     ? 'text-amber-400' :
-    'text-[oklch(0.40_0.01_280)]';
+    urgency === 'soon'     ? '#f59e0b' : '#6366f1';
+  const textStyle: React.CSSProperties =
+    urgency === 'critical' ? { color: NO_COLOR }   :
+    urgency === 'urgent'   ? { color: '#fb923c' }  :
+    urgency === 'soon'     ? { color: '#fbbf24' }  :
+    { color: 'oklch(0.40 0.01 280)' };
 
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[9px] font-bold uppercase tracking-wider text-[oklch(0.28_0.02_260)]">
-          Closes in
-        </span>
-        <span className={cn('flex items-center gap-1 text-[10px] font-semibold', textColor)}>
+        <span className="text-[9px] font-black uppercase tracking-widest"
+              style={{ color: 'oklch(0.28 0.02 260)' }}>Closes in</span>
+        <span className="flex items-center gap-1 text-[10px] font-bold" style={textStyle}>
           <Clock className={cn('w-3 h-3', urgency === 'critical' && 'animate-pulse')} />
           {label}
         </span>
       </div>
-      {/* Progress bar — left = elapsed, right = remaining */}
-      <div className="relative h-1.5 rounded-full overflow-hidden bg-[oklch(0.13_0.01_280)]">
-        <div
-          className="absolute left-0 top-0 h-full rounded-full transition-all duration-1000"
-          style={{ width: `${pctElapsed}%`, backgroundColor: barColor, opacity: 0.75 }}
-        />
+      <div className="relative h-1.5 rounded-full overflow-hidden"
+           style={{ backgroundColor: 'oklch(0.12 0.01 280)' }}>
+        <div className="absolute left-0 top-0 h-full rounded-full transition-all duration-1000"
+             style={{ width: `${pctElapsed}%`, backgroundColor: barColor, opacity: 0.8 }} />
       </div>
     </div>
   );
 }
 
-// ── Related Markets Link ───────────────────────────────────────────────────────
-function RelatedMarketsLink({ seriesTicker, eventTicker }: { seriesTicker?: string; eventTicker?: string }) {
-  // Only use tickers that are valid public Kalshi identifiers (no UUID/hex segments)
-  const isPublicTicker = (t?: string) =>
-    Boolean(t) && (t as string).length <= 35 && !/-[0-9a-f]{8,}/i.test(t as string);
+// ── Related Markets ────────────────────────────────────────────────────────────
 
+function RelatedMarketsLink({ seriesTicker, eventTicker }: { seriesTicker?: string; eventTicker?: string }) {
   const validSeries = isPublicTicker(seriesTicker) ? seriesTicker : null;
   const validEvent  = isPublicTicker(eventTicker)  ? eventTicker  : null;
   const linkTarget  = validSeries || validEvent;
   if (!linkTarget) return null;
-
   return (
     <a
       href={`https://kalshi.com/markets/${linkTarget.toLowerCase()}`}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-1.5 text-[10px] text-[oklch(0.38_0.02_260)] hover:text-[oklch(0.55_0.02_260)] transition-colors duration-150 font-medium"
+      className="flex items-center gap-1.5 text-[10px] font-medium transition-colors duration-150 group/rel"
+      style={{ color: 'oklch(0.36 0.02 260)' }}
     >
       <Layers className="w-3 h-3 shrink-0" />
-      More markets in {linkTarget}
-      <ChevronRight className="w-3 h-3" />
+      <span className="group-hover/rel:underline">More in {linkTarget}</span>
+      <ChevronRight className="w-3 h-3 opacity-60" />
     </a>
   );
+}
+
+// ── Divider ────────────────────────────────────────────────────────────────────
+
+function Divider() {
+  return <div className="h-px" style={{ backgroundColor: 'oklch(0.10 0.01 280)' }} />;
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export const KalshiCard = memo(function KalshiCard({
-  title,
-  category,
-  subcategory,
-  data: d,
-  status,
-  onAnalyze,
-  isHero,
+  title, category, subcategory, data: d, status, onAnalyze, isHero,
 }: KalshiCardProps) {
   const [animated, setAnimated] = useState(false);
   const [trades, setTrades]     = useState<Array<{ price: number }> | null>(null);
 
-  // Trigger bar animation on mount
+  // Mount animation
   useEffect(() => {
     const t = setTimeout(() => setAnimated(true), 80);
     return () => clearTimeout(t);
   }, []);
 
-  // Fetch trade history for sparkline (staggered to avoid rate-limit spikes)
+  // Fetch trade sparkline (staggered to avoid rate-limit spikes on multi-card grids)
   const fetchTrades = useCallback(() => {
     if (!d.ticker) return;
-    const delay = Math.random() * 600; // 0–600ms stagger across multiple cards
+    const delay = Math.random() * 500;
     const tid = setTimeout(() => {
       fetch(`/api/kalshi?ticker=${encodeURIComponent(d.ticker)}&include=trades`)
         .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          if (data?.trades?.length >= 2) {
-            setTrades(data.trades.slice(-24).map((t: any) => ({ price: t.price })));
+        .then(res => {
+          if (res?.trades?.length >= 2) {
+            setTrades(res.trades.slice(-24).map((t: any) => ({ price: t.price })));
           }
         })
         .catch(() => null);
@@ -507,7 +558,8 @@ export const KalshiCard = memo(function KalshiCard({
     return cleanup;
   }, [fetchTrades]);
 
-  // Derived values
+  // ── Derived values ─────────────────────────────────────────────────────────
+
   const yesPct: number = (() => {
     if (typeof d.yesPct === 'number') return Math.min(100, Math.max(0, d.yesPct));
     if (typeof d.yesPrice === 'string') {
@@ -517,8 +569,8 @@ export const KalshiCard = memo(function KalshiCard({
     return 50;
   })();
 
-  const isActive   = status === 'active' || status === 'open' || status === 'live';
-  const marketCat  = (d.subcategory || subcategory || category || 'Prediction').toUpperCase();
+  const isActive    = status === 'active' || status === 'open' || status === 'live';
+  const marketCat   = (d.subcategory || subcategory || category || 'Prediction').toUpperCase();
   const accentColor = getCategoryAccent(d.iconLabel);
 
   const yesBid: number | null = typeof d.yesBid === 'number' && d.yesBid > 0 ? d.yesBid : null;
@@ -527,23 +579,21 @@ export const KalshiCard = memo(function KalshiCard({
   const noAsk:  number | null = typeof d.noAsk  === 'number' && d.noAsk  > 0 ? d.noAsk  : null;
   const hasPrices = yesBid !== null || yesAsk !== null || noBid !== null || noAsk !== null;
 
+  const hasOrderBook =
+    Array.isArray(d.orderbookBids) && d.orderbookBids.length > 0 &&
+    Array.isArray(d.orderbookAsks) && d.orderbookAsks.length > 0;
+
   const rawChange  = typeof d.priceChange === 'number' ? d.priceChange : 0;
   const safeChange = Math.abs(rawChange) <= 99 ? rawChange : 0;
   const priceDir   = d.priceDirection || (safeChange > 0 ? 'up' : safeChange < 0 ? 'down' : 'flat');
 
-  const displayTitle = shortenTitle(title);
+  // ── Deep link construction ─────────────────────────────────────────────────
 
-  // Deep link — Kalshi URL format: /markets/{event_ticker}/{market_ticker} (lowercase)
-  // Validate that tickers are real public Kalshi identifiers.
-  // Internal cross-category markets have UUID/hex segments (e.g. "-s20269c2be3773b8")
-  // that don't resolve to public Kalshi pages → 404. Filter those out.
-  const isPublicTicker = (t?: string) =>
-    Boolean(t) && (t as string).length <= 35 && !/-[0-9a-f]{8,}/i.test(t as string);
+  const evtLower    = isPublicTicker(d.eventTicker)  ? (d.eventTicker as string).toLowerCase()  : '';
+  const mktLower    = isPublicTicker(d.ticker)        ? (d.ticker as string).toLowerCase()        : '';
+  const seriesLower = isPublicTicker(d.seriesTicker) ? (d.seriesTicker as string).toLowerCase() : '';
 
-  const evtLower    = isPublicTicker(d.eventTicker)   ? (d.eventTicker as string).toLowerCase()   : '';
-  const mktLower    = isPublicTicker(d.ticker)         ? (d.ticker as string).toLowerCase()         : '';
-  const seriesLower = isPublicTicker(d.seriesTicker)  ? (d.seriesTicker as string).toLowerCase()  : '';
-
+  const hasSpecificMarket = evtLower || mktLower || seriesLower;
   const tradeBase = evtLower && mktLower
     ? `https://kalshi.com/markets/${evtLower}/${mktLower}`
     : seriesLower
@@ -552,43 +602,40 @@ export const KalshiCard = memo(function KalshiCard({
     ? `https://kalshi.com/markets/${evtLower}`
     : `https://kalshi.com/markets`;
 
-  // YES/NO buy deep links — Kalshi doesn't have a ?side= param, both link to the same market
-  // hasSpecificMarket: only show trade buttons when we have a real market URL (not just homepage)
-  const hasSpecificMarket = evtLower || mktLower || seriesLower;
-  const yesTradeUrl = tradeBase;
-  const noTradeUrl  = tradeBase;
-
   return (
     <article
       className={cn(
-        'group relative w-full rounded-2xl overflow-hidden transition-all duration-300',
+        'group relative w-full rounded-2xl overflow-hidden',
+        'transition-all duration-300',
         isHero
-          ? 'border shadow-[0_0_48px_#00d15d06]'
-          : 'border hover:shadow-[0_6px_32px_#00000050]',
+          ? 'shadow-[0_0_56px_#00d15d08]'
+          : 'hover:shadow-[0_8px_40px_#00000060] hover:-translate-y-px',
       )}
       style={{
-        backgroundColor: '#07090f',
-        borderColor: isHero ? '#1e2840' : '#111827',
+        backgroundColor: '#070a10',
+        border: `1px solid ${isHero ? '#1a2236' : '#0f1624'}`,
         borderTopColor: accentColor,
         borderTopWidth: '2px',
       }}
     >
+
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="px-4 pt-3.5 pb-3" style={{ borderBottom: '1px solid #0c0f18' }}>
-        {/* Breadcrumb + status */}
+      <div className="px-4 pt-3.5 pb-3" style={{ borderBottom: '1px solid #0b0f1a' }}>
+
+        {/* Breadcrumb + badges */}
         <div className="flex items-center justify-between mb-2.5 gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
+            {/* Category icon pill */}
             <div
-              className="flex items-center justify-center w-5 h-5 rounded"
-              style={{ backgroundColor: accentColor + '18', border: `1px solid ${accentColor}30` }}
+              className="flex items-center justify-center w-5 h-5 rounded-md shrink-0"
+              style={{ backgroundColor: accentColor + '16', border: `1px solid ${accentColor}2e` }}
             >
-              <CategoryIcon label={d.iconLabel} style={{ color: accentColor }} className="" />
+              <CategoryIcon label={d.iconLabel} size={11} style={{ color: accentColor }} />
             </div>
-            <span className="text-[9px] font-black uppercase tracking-[0.14em] text-[oklch(0.30_0.025_260)] shrink-0">
-              Kalshi
-            </span>
-            <span className="text-[oklch(0.18_0.01_280)] text-[9px]">/</span>
-            <span className="text-[9px] font-semibold truncate" style={{ color: accentColor + 'cc' }}>
+            <span className="text-[9px] font-black uppercase tracking-[0.14em] shrink-0"
+                  style={{ color: 'oklch(0.28 0.025 260)' }}>Kalshi</span>
+            <span className="text-[oklch(0.16_0.01_280)] text-[9px] shrink-0">/</span>
+            <span className="text-[9px] font-bold truncate" style={{ color: accentColor + 'cc' }}>
               {marketCat}
             </span>
             {d.isHot && (
@@ -598,13 +645,16 @@ export const KalshiCard = memo(function KalshiCard({
             )}
           </div>
 
+          {/* Live / Closed badge */}
           {isActive ? (
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full shrink-0 bg-[#00d15d0d] border border-[#00d15d20]">
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse bg-[#00d15d]" />
-              <span className="text-[8px] font-black uppercase tracking-widest text-[#00d15d]">Live</span>
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full shrink-0"
+                 style={{ backgroundColor: YES_COLOR + '0d', border: `1px solid ${YES_COLOR}22` }}>
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: YES_COLOR }} />
+              <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: YES_COLOR }}>Live</span>
             </div>
           ) : (
-            <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-[oklch(0.10_0.01_280)] border border-[oklch(0.16_0.01_280)] text-[oklch(0.28_0.01_280)] shrink-0">
+            <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full shrink-0"
+                  style={{ backgroundColor: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.15 0.01 280)', color: 'oklch(0.28 0.01 280)' }}>
               Closed
             </span>
           )}
@@ -612,24 +662,31 @@ export const KalshiCard = memo(function KalshiCard({
 
         {/* Title */}
         <h3
-          className={cn('font-bold text-white leading-snug', isHero ? 'text-base' : 'text-[13px]')}
+          className={cn('font-bold text-white leading-snug', isHero ? 'text-[15px]' : 'text-[13px]')}
           title={title}
         >
-          {displayTitle}
+          {shortenTitle(title)}
         </h3>
 
-        {/* Subtitle / resolution condition */}
+        {/* Subtitle */}
         {d.subtitle && d.subtitle !== title && d.subtitle.length > 0 && (
-          <p className="text-[11px] text-[oklch(0.38_0.01_280)] mt-1 line-clamp-2 leading-relaxed">
+          <p className="text-[11px] mt-1 line-clamp-2 leading-relaxed"
+             style={{ color: 'oklch(0.36 0.01 280)' }}>
             {d.subtitle}
           </p>
         )}
       </div>
 
       {/* ── Body ────────────────────────────────────────────────────────────── */}
-      <div className="px-4 py-4 space-y-4">
+      <div className={cn('px-4 pb-4 space-y-3.5', isHero ? 'pt-4' : 'pt-3.5')}>
 
-        {/* Probability hero + sparkline */}
+        {/* Signal banner */}
+        <SignalBanner
+          recommendation={d.recommendation}
+          edgeScore={typeof d.edgeScore === 'number' ? d.edgeScore : undefined}
+        />
+
+        {/* Probability hero */}
         <ProbabilityHero
           yesPct={yesPct}
           lastPrice={typeof d.lastPrice === 'number' ? d.lastPrice : undefined}
@@ -640,96 +697,126 @@ export const KalshiCard = memo(function KalshiCard({
           animated={animated}
         />
 
-        <div className="h-px bg-[#0c0f18]" />
+        <Divider />
 
-        {/* Buy prices + spread */}
-        {hasPrices && (
+        {/* Order book depth (when available) */}
+        {hasOrderBook && (
+          <OrderBookMini bids={d.orderbookBids} asks={d.orderbookAsks} />
+        )}
+
+        {/* Buy price chips (when no order book) */}
+        {hasPrices && !hasOrderBook && (
           <PriceChips
-            yesBid={yesBid}
-            yesAsk={yesAsk}
-            noBid={noBid}
-            noAsk={noAsk}
+            yesBid={yesBid} yesAsk={yesAsk}
+            noBid={noBid}   noAsk={noAsk}
             spread={typeof d.spread === 'number' ? d.spread : undefined}
           />
         )}
 
-        {/* Stats: 24h vol, total vol, OI */}
+        {/* Market stats */}
         <StatsRow
           volume24hRaw={d.volume24hRaw}
           volumeRaw={d.volumeRaw}
           openInterestRaw={d.openInterestRaw}
+          volumeTier={d.volumeTier}
         />
 
-        {/* Time remaining bar */}
+        {/* Time remaining */}
         <TimeBar closeTimeIso={d.closeTimeIso} />
 
-        {/* Related markets */}
+        {/* Related markets link */}
         {(d.seriesTicker || d.eventTicker) && d.seriesTicker !== d.ticker && (
           <RelatedMarketsLink seriesTicker={d.seriesTicker} eventTicker={d.eventTicker} />
         )}
 
-        {/* ── CTAs ──────────────────────────────────────────────────────────── */}
-        <div className="space-y-2 pt-1" style={{ borderTop: '1px solid #0c0f18' }}>
+        <Divider />
 
-          {/* Analyze */}
+        {/* ── CTAs ──────────────────────────────────────────────────────────── */}
+        <div className="space-y-2">
+
+          {/* AI Analysis */}
           {onAnalyze && (
             <button
               onClick={onAnalyze}
-              className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-xs font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00d15d]/30 bg-[oklch(0.11_0.018_260)] border border-[oklch(0.17_0.022_260)] text-[oklch(0.48_0.015_260)] hover:bg-[oklch(0.16_0.022_260)] hover:text-white hover:border-[oklch(0.24_0.028_260)]"
-              aria-label={`Analyze ${title}`}
+              className="group/btn flex items-center justify-center gap-2 w-full py-2 rounded-xl text-[11px] font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2"
+              style={{
+                backgroundColor: 'oklch(0.11 0.018 260)',
+                border: '1px solid oklch(0.17 0.022 260)',
+                color: 'oklch(0.48 0.015 260)',
+              }}
+              onFocus={e => { e.currentTarget.style.borderColor = `${YES_COLOR}40`; }}
+              onBlur={e => { e.currentTarget.style.borderColor = 'oklch(0.17 0.022 260)'; }}
+              onMouseEnter={e => {
+                e.currentTarget.style.backgroundColor = 'oklch(0.15 0.022 260)';
+                e.currentTarget.style.color = '#ffffff';
+                e.currentTarget.style.borderColor = 'oklch(0.22 0.028 260)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.backgroundColor = 'oklch(0.11 0.018 260)';
+                e.currentTarget.style.color = 'oklch(0.48 0.015 260)';
+                e.currentTarget.style.borderColor = 'oklch(0.17 0.022 260)';
+              }}
+              aria-label={`AI analysis for ${title}`}
             >
-              <BarChart3 className="w-3.5 h-3.5" />
+              <BarChart3 className="w-3.5 h-3.5 shrink-0" />
               AI Analysis
-              <ChevronRight className="w-3.5 h-3.5" />
+              <ChevronRight className="w-3.5 h-3.5 opacity-60 transition-transform duration-150 group-hover/btn:translate-x-0.5" />
             </button>
           )}
 
-          {/* Split YES / NO trade buttons — only shown when we have a real public market URL */}
+          {/* YES / NO trade buttons */}
           {hasSpecificMarket && (
             <div className="grid grid-cols-2 gap-2">
+              {/* YES */}
               <a
-                href={yesTradeUrl!}
+                href={tradeBase}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-black tracking-wide transition-all duration-150 border"
+                className="group/yes flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-black tracking-wide transition-all duration-150"
                 style={{
                   color: YES_COLOR,
-                  backgroundColor: YES_COLOR + '14',
-                  borderColor: YES_COLOR + '30',
+                  backgroundColor: YES_COLOR + '12',
+                  border: `1px solid ${YES_COLOR}28`,
                 }}
                 onMouseEnter={e => {
-                  (e.currentTarget as HTMLElement).style.backgroundColor = YES_COLOR + '26';
-                  (e.currentTarget as HTMLElement).style.borderColor = YES_COLOR + '55';
+                  e.currentTarget.style.backgroundColor = YES_COLOR + '24';
+                  e.currentTarget.style.borderColor = YES_COLOR + '50';
+                  e.currentTarget.style.boxShadow = `0 4px 16px ${YES_COLOR}18`;
                 }}
                 onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.backgroundColor = YES_COLOR + '14';
-                  (e.currentTarget as HTMLElement).style.borderColor = YES_COLOR + '30';
+                  e.currentTarget.style.backgroundColor = YES_COLOR + '12';
+                  e.currentTarget.style.borderColor = YES_COLOR + '28';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
               >
                 Buy YES
-                <ExternalLink className="w-3 h-3 opacity-60" />
+                <ExternalLink className="w-3 h-3 opacity-50 transition-opacity duration-150 group-hover/yes:opacity-90" />
               </a>
+
+              {/* NO */}
               <a
-                href={noTradeUrl!}
+                href={tradeBase}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-black tracking-wide transition-all duration-150 border"
+                className="group/no flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-black tracking-wide transition-all duration-150"
                 style={{
                   color: NO_COLOR,
-                  backgroundColor: NO_COLOR + '10',
-                  borderColor: NO_COLOR + '28',
+                  backgroundColor: NO_COLOR + '0e',
+                  border: `1px solid ${NO_COLOR}25`,
                 }}
                 onMouseEnter={e => {
-                  (e.currentTarget as HTMLElement).style.backgroundColor = NO_COLOR + '22';
-                  (e.currentTarget as HTMLElement).style.borderColor = NO_COLOR + '50';
+                  e.currentTarget.style.backgroundColor = NO_COLOR + '20';
+                  e.currentTarget.style.borderColor = NO_COLOR + '48';
+                  e.currentTarget.style.boxShadow = `0 4px 16px ${NO_COLOR}14`;
                 }}
                 onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.backgroundColor = NO_COLOR + '10';
-                  (e.currentTarget as HTMLElement).style.borderColor = NO_COLOR + '28';
+                  e.currentTarget.style.backgroundColor = NO_COLOR + '0e';
+                  e.currentTarget.style.borderColor = NO_COLOR + '25';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
               >
                 Buy NO
-                <ExternalLink className="w-3 h-3 opacity-60" />
+                <ExternalLink className="w-3 h-3 opacity-50 transition-opacity duration-150 group-hover/no:opacity-90" />
               </a>
             </div>
           )}

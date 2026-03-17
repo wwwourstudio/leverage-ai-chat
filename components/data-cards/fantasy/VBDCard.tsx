@@ -44,7 +44,8 @@ export const VBDCard = memo(function VBDCard({ data, isHero, ...p }: FantasyCard
                   rowBg,
                 )}
                 onClick={() => {
-                  const query = `Analyze ${pl.name} (${pl.team} ${pl.pos}) — show recent game stats, season projections, and best prop bets`;
+                  const meta = [pl.team, pl.pos].filter(Boolean).join(' ');
+                  const query = `Analyze ${pl.name}${meta ? ` (${meta})` : ''} — show recent game stats, season projections, and best prop bets`;
                   window.dispatchEvent(new CustomEvent('leveragePlayerClick', { detail: { query, category: 'fantasy' } }));
                 }}
                 title={`Analyze ${pl.name}`}

@@ -13,6 +13,9 @@ import {
   HTTP_STATUS,
   ERROR_MESSAGES,
   NFBC_DRAFT_YEAR,
+  PLAYER_SPORT_MAP,
+  STAT_SPORT_MAP,
+  LOG_PREFIXES,
 } from '@/lib/constants';
 import { getADPData, queryADP, parseTSV, saveADPToSupabase, clearADPCache } from '@/lib/adp-data';
 import { getNFLADPData, clearNFLADPCache } from '@/lib/nfl-adp-data';
@@ -23,7 +26,6 @@ import { detectHallucinations } from '@/lib/hallucination-detector';
 import { getGrokApiKey } from '@/lib/config';
 import { logger, LogCategory } from '@/lib/logger';
 import { getMarketIntelligenceSummary } from '@/lib/market-intelligence';
-import { extractMLBJson } from '@/lib/utils/mlb-json-parser';
 
 // ============================================================================
 // Types
@@ -192,8 +194,21 @@ export async function POST(request: NextRequest) {
 
     let inferredSport = context?.sport && context.sport !== 'none' ? context.sport : undefined;
     if (!inferredSport) {
+      // Layer 1: team nicknames (fastest, most reliable)
       for (const [team, sportName] of Object.entries(TEAM_TO_SPORT)) {
         if (msgLower.includes(team)) { inferredSport = sportName; break; }
+      }
+    }
+    if (!inferredSport) {
+      // Layer 2: well-known player last names (handles "Mahomes passing yards", "Ohtani HR", etc.)
+      for (const [player, sportName] of Object.entries(PLAYER_SPORT_MAP)) {
+        if (msgLower.includes(player)) { inferredSport = sportName; break; }
+      }
+    }
+    if (!inferredSport) {
+      // Layer 3: sport-specific statistical vocabulary (longest match wins — iterate most-specific first)
+      for (const { term, sport: sportName } of STAT_SPORT_MAP) {
+        if (msgLower.includes(term)) { inferredSport = sportName; break; }
       }
     }
     // Merge inferred sport back into context so downstream handlers pick it up
@@ -378,6 +393,9 @@ export async function POST(request: NextRequest) {
 
     // Build the enriched prompt with any real odds data or contextual info
     let enrichedPrompt = userMessage;
+    // Holds Kalshi sports markets fetched during prompt enrichment so the card
+    // pipeline can reuse them without a second API call.
+    let kalshiSportsFallbackMarkets: any[] | null = null;
 
     if (context.oddsData?.events?.length > 0) {
       const oddsPreview = context.oddsData.events
@@ -432,17 +450,60 @@ export async function POST(request: NextRequest) {
         if (markets && (markets as any[]).length > 0) {
           const topMarkets = (markets as any[]).slice(0, 6);
           const marketSummary = topMarkets.map((m: any, i: number) => {
-            const yesCents = m.yesPrice ?? m.yesBid ?? m.yes_bid ?? 50;
+            // yesPrice is in cents (0–100). Treat directly as implied probability %.
+            const yesCents = Math.min(100, Math.max(0, m.yesPrice ?? m.yesBid ?? m.yes_bid ?? 50));
+            const noCents  = Math.min(100, Math.max(0, m.noPrice  ?? m.noAsk  ?? m.no_ask  ?? (100 - yesCents)));
+            const spread   = m.spread ?? Math.abs(yesCents - (100 - noCents));
             const vol = m.volume24h ?? m.volume ?? 0;
-            const volStr = vol > 1_000_000 ? `${(vol / 1_000_000).toFixed(1)}M` : vol > 1000 ? `${(vol / 1000).toFixed(0)}K` : `${vol}`;
-            return `${i + 1}. "${m.title}" — YES: ${yesCents}¢, Vol: ${volStr}`;
+            const volStr = vol > 1_000_000 ? `${(vol / 1_000_000).toFixed(1)}M` : vol > 1_000 ? `${(vol / 1_000).toFixed(0)}K` : `${vol}`;
+            return `${i + 1}. "${m.title}" — YES: ${yesCents}% implied prob, NO: ${noCents}%, Spread: ${spread}¢, Vol: ${volStr}`;
           }).join('\n');
-          enrichedPrompt += `\n\n--- LIVE KALSHI MARKETS (ground your analysis in ONLY these real markets — do not invent tickers, prices, or volumes) ---\n${marketSummary}\n--- END KALSHI DATA ---`;
+          console.log(`[KALSHI] Injected ${topMarkets.length} prediction markets into AI context`);
+          enrichedPrompt += `\n\n--- LIVE KALSHI PREDICTION MARKETS ---\n${marketSummary}\n[YES % = market-implied probability. Edge = difference between your model probability and YES %. Ground analysis in these real prices — do not invent tickers or volumes.]\n--- END KALSHI DATA ---`;
         } else {
           enrichedPrompt += `\n\n[Context: Kalshi prediction market query. No live markets available — provide general prediction market analysis and strategy.]`;
         }
       } catch {
         enrichedPrompt += `\n\n[Context: This is a Kalshi prediction market query. Answer directly with prediction market analysis, probability edge, and trading recommendations. Do NOT ask the user to choose a sports platform or area — the user is already on the Kalshi tab. Analyze the specific market or topic asked about.]`;
+      }
+    } else if (context.hasBettingIntent && context.sport && !context.isPoliticalMarket) {
+      // Odds API returned no games for this sport — use Kalshi sports markets as an
+      // independent probability signal (win/loss futures, player props, championship markets).
+      // Maps the internal sport key to the search term Kalshi understands.
+      const SPORT_TO_KALSHI_KW: Record<string, string> = {
+        basketball_nba: 'NBA', basketball_ncaab: 'college basketball',
+        americanfootball_nfl: 'NFL', americanfootball_ncaaf: 'college football',
+        baseball_mlb: 'MLB', icehockey_nhl: 'NHL',
+        soccer_epl: 'Premier League', soccer_mls: 'MLS',
+        mma_mixed_martial_arts: 'UFC MMA',
+      };
+      const sportKw = SPORT_TO_KALSHI_KW[context.sport]
+        ?? context.sport.replace(/^[a-z]+_/, '').toUpperCase();
+      try {
+        const { fetchKalshiMarketsWithRetry, generateKalshiCards } = await import('@/lib/kalshi/index');
+        const markets = await Promise.race([
+          fetchKalshiMarketsWithRetry({ search: sportKw, limit: 10, maxRetries: 1 }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)),
+        ]).catch(() => null);
+        if (markets && (markets as any[]).length > 0) {
+          const top = (markets as any[]).slice(0, 6);
+          kalshiSportsFallbackMarkets = top; // reused by card pipeline below
+          const marketLines = top.map((m: any, i: number) => {
+            const yesCents = Math.min(100, Math.max(0, m.yesPrice ?? m.yesBid ?? 50));
+            const noCents  = Math.min(100, Math.max(0, 100 - yesCents));
+            const vol = m.volume24h ?? m.volume ?? 0;
+            const volStr = vol > 1_000_000 ? `${(vol / 1_000_000).toFixed(1)}M` : vol > 1_000 ? `${(vol / 1_000).toFixed(0)}K` : `${vol}`;
+            return `${i + 1}. "${m.title}" — YES: ${yesCents}% (implied prob ${(yesCents / 100).toFixed(3)}), NO: ${noCents}%, Vol: ${volStr}`;
+          }).join('\n');
+          console.log(`[KALSHI] Injected ${top.length} ${sportKw} markets as odds fallback`);
+          enrichedPrompt += `\n\n--- KALSHI ${sportKw.toUpperCase()} MARKETS (live market-implied probabilities — sportsbook odds unavailable) ---\n${marketLines}\n[YES % = market-implied probability. Use these as your probability baseline. Identify edge where your model probability diverges from market price.]\n--- END KALSHI DATA ---`;
+        } else {
+          enrichedPrompt += `\n\n[Context: Live ${context.sport.toUpperCase()} sportsbook odds are unavailable. Provide expert betting analysis, line expectations, and value picks based on your knowledge. Today: ${dateStr}.]`;
+          console.log(`[KALSHI] No ${sportKw} markets found — falling back to model knowledge`);
+        }
+      } catch (err) {
+        console.warn(`[KALSHI] Sports market fetch failed for ${sportKw}:`, err instanceof Error ? err.message : String(err));
+        enrichedPrompt += `\n\n[Context: Live ${context.sport.toUpperCase()} sportsbook odds are unavailable. Provide expert betting analysis and value picks from your knowledge.]`;
       }
     } else if (!context.hasBettingIntent && !context.sport && !context.isPoliticalMarket) {
       // General question — answer from knowledge
@@ -557,6 +618,16 @@ export async function POST(request: NextRequest) {
           6
         );
         cardPromise = Promise.resolve(builtCards);
+      } else if (kalshiSportsFallbackMarkets && kalshiSportsFallbackMarkets.length > 0) {
+        // Odds API had no games but we already fetched Kalshi sports markets during prompt
+        // enrichment — convert them to cards rather than generating empty placeholders.
+        cardPromise = import('@/lib/kalshi/index')
+          .then(({ generateKalshiCards }) => {
+            const kalshiCards = generateKalshiCards(kalshiSportsFallbackMarkets!);
+            console.log(`[KALSHI] Serving ${kalshiCards.length} prediction market cards (odds API fallback)`);
+            return kalshiCards as InsightCard[];
+          })
+          .catch(() => generateContextualCards('betting', sportKey, 6).catch(() => []));
       } else {
         cardPromise = Promise.race([
           generateContextualCards('betting', sportKey, 6),
@@ -576,13 +647,35 @@ export async function POST(request: NextRequest) {
     const xaiApiKey = getGrokApiKey();
     const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
     const hasClientOddsData = !!(context.oddsData?.events?.length);
-    console.log('[API/analyze] Keys configured:', {
-      XAI_API_KEY: !!xaiApiKey,
-      ODDS_API_KEY: !!oddsApiKey,
-      KALSHI_API_KEY: true,
-      hasOddsData: hasClientOddsData,
+    // ── Pipeline observability log ────────────────────────────────────────────
+    // Single structured entry shows exactly which data sources are active for
+    // this request — makes debugging silent failures fast.
+    console.log(LOG_PREFIXES.PIPELINE, {
+      sport:    context.sport  ?? 'none',
       category,
-      sport: context.sport || 'none',
+      model:    primaryModel,
+      fastPath: useFastPath,
+      sources: {
+        odds:        hasClientOddsData,
+        kalshi:      !!(kalshiSportsFallbackMarkets?.length) || context.isPoliticalMarket || context.selectedCategory === 'kalshi',
+        adp:         hasADPIntent,
+        statcast:    expectsStatcastJSON,
+        projections: hasMLBProjectionIntent,
+        fantasy:     !!(context.hasFantasyIntent),
+      },
+      intent: {
+        betting:    !!(context.hasBettingIntent),
+        fantasy:    !!(context.hasFantasyIntent),
+        player:     !!(context.hasPlayerIntent),
+        political:  !!(context.isPoliticalMarket),
+        adp:        hasADPIntent,
+        ambiguous:  isAmbiguous,
+      },
+      keys: {
+        XAI_API_KEY:    !!xaiApiKey,
+        ODDS_API_KEY:   !!oddsApiKey,
+        KALSHI_API_KEY: !!(process.env.KALSHI_API_KEY),
+      },
     });
     let aiText = '';
     let modelUsed: string = AI_CONFIG.MODEL_DISPLAY_NAME;
@@ -598,6 +691,12 @@ export async function POST(request: NextRequest) {
       'statcast_summary_card', 'hr_prop_card', 'game_simulation_card',
       'leaderboard_card', 'pitch_analysis_card',
     ]);
+
+    // True only when MLB_ANALYSIS_ADDENDUM is the active system prompt — i.e. the model
+    // was instructed to return a Statcast JSON card.  When hasMLBProjectionIntent is true
+    // the system prompt switches to MLB_PROJECTION_ADDENDUM (prose), so we must NOT attempt
+    // to parse JSON from that response or log a spurious "fell back to text extraction" warning.
+    const expectsStatcastJSON = isMLBStatcastMode && !hasMLBProjectionIntent;
 
     const _MAX_HALLUCINATION_RETRIES = 2; // reserved for future retry logic
 
@@ -919,8 +1018,8 @@ export async function POST(request: NextRequest) {
                 }
               }
 
-              // Statcast tool results
-              if (isMLBStatcastMode) {
+              // Statcast tool results — only relevant when MLB_ANALYSIS_ADDENDUM is active
+              if (expectsStatcastJSON) {
                 const statcastResult = allToolResults.find((tr: any) => tr.toolName === 'query_statcast');
                 if (statcastResult) {
                   const srPlayers: StatcastPlayer[] = statcastResult.result?.players ?? [];
@@ -1021,25 +1120,46 @@ export async function POST(request: NextRequest) {
           if (pendingADPCard) cards = [pendingADPCard, ...cards.slice(0, 5)];
           if (pendingADPUploadCard) cards = [...cards, pendingADPUploadCard];
 
-          // MLB Statcast: parse Grok's JSON response into a card
-          if (isMLBStatcastMode && !usedFallback && !skipStatcastJSON) {
-            // Try all candidate JSON blocks (non-greedy) so we don't merge multiple objects
-            const jsonCandidates = [...aiText.matchAll(/\{[\s\S]*?\}/g)].map(m => m[0]);
-            // Also include the full span as a last-resort candidate
+          // MLB Statcast: parse Grok's JSON response into a card.
+          // Only runs when MLB_ANALYSIS_ADDENDUM was active (expectsStatcastJSON).
+          // Projection / DFS / stack queries use MLB_PROJECTION_ADDENDUM and return prose —
+          // attempting JSON extraction on them produces only spurious warnings.
+          if (expectsStatcastJSON && !usedFallback && !skipStatcastJSON) {
+            /** Attempt to parse a JSON string and return it if it has a valid Statcast card type. */
+            const tryParseStatcastCard = (src: string): Record<string, unknown> | null => {
+              try {
+                const p = JSON.parse(src) as Record<string, unknown>;
+                if (
+                  p !== null &&
+                  typeof p === 'object' &&
+                  typeof p.type === 'string' &&
+                  STATCAST_CARD_TYPES.has(p.type) &&
+                  typeof p.title === 'string' &&
+                  Array.isArray(p.summary_metrics)
+                ) {
+                  return p;
+                }
+              } catch {
+                // not valid JSON — try next candidate
+              }
+              return null;
+            };
+
+            // Build candidate list ordered by specificity:
+            // 1. ```json ... ``` or ``` ... ``` code fences (Grok sometimes wraps JSON despite instructions)
+            // 2. Non-greedy {...} blocks (avoids merging adjacent objects)
+            // 3. Full greedy {...} span as last resort (handles deeply-nested objects)
+            const jsonCandidates: string[] = [];
+            const codeFenceMatch = aiText.match(/```(?:json)?\s*([\s\S]*?)```/);
+            if (codeFenceMatch) jsonCandidates.push(codeFenceMatch[1].trim());
+            for (const m of aiText.matchAll(/\{[\s\S]*?\}/g)) jsonCandidates.push(m[0]);
             const fullSpanMatch = aiText.match(/\{[\s\S]*\}/);
             if (fullSpanMatch) jsonCandidates.push(fullSpanMatch[0]);
 
             let parsedStatcast: Record<string, unknown> | null = null;
             for (const candidate of jsonCandidates) {
-              try {
-                const p = JSON.parse(candidate) as Record<string, unknown>;
-                if (p && typeof p.type === 'string' && STATCAST_CARD_TYPES.has(p.type)) {
-                  parsedStatcast = p;
-                  break;
-                }
-              } catch {
-                // try next candidate
-              }
+              parsedStatcast = tryParseStatcastCard(candidate);
+              if (parsedStatcast) break;
             }
 
             if (parsedStatcast) {
@@ -1059,12 +1179,14 @@ export async function POST(request: NextRequest) {
               // Replace the raw JSON the client already received with readable prose
               controller.enqueue(sseChunk({ type: 'replace', text: cleanText }));
             } else {
-              // Grok returned markdown/text instead of JSON — extract structured fields
-              const mlbAnalysis = extractMLBJson(aiText);
-              logger.warn(LogCategory.API, '[API/analyze] MLB JSON parse fell back to text extraction', {
-                pick: mlbAnalysis.pick,
-                book: mlbAnalysis.book,
-                odds: mlbAnalysis.odds,
+              // Grok returned markdown/text despite JSON instructions — log with context
+              // so we can diagnose prompt-compliance issues without surface-level noise.
+              const preview = aiText.slice(0, 120).replace(/\n/g, ' ');
+              logger.warn(LogCategory.API, '[API/analyze] MLB Statcast JSON not found in response — prose fallback', {
+                previewChars: preview,
+                responseLength: aiText.length,
+                hasCodeFence: aiText.includes('```'),
+                hasBrace: aiText.includes('{'),
               });
             }
           }

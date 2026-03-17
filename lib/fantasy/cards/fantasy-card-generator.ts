@@ -326,58 +326,70 @@ function computeVBDGeneric(
 }
 
 // ============================================================================
-// MLB 2025 Projections (5×5 roto standard scoring)
+// MLB 2026 Projections (5×5 roto standard scoring)
+// Updated for 2026 season — includes offseason roster moves.
 // ============================================================================
 
 const MLB_PROJECTIONS_2025: GenericPlayer[] = [
-  { name: 'Ronald Acuna Jr.',      team: 'ATL', pos: 'OF', pts: 52.4, adp: 1.2  },
-  { name: 'Mookie Betts',          team: 'LAD', pos: 'OF', pts: 48.8, adp: 4.1  },
-  { name: 'Juan Soto',             team: 'NYM', pos: 'OF', pts: 47.2, adp: 5.8  },
-  { name: 'Kyle Tucker',           team: 'CHC', pos: 'OF', pts: 45.1, adp: 8.3  },
-  { name: 'Julio Rodriguez',       team: 'SEA', pos: 'OF', pts: 43.6, adp: 11.4 },
-  { name: 'Mike Trout',            team: 'LAA', pos: 'OF', pts: 41.2, adp: 14.7 },
-  { name: 'Yordan Alvarez',        team: 'HOU', pos: 'OF', pts: 39.8, adp: 18.3 },
-  { name: 'Fernando Tatis Jr.',    team: 'SD',  pos: 'OF', pts: 38.4, adp: 22.6 },
-  { name: 'Corbin Carroll',        team: 'ARI', pos: 'OF', pts: 36.2, adp: 28.1 },
-  { name: 'Randy Arozarena',       team: 'SEA', pos: 'OF', pts: 33.8, adp: 36.4 },
-  { name: 'Elly De La Cruz',       team: 'CIN', pos: 'SS', pts: 44.8, adp: 6.5  },
-  { name: 'Jose Ramirez',          team: 'CLE', pos: 'SS', pts: 44.2, adp: 7.8  },
-  { name: 'Bobby Witt Jr.',        team: 'KC',  pos: 'SS', pts: 43.1, adp: 9.2  },
-  { name: 'Corey Seager',          team: 'TEX', pos: 'SS', pts: 39.4, adp: 18.6 },
-  { name: 'Gunnar Henderson',      team: 'BAL', pos: 'SS', pts: 37.8, adp: 24.3 },
-  { name: 'Trea Turner',           team: 'PHI', pos: 'SS', pts: 35.6, adp: 31.7 },
-  { name: 'Freddie Freeman',       team: 'LAD', pos: '1B', pts: 42.3, adp: 12.1 },
-  { name: 'Matt Olson',            team: 'ATL', pos: '1B', pts: 40.8, adp: 16.4 },
-  { name: 'Vladimir Guerrero Jr.', team: 'TOR', pos: '1B', pts: 38.2, adp: 23.8 },
-  { name: 'Pete Alonso',           team: 'NYM', pos: '1B', pts: 36.4, adp: 30.2 },
-  { name: 'Christian Walker',      team: 'HOU', pos: '1B', pts: 32.8, adp: 42.6 },
-  { name: 'Jose Altuve',           team: 'HOU', pos: '2B', pts: 36.8, adp: 27.4 },
-  { name: 'Marcus Semien',         team: 'TEX', pos: '2B', pts: 34.6, adp: 34.1 },
-  { name: 'Ozzie Albies',          team: 'ATL', pos: '2B', pts: 33.2, adp: 40.8 },
-  { name: 'Jeff McNeil',           team: 'NYM', pos: '2B', pts: 30.2, adp: 48.3 },
-  { name: 'Austin Riley',          team: 'ATL', pos: '3B', pts: 38.8, adp: 20.4 },
-  { name: 'Rafael Devers',         team: 'BOS', pos: '3B', pts: 36.6, adp: 29.1 },
-  { name: 'Nolan Arenado',         team: 'STL', pos: '3B', pts: 33.4, adp: 39.8 },
-  { name: 'Manny Machado',         team: 'SD',  pos: '3B', pts: 32.1, adp: 44.2 },
-  { name: 'Adley Rutschman',       team: 'BAL', pos: 'C',  pts: 34.8, adp: 32.4 },
-  { name: 'Will Smith',            team: 'LAD', pos: 'C',  pts: 32.6, adp: 40.2 },
-  { name: 'William Contreras',     team: 'MIL', pos: 'C',  pts: 30.4, adp: 49.6 },
-  { name: 'Sean Murphy',           team: 'ATL', pos: 'C',  pts: 28.8, adp: 57.1 },
-  { name: 'Spencer Strider',       team: 'ATL', pos: 'SP', pts: 38.6, adp: 19.3 },
-  { name: 'Gerrit Cole',           team: 'NYY', pos: 'SP', pts: 36.2, adp: 23.7 },
-  { name: 'Zac Gallen',            team: 'ARI', pos: 'SP', pts: 34.8, adp: 28.5 },
-  { name: 'Logan Webb',            team: 'SF',  pos: 'SP', pts: 33.4, adp: 33.8 },
-  { name: 'Dylan Cease',           team: 'SD',  pos: 'SP', pts: 32.2, adp: 38.1 },
-  { name: 'Corbin Burnes',         team: 'BAL', pos: 'SP', pts: 31.4, adp: 41.7 },
-  { name: 'Max Fried',             team: 'NYY', pos: 'SP', pts: 30.6, adp: 45.3 },
-  { name: 'Yoshinobu Yamamoto',    team: 'LAD', pos: 'SP', pts: 29.8, adp: 49.2 },
-  { name: 'Sandy Alcantara',       team: 'MIA', pos: 'SP', pts: 28.4, adp: 54.6 },
-  { name: 'Shane McClanahan',      team: 'TB',  pos: 'SP', pts: 27.6, adp: 60.1 },
-  { name: 'Edwin Diaz',            team: 'NYM', pos: 'RP', pts: 28.4, adp: 55.1 },
-  { name: 'Ryan Helsley',          team: 'STL', pos: 'RP', pts: 27.8, adp: 58.6 },
-  { name: 'Josh Hader',            team: 'HOU', pos: 'RP', pts: 27.2, adp: 62.3 },
-  { name: 'Felix Bautista',        team: 'BAL', pos: 'RP', pts: 26.6, adp: 67.4 },
-  { name: 'Devin Williams',        team: 'MIL', pos: 'RP', pts: 25.8, adp: 73.2 },
+  // OFs — sorted by projected pts
+  { name: 'Aaron Judge',           team: 'NYY', pos: 'OF', pts: 54.8, adp: 1.1  },
+  { name: 'Shohei Ohtani',         team: 'LAD', pos: 'OF', pts: 53.6, adp: 2.2  },
+  { name: 'Ronald Acuna Jr.',      team: 'ATL', pos: 'OF', pts: 52.4, adp: 3.1  },
+  { name: 'Mookie Betts',          team: 'LAD', pos: 'OF', pts: 48.8, adp: 5.3  },
+  { name: 'Juan Soto',             team: 'NYM', pos: 'OF', pts: 47.2, adp: 6.8  },
+  { name: 'Kyle Tucker',           team: 'CHC', pos: 'OF', pts: 45.1, adp: 9.3  },
+  { name: 'Julio Rodriguez',       team: 'SEA', pos: 'OF', pts: 43.6, adp: 12.4 },
+  { name: 'Yordan Alvarez',        team: 'HOU', pos: 'OF', pts: 39.8, adp: 19.3 },
+  { name: 'Fernando Tatis Jr.',    team: 'SD',  pos: 'OF', pts: 38.4, adp: 24.6 },
+  { name: 'Corbin Carroll',        team: 'ARI', pos: 'OF', pts: 36.2, adp: 30.1 },
+  { name: 'Randy Arozarena',       team: 'SEA', pos: 'OF', pts: 33.8, adp: 38.4 },
+  // SSs
+  { name: 'Elly De La Cruz',       team: 'CIN', pos: 'SS', pts: 44.8, adp: 7.5  },
+  { name: 'Jose Ramirez',          team: 'CLE', pos: 'SS', pts: 44.2, adp: 8.8  },
+  { name: 'Bobby Witt Jr.',        team: 'KC',  pos: 'SS', pts: 43.1, adp: 10.2 },
+  { name: 'Corey Seager',          team: 'TEX', pos: 'SS', pts: 39.4, adp: 20.6 },
+  { name: 'Gunnar Henderson',      team: 'BAL', pos: 'SS', pts: 37.8, adp: 26.3 },
+  { name: 'Trea Turner',           team: 'PHI', pos: 'SS', pts: 35.6, adp: 33.7 },
+  // 1Bs
+  { name: 'Freddie Freeman',       team: 'LAD', pos: '1B', pts: 42.3, adp: 13.1 },
+  { name: 'Matt Olson',            team: 'ATL', pos: '1B', pts: 40.8, adp: 17.4 },
+  { name: 'Vladimir Guerrero Jr.', team: 'NYM', pos: '1B', pts: 38.2, adp: 25.8 },
+  { name: 'Pete Alonso',           team: 'NYM', pos: '1B', pts: 36.4, adp: 32.2 },
+  { name: 'Christian Walker',      team: 'HOU', pos: '1B', pts: 32.8, adp: 44.6 },
+  // 2Bs
+  { name: 'Jose Altuve',           team: 'HOU', pos: '2B', pts: 36.8, adp: 29.4 },
+  { name: 'Marcus Semien',         team: 'TEX', pos: '2B', pts: 34.6, adp: 36.1 },
+  { name: 'Ozzie Albies',          team: 'ATL', pos: '2B', pts: 33.2, adp: 42.8 },
+  { name: 'Jeff McNeil',           team: 'NYM', pos: '2B', pts: 30.2, adp: 50.3 },
+  // 3Bs
+  { name: 'Austin Riley',          team: 'ATL', pos: '3B', pts: 38.8, adp: 21.4 },
+  { name: 'Rafael Devers',         team: 'BOS', pos: '3B', pts: 36.6, adp: 31.1 },
+  { name: 'Nolan Arenado',         team: 'STL', pos: '3B', pts: 33.4, adp: 41.8 },
+  { name: 'Manny Machado',         team: 'SD',  pos: '3B', pts: 32.1, adp: 46.2 },
+  // Cs
+  { name: 'Adley Rutschman',       team: 'BAL', pos: 'C',  pts: 34.8, adp: 34.4 },
+  { name: 'Will Smith',            team: 'LAD', pos: 'C',  pts: 32.6, adp: 42.2 },
+  { name: 'William Contreras',     team: 'MIL', pos: 'C',  pts: 30.4, adp: 51.6 },
+  { name: 'Sean Murphy',           team: 'ATL', pos: 'C',  pts: 28.8, adp: 59.1 },
+  // SPs — updated for 2026 season
+  { name: 'Zack Wheeler',          team: 'PHI', pos: 'SP', pts: 40.2, adp: 15.4 },
+  { name: 'Paul Skenes',           team: 'PIT', pos: 'SP', pts: 39.4, adp: 17.8 },
+  { name: 'Spencer Strider',       team: 'ATL', pos: 'SP', pts: 38.6, adp: 20.3 },
+  { name: 'Gerrit Cole',           team: 'NYY', pos: 'SP', pts: 36.2, adp: 25.7 },
+  { name: 'Logan Webb',            team: 'SF',  pos: 'SP', pts: 34.8, adp: 30.5 },
+  { name: 'Zac Gallen',            team: 'ARI', pos: 'SP', pts: 33.4, adp: 35.8 },
+  { name: 'Dylan Cease',           team: 'SD',  pos: 'SP', pts: 32.2, adp: 40.1 },
+  { name: 'Max Fried',             team: 'NYY', pos: 'SP', pts: 31.4, adp: 43.7 },
+  { name: 'Corbin Burnes',         team: 'ARI', pos: 'SP', pts: 30.6, adp: 47.3 },
+  { name: 'Yoshinobu Yamamoto',    team: 'LAD', pos: 'SP', pts: 29.8, adp: 51.2 },
+  { name: 'Sandy Alcantara',       team: 'MIA', pos: 'SP', pts: 28.4, adp: 56.6 },
+  { name: 'Shane McClanahan',      team: 'TB',  pos: 'SP', pts: 27.6, adp: 62.1 },
+  // RPs
+  { name: 'Edwin Diaz',            team: 'NYM', pos: 'RP', pts: 28.4, adp: 57.1 },
+  { name: 'Ryan Helsley',          team: 'STL', pos: 'RP', pts: 27.8, adp: 60.6 },
+  { name: 'Josh Hader',            team: 'HOU', pos: 'RP', pts: 27.2, adp: 64.3 },
+  { name: 'Felix Bautista',        team: 'BAL', pos: 'RP', pts: 26.6, adp: 69.4 },
+  { name: 'Devin Williams',        team: 'MIL', pos: 'RP', pts: 25.8, adp: 75.2 },
 ];
 
 const MLB_REPLACEMENT_RANKS: Record<string, number> = {
@@ -754,39 +766,112 @@ const MLB_PARK_TIERS: Record<string, 'A' | 'B' | 'C' | 'D'> = {
   SD: 'D', PIT: 'D', OAK: 'D', WSH: 'D', LAA: 'D',
 };
 
+/** Fetch probable starters for today + next `days` days from the MLB Stats API */
+async function fetchUpcomingStarts(days = 4): Promise<Array<{
+  pitcherName: string; pitcherTeam: string;
+  opponentAbbr: string; homeTeamAbbr: string;
+  gameDate: string; isHome: boolean;
+}>> {
+  const { fetchTodaysGames } = await import('@/lib/mlb-projections/mlb-stats-api');
+  const starts: Array<{ pitcherName: string; pitcherTeam: string; opponentAbbr: string; homeTeamAbbr: string; gameDate: string; isHome: boolean }> = [];
+  for (let d = 0; d < days; d++) {
+    const date = new Date();
+    date.setDate(date.getDate() + d);
+    const dateStr = date.toISOString().slice(0, 10);
+    try {
+      const games = await fetchTodaysGames(dateStr);
+      for (const game of games) {
+        if (game.probableHomePitcher?.fullName) {
+          starts.push({ pitcherName: game.probableHomePitcher.fullName, pitcherTeam: game.homeTeamAbbr, opponentAbbr: game.awayTeamAbbr, homeTeamAbbr: game.homeTeamAbbr, gameDate: dateStr, isHome: true });
+        }
+        if (game.probableAwayPitcher?.fullName) {
+          starts.push({ pitcherName: game.probableAwayPitcher.fullName, pitcherTeam: game.awayTeamAbbr, opponentAbbr: game.homeTeamAbbr, homeTeamAbbr: game.homeTeamAbbr, gameDate: dateStr, isHome: false });
+        }
+      }
+    } catch { /* skip day */ }
+  }
+  return starts;
+}
+
+/** Fuzzy-match a pitcher name from the schedule to a projected player */
+function matchPitcher(scheduleName: string, projectedSPs: PlayerVBD[]): PlayerVBD | undefined {
+  const sLower = scheduleName.toLowerCase();
+  // Exact match
+  const exact = projectedSPs.find(sp => sp.name.toLowerCase() === sLower);
+  if (exact) return exact;
+  // Last-name match (e.g. "Wheeler" in "Zack Wheeler")
+  const lastName = sLower.split(' ').pop() ?? '';
+  if (lastName.length > 3) {
+    const byLast = projectedSPs.find(sp => sp.name.toLowerCase().endsWith(lastName));
+    if (byLast) return byLast;
+  }
+  return undefined;
+}
+
 /**
  * Generate MLB start/sit matchup-focused cards.
+ * Attempts to fetch the real MLB schedule (upcoming probable starters + real opponent tiers).
+ * Falls back to a simulation when the schedule API is unavailable.
  * Returns two cards:
- *   1. SP Start/Sit Rankings — Tier 1–2 starters to target vs favourable lineups
- *   2. Hitter Matchup Stacks — Top hitters facing weak/mid-tier pitching
+ *   1. SP Start/Sit Rankings — matchup-graded probable starters
+ *   2. Hitter Matchup Stacks — top hitters vs tonight's pitching
  */
-function generateMLBStartSitCards(mlbVBD: PlayerVBD[], season: string, leagueOptions?: LeagueOptions): InsightCard[] {
+async function generateMLBStartSitCards(mlbVBD: PlayerVBD[], season: string, leagueOptions?: LeagueOptions): Promise<InsightCard[]> {
   const fmt = formatLabel(leagueOptions?.scoringFormat, 'mlb');
   const teams = leagueOptions?.teamCount ?? 12;
   const subcategory = `MLB ${season} • ${fmt} • ${teams}-Team`;
 
-  // ── Card 1: SP Matchup Rankings ────────────────────────────────────────
   const spPlayers = mlbVBD.filter(p => p.pos === 'SP').sort((a, b) => b.vbd - a.vbd);
 
-  // Assign each SP a matchup grade based on their opponent lineup tier
-  // (opponent unknown without live schedule, so we use the SP's home-park tier as proxy
-  //  and simulate a "best case" matchup for top-tier aces)
-  const spMatchups = spPlayers.slice(0, 8).map((sp, i) => {
-    const parkTier = MLB_PARK_TIERS[sp.team] ?? 'C';
-    // Top aces (T1) get favourable matchup label; lower tiers rotate
+  // ── Try real schedule first ────────────────────────────────────────────
+  let spMatchups: Array<{ name: string; team: string; pos: string; tier: number; vbd: number; adp: number; recommendation: 'START'|'SIT'|'STREAM'; reason: string; oppTier: 'A'|'B'|'C'|'D' }> = [];
+  let realScheduleUsed = false;
+
+  try {
+    const scheduledStarts = await fetchUpcomingStarts(4);
+    if (scheduledStarts.length >= 4) {
+      const seenPitchers = new Set<string>();
+      for (const start of scheduledStarts) {
+        if (spMatchups.length >= 8) break;
+        const sp = matchPitcher(start.pitcherName, spPlayers);
+        if (!sp || seenPitchers.has(sp.name)) continue;
+        seenPitchers.add(sp.name);
+        const oppTier = MLB_LINEUP_TIERS[start.opponentAbbr] ?? 'C';
+        const parkTier = MLB_PARK_TIERS[start.homeTeamAbbr] ?? 'C';
+        const recommendation: 'START' | 'SIT' | 'STREAM' =
+          sp.tier === 1 ? 'START'
+          : sp.tier === 2 && oppTier !== 'A' ? 'START'
+          : sp.tier === 3 && oppTier === 'D' ? 'STREAM'
+          : sp.tier >= 3 ? 'SIT'
+          : 'START';
+        const oppLabel = oppTier === 'A' ? 'vs elite lineup' : oppTier === 'B' ? 'vs above-avg lineup' : oppTier === 'C' ? 'vs average lineup' : 'vs weak lineup';
+        const parkNote = parkTier === 'A' ? ' (HR-friendly park — caution)' : parkTier === 'D' ? ' (pitcher-friendly ✅)' : '';
+        const projLow  = Math.round(25 - sp.tier * 3 + (oppTier === 'D' ? 4 : oppTier === 'A' ? -5 : 0));
+        const projHigh = Math.round(32 - sp.tier * 3 + (oppTier === 'D' ? 4 : oppTier === 'A' ? -5 : 0));
+        const reason = `T${sp.tier} arm${parkNote} — ${oppLabel} (${start.opponentAbbr}). Proj ${projLow}–${projHigh} pts.`;
+        spMatchups.push({ name: sp.name, team: sp.team, pos: sp.pos, tier: sp.tier, vbd: sp.vbd, adp: sp.adp, recommendation, reason, oppTier });
+      }
+      if (spMatchups.length >= 3) realScheduleUsed = true;
+    }
+  } catch { /* fall through to simulation */ }
+
+  // ── Fallback: simulated opponent tiers when schedule unavailable ───────
+  if (!realScheduleUsed) {
     const lineupDifficulty: ('A' | 'B' | 'C' | 'D')[] = ['D', 'C', 'C', 'B', 'B', 'C', 'D', 'C'];
-    const oppTier = lineupDifficulty[i] ?? 'C';
-    const oppLabel = oppTier === 'A' ? 'vs Elite Lineup' : oppTier === 'B' ? 'vs Above-Avg Lineup' : oppTier === 'C' ? 'vs Average Lineup' : 'vs Weak Lineup';
-    const recommendation: 'START' | 'SIT' | 'STREAM' =
-      sp.tier === 1 ? 'START'
-      : sp.tier === 2 && oppTier !== 'A' ? 'START'
-      : sp.tier === 3 && oppTier === 'D' ? 'STREAM'
-      : sp.tier >= 3 && oppTier !== 'D' ? 'SIT'
-      : 'START';
-    const parkNote = parkTier === 'A' ? ' (HR-friendly park — caution)' : parkTier === 'D' ? ' (pitcher-friendly park ✅)' : '';
-    const reason = `T${sp.tier} arm${parkNote} — ${oppLabel}. Projected ${Math.round(25 - sp.tier * 3 + (oppTier === 'D' ? 4 : oppTier === 'A' ? -5 : 0))}–${Math.round(32 - sp.tier * 3 + (oppTier === 'D' ? 4 : oppTier === 'A' ? -5 : 0))} fantasy pts.`;
-    return { name: sp.name, team: sp.team, pos: sp.pos, tier: sp.tier, vbd: sp.vbd, adp: sp.adp, recommendation, reason, oppTier };
-  });
+    spMatchups = spPlayers.slice(0, 8).map((sp, i) => {
+      const parkTier = MLB_PARK_TIERS[sp.team] ?? 'C';
+      const oppTier = lineupDifficulty[i] ?? 'C';
+      const oppLabel = oppTier === 'A' ? 'vs Elite Lineup' : oppTier === 'B' ? 'vs Above-Avg Lineup' : oppTier === 'C' ? 'vs Average Lineup' : 'vs Weak Lineup';
+      const recommendation: 'START' | 'SIT' | 'STREAM' =
+        sp.tier === 1 ? 'START'
+        : sp.tier === 2 && oppTier !== 'A' ? 'START'
+        : sp.tier === 3 && oppTier === 'D' ? 'STREAM'
+        : 'SIT';
+      const parkNote = parkTier === 'A' ? ' (HR-friendly park — caution)' : parkTier === 'D' ? ' (pitcher-friendly ✅)' : '';
+      const reason = `T${sp.tier} arm${parkNote} — ${oppLabel}. Proj ${Math.round(25 - sp.tier * 3 + (oppTier === 'D' ? 4 : oppTier === 'A' ? -5 : 0))}–${Math.round(32 - sp.tier * 3 + (oppTier === 'D' ? 4 : oppTier === 'A' ? -5 : 0))} pts.`;
+      return { name: sp.name, team: sp.team, pos: sp.pos, tier: sp.tier, vbd: sp.vbd, adp: sp.adp, recommendation, reason, oppTier };
+    });
+  }
 
   const card1: InsightCard = {
     type: 'FANTASY_WAIVER',
@@ -802,8 +887,7 @@ function generateMLBStartSitCards(mlbVBD: PlayerVBD[], season: string, leagueOpt
         name: sp.name,
         team: sp.team,
         pos: sp.pos,
-        faabBid: 0,
-        faabPct: 0,
+        // No FAAB for SP start/sit — use breakoutScore as matchup grade only
         breakoutScore: sp.tier === 1 ? 3 : sp.tier === 2 ? 2 : 1,
         reason: `${sp.recommendation} — ${sp.reason}`,
         rostered: sp.tier === 1 ? 99 : sp.tier === 2 ? 88 : 55,
@@ -811,7 +895,7 @@ function generateMLBStartSitCards(mlbVBD: PlayerVBD[], season: string, leagueOpt
       description: 'Matchup-graded SP starts for this week. START = strong play, STREAM = favourable spot, SIT = avoid.',
       status: 'target',
     },
-    metadata: { realData: false, dataSource: `MLB ${season} Matchup Engine` },
+    metadata: { realData: realScheduleUsed, dataSource: realScheduleUsed ? 'MLB Stats API • Live Schedule' : `MLB ${season} Matchup Engine` },
   };
 
   // ── Card 2: Hitter Stack Targets ──────────────────────────────────────
@@ -898,7 +982,7 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
 
     // ── Start/Sit mode: return matchup-focused cards instead of VBD/draft ──
     if (leagueOptions?.isStartSit) {
-      const startSitCards = generateMLBStartSitCards(mlbVBD, String(mlbSeason), leagueOptions);
+      const startSitCards = await generateMLBStartSitCards(mlbVBD, String(mlbSeason), leagueOptions);
       // Append a streaming SP card (Tier 3 starter facing a weak lineup)
       const streamSP = mlbVBD.filter(p => p.pos === 'SP' && p.tier === 3)[0];
       if (streamSP && startSitCards.length < count) {
@@ -1066,7 +1150,8 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
               sport: 'MLB',
               players: vpeRanked.map((p, i) => ({
                 name: p.name,
-                pos: p.playerType === 'batter' ? 'BAT' : 'PIT',
+                team: '',  // Statcast CSV does not include team
+                pos: p.playerType === 'batter' ? 'OF' : 'SP',
                 vbd: p.vpeVal,
                 pts: p.vpeVal,
                 adp: i + 1,

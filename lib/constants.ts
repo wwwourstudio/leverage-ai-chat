@@ -541,7 +541,71 @@ export const LOG_PREFIXES = {
   DATA_SERVICE: '[DataService]',
   CONFIG: '[Config]',
   DATABASE: '[Database]',
+  KALSHI: '[KALSHI]',
+  PIPELINE: '[PIPELINE]',
 } as const;
+
+/**
+ * Player last-name → sport lookup.
+ * Only includes names that are (a) unique enough to not produce false positives
+ * and (b) frequently used in sports betting / fantasy queries.
+ * Used as a server-side fallback when the client sends no sport context.
+ */
+export const PLAYER_SPORT_MAP: Record<string, string> = {
+  // ── NFL ──────────────────────────────────────────────────────────────────
+  mahomes: 'nfl', kelce: 'nfl', hurts: 'nfl', burrow: 'nfl',
+  prescott: 'nfl', purdy: 'nfl', stroud: 'nfl', stafford: 'nfl',
+  mccaffrey: 'nfl', ekeler: 'nfl', diggs: 'nfl', metcalf: 'nfl',
+  kupp: 'nfl', rodgers: 'nfl', lafleur: 'nfl', belichick: 'nfl',
+  // ── NBA ──────────────────────────────────────────────────────────────────
+  curry: 'nba', doncic: 'nba', embiid: 'nba', tatum: 'nba',
+  durant: 'nba', jokic: 'nba', harden: 'nba', lillard: 'nba',
+  morant: 'nba', wembanyama: 'nba', brunson: 'nba', siakam: 'nba',
+  giannis: 'nba',   // first name — unique enough
+  // ── MLB ──────────────────────────────────────────────────────────────────
+  ohtani: 'mlb', trout: 'mlb', acuna: 'mlb', betts: 'mlb',
+  devers: 'mlb', lindor: 'mlb', verlander: 'mlb', glasnow: 'mlb',
+  kershaw: 'mlb', goldschmidt: 'mlb', arenado: 'mlb', machado: 'mlb',
+  degrom: 'mlb', scherzer: 'mlb', soto: 'mlb', alvarez: 'mlb',
+  freedman: 'mlb', correa: 'mlb', bogaerts: 'mlb', semien: 'mlb',
+  // ── NHL ──────────────────────────────────────────────────────────────────
+  mcdavid: 'nhl', crosby: 'nhl', mackinnon: 'nhl', ovechkin: 'nhl',
+  draisaitl: 'nhl', marner: 'nhl', hedman: 'nhl', pastrnak: 'nhl',
+  gaudreau: 'nhl', stamkos: 'nhl', karlsson: 'nhl', panarin: 'nhl',
+} as const;
+
+/**
+ * Sport-specific statistical terms → sport.
+ * Applied when no team name or player name resolves the sport.
+ * Ordered from most specific (multi-word) to least specific (single word).
+ */
+export const STAT_SPORT_MAP: Array<{ term: string; sport: string }> = [
+  // NFL (most specific first)
+  { term: 'passing yards', sport: 'nfl' },
+  { term: 'rushing yards', sport: 'nfl' },
+  { term: 'receiving yards', sport: 'nfl' },
+  { term: 'passer rating', sport: 'nfl' },
+  { term: 'qb rating', sport: 'nfl' },
+  { term: 'touchdown passes', sport: 'nfl' },
+  { term: 'fantasy football', sport: 'nfl' },
+  // MLB
+  { term: 'batting average', sport: 'mlb' },
+  { term: 'home run', sport: 'mlb' },
+  { term: 'stolen base', sport: 'mlb' },
+  { term: 'strikeout', sport: 'mlb' },
+  { term: 'on-base', sport: 'mlb' },
+  { term: 'whip', sport: 'mlb' },
+  // NBA
+  { term: 'three-pointer', sport: 'nba' },
+  { term: 'three pointer', sport: 'nba' },
+  { term: 'free throw', sport: 'nba' },
+  { term: 'per game', sport: 'nba' },   // "points per game", "assists per game" etc.
+  // NHL
+  { term: 'save percentage', sport: 'nhl' },
+  { term: 'goals against', sport: 'nhl' },
+  { term: 'power play', sport: 'nhl' },
+  { term: 'penalty kill', sport: 'nhl' },
+] as const;
 
 // System Prompt Template
 export const SYSTEM_PROMPT = `You are Leverage AI, an elite sports betting and prediction markets analyst powered by Grok (xAI). Today: [CURRENT_DATE].

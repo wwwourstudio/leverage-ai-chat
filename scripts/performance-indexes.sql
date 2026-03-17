@@ -112,6 +112,25 @@ CREATE INDEX IF NOT EXISTS idx_odds_history_bookmaker
   ON odds_history(bookmaker, timestamp DESC);
 
 -- ============================================
+-- nfbc_adp Optimization
+-- Columns: id, rank, player_name, display_name, adp, positions, team,
+--          value_delta, is_value_pick, auction_value, sport, fetched_at
+-- ============================================
+
+-- Primary access pattern: fetch all rows for a sport ordered by rank
+-- (loadADPFromSupabase → .eq('sport', sport).order('rank').limit(300))
+CREATE INDEX IF NOT EXISTS idx_nfbc_adp_sport_rank
+  ON api.nfbc_adp (sport, rank ASC);
+
+-- Full-text search on display_name for AI tool player lookups
+CREATE INDEX IF NOT EXISTS idx_nfbc_adp_display_name
+  ON api.nfbc_adp USING gin (to_tsvector('english', display_name));
+
+-- Value-pick filter (queryADP valueOnly path)
+CREATE INDEX IF NOT EXISTS idx_nfbc_adp_value_pick
+  ON api.nfbc_adp (sport, is_value_pick) WHERE is_value_pick = true;
+
+-- ============================================
 -- Update table statistics for query planner
 -- ============================================
 
@@ -120,3 +139,4 @@ ANALYZE live_odds_cache;
 ANALYZE bet_allocations;
 ANALYZE historical_games;
 ANALYZE line_movement;
+ANALYZE api.nfbc_adp;

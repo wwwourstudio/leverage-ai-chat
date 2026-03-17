@@ -35,6 +35,21 @@ const PREFERRED_BOOKS = [
 ];
 
 // ============================================================================
+// Card type validation — warn at runtime when an unknown type is produced.
+// Catches regressions where new card categories are added without updating
+// the CARD_TYPES constant or the DynamicCardRenderer routing.
+// ============================================================================
+const VALID_CARD_TYPES = new Set<string>(Object.values(CARD_TYPES));
+
+export function assertCardType(type: string, context?: string): void {
+  if (!VALID_CARD_TYPES.has(type)) {
+    console.warn(
+      `[v0] [CARDS-GEN] Unknown card type "${type}"${context ? ` in ${context}` : ''} — add it to CARD_TYPES in lib/constants.ts`,
+    );
+  }
+}
+
+// ============================================================================
 // In-memory card cache (shared between SSR page load and /api/analyze)
 // Prevents duplicate API calls when the analyze endpoint needs cards that
 // were already fetched during SSR.

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DynamicCardRenderer, CardList } from '@/components/data-cards/DynamicCardRenderer';
+import { assertCardType } from '@/lib/cards-generator';
 
 // Mock child card components so tests focus on routing logic, not rendering internals
 vi.mock('@/components/data-cards/BettingCard', () => ({
@@ -32,6 +33,36 @@ vi.mock('@/components/data-cards/WeatherCard', () => ({
 vi.mock('@/components/data-cards/ArbitrageCard', () => ({
   ArbitrageCard: ({ onAnalyze }: any) => (
     <div data-testid="arbitrage-card">
+      {onAnalyze && <button onClick={onAnalyze}>Analyze</button>}
+    </div>
+  ),
+}));
+
+vi.mock('@/components/data-cards/LineMovementCard', () => ({
+  LineMovementCard: ({ title, data, onAnalyze }: any) => (
+    <div data-testid="line-movement-card">
+      <span>{title}</span>
+      {data?.lineChange && <span data-testid="line-change">{data.lineChange}</span>}
+      {onAnalyze && <button onClick={onAnalyze}>Analyze</button>}
+    </div>
+  ),
+}));
+
+vi.mock('@/components/data-cards/KellyBetCard', () => ({
+  KellyBetCard: ({ title, data, onAnalyze }: any) => (
+    <div data-testid="kelly-bet-card">
+      <span>{title}</span>
+      {data?.recommendedStake && <span data-testid="recommended-stake">{data.recommendedStake}</span>}
+      {onAnalyze && <button onClick={onAnalyze}>Analyze</button>}
+    </div>
+  ),
+}));
+
+vi.mock('@/components/data-cards/PortfolioCard', () => ({
+  PortfolioCard: ({ title, data, onAnalyze }: any) => (
+    <div data-testid="portfolio-card">
+      <span>{title}</span>
+      {data?.totalBankroll && <span data-testid="total-bankroll">{data.totalBankroll}</span>}
       {onAnalyze && <button onClick={onAnalyze}>Analyze</button>}
     </div>
   ),
@@ -220,6 +251,130 @@ describe('DynamicCardRenderer', () => {
       );
       expect(screen.queryByTestId('betting-card')).toBeNull();
     });
+
+    it('routes line_movement to LineMovementCard', () => {
+      render(
+        <DynamicCardRenderer
+          card={{
+            type: 'line_movement',
+            title: 'Lakers @ Celtics',
+            category: 'LINE MOVEMENT',
+            subcategory: 'STEAM UP',
+            gradient: 'from-blue-600 to-indigo-600',
+            data: { lineChange: '+2.5 points', oldLine: '-3', newLine: '-5.5' },
+            status: 'active',
+          }}
+        />
+      );
+      expect(screen.getByTestId('line-movement-card')).toBeTruthy();
+      expect(screen.queryByTestId('betting-card')).toBeNull();
+    });
+
+    it('passes lineChange data to LineMovementCard', () => {
+      render(
+        <DynamicCardRenderer
+          card={{
+            type: 'line_movement',
+            title: 'Steam Move',
+            category: 'LINE MOVEMENT',
+            subcategory: 'UP',
+            gradient: 'from-blue-600 to-indigo-600',
+            data: { lineChange: '+3.0 points' },
+            status: 'active',
+          }}
+        />
+      );
+      expect(screen.getByTestId('line-change').textContent).toBe('+3.0 points');
+    });
+
+    it('routes kelly_bet to KellyBetCard', () => {
+      render(
+        <DynamicCardRenderer
+          card={{
+            type: 'kelly_bet',
+            title: 'Lakers Moneyline',
+            category: 'KELLY SIZING',
+            subcategory: '4.50% Kelly',
+            gradient: 'from-indigo-600 to-purple-600',
+            data: { recommendedStake: '$45.00', edge: '3.50%', kellyFraction: '4.50%' },
+            status: 'active',
+          }}
+        />
+      );
+      expect(screen.getByTestId('kelly-bet-card')).toBeTruthy();
+      expect(screen.queryByTestId('betting-card')).toBeNull();
+    });
+
+    it('passes recommendedStake data to KellyBetCard', () => {
+      render(
+        <DynamicCardRenderer
+          card={{
+            type: 'kelly_bet',
+            title: 'Bet Sizing',
+            category: 'KELLY SIZING',
+            subcategory: '3.0% Kelly',
+            gradient: 'from-indigo-600 to-purple-600',
+            data: { recommendedStake: '$75.00' },
+            status: 'active',
+          }}
+        />
+      );
+      expect(screen.getByTestId('recommended-stake').textContent).toBe('$75.00');
+    });
+
+    it('routes portfolio to PortfolioCard', () => {
+      render(
+        <DynamicCardRenderer
+          card={{
+            type: 'portfolio',
+            title: 'Portfolio Overview',
+            category: 'PORTFOLIO',
+            subcategory: '45.0% Deployed',
+            gradient: 'from-purple-600 to-pink-600',
+            data: { totalBankroll: '$1000.00', deployed: '$450.00', available: '$550.00' },
+            status: 'active',
+          }}
+        />
+      );
+      expect(screen.getByTestId('portfolio-card')).toBeTruthy();
+      expect(screen.queryByTestId('betting-card')).toBeNull();
+    });
+
+    it('passes totalBankroll data to PortfolioCard', () => {
+      render(
+        <DynamicCardRenderer
+          card={{
+            type: 'portfolio',
+            title: 'My Portfolio',
+            category: 'PORTFOLIO',
+            subcategory: 'Kelly Criterion',
+            gradient: 'from-purple-600 to-pink-600',
+            data: { totalBankroll: '$2500.00' },
+            status: 'active',
+          }}
+        />
+      );
+      expect(screen.getByTestId('total-bankroll').textContent).toBe('$2500.00');
+    });
+
+    it('routes CARD_TYPES.LINE_MOVEMENT value to LineMovementCard (not BettingCard)', () => {
+      // Verifies the constant value 'line_movement' routes correctly
+      render(<DynamicCardRenderer card={{ ...baseCard, type: 'line_movement' }} />);
+      expect(screen.getByTestId('line-movement-card')).toBeTruthy();
+      expect(screen.queryByTestId('betting-card')).toBeNull();
+    });
+
+    it('routes CARD_TYPES.KELLY_BET value to KellyBetCard (not BettingCard)', () => {
+      render(<DynamicCardRenderer card={{ ...baseCard, type: 'kelly_bet' }} />);
+      expect(screen.getByTestId('kelly-bet-card')).toBeTruthy();
+      expect(screen.queryByTestId('betting-card')).toBeNull();
+    });
+
+    it('routes CARD_TYPES.PORTFOLIO value to PortfolioCard (not BettingCard)', () => {
+      render(<DynamicCardRenderer card={{ ...baseCard, type: 'portfolio' }} />);
+      expect(screen.getByTestId('portfolio-card')).toBeTruthy();
+      expect(screen.queryByTestId('betting-card')).toBeNull();
+    });
   });
 
   describe('card data normalization', () => {
@@ -289,5 +444,71 @@ describe('CardList', () => {
     const { container } = render(<CardList cards={[]} className="custom-class" />);
     // empty state doesn't get the className since cards are empty
     expect(container).toBeTruthy();
+  });
+});
+
+// ============================================================================
+// assertCardType — card type validation utility
+// ============================================================================
+
+describe('assertCardType', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it('does not warn for known type: live-odds', () => {
+    assertCardType('live-odds');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not warn for known type: line_movement', () => {
+    assertCardType('line_movement');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not warn for known type: kelly_bet', () => {
+    assertCardType('kelly_bet');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not warn for known type: portfolio', () => {
+    assertCardType('portfolio');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not warn for known type: arbitrage', () => {
+    assertCardType('arbitrage');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not warn for known type: player-prop', () => {
+    assertCardType('player-prop');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('warns for unknown type', () => {
+    assertCardType('UNKNOWN_CARD');
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(warnSpy.mock.calls[0][0]).toContain('Unknown card type');
+    expect(warnSpy.mock.calls[0][0]).toContain('UNKNOWN_CARD');
+  });
+
+  it('includes context in warning when provided', () => {
+    assertCardType('bad_type', 'generateFantasyCards');
+    expect(warnSpy.mock.calls[0][0]).toContain('generateFantasyCards');
+  });
+
+  it('warns for legacy uppercase type strings', () => {
+    // Guard against regression — raw uppercase strings should no longer be used
+    assertCardType('LINE_MOVEMENT');
+    assertCardType('KELLY_BET');
+    assertCardType('PORTFOLIO');
+    expect(warnSpy).toHaveBeenCalledTimes(3);
   });
 });

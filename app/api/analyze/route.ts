@@ -647,6 +647,20 @@ export async function POST(request: NextRequest) {
     const xaiApiKey = getGrokApiKey();
     const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
     const hasClientOddsData = !!(context.oddsData?.events?.length);
+
+    // Route DFS, pure-fantasy, file-upload, off-season, and ambiguous queries directly to
+    // grok-3-fast (3-6s). Reserve grok-3 for live-odds betting analysis only.
+    // ADP queries override to grok-3: reliable tool use requires the stronger model.
+    // isAmbiguous queries only need a short clarification reply — no need for grok-3.
+    const useFastPath = hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context));
+    const primaryModel = useFastPath ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.MODEL_NAME;
+
+    // True only when MLB_ANALYSIS_ADDENDUM is the active system prompt — i.e. the model
+    // was instructed to return a Statcast JSON card.  When hasMLBProjectionIntent is true
+    // the system prompt switches to MLB_PROJECTION_ADDENDUM (prose), so we must NOT attempt
+    // to parse JSON from that response or log a spurious "fell back to text extraction" warning.
+    const expectsStatcastJSON = isMLBStatcastMode && !hasMLBProjectionIntent;
+
     // ── Pipeline observability log ────────────────────────────────────────────
     // Single structured entry shows exactly which data sources are active for
     // this request — makes debugging silent failures fast.
@@ -677,6 +691,7 @@ export async function POST(request: NextRequest) {
         KALSHI_API_KEY: !!(process.env.KALSHI_API_KEY),
       },
     });
+
     let aiText = '';
     let modelUsed: string = AI_CONFIG.MODEL_DISPLAY_NAME;
     let usedFallback = false;
@@ -691,12 +706,6 @@ export async function POST(request: NextRequest) {
       'statcast_summary_card', 'hr_prop_card', 'game_simulation_card',
       'leaderboard_card', 'pitch_analysis_card',
     ]);
-
-    // True only when MLB_ANALYSIS_ADDENDUM is the active system prompt — i.e. the model
-    // was instructed to return a Statcast JSON card.  When hasMLBProjectionIntent is true
-    // the system prompt switches to MLB_PROJECTION_ADDENDUM (prose), so we must NOT attempt
-    // to parse JSON from that response or log a spurious "fell back to text extraction" warning.
-    const expectsStatcastJSON = isMLBStatcastMode && !hasMLBProjectionIntent;
 
     const _MAX_HALLUCINATION_RETRIES = 2; // reserved for future retry logic
 
@@ -733,12 +742,6 @@ export async function POST(request: NextRequest) {
       return { prompt };
     };
 
-    // Route DFS, pure-fantasy, file-upload, off-season, and ambiguous queries directly to
-    // grok-3-fast (3-6s). Reserve grok-3 for live-odds betting analysis only.
-    // ADP queries override to grok-3: reliable tool use requires the stronger model.
-    // isAmbiguous queries only need a short clarification reply — no need for grok-3.
-    const useFastPath = hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context));
-    const primaryModel = useFastPath ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.MODEL_NAME;
     // Always log the resolved model so failures are immediately traceable in Vercel logs
     logger.info(LogCategory.AI, 'model_selected', {
       metadata: { model: primaryModel, fastPath: useFastPath, hasADPIntent, sport: context?.sport ?? null },

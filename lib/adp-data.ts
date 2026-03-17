@@ -432,8 +432,13 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
     const numericCount = dbData.filter(p => /^\d+$/.test((p.displayName ?? '').trim())).length;
     if (numericCount > dbData.length * 0.3) {
       console.warn(`[v0] [ADP] Supabase data has ${numericCount}/${dbData.length} numeric display names — upload malformed, purging from DB and falling back to static`);
-      // Delete the bad rows so we don't re-check on every request
+      // Delete the bad rows so we don't re-check on every request.
+      // Cache the static fallback immediately so subsequent requests skip Supabase
+      // while the async purge completes (prevents the warning from firing on every hit).
       purgeADPFromSupabase('mlb').catch(() => {});
+      adpCache = STATIC_FALLBACK_PLAYERS;
+      lastFetched = now;
+      return STATIC_FALLBACK_PLAYERS;
     } else {
       console.log(`[v0] [ADP] Serving ${dbData.length} MLB players from Supabase (user upload)`);
       adpCache = dbData;

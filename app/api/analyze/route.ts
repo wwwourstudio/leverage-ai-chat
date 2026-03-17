@@ -654,6 +654,16 @@ export async function POST(request: NextRequest) {
     const xaiApiKey = getGrokApiKey();
     const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
     const hasClientOddsData = !!(context.oddsData?.events?.length);
+    // Route DFS, pure-fantasy, file-upload, off-season, and ambiguous queries directly to
+    // grok-3-fast (3-6s). Reserve grok-3 for live-odds betting analysis only.
+    // ADP queries override to grok-3: reliable tool use requires the stronger model.
+    // isAmbiguous queries only need a short clarification reply — no need for grok-3.
+    const useFastPath = hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context));
+    const primaryModel = useFastPath ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.MODEL_NAME;
+    // Always log the resolved model so failures are immediately traceable in Vercel logs
+    logger.info(LogCategory.AI, 'model_selected', {
+      metadata: { model: primaryModel, fastPath: useFastPath, hasADPIntent, sport: context?.sport ?? null },
+    });
     // ── Pipeline observability log ────────────────────────────────────────────
     // Single structured entry shows exactly which data sources are active for
     // this request — makes debugging silent failures fast.
@@ -739,17 +749,6 @@ export async function POST(request: NextRequest) {
       }
       return { prompt };
     };
-
-    // Route DFS, pure-fantasy, file-upload, off-season, and ambiguous queries directly to
-    // grok-3-fast (3-6s). Reserve grok-3 for live-odds betting analysis only.
-    // ADP queries override to grok-3: reliable tool use requires the stronger model.
-    // isAmbiguous queries only need a short clarification reply — no need for grok-3.
-    const useFastPath = hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context));
-    const primaryModel = useFastPath ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.MODEL_NAME;
-    // Always log the resolved model so failures are immediately traceable in Vercel logs
-    logger.info(LogCategory.AI, 'model_selected', {
-      metadata: { model: primaryModel, fastPath: useFastPath, hasADPIntent, sport: context?.sport ?? null },
-    });
 
     // ── ADP tool (injected when hasADPIntent) ────────────────────────────────────
     const adpParams = z.object({

@@ -541,6 +541,7 @@ export const LOG_PREFIXES = {
   DATA_SERVICE: '[DataService]',
   CONFIG: '[Config]',
   DATABASE: '[Database]',
+  KALSHI: '[KALSHI]',
 } as const;
 
 // System Prompt Template

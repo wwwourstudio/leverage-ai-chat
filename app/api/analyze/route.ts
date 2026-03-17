@@ -378,6 +378,9 @@ export async function POST(request: NextRequest) {
 
     // Build the enriched prompt with any real odds data or contextual info
     let enrichedPrompt = userMessage;
+    // Holds Kalshi sports markets fetched during prompt enrichment so the card
+    // pipeline can reuse them without a second API call.
+    let kalshiSportsFallbackMarkets: any[] | null = null;
 
     if (context.oddsData?.events?.length > 0) {
       const oddsPreview = context.oddsData.events
@@ -432,17 +435,60 @@ export async function POST(request: NextRequest) {
         if (markets && (markets as any[]).length > 0) {
           const topMarkets = (markets as any[]).slice(0, 6);
           const marketSummary = topMarkets.map((m: any, i: number) => {
-            const yesCents = m.yesPrice ?? m.yesBid ?? m.yes_bid ?? 50;
+            // yesPrice is in cents (0–100). Treat directly as implied probability %.
+            const yesCents = Math.min(100, Math.max(0, m.yesPrice ?? m.yesBid ?? m.yes_bid ?? 50));
+            const noCents  = Math.min(100, Math.max(0, m.noPrice  ?? m.noAsk  ?? m.no_ask  ?? (100 - yesCents)));
+            const spread   = m.spread ?? Math.abs(yesCents - (100 - noCents));
             const vol = m.volume24h ?? m.volume ?? 0;
-            const volStr = vol > 1_000_000 ? `${(vol / 1_000_000).toFixed(1)}M` : vol > 1000 ? `${(vol / 1000).toFixed(0)}K` : `${vol}`;
-            return `${i + 1}. "${m.title}" — YES: ${yesCents}¢, Vol: ${volStr}`;
+            const volStr = vol > 1_000_000 ? `${(vol / 1_000_000).toFixed(1)}M` : vol > 1_000 ? `${(vol / 1_000).toFixed(0)}K` : `${vol}`;
+            return `${i + 1}. "${m.title}" — YES: ${yesCents}% implied prob, NO: ${noCents}%, Spread: ${spread}¢, Vol: ${volStr}`;
           }).join('\n');
-          enrichedPrompt += `\n\n--- LIVE KALSHI MARKETS (ground your analysis in ONLY these real markets — do not invent tickers, prices, or volumes) ---\n${marketSummary}\n--- END KALSHI DATA ---`;
+          console.log(`[KALSHI] Injected ${topMarkets.length} prediction markets into AI context`);
+          enrichedPrompt += `\n\n--- LIVE KALSHI PREDICTION MARKETS ---\n${marketSummary}\n[YES % = market-implied probability. Edge = difference between your model probability and YES %. Ground analysis in these real prices — do not invent tickers or volumes.]\n--- END KALSHI DATA ---`;
         } else {
           enrichedPrompt += `\n\n[Context: Kalshi prediction market query. No live markets available — provide general prediction market analysis and strategy.]`;
         }
       } catch {
         enrichedPrompt += `\n\n[Context: This is a Kalshi prediction market query. Answer directly with prediction market analysis, probability edge, and trading recommendations. Do NOT ask the user to choose a sports platform or area — the user is already on the Kalshi tab. Analyze the specific market or topic asked about.]`;
+      }
+    } else if (context.hasBettingIntent && context.sport && !context.isPoliticalMarket) {
+      // Odds API returned no games for this sport — use Kalshi sports markets as an
+      // independent probability signal (win/loss futures, player props, championship markets).
+      // Maps the internal sport key to the search term Kalshi understands.
+      const SPORT_TO_KALSHI_KW: Record<string, string> = {
+        basketball_nba: 'NBA', basketball_ncaab: 'college basketball',
+        americanfootball_nfl: 'NFL', americanfootball_ncaaf: 'college football',
+        baseball_mlb: 'MLB', icehockey_nhl: 'NHL',
+        soccer_epl: 'Premier League', soccer_mls: 'MLS',
+        mma_mixed_martial_arts: 'UFC MMA',
+      };
+      const sportKw = SPORT_TO_KALSHI_KW[context.sport]
+        ?? context.sport.replace(/^[a-z]+_/, '').toUpperCase();
+      try {
+        const { fetchKalshiMarketsWithRetry, generateKalshiCards } = await import('@/lib/kalshi/index');
+        const markets = await Promise.race([
+          fetchKalshiMarketsWithRetry({ search: sportKw, limit: 10, maxRetries: 1 }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)),
+        ]).catch(() => null);
+        if (markets && (markets as any[]).length > 0) {
+          const top = (markets as any[]).slice(0, 6);
+          kalshiSportsFallbackMarkets = top; // reused by card pipeline below
+          const marketLines = top.map((m: any, i: number) => {
+            const yesCents = Math.min(100, Math.max(0, m.yesPrice ?? m.yesBid ?? 50));
+            const noCents  = Math.min(100, Math.max(0, 100 - yesCents));
+            const vol = m.volume24h ?? m.volume ?? 0;
+            const volStr = vol > 1_000_000 ? `${(vol / 1_000_000).toFixed(1)}M` : vol > 1_000 ? `${(vol / 1_000).toFixed(0)}K` : `${vol}`;
+            return `${i + 1}. "${m.title}" — YES: ${yesCents}% (implied prob ${(yesCents / 100).toFixed(3)}), NO: ${noCents}%, Vol: ${volStr}`;
+          }).join('\n');
+          console.log(`[KALSHI] Injected ${top.length} ${sportKw} markets as odds fallback`);
+          enrichedPrompt += `\n\n--- KALSHI ${sportKw.toUpperCase()} MARKETS (live market-implied probabilities — sportsbook odds unavailable) ---\n${marketLines}\n[YES % = market-implied probability. Use these as your probability baseline. Identify edge where your model probability diverges from market price.]\n--- END KALSHI DATA ---`;
+        } else {
+          enrichedPrompt += `\n\n[Context: Live ${context.sport.toUpperCase()} sportsbook odds are unavailable. Provide expert betting analysis, line expectations, and value picks based on your knowledge. Today: ${dateStr}.]`;
+          console.log(`[KALSHI] No ${sportKw} markets found — falling back to model knowledge`);
+        }
+      } catch (err) {
+        console.warn(`[KALSHI] Sports market fetch failed for ${sportKw}:`, err instanceof Error ? err.message : String(err));
+        enrichedPrompt += `\n\n[Context: Live ${context.sport.toUpperCase()} sportsbook odds are unavailable. Provide expert betting analysis and value picks from your knowledge.]`;
       }
     } else if (!context.hasBettingIntent && !context.sport && !context.isPoliticalMarket) {
       // General question — answer from knowledge
@@ -557,6 +603,16 @@ export async function POST(request: NextRequest) {
           6
         );
         cardPromise = Promise.resolve(builtCards);
+      } else if (kalshiSportsFallbackMarkets && kalshiSportsFallbackMarkets.length > 0) {
+        // Odds API had no games but we already fetched Kalshi sports markets during prompt
+        // enrichment — convert them to cards rather than generating empty placeholders.
+        cardPromise = import('@/lib/kalshi/index')
+          .then(({ generateKalshiCards }) => {
+            const kalshiCards = generateKalshiCards(kalshiSportsFallbackMarkets!);
+            console.log(`[KALSHI] Serving ${kalshiCards.length} prediction market cards (odds API fallback)`);
+            return kalshiCards as InsightCard[];
+          })
+          .catch(() => generateContextualCards('betting', sportKey, 6).catch(() => []));
       } else {
         cardPromise = Promise.race([
           generateContextualCards('betting', sportKey, 6),

@@ -17,6 +17,8 @@ interface Message {
   processingTime?: number;
   sources?: any[];
   isStreaming?: boolean;
+  isPartial?: boolean;
+  isError?: boolean;
 }
 
 interface MessageListProps {

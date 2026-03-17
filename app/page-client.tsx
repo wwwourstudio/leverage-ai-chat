@@ -137,6 +137,8 @@ interface Message {
   attachments?: FileAttachment[];
   voted?: 'up' | 'down';
   isStreaming?: boolean;
+  isPartial?: boolean;   // stream was interrupted; content shows what arrived before the break
+  isError?: boolean;     // request failed with no usable content
 }
 
 interface Chat {
@@ -1280,6 +1282,7 @@ No preamble. Start directly with section 1.`;
     const isDev = process.env.NODE_ENV !== 'production';
     // Hoisted so catch/AbortError blocks can clean up the in-flight streaming message
     let streamingMessageId: string | undefined;
+    let hadPartialContent = false; // true when stream breaks after some tokens arrived
 
     try {
       console.log('[v0] Starting real AI analysis for:', userMessage);
@@ -1519,7 +1522,20 @@ No preamble. Start directly with section 1.`;
         if (!res.ok) {
           const text = await res.text().catch(() => '');
           console.error('[v0] /api/analyze non-OK response:', res.status, text.slice(0, 200));
-          return { success: false, error: `Server error ${res.status}` } as APIResponse;
+          let errorMsg: string;
+          if (res.status === 429) {
+            const retryAfter = res.headers.get('Retry-After');
+            const seconds = retryAfter ? parseInt(retryAfter, 10) : 3600;
+            const mins = Math.ceil(seconds / 60);
+            errorMsg = `Rate limit reached — try again in ${mins} minute${mins !== 1 ? 's' : ''}.`;
+          } else if (res.status === 401) {
+            errorMsg = 'Sign in to continue chatting.';
+          } else if (res.status >= 500) {
+            errorMsg = 'Server error — AI is temporarily unavailable. Please retry.';
+          } else {
+            errorMsg = `Request failed (${res.status})`;
+          }
+          return { success: false, error: errorMsg, httpStatus: res.status } as APIResponse & { httpStatus?: number };
         }
         if (res.headers.get('Content-Type')?.includes('text/event-stream')) {
           // ── Streaming path ───────────────────────────────────────────────
@@ -1579,6 +1595,7 @@ No preamble. Start directly with section 1.`;
             // Network error or reader abort mid-stream — cancel any pending RAF and
             // finalize the streaming message with whatever content was received so far.
             if (rafHandle !== null) { cancelAnimationFrame(rafHandle); rafHandle = null; }
+            hadPartialContent = streamContent.length > 0;
             if (mountedRef.current) {
               setMessages((prev: any) => prev.map((m: any) =>
                 m.id === streamingMessageId
@@ -1586,7 +1603,7 @@ No preamble. Start directly with section 1.`;
                   : m
               ));
             }
-            throw streamErr; // re-throw so outer catch can append the error message
+            throw streamErr; // re-throw so outer catch can handle the partial state
           }
           // Flush any tokens buffered in the last partial frame
           if (rafHandle !== null) { cancelAnimationFrame(rafHandle); rafHandle = null; }
@@ -1625,11 +1642,26 @@ No preamble. Start directly with section 1.`;
       
       if (!analysisResult.success) {
         console.log('[v0] API call failed, using available cards as fallback');
-        
+
+        const httpStatus = (analysisResult as any).httpStatus as number | undefined;
+        // Rate-limit and auth errors: show the message directly, no cached-data fallback
+        if (httpStatus === 429 || httpStatus === 401) {
+          newMessage = {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: analysisResult.error ?? 'Request failed.',
+            timestamp: new Date(),
+            cards: [],
+            confidence: 0,
+            sources: [],
+            modelUsed: 'System',
+            processingTime,
+            isError: true,
+          } as Message;
+        } else {
         // Use already-loaded cards rather than making another server call
         const fallbackCards = availableCards.length > 0 ? availableCards : await selectRelevantCards(userMessage, context);
-        const errorMessage = analysisResult.error || 'API temporarily unavailable';
-        
+
         newMessage = {
           id: crypto.randomUUID(),
           role: 'assistant',
@@ -1658,6 +1690,7 @@ No preamble. Start directly with section 1.`;
             flags: [{ type: 'fallback', message: 'AI unavailable — showing cached market data', severity: 'warning' }]
           }
         };
+        }
       } else {
         // Success path - process the analysis result.
         // If the server returns cards, use them. Otherwise fall back to
@@ -1808,8 +1841,21 @@ No preamble. Start directly with section 1.`;
 
       // Finalize any in-flight streaming message (mark it done, keep partial content)
       if (streamingMessageId && mountedRef.current) {
+        if (hadPartialContent) {
+          // Stream produced content before breaking — preserve it as a partial response
+          // rather than discarding it and showing a separate error message.
+          setMessages((prev: Message[]) => prev.map((m: Message) =>
+            m.id === streamingMessageId
+              ? { ...m, isStreaming: false, isPartial: true,
+                  content: m.content + '\n\n*[Response interrupted — partial result]*' }
+              : m
+          ));
+          setSuggestedPrompts(generateContextualSuggestions(userMessage, []));
+          setIsClarificationPills(false);
+          return; // don't append a second error message
+        }
         setMessages((prev: Message[]) => prev.map((m: Message) =>
-          m.id === streamingMessageId ? { ...m, isStreaming: false } : m
+          m.id === streamingMessageId ? { ...m, isStreaming: false, isError: true } : m
         ));
       }
 
@@ -3257,7 +3303,11 @@ No preamble. Start directly with section 1.`;
                     className={`relative group/message ${
                       message.role === 'user'
                         ? 'rounded-2xl rounded-tr-sm px-5 py-3.5 bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-lg shadow-blue-500/25 w-fit max-w-[85%] ml-auto'
-                        : 'rounded-2xl rounded-tl-sm px-5 py-4 bg-gradient-to-br from-gray-900 via-gray-800/50 to-gray-900 text-gray-100 border border-gray-700/40 shadow-lg shadow-black/30'
+                        : message.isError
+                          ? 'rounded-2xl rounded-tl-sm px-5 py-4 bg-red-950/20 text-gray-100 border border-red-800/40 border-l-2 border-l-red-500/60 shadow-lg shadow-black/30'
+                          : message.isPartial
+                            ? 'rounded-2xl rounded-tl-sm px-5 py-4 bg-gradient-to-br from-gray-900 via-gray-800/50 to-gray-900 text-gray-100 border border-gray-700/40 border-l-2 border-l-amber-500/60 shadow-lg shadow-black/30'
+                            : 'rounded-2xl rounded-tl-sm px-5 py-4 bg-gradient-to-br from-gray-900 via-gray-800/50 to-gray-900 text-gray-100 border border-gray-700/40 shadow-lg shadow-black/30'
                     }`}
                   >
                     {editingMessageIndex === index ? (
@@ -3297,6 +3347,19 @@ No preamble. Start directly with section 1.`;
                       </div>
                     ) : (
                       <>
+                        {/* Error / partial banners for assistant messages */}
+                        {message.role === 'assistant' && message.isError && (
+                          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-red-800/30">
+                            <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                            <span className="text-xs text-red-400 font-medium">Response failed</span>
+                          </div>
+                        )}
+                        {message.role === 'assistant' && message.isPartial && (
+                          <div className="flex items-center gap-2 mb-2">
+                            <Info className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span className="text-xs text-amber-400">Partial response</span>
+                          </div>
+                        )}
                         {/* Check if this is a detailed analysis with structured data */}
                         {message.content.includes('__DETAILED_ANALYSIS__') ? (
                           (() => {
@@ -3837,11 +3900,22 @@ No preamble. Start directly with section 1.`;
                           </button>
                           <button
                             onClick={() => handleRegenerateResponse(index)}
-                            className="p-1.5 rounded-lg hover:bg-purple-500/10 active:bg-purple-500/20 transition-all group/action border border-transparent hover:border-purple-500/30"
+                            className={`flex items-center gap-1 p-1.5 rounded-lg transition-all group/action border ${
+                              message.isError
+                                ? 'text-red-400 bg-red-950/30 border-red-800/40 hover:bg-red-900/40'
+                                : message.isPartial
+                                  ? 'text-amber-400 bg-amber-950/30 border-amber-800/40 hover:bg-amber-900/40'
+                                  : 'hover:bg-purple-500/10 active:bg-purple-500/20 border-transparent hover:border-purple-500/30'
+                            }`}
                             title="Regenerate this response"
                             aria-label="Regenerate response"
                           >
-                            <RotateCcw className="w-3.5 h-3.5 text-gray-500 group-hover/action:text-purple-400 transition-colors" />
+                            <RotateCcw className={`w-3.5 h-3.5 transition-colors ${
+                              message.isError ? 'text-red-400' : message.isPartial ? 'text-amber-400' : 'text-gray-500 group-hover/action:text-purple-400'
+                            }`} />
+                            {(message.isError || message.isPartial) && (
+                              <span className="text-[11px] font-medium">Retry</span>
+                            )}
                           </button>
                         </>
                       )}

@@ -26,6 +26,8 @@ import { detectHallucinations } from '@/lib/hallucination-detector';
 import { getGrokApiKey } from '@/lib/config';
 import { logger, LogCategory } from '@/lib/logger';
 import { getMarketIntelligenceSummary } from '@/lib/market-intelligence';
+import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
+import { createClient } from '@/lib/supabase/server';
 
 // ============================================================================
 // Types
@@ -103,44 +105,40 @@ function shouldUseFastModel(
 // POST /api/analyze
 // ============================================================================
 
-// ── Server-side rate limiter (in-memory, resets on cold start) ──────────────
-// Adequate for single-region Vercel deployment. For multi-instance scale,
-// replace with Upstash Redis: https://github.com/upstash/ratelimit
-const _rateMap = new Map<string, { count: number; resetAt: number }>();
-const _RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const _RATE_LIMIT = 30; // requests per IP per window
-const _RATE_MAP_MAX_SIZE = 10_000; // prevent unbounded growth from unique IPs
-
-function _checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-
-  // Periodically prune expired entries to prevent unbounded memory growth.
-  // Only runs when map is large to minimize overhead on every request.
-  if (_rateMap.size > _RATE_MAP_MAX_SIZE) {
-    for (const [key, val] of _rateMap) {
-      if (now > val.resetAt) _rateMap.delete(key);
-    }
-  }
-
-  const entry = _rateMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    _rateMap.set(ip, { count: 1, resetAt: now + _RATE_WINDOW_MS });
-    return true;
-  }
-  if (entry.count >= _RATE_LIMIT) return false;
-  entry.count++;
-  return true;
-}
+// ── Request body schema ──────────────────────────────────────────────────────
+// Validates at the HTTP boundary so malformed bodies fail fast with a clean 400
+// instead of propagating undefined/oversized values deep into the pipeline.
+const AnalyzeBodySchema = z.object({
+  userMessage:        z.string().min(1, 'Message is required').max(8000, 'Message too long'),
+  existingCards:      z.array(z.any()).max(50).optional().default([]),
+  context:            z.record(z.any()).optional().default({}),
+  customInstructions: z.string().max(2000).optional(),
+  imageAttachments:   z.array(z.any()).max(5).optional().default([]),
+});
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
-  // Server-side rate limit check (bypasses client-side localStorage spoofing)
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-  if (!_checkRateLimit(ip)) {
+  // ── Rate limiting: prefer user ID when authenticated ────────────────────────
+  // Authenticated users get a per-user bucket (10 req/min) so shared IPs (office
+  // NAT, VPN) don't exhaust a single anonymous quota.
+  // Anonymous users get a per-IP bucket (30 req/hour) — same as before.
+  let rateLimitUserId: string | undefined;
+  try {
+    const supabase = await createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    rateLimitUserId = session?.user?.id;
+  } catch {
+    // Supabase unavailable — fall through to IP-based limiting
+  }
+  const rlIdentifier = getRateLimitId(request, rateLimitUserId);
+  const rlResult = rateLimitUserId
+    ? checkRateLimit('analyze:authed', rlIdentifier, { limit: 10, windowMs: 60_000 })
+    : checkRateLimit('analyze:anon',   rlIdentifier, { limit: 30, windowMs: 3_600_000 });
+  if (!rlResult.allowed) {
     return new Response(
-      JSON.stringify({ success: false, error: 'Rate limit exceeded. Try again in an hour.' }),
-      { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': '3600' } },
+      JSON.stringify({ success: false, error: 'Rate limit exceeded. Try again later.' }),
+      { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': String(rlResult.retryAfter ?? 3600) } },
     );
   }
 
@@ -152,7 +150,16 @@ export async function POST(request: NextRequest) {
   const FALLBACK_TIMEOUT_MS = 10_000;
 
   try {
-    const body: AnalyzeRequestBody = await request.json();
+    const rawBody = await request.json();
+    const parsed = AnalyzeBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      const msg = parsed.error.errors[0]?.message ?? 'Invalid request body';
+      return new Response(
+        JSON.stringify({ success: false, error: msg }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+    const body = parsed.data as AnalyzeRequestBody;
     const { userMessage, existingCards = [], context = {}, customInstructions } = body;
 
     // Inject live date into system prompt
@@ -647,6 +654,16 @@ export async function POST(request: NextRequest) {
     const xaiApiKey = getGrokApiKey();
     const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
     const hasClientOddsData = !!(context.oddsData?.events?.length);
+    // Route DFS, pure-fantasy, file-upload, off-season, and ambiguous queries directly to
+    // grok-3-fast (3-6s). Reserve grok-3 for live-odds betting analysis only.
+    // ADP queries override to grok-3: reliable tool use requires the stronger model.
+    // isAmbiguous queries only need a short clarification reply — no need for grok-3.
+    const useFastPath = hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context));
+    const primaryModel = useFastPath ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.MODEL_NAME;
+    // Always log the resolved model so failures are immediately traceable in Vercel logs
+    logger.info(LogCategory.AI, 'model_selected', {
+      metadata: { model: primaryModel, fastPath: useFastPath, hasADPIntent, sport: context?.sport ?? null },
+    });
     // ── Pipeline observability log ────────────────────────────────────────────
     // Single structured entry shows exactly which data sources are active for
     // this request — makes debugging silent failures fast.
@@ -732,17 +749,6 @@ export async function POST(request: NextRequest) {
       }
       return { prompt };
     };
-
-    // Route DFS, pure-fantasy, file-upload, off-season, and ambiguous queries directly to
-    // grok-3-fast (3-6s). Reserve grok-3 for live-odds betting analysis only.
-    // ADP queries override to grok-3: reliable tool use requires the stronger model.
-    // isAmbiguous queries only need a short clarification reply — no need for grok-3.
-    const useFastPath = hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context));
-    const primaryModel = useFastPath ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.MODEL_NAME;
-    // Always log the resolved model so failures are immediately traceable in Vercel logs
-    logger.info(LogCategory.AI, 'model_selected', {
-      metadata: { model: primaryModel, fastPath: useFastPath, hasADPIntent, sport: context?.sport ?? null },
-    });
 
     // ── ADP tool (injected when hasADPIntent) ────────────────────────────────────
     const adpParams = z.object({

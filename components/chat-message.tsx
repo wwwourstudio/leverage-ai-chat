@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { TrustMetricsDisplay } from '@/components/trust-metrics-display';
-import { Shield, Copy, Edit3, CheckCheck, X, Zap, Brain } from 'lucide-react';
+import { Shield, Copy, Edit3, CheckCheck, X, Zap, Brain, AlertCircle, Info, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Message {
@@ -14,12 +14,15 @@ interface Message {
   sources?: any[];
   modelUsed?: string;
   processingTime?: number;
+  isPartial?: boolean;  // stream interrupted; content shows what arrived before the break
+  isError?: boolean;    // request failed with no usable content
 }
 
 interface ChatMessageProps {
   message: Message;
   onEdit?: (content: string) => void;
   onCopy?: () => void;
+  onRetry?: () => void;
 }
 
 /** Render inline markdown: **bold**, _italic_, `code` */
@@ -266,7 +269,7 @@ function formatRelativeTime(date: Date): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, onCopy }: ChatMessageProps) {
+export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, onCopy, onRetry }: ChatMessageProps) {
   const [isEditing, setIsEditing] = React.useState(false);
   const [editContent, setEditContent] = React.useState(message.content);
   const [showTrust, setShowTrust] = React.useState(false);
@@ -289,7 +292,11 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
           'rounded-2xl px-5 py-4',
           isUser
             ? 'bg-gradient-to-br from-[oklch(0.30_0.07_260)] to-[oklch(0.24_0.05_265)] text-white shadow-lg shadow-[oklch(0.15_0.04_260)/0.3] min-w-[200px] border border-[oklch(0.38_0.06_260)]'
-            : 'bg-[oklch(0.12_0.015_280)] border border-l-[3px] border-[oklch(0.22_0.02_280)] border-l-[oklch(0.45_0.06_260)] shadow-sm',
+            : message.isError
+              ? 'bg-red-950/20 border border-l-[3px] border-red-800/40 border-l-red-500/60 shadow-sm'
+              : message.isPartial
+                ? 'bg-[oklch(0.12_0.015_280)] border border-l-[3px] border-[oklch(0.22_0.02_280)] border-l-amber-500/60 shadow-sm'
+                : 'bg-[oklch(0.12_0.015_280)] border border-l-[3px] border-[oklch(0.22_0.02_280)] border-l-[oklch(0.45_0.06_260)] shadow-sm',
         )}>
           {isEditing ? (
             <div className="space-y-3">
@@ -317,6 +324,19 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
             </div>
           ) : (
             <>
+              {/* Error / partial banners — shown above message content for assistant turns */}
+              {!isUser && message.isError && (
+                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-red-800/30">
+                  <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                  <span className="text-xs text-red-400 font-medium">Response failed</span>
+                </div>
+              )}
+              {!isUser && message.isPartial && (
+                <div className="flex items-center gap-2 mb-2">
+                  <Info className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span className="text-xs text-amber-400">Partial response</span>
+                </div>
+              )}
               {isUser ? (
                 <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
               ) : (
@@ -352,6 +372,24 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                     )}
 
                     {/* Action buttons */}
+                    {/* Retry button — prominent red/amber when error/partial, subtle otherwise */}
+                    {onRetry && (
+                      <button
+                        onClick={onRetry}
+                        title="Retry"
+                        className={cn(
+                          'flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] transition-all',
+                          message.isError
+                            ? 'text-red-400 bg-red-950/30 hover:bg-red-900/40 hover:text-red-300'
+                            : message.isPartial
+                              ? 'text-amber-400 bg-amber-950/30 hover:bg-amber-900/40 hover:text-amber-300'
+                              : 'opacity-60 hover:opacity-100 text-[oklch(0.42_0.01_280)] hover:text-blue-400 hover:bg-[oklch(0.18_0.01_280)]',
+                        )}
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        {(message.isError || message.isPartial) && <span>Retry</span>}
+                      </button>
+                    )}
                     <button
                       onClick={onCopy}
                       title="Copy response"

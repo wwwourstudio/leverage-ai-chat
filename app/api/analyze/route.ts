@@ -13,6 +13,9 @@ import {
   HTTP_STATUS,
   ERROR_MESSAGES,
   NFBC_DRAFT_YEAR,
+  PLAYER_SPORT_MAP,
+  STAT_SPORT_MAP,
+  LOG_PREFIXES,
 } from '@/lib/constants';
 import { getADPData, queryADP, parseTSV, saveADPToSupabase, clearADPCache } from '@/lib/adp-data';
 import { getNFLADPData, clearNFLADPCache } from '@/lib/nfl-adp-data';
@@ -192,8 +195,21 @@ export async function POST(request: NextRequest) {
 
     let inferredSport = context?.sport && context.sport !== 'none' ? context.sport : undefined;
     if (!inferredSport) {
+      // Layer 1: team nicknames (fastest, most reliable)
       for (const [team, sportName] of Object.entries(TEAM_TO_SPORT)) {
         if (msgLower.includes(team)) { inferredSport = sportName; break; }
+      }
+    }
+    if (!inferredSport) {
+      // Layer 2: well-known player last names (handles "Mahomes passing yards", "Ohtani HR", etc.)
+      for (const [player, sportName] of Object.entries(PLAYER_SPORT_MAP)) {
+        if (msgLower.includes(player)) { inferredSport = sportName; break; }
+      }
+    }
+    if (!inferredSport) {
+      // Layer 3: sport-specific statistical vocabulary (longest match wins — iterate most-specific first)
+      for (const { term, sport: sportName } of STAT_SPORT_MAP) {
+        if (msgLower.includes(term)) { inferredSport = sportName; break; }
       }
     }
     // Merge inferred sport back into context so downstream handlers pick it up
@@ -632,13 +648,35 @@ export async function POST(request: NextRequest) {
     const xaiApiKey = getGrokApiKey();
     const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
     const hasClientOddsData = !!(context.oddsData?.events?.length);
-    console.log('[API/analyze] Keys configured:', {
-      XAI_API_KEY: !!xaiApiKey,
-      ODDS_API_KEY: !!oddsApiKey,
-      KALSHI_API_KEY: true,
-      hasOddsData: hasClientOddsData,
+    // ── Pipeline observability log ────────────────────────────────────────────
+    // Single structured entry shows exactly which data sources are active for
+    // this request — makes debugging silent failures fast.
+    console.log(LOG_PREFIXES.PIPELINE, {
+      sport:    context.sport  ?? 'none',
       category,
-      sport: context.sport || 'none',
+      model:    primaryModel,
+      fastPath: useFastPath,
+      sources: {
+        odds:        hasClientOddsData,
+        kalshi:      !!(kalshiSportsFallbackMarkets?.length) || context.isPoliticalMarket || context.selectedCategory === 'kalshi',
+        adp:         hasADPIntent,
+        statcast:    expectsStatcastJSON,
+        projections: hasMLBProjectionIntent,
+        fantasy:     !!(context.hasFantasyIntent),
+      },
+      intent: {
+        betting:    !!(context.hasBettingIntent),
+        fantasy:    !!(context.hasFantasyIntent),
+        player:     !!(context.hasPlayerIntent),
+        political:  !!(context.isPoliticalMarket),
+        adp:        hasADPIntent,
+        ambiguous:  isAmbiguous,
+      },
+      keys: {
+        XAI_API_KEY:    !!xaiApiKey,
+        ODDS_API_KEY:   !!oddsApiKey,
+        KALSHI_API_KEY: !!(process.env.KALSHI_API_KEY),
+      },
     });
     let aiText = '';
     let modelUsed: string = AI_CONFIG.MODEL_DISPLAY_NAME;

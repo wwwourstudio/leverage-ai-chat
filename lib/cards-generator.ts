@@ -859,7 +859,7 @@ async function _generateContextualCards(
         
         opportunities.forEach((opp: any) => {
           cards.push({
-            type: 'ARBITRAGE',
+            type: CARD_TYPES.ARBITRAGE_OPPORTUNITY,
             title: `${opp.away_team} @ ${opp.home_team}`,
             icon: 'DollarSign',
             category: 'ARBITRAGE',
@@ -904,7 +904,7 @@ async function _generateContextualCards(
 
     // Fallback if no opportunities found
     cards.push({
-      type: 'ARBITRAGE',
+      type: CARD_TYPES.ARBITRAGE_OPPORTUNITY,
       title: 'Arbitrage Scanner',
       icon: 'DollarSign',
       category: 'ARBITRAGE',
@@ -1010,7 +1010,7 @@ async function _generateContextualCards(
           const isSteam = Math.abs(lineChange) > 2;
           
           cards.push({
-            type: 'LINE_MOVEMENT',
+            type: CARD_TYPES.LINE_MOVEMENT,
             title: `${move.away_team} @ ${move.home_team}`,
             icon: isSteam ? 'TrendingUp' : 'Activity',
             category: 'LINE MOVEMENT',
@@ -1049,7 +1049,7 @@ async function _generateContextualCards(
 
     // Fallback
     cards.push({
-      type: 'LINE_MOVEMENT',
+      type: CARD_TYPES.LINE_MOVEMENT,
       title: 'Line Movement Tracker',
       icon: 'Activity',
       category: 'LINE MOVEMENT',
@@ -1191,7 +1191,7 @@ async function _generateContextualCards(
         
         // Portfolio summary card
         cards.push({
-          type: 'PORTFOLIO',
+          type: CARD_TYPES.PORTFOLIO,
           title: 'Portfolio Overview',
           icon: 'Wallet',
           category: 'PORTFOLIO',
@@ -1221,7 +1221,7 @@ async function _generateContextualCards(
           allocations.slice(0, Math.min(2, count - 1)).forEach((bet: any) => {
             const kellyPct = (bet.kelly_fraction * 100).toFixed(2);
             cards.push({
-              type: 'KELLY_BET',
+              type: CARD_TYPES.KELLY_BET,
               title: bet.matchup || 'Bet Allocation',
               icon: 'Target',
               category: 'KELLY SIZING',
@@ -1256,7 +1256,7 @@ async function _generateContextualCards(
 
     // Fallback
     cards.push({
-      type: 'PORTFOLIO',
+      type: CARD_TYPES.PORTFOLIO,
       title: 'Portfolio Manager',
       icon: 'Wallet',
       category: 'PORTFOLIO',
@@ -1304,7 +1304,7 @@ async function _generateContextualCards(
     
     // Fallback placeholder
     cards.push({
-      type: 'PLAYER_PROP',
+      type: CARD_TYPES.PLAYER_PROP,
       title: 'Player Props',
       icon: 'User',
       category: displaySport,
@@ -1547,7 +1547,7 @@ async function _generateContextualCards(
     }
 
     cards.push({
-      type: 'DFS_LINEUP',
+      type: CARD_TYPES.DFS_LINEUP,
       title: `${displaySport || 'DFS'} Optimal Lineup`,
       icon: 'Users',
       category: 'DFS',
@@ -1569,7 +1569,7 @@ async function _generateContextualCards(
       console.error('[v0] [CARDS-GEN] Fantasy card generation failed:', err);
       // Fallback placeholder
       cards.push({
-        type: 'FANTASY_ADVICE',
+        type: CARD_TYPES.FANTASY_ADVICE,
         title: 'Fantasy Intelligence',
         icon: 'Trophy',
         category: 'FANTASY',

@@ -69,8 +69,8 @@ export const WaiverCard = memo(function WaiverCard({ data, isHero, ...p }: Fanta
                   )}
                 </div>
               </div>
-              {/* FAAB bid row */}
-              {t.faabBid != null && (
+              {/* FAAB bid row — hide when bid is 0 (e.g. SP start/sit context) */}
+              {t.faabBid != null && t.faabBid > 0 && (
                 <div className="flex items-center gap-1 mb-1.5">
                   <span className="text-[9px] font-bold text-[oklch(0.42_0.01_280)]">FAAB</span>
                   <span className="text-base font-black text-teal-400 tabular-nums">${t.faabBid}</span>

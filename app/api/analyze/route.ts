@@ -599,6 +599,12 @@ export async function POST(request: NextRequest) {
       'leaderboard_card', 'pitch_analysis_card',
     ]);
 
+    // True only when MLB_ANALYSIS_ADDENDUM is the active system prompt — i.e. the model
+    // was instructed to return a Statcast JSON card.  When hasMLBProjectionIntent is true
+    // the system prompt switches to MLB_PROJECTION_ADDENDUM (prose), so we must NOT attempt
+    // to parse JSON from that response or log a spurious "fell back to text extraction" warning.
+    const expectsStatcastJSON = isMLBStatcastMode && !hasMLBProjectionIntent;
+
     const _MAX_HALLUCINATION_RETRIES = 2; // reserved for future retry logic
 
     // ── Image attachment validation ───────────────────────────────────────────
@@ -919,8 +925,8 @@ export async function POST(request: NextRequest) {
                 }
               }
 
-              // Statcast tool results
-              if (isMLBStatcastMode) {
+              // Statcast tool results — only relevant when MLB_ANALYSIS_ADDENDUM is active
+              if (expectsStatcastJSON) {
                 const statcastResult = allToolResults.find((tr: any) => tr.toolName === 'query_statcast');
                 if (statcastResult) {
                   const srPlayers: StatcastPlayer[] = statcastResult.result?.players ?? [];
@@ -1021,25 +1027,46 @@ export async function POST(request: NextRequest) {
           if (pendingADPCard) cards = [pendingADPCard, ...cards.slice(0, 5)];
           if (pendingADPUploadCard) cards = [...cards, pendingADPUploadCard];
 
-          // MLB Statcast: parse Grok's JSON response into a card
-          if (isMLBStatcastMode && !usedFallback && !skipStatcastJSON) {
-            // Try all candidate JSON blocks (non-greedy) so we don't merge multiple objects
-            const jsonCandidates = [...aiText.matchAll(/\{[\s\S]*?\}/g)].map(m => m[0]);
-            // Also include the full span as a last-resort candidate
+          // MLB Statcast: parse Grok's JSON response into a card.
+          // Only runs when MLB_ANALYSIS_ADDENDUM was active (expectsStatcastJSON).
+          // Projection / DFS / stack queries use MLB_PROJECTION_ADDENDUM and return prose —
+          // attempting JSON extraction on them produces only spurious warnings.
+          if (expectsStatcastJSON && !usedFallback && !skipStatcastJSON) {
+            /** Attempt to parse a JSON string and return it if it has a valid Statcast card type. */
+            const tryParseStatcastCard = (src: string): Record<string, unknown> | null => {
+              try {
+                const p = JSON.parse(src) as Record<string, unknown>;
+                if (
+                  p !== null &&
+                  typeof p === 'object' &&
+                  typeof p.type === 'string' &&
+                  STATCAST_CARD_TYPES.has(p.type) &&
+                  typeof p.title === 'string' &&
+                  Array.isArray(p.summary_metrics)
+                ) {
+                  return p;
+                }
+              } catch {
+                // not valid JSON — try next candidate
+              }
+              return null;
+            };
+
+            // Build candidate list ordered by specificity:
+            // 1. ```json ... ``` or ``` ... ``` code fences (Grok sometimes wraps JSON despite instructions)
+            // 2. Non-greedy {...} blocks (avoids merging adjacent objects)
+            // 3. Full greedy {...} span as last resort (handles deeply-nested objects)
+            const jsonCandidates: string[] = [];
+            const codeFenceMatch = aiText.match(/```(?:json)?\s*([\s\S]*?)```/);
+            if (codeFenceMatch) jsonCandidates.push(codeFenceMatch[1].trim());
+            for (const m of aiText.matchAll(/\{[\s\S]*?\}/g)) jsonCandidates.push(m[0]);
             const fullSpanMatch = aiText.match(/\{[\s\S]*\}/);
             if (fullSpanMatch) jsonCandidates.push(fullSpanMatch[0]);
 
             let parsedStatcast: Record<string, unknown> | null = null;
             for (const candidate of jsonCandidates) {
-              try {
-                const p = JSON.parse(candidate) as Record<string, unknown>;
-                if (p && typeof p.type === 'string' && STATCAST_CARD_TYPES.has(p.type)) {
-                  parsedStatcast = p;
-                  break;
-                }
-              } catch {
-                // try next candidate
-              }
+              parsedStatcast = tryParseStatcastCard(candidate);
+              if (parsedStatcast) break;
             }
 
             if (parsedStatcast) {
@@ -1059,12 +1086,14 @@ export async function POST(request: NextRequest) {
               // Replace the raw JSON the client already received with readable prose
               controller.enqueue(sseChunk({ type: 'replace', text: cleanText }));
             } else {
-              // Grok returned markdown/text instead of JSON — extract structured fields
-              const mlbAnalysis = extractMLBJson(aiText);
-              logger.warn(LogCategory.API, '[API/analyze] MLB JSON parse fell back to text extraction', {
-                pick: mlbAnalysis.pick,
-                book: mlbAnalysis.book,
-                odds: mlbAnalysis.odds,
+              // Grok returned markdown/text despite JSON instructions — log with context
+              // so we can diagnose prompt-compliance issues without surface-level noise.
+              const preview = aiText.slice(0, 120).replace(/\n/g, ' ');
+              logger.warn(LogCategory.API, '[API/analyze] MLB Statcast JSON not found in response — prose fallback', {
+                previewChars: preview,
+                responseLength: aiText.length,
+                hasCodeFence: aiText.includes('```'),
+                hasBrace: aiText.includes('{'),
               });
             }
           }

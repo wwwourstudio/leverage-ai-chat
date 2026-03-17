@@ -26,6 +26,15 @@ function cardId(...parts: (string | number | undefined | null)[]): string {
 }
 
 // ============================================================================
+// Preferred bookmaker order — used in both oddsEventsToBettingCards and
+// generateSportSpecificCards. Extracted here to avoid duplication.
+// ============================================================================
+const PREFERRED_BOOKS = [
+  'DraftKings', 'FanDuel', 'BetMGM', 'Caesars', 'PointsBet',
+  'BetRivers', 'ESPN BET', 'Hard Rock Bet', 'Fanatics', 'bet365',
+];
+
+// ============================================================================
 // In-memory card cache (shared between SSR page load and /api/analyze)
 // Prevents duplicate API calls when the analyze endpoint needs cards that
 // were already fetched during SSR.
@@ -77,10 +86,6 @@ export function oddsEventsToBettingCards(
 ): InsightCard[] {
   const cards: InsightCard[] = [];
   const displaySport = apiToSport(sport).toUpperCase();
-  const PREFERRED_BOOKS = [
-    'DraftKings', 'FanDuel', 'BetMGM', 'Caesars', 'PointsBet',
-    'BetRivers', 'ESPN BET', 'Hard Rock Bet', 'Fanatics', 'bet365',
-  ];
 
   // First pass: completed games with scores
   for (const game of events) {
@@ -140,6 +145,30 @@ export function oddsEventsToBettingCards(
     const gameTimeStr = isToday
       ? `Today ${gameDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
       : gameDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    // Multi-book comparison: top 3 preferred books with H2H ML odds
+    const topBooks = sorted.slice(0, 3).map((b: any) => {
+      const bH2h = b.markets?.find((m: any) => m.key === 'h2h')?.outcomes || [];
+      const bHome = bH2h.find((o: any) => o.name === game.home_team);
+      const bAway = bH2h.find((o: any) => o.name === game.away_team);
+      return {
+        name: b.title as string,
+        homeOdds: bHome ? (bHome.price > 0 ? `+${bHome.price}` : `${bHome.price}`) : null,
+        awayOdds: bAway ? (bAway.price > 0 ? `+${bAway.price}` : `${bAway.price}`) : null,
+      };
+    }).filter((b: any) => b.homeOdds || b.awayOdds);
+
+    // Best odds (highest price = most favorable) across all bookmakers
+    let bestHomeRaw: number | null = null;
+    let bestAwayRaw: number | null = null;
+    for (const b of bookmakers) {
+      const bH2h = b.markets?.find((m: any) => m.key === 'h2h')?.outcomes || [];
+      const bHome = bH2h.find((o: any) => o.name === game.home_team);
+      const bAway = bH2h.find((o: any) => o.name === game.away_team);
+      if (bHome && (bestHomeRaw === null || bHome.price > bestHomeRaw)) bestHomeRaw = bHome.price;
+      if (bAway && (bestAwayRaw === null || bAway.price > bestAwayRaw)) bestAwayRaw = bAway.price;
+    }
+
     cards.push({
       type: CARD_TYPES.LIVE_ODDS,
       title: `${game.away_team} @ ${game.home_team}`,
@@ -157,7 +186,10 @@ export function oddsEventsToBettingCards(
         awaySpread: awaySpread ? `${awaySpread.point > 0 ? '+' : ''}${awaySpread.point} (${awaySpread.price > 0 ? '+' : ''}${awaySpread.price})` : 'N/A',
         overUnder: over && under ? `O/U ${over.point}: Over ${over.price > 0 ? '+' : ''}${over.price} / Under ${under.price > 0 ? '+' : ''}${under.price}` : 'N/A',
         bookmaker: book?.title ?? (hasOdds ? 'Multiple Books' : 'Upcoming'),
-        bookmakerCount: game.bookmakers?.length || 0,
+        bookmakerCount: bookmakers.length,
+        books: topBooks.length >= 2 ? topBooks : undefined,
+        bestHomeOdds: bestHomeRaw !== null ? (bestHomeRaw > 0 ? `+${bestHomeRaw}` : `${bestHomeRaw}`) : undefined,
+        bestAwayOdds: bestAwayRaw !== null ? (bestAwayRaw > 0 ? `+${bestAwayRaw}` : `${bestAwayRaw}`) : undefined,
         realData: true,
         status: hasOdds ? 'VALUE' : 'UPCOMING',
       },
@@ -203,12 +235,6 @@ async function generateSportSpecificCards(
       
       if (oddsData && oddsData.length > 0) {
         console.log(`[v0] [CARDS-GEN] SUCCESS: Found ${oddsData.length} games for ${displaySport}`);
-
-        // Preferred bookmaker order — rotate through these so every major book gets shown
-        const PREFERRED_BOOKS = [
-          'DraftKings', 'FanDuel', 'BetMGM', 'Caesars', 'PointsBet',
-          'BetRivers', 'ESPN BET', 'Hard Rock Bet', 'Fanatics', 'bet365',
-        ];
 
         // Build a flat list: one entry per (game, bookmaker) pair, prioritising preferred books
         const gameBookPairs: Array<{ game: any; book: any; bookIdx: number }> = [];
@@ -266,6 +292,7 @@ async function generateSportSpecificCards(
         for (const { game, book } of gameBookPairs) {
           if (cards.length >= actualCount) break;
 
+          const bookmakers: any[] = game.bookmakers || [];
           const h2hMarket = book?.markets?.find((m: any) => m.key === 'h2h');
           const spreadsMarket = book?.markets?.find((m: any) => m.key === 'spreads');
           const totalsMarket = book?.markets?.find((m: any) => m.key === 'totals');
@@ -290,6 +317,34 @@ async function generateSportSpecificCards(
             ? `Today ${gameDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
             : gameDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
+          // Multi-book comparison: sort all available books and take top 3
+          const allSorted = [...bookmakers].sort((a, b) => {
+            const ai = PREFERRED_BOOKS.findIndex(n => a.title?.includes(n));
+            const bi = PREFERRED_BOOKS.findIndex(n => b.title?.includes(n));
+            return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+          });
+          const topBooks = allSorted.slice(0, 3).map((b: any) => {
+            const bH2h = b.markets?.find((m: any) => m.key === 'h2h')?.outcomes || [];
+            const bHome = bH2h.find((o: any) => o.name === game.home_team);
+            const bAway = bH2h.find((o: any) => o.name === game.away_team);
+            return {
+              name: b.title as string,
+              homeOdds: bHome ? (bHome.price > 0 ? `+${bHome.price}` : `${bHome.price}`) : null,
+              awayOdds: bAway ? (bAway.price > 0 ? `+${bAway.price}` : `${bAway.price}`) : null,
+            };
+          }).filter((b: any) => b.homeOdds || b.awayOdds);
+
+          // Best odds across all bookmakers
+          let bestHomeRaw: number | null = null;
+          let bestAwayRaw: number | null = null;
+          for (const b of bookmakers) {
+            const bH2h = b.markets?.find((m: any) => m.key === 'h2h')?.outcomes || [];
+            const bHome = bH2h.find((o: any) => o.name === game.home_team);
+            const bAway = bH2h.find((o: any) => o.name === game.away_team);
+            if (bHome && (bestHomeRaw === null || bHome.price > bestHomeRaw)) bestHomeRaw = bHome.price;
+            if (bAway && (bestAwayRaw === null || bAway.price > bestAwayRaw)) bestAwayRaw = bAway.price;
+          }
+
           cards.push({
             type: CARD_TYPES.LIVE_ODDS,
             title: `${game.away_team} @ ${game.home_team}`,
@@ -307,7 +362,10 @@ async function generateSportSpecificCards(
               awaySpread: awaySpread ? `${awaySpread.point > 0 ? '+' : ''}${awaySpread.point} (${awaySpread.price > 0 ? '+' : ''}${awaySpread.price})` : 'N/A',
               overUnder: over && under ? `O/U ${over.point}: Over ${over.price > 0 ? '+' : ''}${over.price} / Under ${under.price > 0 ? '+' : ''}${under.price}` : 'N/A',
               bookmaker: book?.title ?? (hasOdds ? 'Multiple Books' : 'Upcoming'),
-              bookmakerCount: game.bookmakers?.length || 0,
+              bookmakerCount: bookmakers.length,
+              books: topBooks.length >= 2 ? topBooks : undefined,
+              bestHomeOdds: bestHomeRaw !== null ? (bestHomeRaw > 0 ? `+${bestHomeRaw}` : `${bestHomeRaw}`) : undefined,
+              bestAwayOdds: bestAwayRaw !== null ? (bestAwayRaw > 0 ? `+${bestAwayRaw}` : `${bestAwayRaw}`) : undefined,
               realData: true,
               status: hasOdds ? 'VALUE' : 'UPCOMING',
             },

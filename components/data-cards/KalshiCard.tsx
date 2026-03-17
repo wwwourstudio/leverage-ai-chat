@@ -442,10 +442,15 @@ function TimeBar({ closeTimeIso }: { closeTimeIso?: string | null }) {
 
 // ── Related Markets Link ───────────────────────────────────────────────────────
 function RelatedMarketsLink({ seriesTicker, eventTicker }: { seriesTicker?: string; eventTicker?: string }) {
-  // Prefer eventTicker for the link since it maps to a real Kalshi page (/markets/{event})
-  const linkTarget = eventTicker || seriesTicker;
+  // Only use tickers that are valid public Kalshi identifiers (no UUID/hex segments)
+  const isPublicTicker = (t?: string) =>
+    Boolean(t) && (t as string).length <= 35 && !/-[0-9a-f]{8,}/i.test(t as string);
+
+  const validSeries = isPublicTicker(seriesTicker) ? seriesTicker : null;
+  const validEvent  = isPublicTicker(eventTicker)  ? eventTicker  : null;
+  const linkTarget  = validSeries || validEvent;
   if (!linkTarget) return null;
-  const label = seriesTicker || eventTicker || '';
+
   return (
     <a
       href={`https://kalshi.com/markets/${linkTarget.toLowerCase()}`}
@@ -454,7 +459,7 @@ function RelatedMarketsLink({ seriesTicker, eventTicker }: { seriesTicker?: stri
       className="flex items-center gap-1.5 text-[10px] text-[oklch(0.38_0.02_260)] hover:text-[oklch(0.55_0.02_260)] transition-colors duration-150 font-medium"
     >
       <Layers className="w-3 h-3 shrink-0" />
-      More markets in {label}
+      More markets in {linkTarget}
       <ChevronRight className="w-3 h-3" />
     </a>
   );
@@ -529,19 +534,27 @@ export const KalshiCard = memo(function KalshiCard({
   const displayTitle = shortenTitle(title);
 
   // Deep link — Kalshi URL format: /markets/{event_ticker}/{market_ticker} (lowercase)
-  // seriesTicker is a category grouping (e.g. "KXBTC"), NOT a valid URL path segment
-  // eventTicker is the parent event (e.g. "KXBTCD-25MAR14") used as the first path segment
-  const evt = (d.eventTicker || '').toLowerCase();
-  const mkt = (d.ticker      || '').toLowerCase();
-  const tradeBase = evt && mkt
-    ? `https://kalshi.com/markets/${evt}/${mkt}`
-    : evt
-    ? `https://kalshi.com/markets/${evt}`
-    : mkt
-    ? `https://kalshi.com/markets/${mkt}`
-    : null;
+  // Validate that tickers are real public Kalshi identifiers.
+  // Internal cross-category markets have UUID/hex segments (e.g. "-s20269c2be3773b8")
+  // that don't resolve to public Kalshi pages → 404. Filter those out.
+  const isPublicTicker = (t?: string) =>
+    Boolean(t) && (t as string).length <= 35 && !/-[0-9a-f]{8,}/i.test(t as string);
+
+  const evtLower    = isPublicTicker(d.eventTicker)   ? (d.eventTicker as string).toLowerCase()   : '';
+  const mktLower    = isPublicTicker(d.ticker)         ? (d.ticker as string).toLowerCase()         : '';
+  const seriesLower = isPublicTicker(d.seriesTicker)  ? (d.seriesTicker as string).toLowerCase()  : '';
+
+  const tradeBase = evtLower && mktLower
+    ? `https://kalshi.com/markets/${evtLower}/${mktLower}`
+    : seriesLower
+    ? `https://kalshi.com/markets/${seriesLower}`
+    : evtLower
+    ? `https://kalshi.com/markets/${evtLower}`
+    : `https://kalshi.com/markets`;
 
   // YES/NO buy deep links — Kalshi doesn't have a ?side= param, both link to the same market
+  // hasSpecificMarket: only show trade buttons when we have a real market URL (not just homepage)
+  const hasSpecificMarket = evtLower || mktLower || seriesLower;
   const yesTradeUrl = tradeBase;
   const noTradeUrl  = tradeBase;
 
@@ -671,8 +684,8 @@ export const KalshiCard = memo(function KalshiCard({
             </button>
           )}
 
-          {/* Split YES / NO trade buttons */}
-          {tradeBase && (
+          {/* Split YES / NO trade buttons — only shown when we have a real public market URL */}
+          {hasSpecificMarket && (
             <div className="grid grid-cols-2 gap-2">
               <a
                 href={yesTradeUrl!}

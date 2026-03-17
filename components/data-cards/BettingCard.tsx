@@ -3,11 +3,17 @@
 import { memo, useState } from 'react';
 import {
   Clock, TrendingUp, TrendingDown, Minus,
-  ChevronRight, Zap, Shield, AlertTriangle, Wind,
+  ChevronRight, Zap, Shield, AlertTriangle, Wind, BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PlayerAvatar } from './PlayerAvatar';
 import { getPlayerHeadshotUrl, getTeamLogoUrl } from '@/lib/constants';
+
+interface BookEntry {
+  name: string;
+  homeOdds: string | null;
+  awayOdds: string | null;
+}
 
 interface BettingCardData {
   matchup?: string;
@@ -27,6 +33,12 @@ interface BettingCardData {
   book?: string;
   bookmaker?: string;
   bookmakerCount?: number | string;
+  /** Top 3 bookmakers with H2H ML odds for side-by-side comparison */
+  books?: BookEntry[];
+  /** Best available home moneyline across all books */
+  bestHomeOdds?: string;
+  /** Best available away moneyline across all books */
+  bestAwayOdds?: string;
   edge?: string;
   impliedWin?: string;
   impliedProb?: string;
@@ -120,6 +132,14 @@ function impliedProb(ml?: string): number | null {
   return n < 0 ? Math.round((-n / (-n + 100)) * 100) : Math.round((100 / (n + 100)) * 100);
 }
 
+/** Calculate bookmaker overround (vig) as a percentage */
+function calcVig(homeML?: string, awayML?: string): number | null {
+  const h = impliedProb(homeML);
+  const a = impliedProb(awayML);
+  if (h === null || a === null) return null;
+  return Math.round((h + a - 100) * 10) / 10;
+}
+
 /** Sport-specific gradient + accent colours */
 function sportTheme(sport?: string): {
   headerGrad: string;
@@ -204,13 +224,15 @@ function SplitBar({ leftPct, leftLabel, rightLabel, leftColor, rightColor }: {
 // ─────────────────────────────────────────────────────────────────────────────
 // OddsCell
 // ─────────────────────────────────────────────────────────────────────────────
-function OddsCell({ label, value, sub, positive, highlight }: {
-  label: string; value: string; sub?: string; positive?: boolean; highlight?: boolean;
+function OddsCell({ label, value, sub, positive, highlight, isBest }: {
+  label: string; value: string; sub?: string; positive?: boolean; highlight?: boolean; isBest?: boolean;
 }) {
   return (
     <div className={cn(
       'flex flex-col items-center gap-0.5 px-2 py-2.5 rounded-xl border',
-      highlight
+      isBest
+        ? 'bg-emerald-500/8 border-emerald-500/25'
+        : highlight
         ? 'bg-blue-500/10 border-blue-500/20'
         : 'bg-[oklch(0.08_0.01_280)] border-[oklch(0.17_0.015_280)]',
     )}>
@@ -221,6 +243,131 @@ function OddsCell({ label, value, sub, positive, highlight }: {
         'text-white'
       )}>{value}</span>
       {sub && <span className="text-[9px] text-[oklch(0.38_0.01_280)]">{sub}</span>}
+      {isBest && <span className="text-[7px] font-black text-emerald-500 uppercase tracking-wider">BEST</span>}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BookComparisonRow — side-by-side ML odds from top 3 bookmakers
+// ─────────────────────────────────────────────────────────────────────────────
+function BookComparisonRow({
+  books,
+  homeTeam,
+  awayTeam,
+  bestHomeOdds,
+  bestAwayOdds,
+}: {
+  books: BookEntry[];
+  homeTeam?: string;
+  awayTeam?: string;
+  bestHomeOdds?: string;
+  bestAwayOdds?: string;
+}) {
+  if (!books || books.length < 2) return null;
+
+  // Shorten book names for compact display
+  const shortName = (name: string) =>
+    name
+      .replace(' Sportsbook', '')
+      .replace(' BET', '')
+      .replace('DraftKings', 'DK')
+      .replace('FanDuel', 'FD')
+      .replace('BetMGM', 'MGM')
+      .replace('Caesars', 'CZR')
+      .replace('PointsBet', 'PB')
+      .replace('BetRivers', 'BR')
+      .replace('ESPN BET', 'ESPN')
+      .replace('bet365', '365');
+
+  const cols = books.length;
+
+  return (
+    <div className="rounded-xl bg-[oklch(0.07_0.008_280)] border border-[oklch(0.15_0.012_280)] overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-1.5 px-3 pt-2 pb-1.5">
+        <BookOpen className="w-3 h-3 text-[oklch(0.40_0.01_280)]" />
+        <span className="text-[9px] font-black uppercase tracking-widest text-[oklch(0.40_0.01_280)]">Odds Comparison</span>
+        <span className="ml-auto text-[8px] text-[oklch(0.32_0.01_280)]">ML</span>
+      </div>
+
+      {/* Column headers */}
+      <div
+        className="grid px-3 pb-1"
+        style={{ gridTemplateColumns: `1fr repeat(${cols}, minmax(0, 1fr))` }}
+      >
+        <span />
+        {books.map((b) => (
+          <span
+            key={b.name}
+            className="text-[9px] font-bold text-[oklch(0.38_0.01_280)] text-center truncate"
+          >
+            {shortName(b.name)}
+          </span>
+        ))}
+      </div>
+
+      {/* Away team row */}
+      {awayTeam && (
+        <div
+          className="grid px-3 py-1.5 border-t border-[oklch(0.12_0.01_280)]"
+          style={{ gridTemplateColumns: `1fr repeat(${cols}, minmax(0, 1fr))` }}
+        >
+          <span className="text-[10px] font-semibold text-white/70 truncate self-center">
+            {awayTeam.split(' ').slice(-1)[0]}
+          </span>
+          {books.map((b) => {
+            const isBest = b.awayOdds !== null && b.awayOdds === bestAwayOdds;
+            const n = b.awayOdds ? parseFloat(b.awayOdds) : NaN;
+            return (
+              <span
+                key={b.name}
+                className={cn(
+                  'text-[11px] font-black tabular-nums text-center self-center',
+                  !b.awayOdds ? 'text-[oklch(0.28_0.01_280)]'
+                    : n > 0 ? 'text-emerald-400'
+                    : 'text-white/80',
+                  isBest && 'text-emerald-300',
+                )}
+              >
+                {b.awayOdds ?? '—'}
+                {isBest && <span className="text-[8px] ml-0.5 text-emerald-500">★</span>}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Home team row */}
+      {homeTeam && (
+        <div
+          className="grid px-3 py-1.5 border-t border-[oklch(0.12_0.01_280)]"
+          style={{ gridTemplateColumns: `1fr repeat(${cols}, minmax(0, 1fr))` }}
+        >
+          <span className="text-[10px] font-semibold text-white/70 truncate self-center">
+            {homeTeam.split(' ').slice(-1)[0]}
+          </span>
+          {books.map((b) => {
+            const isBest = b.homeOdds !== null && b.homeOdds === bestHomeOdds;
+            const n = b.homeOdds ? parseFloat(b.homeOdds) : NaN;
+            return (
+              <span
+                key={b.name}
+                className={cn(
+                  'text-[11px] font-black tabular-nums text-center self-center',
+                  !b.homeOdds ? 'text-[oklch(0.28_0.01_280)]'
+                    : n > 0 ? 'text-emerald-400'
+                    : 'text-white/80',
+                  isBest && 'text-emerald-300',
+                )}
+              >
+                {b.homeOdds ?? '—'}
+                {isBest && <span className="text-[8px] ml-0.5 text-emerald-500">★</span>}
+              </span>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -244,6 +391,7 @@ export const BettingCard = memo(function BettingCard({
   const ou = parseOU(data.overUnder);
   const hasOdds = !!(homeML || awayML || spreadHome || spreadAway || ou);
   const isFinal = data.status === 'FINAL' || !!data.finalScore;
+  const isLiveGame = data.status === 'LIVE';
   const theme = sportTheme(data.sport);
 
   const isPlayerProp = !!(data.player) || subcategory.toLowerCase().includes('prop');
@@ -270,6 +418,16 @@ export const BettingCard = memo(function BettingCard({
   const homeProb = impliedProb(data.homeOdds);
   const awayProb = impliedProb(data.awayOdds);
 
+  // Best-odds flags for highlighting in the matchup block
+  const isBestHome = !!(data.bestHomeOdds && data.homeOdds && data.homeOdds === data.bestHomeOdds);
+  const isBestAway = !!(data.bestAwayOdds && data.awayOdds && data.awayOdds === data.bestAwayOdds);
+
+  // Bookmaker vig (overround)
+  const vigPct = calcVig(data.homeOdds, data.awayOdds);
+
+  const books: BookEntry[] = Array.isArray(data.books) ? data.books : [];
+  const hasBookComparison = books.length >= 2;
+
   return (
     <article className={cn(
       'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.09_0.012_280)] border transition-all duration-300',
@@ -280,26 +438,37 @@ export const BettingCard = memo(function BettingCard({
 
       {/* ── Full-bleed gradient header ───────────────────────────────── */}
       <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', theme.headerGrad)}>
-        {/* Live / FINAL badge top-right */}
+        {/* Status badges top-right */}
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
-          {data.realData && (
-            <>
+          {/* In-game LIVE badge (pulsing) */}
+          {isLiveGame && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-[9px] font-black text-emerald-300 uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-emerald-300">LIVE</span>
-            </>
+              LIVE
+            </span>
           )}
+          {/* Real API data indicator (non-in-game) */}
+          {data.realData && !isLiveGame && !isFinal && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-bold text-emerald-400/80">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              LIVE DATA
+            </span>
+          )}
+          {/* Final badge */}
           {isFinal && (
             <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-[9px] font-black text-emerald-300 uppercase tracking-wider">
               FINAL
             </span>
           )}
         </div>
+
         {/* Category breadcrumb */}
         <div className="flex items-center gap-1.5 mb-1.5">
           <span className="text-[9px] font-black uppercase tracking-widest text-white/70">{category}</span>
           <span className="text-white/30">·</span>
           <span className="text-[9px] text-white/50 truncate">{subcategory}</span>
         </div>
+
         {/* Bottom row: game time + edge badge + line move pill */}
         <div className="flex items-center gap-2 flex-wrap mt-1">
           {data.gameTime && (
@@ -362,8 +531,14 @@ export const BettingCard = memo(function BettingCard({
                 <TeamLogo name={teams.away} sport={data.sport} avatarCls={theme.avatarCls} isLarge={isHero} />
                 <span className={cn('font-bold text-white/90 text-center leading-tight truncate w-full', isHero ? 'text-sm' : 'text-xs')}>{teams.away}</span>
                 {awayML && (
-                  <span className={cn('font-black tabular-nums', isHero ? 'text-xl' : 'text-lg', awayML.positive ? 'text-emerald-400' : 'text-white/80')}>
+                  <span className={cn(
+                    'font-black tabular-nums',
+                    isHero ? 'text-xl' : 'text-lg',
+                    awayML.positive ? 'text-emerald-400' : 'text-white/80',
+                    isBestAway && 'ring-1 ring-emerald-400/40 rounded-md px-1 bg-emerald-500/8',
+                  )}>
                     {awayML.display}
+                    {isBestAway && <span className="text-[8px] ml-0.5 text-emerald-500 font-black">★</span>}
                   </span>
                 )}
                 {awayProb !== null && (
@@ -388,8 +563,14 @@ export const BettingCard = memo(function BettingCard({
                 <TeamLogo name={teams.home} sport={data.sport} avatarCls={theme.avatarCls} isLarge={isHero} />
                 <span className={cn('font-bold text-white/90 text-center leading-tight truncate w-full', isHero ? 'text-sm' : 'text-xs')}>{teams.home}</span>
                 {homeML && (
-                  <span className={cn('font-black tabular-nums', isHero ? 'text-xl' : 'text-lg', homeML.positive ? 'text-emerald-400' : 'text-white/80')}>
+                  <span className={cn(
+                    'font-black tabular-nums',
+                    isHero ? 'text-xl' : 'text-lg',
+                    homeML.positive ? 'text-emerald-400' : 'text-white/80',
+                    isBestHome && 'ring-1 ring-emerald-400/40 rounded-md px-1 bg-emerald-500/8',
+                  )}>
                     {homeML.display}
+                    {isBestHome && <span className="text-[8px] ml-0.5 text-emerald-500 font-black">★</span>}
                   </span>
                 )}
                 {homeProb !== null && (
@@ -415,14 +596,39 @@ export const BettingCard = memo(function BettingCard({
           <p className="text-sm font-semibold text-white/80 mt-3 truncate">{title}</p>
         )}
 
+        {/* ── Multi-book odds comparison ─────────────────────────────── */}
+        {!isFinal && hasBookComparison && teams && (
+          <BookComparisonRow
+            books={books}
+            homeTeam={teams.home}
+            awayTeam={teams.away}
+            bestHomeOdds={data.bestHomeOdds}
+            bestAwayOdds={data.bestAwayOdds}
+          />
+        )}
+
         {/* ── Odds grid ─────────────────────────────────────────────── */}
         {hasOdds && !isFinal && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-            {(spreadAway || spreadHome) && (
+          <div className={cn(
+            'grid gap-1.5',
+            spreadHome && spreadAway && ou
+              ? 'grid-cols-3'
+              : spreadHome && spreadAway
+              ? 'grid-cols-2'
+              : 'grid-cols-2 sm:grid-cols-3',
+          )}>
+            {spreadAway && (
               <OddsCell
-                label={teams ? `${abbr(teams.away)} Spread` : 'Spread'}
-                value={spreadAway?.pts ?? spreadHome?.pts ?? '—'}
-                sub={spreadAway?.juice ? `(${spreadAway.juice})` : spreadHome?.juice ? `(${spreadHome.juice})` : undefined}
+                label={teams ? `${abbr(teams.away)} ATS` : 'Away Spread'}
+                value={spreadAway.pts}
+                sub={spreadAway.juice ? `(${spreadAway.juice})` : undefined}
+              />
+            )}
+            {spreadHome && (
+              <OddsCell
+                label={teams ? `${abbr(teams.home)} ATS` : 'Home Spread'}
+                value={spreadHome.pts}
+                sub={spreadHome.juice ? `(${spreadHome.juice})` : undefined}
               />
             )}
             {ou && (
@@ -434,16 +640,16 @@ export const BettingCard = memo(function BettingCard({
               />
             )}
             {!spreadAway && !spreadHome && !ou && awayML && (
-              <OddsCell label={teams ? abbr(teams.away) : 'Away'} value={awayML.display} positive={awayML.positive} />
+              <OddsCell label={teams ? abbr(teams.away) : 'Away'} value={awayML.display} positive={awayML.positive} isBest={isBestAway} />
             )}
             {!spreadAway && !spreadHome && !ou && homeML && (
-              <OddsCell label={teams ? abbr(teams.home) : 'Home'} value={homeML.display} positive={homeML.positive} />
+              <OddsCell label={teams ? abbr(teams.home) : 'Home'} value={homeML.display} positive={homeML.positive} isBest={isBestHome} />
             )}
           </div>
         )}
 
         {/* ── Analytics panel ───────────────────────────────────────── */}
-        {(confPct !== null || sharpPct !== null || hasLineMove) && (
+        {(confPct !== null || sharpPct !== null || hasLineMove || vigPct !== null) && (
           <div className="rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] p-3 space-y-2.5">
             <div className="flex items-center gap-1.5">
               <Zap className="w-3 h-3 text-amber-400" />
@@ -498,6 +704,19 @@ export const BettingCard = memo(function BettingCard({
                 </span>
               </div>
             )}
+
+            {/* Book vig (overround) */}
+            {vigPct !== null && vigPct > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-semibold text-[oklch(0.42_0.01_280)] uppercase tracking-wider">Book Vig</span>
+                <span className={cn(
+                  'text-[10px] font-bold',
+                  vigPct > 5 ? 'text-red-400' : vigPct > 3 ? 'text-amber-400' : 'text-emerald-400',
+                )}>
+                  {vigPct}%
+                </span>
+              </div>
+            )}
           </div>
         )}
 
@@ -549,7 +768,10 @@ export const BettingCard = memo(function BettingCard({
               </span>
             )}
             {data.bookmakerCount && Number(data.bookmakerCount) > 1 && (
-              <span className="text-[10px] text-[oklch(0.35_0.01_280)]">+{Number(data.bookmakerCount) - 1} books</span>
+              <span className="flex items-center gap-1 text-[10px] text-[oklch(0.35_0.01_280)]">
+                <BookOpen className="w-3 h-3" />
+                {Number(data.bookmakerCount)} books
+              </span>
             )}
           </div>
           {onAnalyze && (

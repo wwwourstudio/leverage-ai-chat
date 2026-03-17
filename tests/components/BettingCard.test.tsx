@@ -165,7 +165,7 @@ describe('BettingCard — matchup display', () => {
 // ============================================================================
 
 describe('BettingCard — live badge', () => {
-  it('shows LIVE indicator when realData=true', () => {
+  it('shows LIVE DATA indicator when realData=true and game is not in-progress', () => {
     render(
       <BettingCard
         {...makeProps({
@@ -173,10 +173,21 @@ describe('BettingCard — live badge', () => {
         })}
       />
     );
+    expect(screen.getByText('LIVE DATA')).toBeTruthy();
+  });
+
+  it('shows pulsing LIVE badge when status=LIVE (in-game)', () => {
+    render(
+      <BettingCard
+        {...makeProps({
+          data: { realData: true, status: 'LIVE' },
+        })}
+      />
+    );
     expect(screen.getByText('LIVE')).toBeTruthy();
   });
 
-  it('does not show LIVE indicator when realData=false', () => {
+  it('does not show any live indicator when realData=false', () => {
     render(
       <BettingCard
         {...makeProps({
@@ -184,6 +195,7 @@ describe('BettingCard — live badge', () => {
         })}
       />
     );
+    expect(screen.queryByText('LIVE DATA')).toBeNull();
     expect(screen.queryByText('LIVE')).toBeNull();
   });
 });

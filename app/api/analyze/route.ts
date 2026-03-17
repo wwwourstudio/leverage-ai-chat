@@ -26,7 +26,6 @@ import { detectHallucinations } from '@/lib/hallucination-detector';
 import { getGrokApiKey } from '@/lib/config';
 import { logger, LogCategory } from '@/lib/logger';
 import { getMarketIntelligenceSummary } from '@/lib/market-intelligence';
-import { extractMLBJson } from '@/lib/utils/mlb-json-parser';
 
 // ============================================================================
 // Types

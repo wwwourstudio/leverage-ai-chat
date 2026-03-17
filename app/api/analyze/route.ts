@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
   //   grok-3 primary: 52s first-token | grok-3-mini primary: 28s | fallback: 10s
   // Vercel serverless functions have a 60s wall-clock limit. Keeping primary+fallback
   // to ≤58s gives a small buffer for the response serialisation overhead.
-  const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 28_000 : 52_000;
+  const PRIMARY_TIMEOUT_MS = (isFast: boolean) => isFast ? 28_000 : 52_000;
   const FALLBACK_TIMEOUT_MS = 10_000;
 
   try {
@@ -662,9 +662,7 @@ export async function POST(request: NextRequest) {
     const expectsStatcastJSON = isMLBStatcastMode && !hasMLBProjectionIntent;
 
     // ── Pipeline observability log ────────────────────────────────────────────
-    // Single structured entry shows exactly which data sources are active for
-    // this request — makes debugging silent failures fast.
-    console.log(LOG_PREFIXES.PIPELINE, {
+    const _pipelineLog = {
       sport:    context.sport  ?? 'none',
       category,
       model:    primaryModel,
@@ -690,7 +688,8 @@ export async function POST(request: NextRequest) {
         ODDS_API_KEY:   !!oddsApiKey,
         KALSHI_API_KEY: !!(process.env.KALSHI_API_KEY),
       },
-    });
+    };
+    console.log(LOG_PREFIXES.PIPELINE, _pipelineLog);
 
     let aiText = '';
     let modelUsed: string = AI_CONFIG.MODEL_DISPLAY_NAME;

@@ -125,11 +125,12 @@ export const CardLayout = memo(function CardLayout({
             'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
           )}>
             {suggestedCards.map((card, i) => {
-              // Map back to original index in the cards array
+              // Use the position within suggestedCards (i) rather than cards.indexOf(card)
+              // to avoid duplicate keys when multiple cards share the same type.
               const originalIndex = cards.indexOf(card);
               return (
                 <CompactCard
-                  key={card.id ?? `${card.type}-${originalIndex}`}
+                  key={card.id ?? `${card.type}-${i}`}
                   card={card}
                   index={i}
                   isActive={false}

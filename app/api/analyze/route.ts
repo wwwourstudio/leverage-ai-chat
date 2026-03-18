@@ -257,6 +257,12 @@ export async function POST(request: NextRequest) {
       !hasStartSitIntent &&
       MLB_PROJECTION_KEYWORDS.some(k => msgLower.includes(k));
 
+    // True only when MLB_ANALYSIS_ADDENDUM is the active system prompt — i.e. the model
+    // was instructed to return a Statcast JSON card.  When hasMLBProjectionIntent is true
+    // the system prompt switches to MLB_PROJECTION_ADDENDUM (prose), so we must NOT attempt
+    // to parse JSON from that response or log a spurious "fell back to text extraction" warning.
+    const expectsStatcastJSON = isMLBStatcastMode && !hasMLBProjectionIntent;
+
     const baseWithAddendum = hasStartSitIntent
       ? `${baseSystemPrompt}${FANTASY_STARTSIT_ADDENDUM}`
       : hasMLBProjectionIntent
@@ -708,12 +714,6 @@ export async function POST(request: NextRequest) {
       'statcast_summary_card', 'hr_prop_card', 'game_simulation_card',
       'leaderboard_card', 'pitch_analysis_card',
     ]);
-
-    // True only when MLB_ANALYSIS_ADDENDUM is the active system prompt — i.e. the model
-    // was instructed to return a Statcast JSON card.  When hasMLBProjectionIntent is true
-    // the system prompt switches to MLB_PROJECTION_ADDENDUM (prose), so we must NOT attempt
-    // to parse JSON from that response or log a spurious "fell back to text extraction" warning.
-    const expectsStatcastJSON = isMLBStatcastMode && !hasMLBProjectionIntent;
 
     const _MAX_HALLUCINATION_RETRIES = 2; // reserved for future retry logic
 

@@ -640,7 +640,7 @@ export async function POST(request: NextRequest) {
         // DFS tab: fetch real player prop lines
         cardFetchPromise = generateContextualCards('dfs', context.sport ?? undefined, 3).catch(() => []);
 
-      } else if (!context.isPoliticalMarket && (context.hasFantasyIntent || hasADPIntent) && (!context.hasBettingIntent || context.selectedCategory === 'fantasy')) {
+      } else if (!context.isPoliticalMarket && (context.hasFantasyIntent || hasADPIntent) && (!context.hasBettingIntent || context.selectedCategory === 'fantasy' || hasADPIntent)) {
         // Fantasy: warm projection cache (fire-and-forget) then generate fantasy cards
         const fantSport = context.sport === 'mlb' ? 'mlb'
           : context.sport?.includes('football') ? 'nfl'

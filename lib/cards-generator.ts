@@ -1603,69 +1603,26 @@ async function _generateContextualCards(
     }
   }
 
-  // DFS cards — fetch real player prop lines from Odds API, fall back to hardcoded
-  // Note: MLB DFS is handled above by the projection engine; this block handles NBA/NFL/NHL
+  // DFS cards — fetch real player prop lines from The Odds API.
+  // No hardcoded demo data: if live props aren't available we skip the card
+  // so the AI can address the slate from its knowledge instead of the UI
+  // showing stale/fabricated player names and salaries.
+  // MLB DFS is handled above by the projection engine; this block covers NBA/NFL/NHL.
   if (category === 'dfs' && normalizedSport !== 'baseball_mlb') {
-    const dfsSlates: Record<string, Record<string, unknown>> = {
-      baseball_mlb: {
-        player: 'Ronald Acuna Jr.', team: 'ATL', position: 'OF',
-        salary: '$8,400', projection: '42.5', ownership: '14%',
-        boomCeiling: '68.0', bustFloor: '22.0',
-        targetGame: 'ATL@LAD', targetPlayers: ['Mookie Betts', 'Freddie Freeman'],
-        platforms: ['DraftKings', 'FanDuel'],
-        tips: 'ATL stacks extremely well vs LHP tonight. Acuna leads 3B-eligible pool in salary efficiency at 5.1x.',
-        value: '5.1',
-      },
-      basketball_nba: {
-        player: 'Nikola Jokic', team: 'DEN', position: 'C',
-        salary: '$10,800', projection: '58.4', ownership: '22%',
-        boomCeiling: '85.0', bustFloor: '38.0',
-        targetGame: 'DEN@LAL', targetPlayers: ['Jamal Murray', 'Michael Porter Jr.'],
-        platforms: ['DraftKings', 'FanDuel'],
-        tips: 'Jokic triple-double upside in high-total game (O/U 236.5). DEN stack with Murray elevates floor significantly.',
-        value: '5.4',
-      },
-      americanfootball_nfl: {
-        player: 'Josh Allen', team: 'BUF', position: 'QB',
-        salary: '$8,800', projection: '38.2', ownership: '18%',
-        boomCeiling: '58.0', bustFloor: '22.0',
-        targetGame: 'BUF@MIA', targetPlayers: ['Stefon Diggs', 'Gabe Davis'],
-        platforms: ['DraftKings', 'FanDuel'],
-        tips: 'Allen rushing upside in dome game — 50+ pt ceiling. BUF stack unlocks WR correlation.',
-        value: '4.3',
-      },
-    };
-    const genericFallback: Record<string, unknown> = {
-      player: 'Core Value Play', team: '—', position: 'FLEX',
-      salary: '$7,200', projection: '32.0', ownership: '11%',
-      boomCeiling: '52.0', bustFloor: '16.0',
-      targetGame: 'Top Slate Game', targetPlayers: ['Correlated Stack'],
-      platforms: ['DraftKings', 'FanDuel'],
-      tips: 'Focus on value plays in GPP tournaments. Low ownership + high upside = leverage.',
-      value: '4.4',
-    };
-
-    let slateData: Record<string, unknown> = dfsSlates[normalizedSport || ''] ?? genericFallback;
-    let isRealData = false;
-
-    // Try to get real player lines from The Odds API
     const dfsMarketMap: Record<string, string> = {
       basketball_nba: 'player_points',
       americanfootball_nfl: 'player_passing_yards',
-      baseball_mlb: 'batter_hits',
       icehockey_nhl: 'player_shots_on_goal',
     };
     const dfsPositionMap: Record<string, string> = {
       basketball_nba: 'G/F',
       americanfootball_nfl: 'QB',
-      baseball_mlb: 'OF',
       icehockey_nhl: 'W',
     };
     const dfsStatLabel: Record<string, string> = {
       basketball_nba: 'scoring',
       americanfootball_nfl: 'passing yards',
-      baseball_mlb: 'hits',
-      icehockey_nhl: 'shots',
+      icehockey_nhl: 'shots on goal',
     };
     const dfsMarket = dfsMarketMap[normalizedSport || ''];
 
@@ -1693,9 +1650,10 @@ async function _generateContextualCards(
 
         if (resp?.ok) {
           const events = await resp.json() as OddsEvent[];
+          // Collect all player lines across all events
           const lines: Array<{ player: string; line: number; game: string }> = [];
           for (const ev of events) {
-            const game = `${ev.away_team}@${ev.home_team}`;
+            const game = `${ev.away_team} @ ${ev.home_team}`;
             for (const bk of ev.bookmakers ?? []) {
               const mkt = bk.markets?.find(m => m.key === dfsMarket);
               for (const out of mkt?.outcomes ?? []) {
@@ -1708,41 +1666,60 @@ async function _generateContextualCards(
           }
 
           if (lines.length > 0) {
-            const top = lines.reduce((a, b) => b.line > a.line ? b : a);
+            // Deduplicate by player — keep highest line per player
+            const byPlayer = new Map<string, { player: string; line: number; game: string }>();
+            for (const l of lines) {
+              const existing = byPlayer.get(l.player);
+              if (!existing || l.line > existing.line) byPlayer.set(l.player, l);
+            }
+            const unique = Array.from(byPlayer.values()).sort((a, b) => b.line - a.line);
+
+            // Top play (highest line = most valuable DFS asset)
+            const top = unique[0];
             const salaryBase = Math.round((top.line * 190 + 3800) / 100) * 100;
             const proj = top.line;
-            slateData = {
-              player: top.player,
-              team: '—',
-              position: dfsPositionMap[normalizedSport] ?? 'FLEX',
-              salary: `$${salaryBase.toLocaleString()}`,
-              projection: proj.toFixed(1),
-              ownership: `${Math.min(35, Math.round(8 + proj / 4))}%`,
-              boomCeiling: (proj * 1.52).toFixed(1),
-              bustFloor: (proj * 0.52).toFixed(1),
-              targetGame: top.game,
-              platforms: ['DraftKings', 'FanDuel'],
-              value: (proj / (salaryBase / 1000)).toFixed(1),
-              tips: `${top.player} leads ${dfsStatLabel[normalizedSport] ?? 'production'} market with ${proj} line — elite ceiling for GPP play.`,
-            };
-            isRealData = true;
+            // Value plays: top 3 by pts-per-$K excluding the top pick
+            const valuePlayers = unique
+              .slice(1, 6)
+              .map(p => ({ ...p, ppk: p.line / ((Math.round((p.line * 190 + 3800) / 100) * 100) / 1000) }))
+              .sort((a, b) => b.ppk - a.ppk)
+              .slice(0, 3)
+              .map(p => p.player);
+
+            cards.push({
+              type: CARD_TYPES.DFS_LINEUP,
+              title: `${displaySport || 'DFS'} Optimal Lineup`,
+              icon: 'Users',
+              category: 'DFS',
+              subcategory: `${displaySport || 'Daily Fantasy'} • GPP Stack`,
+              gradient: 'from-orange-600 to-red-700',
+              data: {
+                player: top.player,
+                team: '—',
+                position: dfsPositionMap[normalizedSport] ?? 'FLEX',
+                salary: `$${salaryBase.toLocaleString()}`,
+                projection: proj.toFixed(1),
+                ownership: `${Math.min(35, Math.round(8 + proj / 4))}%`,
+                boomCeiling: (proj * 1.52).toFixed(1),
+                bustFloor: (proj * 0.52).toFixed(1),
+                targetGame: top.game,
+                targetPlayers: valuePlayers.length > 0 ? valuePlayers : undefined,
+                platforms: ['DraftKings', 'FanDuel'],
+                value: (proj / (salaryBase / 1000)).toFixed(1),
+                tips: `${top.player} leads the ${dfsStatLabel[normalizedSport] ?? 'production'} market with a ${proj} projected line — highest ceiling on today's slate.`,
+                realData: true,
+              },
+              realData: true,
+            });
           }
+          // If lines.length === 0: no props available yet — skip card so AI handles it
         }
+        // If resp not ok: skip card, no hardcoded fallback
       } catch {
-        // Keep hardcoded fallback — silently degrade
+        // API error — skip card rather than show demo data
+        console.warn('[v0] [CARDS-GEN] DFS player props fetch failed — skipping card');
       }
     }
-
-    cards.push({
-      type: CARD_TYPES.DFS_LINEUP,
-      title: `${displaySport || 'DFS'} Optimal Lineup`,
-      icon: 'Users',
-      category: 'DFS',
-      subcategory: `${displaySport || 'Daily Fantasy'} • GPP Stack`,
-      gradient: 'from-orange-600 to-red-700',
-      data: slateData,
-      realData: isRealData,
-    });
   }
 
   // Fantasy / Draft cards — rich cards from the fantasy card generator
@@ -1874,3 +1851,115 @@ export const generateContextualCards = unstable_cache(
   ['cards-generator'],
   { revalidate: 180 } // 3 minutes — matches CARD_CACHE_TTL
 );
+
+// ============================================================================
+// cardsToPromptContext — converts generated cards into a compact, structured
+// text block that can be injected into the AI enrichedPrompt.
+//
+// This is the critical bridge that makes the AI response reference the SAME
+// specific games, players, and odds that appear in the UI cards below it.
+// Called by /api/analyze after cards are resolved, before the AI call starts.
+// ============================================================================
+export function cardsToPromptContext(cards: InsightCard[]): string {
+  if (!cards || cards.length === 0) return '';
+
+  const lines: string[] = [];
+
+  for (const card of cards) {
+    if (!card.data) continue;
+    const d = card.data as Record<string, unknown>;
+
+    // ── Betting / Live Odds cards ────────────────────────────────────────────
+    if (
+      card.type === CARD_TYPES.LIVE_ODDS ||
+      card.type === 'live-odds' ||
+      card.type === 'betting'
+    ) {
+      const matchup = String(d.matchup ?? card.title ?? '');
+      if (!matchup) continue;
+      const parts: string[] = [matchup];
+      if (d.gameTime) parts.push(`Time: ${d.gameTime}`);
+      if (d.homeOdds && d.awayOdds && d.homeOdds !== '—' && d.awayOdds !== '—') {
+        parts.push(`ML: ${d.homeOdds} / ${d.awayOdds}`);
+      }
+      if (d.homeSpread && d.homeSpread !== 'N/A') parts.push(`Spread: ${d.homeSpread}`);
+      if (d.overUnder && d.overUnder !== 'N/A') parts.push(`O/U: ${d.overUnder}`);
+      if (d.bookmaker) parts.push(`Book: ${d.bookmaker}`);
+      if (d.finalScore) parts.push(`Final: ${d.finalScore}`);
+      lines.push(parts.join(' | '));
+      continue;
+    }
+
+    // ── DFS lineup cards ─────────────────────────────────────────────────────
+    if (card.type === CARD_TYPES.DFS_LINEUP || card.type === 'dfs-lineup') {
+      const parts: string[] = [`DFS: ${card.title}`];
+      if (d.player) parts.push(`Core: ${d.player}${d.position ? ` (${d.position})` : ''}`);
+      if (d.salary) parts.push(`Salary: ${d.salary}`);
+      if (d.projection) parts.push(`Proj: ${d.projection} pts`);
+      if (d.ownership) parts.push(`Own: ${d.ownership}`);
+      if (d.targetGame) parts.push(`Game: ${d.targetGame}`);
+      if (Array.isArray(d.targetPlayers) && (d.targetPlayers as string[]).length) {
+        parts.push(`Stack: ${(d.targetPlayers as string[]).join(', ')}`);
+      }
+      lines.push(parts.join(' | '));
+      continue;
+    }
+
+    // ── Kalshi / prediction market cards ─────────────────────────────────────
+    if (card.type === CARD_TYPES.KALSHI || card.type === 'kalshi') {
+      const title = String(d.market ?? d.title ?? card.title ?? '');
+      const parts: string[] = [`Kalshi: ${title}`];
+      if (d.yesPrice !== undefined) parts.push(`YES: ${d.yesPrice}¢`);
+      if (d.noPrice !== undefined) parts.push(`NO: ${d.noPrice}¢`);
+      if (d.volume) parts.push(`Vol: ${d.volume}`);
+      lines.push(parts.join(' | '));
+      continue;
+    }
+
+    // ── Player prop / prop-hit-rate cards ────────────────────────────────────
+    if (
+      card.type === CARD_TYPES.PLAYER_PROP ||
+      card.type === CARD_TYPES.PROP_HIT_RATE ||
+      card.type === 'player-prop' ||
+      card.type === 'prop-hit-rate'
+    ) {
+      const parts: string[] = [String(d.player ?? card.title ?? '')];
+      if (d.stat) parts.push(String(d.stat));
+      if (d.line !== undefined) parts.push(`Line: ${d.line}`);
+      if (d.overOdds) parts.push(`Over: ${d.overOdds}`);
+      if (d.underOdds) parts.push(`Under: ${d.underOdds}`);
+      if (d.hitRate) parts.push(`Hit%: ${d.hitRate}`);
+      lines.push(parts.join(' | '));
+      continue;
+    }
+
+    // ── Arbitrage cards ───────────────────────────────────────────────────────
+    if (card.type === CARD_TYPES.ARBITRAGE || card.type === 'arbitrage') {
+      const parts: string[] = [`Arb: ${card.title}`];
+      if (d.profit) parts.push(`Profit: ${d.profit}`);
+      if (d.book1 && d.book2) parts.push(`Books: ${d.book1} vs ${d.book2}`);
+      lines.push(parts.join(' | '));
+      continue;
+    }
+
+    // ── Fantasy cards ─────────────────────────────────────────────────────────
+    if (
+      card.type === CARD_TYPES.FANTASY_ADVICE ||
+      card.type === 'fantasy' ||
+      card.type === 'fantasy-advice'
+    ) {
+      const parts: string[] = [`Fantasy: ${card.title}`];
+      if (d.player) parts.push(String(d.player));
+      if (d.recommendation) parts.push(String(d.recommendation));
+      lines.push(parts.join(' | '));
+      continue;
+    }
+
+    // ── Generic fallback: include title only ─────────────────────────────────
+    if (card.title) lines.push(card.title);
+  }
+
+  if (lines.length === 0) return '';
+
+  return `[Cards shown in UI below this response — reference these specifically in your analysis:\n${lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}\nEnsure your response directly addresses and expands on the data shown in these cards.]`;
+}

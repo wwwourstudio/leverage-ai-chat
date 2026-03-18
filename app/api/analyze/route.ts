@@ -21,7 +21,7 @@ import { getADPData, queryADP, parseTSV, saveADPToSupabase, clearADPCache } from
 import { getNFLADPData, clearNFLADPCache } from '@/lib/nfl-adp-data';
 import { getStatcastData, queryStatcast } from '@/lib/baseball-savant';
 import type { StatcastPlayer } from '@/lib/baseball-savant';
-import { generateContextualCards, oddsEventsToBettingCards, type InsightCard } from '@/lib/cards-generator';
+import { generateContextualCards, oddsEventsToBettingCards, cardsToPromptContext, type InsightCard } from '@/lib/cards-generator';
 import { detectHallucinations } from '@/lib/hallucination-detector';
 import { getGrokApiKey } from '@/lib/config';
 import { logger, LogCategory } from '@/lib/logger';
@@ -565,11 +565,20 @@ export async function POST(request: NextRequest) {
       enrichedPrompt += `\n\n[System: Live odds are unavailable — ODDS_API_KEY is not configured in the server environment. Inform the user they need to add ODDS_API_KEY to their Vercel environment variables to enable live odds.]`;
     }
 
-    // ── Launch card generation BEFORE AI (they're independent operations) ──────
-    // Starting both in parallel shaves ~6-8 seconds off the total request time
-    // because card generation (Odds API fetch) runs during the AI generation window.
-    // Don't reuse stale previous-message cards for sport-specific or betting-intent
-    // queries — always generate fresh cards so the response context matches the question.
+    // ── Card generation + AI prompt alignment ────────────────────────────────
+    //
+    // ARCHITECTURE: For queries where the client already sent live odds (context.oddsData),
+    // cards are built synchronously from those odds AND the same odds are in enrichedPrompt
+    // above — AI and cards are perfectly aligned with zero extra latency.
+    //
+    // For all other cases (server-fetched cards), we now AWAIT card generation before
+    // building the final AI prompt, then inject a compact summary of the fetched card
+    // data via cardsToPromptContext(). This ensures the AI response directly references
+    // the same games, players, and odds shown in the UI cards below it.
+    //
+    // Trade-off: adds ~600-900ms sequential overhead for server-fetch cases, but
+    // eliminates the mismatch between AI narrative and displayed card data.
+    //
     const hasExistingCards = Array.isArray(existingCards) && existingCards.length > 0
       && !context.sport
       && !context.isSportsQuery
@@ -577,89 +586,111 @@ export async function POST(request: NextRequest) {
       && !context.isPoliticalMarket
       && context.selectedCategory !== 'kalshi'
       && context.selectedCategory !== 'dfs';
+
+    // Cards we've already resolved (available for prompt injection before AI starts)
+    let resolvedCards: InsightCard[] | null = null;
     let cardPromise: Promise<InsightCard[]>;
-    if (isAmbiguous) {
-      // Ambiguous query — return trending multi-sport cards as fallback so UI is never empty
-      cardPromise = Promise.race([
-        generateContextualCards('all', undefined, 6),
-        new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 8000)),
-      ]).catch(() => []);
+
+    // ── Case 1: Client sent live odds → cards built synchronously, AI already has data ──
+    if (!context.isPoliticalMarket && !isAmbiguous && (context.isSportsQuery || context.hasBettingIntent) && context.oddsData?.events?.length > 0) {
+      const sportKey = context.sport || context.oddsData.sport || 'sports';
+      const builtCards = oddsEventsToBettingCards(
+        context.oddsData.events,
+        context.oddsData.sport || sportKey,
+        6
+      );
+      resolvedCards = builtCards;
+      cardPromise = Promise.resolve(builtCards);
+      // enrichedPrompt already contains these odds from the earlier injection above
+
+    // ── Case 2: Reuse existing cards for truly general queries ────────────────
     } else if (hasExistingCards) {
       cardPromise = Promise.resolve(existingCards as InsightCard[]);
-    } else if (!context.isPoliticalMarket && context.selectedCategory === 'dfs') {
-      // DFS tab — generate DFS lineup card(s) specifically
-      cardPromise = Promise.race([
-        generateContextualCards('dfs', context.sport ?? undefined, 3),
-        new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 8000)),
-      ]).catch(() => []);
-    } else if (!context.isPoliticalMarket && (context.hasFantasyIntent || hasADPIntent) && (!context.hasBettingIntent || context.selectedCategory === 'fantasy')) {
-      // Fire-and-forget: warm the projections cache from Supabase so next request uses live data
-      const fantSport = context.sport === 'mlb' ? 'mlb'
-        : context.sport?.includes('football') ? 'nfl'
-        : context.sport === 'nba' ? 'nba'
-        : null;
-      if (fantSport) {
-        import('@/lib/fantasy/projections-cache')
-          .then(({ currentSeasonFor }) => {
-            const season = currentSeasonFor(fantSport as 'nfl' | 'mlb' | 'nba');
-            return import('@/lib/fantasy/projections-seeder').then(({ seedProjectionsFromSupabase }) =>
-              seedProjectionsFromSupabase(fantSport as 'nfl' | 'mlb' | 'nba', season)
-            );
-          })
-          .catch((err: unknown) => {
-            console.warn('[API/analyze] Projection seeding failed (fallback data in use):', err instanceof Error ? err.message : String(err));
-          });
-      }
-      // Pass hasStartSitIntent so the generator can produce matchup-focused cards
-      cardPromise = import('@/lib/fantasy/cards/fantasy-card-generator')
-        .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 3, context.sport ?? undefined, {
-          teamCount: context.leagueSize ?? undefined,
-          scoringFormat: context.leagueScoringFormat ?? undefined,
-          isStartSit: hasStartSitIntent,
-        }))
-        .catch(() => generateContextualCards('fantasy', context.sport ?? undefined, 3).catch(() => []));
-    } else if (!context.isPoliticalMarket && context.hasPlayerIntent) {
-      // Player-specific query — build Statcast/VPE cards for this player
-      cardPromise = Promise.race([
-        generateContextualCards('player', context.sport ?? undefined, 3, false, undefined, { playerName: context.playerName }),
-        new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 8000)),
-      ]).catch(() => []);
-    } else if (!context.isPoliticalMarket && (context.isSportsQuery || context.hasBettingIntent)) {
-      const sportKey = context.sport || undefined;
-      // If the client already fetched live odds and sent them in context.oddsData,
-      // build cards directly from that data so AI and cards show the exact same games.
-      if (context.oddsData?.events?.length > 0) {
-        const builtCards = oddsEventsToBettingCards(
-          context.oddsData.events,
-          context.oddsData.sport || sportKey || 'sports',
-          6
-        );
-        cardPromise = Promise.resolve(builtCards);
-      } else if (kalshiSportsFallbackMarkets && kalshiSportsFallbackMarkets.length > 0) {
-        // Odds API had no games but we already fetched Kalshi sports markets during prompt
-        // enrichment — convert them to cards rather than generating empty placeholders.
-        cardPromise = import('@/lib/kalshi/index')
-          .then(({ generateKalshiCards }) => {
-            const kalshiCards = generateKalshiCards(kalshiSportsFallbackMarkets!);
-            console.log(`[KALSHI] Serving ${kalshiCards.length} prediction market cards (odds API fallback)`);
-            return kalshiCards as InsightCard[];
-          })
-          .catch(() => generateContextualCards('betting', sportKey, 6).catch(() => []));
-      } else {
-        cardPromise = Promise.race([
-          generateContextualCards('betting', sportKey, 6),
-          new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 6000)),
-        ]);
-      }
+
+    // ── Case 3: Server must fetch cards — await first so AI references same data ──
     } else {
-      // General query — try to return cached/fresh multi-sport cards so the
-      // response always has data cards rather than falling back to empty.
-      cardPromise = Promise.race([
-        generateContextualCards(category, context.sport ?? undefined, 6, false, context.kalshiSubcategory),
-        new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 10000)),
-      ]).catch(() => []);
+      // Build the appropriate fetch promise for this query type
+      let cardFetchPromise: Promise<InsightCard[]>;
+
+      if (isAmbiguous) {
+        // Ambiguous query: show multi-sport real games and tell AI what's displayed
+        cardFetchPromise = generateContextualCards('all', undefined, 6).catch(() => []);
+
+      } else if (!context.isPoliticalMarket && context.selectedCategory === 'dfs') {
+        // DFS tab: fetch real player prop lines
+        cardFetchPromise = generateContextualCards('dfs', context.sport ?? undefined, 3).catch(() => []);
+
+      } else if (!context.isPoliticalMarket && (context.hasFantasyIntent || hasADPIntent) && (!context.hasBettingIntent || context.selectedCategory === 'fantasy')) {
+        // Fantasy: warm projection cache (fire-and-forget) then generate fantasy cards
+        const fantSport = context.sport === 'mlb' ? 'mlb'
+          : context.sport?.includes('football') ? 'nfl'
+          : context.sport === 'nba' ? 'nba'
+          : null;
+        if (fantSport) {
+          import('@/lib/fantasy/projections-cache')
+            .then(({ currentSeasonFor }) => {
+              const season = currentSeasonFor(fantSport as 'nfl' | 'mlb' | 'nba');
+              return import('@/lib/fantasy/projections-seeder').then(({ seedProjectionsFromSupabase }) =>
+                seedProjectionsFromSupabase(fantSport as 'nfl' | 'mlb' | 'nba', season)
+              );
+            })
+            .catch((err: unknown) => {
+              console.warn('[API/analyze] Projection seeding failed:', err instanceof Error ? err.message : String(err));
+            });
+        }
+        cardFetchPromise = import('@/lib/fantasy/cards/fantasy-card-generator')
+          .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 3, context.sport ?? undefined, {
+            teamCount: context.leagueSize ?? undefined,
+            scoringFormat: context.leagueScoringFormat ?? undefined,
+            isStartSit: hasStartSitIntent,
+          }))
+          .catch(() => generateContextualCards('fantasy', context.sport ?? undefined, 3).catch(() => []));
+
+      } else if (!context.isPoliticalMarket && context.hasPlayerIntent) {
+        // Player-specific: Statcast/VPE cards
+        cardFetchPromise = generateContextualCards('player', context.sport ?? undefined, 3, false, undefined, { playerName: context.playerName }).catch(() => []);
+
+      } else if (!context.isPoliticalMarket && (context.isSportsQuery || context.hasBettingIntent)) {
+        // Betting/sports with no client odds: fetch from server
+        const sportKey = context.sport || undefined;
+        if (kalshiSportsFallbackMarkets && kalshiSportsFallbackMarkets.length > 0) {
+          cardFetchPromise = import('@/lib/kalshi/index')
+            .then(({ generateKalshiCards }) => {
+              const kalshiCards = generateKalshiCards(kalshiSportsFallbackMarkets!);
+              console.log(`[KALSHI] Serving ${kalshiCards.length} prediction market cards (odds API fallback)`);
+              return kalshiCards as InsightCard[];
+            })
+            .catch(() => generateContextualCards('betting', sportKey, 6).catch(() => []));
+        } else {
+          cardFetchPromise = generateContextualCards('betting', sportKey, 6).catch(() => []);
+        }
+
+      } else {
+        // General / fallback
+        cardFetchPromise = generateContextualCards(category, context.sport ?? undefined, 6, false, context.kalshiSubcategory).catch(() => []);
+      }
+
+      // Await with a generous timeout — cards typically resolve in 600-900ms.
+      // If they exceed 5s we start AI with whatever we have (or empty).
+      resolvedCards = await Promise.race([
+        cardFetchPromise,
+        new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 5000)),
+      ]);
+
+      // Inject card context into enrichedPrompt so the AI knows what data the user sees.
+      // Only inject for real-data cards — skip when cards are empty or all fallback.
+      const realCards = resolvedCards.filter(c => c.data?.realData === true || c.metadata?.realData === true);
+      if (realCards.length > 0) {
+        const cardCtx = cardsToPromptContext(realCards);
+        if (cardCtx) {
+          enrichedPrompt += `\n\n${cardCtx}`;
+          console.log(`[v0] [ANALYZE] Injected ${realCards.length} card(s) into AI prompt context`);
+        }
+      }
+
+      cardPromise = Promise.resolve(resolvedCards);
     }
-    // ── AI generation starts now (concurrently with card generation above) ──────
+    // ── AI generation starts now ──────────────────────────────────────────────
 
     const xaiApiKey = getGrokApiKey();
     const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;

@@ -563,8 +563,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Fantasy-specific context injection
-    if (context.hasFantasyIntent) {
+    // Fantasy-specific context injection — only when fantasy is the primary intent.
+    // Mirrors the card-generation guard (line ~640): betting takes priority over fantasy
+    // when both intents are detected, so don't pollute a live-odds betting prompt with
+    // a Fantasy Context block that tells the AI to give fantasy advice instead.
+    if (context.hasFantasyIntent && (!context.hasBettingIntent || context.selectedCategory === 'fantasy' || context.selectedCategory === 'dfs')) {
       const sport = context.sport || '';
       const isNFL = sport.includes('football') || sport === '';
       if (isNFL) {

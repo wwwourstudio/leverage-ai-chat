@@ -676,7 +676,7 @@ export async function POST(request: NextRequest) {
         odds:        hasClientOddsData,
         kalshi:      !!(kalshiSportsFallbackMarkets?.length) || context.isPoliticalMarket || context.selectedCategory === 'kalshi',
         adp:         hasADPIntent,
-        statcast:    expectsStatcastJSON,
+        statcast:    isMLBStatcastMode && !hasMLBProjectionIntent,
         projections: hasMLBProjectionIntent,
         fantasy:     !!(context.hasFantasyIntent),
       },

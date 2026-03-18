@@ -720,9 +720,9 @@ export async function POST(request: NextRequest) {
     const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
     const hasClientOddsData = !!(context.oddsData?.events?.length);
     // Route DFS, pure-fantasy, file-upload, off-season, and ambiguous queries directly to
-    // grok-3-fast (3-6s). Reserve grok-3 for live-odds betting analysis only.
-    // ADP queries override to grok-3: reliable tool use requires the stronger model.
-    // isAmbiguous queries only need a short clarification reply — no need for grok-3.
+    // grok-3-fast (3-6s). Reserve grok-4 for live-odds betting analysis only.
+    // ADP queries override to grok-4: reliable tool use requires the stronger model.
+    // isAmbiguous queries only need a short clarification reply — no need for grok-4.
     const useFastPath = hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context));
     const primaryModel = useFastPath ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.MODEL_NAME;
     // Always log the resolved model so failures are immediately traceable in Vercel logs

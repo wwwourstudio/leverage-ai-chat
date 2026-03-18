@@ -59,6 +59,10 @@ export interface StatcastQueryParams {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const SAVANT_BASE = 'https://baseballsavant.mlb.com/expected_statistics';
+// Statcast leaderboard — provides exit velocity, barrel rate, sweet spot %, hard hit %.
+// The expected_statistics endpoint only covers xwOBA/xBA/xSLG; batted-ball metrics
+// live on this separate endpoint. We fetch both in parallel and merge by player_id.
+const SAVANT_BATTED_BALL_BASE = 'https://baseballsavant.mlb.com/leaderboard/statcast';
 // MLB regular season: April–November = current year; Dec–March (off-season) = previous year
 function currentMLBSeason(): number {
   const month = new Date().getMonth() + 1; // 1-12
@@ -212,26 +216,50 @@ function parseCSV(csv: string, playerType: 'batter' | 'pitcher'): StatcastPlayer
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 
+const SAVANT_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept': 'text/csv, text/plain, */*',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Referer': 'https://baseballsavant.mlb.com/expected_statistics',
+  'Cache-Control': 'no-cache',
+};
+
 async function fetchStatcastType(playerType: 'batter' | 'pitcher'): Promise<StatcastPlayer[]> {
-  const url = `${SAVANT_BASE}?type=${playerType}&year=${SEASON}&min=${MIN_PA}&csv=true`;
+  const expectedStatsUrl = `${SAVANT_BASE}?type=${playerType}&year=${SEASON}&min=${MIN_PA}&csv=true`;
+  // Batted-ball leaderboard provides exit velocity, barrel rate, sweet spot %, hard hit %.
+  // These columns are absent from expected_statistics — fetch in parallel, merge by player_id.
+  const battedBallUrl = `${SAVANT_BATTED_BALL_BASE}?type=${playerType}&year=${SEASON}&position=&team=&min=${MIN_PA}&csv=true`;
 
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/csv, text/plain, */*',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Referer': 'https://baseballsavant.mlb.com/expected_statistics',
-      'Cache-Control': 'no-cache',
-    },
-    signal: AbortSignal.timeout(15000),
-  });
+  const [expectedCsv, battedBallCsv] = await Promise.all([
+    fetch(expectedStatsUrl, { headers: SAVANT_HEADERS, signal: AbortSignal.timeout(15000) })
+      .then(r => {
+        if (!r.ok) throw new Error(`Baseball Savant fetch failed (${playerType}): HTTP ${r.status}`);
+        return r.text();
+      }),
+    fetch(battedBallUrl, { headers: SAVANT_HEADERS, signal: AbortSignal.timeout(15000) })
+      .then(r => r.ok ? r.text() : null)
+      .catch(() => null), // non-fatal — missing batted-ball data degrades gracefully
+  ]);
 
-  if (!res.ok) {
-    throw new Error(`Baseball Savant fetch failed (${playerType}): HTTP ${res.status}`);
+  const players = parseCSV(expectedCsv, playerType);
+
+  // Merge batted-ball metrics (EV, barrel %, sweet spot %, hard hit %) into xwOBA players
+  if (battedBallCsv) {
+    const bbPlayers = parseCSV(battedBallCsv, playerType);
+    const bbMap = new Map(bbPlayers.map(p => [p.playerId, p]));
+    for (const p of players) {
+      const bb = p.playerId ? bbMap.get(p.playerId) : undefined;
+      if (bb) {
+        if (bb.exitVelocity > 0) p.exitVelocity = bb.exitVelocity;
+        if (bb.barrelRate   > 0) p.barrelRate   = bb.barrelRate;
+        if (bb.sweetSpotPct > 0) p.sweetSpotPct = bb.sweetSpotPct;
+        if (bb.hardHitPct   > 0) p.hardHitPct   = bb.hardHitPct;
+        if (bb.launchAngle  !== 0) p.launchAngle = bb.launchAngle;
+      }
+    }
   }
 
-  const csv = await res.text();
-  return parseCSV(csv, playerType);
+  return players;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

@@ -126,8 +126,8 @@ export async function POST(request: NextRequest) {
   let rateLimitUserId: string | undefined;
   try {
     const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    rateLimitUserId = session?.user?.id;
+    const { data: { user } } = await supabase.auth.getUser();
+    rateLimitUserId = user?.id;
   } catch {
     // Supabase unavailable — fall through to IP-based limiting
   }

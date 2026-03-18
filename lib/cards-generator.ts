@@ -1201,12 +1201,33 @@ async function _generateContextualCards(
       } else if (sub === 'trending') {
         markets = await fetchTopMarketsByVolume(count);
       } else {
-        // No sub-filter — fetch a broad set of open markets sorted by volume
+        // No sub-filter — fetch a broad set of open markets sorted by volume.
+        // fetchKalshiMarketsWithRetry will skip retries if the API legitimately
+        // returns 0 (e.g. empty search result), so this won't exhaust retries
+        // on every call when the API is working but no markets match.
         markets = await fetchKalshiMarketsWithRetry({
           status: 'open',
           limit: Math.max(count * 5, 50),
-          maxRetries: 3,
+          maxRetries: 2,
         });
+
+        // If the generic fetch returned nothing, try election and sports markets as a
+        // fallback — these categories are reliably populated on Kalshi year-round.
+        if (markets.length === 0) {
+          console.log('[v0] [CARDS-GEN] Generic Kalshi fetch returned 0 — trying election/sports fallback');
+          const [electionMarkets, sportsMarkets] = await Promise.allSettled([
+            fetchElectionMarkets({ limit: count * 3 }),
+            fetchSportsMarkets(),
+          ]);
+          const fallback = [
+            ...(electionMarkets.status === 'fulfilled' ? electionMarkets.value : []),
+            ...(sportsMarkets.status === 'fulfilled' ? sportsMarkets.value : []),
+          ];
+          if (fallback.length > 0) {
+            console.log(`[v0] [CARDS-GEN] Fallback yielded ${fallback.length} Kalshi markets`);
+            markets = fallback;
+          }
+        }
 
         // When sport context is present, filter to sport-relevant markets
         if (sport && markets.length > 0) {
@@ -1259,7 +1280,7 @@ async function _generateContextualCards(
         return cards;
       }
 
-      console.warn('[v0] [CARDS-GEN] Kalshi API returned 0 markets — returning no cards');
+      console.log('[v0] [CARDS-GEN] Kalshi API returned 0 markets after all strategies — no cards generated');
     } catch (error) {
       console.error('[v0] [CARDS-GEN] Kalshi API error:', error);
     }

@@ -234,9 +234,12 @@ export async function POST(request: NextRequest) {
       'matchup based', 'streaming', 'stream this week', 'stream today',
       'must start', 'must sit', 'favorable matchup', 'tough matchup',
     ];
-    const hasStartSitIntent =
-      context?.hasFantasyIntent === true &&
-      START_SIT_KEYWORDS.some(k => msgLower.includes(k));
+    // The hasFantasyIntent guard is intentionally absent: these keywords are
+    // unambiguous in a sports context (e.g. "stream this week", "who should i start")
+    // and the fantasy-intent classifier occasionally misses streaming questions.
+    // Without the guard, isMLBStatcastMode is correctly suppressed so expectsStatcastJSON
+    // stays false and no spurious "JSON not found" warning is logged for prose responses.
+    const hasStartSitIntent = START_SIT_KEYWORDS.some(k => msgLower.includes(k));
 
     // Statcast JSON mode only applies to non-ADP, non-start/sit MLB queries
     const isMLBStatcastMode = isMLBQuery && !hasADPIntent && !hasStartSitIntent;

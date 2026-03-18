@@ -125,11 +125,16 @@ export const CardLayout = memo(function CardLayout({
             'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
           )}>
             {suggestedCards.map((card, i) => {
-              // Map back to original index in the cards array
+              // originalIndex is used only for hero navigation, not for the key.
+              // Using cards.indexOf for the key caused duplicate keys when the array
+              // contained repeated references (indexOf always returns the first match).
               const originalIndex = cards.indexOf(card);
+              // Key must be unique among siblings — use the map position `i` as
+              // the tiebreaker so identical card types never collide.
+              const key = card.id ?? `${card.type}-${i}`;
               return (
                 <CompactCard
-                  key={card.id ?? `${card.type}-${originalIndex}`}
+                  key={key}
                   card={card}
                   index={i}
                   isActive={false}

@@ -730,13 +730,6 @@ export default function ADPTroubleshootPage() {
               );
             })}
           </div>
-          <div className="flex items-start gap-2 rounded-lg bg-red-500/5 border border-red-500/15 p-3">
-            <XCircle className="h-3.5 w-3.5 text-red-400 mt-0.5 shrink-0" aria-hidden="true" />
-            <p className="text-[10px] text-gray-500">
-              <span className="text-red-300 font-semibold">Fallback activates</span> when step 2 never happened (empty table),
-              or when the Supabase client returns null (missing env vars), or when uploaded data was auto-purged due to malformed player names.
-            </p>
-          </div>
         </div>
 
         {/* All sections */}

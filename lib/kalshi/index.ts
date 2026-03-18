@@ -52,6 +52,11 @@ const marketCache = new Map<string, CacheEntry>();
 // Tracks in-flight requests by cache key so concurrent callers share one HTTP request
 const pendingRequests = new Map<string, Promise<KalshiMarket[]>>();
 
+// Set to true inside doFetch's catch block so fetchKalshiMarketsWithRetry can
+// distinguish "API returned 0" (legitimate, don't retry) from "API errored and
+// returned []" (worth retrying).  Reset to false on every successful HTTP response.
+let _kalshiLastFetchHadError = false;
+
 /**
  * Generate cache key from parameters
  */
@@ -372,6 +377,7 @@ async function _fetchKalshiPageInner(queryParams: URLSearchParams): Promise<Kals
 
       if (!data.markets || !Array.isArray(data.markets)) {
         console.warn('[KALSHI] Unexpected response format, keys:', Object.keys(data).join(', '));
+        _kalshiLastFetchHadError = false; // 200 OK — not an error
         return { markets: [], cursor: null };
       }
 
@@ -382,6 +388,7 @@ async function _fetchKalshiPageInner(queryParams: URLSearchParams): Promise<Kals
       // event_ticker (e.g. "KXMVECROSSCATEGORY-S20269C2BE3773B8"). These markets don't
       // have public Kalshi web pages, so they produce 404 deep links.
       const HEX_SEGMENT_RE = /-[0-9a-f]{8,}/i;
+      const rawCount = data.markets.length;
       const markets = data.markets
         .map(parseMarket)
         .filter((m: KalshiMarket) => {
@@ -393,6 +400,11 @@ async function _fetchKalshiPageInner(queryParams: URLSearchParams): Promise<Kals
           return true;
         });
 
+      if (markets.length < rawCount) {
+        console.log(`[KALSHI] Quality filter: ${rawCount} raw → ${markets.length} kept (${rawCount - markets.length} removed)`);
+      }
+
+      _kalshiLastFetchHadError = false; // successful 200 response
       const cursor = data.cursor && data.cursor !== '' ? data.cursor : null;
       return { markets, cursor };
     } catch (err) {
@@ -518,6 +530,7 @@ export async function fetchKalshiMarkets(params?: {
       } else {
         console.error(`[KALSHI] ❌ Failed to fetch markets: ${err.message}${cause ? ` (cause: ${cause.code ?? cause.message ?? cause})` : ''}`);
       }
+      _kalshiLastFetchHadError = true; // signal that [] is due to an error, not an empty API response
       return [];
     } finally {
       pendingRequests.delete(cacheKey);
@@ -615,13 +628,22 @@ export async function fetchKalshiMarketsWithRetry(params?: {
         return markets;
       }
 
+      // If the inner fetch succeeded (200 OK) but returned 0 markets, that is a
+      // legitimate empty response — retrying won't change the result.
+      if (!_kalshiLastFetchHadError) {
+        console.log('[KALSHI] API returned 0 markets (empty response, not an error) — skipping retries');
+        return [];
+      }
+
+      // Inner fetch had a network/API error (returned [] due to caught exception).
+      // Retry with exponential back-off.
       if (attempt < maxRetries) {
         const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-        console.log(`[KALSHI] Got 0 markets, retrying in ${backoffMs}ms...`);
+        console.log(`[KALSHI] Fetch error yielded 0 markets, retrying in ${backoffMs}ms... (${attempt}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, backoffMs));
       } else {
-        console.warn('[KALSHI] All retry attempts exhausted');
-        return markets;
+        console.warn('[KALSHI] All retry attempts exhausted after fetch errors');
+        return [];
       }
     } catch (error) {
       console.error(`[KALSHI] Attempt ${attempt} failed:`, error);

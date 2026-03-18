@@ -1184,6 +1184,7 @@ async function _generateContextualCards(
         fetchWeatherMarkets,
         fetchFinanceMarkets,
         fetchTopMarketsByVolume,
+        fetchAllKalshiMarkets,
         fetchMarketOrderbook,
         kalshiMarketToCard,
       } = await import('@/lib/kalshi-client');
@@ -1226,6 +1227,22 @@ async function _generateContextualCards(
           if (fallback.length > 0) {
             console.log(`[v0] [CARDS-GEN] Fallback yielded ${fallback.length} Kalshi markets`);
             markets = fallback;
+          }
+        }
+
+        // Last resort: fetch all open markets without any title filter. This bypasses
+        // the `title` search parameter which Kalshi sometimes ignores, and simply
+        // returns the top open markets sorted by the API's default ordering.
+        if (markets.length === 0) {
+          console.log('[v0] [CARDS-GEN] Category/election/sports all returned 0 — trying fetchAllKalshiMarkets (no filter)');
+          try {
+            const allMarkets = await fetchAllKalshiMarkets({ status: 'open', maxMarkets: Math.max(count * 10, 100) });
+            if (allMarkets.length > 0) {
+              console.log(`[v0] [CARDS-GEN] fetchAllKalshiMarkets yielded ${allMarkets.length} markets`);
+              markets = allMarkets;
+            }
+          } catch {
+            // fetchAllKalshiMarkets failed too — Kalshi API is down/unreachable
           }
         }
 
@@ -1280,12 +1297,57 @@ async function _generateContextualCards(
         return cards;
       }
 
-      console.log('[v0] [CARDS-GEN] Kalshi API returned 0 markets after all strategies — no cards generated');
+      // All strategies exhausted with 0 markets. Surface a graceful placeholder
+      // card so the UI communicates the situation rather than silently showing nothing.
+      console.warn('[v0] [CARDS-GEN] Kalshi API returned 0 markets after all strategies — showing unavailable card');
+      cards.push({
+        type: CARD_TYPES.KALSHI_INSIGHT,
+        title: 'Prediction Markets Temporarily Unavailable',
+        icon: 'TrendingUp',
+        category: 'KALSHI',
+        subcategory: 'Service Status',
+        gradient: 'from-slate-700 to-slate-800',
+        status: CARD_STATUS.NEUTRAL,
+        realData: false,
+        data: {
+          iconLabel: 'market',
+          yesPct: 50,
+          noPct: 50,
+          edgeScore: 0,
+          signal: 'Kalshi market data is temporarily unavailable. Check kalshi.com for live markets.',
+          note: 'Data will refresh automatically once the Kalshi API is reachable.',
+          volumeTier: 'Thin',
+          spreadLabel: 'N/A',
+          priceDirection: 'flat',
+          priceChange: 0,
+        },
+      });
     } catch (error) {
       console.error('[v0] [CARDS-GEN] Kalshi API error:', error);
+      // Show a placeholder card even on unexpected errors so the UI slot isn't empty
+      cards.push({
+        type: CARD_TYPES.KALSHI_INSIGHT,
+        title: 'Prediction Markets Temporarily Unavailable',
+        icon: 'TrendingUp',
+        category: 'KALSHI',
+        subcategory: 'Service Status',
+        gradient: 'from-slate-700 to-slate-800',
+        status: CARD_STATUS.NEUTRAL,
+        realData: false,
+        data: {
+          iconLabel: 'market',
+          yesPct: 50,
+          noPct: 50,
+          edgeScore: 0,
+          signal: 'Kalshi market data is temporarily unavailable. Check kalshi.com for live markets.',
+          note: error instanceof Error ? error.message : String(error),
+          volumeTier: 'Thin',
+          spreadLabel: 'N/A',
+          priceDirection: 'flat',
+          priceChange: 0,
+        },
+      });
     }
-    // Kalshi unavailable — return empty array rather than a placeholder card with
-    // missing price fields that KalshiCard would render as garbage (NaN/undefined).
     return cards;
   }
 

@@ -407,6 +407,23 @@ export async function POST(request: NextRequest) {
               ? 'betting'
               : 'all';
 
+    // ── Server-side cross-sport contamination guard ───────────────────────────
+    // The client may send stale oddsData from a previous sport fetch (e.g., cached
+    // NBA odds while the current query is about MLB). Validate sport match before
+    // any prompt injection or card construction consumes the oddsData.
+    // Normalizes both keys to their base form (strips prefix: 'baseball_mlb' → 'mlb').
+    if (context.sport && context.oddsData?.sport) {
+      const normalizeSportKey = (s: string) => s.toLowerCase().replace(/^[a-z]+_/, '');
+      const ctxSportNorm  = normalizeSportKey(context.sport);
+      const oddsSportNorm = normalizeSportKey(context.oddsData.sport);
+      if (ctxSportNorm !== oddsSportNorm) {
+        console.warn(
+          `[v0] [CROSS-SPORT GUARD] Cleared oddsData: context.sport="${context.sport}" ≠ oddsData.sport="${context.oddsData.sport}" — fetching fresh data server-side`,
+        );
+        context.oddsData = undefined as any;
+      }
+    }
+
     // Build the enriched prompt with any real odds data or contextual info
     let enrichedPrompt = userMessage;
     // Holds Kalshi sports markets fetched during prompt enrichment so the card

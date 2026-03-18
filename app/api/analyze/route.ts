@@ -575,7 +575,8 @@ export async function POST(request: NextRequest) {
       && !context.isSportsQuery
       && !context.hasBettingIntent
       && !context.isPoliticalMarket
-      && context.selectedCategory !== 'kalshi';
+      && context.selectedCategory !== 'kalshi'
+      && context.selectedCategory !== 'dfs';
     let cardPromise: Promise<InsightCard[]>;
     if (isAmbiguous) {
       // Ambiguous query — return trending multi-sport cards as fallback so UI is never empty

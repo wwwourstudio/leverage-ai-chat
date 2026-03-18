@@ -522,16 +522,16 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     (async () => {
       try {
         const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { user } } = await supabase.auth.getUser();
 
-        if (session?.user) {
+        if (user) {
           setIsLoggedIn(true);
           setUser({
-            name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
-            email: session.user.email || ''
+            name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+            email: user.email || ''
           });
           // Load credits and instructions from Supabase
-          loadCreditsFromSupabase(session.user.id);
+          loadCreditsFromSupabase(user.id);
           loadInstructionsFromApi();
           // Load persisted chat threads from Supabase
           loadThreads().then(threads => {

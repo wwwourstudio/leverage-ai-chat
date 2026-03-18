@@ -403,7 +403,8 @@ The current Kalshi client (`lib/kalshi/kalshiClient.ts`) uses `api.elections.kal
 | `NEXT_PUBLIC_SUPABASE_URL` | **Yes** | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **Yes** | Supabase anonymous key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Optional | For admin/migration routes |
-| `KALSHI_API_KEY` | Optional | Kalshi prediction markets (degraded without it) |
+| `KALSHI_API_KEY_ID` | Optional | Kalshi API key ID for prediction markets |
+| `KALSHI_PRIVATE_KEY` | Optional | Kalshi RSA private key for authenticated trading |
 | `STRIPE_SECRET_KEY` | Optional | Stripe payment processing |
 
 All env var access is centralized in `lib/config.ts`. Use `getGrokApiKey()`, `getOddsApiKey()`, `isSupabaseConfigured()`, etc. rather than reading `process.env` directly.

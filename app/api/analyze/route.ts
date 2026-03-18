@@ -23,7 +23,7 @@ import { getStatcastData, queryStatcast } from '@/lib/baseball-savant';
 import type { StatcastPlayer } from '@/lib/baseball-savant';
 import { generateContextualCards, oddsEventsToBettingCards, cardsToPromptContext, type InsightCard } from '@/lib/cards-generator';
 import { detectHallucinations } from '@/lib/hallucination-detector';
-import { getGrokApiKey } from '@/lib/config';
+import { getGrokApiKey, isKalshiConfigured } from '@/lib/config';
 import { logger, LogCategory } from '@/lib/logger';
 import { getMarketIntelligenceSummary } from '@/lib/market-intelligence';
 import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
@@ -756,7 +756,7 @@ export async function POST(request: NextRequest) {
       keys: {
         XAI_API_KEY:    !!xaiApiKey,
         ODDS_API_KEY:   !!oddsApiKey,
-        KALSHI_API_KEY: !!(process.env.KALSHI_API_KEY),
+        KALSHI_API_KEY: isKalshiConfigured(),
       },
     });
     let aiText = '';

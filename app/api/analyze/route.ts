@@ -499,9 +499,10 @@ export async function POST(request: NextRequest) {
       } catch {
         enrichedPrompt += `\n\n[Context: This is a Kalshi prediction market query. Answer directly with prediction market analysis, probability edge, and trading recommendations. Do NOT ask the user to choose a sports platform or area — the user is already on the Kalshi tab. Analyze the specific market or topic asked about.]`;
       }
-    } else if (context.hasBettingIntent && context.sport && !context.isPoliticalMarket) {
+    } else if (context.hasBettingIntent && context.sport && !context.isPoliticalMarket && !hasADPIntent) {
       // Odds API returned no games for this sport — use Kalshi sports markets as an
       // independent probability signal (win/loss futures, player props, championship markets).
+      // Skip for ADP queries: the NFBC system prompt + ADP tool already provides the right context.
       // Maps the internal sport key to the search term Kalshi understands.
       const SPORT_TO_KALSHI_KW: Record<string, string> = {
         basketball_nba: 'NBA', basketball_ncaab: 'college basketball',
@@ -538,6 +539,9 @@ export async function POST(request: NextRequest) {
         console.warn(`[KALSHI] Sports market fetch failed for ${sportKw}:`, err instanceof Error ? err.message : String(err));
         enrichedPrompt += `\n\n[Context: Live ${context.sport.toUpperCase()} sportsbook odds are unavailable. Provide expert betting analysis and value picks from your knowledge.]`;
       }
+    } else if (hasADPIntent && context.sport) {
+      // ADP/draft query — NFBC system prompt + ADP tool provide all context; no odds data needed
+      enrichedPrompt += `\n\n[Context: Fantasy draft/ADP query for ${context.sport.toUpperCase()}. Use the query_adp tool and your NFBC expertise to answer. Focus on draft value, positional scarcity, and roster construction — not sportsbook odds.]`;
     } else if (!context.hasBettingIntent && !context.sport && !context.isPoliticalMarket) {
       // General question — answer from knowledge
       enrichedPrompt += `\n\n[Context: General question — answer with your full expert knowledge about sports betting, fantasy, DFS, or prediction markets as appropriate.]`;
@@ -563,8 +567,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Fantasy-specific context injection
-    if (context.hasFantasyIntent) {
+    // Fantasy-specific context injection — only when fantasy is the primary intent.
+    // Mirrors the card-generation guard (line ~640): betting takes priority over fantasy
+    // when both intents are detected, so don't pollute a live-odds betting prompt with
+    // a Fantasy Context block that tells the AI to give fantasy advice instead.
+    if (context.hasFantasyIntent && (!context.hasBettingIntent || context.selectedCategory === 'fantasy' || context.selectedCategory === 'dfs')) {
       const sport = context.sport || '';
       const isNFL = sport.includes('football') || sport === '';
       if (isNFL) {
@@ -637,7 +644,7 @@ export async function POST(request: NextRequest) {
         // DFS tab: fetch real player prop lines
         cardFetchPromise = generateContextualCards('dfs', context.sport ?? undefined, 3).catch(() => []);
 
-      } else if (!context.isPoliticalMarket && (context.hasFantasyIntent || hasADPIntent) && (!context.hasBettingIntent || context.selectedCategory === 'fantasy')) {
+      } else if (!context.isPoliticalMarket && (context.hasFantasyIntent || hasADPIntent) && (!context.hasBettingIntent || context.selectedCategory === 'fantasy' || hasADPIntent)) {
         // Fantasy: warm projection cache (fire-and-forget) then generate fantasy cards
         const fantSport = context.sport === 'mlb' ? 'mlb'
           : context.sport?.includes('football') ? 'nfl'

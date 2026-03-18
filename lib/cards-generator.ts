@@ -560,13 +560,15 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
     }
 
     const name: string = player.name ?? player.player_name ?? playerName;
-    const ev = player.avg_exit_velocity ?? player.exit_velocity_avg;
-    const hardHit = player.hard_hit_percent ?? player.hard_hit_pct;
-    const barrel = player.barrel_batted_rate ?? player.barrel_pct ?? player.barrel_rate;
-    const xba = player.xba ?? player.expected_batting_average;
-    const xslg = player.xslg ?? player.expected_slg;
-    const xwoba = player.xwoba ?? player.expected_woba;
-    const sweetSpot = player.sweet_spot_percent ?? player.sweet_spot_pct;
+    // StatcastPlayer uses camelCase — check those first, then fall back to snake_case
+    // variants that may appear in raw CSV-derived objects or legacy data sources.
+    const ev       = player.exitVelocity   ?? player.avg_exit_velocity  ?? player.exit_velocity_avg;
+    const hardHit  = player.hardHitPct     ?? player.hard_hit_percent   ?? player.hard_hit_pct;
+    const barrel   = player.barrelRate     ?? player.barrel_batted_rate ?? player.barrel_pct ?? player.barrel_rate;
+    const xba      = player.xba            ?? player.expected_batting_average;
+    const xslg     = player.xslg           ?? player.expected_slg;
+    const xwoba    = player.xwoba          ?? player.expected_woba;
+    const sweetSpot = player.sweetSpotPct  ?? player.sweet_spot_percent ?? player.sweet_spot_pct;
 
     const metrics = [
       ev != null ? { label: 'Avg Exit Velocity', value: `${Number(ev).toFixed(1)} mph` } : null,

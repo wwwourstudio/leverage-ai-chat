@@ -60,8 +60,8 @@ export const CardLayout = memo(function CardLayout({
 
   // Hero card is the currently selected one
   const heroCard = cards[heroIndex] ?? cards[0];
-  // Suggested cards are the rest (up to 3), excluding the hero
-  const suggestedCards = cards.filter((_, i) => i !== heroIndex).slice(0, 3);
+  // Suggested cards are the rest (up to 5), excluding the hero
+  const suggestedCards = cards.filter((_, i) => i !== heroIndex).slice(0, 5);
 
   const insight = aiInsight ? extractInsightBlurb(aiInsight) : null;
 
@@ -122,7 +122,8 @@ export const CardLayout = memo(function CardLayout({
             'grid gap-2',
             suggestedCards.length === 1 ? 'grid-cols-1' :
             suggestedCards.length === 2 ? 'grid-cols-1 sm:grid-cols-2' :
-            'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+            suggestedCards.length <= 4 ? 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4' :
+            'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5',
           )}>
             {suggestedCards.map((card, i) => {
               // originalIndex is used only for hero navigation, not for the key.

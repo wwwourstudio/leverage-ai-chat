@@ -148,7 +148,7 @@ export function AuthModals({
                 <p className="text-sm text-gray-400">Sign in to access your account</p>
               </div>
 
-              <div className="space-y-4">
+              <form className="space-y-4" onSubmit={(e: any) => { e.preventDefault(); handleLogin(); }}>
                 {loginError && <ErrorBanner message={loginError} />}
 
                 <div>
@@ -168,14 +168,13 @@ export function AuthModals({
                     type="password"
                     value={loginPassword}
                     onChange={(e: any) => setLoginPassword(e.target.value)}
-                    onKeyDown={(e: any) => e.key === 'Enter' && handleLogin()}
                     placeholder="Enter password"
                     className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
                 </div>
 
                 <button
-                  onClick={handleLogin}
+                  type="submit"
                   disabled={loginLoading}
                   className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all"
                 >
@@ -201,6 +200,7 @@ export function AuthModals({
                 <p className="text-center text-sm text-gray-500">
                   {"Don't have an account? "}
                   <button
+                    type="button"
                     onClick={() => {
                       setShowLoginModal(false);
                       setShowSignupModal(true);
@@ -210,7 +210,7 @@ export function AuthModals({
                     Sign up
                   </button>
                 </p>
-              </div>
+              </form>
             </div>
           </div>
         </div>
@@ -238,7 +238,7 @@ export function AuthModals({
                 <p className="text-sm text-gray-400">Sign up to get started with Leverage AI</p>
               </div>
 
-              <div className="space-y-4">
+              <form className="space-y-4" onSubmit={(e: any) => { e.preventDefault(); handleSignup(); }}>
                 {signupError && <ErrorBanner message={signupError} />}
 
                 <div>
@@ -269,14 +269,13 @@ export function AuthModals({
                     type="password"
                     value={signupPassword}
                     onChange={(e: any) => setSignupPassword(e.target.value)}
-                    onKeyDown={(e: any) => e.key === 'Enter' && handleSignup()}
                     placeholder="Create a password"
                     className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
                 </div>
 
                 <button
-                  onClick={handleSignup}
+                  type="submit"
                   disabled={signupLoading}
                   className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all shadow-lg"
                 >
@@ -302,6 +301,7 @@ export function AuthModals({
                 <p className="text-center text-sm text-gray-500">
                   {"Already have an account? "}
                   <button
+                    type="button"
                     onClick={() => {
                       setShowSignupModal(false);
                       setShowLoginModal(true);
@@ -311,7 +311,7 @@ export function AuthModals({
                     Log in
                   </button>
                 </p>
-              </div>
+              </form>
             </div>
           </div>
         </div>

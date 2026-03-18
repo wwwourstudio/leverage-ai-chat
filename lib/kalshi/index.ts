@@ -392,21 +392,38 @@ async function _fetchKalshiPageInner(queryParams: URLSearchParams): Promise<Kals
       // Internal cross-category / multi-leg markets have UUID-like hex segments in their
       // event_ticker (e.g. "KXMVECROSSCATEGORY-S20269C2BE3773B8"). These markets don't
       // have public Kalshi web pages, so they produce 404 deep links.
-      const HEX_SEGMENT_RE = /-[0-9a-f]{8,}/i;
+      //
+      // IMPORTANT: threshold must be ≥ 10 to avoid false-positive matches on date segments
+      // in normal Kalshi tickers. DEC/FEB months use only hex-compatible letters (D,E,C and
+      // F,E,B), so a date like "26DEC2026" or "26FEB2026" produces a 9-char all-hex sequence
+      // that would incorrectly match at {8,}. Real UUID segments are ≥ 12 chars.
+      const HEX_SEGMENT_RE = /-[0-9a-f]{12,}/i;
       const rawCount = data.markets.length;
+
+      // Rejection counters — logged once per page so we can diagnose filter drift
+      let rejShort = 0, rejTicker = 0, rejHexEvent = 0, rejHexTicker = 0;
+
       const markets = data.markets
         .map(parseMarket)
         .filter((m: KalshiMarket) => {
-          if (!m.title || m.title.length < 10) return false;
-          if (TICKER_RE.test(m.title)) return false;
+          if (!m.title || m.title.length < 10) { rejShort++; return false; }
+          if (TICKER_RE.test(m.title)) { rejTicker++; return false; }
           // Exclude internal cross-category markets (no public Kalshi URLs)
-          if (m.eventTicker && HEX_SEGMENT_RE.test(m.eventTicker)) return false;
-          if (m.ticker && HEX_SEGMENT_RE.test(m.ticker)) return false;
+          if (m.eventTicker && HEX_SEGMENT_RE.test(m.eventTicker)) { rejHexEvent++; return false; }
+          if (m.ticker && HEX_SEGMENT_RE.test(m.ticker)) { rejHexTicker++; return false; }
           return true;
         });
 
       if (markets.length < rawCount) {
-        console.log(`[KALSHI] Quality filter: ${rawCount} raw → ${markets.length} kept (${rawCount - markets.length} removed)`);
+        console.log(
+          `[KALSHI] Quality filter: ${rawCount} raw → ${markets.length} kept` +
+          ` (short/empty:${rejShort} ticker-title:${rejTicker} hex-event:${rejHexEvent} hex-ticker:${rejHexTicker})`
+        );
+        // Log a sample of the first rejected market so drift is immediately diagnosable
+        if (markets.length === 0 && data.markets.length > 0) {
+          const sample = data.markets[0];
+          console.log(`[KALSHI] Sample rejected market — ticker:"${sample.ticker}" title:"${sample.title}" event_ticker:"${sample.event_ticker}"`);
+        }
       }
 
       _kalshiLastFetchHadError = false; // successful 200 response

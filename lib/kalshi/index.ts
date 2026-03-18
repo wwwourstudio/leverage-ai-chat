@@ -348,10 +348,13 @@ async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage
 }
 
 async function _fetchKalshiPageInner(queryParams: URLSearchParams): Promise<KalshiPage> {
-  const urls = [
+  // Deduplicate: both constants point to the same host. Build a unique URL list so we
+  // never hit the same endpoint twice (which would just double latency on errors).
+  const urlSet = new Set([
     `${KALSHI_TRADING_URL}/markets?${queryParams}`,
     `${KALSHI_FALLBACK_URL}/markets?${queryParams}`,
-  ];
+  ]);
+  const urls = Array.from(urlSet);
 
   let lastError: Error | null = null;
 
@@ -367,10 +370,12 @@ async function _fetchKalshiPageInner(queryParams: URLSearchParams): Promise<Kals
         const host = new URL(url).hostname;
         console.error(`[KALSHI] API error ${response.status} at ${host} — ${errorText.substring(0, 200)}`);
         lastError = new Error(`Kalshi API error: ${response.status} ${response.statusText}`);
-        // 429: both URLs point to the same host — retrying immediately just logs a second
-        // identical 429. Break and let the caller handle back-off.
-        if (response.status === 429) break;
-        continue; // try fallback URL for other error codes
+        // 4xx errors are permanent — retrying (or trying the identical fallback URL) will
+        // never succeed. Break immediately so the caller does not waste more attempts.
+        // Exception: 429 is transient and the caller already handles back-off.
+        if (response.status !== 429 && response.status >= 400 && response.status < 500) break;
+        // 429 and 5xx: break (same host) and let the retry layer handle back-off.
+        break;
       }
 
       const data = await response.json();
@@ -642,7 +647,7 @@ export async function fetchKalshiMarketsWithRetry(params?: {
         console.log(`[KALSHI] Fetch error yielded 0 markets, retrying in ${backoffMs}ms... (${attempt}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, backoffMs));
       } else {
-        console.warn('[KALSHI] All retry attempts exhausted after fetch errors');
+        console.warn(`[KALSHI] All ${maxRetries} retry attempts exhausted — Kalshi markets unavailable`);
         return [];
       }
     } catch (error) {
@@ -655,6 +660,16 @@ export async function fetchKalshiMarketsWithRetry(params?: {
       if (msg.includes('401') || msg.includes('Unauthorized')) {
         console.error('[KALSHI] Auth failure (401) — aborting retries');
         return [];
+      }
+      // Any 4xx that isn't a rate limit is a permanent client error (bad params, forbidden, etc.)
+      // Retrying will never fix these — abort immediately.
+      const httpStatus = msg.match(/API error: (\d{3})/)?.[1];
+      if (httpStatus) {
+        const status = parseInt(httpStatus, 10);
+        if (status >= 400 && status < 500 && status !== 429) {
+          console.error(`[KALSHI] Permanent HTTP ${status} — aborting retries`);
+          return [];
+        }
       }
       if (errCode === 'ENOTFOUND' || errCode === 'EAI_AGAIN' || msg.includes('ENOTFOUND')) {
         console.error('[KALSHI] DNS failure (ENOTFOUND) — aborting retries');

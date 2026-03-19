@@ -176,6 +176,11 @@ export async function POST(request: NextRequest) {
     // Narrowed: no longer fires for all MLB fantasy queries — only explicit ADP keywords.
     const msgLower = userMessage.toLowerCase();
 
+    // Strip the [Fantasy League Context: ...]\n\n prefix the client injects so that
+    // an NFBC user's platform name ("nfbc") in the context block doesn't falsely fire
+    // hasADPIntent / hasStartSitIntent for every message they send.
+    const rawQueryLower = userMessage.replace(/^\[.*?\]\n\n/s, '').toLowerCase();
+
     // ── Team-name → sport inference ──────────────────────────────────────────
     // When context.sport is absent or 'none', scan the user message for known
     // team nicknames and infer the sport so card generation and model routing
@@ -225,7 +230,7 @@ export async function POST(request: NextRequest) {
 
     const hasADPIntent =
       ['adp', 'nfbc', 'nffc', 'average draft', 'draft position', 'draft rank', 'draft order', 'nfbc board', 'nffc board']
-        .some(k => msgLower.includes(k));
+        .some(k => rawQueryLower.includes(k));
 
     // Start/sit intent: user wants daily matchup-based start or sit advice.
     const START_SIT_KEYWORDS = [
@@ -239,7 +244,7 @@ export async function POST(request: NextRequest) {
     // and the fantasy-intent classifier occasionally misses streaming questions.
     // Without the guard, isMLBStatcastMode is correctly suppressed so expectsStatcastJSON
     // stays false and no spurious "JSON not found" warning is logged for prose responses.
-    const hasStartSitIntent = START_SIT_KEYWORDS.some(k => msgLower.includes(k));
+    const hasStartSitIntent = START_SIT_KEYWORDS.some(k => rawQueryLower.includes(k));
 
     // Statcast JSON mode only applies to non-ADP, non-start/sit MLB queries
     const isMLBStatcastMode = isMLBQuery && !hasADPIntent && !hasStartSitIntent;
@@ -258,7 +263,7 @@ export async function POST(request: NextRequest) {
       isMLBQuery &&
       !hasADPIntent &&
       !hasStartSitIntent &&
-      MLB_PROJECTION_KEYWORDS.some(k => msgLower.includes(k));
+      MLB_PROJECTION_KEYWORDS.some(k => rawQueryLower.includes(k));
 
     // True only when MLB_ANALYSIS_ADDENDUM is the active system prompt — i.e. the model
     // was instructed to return a Statcast JSON card.  When hasMLBProjectionIntent is true
@@ -829,7 +834,7 @@ export async function POST(request: NextRequest) {
       execute: async ({ player, position, rankMin, rankMax, limit, team, valueOnly }: z.infer<typeof adpParams>) => {
         console.log('[API/analyze] ADP tool called:', { player, position, rankMin, rankMax, limit, team, valueOnly });
         const isNFL = context?.sport?.includes('football') || context?.sport === 'nfl' ||
-          msgLower.includes('football') || msgLower.includes('nfl') || msgLower.includes('nffc');
+          rawQueryLower.includes('football') || rawQueryLower.includes('nfl') || rawQueryLower.includes('nffc');
         const data = isNFL ? await getNFLADPData() : await getADPData();
         const source = isNFL ? `NFFC ${NFBC_DRAFT_YEAR} NFL ADP` : `NFBC ${NFBC_DRAFT_YEAR} ADP`;
         if (data.length === 0) {
@@ -1330,7 +1335,7 @@ export async function POST(request: NextRequest) {
             sources.push({ name: 'Fantasy Projections Engine', type: 'database' as const, reliability: 91 });
           }
           if (hasADPIntent) {
-            const isNFLContext = context?.sport?.includes('football') || context?.sport === 'nfl' || msgLower.includes('nffc') || msgLower.includes('nfl draft') || msgLower.includes('fantasy football');
+            const isNFLContext = context?.sport?.includes('football') || context?.sport === 'nfl' || rawQueryLower.includes('nffc') || rawQueryLower.includes('nfl draft') || rawQueryLower.includes('fantasy football');
             const adpBoardName = isNFLContext
               ? `NFFC ${new Date().getFullYear()} NFL ADP Board`
               : `NFBC ${new Date().getFullYear()} ADP Board`;

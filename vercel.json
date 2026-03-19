@@ -11,6 +11,9 @@
     },
     "app/api/daily-picks/route.ts": {
       "maxDuration": 60
+    },
+    "app/api/picks/route.ts": {
+      "maxDuration": 15
     }
   },
   "crons": [

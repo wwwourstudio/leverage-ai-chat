@@ -173,13 +173,22 @@ function extractLineup(players: any[], teamName: string, teamAbbr: string): MLBB
 }
 
 /**
- * Get remaining games in the 2025 MLB season (for ROS projections).
- * Returns approximate remaining games based on today's date vs season end (Sep 28, 2025).
+ * Get remaining games in the current MLB season (for ROS projections).
+ * Season window: Opening Day (≈ last week of March) → last Sunday of September.
+ * During the off-season / Spring Training the full 162 is returned so that
+ * ROS projections still produce meaningful numbers before the season starts.
  */
 export function getRemainingGames(gamesPerTeamPerSeason = 162): number {
-  const seasonEnd = new Date('2025-09-28');
   const today = new Date();
-  const daysLeft = Math.max(0, (seasonEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  const gamesPerDay = 162 / 183; // ~0.885 games/day over ~183-day season
-  return Math.round(Math.min(gamesPerTeamPerSeason, daysLeft * gamesPerDay));
+  const year  = today.getFullYear();
+  // Approximate season boundaries — good enough for ROS scaling
+  const seasonStart = new Date(`${year}-03-27`);
+  const seasonEnd   = new Date(`${year}-09-28`);
+
+  if (today < seasonStart) return gamesPerTeamPerSeason; // Pre-season: full slate
+  if (today > seasonEnd)   return 0;                      // Post-season: done
+
+  const totalDays  = (seasonEnd.getTime() - seasonStart.getTime()) / (1000 * 60 * 60 * 24);
+  const daysLeft   = (seasonEnd.getTime() - today.getTime())       / (1000 * 60 * 60 * 24);
+  return Math.round((daysLeft / totalDays) * gamesPerTeamPerSeason);
 }

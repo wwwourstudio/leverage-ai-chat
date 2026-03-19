@@ -140,6 +140,12 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
     fetchStatcastPitchers(60),
   ]);
 
+  // No games today (pre-season / off-day) — fall back to top Statcast performers
+  if (games.length === 0) {
+    console.warn('[MLBProj] No games on schedule — generating Statcast-only projections');
+    return buildNoGamesCards({ allHitters, allPitchers, playerType, playerName, limit });
+  }
+
   const projections: MLBProjectionCardData[] = [];
 
   for (const game of games) {
@@ -445,6 +451,76 @@ function defaultMatchupVars() {
     umpireZone: 0.5, parkFactor: 0.5, weatherFactor: 0.5,
     velocityGap: 0.5, pitchDeception: 0.5, sprayAngleMatchup: 0.5,
   };
+}
+
+// ─── No-games fallback ────────────────────────────────────────────────────────
+
+/**
+ * Generate projection cards when no games are scheduled (pre-season, off-day).
+ * Uses Statcast data directly with neutral park factors and weather.
+ */
+async function buildNoGamesCards(opts: {
+  allHitters: Awaited<ReturnType<typeof fetchStatcastHitters>>;
+  allPitchers: Awaited<ReturnType<typeof fetchStatcastPitchers>>;
+  playerType: 'hitter' | 'pitcher' | 'all';
+  playerName?: string;
+  limit: number;
+}): Promise<MLBProjectionCardData[]> {
+  const { allHitters, allPitchers, playerType, playerName, limit } = opts;
+  const weather: WeatherConditions = { tempF: 72, windSpeedMph: 5, windDirectionDeg: 180, isOutdoor: true };
+  const neutralPark = getParkFactors('CHC'); // Wrigley — neutral park factor ~1.0
+  const nullGame: MLBGame = {
+    gamePk: 0, gameDate: '', status: '', homeTeam: '', awayTeam: '',
+    homeTeamAbbr: '', awayTeamAbbr: '', venue: 'Upcoming', venueLat: 0, venueLon: 0,
+    homeLineup: [], awayLineup: [],
+  };
+
+  const cards: MLBProjectionCardData[] = [];
+
+  // Top pitchers
+  if (playerType !== 'hitter') {
+    const pitchers = playerName
+      ? allPitchers.filter(p => p.playerName.toLowerCase().includes(playerName.toLowerCase()))
+      : allPitchers.slice(0, Math.ceil(limit * 0.5));
+
+    for (const statcast of pitchers) {
+      if (cards.length >= limit) break;
+      const features = buildPitcherFeatures(statcast, neutralPark, weather);
+      const bio      = buildBiomechanicsFeatures(statcast);
+      const probs    = computePitcherProbs(features);
+      const breakout = pitcherBreakoutScore(bio);
+      const sim      = simulatePitcher(probs, 1000);
+      cards.push(buildPitcherCard(
+        { id: statcast.playerId, fullName: statcast.playerName, team: statcast.team, teamAbbr: '', throws: statcast.throws },
+        statcast, probs, sim, breakout, features, weather, nullGame, 'Upcoming Opponent',
+      ));
+    }
+  }
+
+  // Top hitters
+  if (playerType !== 'pitcher') {
+    const hitters = playerName
+      ? allHitters.filter(h => h.playerName.toLowerCase().includes(playerName.toLowerCase()))
+      : allHitters.slice(0, limit - cards.length);
+
+    for (const statcast of hitters) {
+      if (cards.length >= limit) break;
+      const features = buildHitterFeatures(
+        { ...statcast, bats: statcast.bats ?? 'R' },
+        neutralPark, weather, 'R', 'DH',
+      );
+      const probs = computeHitterProbs(features);
+      const sim   = simulateHitter(probs, 1000);
+      cards.push(buildHitterCard(
+        { id: statcast.playerId, fullName: statcast.playerName, team: statcast.team, teamAbbr: '', battingOrder: 3, position: 'DH', bats: statcast.bats ?? 'R' },
+        statcast, probs, sim, features,
+        { dfsMatchupScore: 0.55, ...defaultMatchupVars() },
+        weather, nullGame, undefined,
+      ));
+    }
+  }
+
+  return cards.slice(0, limit);
 }
 
 /**

@@ -63,6 +63,8 @@ const SAVANT_BASE = 'https://baseballsavant.mlb.com/expected_statistics';
 // The expected_statistics endpoint only covers xwOBA/xBA/xSLG; batted-ball metrics
 // live on this separate endpoint. We fetch both in parallel and merge by player_id.
 const SAVANT_BATTED_BALL_BASE = 'https://baseballsavant.mlb.com/leaderboard/statcast';
+// Per-game search endpoint — returns pitch-level data for a specific player + date range.
+const SAVANT_SEARCH_URL = 'https://baseballsavant.mlb.com/statcast_search/csv';
 // MLB regular season: April–November = current year; Dec–March (off-season) = previous year
 function currentMLBSeason(): number {
   const month = new Date().getMonth() + 1; // 1-12
@@ -336,4 +338,122 @@ export function queryStatcast(players: StatcastPlayer[], params: StatcastQueryPa
   results = results.slice().sort((a, b) => b.xwoba - a.xwoba);
 
   return results.slice(0, limit);
+}
+
+// ── Recent game-level data ─────────────────────────────────────────────────────
+
+/**
+ * Recent (last N days) aggregated Statcast metrics from pitch-level game data.
+ * More actionable than season averages for short-term prop betting.
+ */
+export interface RecentStatcastData {
+  /** Average exit velocity on balls in play (mph) */
+  avgExitVelo: number;
+  /** Barrel rate on balls in play (%) — simplified MLB definition: EV ≥ 98 + angle 26–30° */
+  barrelRate: number;
+  /** Hard-hit rate — balls in play with EV ≥ 95 mph (%) */
+  hardHitPct: number;
+  /** Number of plate appearances in the sample */
+  sampleSize: number;
+  /** Days window used */
+  days: number;
+  /** true = live Baseball Savant game data; false = fell back to season aggregates */
+  isLive: boolean;
+}
+
+/**
+ * Fetch recent (last `days` calendar days) per-game Statcast data for a batter.
+ *
+ * Uses the `statcast_search/csv` endpoint which returns pitch-level data for
+ * a specific player and date range. Aggregates into key hitting metrics.
+ *
+ * Returns `null` when there is insufficient sample (< 5 balls in play) or if
+ * Baseball Savant is unreachable — callers should fall back to `getStatcastData()`.
+ *
+ * Note: the endpoint accepts "First Last" or "Last, First" player name formats.
+ * We try both before giving up.
+ */
+export async function getRecentStatcast(
+  playerName: string,
+  days = 14,
+): Promise<RecentStatcastData | null> {
+  const today = new Date();
+  const start = new Date();
+  start.setDate(today.getDate() - days);
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+
+  // Try "First Last" format first, then "Last, First" on empty result
+  const namesToTry = [playerName];
+  const parts = playerName.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    const lastFirst = `${parts[parts.length - 1]}, ${parts.slice(0, -1).join(' ')}`;
+    if (lastFirst !== playerName) namesToTry.push(lastFirst);
+  }
+
+  for (const name of namesToTry) {
+    const params = new URLSearchParams({
+      player_type: 'batter',
+      hfGT:        'R|',   // regular season only
+      player_name: name,
+      game_date_gt: fmt(start),
+      game_date_lt: fmt(today),
+      type:        'details',
+      csv:         'true',
+    });
+
+    try {
+      const res = await fetch(`${SAVANT_SEARCH_URL}?${params}`, {
+        headers: SAVANT_HEADERS,
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) continue;
+
+      const csv = await res.text();
+      const lines = csv.trim().split('\n');
+      if (lines.length < 2) continue;
+
+      // Parse header to find column indices
+      const header = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+      const evIdx     = header.indexOf('launch_speed');
+      const angIdx    = header.indexOf('launch_angle');
+      const eventsIdx = header.indexOf('events');
+      if (evIdx === -1) continue; // unexpected format
+
+      let totalEV = 0, evCount = 0;
+      let barrels = 0, hardHit = 0, bip = 0;
+      let paCount = 0;
+
+      for (let i = 1; i < lines.length; i++) {
+        const row = lines[i].split(',');
+        const eventVal = eventsIdx >= 0 ? (row[eventsIdx] ?? '').replace(/"/g, '').trim() : '';
+        if (eventVal.length > 0) paCount++; // non-empty events column = terminal PA result
+
+        const ev  = parseFloat((row[evIdx]  ?? '').replace(/"/g, ''));
+        const ang = parseFloat(angIdx >= 0 ? (row[angIdx] ?? '').replace(/"/g, '') : 'NaN');
+
+        if (isNaN(ev) || ev <= 0) continue;
+        totalEV += ev;
+        evCount++;
+        bip++;
+        // Simplified barrel: EV ≥ 98 mph AND launch angle 26–30°
+        if (!isNaN(ang) && ev >= 98 && ang >= 26 && ang <= 30) barrels++;
+        if (ev >= 95) hardHit++;
+      }
+
+      if (bip < 5) continue; // too few balls in play for reliable metrics
+
+      return {
+        avgExitVelo: totalEV / evCount,
+        barrelRate:  (barrels / bip) * 100,
+        hardHitPct:  (hardHit  / bip) * 100,
+        sampleSize:  paCount,
+        days,
+        isLive: true,
+      };
+    } catch {
+      // Try next name format or return null
+    }
+  }
+
+  return null;
 }

@@ -4,21 +4,24 @@
  * Automated MLB HR prop analysis pipeline. Runs daily (via cron) to surface
  * ELITE / STRONG / LEAN bets ranked by model edge over the market.
  *
- * DATA FLOW
- * ─────────
+ * FULL PROJECTION STACK
+ * ─────────────────────
  *   HR Prop Markets (Odds API)
  *     → Players with active props today
- *     → MLBAM ID + team (player-map.ts)
- *     → Game schedule (mlb-schedule.ts) — pitcher + venue
+ *     → MLBAM ID + team  (player-map.ts)
+ *     → Game schedule    (mlb-schedule.ts) — pitcher, venue, HP umpire
  *     → Statcast features (baseball-savant.ts) — 14-day or season
- *     → Weather (weather/index.ts) — Open-Meteo at stadium lat/lon
- *     → Pitcher HR susceptibility (baseball-savant.ts — pitcher data)
- *     → HR model (hrEngine.ts) — Bayesian logistic [0,1]
- *     → rankBet() (card-pipeline.ts) — edge + ELITE/STRONG/LEAN/PASS
- *     → Supabase daily_picks table
+ *     → HR model         (hrEngine.ts)       — Bayesian logistic [0,1]
  *
- * Only players with PASS-or-better edge AND at least one book line are saved.
- * PASS-tier picks are excluded from the default API response but kept for audit.
+ *   ADJUSTMENT MULTIPLIERS (applied in order):
+ *     × weatherFactor    (weather/index.ts)    — temp + wind vs outfield bearing
+ *     × matchupFactor    (pitcher HR9 vs league avg, ±platoon bonus)
+ *     × park.hrFactor    (park-factors.ts)     — FanGraphs 5-yr park factors
+ *     × (1 + ump.hrBoost)(umpire-profiles.ts)  — tight/expanded zone effect
+ *     × bullpen.fatigueFactor (bullpen-tracker.ts) — last-3-game pen usage
+ *
+ *   → rankBet()          (card-pipeline.ts)    — ELITE/STRONG/LEAN/PASS tiers
+ *   → Supabase daily_picks table
  */
 
 import { getOddsApiKey } from '@/lib/config';
@@ -28,43 +31,51 @@ import type { BetTier } from '@/lib/card-pipeline';
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface PickResult {
-  pickDate:           string;   // YYYY-MM-DD
-  gameId:             number | null;
-  playerName:         string;
-  canonicalName:      string;
-  mlbamId:            number | null;
-  homeTeam:           string;
-  awayTeam:           string;
-  opposingPitcher:    string | null;
-  pitcherHand:        'L' | 'R' | null;
-  /** Model probability per PA [0,1] */
-  modelProbability:   number;
+  pickDate:            string;   // YYYY-MM-DD
+  gameId:              number | null;
+  playerName:          string;
+  canonicalName:       string;
+  mlbamId:             number | null;
+  homeTeam:            string;
+  awayTeam:            string;
+  opposingPitcher:     string | null;
+  pitcherHand:         'L' | 'R' | null;
+  homeUmpire:          string | null;
+
+  /** Raw Statcast model probability per PA [0,1] */
+  modelProbability:    number;
   /** Best market-implied probability [0,1] */
-  impliedProbability: number;
-  /** Base edge (no adjustments) pp */
-  edge:               number;
-  /** Weather + matchup adjusted edge pp */
-  adjustedEdge:       number;
+  impliedProbability:  number;
+  /** Base edge (model vs market, no adjustments) in pp */
+  edge:                number;
+  /** Fully-adjusted edge after all 5 multipliers, in pp */
+  adjustedEdge:        number;
   /** Final score = adjustedEdge + sharp bonus */
-  score:              number;
-  tier:               BetTier;
-  bestOdds:           number;
-  bestBook:           string;
-  line:               number;
-  allLines:           Array<{ bookmaker: string; overOdds: number; impliedProbability: number }>;
-  weatherFactor:      number;
-  matchupFactor:      number;
-  sharpBoosted:       boolean;
-  dataSource:         string;
-  /** ISO timestamp of generation */
-  generatedAt:        string;
+  score:               number;
+  tier:                BetTier;
+
+  bestOdds:            number;
+  bestBook:            string;
+  line:                number;
+  allLines:            Array<{ bookmaker: string; overOdds: number; impliedProbability: number }>;
+
+  // Individual adjustment factors (for display + audit)
+  weatherFactor:       number;
+  matchupFactor:       number;
+  parkFactor:          number;
+  umpireBoost:         number;   // raw hrBoost value (e.g. 0.03), not the multiplier
+  bullpenFactor:       number;
+
+  sharpBoosted:        boolean;
+  dataSource:          string;
+  generatedAt:         string;   // ISO timestamp
 }
 
 export interface GeneratePicksOptions {
   /** YYYY-MM-DD. Defaults to today ET. */
-  date?:     string;
+  date?:        string;
   /** Skip tiers below this. Default: 'LEAN' (excludes PASS) */
-  minTier?:  BetTier;
+  minTier?:     BetTier;
   /** Max concurrent player analyses. Default: 5 */
   concurrency?: number;
 }
@@ -81,14 +92,8 @@ const LEAGUE_AVG_PITCHER_BARREL = 7.0;  // barrel % allowed
 /**
  * Run the full daily picks pipeline for MLB HR props.
  *
- * 1. Fetch all active HR prop markets from The Odds API
- * 2. For each player with a market:
- *    a. Resolve MLBAM ID + team
- *    b. Find today's game (for pitcher + weather context)
- *    c. Compute Statcast-based model probability
- *    d. Rank with weather + matchup adjustments
- * 3. Filter to minTier and above
- * 4. Sort: ELITE → STRONG → LEAN, then by score desc
+ * Fetches all active HR prop markets, runs the 5-factor model stack for each
+ * player, filters to minTier and above, and returns sorted results.
  *
  * Returns [] when ODDS_API_KEY is not configured.
  */
@@ -107,15 +112,14 @@ export async function generateDailyPicks(
   const t0 = Date.now();
   logger.info(LogCategory.API, 'picks_engine_start', { metadata: { pickDate, minTier } });
 
-  // ── Step 1: Get all HR prop markets ────────────────────────────────────────
-  const { getAllHRLines } = await import('@/lib/card-pipeline');
+  // ── Step 1: Fetch all HR prop markets ─────────────────────────────────────
   const allLines = await fetchAllHRPropPlayers(oddsApiKey);
   if (allLines.size === 0) {
     logger.info(LogCategory.API, 'picks_engine_no_markets', { metadata: { pickDate } });
     return [];
   }
 
-  // ── Step 2: Get today's MLB schedule ──────────────────────────────────────
+  // ── Step 2: Fetch today's MLB schedule (pitchers + umpires) ───────────────
   const { getTodayGames } = await import('@/lib/mlb-schedule');
   const games = await getTodayGames(pickDate);
 
@@ -126,7 +130,7 @@ export async function generateDailyPicks(
   for (let i = 0; i < playerNames.length; i += concurrency) {
     const batch = playerNames.slice(i, i + concurrency);
     const results = await Promise.allSettled(
-      batch.map(name => analyzePlayer(name, allLines.get(name)!, games, pickDate, oddsApiKey)),
+      batch.map(name => analyzePlayer(name, allLines.get(name)!, games, pickDate)),
     );
     for (const r of results) {
       if (r.status === 'fulfilled' && r.value) picks.push(r.value);
@@ -152,7 +156,7 @@ export async function generateDailyPicks(
 
 /**
  * Save a set of picks to Supabase `daily_picks` table.
- * Uses upsert on (pick_date, mlbam_id, game_id) to be idempotent.
+ * Uses upsert on (pick_date, player_id, game_id) to be idempotent.
  * Non-throwing — logs warning on failure.
  */
 export async function savePicks(picks: PickResult[]): Promise<void> {
@@ -170,6 +174,7 @@ export async function savePicks(picks: PickResult[]): Promise<void> {
       away_team:            p.awayTeam,
       opposing_pitcher:     p.opposingPitcher,
       pitcher_hand:         p.pitcherHand,
+      home_umpire:          p.homeUmpire,
       model_probability:    p.modelProbability,
       implied_probability:  p.impliedProbability,
       edge:                 p.edge,
@@ -182,6 +187,9 @@ export async function savePicks(picks: PickResult[]): Promise<void> {
       all_lines:            p.allLines,
       weather_factor:       p.weatherFactor,
       matchup_factor:       p.matchupFactor,
+      park_factor:          p.parkFactor,
+      umpire_boost:         p.umpireBoost,
+      bullpen_factor:       p.bullpenFactor,
       sharp_boosted:        p.sharpBoosted,
       data_source:          p.dataSource,
       generated_at:         p.generatedAt,
@@ -229,30 +237,34 @@ export async function getSavedPicks(
     if (error) return [];
 
     return (data ?? []).map(row => ({
-      pickDate:           row.pick_date,
-      gameId:             row.game_id ? Number(row.game_id) : null,
-      playerName:         row.player_name,
-      canonicalName:      row.player_name,
-      mlbamId:            row.player_id,
-      homeTeam:           row.home_team ?? '',
-      awayTeam:           row.away_team ?? '',
-      opposingPitcher:    row.opposing_pitcher,
-      pitcherHand:        row.pitcher_hand,
-      modelProbability:   row.model_probability,
-      impliedProbability: row.implied_probability,
-      edge:               row.edge,
-      adjustedEdge:       row.adjusted_edge,
-      score:              row.score,
-      tier:               row.tier as BetTier,
-      bestOdds:           row.best_odds,
-      bestBook:           row.best_book,
-      line:               row.prop_line,
-      allLines:           row.all_lines ?? [],
-      weatherFactor:      row.weather_factor ?? 1,
-      matchupFactor:      row.matchup_factor ?? 1,
-      sharpBoosted:       row.sharp_boosted ?? false,
-      dataSource:         row.data_source ?? 'unknown',
-      generatedAt:        row.generated_at,
+      pickDate:            row.pick_date,
+      gameId:              row.game_id ? Number(row.game_id) : null,
+      playerName:          row.player_name,
+      canonicalName:       row.player_name,
+      mlbamId:             row.player_id,
+      homeTeam:            row.home_team ?? '',
+      awayTeam:            row.away_team ?? '',
+      opposingPitcher:     row.opposing_pitcher,
+      pitcherHand:         row.pitcher_hand,
+      homeUmpire:          row.home_umpire ?? null,
+      modelProbability:    row.model_probability,
+      impliedProbability:  row.implied_probability,
+      edge:                row.edge,
+      adjustedEdge:        row.adjusted_edge,
+      score:               row.score,
+      tier:                row.tier as BetTier,
+      bestOdds:            row.best_odds,
+      bestBook:            row.best_book,
+      line:                row.prop_line,
+      allLines:            row.all_lines ?? [],
+      weatherFactor:       row.weather_factor  ?? 1,
+      matchupFactor:       row.matchup_factor  ?? 1,
+      parkFactor:          row.park_factor     ?? 1,
+      umpireBoost:         row.umpire_boost    ?? 0,
+      bullpenFactor:       row.bullpen_factor  ?? 1,
+      sharpBoosted:        row.sharp_boosted   ?? false,
+      dataSource:          row.data_source     ?? 'unknown',
+      generatedAt:         row.generated_at,
     }));
   } catch {
     return [];
@@ -261,13 +273,14 @@ export async function getSavedPicks(
 
 // ── Internal helpers ───────────────────────────────────────────────────────────
 
-/** Fetch all HR prop lines from Odds API and return a Map<playerName, lines[]> */
+/** Fetch all HR prop lines from Odds API → Map<playerName, lines[]> */
 async function fetchAllHRPropPlayers(
   apiKey: string,
-): Promise<Map<string, Array<{ bookmaker: string; overOdds: number; line: number; impliedProbability: number }>>> {
-  const map = new Map<string, Array<{ bookmaker: string; overOdds: number; line: number; impliedProbability: number }>>();
+): Promise<Map<string, PropLines>> {
+  const map = new Map<string, PropLines>();
   try {
-    const url = `https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?apiKey=${apiKey}&regions=us&markets=player_home_runs&oddsFormat=american`;
+    const url = `https://api.the-odds-api.com/v4/sports/baseball_mlb/odds` +
+                `?apiKey=${apiKey}&regions=us&markets=player_home_runs&oddsFormat=american`;
     const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) return map;
 
@@ -289,22 +302,21 @@ async function fetchAllHRPropPlayers(
         for (const market of (book.markets ?? [])) {
           if (market.key !== 'player_home_runs') continue;
           for (const outcome of (market.outcomes ?? [])) {
-            const name  = outcome.name;
             const entry = {
               bookmaker:          book.title,
               overOdds:           outcome.price,
               line:               outcome.point ?? 0.5,
               impliedProbability: americanToProb(outcome.price),
             };
-            const existing = map.get(name) ?? [];
+            const existing = map.get(outcome.name) ?? [];
             existing.push(entry);
-            map.set(name, existing);
+            map.set(outcome.name, existing);
           }
         }
       }
     }
 
-    // Sort each player's lines best → worst
+    // Sort each player's lines best → worst (highest overOdds = best for bettor)
     for (const [name, lines] of map) {
       map.set(name, lines.sort((a, b) => b.overOdds - a.overOdds));
     }
@@ -316,34 +328,39 @@ async function fetchAllHRPropPlayers(
   return map;
 }
 
-type PropLines = Array<{ bookmaker: string; overOdds: number; line: number; impliedProbability: number }>;
+type PropLines = Array<{
+  bookmaker:          string;
+  overOdds:           number;
+  line:               number;
+  impliedProbability: number;
+}>;
 
-/** Analyse a single player and produce a PickResult (or null when data is insufficient) */
+/** Full 5-factor analysis for a single player. Returns null when data is insufficient. */
 async function analyzePlayer(
   playerName:  string,
   propLines:   PropLines,
   games:       import('@/lib/mlb-schedule').ScheduledGame[],
   pickDate:    string,
-  _oddsApiKey: string,
 ): Promise<PickResult | null> {
   try {
-    // 1. MLBAM ID + team ───────────────────────────────────────────────────────
+    // ── 1. MLBAM ID + team ────────────────────────────────────────────────────
     const { getPlayerByName } = await import('@/lib/player-map');
-    const profile = await getPlayerByName(playerName).catch(() => null);
-    const mlbamId      = profile?.id ?? null;
+    const profile       = await getPlayerByName(playerName).catch(() => null);
+    const mlbamId       = profile?.id       ?? null;
     const canonicalName = profile?.fullName ?? playerName;
-    const teamName     = profile?.team ?? '';
-    const batterHand   = (profile?.batSide as 'L' | 'R' | undefined) ?? undefined;
+    const teamName      = profile?.team     ?? '';
+    const batterHand    = (profile?.batSide as 'L' | 'R' | undefined) ?? undefined;
 
-    // 2. Match game ────────────────────────────────────────────────────────────
+    // ── 2. Match game ─────────────────────────────────────────────────────────
     const { findGameForTeam, getOpposingPitcher } = await import('@/lib/mlb-schedule');
     const game    = teamName ? findGameForTeam(games, teamName) : null;
     const pitcher = game ? getOpposingPitcher(game, teamName) : null;
 
-    // 3. Statcast features ─────────────────────────────────────────────────────
-    const { getRecentStatcast, getStatcastData, queryStatcast } = await import('@/lib/baseball-savant');
+    // ── 3. Statcast features ──────────────────────────────────────────────────
+    const { getRecentStatcast, getStatcastData, queryStatcast } =
+      await import('@/lib/baseball-savant');
 
-    let barrelRate  = 0; // fraction 0–1
+    let barrelRate  = 0;
     let avgExitVelo = 0;
     let sampleSize  = 0;
     let dataSource  = 'fallback';
@@ -365,39 +382,52 @@ async function analyzePlayer(
       }
     }
 
-    if (sampleSize === 0) return null; // no Statcast data
+    if (sampleSize === 0) return null; // insufficient Statcast data
 
-    // 4. Model probability ────────────────────────────────────────────────────
-    const { computeHRProb, fairAmericanOdds } = await import('@/lib/hrEngine');
-    const airPullRate   = Math.min(0.60, barrelRate * 2.2);
+    // ── 4. Base model probability ─────────────────────────────────────────────
+    const { computeHRProb } = await import('@/lib/hrEngine');
+    const airPullRate      = Math.min(0.60, barrelRate * 2.2);
     const modelProbability = computeHRProb({
       airPullRate,
       barrelRate,
       avgExitVelocity:      avgExitVelo,
       platoonAdvantage:     0,
-      parkHRFactor:         1.0,
+      parkHRFactor:         1.0, // applied separately below
       pitcherHRSuppression: 0.5,
       sampleSize,
     });
 
-    // 5. Pitcher HR susceptibility from Statcast pitcher data ─────────────────
-    let pitcherHR9 = 1.2; // league average default
+    // ── 5. Pitcher HR susceptibility → matchupFactor ──────────────────────────
+    let pitcherHR9   = 1.2; // league average HR/9 default
+    let matchupFactor = 1.0;
     if (pitcher?.fullName) {
-      const { players: pitchers } = await getStatcastData().catch(() => ({ players: [] as import('@/lib/baseball-savant').StatcastPlayer[] }));
-      const pitcherData = queryStatcast(pitchers, { player: pitcher.fullName, playerType: 'pitcher', limit: 1 });
+      const { players: pitchers } = await getStatcastData().catch(() => ({
+        players: [] as import('@/lib/baseball-savant').StatcastPlayer[],
+      }));
+      const pitcherData = queryStatcast(pitchers, {
+        player:     pitcher.fullName,
+        playerType: 'pitcher',
+        limit:      1,
+      });
       if (pitcherData.length > 0) {
         const pd = pitcherData[0];
-        // HR susceptibility: high EV allowed + high barrel% allowed = HR-prone pitcher
-        pitcherHR9 = 1.2 * (pd.exitVelocity / LEAGUE_AVG_PITCHER_EV) * (pd.barrelRate / LEAGUE_AVG_PITCHER_BARREL);
-        pitcherHR9 = Math.max(0.4, Math.min(3.0, pitcherHR9));
+        pitcherHR9  = 1.2
+          * (pd.exitVelocity  / LEAGUE_AVG_PITCHER_EV)
+          * (pd.barrelRate    / LEAGUE_AVG_PITCHER_BARREL);
+        pitcherHR9  = Math.max(0.4, Math.min(3.0, pitcherHR9));
+      }
+      matchupFactor = Math.max(0.5, Math.min(2.0, pitcherHR9 / 1.2));
+      if (pitcher.hand && batterHand && pitcher.hand !== batterHand) {
+        matchupFactor *= 1.08; // platoon advantage
       }
     }
 
-    // 6. Weather factor ───────────────────────────────────────────────────────
+    // ── 6. Weather factor ─────────────────────────────────────────────────────
     let weatherFactor = 1.0;
     if (game && !game.isDome) {
       try {
-        const { fetchWeatherForLocation, weatherHRFactor } = await import('@/lib/weather/index');
+        const { fetchWeatherForLocation, weatherHRFactor } =
+          await import('@/lib/weather/index');
         const { resolveHomeTeamCoords } = await import('@/lib/picks-engine-helpers');
         const coords = resolveHomeTeamCoords(game.homeTeam);
         if (coords) {
@@ -406,66 +436,102 @@ async function analyzePlayer(
             weatherFactor = weatherHRFactor({
               temp:      weather.temperature,
               windSpeed: weather.windSpeed,
-              windDeg:   0, // wind direction not in WeatherData top-level
+              windDeg:   0, // top-level WeatherData doesn't include direction
               homeTeam:  game.homeTeam,
             });
           }
         }
       } catch {
-        // Non-fatal — weather stays 1.0
+        // Non-fatal — stays 1.0
       }
     }
 
-    // 7. Matchup factor ───────────────────────────────────────────────────────
-    let matchupFactor = 1.0;
-    if (pitcherHR9 !== 1.2) {
-      matchupFactor = Math.max(0.5, Math.min(2.0, pitcherHR9 / 1.2));
-      if (pitcher?.hand && batterHand && pitcher.hand !== batterHand) {
-        matchupFactor *= 1.08; // platoon advantage
+    // ── 7. Park factor ────────────────────────────────────────────────────────
+    let parkFactor = 1.0;
+    if (game) {
+      const { getParkFactor } = await import('@/lib/park-factors');
+      parkFactor = getParkFactor(game.homeTeam).hrFactor;
+    }
+
+    // ── 8. Umpire factor ──────────────────────────────────────────────────────
+    let umpireBoost = 0;
+    if (game?.homeUmpire) {
+      const { getUmpireProfile } = await import('@/lib/umpire-profiles');
+      umpireBoost = getUmpireProfile(game.homeUmpire).hrBoost;
+    }
+
+    // ── 9. Bullpen fatigue factor ─────────────────────────────────────────────
+    // Use the opposing pitcher's team (the team pitching against our batter)
+    let bullpenFactor = 1.0;
+    const opposingTeam = game
+      ? (teamName && game.homeTeam.toLowerCase().includes(teamName.toLowerCase())
+          ? game.awayTeam
+          : game.homeTeam)
+      : null;
+    if (opposingTeam) {
+      try {
+        const { getBullpenStatus } = await import('@/lib/bullpen-tracker');
+        const bullpen = await getBullpenStatus(opposingTeam);
+        bullpenFactor = bullpen.fatigueFactor;
+      } catch {
+        // Non-fatal — stays 1.0
       }
     }
 
-    // 8. Rank bet ─────────────────────────────────────────────────────────────
-    const { rankBet, calculateEdge } = await import('@/lib/card-pipeline');
-    const best   = propLines[0];
-    const edge   = calculateEdge(modelProbability, best.impliedProbability);
-    const rank   = rankBet({
-      projection:    modelProbability,
+    // ── 10. Combine all 5 factors → adjusted projection ───────────────────────
+    const finalProjection = Math.max(0.001, Math.min(0.90,
+      modelProbability
+        * weatherFactor
+        * matchupFactor
+        * parkFactor
+        * (1 + umpireBoost)
+        * bullpenFactor,
+    ));
+
+    const best = propLines[0];
+    const { calculateEdge, rankBet } = await import('@/lib/card-pipeline');
+
+    const edge    = calculateEdge(modelProbability, best.impliedProbability);
+    const rank    = rankBet({
+      projection:    finalProjection,
       implied:       best.impliedProbability,
-      weatherFactor,
-      matchupFactor,
-      isSharp:       false, // line movement requires historical data — not available on first run
+      // weatherFactor + matchupFactor already baked into finalProjection
+      isSharp: false,
     });
 
     return {
       pickDate,
-      gameId:             game?.gameId ?? null,
+      gameId:              game?.gameId ?? null,
       playerName,
       canonicalName,
       mlbamId,
-      homeTeam:           game?.homeTeam ?? '',
-      awayTeam:           game?.awayTeam ?? '',
-      opposingPitcher:    pitcher?.fullName ?? null,
-      pitcherHand:        pitcher?.hand ?? null,
+      homeTeam:            game?.homeTeam ?? '',
+      awayTeam:            game?.awayTeam ?? '',
+      opposingPitcher:     pitcher?.fullName ?? null,
+      pitcherHand:         pitcher?.hand     ?? null,
+      homeUmpire:          game?.homeUmpire  ?? null,
       modelProbability,
-      impliedProbability: best.impliedProbability,
+      impliedProbability:  best.impliedProbability,
       edge,
-      adjustedEdge:       rank.adjustedEdge,
-      score:              rank.score,
-      tier:               rank.tier,
-      bestOdds:           best.overOdds,
-      bestBook:           best.bookmaker,
-      line:               best.line,
-      allLines:           propLines.map(l => ({
+      adjustedEdge:        rank.adjustedEdge,
+      score:               rank.score,
+      tier:                rank.tier,
+      bestOdds:            best.overOdds,
+      bestBook:            best.bookmaker,
+      line:                best.line,
+      allLines:            propLines.map(l => ({
         bookmaker:          l.bookmaker,
         overOdds:           l.overOdds,
         impliedProbability: l.impliedProbability,
       })),
       weatherFactor,
       matchupFactor,
-      sharpBoosted:       false,
+      parkFactor,
+      umpireBoost,
+      bullpenFactor,
+      sharpBoosted:        false,
       dataSource,
-      generatedAt:        new Date().toISOString(),
+      generatedAt:         new Date().toISOString(),
     };
   } catch {
     return null;

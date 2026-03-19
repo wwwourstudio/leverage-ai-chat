@@ -22,6 +22,25 @@ const TIER_CONFIG: Record<BetTier, { label: string; color: string; bg: string }>
 
 const TIERS: BetTier[] = ['ELITE', 'STRONG', 'LEAN'];
 
+// ── Factor badge ───────────────────────────────────────────────────────────────
+
+function FactorBadge({
+  label, value, kind,
+}: { label: string; value: number; kind: 'mult' }) {
+  const delta  = kind === 'mult' ? value - 1 : value;
+  const isUp   = delta >  0.005;
+  const isDown = delta < -0.005;
+  const color  = isUp ? 'text-green-400' : isDown ? 'text-red-400' : 'text-zinc-400';
+  const display = kind === 'mult'
+    ? (value === 1.0 ? '—' : `${value.toFixed(2)}×`)
+    : (value === 0   ? '—' : `${value > 0 ? '+' : ''}${(value * 100).toFixed(0)}pp`);
+  return (
+    <span>
+      {label}: <span className={color}>{display}</span>
+    </span>
+  );
+}
+
 // ── American odds formatter ────────────────────────────────────────────────────
 
 function fmtOdds(odds: number): string {
@@ -30,10 +49,6 @@ function fmtOdds(odds: number): string {
 
 function fmtPct(n: number): string {
   return `${(n * 100).toFixed(1)}%`;
-}
-
-function fmtFactor(n: number): string {
-  return n === 1.0 ? '—' : n > 1 ? `+${((n - 1) * 100).toFixed(0)}%` : `${((n - 1) * 100).toFixed(0)}%`;
 }
 
 // ── Tier badge ─────────────────────────────────────────────────────────────────
@@ -102,22 +117,27 @@ function PickCard({ pick }: { pick: PickResult }) {
         </div>
       </div>
 
-      {/* Adjustment factors */}
-      <div className="flex gap-3 text-xs text-zinc-400">
-        <span>
-          Weather: <span className={pick.weatherFactor > 1 ? 'text-green-400' : pick.weatherFactor < 1 ? 'text-red-400' : 'text-zinc-300'}>
-            {fmtFactor(pick.weatherFactor)}
-          </span>
-        </span>
-        <span>
-          Matchup: <span className={pick.matchupFactor > 1 ? 'text-green-400' : pick.matchupFactor < 1 ? 'text-red-400' : 'text-zinc-300'}>
-            {fmtFactor(pick.matchupFactor)}
-          </span>
-        </span>
-        <span className="text-zinc-500 ml-auto">
-          src: {pick.dataSource}
+      {/* Adjustment factors — 5-factor stack */}
+      <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-xs text-zinc-400">
+        <FactorBadge label="Weather"  value={pick.weatherFactor}             kind="mult" />
+        <FactorBadge label="Matchup"  value={pick.matchupFactor}             kind="mult" />
+        <FactorBadge label="Park"     value={pick.parkFactor}                kind="mult" />
+        <FactorBadge label="Umpire"   value={1 + pick.umpireBoost}           kind="mult" />
+        <FactorBadge label="Bullpen"  value={pick.bullpenFactor}             kind="mult" />
+        <span className="text-zinc-600 text-right col-span-1 self-center truncate">
+          {pick.dataSource}
         </span>
       </div>
+      {pick.homeUmpire && (
+        <div className="text-xs text-zinc-500">
+          HP Ump: <span className="text-zinc-300">{pick.homeUmpire}</span>
+          {pick.umpireBoost !== 0 && (
+            <span className={pick.umpireBoost > 0 ? 'text-green-400 ml-1' : 'text-red-400 ml-1'}>
+              ({pick.umpireBoost > 0 ? '+' : ''}{(pick.umpireBoost * 100).toFixed(0)}pp)
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Multi-book lines (expandable) */}
       {pick.allLines.length > 1 && (

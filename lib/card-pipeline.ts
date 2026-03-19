@@ -621,6 +621,87 @@ function formatAmerican(price: number): string {
 }
 
 // ============================================================================
+// BET RANKING ENGINE
+//
+// Combines model edge with environment multipliers (weather, pitcher matchup,
+// sharp-money signal) to produce a final ranked bet recommendation.
+//
+// Tier thresholds (percentage-point edge after all adjustments):
+//   ELITE  > 15pp — high-confidence +EV bet
+//   STRONG > 8pp  — solid edge, worth action
+//   LEAN   > 3pp  — positive EV but thin
+//   PASS   ≤ 3pp  — below minimum edge threshold
+// ============================================================================
+
+export type BetTier = 'ELITE' | 'STRONG' | 'LEAN' | 'PASS';
+
+export interface BetRank {
+  /** Base model edge (no env adjustments) in percentage points */
+  baseEdge:       number;
+  /** Edge after weather + matchup multipliers */
+  adjustedEdge:   number;
+  /** Final score = adjustedEdge + sharp-money bonus */
+  score:          number;
+  tier:           BetTier;
+  /** Weather multiplier applied (1.0 = neutral) */
+  weatherFactor:  number;
+  /** Matchup multiplier applied (1.0 = neutral) */
+  matchupFactor:  number;
+  /** Whether a sharp-money signal boosted this bet */
+  sharpBoosted:   boolean;
+}
+
+/**
+ * Rank a bet opportunity by combining base model edge with environment multipliers.
+ *
+ * @param projection   - Model probability [0,1] (from hrEngine.computeHRProb or similar)
+ * @param implied      - Market-implied probability [0,1]
+ * @param weatherFactor - Weather HR multiplier from weatherHRFactor() (default 1.0)
+ * @param matchupFactor - Pitcher matchup multiplier (default 1.0)
+ * @param isSharp      - Whether line movement tracking detected sharp money
+ */
+export function rankBet({
+  projection,
+  implied,
+  weatherFactor = 1.0,
+  matchupFactor = 1.0,
+  isSharp = false,
+}: {
+  projection:     number;
+  implied:        number;
+  weatherFactor?: number;
+  matchupFactor?: number;
+  isSharp?:       boolean;
+}): BetRank {
+  // Apply environment multipliers to the model probability
+  // Clamp to [0, 0.95] to avoid impossible probabilities
+  const adjustedProb = Math.min(0.95, projection * weatherFactor * matchupFactor);
+
+  const baseEdge     = calculateEdge(projection,    implied);
+  const adjustedEdge = calculateEdge(adjustedProb,  implied);
+
+  // Sharp-money bonus: sharp signal adds 5pp to scoring (but NOT to edge output)
+  const sharpBonus = isSharp ? 5 : 0;
+  const score      = adjustedEdge + sharpBonus;
+
+  const tier: BetTier =
+    score > 15 ? 'ELITE'  :
+    score > 8  ? 'STRONG' :
+    score > 3  ? 'LEAN'   :
+    'PASS';
+
+  return {
+    baseEdge,
+    adjustedEdge,
+    score,
+    tier,
+    weatherFactor,
+    matchupFactor,
+    sharpBoosted: isSharp,
+  };
+}
+
+// ============================================================================
 // HR EDGE ANALYSER — full real-data pipeline for HR prop betting
 //
 // Pipeline:
@@ -670,6 +751,30 @@ export interface HREdgeResult {
   confidence:         number;
   /** Data quality tier: recent 14-day > full season > fallback */
   dataSource:         'recent_14d' | 'season' | 'fallback';
+  /** Full bet ranking including weather + matchup adjustments */
+  rank:               BetRank;
+}
+
+/**
+ * Optional game-context for enriched ranking.
+ * When provided, `analyzeHREdge` applies weather + matchup adjustments
+ * to produce an adjusted edge and ELITE/STRONG/LEAN/PASS tier.
+ */
+export interface HREdgeContext {
+  /** Home team name — used to fetch Open-Meteo weather + look up stadium orientation */
+  homeTeam?: string;
+  /** Latitude for weather fetch (overrides stadium lookup) */
+  lat?: number;
+  /** Longitude for weather fetch (overrides stadium lookup) */
+  lon?: number;
+  /** Pitcher's HR rate per 9 innings — 1.2 = league average */
+  pitcherHR9?: number;
+  /** Pitcher's throwing hand */
+  pitcherHand?: 'L' | 'R';
+  /** Batter's hitting hand */
+  batterHand?: 'L' | 'R';
+  /** Whether the line-movement tracker detected sharp money on this player */
+  isSharp?: boolean;
 }
 
 /** American odds → implied probability (removes vig naively) */
@@ -738,7 +843,10 @@ export async function getAllHRLines(
  *
  * Non-throwing — all errors are caught and return null gracefully.
  */
-export async function analyzeHREdge(playerName: string): Promise<HREdgeResult | null> {
+export async function analyzeHREdge(
+  playerName: string,
+  ctx: HREdgeContext = {},
+): Promise<HREdgeResult | null> {
   const oddsApiKey = getOddsApiKey();
   if (!oddsApiKey) return null;
 
@@ -819,6 +927,50 @@ export async function analyzeHREdge(playerName: string): Promise<HREdgeResult | 
     edge,
   );
 
+  // ── Step 6: Weather + matchup adjustments → final ranking ────────────────
+  let weatherFactor  = 1.0;
+  let matchupFactor  = 1.0;
+
+  if (ctx.homeTeam || (ctx.lat != null && ctx.lon != null)) {
+    try {
+      const { fetchWeatherForLocation, weatherHRFactor } = await import('@/lib/weather/index');
+      // Use provided lat/lon or fall back to rough lookup via homeTeam
+      const latLon = (ctx.lat != null && ctx.lon != null)
+        ? { lat: ctx.lat, lon: ctx.lon }
+        : await resolveTeamLatLon(ctx.homeTeam!);
+      if (latLon) {
+        const weather = await fetchWeatherForLocation(latLon.lat, latLon.lon);
+        if (!weather) throw new Error('weather null');
+        weatherFactor = weatherHRFactor({
+          temp:      weather.temperature,
+          windSpeed: weather.windSpeed,
+          windDeg:   0, // Open-Meteo provides windDirection in HourlyForecast but not WeatherData
+          homeTeam:  ctx.homeTeam,
+        });
+      }
+    } catch {
+      // Non-fatal — weather context is additive
+    }
+  }
+
+  if (ctx.pitcherHR9 != null) {
+    // Simple matchup factor: pitcher HR/9 relative to league average (1.2)
+    // A pitcher allowing 1.8 HR/9 = 50% above average = 1.5× factor
+    matchupFactor = Math.max(0.5, Math.min(2.0, ctx.pitcherHR9 / 1.2));
+    // Platoon advantage: batter facing opposite hand = +8% factor
+    if (ctx.pitcherHand && ctx.batterHand && ctx.pitcherHand !== ctx.batterHand) {
+      matchupFactor *= 1.08;
+    }
+  }
+
+  const rank = rankBet({
+    projection:    modelProbability,
+    implied:       impliedProbability,
+    weatherFactor,
+    matchupFactor,
+    isSharp:       ctx.isSharp ?? false,
+  });
+
   return {
     playerName,
     canonicalName,
@@ -833,5 +985,51 @@ export async function analyzeHREdge(playerName: string): Promise<HREdgeResult | 
     allLines,
     confidence,
     dataSource,
+    rank,
   };
+}
+
+/** Rough lat/lon lookup for MLB home teams. Used when exact coordinates are not provided. */
+async function resolveTeamLatLon(teamName: string): Promise<{ lat: number; lon: number } | null> {
+  // MLB stadium coordinates (approximate centre-field)
+  const MLB_COORDS: Record<string, { lat: number; lon: number }> = {
+    'New York Yankees':       { lat: 40.8296, lon: -73.9262 },
+    'New York Mets':          { lat: 40.7571, lon: -73.8458 },
+    'Boston Red Sox':         { lat: 42.3467, lon: -71.0972 },
+    'Los Angeles Dodgers':    { lat: 34.0739, lon: -118.2400 },
+    'Los Angeles Angels':     { lat: 33.8003, lon: -117.8827 },
+    'San Francisco Giants':   { lat: 37.7786, lon: -122.3893 },
+    'Chicago Cubs':           { lat: 41.9484, lon: -87.6554 },
+    'Chicago White Sox':      { lat: 41.8299, lon: -87.6338 },
+    'Houston Astros':         { lat: 29.7573, lon: -95.3555 },
+    'Atlanta Braves':         { lat: 33.8908, lon: -84.4678 },
+    'Philadelphia Phillies':  { lat: 39.9061, lon: -75.1665 },
+    'Washington Nationals':   { lat: 38.8730, lon: -77.0074 },
+    'Pittsburgh Pirates':     { lat: 40.4469, lon: -80.0057 },
+    'Cincinnati Reds':        { lat: 39.0975, lon: -84.5070 },
+    'St. Louis Cardinals':    { lat: 38.6226, lon: -90.1928 },
+    'Milwaukee Brewers':      { lat: 43.0280, lon: -87.9712 },
+    'Minnesota Twins':        { lat: 44.9817, lon: -93.2776 },
+    'Detroit Tigers':         { lat: 42.3390, lon: -83.0485 },
+    'Cleveland Guardians':    { lat: 41.4962, lon: -81.6852 },
+    'Baltimore Orioles':      { lat: 39.2839, lon: -76.6217 },
+    'Toronto Blue Jays':      { lat: 43.6414, lon: -79.3894 },
+    'Tampa Bay Rays':         { lat: 27.7683, lon: -82.6534 },
+    'Miami Marlins':          { lat: 25.7781, lon: -80.2196 },
+    'Colorado Rockies':       { lat: 39.7559, lon: -104.9942 },
+    'Arizona Diamondbacks':   { lat: 33.4455, lon: -112.0667 },
+    'Seattle Mariners':       { lat: 47.5914, lon: -122.3321 },
+    'Oakland Athletics':      { lat: 37.7516, lon: -122.2005 },
+    'San Diego Padres':       { lat: 32.7073, lon: -117.1566 },
+    'Texas Rangers':          { lat: 32.7512, lon: -97.0832 },
+    'Kansas City Royals':     { lat: 39.0517, lon: -94.4803 },
+  };
+
+  const lower = teamName.toLowerCase();
+  for (const [name, coords] of Object.entries(MLB_COORDS)) {
+    if (name.toLowerCase().includes(lower) || lower.includes(name.toLowerCase())) {
+      return coords;
+    }
+  }
+  return null;
 }

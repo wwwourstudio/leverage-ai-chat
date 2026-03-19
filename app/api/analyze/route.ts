@@ -253,8 +253,15 @@ export async function POST(request: NextRequest) {
     // stays false and no spurious "JSON not found" warning is logged for prose responses.
     const hasStartSitIntent = START_SIT_KEYWORDS.some(k => rawQueryLower.includes(k));
 
-    // Statcast JSON mode only applies to non-ADP, non-start/sit MLB queries
-    const isMLBStatcastMode = isMLBQuery && !hasADPIntent && !hasStartSitIntent;
+    // Statcast JSON mode applies to player-specific or non-betting MLB queries only.
+    // General betting queries (hasBettingIntent && !hasPlayerIntent) get prose via baseSystemPrompt
+    // — injecting MLB_ANALYSIS_ADDENDUM (which mandates JSON output) causes a prompt/response
+    // mismatch: the AI correctly returns prose about odds, then we log a spurious JSON warning.
+    const isMLBStatcastMode =
+      isMLBQuery &&
+      !hasADPIntent &&
+      !hasStartSitIntent &&
+      (!context?.hasBettingIntent || !!context?.hasPlayerIntent);
 
     // MLB Projection Engine intent: projection/DFS/fantasy/betting queries that need
     // the LeverageMetrics algorithm (Monte Carlo, HR model, breakout scores).
@@ -1256,9 +1263,10 @@ export async function POST(request: NextRequest) {
               aiText = cleanText;
               // Replace the raw JSON the client already received with readable prose
               controller.enqueue(sseChunk({ type: 'replace', text: cleanText }));
-            } else {
+            } else if (expectsStatcastJSON) {
               // Grok returned markdown/text despite JSON instructions — log with context
               // so we can diagnose prompt-compliance issues without surface-level noise.
+              // Only warn when expectsStatcastJSON=true; prose is correct for all other paths.
               const preview = aiText.slice(0, 120).replace(/\n/g, ' ');
               logger.warn(LogCategory.API, '[API/analyze] MLB Statcast JSON not found in response — prose fallback', {
                 previewChars: preview,

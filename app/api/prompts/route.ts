@@ -94,7 +94,10 @@ function getStaticFallback(category: string, sport: string): Array<{ label: stri
 export const dynamic = 'force-dynamic';
 export const maxDuration = 15;
 
-const AI_TIMEOUT_MS = 4000; // fall back to static prompts if AI takes longer than this
+// 8s gives grok-3-fast room to complete on cold starts (~5-7s) while the static
+// fallback is already served to the UI instantly when the cache is cold.
+// The route has a 15s maxDuration so this leaves 7s of headroom.
+const AI_TIMEOUT_MS = 8000;
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;

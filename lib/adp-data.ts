@@ -378,7 +378,11 @@ export async function loadADPFromSupabase(sport = 'mlb', allowStale = false): Pr
       .eq('sport', sport)
       .order('rank', { ascending: true })
       .limit(300);
-    if (error || !data || data.length === 0) return null;
+    if (error || !data || data.length === 0) {
+      if (error) console.warn('[v0] [ADP] loadADPFromSupabase query error:', error.message, error.code);
+      else console.log(`[v0] [ADP] loadADPFromSupabase: table empty for sport="${sport}" — no upload yet`);
+      return null;
+    }
     // Check freshness unless allowStale — compare against cache TTL (4 hours)
     if (!allowStale) {
       const latestFetch = data[0]?.fetched_at ? new Date(data[0].fetched_at).getTime() : 0;
@@ -448,6 +452,10 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
   }
 
   console.log(`[v0] [ADP] No MLB ADP upload found — serving static fallback (${STATIC_FALLBACK_PLAYERS.length} players)`);
+  // Cache the static fallback so subsequent requests in the same instance don't
+  // hit Supabase on every call when there's no upload.
+  adpCache = STATIC_FALLBACK_PLAYERS;
+  lastFetched = now;
   return STATIC_FALLBACK_PLAYERS;
 }
 

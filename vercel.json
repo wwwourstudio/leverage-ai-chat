@@ -11,12 +11,19 @@
     },
     "app/api/daily-picks/route.ts": {
       "maxDuration": 60
+    },
+    "app/api/picks/route.ts": {
+      "maxDuration": 15
     }
   },
   "crons": [
     {
       "path": "/api/daily-picks",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/daily-picks?action=refresh",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

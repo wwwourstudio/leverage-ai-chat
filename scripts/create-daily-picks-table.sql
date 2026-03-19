@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS api.daily_picks (
   away_team           TEXT,
   opposing_pitcher    TEXT,
   pitcher_hand        CHAR(1),                       -- 'L' | 'R'
+  home_umpire         TEXT,                          -- HP umpire full name
 
   -- Model output
   model_probability   NUMERIC(6,4) NOT NULL,         -- [0,1]
@@ -34,9 +35,12 @@ CREATE TABLE IF NOT EXISTS api.daily_picks (
   -- Full book comparison (JSON array)
   all_lines           JSONB,                         -- [{bookmaker, overOdds, impliedProbability}]
 
-  -- Adjustment factors
+  -- Adjustment factors (all 5 multipliers)
   weather_factor      NUMERIC(5,3) NOT NULL DEFAULT 1.0,
   matchup_factor      NUMERIC(5,3) NOT NULL DEFAULT 1.0,
+  park_factor         NUMERIC(5,3) NOT NULL DEFAULT 1.0,
+  umpire_boost        NUMERIC(5,3) NOT NULL DEFAULT 0.0, -- raw hrBoost (e.g. 0.03)
+  bullpen_factor      NUMERIC(5,3) NOT NULL DEFAULT 1.0,
   sharp_boosted       BOOLEAN      NOT NULL DEFAULT FALSE,
   data_source         TEXT,                          -- 'recent_14d' | 'season' | 'fallback'
 

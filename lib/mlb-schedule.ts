@@ -43,6 +43,8 @@ export interface ScheduledGame {
   awayPitcher:  ProbablePitcher | null;
   /** true when the venue has a permanent or retractable roof (weather irrelevant) */
   isDome:       boolean;
+  /** HP umpire full name — populated from officials hydration (null when not yet posted) */
+  homeUmpire:   string | null;
 }
 
 // ── Dome detection ─────────────────────────────────────────────────────────────
@@ -76,7 +78,7 @@ export async function getTodayGames(date?: string): Promise<ScheduledGame[]> {
   const cached = scheduleCache.get(gameDate);
   if (cached && cached.expiry > now) return cached.data;
 
-  const url = `${MLB_SCHEDULE_BASE}?sportId=1&date=${gameDate}&hydrate=probablePitcher`;
+  const url = `${MLB_SCHEDULE_BASE}?sportId=1&date=${gameDate}&hydrate=probablePitcher,officials`;
 
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT) });
@@ -96,6 +98,10 @@ export async function getTodayGames(date?: string): Promise<ScheduledGame[]> {
             home?: { id: number; fullName: string };
             away?: { id: number; fullName: string };
           };
+          officials?: Array<{
+            official:     { id: number; fullName: string };
+            officialType: string;
+          }>;
         }>;
       }>;
     };
@@ -110,22 +116,29 @@ export async function getTodayGames(date?: string): Promise<ScheduledGame[]> {
     }
     const handMap = await fetchPitcherHands([...pitcherIds]);
 
-    const games: ScheduledGame[] = rawGames.map(g => ({
-      gameId:     g.gamePk,
-      gameDate:   g.gameDate,
-      homeTeam:   g.teams.home.team.name,
-      homeTeamId: g.teams.home.team.id,
-      awayTeam:   g.teams.away.team.name,
-      awayTeamId: g.teams.away.team.id,
-      venueName:  g.venue.name,
-      isDome:     isDomeVenue(g.venue.name),
-      homePitcher: g.probablePitchers?.home
-        ? { id: g.probablePitchers.home.id, fullName: g.probablePitchers.home.fullName, hand: handMap.get(g.probablePitchers.home.id) ?? null }
-        : null,
-      awayPitcher: g.probablePitchers?.away
-        ? { id: g.probablePitchers.away.id, fullName: g.probablePitchers.away.fullName, hand: handMap.get(g.probablePitchers.away.id) ?? null }
-        : null,
-    }));
+    const games: ScheduledGame[] = rawGames.map(g => {
+      const hpOfficial = (g.officials ?? []).find(o =>
+        o.officialType === 'Home Plate' ||
+        o.officialType.toLowerCase().includes('home'),
+      );
+      return {
+        gameId:     g.gamePk,
+        gameDate:   g.gameDate,
+        homeTeam:   g.teams.home.team.name,
+        homeTeamId: g.teams.home.team.id,
+        awayTeam:   g.teams.away.team.name,
+        awayTeamId: g.teams.away.team.id,
+        venueName:  g.venue.name,
+        isDome:     isDomeVenue(g.venue.name),
+        homeUmpire: hpOfficial?.official.fullName ?? null,
+        homePitcher: g.probablePitchers?.home
+          ? { id: g.probablePitchers.home.id, fullName: g.probablePitchers.home.fullName, hand: handMap.get(g.probablePitchers.home.id) ?? null }
+          : null,
+        awayPitcher: g.probablePitchers?.away
+          ? { id: g.probablePitchers.away.id, fullName: g.probablePitchers.away.fullName, hand: handMap.get(g.probablePitchers.away.id) ?? null }
+          : null,
+      };
+    });
 
     scheduleCache.set(gameDate, { data: games, expiry: now + CACHE_TTL_MS });
     return games;

@@ -22,6 +22,7 @@ import { getNFLADPData, clearNFLADPCache } from '@/lib/nfl-adp-data';
 import { getStatcastData, queryStatcast } from '@/lib/baseball-savant';
 import type { StatcastPlayer } from '@/lib/baseball-savant';
 import { generateContextualCards, oddsEventsToBettingCards, cardsToPromptContext, type InsightCard } from '@/lib/cards-generator';
+import { parseIntent } from '@/lib/card-pipeline';
 import { detectHallucinations } from '@/lib/hallucination-detector';
 import { getGrokApiKey } from '@/lib/config';
 import { logger, LogCategory } from '@/lib/logger';
@@ -690,8 +691,16 @@ export async function POST(request: NextRequest) {
           .catch(() => generateContextualCards('fantasy', context.sport ?? undefined, 3).catch(() => []));
 
       } else if (!context.isPoliticalMarket && context.hasPlayerIntent) {
-        // Player-specific: Statcast/VPE cards
-        cardFetchPromise = generateContextualCards('player', context.sport ?? undefined, 3, false, undefined, { playerName: context.playerName }).catch(() => []);
+        // Player-specific: Statcast/VPE cards.
+        // Use parseIntent to extract a player name from the query text when the client
+        // did not supply context.playerName (e.g. "Aaron Judge stats" with no playerName set).
+        const intent = parseIntent(userMessage, context.sport ?? undefined);
+        const resolvedPlayerName = context.playerName
+          ?? (intent.players.length > 0 ? intent.players[0] : undefined);
+        if (resolvedPlayerName && !context.playerName) {
+          console.log(`[API/analyze] parseIntent extracted playerName="${resolvedPlayerName}" from query`);
+        }
+        cardFetchPromise = generateContextualCards('player', context.sport ?? undefined, 3, false, undefined, { playerName: resolvedPlayerName }).catch(() => []);
 
       } else if (!context.isPoliticalMarket && (context.isSportsQuery || context.hasBettingIntent)) {
         // Betting/sports with no client odds: fetch from server

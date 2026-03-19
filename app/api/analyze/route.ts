@@ -22,6 +22,7 @@ import { getNFLADPData, clearNFLADPCache } from '@/lib/nfl-adp-data';
 import { getStatcastData, queryStatcast } from '@/lib/baseball-savant';
 import type { StatcastPlayer } from '@/lib/baseball-savant';
 import { generateContextualCards, oddsEventsToBettingCards, cardsToPromptContext, type InsightCard } from '@/lib/cards-generator';
+import { parseIntent } from '@/lib/card-pipeline';
 import { detectHallucinations } from '@/lib/hallucination-detector';
 import { getGrokApiKey } from '@/lib/config';
 import { logger, LogCategory } from '@/lib/logger';
@@ -253,8 +254,15 @@ export async function POST(request: NextRequest) {
     // stays false and no spurious "JSON not found" warning is logged for prose responses.
     const hasStartSitIntent = START_SIT_KEYWORDS.some(k => rawQueryLower.includes(k));
 
-    // Statcast JSON mode only applies to non-ADP, non-start/sit MLB queries
-    const isMLBStatcastMode = isMLBQuery && !hasADPIntent && !hasStartSitIntent;
+    // Statcast JSON mode applies to player-specific or non-betting MLB queries only.
+    // General betting queries (hasBettingIntent && !hasPlayerIntent) get prose via baseSystemPrompt
+    // — injecting MLB_ANALYSIS_ADDENDUM (which mandates JSON output) causes a prompt/response
+    // mismatch: the AI correctly returns prose about odds, then we log a spurious JSON warning.
+    const isMLBStatcastMode =
+      isMLBQuery &&
+      !hasADPIntent &&
+      !hasStartSitIntent &&
+      (!context?.hasBettingIntent || !!context?.hasPlayerIntent);
 
     // MLB Projection Engine intent: projection/DFS/fantasy/betting queries that need
     // the LeverageMetrics algorithm (Monte Carlo, HR model, breakout scores).
@@ -683,8 +691,16 @@ export async function POST(request: NextRequest) {
           .catch(() => generateContextualCards('fantasy', context.sport ?? undefined, 3).catch(() => []));
 
       } else if (!context.isPoliticalMarket && context.hasPlayerIntent) {
-        // Player-specific: Statcast/VPE cards
-        cardFetchPromise = generateContextualCards('player', context.sport ?? undefined, 3, false, undefined, { playerName: context.playerName }).catch(() => []);
+        // Player-specific: Statcast/VPE cards.
+        // Use parseIntent to extract a player name from the query text when the client
+        // did not supply context.playerName (e.g. "Aaron Judge stats" with no playerName set).
+        const intent = parseIntent(userMessage, context.sport ?? undefined);
+        const resolvedPlayerName = context.playerName
+          ?? (intent.players.length > 0 ? intent.players[0] : undefined);
+        if (resolvedPlayerName && !context.playerName) {
+          console.log(`[API/analyze] parseIntent extracted playerName="${resolvedPlayerName}" from query`);
+        }
+        cardFetchPromise = generateContextualCards('player', context.sport ?? undefined, 3, false, undefined, { playerName: resolvedPlayerName }).catch(() => []);
 
       } else if (!context.isPoliticalMarket && (context.isSportsQuery || context.hasBettingIntent)) {
         // Betting/sports with no client odds: fetch from server
@@ -1256,9 +1272,10 @@ export async function POST(request: NextRequest) {
               aiText = cleanText;
               // Replace the raw JSON the client already received with readable prose
               controller.enqueue(sseChunk({ type: 'replace', text: cleanText }));
-            } else {
+            } else if (expectsStatcastJSON) {
               // Grok returned markdown/text despite JSON instructions — log with context
               // so we can diagnose prompt-compliance issues without surface-level noise.
+              // Only warn when expectsStatcastJSON=true; prose is correct for all other paths.
               const preview = aiText.slice(0, 120).replace(/\n/g, ' ');
               logger.warn(LogCategory.API, '[API/analyze] MLB Statcast JSON not found in response — prose fallback', {
                 previewChars: preview,

@@ -412,11 +412,149 @@ function generateRecommendation(
 
 function parseFieldOrientation(orientation: string): number {
   const normalized = orientation.toLowerCase();
-  
+
   if (normalized.includes('north-south') || normalized.includes('n-s')) return 0;
   if (normalized.includes('northeast-southwest') || normalized.includes('ne-sw')) return 45;
   if (normalized.includes('east-west') || normalized.includes('e-w')) return 90;
   if (normalized.includes('southeast-northwest') || normalized.includes('se-nw')) return 135;
-  
+
   return 0;
+}
+
+// ============================================================================
+// MLB WEATHER HR FACTOR
+//
+// Wind + temperature affect HR rates significantly:
+//   • Warm air is less dense → ball carries further (+10% at 95°F vs 60°F)
+//   • Wind blowing out → major HR boost (Wrigley out to CF is notorious)
+//   • Wind blowing in → strong suppressor
+//   • Domes → neutral (factor = 1.0)
+//
+// Stadium orientation (outfield bearing = compass direction centerfield faces)
+// determines whether a wind blows out, across, or in.
+// Source: surveyed from Google Earth / Statcast geodata.
+// ============================================================================
+
+/** Outfield bearing = compass direction the CF fence faces, relative to home plate */
+const MLB_OUTFIELD_BEARINGS: Record<string, number> = {
+  // Team name → degrees (0 = N, 90 = E, 180 = S, 270 = W)
+  'Chicago Cubs':          315,  // Wrigley: CF faces NW
+  'Boston Red Sox':        305,  // Fenway: CF faces WNW
+  'New York Yankees':      225,  // Yankee Stadium: CF faces SW
+  'New York Mets':         200,  // Citi Field: CF faces SSW
+  'San Francisco Giants':  290,  // Oracle: CF faces WNW — strong SF wind
+  'Los Angeles Dodgers':   180,  // Dodger Stadium: CF faces S
+  'Chicago White Sox':     225,  // Guaranteed Rate: CF faces SW
+  'Pittsburgh Pirates':    200,  // PNC Park: CF faces SSW
+  'Baltimore Orioles':     260,  // Camden Yards: CF faces W
+  'Cleveland Guardians':   240,  // Progressive: CF faces WSW
+  'Detroit Tigers':        220,  // Comerica: CF faces SW
+  'Minnesota Twins':       260,  // Target Field: CF faces W
+  'Kansas City Royals':    240,  // Kauffman: CF faces WSW
+  'Texas Rangers':         200,  // Globe Life: CF faces SSW
+  'Houston Astros':          0,  // Minute Maid: retractable dome → ignored
+  'Seattle Mariners':        0,  // T-Mobile: retractable dome → ignored
+  'Arizona Diamondbacks':    0,  // Chase: retractable dome → ignored
+  'Toronto Blue Jays':       0,  // Rogers Centre: dome → ignored
+  'Miami Marlins':           0,  // LoanDepot: dome → ignored
+  'Tampa Bay Rays':          0,  // Tropicana: dome → ignored
+  'Milwaukee Brewers':       0,  // American Family: retractable → ignored
+  'Atlanta Braves':        210,  // Truist Park: CF faces SSW
+  'Washington Nationals':  240,  // Nationals Park: CF faces WSW
+  'Philadelphia Phillies': 250,  // Citizens Bank: CF faces W
+  'Cincinnati Reds':       220,  // Great American: CF faces SW
+  'St. Louis Cardinals':   210,  // Busch Stadium: CF faces SSW
+  'Colorado Rockies':      210,  // Coors Field: CF faces SSW — high altitude
+  'Oakland Athletics':     270,  // Oakland Coliseum: CF faces W
+  'Los Angeles Angels':    220,  // Angel Stadium: CF faces SW
+  'San Diego Padres':      215,  // Petco Park: CF faces SSW
+};
+
+/** Whether the home team plays in a dome (weather irrelevant) */
+const MLB_DOME_TEAMS = new Set([
+  'Houston Astros', 'Seattle Mariners', 'Arizona Diamondbacks',
+  'Toronto Blue Jays', 'Miami Marlins', 'Tampa Bay Rays', 'Milwaukee Brewers',
+]);
+
+/**
+ * Input context for the HR weather factor calculation.
+ * Use `fetchWeatherForLocation()` to get temp + wind, and the home team name
+ * to look up stadium orientation automatically.
+ */
+export interface WeatherHRContext {
+  /** Air temperature in Fahrenheit */
+  temp: number;
+  /** Wind speed in mph */
+  windSpeed: number;
+  /** Wind direction in meteorological degrees (0=N, 90=E, 180=S, 270=W)
+   *  This is the direction the wind is COMING FROM. */
+  windDeg: number;
+  /** Home team name — used to look up stadium orientation.
+   *  If omitted, wind direction adjustment is skipped. */
+  homeTeam?: string;
+}
+
+/**
+ * Compute a park + weather HR multiplier for use in the HR probability model.
+ *
+ * Factor interpretation:
+ *   1.0 = neutral (league-average conditions)
+ *   > 1.0 = conditions favour home runs (warm, wind out)
+ *   < 1.0 = conditions suppress home runs (cold, wind in, dome)
+ *
+ * Clamped to [0.70, 1.40] — beyond that range we'd be extrapolating.
+ *
+ * @example
+ * // Wrigley, 88°F, 14 mph blowing out to CF
+ * weatherHRFactor({ temp: 88, windSpeed: 14, windDeg: 135, homeTeam: 'Chicago Cubs' })
+ * // → ~1.28 (warm + strong out wind at a wind-friendly park)
+ */
+export function weatherHRFactor(ctx: WeatherHRContext): number {
+  const { temp, windSpeed, windDeg, homeTeam } = ctx;
+
+  // Dome parks: weather has no effect
+  if (homeTeam && MLB_DOME_TEAMS.has(homeTeam)) return 1.0;
+
+  let factor = 1.0;
+
+  // ── Temperature adjustment ────────────────────────────────────────────────
+  // Air density decreases with temperature → ball carries further in warm air.
+  // Approximate: ~0.5% carry difference per °F relative to 72°F baseline.
+  if (temp >= 95)       factor += 0.12;
+  else if (temp >= 85)  factor += 0.08;
+  else if (temp >= 75)  factor += 0.04;
+  else if (temp <= 40)  factor -= 0.12;
+  else if (temp <= 50)  factor -= 0.08;
+  else if (temp <= 60)  factor -= 0.04;
+
+  // Coors Field altitude bonus (already partially baked into park factor, but
+  // temperature swing there is extreme — cold night games can drop HR rate significantly)
+  if (homeTeam === 'Colorado Rockies') factor += 0.05; // thin air baseline bonus
+
+  // ── Wind adjustment ───────────────────────────────────────────────────────
+  if (windSpeed >= 5 && homeTeam) {
+    const outfieldBearing = MLB_OUTFIELD_BEARINGS[homeTeam];
+    if (outfieldBearing !== undefined && outfieldBearing !== 0) {
+      // Wind direction = where wind COMES FROM.
+      // Wind blows TOWARD = windDeg + 180°.
+      const windToward  = (windDeg + 180) % 360;
+      const diff        = Math.abs(windToward - outfieldBearing);
+      const angleDiff   = Math.min(diff, 360 - diff); // 0–180°
+
+      // angleDiff = 0 → directly out to CF (maximum boost)
+      // angleDiff = 90 → crosswind (minimal HR effect)
+      // angleDiff = 180 → directly in from CF (suppressor)
+      const windComponent = Math.cos((angleDiff * Math.PI) / 180); // +1 to -1
+
+      if (windSpeed >= 15)     factor += windComponent * 0.18;
+      else if (windSpeed >= 10) factor += windComponent * 0.12;
+      else                      factor += windComponent * 0.06;
+    }
+  } else if (windSpeed >= 10 && !homeTeam) {
+    // No stadium data — conservative generic adjustment
+    factor += 0.05; // assume slight boost on average
+  }
+
+  // Clamp to realistic range
+  return Math.max(0.70, Math.min(1.40, factor));
 }

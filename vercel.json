@@ -20,10 +20,6 @@
     {
       "path": "/api/daily-picks",
       "schedule": "0 7 * * *"
-    },
-    {
-      "path": "/api/daily-picks?action=refresh",
-      "schedule": "*/15 * * * *"
     }
   ]
 }

@@ -258,11 +258,14 @@ export async function POST(request: NextRequest) {
     // General betting queries (hasBettingIntent && !hasPlayerIntent) get prose via baseSystemPrompt
     // — injecting MLB_ANALYSIS_ADDENDUM (which mandates JSON output) causes a prompt/response
     // mismatch: the AI correctly returns prose about odds, then we log a spurious JSON warning.
+    // Similarly, general fantasy strategy questions (hasFantasyIntent && !hasPlayerIntent) —
+    // e.g. "15-team roto draft strategy" — should return prose, not a JSON Statcast card.
     const isMLBStatcastMode =
       isMLBQuery &&
       !hasADPIntent &&
       !hasStartSitIntent &&
-      (!context?.hasBettingIntent || !!context?.hasPlayerIntent);
+      (!context?.hasBettingIntent || !!context?.hasPlayerIntent) &&
+      !(!!context?.hasFantasyIntent && !context?.hasPlayerIntent);
 
     // MLB Projection Engine intent: projection/DFS/fantasy/betting queries that need
     // the LeverageMetrics algorithm (Monte Carlo, HR model, breakout scores).

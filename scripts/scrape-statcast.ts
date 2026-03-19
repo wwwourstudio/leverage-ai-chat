@@ -31,14 +31,14 @@
  *   DRY_RUN               | Default: false. Set to "true" to skip DB writes.
  *   RESUME_FILE           | Default: .statcast_resume.json
  *
- * REPLACING THE DOWNLOAD URL
- * --------------------------
- *   The function `buildSavantUrl(date)` at the top of this file is the
- *   SINGLE place to change the download URL pattern.  The placeholder below
- *   uses the Baseball Savant search CSV endpoint which is publicly documented,
- *   but you should verify the current URL pattern against:
- *     https://baseballsavant.mlb.com/statcast_search
- *   before running a full backfill.
+ * DOWNLOAD URL
+ * ------------
+ *   The function `buildSavantUrl(date)` is the SINGLE place to change the
+ *   download URL pattern.  The confirmed endpoint is:
+ *     https://baseballsavant.mlb.com/statcast_search/csv
+ *   with parameters: all=true, type=details, csv=true, hfGT=R| (regular
+ *   season), game_date_gt/lt=YYYY-MM-DD.  Verified from lib/baseball-savant.ts
+ *   in this repository.  If Savant changes their API, update buildSavantUrl().
  *
  * PERFORMANCE NOTES
  * -----------------
@@ -103,21 +103,29 @@ const MAX_DB_RETRIES       = 4;
 // =============================================================================
 // ┌─────────────────────────────────────────────────────────────────────────┐
 // │  THIS IS THE SINGLE PLACE TO CHANGE THE SAVANT CSV ENDPOINT.            │
-// │  Current pattern fetches all pitches for a given calendar date.         │
-// │  Verify against https://baseballsavant.mlb.com/statcast_search before   │
-// │  running a full historical backfill.                                    │
+// │                                                                         │
+// │  Confirmed endpoint (verified from lib/baseball-savant.ts in this repo):│
+// │    https://baseballsavant.mlb.com/statcast_search/csv                  │
+// │                                                                         │
+// │  Key parameters:                                                        │
+// │    type=details      → pitch-level rows (one row per pitch/play)        │
+// │    csv=true          → force CSV response                               │
+// │    hfGT=R|           → regular season only (omit to include ST/playoffs)│
+// │    game_date_gt/lt   → inclusive date range (YYYY-MM-DD)               │
+// │                                                                         │
+// │  URLSearchParams will encode hfGT value as R%7C automatically.         │
 // └─────────────────────────────────────────────────────────────────────────┘
 
 function buildSavantUrl(date: string): string {
   // date must be YYYY-MM-DD
   const base = 'https://baseballsavant.mlb.com/statcast_search/csv';
   const params = new URLSearchParams({
-    all:           'true',
-    type:          'details',
-    game_date_gt:  date,
-    game_date_lt:  date,
-    // Add additional filters here (e.g. player_type, hfGT) as needed
-    // hfGT: 'R%7C',  // Regular season only
+    all:          'true',
+    type:         'details',
+    csv:          'true',
+    hfGT:         'R|',   // regular season only; remove to include spring training / playoffs
+    game_date_gt: date,
+    game_date_lt: date,
   });
   return `${base}?${params.toString()}`;
 }
@@ -183,13 +191,17 @@ async function downloadToTemp(url: string, label: string): Promise<string | null
 
       await new Promise<void>((resolve, reject) => {
         const parsedUrl = new URL(url);
+        // Headers confirmed from lib/baseball-savant.ts — these are the values
+        // that successfully bypass Cloudflare in the existing app code.
         const options = {
           hostname: parsedUrl.hostname,
           path:     parsedUrl.pathname + parsedUrl.search,
           headers:  {
-            'User-Agent':
-              'Mozilla/5.0 (compatible; LeverageAI-Statcast-Scraper/1.0; +https://github.com/wwwourstudio/leverage-ai-chat)',
-            'Accept': 'text/csv,*/*',
+            'User-Agent':      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept':          'text/csv, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer':         'https://baseballsavant.mlb.com/statcast_search',
+            'Cache-Control':   'no-cache',
           },
         };
 
@@ -243,16 +255,29 @@ async function downloadToTemp(url: string, label: string): Promise<string | null
 /** Row from csv-parse with headers enabled — all values are strings. */
 type RawRow = Record<string, string>;
 
-/** Parse a CSV file into an array of plain objects keyed by header names. */
+/**
+ * Parse a Baseball Savant CSV file into plain objects keyed by header names.
+ *
+ * QUIRK: Savant exports use a SINGLE quoted header `"last_name, first_name"`
+ * whose values are `"Last, First"` — a comma inside a quoted cell.
+ * csv-parse with `columns: true` handles this correctly because it respects
+ * RFC 4180 quoting, so that column appears as the key `last_name, first_name`
+ * (with the embedded comma) in every row object.  No custom parsing needed.
+ *
+ * The upsert SQL function uses `p_row->>'player_name'` as the pitcher name
+ * (Savant's `player_name` column) and expects `batter_name` for batters.
+ * If your CSV export has `"last_name, first_name"` instead, adjust the
+ * relevant NULLIF lines in the upsert function or add a renaming step here.
+ */
 async function parseCsvFile(filePath: string): Promise<RawRow[]> {
   return new Promise((resolve, reject) => {
     const rows: RawRow[] = [];
     const opts: CsvOptions = {
-      columns:          true,   // use first row as header keys
-      skip_empty_lines: true,
-      trim:             true,
-      relax_column_count: true, // Savant occasionally adds/removes columns
-      cast:             false,  // keep everything as strings; DB does the casting
+      columns:            true,   // use first row as header keys
+      skip_empty_lines:   true,
+      trim:               true,
+      relax_column_count: true,   // Savant occasionally adds/removes columns
+      cast:               false,  // keep everything as strings; DB does the casting
     };
     fs.createReadStream(filePath)
       .pipe(csvParse(opts))

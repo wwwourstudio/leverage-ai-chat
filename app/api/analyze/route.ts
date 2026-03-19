@@ -179,7 +179,14 @@ export async function POST(request: NextRequest) {
     // Strip the [Fantasy League Context: ...]\n\n prefix the client injects so that
     // an NFBC user's platform name ("nfbc") in the context block doesn't falsely fire
     // hasADPIntent / hasStartSitIntent for every message they send.
-    const rawQueryLower = userMessage.replace(/^\[.*?\]\n\n/s, '').toLowerCase();
+    // Using explicit indexOf rather than a regex to avoid edge cases with brackets inside leagueCtx.
+    const rawQueryLower = (() => {
+      if (userMessage.startsWith('[Fantasy League Context:')) {
+        const closingIdx = userMessage.indexOf(']\n\n');
+        if (closingIdx !== -1) return userMessage.slice(closingIdx + 3).toLowerCase();
+      }
+      return msgLower;
+    })();
 
     // ── Team-name → sport inference ──────────────────────────────────────────
     // When context.sport is absent or 'none', scan the user message for known

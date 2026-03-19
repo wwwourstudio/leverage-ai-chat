@@ -1186,10 +1186,11 @@ export async function POST(request: NextRequest) {
           if (pendingADPUploadCard) cards = [...cards, pendingADPUploadCard];
 
           // MLB Statcast: parse Grok's JSON response into a card.
-          // Only runs when MLB_ANALYSIS_ADDENDUM was active (expectsStatcastJSON).
-          // Projection / DFS / stack queries use MLB_PROJECTION_ADDENDUM and return prose —
-          // attempting JSON extraction on them produces only spurious warnings.
-          if (expectsStatcastJSON && !usedFallback && !skipStatcastJSON) {
+          // Runs for all MLB queries (not just expectsStatcastJSON) because the AI occasionally
+          // generates a valid card JSON even when the ADP or projection addendum is active.
+          // Projection / DFS / stack queries normally return prose — the inner type-check guard
+          // (STATCAST_CARD_TYPES.has) prevents spurious parses of non-card JSON.
+          if (isMLBQuery && !usedFallback && !skipStatcastJSON) {
             /** Attempt to parse a JSON string and return it if it has a valid Statcast card type. */
             const tryParseStatcastCard = (src: string): Record<string, unknown> | null => {
               try {

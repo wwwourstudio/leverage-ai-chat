@@ -94,7 +94,7 @@ function getStaticFallback(category: string, sport: string): Array<{ label: stri
 export const dynamic = 'force-dynamic';
 export const maxDuration = 15;
 
-const AI_TIMEOUT_MS = 4000; // fall back to static prompts if AI takes longer than this
+const AI_TIMEOUT_MS = 8000; // fall back to static prompts if AI takes longer than this
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;

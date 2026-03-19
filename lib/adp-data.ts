@@ -68,11 +68,13 @@ const MAX_LIMIT = 25;
 // ── Static fallback dataset ───────────────────────────────────────────────────
 // Used when the NFBC live endpoint is unreachable. Values are 2026 NFBC consensus
 // pre-season ADP (updated March 2026). Update annually before each MLB draft season.
-// Covers top 120 picks (rounds 1–12 of a 10-team league) across all positions.
+// Covers top 210 picks across all positions.
 
 const STATIC_FALLBACK_PLAYERS: NFBCPlayer[] = [
-  // ── Round 1 (1–10) ──────────────────────────────────────────────────────────
-  { rank: 1,   playerName: 'Witt, Bobby Jr.',           displayName: 'Bobby Witt Jr.',           adp: 1.2,   positions: 'SS',      team: 'KC',  valueDelta: 0.2,  isValuePick: false },
+  // ── Rounds 1–4 ──────────────────────────────────────────────────────────────
+  { rank: 1,   playerName: 'Ohtani, Shohei',            displayName: 'Shohei Ohtani',            adp: 1.18,  positions: 'SP,DH',   team: 'LAD', valueDelta: 0.2,  isValuePick: false },
+  { rank: 2,   playerName: 'Judge, Aaron',               displayName: 'Aaron Judge',              adp: 1.93,  positions: 'OF',      team: 'NYY', valueDelta: -0.1, isValuePick: false },
+  { rank: 3,   playerName: 'Witt, Bobby Jr.',            displayName: 'Bobby Witt Jr.',           adp: 3.19,  positions: 'SS',      team: 'KC',  valueDelta: 0.2,  isValuePick: false },
   { rank: 2,   playerName: 'Acuna, Ronald Jr.',         displayName: 'Ronald Acuna Jr.',         adp: 2.4,   positions: 'OF',      team: 'ATL', valueDelta: 0.4,  isValuePick: false },
   { rank: 3,   playerName: 'Judge, Aaron',              displayName: 'Aaron Judge',              adp: 3.5,   positions: 'OF',      team: 'NYY', valueDelta: 0.5,  isValuePick: false },
   { rank: 4,   playerName: 'Ohtani, Shohei',           displayName: 'Shohei Ohtani',            adp: 4.1,   positions: 'OF,DH',   team: 'LAD', valueDelta: 0.1,  isValuePick: false },
@@ -378,6 +380,7 @@ export async function loadADPFromSupabase(sport = 'mlb', allowStale = false): Pr
       .eq('sport', sport)
       .order('rank', { ascending: true })
       .limit(300);
+    console.log(`[v0] [ADP] Supabase query result: rows=${data?.length ?? 0} error=${error ? error.message : 'none'}`);
     if (error || !data || data.length === 0) return null;
     // Check freshness unless allowStale — compare against cache TTL (4 hours)
     if (!allowStale) {

@@ -160,11 +160,11 @@ function parseCSV(csv: string, playerType: 'batter' | 'pitcher'): StatcastPlayer
   const xslgIdx       = colIdx(headers, ['xslg', 'est_slg', 'x_slg']);
   const wobaIdx       = colIdx(headers, ['woba', 'b_woba', 'p_woba']);
   const xwobaIdx      = colIdx(headers, ['xwoba', 'est_woba', 'x_woba']);
-  const barrelIdx     = colIdx(headers, ['barrel_batted_rate', 'barrel_rate', 'barrels_per_bbe_percent']);
-  const exitVeloIdx   = colIdx(headers, ['exit_velocity_avg', 'avg_exit_velocity', 'launch_speed']);
-  const launchAngIdx  = colIdx(headers, ['launch_angle_avg', 'avg_launch_angle']);
-  const sweetSpotIdx  = colIdx(headers, ['sweet_spot_percent', 'sweet_spot_rate']);
-  const hardHitIdx    = colIdx(headers, ['hard_hit_percent', 'hard_hit_rate', 'hard_hit_pct']);
+  const barrelIdx     = colIdx(headers, ['barrel_batted_rate', 'barrel_rate', 'barrels_per_bbe_percent', 'barrel_pct', 'barrels']);
+  const exitVeloIdx   = colIdx(headers, ['exit_velocity_avg', 'avg_exit_velocity', 'launch_speed', 'avg_launch_speed', 'ev_avg', 'ev95percent']);
+  const launchAngIdx  = colIdx(headers, ['launch_angle_avg', 'avg_launch_angle', 'la_avg', 'launch_angle']);
+  const sweetSpotIdx  = colIdx(headers, ['sweet_spot_percent', 'sweet_spot_rate', 'sweetspot_percent', 'sweet_spot_pct']);
+  const hardHitIdx    = colIdx(headers, ['hard_hit_percent', 'hard_hit_rate', 'hard_hit_pct', 'hardhit_percent', 'hardhit_rate']);
 
   const players: StatcastPlayer[] = [];
 
@@ -205,11 +205,13 @@ function parseCSV(csv: string, playerType: 'batter' | 'pitcher'): StatcastPlayer
       xslg:        parseNum(xslgIdx, 0),
       woba:        parseNum(wobaIdx, 0),
       xwoba:       parseNum(xwobaIdx, 0),
-      barrelRate:  parseNum(barrelIdx, 0),
-      exitVelocity: parseNum(exitVeloIdx, 0),
-      launchAngle: parseNum(launchAngIdx, 0),
-      sweetSpotPct: parseNum(sweetSpotIdx, 0),
-      hardHitPct:  parseNum(hardHitIdx, 0),
+      // Use league-average defaults (not 0) so cards degrade gracefully when the
+      // batted-ball CSV merge hasn't happened yet or the column name doesn't match.
+      barrelRate:   parseNum(barrelIdx,    playerType === 'pitcher' ? 7.5 : 7.0),
+      exitVelocity: parseNum(exitVeloIdx,  playerType === 'pitcher' ? 87.5 : 88.0),
+      launchAngle:  parseNum(launchAngIdx, playerType === 'pitcher' ?  9.0 : 12.0),
+      sweetSpotPct: parseNum(sweetSpotIdx, playerType === 'pitcher' ? 24.0 : 32.0),
+      hardHitPct:   parseNum(hardHitIdx,   playerType === 'pitcher' ? 32.0 : 38.0),
     });
   }
 

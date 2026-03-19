@@ -203,17 +203,31 @@ export async function fetchStatcastPitchers(limit = 30): Promise<StatcastPitcher
 
 /**
  * Look up a specific batter by name (fuzzy match against leaderboard).
- * Returns null if not found.
+ * Merges season-level Baseball Savant data with recent pitch-level DB data.
+ * Returns null if not found in either source.
  */
 export async function findHitterByName(name: string): Promise<StatcastHitterStats | null> {
-  const all = await fetchStatcastHitters(200);
+  const [all, dbData] = await Promise.all([
+    fetchStatcastHitters(200),
+    findHitterInDB(name).catch(() => null),
+  ]);
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z ]/g, '').trim();
   const target = norm(name);
-  return (
+  const seasonRow = (
     all.find(h => norm(h.playerName).includes(target)) ??
     all.find(h => target.split(' ').every(part => norm(h.playerName).includes(part))) ??
     null
   );
+  if (!seasonRow) return null;
+  // Overlay recent DB metrics (last 30 days) onto season-level data when available
+  if (dbData) {
+    if (dbData.avgExitVelocity) seasonRow.avgExitVelocity = dbData.avgExitVelocity;
+    if (dbData.barrelPct)       seasonRow.barrelPct       = dbData.barrelPct;
+    if (dbData.hardHitPct)      seasonRow.hardHitPct      = dbData.hardHitPct;
+    if (dbData.sweetSpotPct)    seasonRow.sweetSpotPct    = dbData.sweetSpotPct;
+    if (dbData.launchAngle)     seasonRow.launchAngle      = dbData.launchAngle;
+  }
+  return seasonRow;
 }
 
 /** Look up a specific pitcher by name. */
@@ -226,6 +240,47 @@ export async function findPitcherByName(name: string): Promise<StatcastPitcherSt
     all.find(p => target.split(' ').every(part => norm(p.playerName).includes(part))) ??
     null
   );
+}
+
+/**
+ * Pull recent pitch-level aggregates for a hitter from the Supabase statcast_events DB.
+ * Returns null if the table is empty or the player has no recent data.
+ * Used to enrich season-level Baseball Savant data with recency-weighted metrics.
+ */
+export async function findHitterInDB(name: string): Promise<Partial<StatcastHitterStats> | null> {
+  try {
+    const { getPlayerAggregate } = await import('@/lib/statcastQuery');
+    const agg = await getPlayerAggregate(name, 'batter', 30);
+    if (!agg || agg.sampleBIP < 10) return null;
+    return {
+      playerName: agg.playerName,
+      avgExitVelocity: agg.avgExitVelo ?? undefined,
+      barrelPct:       agg.barrelRate  ?? undefined,
+      hardHitPct:      agg.hardHitRate ?? undefined,
+      sweetSpotPct:    agg.sweetSpotRate ?? undefined,
+      launchAngle:     agg.avgLaunchAngle ?? undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pull recent pitch-level aggregates for a pitcher from the Supabase statcast_events DB.
+ */
+export async function findPitcherInDB(name: string): Promise<Partial<StatcastPitcherStats> | null> {
+  try {
+    const { getPlayerAggregate } = await import('@/lib/statcastQuery');
+    const agg = await getPlayerAggregate(name, 'pitcher', 30);
+    if (!agg || agg.samplePitches < 20) return null;
+    return {
+      playerName:  agg.playerName,
+      avgVelocity: agg.avgReleaseSpeed ?? undefined,
+      spinRate:    agg.avgSpinRate     ?? undefined,
+    };
+  } catch {
+    return null;
+  }
 }
 
 // ─── League-average fallback data ────────────────────────────────────────────

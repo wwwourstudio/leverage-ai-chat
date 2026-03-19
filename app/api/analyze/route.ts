@@ -894,27 +894,57 @@ export async function POST(request: NextRequest) {
     });
     const statcastTool = tool({
       description:
-        'Query REAL 2025 Baseball Savant Statcast metrics (barrel rate, exit velocity, ' +
-        'xwOBA, hard-hit %, sweet-spot %, xBA, xSLG). ' +
+        'Query REAL Baseball Savant Statcast metrics (barrel rate, exit velocity, ' +
+        'xwOBA, hard-hit %, sweet-spot %, xBA, xSLG) PLUS pitch-level recent 30-day ' +
+        'aggregates from the Leverage AI Statcast database. ' +
         'Use for any MLB player question about Statcast performance or HR probability. ' +
-        'Always call this tool FIRST — never invent Statcast numbers.',
+        'Always call this tool FIRST — never invent Statcast numbers. ' +
+        'db_recent_30d contains the most recent pitch-level data and should be prioritized ' +
+        'over season averages when discussing recent form or hot/cold streaks.',
       inputSchema: statcastParams,
       execute: async ({ player, playerType, limit }: z.infer<typeof statcastParams>) => {
         console.log('[API/analyze] Statcast tool called:', { player, playerType, limit });
+
+        // 1. Season-level xwOBA/xBA/xSLG from Baseball Savant public API
         const { players: allPlayers, isLiveData, season } = await getStatcastData();
-        if (allPlayers.length === 0) {
-          return {
-            players: [],
-            total_in_dataset: 0,
-            source: 'Baseball Savant',
-            error: 'Statcast data temporarily unavailable. Use model knowledge for analysis.',
-          };
+        const results = allPlayers.length > 0
+          ? queryStatcast(allPlayers, { player, playerType, limit })
+          : [];
+
+        // 2. Pitch-level aggregate from our Supabase statcast_events DB (recent 30 days)
+        let dbAggregate = null;
+        if (player) {
+          try {
+            const { getPlayerAggregate } = await import('@/lib/statcastQuery');
+            dbAggregate = await getPlayerAggregate(player, playerType ?? 'batter', 30);
+          } catch {
+            // non-fatal — DB may be empty if scraper hasn't run yet
+          }
         }
-        const results = queryStatcast(allPlayers, { player, playerType, limit });
+
         return {
           players: results,
           total_in_dataset: allPlayers.length,
           source: isLiveData ? `Baseball Savant ${season} (real data)` : `Baseball Savant ${season} (cached fallback)`,
+          ...(dbAggregate && {
+            db_recent_30d: {
+              source: 'Leverage AI Statcast DB (Baseball Savant pitch-level)',
+              playerName: dbAggregate.playerName,
+              samplePitches: dbAggregate.samplePitches,
+              sampleBIP: dbAggregate.sampleBIP,
+              avgExitVelo: dbAggregate.avgExitVelo,
+              barrelRate: dbAggregate.barrelRate,
+              hardHitRate: dbAggregate.hardHitRate,
+              sweetSpotRate: dbAggregate.sweetSpotRate,
+              avgLaunchAngle: dbAggregate.avgLaunchAngle,
+              avgReleaseSpeed: dbAggregate.avgReleaseSpeed,
+              avgSpinRate: dbAggregate.avgSpinRate,
+              dateRange: dbAggregate.dateRange,
+            },
+          }),
+          ...(results.length === 0 && !dbAggregate && {
+            error: 'Statcast data temporarily unavailable. Use model knowledge for analysis.',
+          }),
         };
       },
     });

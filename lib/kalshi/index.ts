@@ -747,10 +747,13 @@ export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
 
   console.log(`[KALSHI] Fetching sports markets across ${sportSearches.length} categories...`);
 
-  // Batch into groups of 2 with a 600 ms pause between batches to stay within
+  // Batch into groups of 3 with a 600 ms pause between batches to stay within
   // Kalshi's rate limit.  Results are cached for 5 minutes to reduce re-fetches
   // across warm Lambda invocations.
-  const batchSize = 2;
+  // limit=20 per search is enough to surface high-quality cards (we only need ~6)
+  // and keeps each fetch fast. 12 searches × 20 = 240 pre-dedup slots, sufficient
+  // to deduplicate down to a diverse set of markets.
+  const batchSize = 3;
   const BATCH_DELAY_MS = 600;
   const SPORTS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -758,7 +761,7 @@ export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
     const batch = sportSearches.slice(i, i + batchSize);
     const results = await Promise.allSettled(
       batch.map(({ search }) =>
-        fetchKalshiMarkets({ search, limit: 100, useCache: true, cacheTtlMs: SPORTS_CACHE_TTL_MS })
+        fetchKalshiMarkets({ search, limit: 20, useCache: true, cacheTtlMs: SPORTS_CACHE_TTL_MS })
       )
     );
 

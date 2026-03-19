@@ -258,11 +258,14 @@ export async function POST(request: NextRequest) {
     // General betting queries (hasBettingIntent && !hasPlayerIntent) get prose via baseSystemPrompt
     // — injecting MLB_ANALYSIS_ADDENDUM (which mandates JSON output) causes a prompt/response
     // mismatch: the AI correctly returns prose about odds, then we log a spurious JSON warning.
+    // Similarly, general fantasy strategy questions (hasFantasyIntent && !hasPlayerIntent) —
+    // e.g. "15-team roto draft strategy" — should return prose, not a JSON Statcast card.
     const isMLBStatcastMode =
       isMLBQuery &&
       !hasADPIntent &&
       !hasStartSitIntent &&
-      (!context?.hasBettingIntent || !!context?.hasPlayerIntent);
+      (!context?.hasBettingIntent || !!context?.hasPlayerIntent) &&
+      !(!!context?.hasFantasyIntent && !context?.hasPlayerIntent);
 
     // MLB Projection Engine intent: projection/DFS/fantasy/betting queries that need
     // the LeverageMetrics algorithm (Monte Carlo, HR model, breakout scores).
@@ -935,7 +938,9 @@ export async function POST(request: NextRequest) {
         'K Model, Breakout Score, 9 DFS matchup variables). ' +
         'Use for ANY MLB question about DFS lineups, fantasy advice (waiver/streaming/ROS), ' +
         'HR prop betting edges, or player projections. ' +
-        'Always call this tool FIRST — NEVER invent salaries, projections, or odds.',
+        'Always call this tool FIRST — NEVER invent salaries, projections, or odds. ' +
+        'Call this tool ONCE per query. When `player` is set, outputFor is ignored — ' +
+        'single-player analysis covers all use cases (projections, betting edge, and fantasy).',
       inputSchema: mlbProjectionParams,
       execute: async ({ playerType, player, limit, date, outputFor }: z.infer<typeof mlbProjectionParams>) => {
         console.log('[API/analyze] MLB projection tool called:', { playerType, player, limit, date, outputFor });
@@ -943,7 +948,15 @@ export async function POST(request: NextRequest) {
           const resolvedOutputFor = outputFor ?? 'projections';
           let cards: unknown[];
 
-          switch (resolvedOutputFor) {
+          // Player-specific: always route to single-player projection regardless of outputFor.
+          // This covers all use cases (projections, betting edge, fantasy) in one call and
+          // prevents the AI from calling the tool twice with different outputFor values.
+          if (player) {
+            const { projectSinglePlayer } = await import('@/lib/mlb-projections/projection-pipeline');
+            const type = playerType === 'all' || !playerType ? 'hitter' : playerType;
+            const card = await projectSinglePlayer(player, type);
+            cards = card ? [card] : [];
+          } else switch (resolvedOutputFor) {
             case 'dfs': {
               const { buildDFSSlate } = await import('@/lib/mlb-projections/slate-builder');
               cards = await buildDFSSlate({ limit: limit ?? 9, date });
@@ -961,15 +974,8 @@ export async function POST(request: NextRequest) {
               break;
             }
             default: {
-              if (player) {
-                const { projectSinglePlayer } = await import('@/lib/mlb-projections/projection-pipeline');
-                const type = playerType === 'all' || !playerType ? 'hitter' : playerType;
-                const card = await projectSinglePlayer(player, type);
-                cards = card ? [card] : [];
-              } else {
-                const { runProjectionPipeline } = await import('@/lib/mlb-projections/projection-pipeline');
-                cards = await runProjectionPipeline({ playerType: playerType ?? 'all', limit: limit ?? 9, date });
-              }
+              const { runProjectionPipeline } = await import('@/lib/mlb-projections/projection-pipeline');
+              cards = await runProjectionPipeline({ playerType: playerType ?? 'all', limit: limit ?? 9, date });
               break;
             }
           }

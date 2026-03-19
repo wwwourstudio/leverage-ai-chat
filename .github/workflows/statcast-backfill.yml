@@ -10,20 +10,15 @@
 # REQUIRED SECRETS  (Settings → Secrets and variables → Actions → New secret)
 #   DATABASE_URL          Postgres connection string (Supabase direct connection)
 #
-# OPTIONAL SECRETS / VARS
+# OPTIONAL VARS  (Settings → Secrets and variables → Actions → Variables)
 #   SCRAPER_START_DATE    Override START_DATE (e.g. "2024-04-01").
-#                         Defaults to STATCAST_ERA_START in the script (2015-03-01).
 #   SCRAPER_END_DATE      Override END_DATE.  Defaults to yesterday.
 #   SCRAPER_DRY_RUN       Set to "true" to run without DB writes (smoke-test).
 #
 # PERFORMANCE NOTE
 #   Full historical backfill may take 12–24 h.  The resume file is NOT
-#   persisted between runs in the default setup because GitHub Actions does
-#   not cache arbitrary files across workflow runs.  If you need resumable
-#   multi-day backfill:
-#     • Use actions/cache to store .statcast_resume.json in the runner cache
-#       (see commented-out step below), or
-#     • Run the scraper locally / on a dedicated server.
+#   persisted between runs in the default setup — run locally for resumable
+#   multi-day backfill or uncomment the cache steps below.
 # =============================================================================
 
 name: Statcast Backfill / Daily Ingest
@@ -53,14 +48,14 @@ jobs:
   ingest:
     name: Ingest Statcast Data
     runs-on: ubuntu-latest
-    timeout-minutes: 360    # 6 h — generous for large date ranges; adjust as needed
+    timeout-minutes: 360    # 6 h — generous for large date ranges
 
     env:
-      NODE_ENV:           production
-      DATABASE_URL:       ${{ secrets.DATABASE_URL }}
-      START_DATE:         ${{ github.event.inputs.start_date || vars.SCRAPER_START_DATE || '' }}
-      END_DATE:           ${{ github.event.inputs.end_date   || vars.SCRAPER_END_DATE   || '' }}
-      DRY_RUN:            ${{ github.event.inputs.dry_run    || vars.SCRAPER_DRY_RUN    || 'false' }}
+      NODE_ENV:            production
+      DATABASE_URL:        ${{ secrets.DATABASE_URL }}
+      START_DATE:          ${{ github.event.inputs.start_date || vars.SCRAPER_START_DATE || '' }}
+      END_DATE:            ${{ github.event.inputs.end_date   || vars.SCRAPER_END_DATE   || '' }}
+      DRY_RUN:             ${{ github.event.inputs.dry_run    || vars.SCRAPER_DRY_RUN    || 'false' }}
       CONCURRENT_REQUESTS: '4'
       BATCH_SIZE:          '500'
       RESUME_FILE:         '.statcast_resume.json'
@@ -70,31 +65,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Set up Node 18 ────────────────────────────────────────────────────
+      # ── 2. Set up pnpm ───────────────────────────────────────────────────────
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      # ── 3. Set up Node.js 20 ─────────────────────────────────────────────────
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: 'pnpm'
 
-      # ── 3. (Optional) Restore resume file from cache ────────────────────────
-      #  Uncomment the next two steps to enable cross-run resume support.
-      #  The cache key includes the date so it refreshes automatically each day.
+      # ── 4. (Optional) Restore resume file from cache ─────────────────────────
+      #  Uncomment to enable cross-run resume support.
       #
       # - name: Restore resume state cache
       #   uses: actions/cache@v4
       #   id: resume-cache
       #   with:
       #     path: .statcast_resume.json
-      #     key: statcast-resume-${{ runner.os }}-${{ hashFiles('.statcast_resume.json') }}
-      #     restore-keys: |
-      #       statcast-resume-${{ runner.os }}-
+      #     key: statcast-resume-${{ runner.os }}-${{ github.run_id }}
+      #     restore-keys: statcast-resume-${{ runner.os }}-
 
-      # ── 4. Install dependencies ──────────────────────────────────────────────
+      # ── 5. Install dependencies ───────────────────────────────────────────────
       - name: Install dependencies
-        run: npm install --include=dev
+        run: pnpm install --frozen-lockfile
 
-      # ── 5. Verify DB connectivity ────────────────────────────────────────────
+      # ── 6. Verify DB connectivity ─────────────────────────────────────────────
       - name: Verify database connection
         run: |
           node -e "
@@ -105,21 +104,21 @@ jobs:
               .catch(e => { console.error('DB FAIL:', e.message); process.exit(1); });
           "
 
-      # ── 6. Run scraper ───────────────────────────────────────────────────────
+      # ── 7. Run scraper ────────────────────────────────────────────────────────
       - name: Run Statcast scraper
-        run: npm run scrape
+        run: pnpm scrape
 
-      # ── 7. (Optional) Save resume file to cache ──────────────────────────────
-      #  Uncomment this step if you uncommented step 3 above.
+      # ── 8. (Optional) Save resume file to cache ───────────────────────────────
+      #  Uncomment if you uncommented step 4 above.
       #
       # - name: Save resume state cache
-      #   if: always()    # save even on partial failure so next run can resume
+      #   if: always()
       #   uses: actions/cache@v4
       #   with:
       #     path: .statcast_resume.json
       #     key: statcast-resume-${{ runner.os }}-${{ github.run_id }}
 
-      # ── 8. Upload resume file as artifact (always, for debugging) ────────────
+      # ── 9. Upload resume file as artifact (always, for debugging) ─────────────
       - name: Upload resume state artifact
         if: always()
         uses: actions/upload-artifact@v4

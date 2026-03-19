@@ -16,13 +16,15 @@
 -- ---------------------------------------------------------------------------
 -- 1. pg_net — move from public to extensions schema
 -- ---------------------------------------------------------------------------
--- pg_net is a Supabase-managed extension and does NOT support SET SCHEMA
--- (postgres raises "extension does not support SET SCHEMA").
--- Resolution: contact Supabase support to have pg_net relocated to the
--- extensions schema at the infrastructure level, or suppress this advisory
--- if your Supabase plan does not permit the move.
--- The line below is intentionally commented out:
---   ALTER EXTENSION pg_net SET SCHEMA extensions;
+-- ALTER EXTENSION ... SET SCHEMA is not supported for pg_net.
+-- Fix: DROP + CREATE in the target schema.
+-- All of pg_net's objects live in the hardcoded "net" schema (net.http_get,
+-- net.http_post, net._http_response, net.http_request_queue, etc.) — they
+-- are unaffected by the extension namespace change. Only the entry in
+-- pg_extension.extnamespace moves from public → extensions.
+-- Safe to run when net.http_request_queue is empty (no in-flight requests).
+DROP EXTENSION IF EXISTS pg_net;
+CREATE EXTENSION pg_net SCHEMA extensions;
 
 
 -- ---------------------------------------------------------------------------

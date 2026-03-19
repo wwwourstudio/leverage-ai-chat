@@ -626,28 +626,30 @@ DROP POLICY IF EXISTS "Public read access" ON bet_allocations;
 CREATE POLICY "Public read access" ON bet_allocations FOR SELECT USING (true);
 
 -- Authenticated write access
+-- NOTE: auth.role() is wrapped in (select ...) to prevent per-row re-evaluation,
+-- which would otherwise cause suboptimal query performance at scale.
 DROP POLICY IF EXISTS "Auth write access" ON live_odds_cache;
-CREATE POLICY "Auth write access" ON live_odds_cache FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Auth write access" ON live_odds_cache FOR INSERT WITH CHECK ((select auth.role()) = 'authenticated');
 DROP POLICY IF EXISTS "Auth write access" ON mlb_odds;
-CREATE POLICY "Auth write access" ON mlb_odds FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Auth write access" ON mlb_odds FOR INSERT WITH CHECK ((select auth.role()) = 'authenticated');
 DROP POLICY IF EXISTS "Auth write access" ON nfl_odds;
-CREATE POLICY "Auth write access" ON nfl_odds FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Auth write access" ON nfl_odds FOR INSERT WITH CHECK ((select auth.role()) = 'authenticated');
 DROP POLICY IF EXISTS "Auth write access" ON nba_odds;
-CREATE POLICY "Auth write access" ON nba_odds FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Auth write access" ON nba_odds FOR INSERT WITH CHECK ((select auth.role()) = 'authenticated');
 DROP POLICY IF EXISTS "Auth write access" ON nhl_odds;
-CREATE POLICY "Auth write access" ON nhl_odds FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Auth write access" ON nhl_odds FOR INSERT WITH CHECK ((select auth.role()) = 'authenticated');
 DROP POLICY IF EXISTS "Auth write access" ON line_movement;
-CREATE POLICY "Auth write access" ON line_movement FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Auth write access" ON line_movement FOR INSERT WITH CHECK ((select auth.role()) = 'authenticated');
 DROP POLICY IF EXISTS "Auth write access" ON arbitrage_opportunities;
-CREATE POLICY "Auth write access" ON arbitrage_opportunities FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Auth write access" ON arbitrage_opportunities FOR INSERT WITH CHECK ((select auth.role()) = 'authenticated');
 DROP POLICY IF EXISTS "Auth write access" ON player_props_markets;
-CREATE POLICY "Auth write access" ON player_props_markets FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Auth write access" ON player_props_markets FOR INSERT WITH CHECK ((select auth.role()) = 'authenticated');
 DROP POLICY IF EXISTS "Auth write access" ON kalshi_markets;
-CREATE POLICY "Auth write access" ON kalshi_markets FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Auth write access" ON kalshi_markets FOR INSERT WITH CHECK ((select auth.role()) = 'authenticated');
 DROP POLICY IF EXISTS "Auth write access" ON capital_state;
-CREATE POLICY "Auth write access" ON capital_state FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Auth write access" ON capital_state FOR INSERT WITH CHECK ((select auth.role()) = 'authenticated');
 DROP POLICY IF EXISTS "Auth write access" ON bet_allocations;
-CREATE POLICY "Auth write access" ON bet_allocations FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Auth write access" ON bet_allocations FOR INSERT WITH CHECK ((select auth.role()) = 'authenticated');
 
 -- RLS for user tables (each user owns their own rows)
 ALTER TABLE user_profiles        ENABLE ROW LEVEL SECURITY;
@@ -665,23 +667,23 @@ ALTER TABLE draft_rooms          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE draft_picks          ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Own predictions only"  ON ai_predictions;
-CREATE POLICY "Own predictions only"  ON ai_predictions     FOR ALL USING (auth.uid() = user_id OR user_id IS NULL);
+CREATE POLICY "Own predictions only"  ON ai_predictions     FOR ALL USING ((select auth.uid()) = user_id OR user_id IS NULL);
 DROP POLICY IF EXISTS "Own profile only"      ON user_profiles;
-CREATE POLICY "Own profile only"      ON user_profiles      FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Own profile only"      ON user_profiles      FOR ALL USING ((select auth.uid()) = user_id);
 DROP POLICY IF EXISTS "Own preferences only"  ON user_preferences;
-CREATE POLICY "Own preferences only"  ON user_preferences   FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Own preferences only"  ON user_preferences   FOR ALL USING ((select auth.uid()) = user_id);
 DROP POLICY IF EXISTS "Own alerts only"       ON user_alerts;
-CREATE POLICY "Own alerts only"       ON user_alerts        FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Own alerts only"       ON user_alerts        FOR ALL USING ((select auth.uid()) = user_id);
 DROP POLICY IF EXISTS "Own stats only"        ON user_stats;
-CREATE POLICY "Own stats only"        ON user_stats         FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Own stats only"        ON user_stats         FOR ALL USING ((select auth.uid()) = user_id);
 DROP POLICY IF EXISTS "Own insights only"     ON user_insights;
-CREATE POLICY "Own insights only"     ON user_insights      FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Own insights only"     ON user_insights      FOR ALL USING ((select auth.uid()) = user_id);
 DROP POLICY IF EXISTS "Own subscription only" ON subscription_tiers;
-CREATE POLICY "Own subscription only" ON subscription_tiers FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Own subscription only" ON subscription_tiers FOR ALL USING ((select auth.uid()) = user_id);
 
 DROP POLICY IF EXISTS "League owner access"  ON fantasy_leagues;
 CREATE POLICY "League owner access"  ON fantasy_leagues
-  FOR ALL USING (auth.uid() = user_id);
+  FOR ALL USING ((select auth.uid()) = user_id);
 
 DROP POLICY IF EXISTS "League member read"   ON fantasy_teams;
 CREATE POLICY "League member read"   ON fantasy_teams
@@ -689,7 +691,7 @@ CREATE POLICY "League member read"   ON fantasy_teams
     EXISTS (
       SELECT 1 FROM fantasy_leagues
       WHERE fantasy_leagues.id = fantasy_teams.league_id
-        AND fantasy_leagues.user_id = auth.uid()
+        AND fantasy_leagues.user_id = (select auth.uid())
     )
   );
 DROP POLICY IF EXISTS "League owner write"   ON fantasy_teams;
@@ -698,7 +700,7 @@ CREATE POLICY "League owner write"   ON fantasy_teams
     EXISTS (
       SELECT 1 FROM fantasy_leagues
       WHERE fantasy_leagues.id = fantasy_teams.league_id
-        AND fantasy_leagues.user_id = auth.uid()
+        AND fantasy_leagues.user_id = (select auth.uid())
     )
   );
 
@@ -709,16 +711,16 @@ CREATE POLICY "Roster access"        ON fantasy_rosters
       SELECT 1 FROM fantasy_teams
       JOIN fantasy_leagues ON fantasy_leagues.id = fantasy_teams.league_id
       WHERE fantasy_teams.id = fantasy_rosters.team_id
-        AND fantasy_leagues.user_id = auth.uid()
+        AND fantasy_leagues.user_id = (select auth.uid())
     )
   );
 
 DROP POLICY IF EXISTS "Projections read"     ON fantasy_projections;
-CREATE POLICY "Projections read"     ON fantasy_projections FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Projections read"     ON fantasy_projections FOR SELECT USING ((select auth.role()) = 'authenticated');
 DROP POLICY IF EXISTS "Projections write"    ON fantasy_projections;
-CREATE POLICY "Projections write"    ON fantasy_projections FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Projections write"    ON fantasy_projections FOR INSERT WITH CHECK ((select auth.role()) = 'authenticated');
 DROP POLICY IF EXISTS "Projections update"   ON fantasy_projections;
-CREATE POLICY "Projections update"   ON fantasy_projections FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Projections update"   ON fantasy_projections FOR UPDATE USING ((select auth.role()) = 'authenticated');
 
 DROP POLICY IF EXISTS "Waiver access"        ON waiver_transactions;
 CREATE POLICY "Waiver access"        ON waiver_transactions
@@ -726,7 +728,7 @@ CREATE POLICY "Waiver access"        ON waiver_transactions
     EXISTS (
       SELECT 1 FROM fantasy_leagues
       WHERE fantasy_leagues.id = waiver_transactions.league_id
-        AND fantasy_leagues.user_id = auth.uid()
+        AND fantasy_leagues.user_id = (select auth.uid())
     )
   );
 
@@ -736,7 +738,7 @@ CREATE POLICY "Draft room access"    ON draft_rooms
     EXISTS (
       SELECT 1 FROM fantasy_leagues
       WHERE fantasy_leagues.id = draft_rooms.league_id
-        AND fantasy_leagues.user_id = auth.uid()
+        AND fantasy_leagues.user_id = (select auth.uid())
     )
   );
 
@@ -747,7 +749,7 @@ CREATE POLICY "Draft pick access"    ON draft_picks
       SELECT 1 FROM draft_rooms
       JOIN fantasy_leagues ON fantasy_leagues.id = draft_rooms.league_id
       WHERE draft_rooms.id = draft_picks.draft_room_id
-        AND fantasy_leagues.user_id = auth.uid()
+        AND fantasy_leagues.user_id = (select auth.uid())
     )
   );
 
@@ -768,13 +770,13 @@ ALTER TABLE api.user_credits ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "User can read own credits" ON api.user_credits;
 CREATE POLICY "User can read own credits"
   ON api.user_credits FOR SELECT
-  USING (auth.uid() = user_id);
+  USING ((select auth.uid()) = user_id);
 
 -- Only the service-role (Stripe webhook) can write; users cannot self-update
 DROP POLICY IF EXISTS "Service role can manage credits" ON api.user_credits;
 CREATE POLICY "Service role can manage credits"
   ON api.user_credits FOR ALL
-  USING (auth.role() = 'service_role');
+  USING ((select auth.role()) = 'service_role');
 
 -- RPC: atomically increment a user's credit balance
 CREATE OR REPLACE FUNCTION api.increment_user_credits(p_user_id uuid, p_amount integer)
@@ -830,7 +832,7 @@ CREATE INDEX IF NOT EXISTS idx_chat_threads_user ON chat_threads(user_id, update
 ALTER TABLE chat_threads ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Own threads only" ON chat_threads;
 CREATE POLICY "Own threads only" ON chat_threads
-  FOR ALL USING (auth.uid() = user_id);
+  FOR ALL USING ((select auth.uid()) = user_id);
 
 -- Chat messages (individual turns in a thread)
 CREATE TABLE IF NOT EXISTS chat_messages (
@@ -853,7 +855,7 @@ CREATE POLICY "Thread owner messages" ON chat_messages
     EXISTS (
       SELECT 1 FROM chat_threads
       WHERE chat_threads.id = chat_messages.thread_id
-        AND chat_threads.user_id = auth.uid()
+        AND chat_threads.user_id = (select auth.uid())
     )
   );
 

@@ -58,7 +58,10 @@ const pendingRequests = new Map<string, Promise<KalshiMarket[]>>();
 let _kalshiLastFetchHadError = false;
 
 /**
- * Generate cache key from parameters
+ * Generate cache key from parameters.
+ * `limit` is intentionally excluded so callers with different limits share
+ * the same cached pool — a limit=10 request will reuse a limit=50 cache entry
+ * (and vice-versa when the cached set is large enough).
  */
 function getCacheKey(params?: {
   category?: string;
@@ -66,14 +69,17 @@ function getCacheKey(params?: {
   limit?: number;
   search?: string;
 }): string {
-  const { category, status, limit, search } = params || {};
-  return `kalshi:${category || 'all'}:${status || 'open'}:${limit || 200}:${search || ''}`;
+  const { category, status, search } = params || {};
+  return `kalshi:${category || 'all'}:${status || 'open'}:${search || ''}`;
 }
 
 /**
- * Get cached markets if available and not expired
+ * Get cached markets if available and not expired.
+ * If `limit` is provided and the cached set is smaller than `limit`, returns
+ * null (cache miss) so the caller re-fetches with the larger limit.
+ * If the cached set is >= `limit`, returns a slice of exactly `limit` items.
  */
-function getCachedMarkets(cacheKey: string): KalshiMarket[] | null {
+function getCachedMarkets(cacheKey: string, limit?: number): KalshiMarket[] | null {
   const cached = marketCache.get(cacheKey);
 
   if (!cached) return null;
@@ -85,9 +91,17 @@ function getCachedMarkets(cacheKey: string): KalshiMarket[] | null {
     return null;
   }
 
+  // If the caller needs more markets than what's cached, treat as a miss so
+  // we re-fetch a larger set and update the cache entry.
+  if (limit !== undefined && cached.data.length < limit) {
+    console.log(`[KALSHI] Cache hit but only ${cached.data.length} markets cached, need ${limit} — re-fetching`);
+    return null;
+  }
+
   const remainingMs = cached.ttl - (now - cached.timestamp);
-  console.log(`[KALSHI] Cache hit! Remaining TTL: ${Math.floor(remainingMs / 1000)}s`);
-  return cached.data;
+  const result = limit !== undefined ? cached.data.slice(0, limit) : cached.data;
+  console.log(`[KALSHI] Cache hit! ${result.length} markets, remaining TTL: ${Math.floor(remainingMs / 1000)}s`);
+  return result;
 }
 
 /**
@@ -462,13 +476,12 @@ export async function fetchKalshiMarkets(params?: {
   cacheTtlMs?: number;
 }): Promise<KalshiMarket[]> {
   const { category, status = 'open', limit = 200, search, cursor, useCache = true, cacheTtlMs = 60000 } = params || {};
-  const cacheKey = getCacheKey({ category, status, limit, search });
+  const cacheKey = getCacheKey({ category, status, search });
 
   // Check cache first (only when not mid-pagination)
   if (useCache && !cursor) {
-    const cached = getCachedMarkets(cacheKey);
+    const cached = getCachedMarkets(cacheKey, limit);
     if (cached) {
-      console.log('[KALSHI] Returning cached markets');
       return cached;
     }
 

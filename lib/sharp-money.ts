@@ -48,6 +48,8 @@ export interface SharpScore {
   score: number;
   /** Categorised signal strength */
   level: SteamLevel;
+  /** Average age of contributing movements in minutes (for UI display) */
+  avgAgeMins: number;
   /** Contributing signal breakdown */
   components: SharpComponents;
   /** Human-readable reason for the highest signal */
@@ -82,6 +84,41 @@ const STEAM_SCORE_THRESH = 0.65;
 const SHARP_SCORE_THRESH = 0.40;
 const MOD_SCORE_THRESH   = 0.20;
 
+// ── Time decay ─────────────────────────────────────────────────────────────────
+//
+// A movement from 2 minutes ago is very different from one 4 hours ago.
+// We apply exponential decay per row so the composite score reflects
+// "how sharp is this RIGHT NOW", not "was this game sharp at some point today".
+//
+// Decay formula: weight = exp(-λ × age_minutes)
+// where λ = ln(2) / HALF_LIFE_MIN — halves every HALF_LIFE_MIN minutes.
+//
+// HALF_LIFE_MIN = 20  →  weight at 0 min = 1.0
+//                         weight at 20 min = 0.50
+//                         weight at 40 min = 0.25
+//                         weight at 60 min = 0.125  (min-clamped to MIN_DECAY_WEIGHT)
+
+const HALF_LIFE_MIN     = 20;
+const LAMBDA            = Math.LN2 / HALF_LIFE_MIN;
+const MIN_DECAY_WEIGHT  = 0.05;   // floor: very old moves still have a tiny signal
+
+/** Compute the time-decay weight for a movement row (0.05–1.0). */
+function decayWeight(timestamp: string): number {
+  const ageMs  = Date.now() - new Date(timestamp).getTime();
+  const ageMins = Math.max(0, ageMs / 60_000);
+  return Math.max(MIN_DECAY_WEIGHT, Math.exp(-LAMBDA * ageMins));
+}
+
+/**
+ * Return rows sorted by decay weight descending, with the weight attached.
+ * Used internally by component calculators.
+ */
+function withDecay(rows: LineMovementRow[]): Array<LineMovementRow & { weight: number }> {
+  return rows
+    .map(r => ({ ...r, weight: decayWeight(r.timestamp) }))
+    .sort((a, b) => b.weight - a.weight);
+}
+
 // ── Core scoring function ──────────────────────────────────────────────────────
 
 /**
@@ -112,6 +149,11 @@ export function scoreMovements(
   const level   = classify(clamped);
   const primary = primarySignalText(components, ctx);
 
+  // Average age of all movement rows
+  const avgAgeMins = rows.length
+    ? rows.reduce((s, r) => s + Math.max(0, (Date.now() - new Date(r.timestamp).getTime()) / 60_000), 0) / rows.length
+    : 0;
+
   return {
     gameId,
     score: parseFloat(clamped.toFixed(3)),
@@ -119,6 +161,7 @@ export function scoreMovements(
     components,
     primarySignal: primary,
     consensusBooks: countConsensusBooks(rows),
+    avgAgeMins: parseFloat(avgAgeMins.toFixed(1)),
   };
 }
 
@@ -159,29 +202,32 @@ function computeComponents(
   };
 }
 
-/** Fraction of total books that moved in the same direction within the window */
+/** Fraction of total books that moved in the same direction within the window.
+ *  Recent moves (high decay weight) count more toward the consensus score. */
 function calcMultiBookConsensus(rows: LineMovementRow[]): number {
   const books = new Set(rows.map(r => r.bookmaker));
   if (books.size < 2) return 0;
 
-  // Count directional moves per market type
-  const directionsByMarket = new Map<string, number[]>();
-  for (const row of rows) {
+  const weighted = withDecay(rows);
+
+  // Accumulate decay-weighted directional votes per market type
+  const scoreByMarket = new Map<string, { pos: number; neg: number; total: number }>();
+  for (const row of weighted) {
     if (row.line_change == null && row.old_odds == null) continue;
     const direction = getDirection(row);
     if (direction === 0) continue;
-    const arr = directionsByMarket.get(row.market_type) ?? [];
-    arr.push(direction);
-    directionsByMarket.set(row.market_type, arr);
+    const entry = scoreByMarket.get(row.market_type) ?? { pos: 0, neg: 0, total: 0 };
+    entry.total += row.weight;
+    if (direction > 0) entry.pos += row.weight;
+    else               entry.neg += row.weight;
+    scoreByMarket.set(row.market_type, entry);
   }
 
-  // Find market with strongest consensus
+  // Find market with strongest weighted consensus
   let maxConsensus = 0;
-  for (const directions of directionsByMarket.values()) {
-    const pos = directions.filter(d => d > 0).length;
-    const neg = directions.filter(d => d < 0).length;
-    const dominant = Math.max(pos, neg);
-    const fraction = dominant / Math.max(directions.length, 1);
+  for (const entry of scoreByMarket.values()) {
+    const dominant = Math.max(entry.pos, entry.neg);
+    const fraction = dominant / Math.max(entry.total, 1e-9);
     if (fraction > maxConsensus) maxConsensus = fraction;
   }
 
@@ -190,28 +236,33 @@ function calcMultiBookConsensus(rows: LineMovementRow[]): number {
   return Math.min(1, (booksMoving / MIN_BOOKS_STEAM) * maxConsensus);
 }
 
-/** Score for steam: multiple books moving within STEAM_WINDOW_MIN */
+/** Score for steam: multiple books moving within STEAM_WINDOW_MIN.
+ *  Uses decay-weighted count so a burst from 5 min ago scores higher
+ *  than an identical burst from 45 min ago. */
 function calcSteamVelocity(rows: LineMovementRow[]): number {
   if (rows.length < 2) return 0;
 
-  // Sort by timestamp
   const sorted = [...rows].sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
   );
 
-  let maxInWindow = 0;
+  let maxWeightedCount = 0;
   for (let i = 0; i < sorted.length; i++) {
     const windowStart = new Date(sorted[i].timestamp).getTime();
     const windowEnd   = windowStart + STEAM_WINDOW_MIN * 60_000;
-    const inWindow = sorted.filter(
-      r => new Date(r.timestamp).getTime() >= windowStart
-        && new Date(r.timestamp).getTime() <= windowEnd,
-    ).length;
-    if (inWindow > maxInWindow) maxInWindow = inWindow;
+    // Decay-weighted sum for rows inside this window
+    const weightedCount = sorted
+      .filter(r => {
+        const t = new Date(r.timestamp).getTime();
+        return t >= windowStart && t <= windowEnd;
+      })
+      .reduce((sum, r) => sum + decayWeight(r.timestamp), 0);
+
+    if (weightedCount > maxWeightedCount) maxWeightedCount = weightedCount;
   }
 
-  // ≥3 moves in window = steam; scale smoothly below that
-  return Math.min(1, (maxInWindow - 1) / (MIN_BOOKS_STEAM - 1));
+  // ≥ MIN_BOOKS_STEAM (each at full weight) = steam; scale below that
+  return Math.min(1, (maxWeightedCount - MIN_DECAY_WEIGHT) / (MIN_BOOKS_STEAM - MIN_DECAY_WEIGHT));
 }
 
 /**
@@ -244,9 +295,16 @@ function calcReverseLineMovement(
   return Math.min(1, rlmCount / Math.max(spreadRows.length, 1));
 }
 
-/** Spread between best and worst available odds for the same outcome across books */
+/** Spread between best and worst available odds, decay-weighted so recent
+ *  variance matters more than stale price divergence. */
 function calcBookVariance(rows: LineMovementRow[]): number {
-  const oddsValues = rows
+  const weighted = withDecay(rows);
+
+  // Only use rows with enough decay weight to be meaningful
+  const relevant = weighted.filter(r => r.weight >= 0.2);
+  if (relevant.length < 2) return 0;
+
+  const oddsValues = relevant
     .map(r => r.new_odds ?? r.old_odds)
     .filter((v): v is number => v != null);
 
@@ -256,8 +314,11 @@ function calcBookVariance(rows: LineMovementRow[]): number {
   const max = Math.max(...oddsValues);
   const variance = Math.abs(max - min);
 
-  // Normalise: SPREAD_STEAM cents = full score
-  return Math.min(1, variance / (SPREAD_STEAM * 100));
+  // Weight the variance itself by the average decay of these rows
+  const avgWeight = relevant.reduce((s, r) => s + r.weight, 0) / relevant.length;
+  const decayedVariance = variance * avgWeight;
+
+  return Math.min(1, decayedVariance / (SPREAD_STEAM * 100));
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────────
@@ -318,5 +379,9 @@ function neutralScore(gameId: string): SharpScore {
     components: { multiBookConsensus: 0, steamVelocity: 0, reverseLineMovement: 0, bookVariance: 0 },
     primarySignal: 'No movement data',
     consensusBooks: 0,
+    avgAgeMins: 0,
   };
 }
+
+/** Exported for use in UI components that want to show "X min ago" labels */
+export { decayWeight };

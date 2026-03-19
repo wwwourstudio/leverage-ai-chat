@@ -102,6 +102,47 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// ── PATCH — Re-score existing picks with latest sharp signals ──────────────────
+//   Body: { date?, sharpMultiplier?, recomputeModelProb? }
+//   Auth: same CRON_SECRET header as POST
+
+export async function PATCH(req: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const authHeader = req.headers.get('authorization');
+    const cronHeader = req.headers.get('x-cron-secret');
+    const provided   = authHeader?.replace('Bearer ', '') ?? cronHeader ?? '';
+    if (provided !== cronSecret) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
+  try {
+    const body = await req.json().catch(() => ({})) as {
+      date?: string;
+      sharpMultiplier?: number;
+      recomputeModelProb?: boolean;
+    };
+
+    const { refreshPicksWithSharpSignals } = await import('@/lib/update-picks');
+    const result = await refreshPicksWithSharpSignals({
+      date:               body.date,
+      sharpMultiplier:    body.sharpMultiplier,
+      recomputeModelProb: body.recomputeModelProb,
+    });
+
+    console.log(`[v0] [API/daily-picks] PATCH refresh — ${result.picksUpdated}/${result.picksProcessed} updated, ${result.sharplyBoosted} sharp-boosted`);
+
+    return NextResponse.json({ success: true, result });
+  } catch (err) {
+    console.error('[v0] [API/daily-picks] PATCH error:', err);
+    return NextResponse.json(
+      { success: false, error: 'Refresh failed' },
+      { status: 500 },
+    );
+  }
+}
+
 // ── Helper ─────────────────────────────────────────────────────────────────────
 
 function getTodayDateET(): string {

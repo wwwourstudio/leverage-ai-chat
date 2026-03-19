@@ -71,7 +71,7 @@ export function DynamicCardRenderer({
     gradient: card.gradient || 'from-blue-500 to-purple-500',
     icon: card.icon,
     data: card.data && typeof card.data === 'object' ? card.data : {},
-    status: card.status || 'active',
+    status: card.status || 'neutral',
     realData: card.realData,
     metadata: card.metadata,
   };

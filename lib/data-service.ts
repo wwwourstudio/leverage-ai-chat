@@ -14,6 +14,7 @@ import {
 } from '@/lib/constants';
 
 export interface DynamicCard {
+  id?: string;
   type: string;
   title: string;
   icon: string;
@@ -23,6 +24,7 @@ export interface DynamicCard {
   data: Record<string, any>;
   status: string;
   realData: boolean;
+  metadata?: Record<string, any>;
 }
 
 export interface UserInsights {

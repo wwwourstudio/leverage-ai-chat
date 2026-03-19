@@ -115,6 +115,7 @@ export function oddsEventsToBettingCards(
       category: displaySport,
       subcategory: 'Final Score',
       gradient: getSportGradient(sport),
+      status: 'neutral',
       data: {
         matchup: `${game.away_team} @ ${game.home_team}`,
         sport,
@@ -191,6 +192,7 @@ export function oddsEventsToBettingCards(
       category: displaySport,
       subcategory: hasOdds ? `${book?.title ?? 'Odds'} Lines` : 'Upcoming',
       gradient: getSportGradient(sport),
+      status: hasOdds ? 'value' : 'neutral',
       data: {
         matchup: `${game.away_team} @ ${game.home_team}`,
         sport,
@@ -299,6 +301,7 @@ async function generateSportSpecificCards(
               realData: true,
               status: 'FINAL',
             },
+            status: 'neutral',
             metadata: { realData: true, dataSource: 'The Odds API Scores', gameId: game.id },
           });
         }
@@ -384,6 +387,7 @@ async function generateSportSpecificCards(
               realData: true,
               status: hasOdds ? 'VALUE' : 'UPCOMING',
             },
+            status: hasOdds ? 'value' : 'neutral',
             metadata: { realData: true, dataSource: 'The Odds API', gameId: game.id },
           });
         }
@@ -412,6 +416,7 @@ async function generateSportSpecificCards(
                 realData: true,
                 status: 'UPCOMING',
               },
+              status: 'neutral',
               metadata: { realData: true, dataSource: 'The Odds API', gameId: game.id },
             });
           }
@@ -459,6 +464,7 @@ async function generateSportSpecificCards(
           category: displaySport,
           subcategory: fallbackReason === 'rate_limited' ? 'Rate Limited' : 'Temporarily Unavailable',
           gradient: getSportGradient(sport),
+          status: 'alert',
           data: {
             description: noDataMessage.description,
             note: noDataMessage.suggestion,
@@ -486,6 +492,7 @@ async function generateSportSpecificCards(
       category: displaySport,
       subcategory: 'No Games Available',
       gradient: getSportGradient(sport),
+      status: 'neutral',
       data: {
         description: noDataMessage.description,
         note: noDataMessage.suggestion,
@@ -916,6 +923,7 @@ async function _generateContextualCards(
         category: displaySport,
         subcategory: 'H2H Markets',
         gradient: getSportGradient(sportToUse),
+        status: 'neutral',
         data: {
           description: `No live ${displaySport} games scheduled`,
           note: 'Check back 24-48 hours before game time',
@@ -971,6 +979,7 @@ async function _generateContextualCards(
             category: 'ARBITRAGE',
             subcategory: `${(opp.profit_margin * 100).toFixed(2)}% Profit`,
             gradient: 'from-emerald-600 to-green-700',
+            status: 'hot',
             data: {
               matchup: `${opp.away_team} @ ${opp.home_team}`,
               profitMargin: `${(opp.profit_margin * 100).toFixed(2)}%`,
@@ -1016,6 +1025,7 @@ async function _generateContextualCards(
       category: 'ARBITRAGE',
       subcategory: 'No Opportunities',
       gradient: 'from-emerald-600 to-teal-700',
+      status: 'optimal',
       data: {
         description: 'Continuously scanning for risk-free profit opportunities',
         note: 'No arbitrage opportunities currently available',
@@ -1122,6 +1132,7 @@ async function _generateContextualCards(
             category: 'LINE MOVEMENT',
             subcategory: isSteam ? `STEAM ${direction}` : `${direction} ${Math.abs(lineChange).toFixed(1)} pts`,
             gradient: isSteam ? 'from-red-600 to-orange-600' : 'from-blue-600 to-indigo-600',
+            status: isSteam ? 'hot' : 'edge',
             data: {
               matchup: `${move.away_team} @ ${move.home_team}`,
               lineChange: `${lineChange > 0 ? '+' : ''}${lineChange.toFixed(1)} points`,
@@ -1161,6 +1172,7 @@ async function _generateContextualCards(
       category: 'LINE MOVEMENT',
       subcategory: 'No Recent Movements',
       gradient: 'from-blue-600 to-indigo-600',
+      status: 'optimal',
       data: {
         description: 'Monitoring odds movements across all sportsbooks',
         note: 'No significant line movements in the last 24 hours',
@@ -1386,6 +1398,7 @@ async function _generateContextualCards(
           category: 'PORTFOLIO',
           subcategory: `${utilization.toFixed(1)}% Deployed`,
           gradient: 'from-purple-600 to-pink-600',
+          status: utilization > 80 ? 'hot' : utilization > 50 ? 'value' : 'neutral',
           data: {
             totalBankroll: `$${capitalState.total_capital.toFixed(2)}`,
             deployed: `$${totalAllocated.toFixed(2)}`,
@@ -1451,6 +1464,7 @@ async function _generateContextualCards(
       category: 'PORTFOLIO',
       subcategory: 'Kelly Criterion',
       gradient: 'from-purple-600 to-pink-600',
+      status: 'alert',
       data: {
         description: 'Optimal bet sizing using Kelly Criterion with fractional scaling',
         features: ['Risk Management', 'Capital Allocation', 'Bankroll Protection'],
@@ -1799,6 +1813,7 @@ async function _generateContextualCards(
       category: displaySport,
       subcategory: 'Market Overview',
       gradient: getSportGradient(normalizedSport || 'default'),
+      status: 'neutral',
       data: {
         description: `${displaySport} markets — no live games currently scheduled`,
         sport: normalizedSport,

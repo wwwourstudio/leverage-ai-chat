@@ -174,7 +174,16 @@ export async function POST(request: NextRequest) {
 
     // ADP intent: user is asking about NFBC/NFFC draft positions or rankings only.
     // Narrowed: no longer fires for all MLB fantasy queries — only explicit ADP keywords.
+    //
+    // IMPORTANT: scan only the raw user query, NOT the injected context prefix.
+    // The client prepends "[Fantasy League Context: Platform: NFBC, ...]" which
+    // contains "nfbc" and would falsely trigger hasADPIntent on every fantasy message
+    // when the user's league platform is NFBC. Strip any "[..context...]\n\n" prefix
+    // before keyword matching so intent detection reflects what the user actually typed.
     const msgLower = userMessage.toLowerCase();
+    const rawQueryLower = msgLower.includes(']\n\n')
+      ? msgLower.slice(msgLower.indexOf(']\n\n') + 3)
+      : msgLower;
 
     // ── Team-name → sport inference ──────────────────────────────────────────
     // When context.sport is absent or 'none', scan the user message for known
@@ -225,7 +234,7 @@ export async function POST(request: NextRequest) {
 
     const hasADPIntent =
       ['adp', 'nfbc', 'nffc', 'average draft', 'draft position', 'draft rank', 'draft order', 'nfbc board', 'nffc board']
-        .some(k => msgLower.includes(k));
+        .some(k => rawQueryLower.includes(k));
 
     // Start/sit intent: user wants daily matchup-based start or sit advice.
     const START_SIT_KEYWORDS = [
@@ -239,7 +248,7 @@ export async function POST(request: NextRequest) {
     // and the fantasy-intent classifier occasionally misses streaming questions.
     // Without the guard, isMLBStatcastMode is correctly suppressed so expectsStatcastJSON
     // stays false and no spurious "JSON not found" warning is logged for prose responses.
-    const hasStartSitIntent = START_SIT_KEYWORDS.some(k => msgLower.includes(k));
+    const hasStartSitIntent = START_SIT_KEYWORDS.some(k => rawQueryLower.includes(k));
 
     // Statcast JSON mode only applies to non-ADP, non-start/sit MLB queries
     const isMLBStatcastMode = isMLBQuery && !hasADPIntent && !hasStartSitIntent;
@@ -258,7 +267,7 @@ export async function POST(request: NextRequest) {
       isMLBQuery &&
       !hasADPIntent &&
       !hasStartSitIntent &&
-      MLB_PROJECTION_KEYWORDS.some(k => msgLower.includes(k));
+      MLB_PROJECTION_KEYWORDS.some(k => rawQueryLower.includes(k));
 
     // True only when MLB_ANALYSIS_ADDENDUM is the active system prompt — i.e. the model
     // was instructed to return a Statcast JSON card.  When hasMLBProjectionIntent is true
@@ -720,9 +729,9 @@ export async function POST(request: NextRequest) {
     const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
     const hasClientOddsData = !!(context.oddsData?.events?.length);
     // Route DFS, pure-fantasy, file-upload, off-season, and ambiguous queries directly to
-    // grok-3-fast (3-6s). Reserve grok-4 for live-odds betting analysis only.
-    // ADP queries override to grok-4: reliable tool use requires the stronger model.
-    // isAmbiguous queries only need a short clarification reply — no need for grok-4.
+    // grok-3-fast (3-6s). Reserve grok-3 for live-odds betting analysis and ADP tool-use.
+    // grok-4 is intentionally avoided: 40s+ latency exceeds acceptable UX thresholds.
+    // isAmbiguous queries only need a short clarification reply — grok-3-fast is sufficient.
     const useFastPath = hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context));
     const primaryModel = useFastPath ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.MODEL_NAME;
     // Always log the resolved model so failures are immediately traceable in Vercel logs

@@ -8,6 +8,15 @@
     },
     "app/api/mlb-projections/route.ts": {
       "maxDuration": 25
+    },
+    "app/api/daily-picks/route.ts": {
+      "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/daily-picks",
+      "schedule": "0 7 * * *"
+    }
+  ]
 }

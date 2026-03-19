@@ -367,39 +367,62 @@ export interface RecentStatcastData {
  * Uses the `statcast_search/csv` endpoint which returns pitch-level data for
  * a specific player and date range. Aggregates into key hitting metrics.
  *
+ * When `playerId` (MLBAM ID) is provided it is used directly — this eliminates
+ * all name-matching ambiguity. When only `playerName` is given, the function
+ * tries "First Last" then "Last, First" name formats as a fallback.
+ *
  * Returns `null` when there is insufficient sample (< 5 balls in play) or if
  * Baseball Savant is unreachable — callers should fall back to `getStatcastData()`.
- *
- * Note: the endpoint accepts "First Last" or "Last, First" player name formats.
- * We try both before giving up.
  */
 export async function getRecentStatcast(
   playerName: string,
   days = 14,
+  playerId?: number,
 ): Promise<RecentStatcastData | null> {
   const today = new Date();
   const start = new Date();
   start.setDate(today.getDate() - days);
   const fmt = (d: Date) => d.toISOString().split('T')[0];
 
-  // Try "First Last" format first, then "Last, First" on empty result
+  // Build the list of parameter-sets to try.
+  // Prefer MLBAM player_id (no name-matching ambiguity); fall back to name variants.
+  type ParamSet = Record<string, string>;
+  const paramSets: ParamSet[] = [];
+
+  if (playerId) {
+    // MLBAM ID path — exact, no ambiguity
+    paramSets.push({
+      player_type:  'batter',
+      hfGT:         'R|',
+      player_id:    String(playerId),
+      game_date_gt: fmt(start),
+      game_date_lt: fmt(today),
+      type:         'details',
+      csv:          'true',
+    });
+  }
+
+  // Name fallbacks (also used when no playerId is available)
   const namesToTry = [playerName];
   const parts = playerName.trim().split(/\s+/);
   if (parts.length >= 2) {
     const lastFirst = `${parts[parts.length - 1]}, ${parts.slice(0, -1).join(' ')}`;
     if (lastFirst !== playerName) namesToTry.push(lastFirst);
   }
-
   for (const name of namesToTry) {
-    const params = new URLSearchParams({
-      player_type: 'batter',
-      hfGT:        'R|',   // regular season only
-      player_name: name,
+    paramSets.push({
+      player_type:  'batter',
+      hfGT:         'R|',
+      player_name:  name,
       game_date_gt: fmt(start),
       game_date_lt: fmt(today),
-      type:        'details',
-      csv:         'true',
+      type:         'details',
+      csv:          'true',
     });
+  }
+
+  for (const paramObj of paramSets) {
+    const params = new URLSearchParams(paramObj);
 
     try {
       const res = await fetch(`${SAVANT_SEARCH_URL}?${params}`, {

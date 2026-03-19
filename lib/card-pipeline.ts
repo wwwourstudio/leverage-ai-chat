@@ -623,13 +623,22 @@ function formatAmerican(price: number): string {
 // ============================================================================
 // HR EDGE ANALYSER — full real-data pipeline for HR prop betting
 //
-// Wires together:
-//   1. getRecentStatcast()   — 14-day game-level exit velocity + barrel rate
-//   2. getStatcastData()     — season-level fallback when recent data is sparse
-//   3. hrEngine.computeHRProb() — Bayesian model probability [0–1]
-//   4. Odds API              — live market-implied probability
-//   5. calculateEdge()       — model edge over market (percentage points)
+// Pipeline:
+//   1. MLBAM ID             — getPlayerByName() — canonical player identity
+//   2. Recent Statcast      — getRecentStatcast(playerId) — 14-day game data
+//   3. Season fallback      — getStatcastData() — if recent sample too thin
+//   4. HR model             — computeHRProb() — Bayesian logistic [0–1]
+//   5. Multi-book odds      — getAllHRLines() — best + all book lines
+//   6. Edge calculation     — calculateEdge() — model vs market pp
 // ============================================================================
+
+/** A single book's HR prop line for a player */
+export interface HRBookLine {
+  bookmaker:         string;
+  overOdds:          number;
+  line:              number;
+  impliedProbability: number;
+}
 
 /**
  * Result of the HR prop edge analysis pipeline.
@@ -637,28 +646,86 @@ function formatAmerican(price: number): string {
  */
 export interface HREdgeResult {
   playerName:         string;
+  /** Canonical full name from MLB Stats API (may differ from input) */
+  canonicalName:      string;
+  /** MLBAM player ID, null if lookup failed */
+  mlbamId:            number | null;
   /** Model-estimated HR probability per plate appearance [0,1] */
   modelProbability:   number;
-  /** Market-implied HR probability from live odds [0,1] */
+  /** Best market-implied HR probability across all books [0,1] */
   impliedProbability: number;
-  /** Edge = (modelProb − impliedProb) × 100 percentage points */
+  /** Edge = (modelProb − bestImpliedProb) × 100 percentage points */
   edge:               number;
   /** Fair American odds implied by the model */
   fairOdds:           number;
-  /** Market's American odds (over line) */
-  marketOdds:         number;
-  /** HR prop line (almost always 0.5 = "to hit at least 1") */
+  /** Best American over-odds found (highest number = most favourable) */
+  bestOdds:           number;
+  /** Bookmaker offering the best odds */
+  bestBook:           string;
+  /** HR prop line (almost always 0.5) */
   line:               number;
-  bookmaker:          string;
-  /** 0–100 confidence score — higher when data quality is good and edge is large */
+  /** All book lines sorted best → worst odds */
+  allLines:           HRBookLine[];
+  /** 0–100 confidence score */
   confidence:         number;
-  /** Data quality tier: recent 14-day game data > full season > no Statcast */
+  /** Data quality tier: recent 14-day > full season > fallback */
   dataSource:         'recent_14d' | 'season' | 'fallback';
 }
 
 /** American odds → implied probability (removes vig naively) */
 function americanToProb(odds: number): number {
   return odds > 0 ? 100 / (odds + 100) : (-odds) / (-odds + 100);
+}
+
+/**
+ * Fetch all book HR prop lines for a player from The Odds API.
+ * Returns lines sorted from best (highest odds) to worst.
+ * Returns empty array when no market is found or on fetch failure.
+ */
+export async function getAllHRLines(
+  playerName: string,
+  oddsApiKey: string,
+): Promise<HRBookLine[]> {
+  try {
+    const url = `https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?apiKey=${oddsApiKey}&regions=us&markets=player_home_runs&oddsFormat=american`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(6_000) });
+    if (!res.ok) return [];
+
+    const games = await res.json() as Array<{
+      bookmakers?: Array<{
+        title: string;
+        markets?: Array<{
+          key: string;
+          outcomes?: Array<{ name: string; price: number; point?: number }>;
+        }>;
+      }>;
+    }>;
+
+    const lower = playerName.toLowerCase();
+    const lines: HRBookLine[] = [];
+
+    for (const game of games) {
+      for (const book of (game.bookmakers ?? [])) {
+        for (const market of (book.markets ?? [])) {
+          if (market.key !== 'player_home_runs') continue;
+          for (const outcome of (market.outcomes ?? [])) {
+            if (!outcome.name?.toLowerCase().includes(lower)) continue;
+            lines.push({
+              bookmaker:          book.title,
+              overOdds:           outcome.price,
+              line:               outcome.point ?? 0.5,
+              impliedProbability: americanToProb(outcome.price),
+            });
+          }
+        }
+      }
+    }
+
+    // Sort: highest odds first (best value for bettor)
+    return lines.sort((a, b) => b.overOdds - a.overOdds);
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -675,8 +742,14 @@ export async function analyzeHREdge(playerName: string): Promise<HREdgeResult | 
   const oddsApiKey = getOddsApiKey();
   if (!oddsApiKey) return null;
 
-  // ── Step 1: Statcast features ─────────────────────────────────────────────
-  // Try recent 14-day game data first; fall back to season aggregates.
+  // ── Step 1: Canonical player identity (MLBAM ID) ──────────────────────────
+  const { getPlayerByName } = await import('@/lib/player-map');
+  const playerProfile = await getPlayerByName(playerName).catch(() => null);
+  const mlbamId       = playerProfile?.id ?? null;
+  const canonicalName = playerProfile?.fullName ?? playerName;
+
+  // ── Step 2: Statcast features ─────────────────────────────────────────────
+  // Prefer MLBAM ID lookup (eliminates name ambiguity); fall back to name search.
   const { getRecentStatcast, getStatcastData, queryStatcast } = await import('@/lib/baseball-savant');
 
   let barrelRate    = 0;  // fraction 0–1 for hrEngine
@@ -684,7 +757,8 @@ export async function analyzeHREdge(playerName: string): Promise<HREdgeResult | 
   let sampleSize    = 0;
   let dataSource: HREdgeResult['dataSource'] = 'fallback';
 
-  const recent = await getRecentStatcast(playerName, 14).catch(() => null);
+  // Use canonicalName for searches so "Judge" → "Aaron Judge" resolves correctly
+  const recent = await getRecentStatcast(canonicalName, 14, mlbamId ?? undefined).catch(() => null);
   if (recent && recent.sampleSize >= 10) {
     barrelRate  = recent.barrelRate  / 100;
     avgExitVelo = recent.avgExitVelo;
@@ -693,7 +767,7 @@ export async function analyzeHREdge(playerName: string): Promise<HREdgeResult | 
   } else {
     // Season aggregates
     const { players } = await getStatcastData().catch(() => ({ players: [] as import('@/lib/baseball-savant').StatcastPlayer[] }));
-    const match = queryStatcast(players, { player: playerName, playerType: 'batter', limit: 1 });
+    const match = queryStatcast(players, { player: canonicalName, playerType: 'batter', limit: 1 });
     if (match.length > 0) {
       barrelRate  = match[0].barrelRate  / 100;
       avgExitVelo = match[0].exitVelocity;
@@ -704,9 +778,8 @@ export async function analyzeHREdge(playerName: string): Promise<HREdgeResult | 
 
   if (sampleSize === 0) return null; // no Statcast data at all
 
-  // ── Step 2: HR model probability ─────────────────────────────────────────
-  const { computeHRProb } = await import('@/lib/hrEngine');
-  const { fairAmericanOdds } = await import('@/lib/hrEngine');
+  // ── Step 3: HR model probability ─────────────────────────────────────────
+  const { computeHRProb, fairAmericanOdds } = await import('@/lib/hrEngine');
 
   // airPullRate: not available from leaderboard endpoints — estimate from barrel rate
   // (R² ≈ 0.62 in Statcast data; barrels concentrate on pulled air balls)
@@ -716,73 +789,48 @@ export async function analyzeHREdge(playerName: string): Promise<HREdgeResult | 
     airPullRate,
     barrelRate,
     avgExitVelocity:      avgExitVelo,
-    platoonAdvantage:     0,    // neutral — matchup data not available
+    platoonAdvantage:     0,    // neutral — matchup not available at this layer
     parkHRFactor:         1.0,  // neutral — park not known without specific game
-    pitcherHRSuppression: 0.5,  // median — pitcher not known without specific game
+    pitcherHRSuppression: 0.5,  // median
     sampleSize,
   });
 
   const fairOdds = fairAmericanOdds(modelProbability);
 
-  // ── Step 3: Live market odds ──────────────────────────────────────────────
-  let impliedProbability = 0;
-  let marketOdds         = 0;
-  let line               = 0.5;
-  let bookmaker          = 'unknown';
-
-  try {
-    const url = `https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?apiKey=${oddsApiKey}&regions=us&markets=player_home_runs&oddsFormat=american`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(6_000) });
-    if (res.ok) {
-      const games = await res.json() as Array<{
-        bookmakers?: Array<{
-          title: string;
-          markets?: Array<{
-            key: string;
-            outcomes?: Array<{ name: string; price: number; point?: number }>;
-          }>;
-        }>;
-      }>;
-
-      const lower = playerName.toLowerCase();
-      outer: for (const game of games) {
-        for (const book of (game.bookmakers ?? [])) {
-          for (const market of (book.markets ?? [])) {
-            if (market.key !== 'player_home_runs') continue;
-            for (const outcome of (market.outcomes ?? [])) {
-              if (!outcome.name?.toLowerCase().includes(lower)) continue;
-              marketOdds         = outcome.price;
-              impliedProbability = americanToProb(outcome.price);
-              line               = outcome.point ?? 0.5;
-              bookmaker          = book.title;
-              break outer;
-            }
-          }
-        }
-      }
-    }
-  } catch {
-    // Non-fatal — edge calculation below will show 0 for no-market case
+  // ── Step 4: Multi-book odds — find best line ──────────────────────────────
+  // Use canonicalName for market search; also try the original playerName as fallback
+  let allLines = await getAllHRLines(canonicalName, oddsApiKey);
+  if (allLines.length === 0 && canonicalName !== playerName) {
+    allLines = await getAllHRLines(playerName, oddsApiKey);
   }
 
-  if (impliedProbability === 0) return null; // no market found
+  if (allLines.length === 0) return null; // no market
 
-  // ── Step 4: Edge + confidence ─────────────────────────────────────────────
+  const best = allLines[0]; // sorted best → worst already
+  const impliedProbability = best.impliedProbability;
+  const marketOdds = best.overOdds;
+  const line       = best.line;
+  const bookmaker  = best.bookmaker;
+
+  // ── Step 5: Edge + confidence ─────────────────────────────────────────────
   const edge = calculateEdge(modelProbability, impliedProbability);
   const confidence = calculateConfidence(
-    [{ source: dataSource === 'recent_14d' ? 'statcast' : 'statcast', latencyMs: 0, success: true, cached: dataSource === 'season' }],
+    [{ source: 'statcast' as const, latencyMs: 0, success: true, cached: dataSource === 'season' }],
     edge,
   );
 
   return {
     playerName,
+    canonicalName,
+    mlbamId,
     modelProbability,
     impliedProbability,
     edge,
     fairOdds,
-    marketOdds,
+    bestOdds:  marketOdds,
+    bestBook:  bookmaker,
     line,
-    bookmaker,
+    allLines,
     confidence,
     dataSource,
   };

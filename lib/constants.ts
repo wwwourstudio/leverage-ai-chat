@@ -15,12 +15,12 @@ export const MLB_SEASON_YEAR: number = _currentMLBSeason();
 export const NFBC_DRAFT_YEAR: number = new Date().getFullYear();
 
 // AI Model Configuration
-// Primary model: grok-4 — xAI's most capable model for deep sports analysis and tool use.
+// Primary model: grok-3 — strong model for live-odds analysis, much faster than grok-4.
 // Fast-path model: grok-3-fast for intent-routing, ADP, and off-season queries.
 export const AI_CONFIG = {
-  MODEL_NAME: 'grok-4',
+  MODEL_NAME: 'grok-3',
   FAST_MODEL_NAME: 'grok-3-fast',
-  MODEL_DISPLAY_NAME: 'Grok 4',
+  MODEL_DISPLAY_NAME: 'Grok 3',
   FAST_MODEL_DISPLAY_NAME: 'Grok 3 Fast',
   PROVIDER: 'xAI',
   API_ENDPOINT: 'https://api.x.ai/v1/chat/completions',
@@ -778,6 +778,8 @@ Tool parameter guide:
   Use for queries like "who are the best sleepers?" or "show me undervalued players"
 
 Respond in natural prose — do NOT output raw JSON or markdown code blocks.
+
+⛔ CRITICAL: Do NOT generate Statcast leaderboard cards (leaderboard_card, statcast_summary_card) or any xwOBA/exit-velocity data for draft questions. You are answering a fantasy draft question — use the \`query_adp\` tool and give ADP-based prose advice. Do not reference any Statcast metrics or Statcast CSV data for this query.
 
 For NFL/NFFC queries, the same \`query_adp\` tool returns NFFC (National Fantasy Football Championship) Average Draft Position data. NFFC position codes: QB | RB | WR | TE | K | DEF. Always cite "NFFC ${NFBC_DRAFT_YEAR} NFL ADP" as the source for football queries.`;
 

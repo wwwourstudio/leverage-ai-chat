@@ -1,14 +1,15 @@
 # =============================================================================
 # .github/workflows/automation-cron.yml
 #
-# Runs the four automation cron routes that can't be scheduled via
+# Runs the five automation cron routes that can't be scheduled via
 # vercel.json on the free (Hobby) plan (2-cron limit).
 #
-# SCHEDULES
-#   04:00 UTC  odds + picks refresh  (after overnight line movements settle)
-#   10:00 UTC  odds + projections + picks refresh  (before afternoon games)
-#   17:00 UTC  odds + picks refresh  (prime-time lines)
-#   03:00 UTC  training run  (after all games finish)
+# SCHEDULES (UTC)
+#   03:00  train      — settle picks + compute model_metrics
+#   03:30  backtest   — run backtester + persist calibration params (after train)
+#   04:00  odds+picks — after overnight lines settle
+#   10:00  odds+projections+picks — before afternoon slate
+#   17:00  odds+picks — prime-time lines
 #
 # REQUIRED SECRETS  (Settings → Secrets and variables → Actions → New secret)
 #   CRON_SECRET   Same value as the CRON_SECRET env var in your Vercel project
@@ -22,12 +23,13 @@ name: Automation Cron Jobs
 
 on:
   schedule:
-    # Odds + picks refresh — 3× daily  (UTC: 04:00, 10:00, 17:00)
+    # Full daily run (train + backtest)
+    - cron: '0 3  * * *'   # train
+    - cron: '30 3 * * *'   # backtest (30 min after train completes)
+    # Odds + picks refresh — 3× daily
     - cron: '0 4  * * *'
     - cron: '0 10 * * *'
     - cron: '0 17 * * *'
-    # Full run (includes projections + training) — daily at 03:00 UTC
-    - cron: '0 3  * * *'
 
   workflow_dispatch:
     inputs:
@@ -42,6 +44,7 @@ on:
           - projections
           - picks
           - train
+          - backtest
 
 jobs:
   # ── Odds ingest ──────────────────────────────────────────────────────────────
@@ -125,5 +128,26 @@ jobs:
           echo "Response: $STATUS"
           if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
             echo "::error::train cron returned HTTP $STATUS"
+            exit 1
+          fi
+
+  # ── Backtesting + calibration ─────────────────────────────────────────────
+  backtest:
+    name: Backtest & Calibrate
+    runs-on: ubuntu-latest
+    # Runs 30 min after train (03:30 UTC) so pick_results are fully settled first
+    if: |
+      github.event_name == 'workflow_dispatch' && (inputs.job == 'backtest' || inputs.job == 'all') ||
+      github.event_name == 'schedule' && github.event.schedule == '30 3 * * *'
+    steps:
+      - name: Call /api/cron/backtest
+        timeout-minutes: 2
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 55 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/backtest")
+          echo "Response: $STATUS"
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+            echo "::error::backtest cron returned HTTP $STATUS"
             exit 1
           fi

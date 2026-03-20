@@ -47,21 +47,45 @@ export async function persistStatcastLeaders(players: StatcastPlayer[]): Promise
 
   // Batch in chunks of 200 to stay within Supabase request size limits
   const CHUNK = 200;
+  let totalUpserted = 0;
+
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK);
+    const chunkNum = Math.floor(i / CHUNK) + 1;
+
     const { error } = await db
       .from('statcast_daily')
       .upsert(chunk, { onConflict: 'player_id,season,player_type' });
 
     if (error) {
-      console.warn(
-        `[statcast-ingest] upsert failed (chunk ${i / CHUNK + 1}):`,
-        error.message,
-      );
+      // Surface sequence-permission errors with a clear remediation hint.
+      // These occur when the service_role lacks USAGE on the BIGSERIAL
+      // sequence (e.g. first-ever INSERT for a player/season pair).
+      // Fix: run scripts/fix-sequence-permissions.sql in Supabase SQL Editor.
+      if (
+        error.message.includes('permission denied for sequence') ||
+        error.code === '42501'
+      ) {
+        console.error(
+          '[statcast-ingest] SEQUENCE PERMISSION ERROR — ' +
+          'run scripts/fix-sequence-permissions.sql in the Supabase SQL Editor ' +
+          'to grant USAGE on api schema sequences to service_role.',
+          { code: error.code, detail: error.message },
+        );
+      } else {
+        console.warn(
+          `[statcast-ingest] upsert failed (chunk ${chunkNum}):`,
+          error.message,
+        );
+      }
+    } else {
+      totalUpserted += chunk.length;
     }
   }
 
-  console.log(`[statcast-ingest] Upserted ${rows.length} Statcast rows`);
+  console.log(
+    `[statcast-ingest] Upserted ${totalUpserted} / ${rows.length} Statcast rows`,
+  );
 }
 
 /**

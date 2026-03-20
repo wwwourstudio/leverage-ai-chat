@@ -9,7 +9,13 @@
  * this shared factory rather than creating their own clients, so we hold at
  * most one extra connection across all ingest operations in a warm Lambda.
  *
- * Pattern mirrors lib/supabase/adp-client.server.ts.
+ * IMPORTANT — why we never fall back to the anon key:
+ *   The anon role lacks USAGE on BIGSERIAL sequences in the api schema.
+ *   Using it causes "permission denied for sequence statcast_daily_id_seq"
+ *   on every INSERT (even though RLS policies allow the write at the table
+ *   level, sequence ACLs are separate).  If the service role key is absent,
+ *   we return null and callers degrade gracefully rather than writing with
+ *   the wrong credentials.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -17,19 +23,26 @@ let _client: any = null;
 
 /**
  * Returns a singleton Supabase client scoped to the `api` schema with the
- * service role key (bypasses RLS).  Returns null in browser context or when
- * env vars are absent.
+ * service role key (bypasses RLS and has USAGE on all sequences).
+ * Returns null in browser context or when SUPABASE_SERVICE_ROLE_KEY is absent.
  */
 export async function getIngestClient() {
   if (typeof window !== 'undefined') return null;
   if (_client) return _client;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // Require the service role key explicitly — do NOT fall back to the anon
+  // key.  The anon role does not have USAGE on api schema sequences, which
+  // causes "permission denied for sequence *_id_seq" on every INSERT.
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!url || !key) return null;
+  if (!url || !key) {
+    console.warn(
+      '[ingest-client] SUPABASE_SERVICE_ROLE_KEY is not set — ' +
+      'ingest writes are disabled.  Add this env var to enable DB persistence.',
+    );
+    return null;
+  }
 
   const { createClient } = await import('@supabase/supabase-js');
   _client = createClient(url, key, {

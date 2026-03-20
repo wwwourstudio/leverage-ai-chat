@@ -160,8 +160,12 @@ function parseCSV(csv: string, playerType: 'batter' | 'pitcher'): StatcastPlayer
   const xslgIdx       = colIdx(headers, ['xslg', 'est_slg', 'x_slg']);
   const wobaIdx       = colIdx(headers, ['woba', 'b_woba', 'p_woba']);
   const xwobaIdx      = colIdx(headers, ['xwoba', 'est_woba', 'x_woba']);
-  const barrelIdx     = colIdx(headers, ['barrel_batted_rate', 'barrel_rate', 'barrels_per_bbe_percent', 'barrel_pct', 'barrels']);
-  const exitVeloIdx   = colIdx(headers, ['exit_velocity_avg', 'avg_exit_velocity', 'launch_speed', 'avg_launch_speed', 'ev_avg', 'ev95percent']);
+  // barrel_batted_rate / brl_percent = barrel rate as a percentage of BBE.
+  // Do NOT include raw 'barrels' count — wrong unit, would show integers like 18 as 18%.
+  const barrelIdx     = colIdx(headers, ['barrel_batted_rate', 'barrel_rate', 'brl_percent', 'barrels_per_bbe_percent', 'barrel_pct']);
+  // avg_hit_speed is the column name used by the Baseball Savant leaderboard/statcast endpoint.
+  // ev95percent is a *percentage* stat (% of batted balls ≥95 mph), NOT an exit velocity — exclude it.
+  const exitVeloIdx   = colIdx(headers, ['exit_velocity_avg', 'avg_exit_velocity', 'avg_hit_speed', 'launch_speed', 'avg_launch_speed', 'ev_avg']);
   const launchAngIdx  = colIdx(headers, ['launch_angle_avg', 'avg_launch_angle', 'la_avg', 'launch_angle']);
   const sweetSpotIdx  = colIdx(headers, ['sweet_spot_percent', 'sweet_spot_rate', 'sweetspot_percent', 'sweet_spot_pct']);
   const hardHitIdx    = colIdx(headers, ['hard_hit_percent', 'hard_hit_rate', 'hard_hit_pct', 'hardhit_percent', 'hardhit_rate']);

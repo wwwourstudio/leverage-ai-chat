@@ -220,10 +220,21 @@ function normalisePlayerName(raw: string): string {
 }
 
 /**
- * Strip surrounding double-quotes from a CSV field value.
+ * Strip surrounding double-quotes from a TSV field value.
  */
 function stripQuotes(s: string): string {
   return s.replace(/^"|"$/g, '').trim();
+}
+
+/**
+ * Quote-aware CSV row tokenizer.
+ * Correctly handles fields like `"Ohtani, Shohei"` and `"UT,P"` without splitting on
+ * the commas inside the quotes — the standard NFBC export uses this format.
+ */
+function parseCsvRow(line: string): string[] {
+  return line.match(/("(?:[^"]|"")*"|[^,]*)(?:,|$)/g)
+    ?.map(c => c.replace(/,$/, '').replace(/^"|"$/g, '').replace(/""/g, '"').trim())
+    ?? line.split(',').map(c => c.trim());
 }
 
 /**
@@ -233,6 +244,9 @@ function stripQuotes(s: string): string {
  *
  * Expected columns (names may vary slightly): Rank, Player, ADP / Overall ADP,
  * Position(s) / Pos, Team
+ *
+ * For CSV format, uses a quote-aware tokenizer so player names like "Ohtani, Shohei"
+ * and multi-position strings like "UT,P" are kept as single fields.
  */
 export function parseTSV(raw: string): NFBCPlayer[] {
   const lines = raw.split('\n').filter(l => l.trim().length > 0);
@@ -241,7 +255,13 @@ export function parseTSV(raw: string): NFBCPlayer[] {
   // Auto-detect delimiter — TSV has tabs, CSV has commas
   const delimiter = lines[0].includes('\t') ? '\t' : ',';
 
-  const headers = lines[0].split(delimiter).map(h => stripQuotes(h).toLowerCase());
+  // For TSV, simple split is safe (player names never contain tabs).
+  // For CSV, use the quote-aware tokenizer so "Last, First" stays as one field.
+  const splitRow = delimiter === '\t'
+    ? (line: string) => line.split('\t').map(stripQuotes)
+    : parseCsvRow;
+
+  const headers = splitRow(lines[0]).map(h => h.toLowerCase());
 
   // Resolve column indices dynamically
   const col = (candidates: string[]): number => {
@@ -262,7 +282,7 @@ export function parseTSV(raw: string): NFBCPlayer[] {
   const players: NFBCPlayer[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(delimiter).map(stripQuotes);
+    const cols = splitRow(lines[i]);
     if (cols.length < 2) continue;
 
     const rawName = playerIdx !== -1 ? (cols[playerIdx] ?? '').trim() : '';

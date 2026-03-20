@@ -1060,6 +1060,9 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
         const { players: statcastPlayers } = await getStatcastData();
         const batters = statcastPlayers
           .filter(p => p.playerType === 'batter' && p.xwoba > 0)
+          // Exclude players where exit velo / barrel rate are still at their league-average
+          // defaults (88.0 / 7.0) — these players lack real batted-ball data from the merge.
+          .filter(p => p.exitVelocity !== 88.0 || p.barrelRate !== 7.0)
           .sort((a, b) => b.xwoba - a.xwoba)
           .slice(0, 6);
         if (batters.length > 0) {
@@ -1141,6 +1144,9 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
         const { players: statcastAll } = await getStatcastData();
         const vpeRanked = rankByVPE(statcastAll).slice(0, 8);
         if (vpeRanked.length > 0) {
+          // Cross-reference ADP data for real positions and ADP values.
+          // Statcast CSV has no team or position columns; use the ADP board to fill them in.
+          const adpLookup = new Map(mlbPlayers.map(p => [p.name.toLowerCase(), p]));
           cards.push({
             type: 'FANTASY_VBD',
             title: 'MLB VPE Rankings — Vortex Engine',
@@ -1152,16 +1158,19 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
               fantasyCardType: 'vbd_rankings',
               position: 'OVERALL',
               sport: 'MLB',
-              players: vpeRanked.map((p, i) => ({
-                name: p.name,
-                team: '',  // Statcast CSV does not include team
-                pos: p.playerType === 'batter' ? 'OF' : 'SP',
-                vbd: p.vpeVal,
-                pts: p.vpeVal,
-                adp: i + 1,
-                tier: Math.floor(i / 3) + 1,
-                rank: i + 1,
-              })),
+              players: vpeRanked.map((p, i) => {
+                const adpEntry = adpLookup.get(p.name.toLowerCase());
+                return {
+                  name: p.name,
+                  team: adpEntry?.team ?? '',
+                  pos: adpEntry?.pos ?? (p.playerType === 'batter' ? 'OF' : 'SP'),
+                  vbd: p.vpeVal,
+                  pts: p.vpeVal,
+                  adp: adpEntry?.adp ?? (i + 1),
+                  tier: Math.floor(i / 3) + 1,
+                  rank: i + 1,
+                };
+              }),
               description: 'VPE-Val weights Barrel%, HardHit%, air-ball tendency for hitters; xwOBA allowed, K/9 proxy, WHIP suppression for pitchers.',
               status: 'target',
             },

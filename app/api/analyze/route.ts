@@ -684,6 +684,10 @@ export async function POST(request: NextRequest) {
           enrichedPrompt += `\n\n${section}`;
           statcastInjected = true;
           console.log(`[v0] [ANALYZE] Injected Statcast leaders: ${batters.length} batters, ${pitchers.length} pitchers`);
+          // Persist to statcast_daily so future requests read from DB (fire-and-forget)
+          void import('@/lib/services/statcast-ingest').then(({ persistStatcastLeaders }) =>
+            persistStatcastLeaders(statcastPlayers)
+          ).catch(() => {/* non-critical */});
         }
       } catch {
         // Non-critical — skip if Baseball Savant is unreachable

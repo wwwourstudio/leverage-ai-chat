@@ -134,11 +134,20 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
     return [];
   }
 
+  // Persist game schedule + rosters to DB (fire-and-forget — never blocks pipeline)
+  void import('@/lib/services/game-ingest').then(({ persistGames }) =>
+    persistGames(games)
+  ).catch(() => {/* non-critical */});
+
   // 2. Fetch all Statcast data in parallel
   const [allHitters, allPitchers] = await Promise.all([
     fetchStatcastHitters(200),
     fetchStatcastPitchers(60),
   ]);
+
+  // Note: Statcast leaderboard is persisted to statcast_daily by the analyze route
+  // (which uses StatcastPlayer from baseball-savant.ts). The mlb-projections statcast
+  // client uses a different type, so we don't duplicate the write here.
 
   // No games today (pre-season / off-day) — fall back to top Statcast performers
   if (games.length === 0) {
@@ -231,7 +240,7 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
   }
 
   // Sort: hot first, then by HR projection descending
-  return projections
+  const finalProjections = projections
     .sort((a, b) => {
       const statusOrder: Record<string, number> = { hot: 0, edge: 1, value: 2, neutral: 3 };
       const ao = statusOrder[a.status] ?? 3;
@@ -240,6 +249,13 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
       return b.projections.hr_proj - a.projections.hr_proj;
     })
     .slice(0, limit);
+
+  // Persist projections to DB (fire-and-forget — powers /api/picks DB-first reads)
+  void import('@/lib/services/projection-store').then(({ persistProjections }) =>
+    persistProjections(finalProjections)
+  ).catch(() => {/* non-critical */});
+
+  return finalProjections;
 }
 
 // ─── Card builders ────────────────────────────────────────────────────────────

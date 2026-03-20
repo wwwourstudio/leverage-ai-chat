@@ -2,9 +2,19 @@
  * Betting Edges Adapter
  * Converts HR/K projections into StatcastCard `hr_prop_card` compatible data
  * with fair odds vs market odds comparison.
+ *
+ * Market odds are sourced from the live Odds API `batter_home_runs` market via
+ * hr-prop-market.ts. Each fetch also records snapshots to line-movement-tracker
+ * so that future requests can detect sharp money signals.
+ * Falls back to a barrel-rate heuristic when live odds are unavailable.
  */
 
 import { runProjectionPipeline, type MLBProjectionCardData } from './projection-pipeline';
+import {
+  fetchHRPropMarketLines,
+  lookupHRPropOdds,
+  type HRPropMarketLine,
+} from './hr-prop-market';
 
 export interface BettingEdgeCardData {
   type: 'hr_prop_card';
@@ -27,11 +37,14 @@ export interface BettingEdgeCardData {
 export async function buildBettingEdgeCards(opts: { limit?: number; date?: string } = {}): Promise<BettingEdgeCardData[]> {
   const { limit = 6 } = opts;
 
-  const projections = await runProjectionPipeline({
-    playerType: 'hitter',  // HR props are for hitters
-    limit: limit * 2,
-    date: opts.date,
-  });
+  // Fetch projections and live HR prop market odds in parallel
+  const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+  const [projections, propLines] = await Promise.all([
+    runProjectionPipeline({ playerType: 'hitter', limit: limit * 2, date: opts.date }),
+    apiKey
+      ? fetchHRPropMarketLines(apiKey).catch(() => new Map<string, HRPropMarketLine>())
+      : Promise.resolve(new Map<string, HRPropMarketLine>()),
+  ]);
 
   // Filter to players with meaningful HR upside
   const edgePlayers = projections
@@ -39,7 +52,7 @@ export async function buildBettingEdgeCards(opts: { limit?: number; date?: strin
     .sort((a, b) => b.projections.hr_proj - a.projections.hr_proj)
     .slice(0, limit);
 
-  return edgePlayers.map(proj => buildHRPropCard(proj));
+  return edgePlayers.map(proj => buildHRPropCard(proj, propLines));
 }
 
 /**
@@ -63,17 +76,23 @@ export async function buildKPropEdgeCards(opts: { limit?: number; date?: string 
 
 // ─── HR prop card ──────────────────────────────────────────────────────────────
 
-function buildHRPropCard(proj: MLBProjectionCardData): BettingEdgeCardData {
+function buildHRPropCard(
+  proj: MLBProjectionCardData,
+  propLines?: Map<string, HRPropMarketLine>,
+): BettingEdgeCardData {
   const hrProbGame = proj.projections.hr_proj;
 
   // Fair odds from model probability
   const fairOdds = probToAmericanOdds(hrProbGame);
 
-  // Market odds estimate: market typically prices HR props at ~8-12% (slightly vig-adjusted)
-  // In absence of live Odds API data, estimate based on barrel rate
+  // Market odds: use live Odds API data when available, fall back to barrel-rate estimate
   const barrelPct = parseFloat(proj.summary_metrics.find(m => m.label === 'Barrel Rate')?.value ?? '8') || 8;
-  const marketImpliedProb = Math.max(0.06, Math.min(0.18, barrelPct * 0.006 + 0.025));
-  const marketOdds = probToAmericanOdds(marketImpliedProb);
+  const liveLine  = propLines ? lookupHRPropOdds(propLines, proj.player_name) : null;
+  const isLiveOdds = !!liveLine;
+  const marketImpliedProb = liveLine
+    ? liveLine.impliedProb
+    : Math.max(0.06, Math.min(0.18, barrelPct * 0.006 + 0.025));
+  const marketOdds = liveLine ? liveLine.overOdds : probToAmericanOdds(marketImpliedProb);
 
   const edge = hrProbGame - marketImpliedProb;
   const edgePct = +(edge * 100).toFixed(1);
@@ -108,6 +127,7 @@ function buildHRPropCard(proj: MLBProjectionCardData): BettingEdgeCardData {
           metrics: [
             { label: 'Model HR Prob',    value: `${(hrProbGame * 100).toFixed(2)}%` },
             { label: 'Market Implied',   value: `${(marketImpliedProb * 100).toFixed(2)}%` },
+            { label: 'Market Source',    value: isLiveOdds ? `Live (${liveLine!.bookmaker})` : 'Estimated' },
             { label: 'Edge',             value: `${edgePct >= 0 ? '+' : ''}${edgePct}%` },
             { label: 'Fair Odds',        value: formatAmericanOdds(fairOdds) },
             { label: 'Kelly (25%)',      value: `${kelly}% bankroll` },

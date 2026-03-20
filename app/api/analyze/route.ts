@@ -568,6 +568,32 @@ export async function POST(request: NextRequest) {
             enrichedPrompt += `\n\n--- REAL LIVE ODDS DATA (use ONLY these numbers for odds/lines) ---\nSport: ${context.sport}\n\n${oddsPreview}\n--- END ODDS DATA ---`;
             serverFetchedOdds = true;
             console.log(`[v0] [ANALYZE] Server-fetched ${_serverEvents.length} ${context.sport} games from Odds API`);
+
+            // Query Supabase for notable line movements in the last 4 hours for this sport.
+            // These indicate where sharp money has been bet — valuable AI context.
+            try {
+              const { createClient: createSbClient } = await import('@/lib/supabase/server');
+              const _sb = await createSbClient();
+              const { data: _moves } = await _sb
+                .from('line_movement')
+                .select('game_id, market_type, bookmaker, old_odds, new_odds, updated_at')
+                .eq('sport', context.sport)
+                .gte('updated_at', new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString())
+                .order('updated_at', { ascending: false })
+                .limit(10);
+              if (_moves && _moves.length > 0) {
+                const sharpLines = _moves.map((m: any) => {
+                  const delta = (m.new_odds ?? 0) - (m.old_odds ?? 0);
+                  const direction = delta < 0 ? 'shortening ▼' : 'lengthening ▲';
+                  const isSharp  = Math.abs(delta) >= 20;
+                  return `  ${m.market_type} (${m.bookmaker}): ${m.old_odds > 0 ? '+' : ''}${m.old_odds} → ${m.new_odds > 0 ? '+' : ''}${m.new_odds} (${direction}${isSharp ? ' 🔥 SHARP' : ''})`;
+                }).join('\n');
+                enrichedPrompt += `\n\n--- RECENT LINE MOVEMENT (last 4h, ${context.sport}) ---\n${sharpLines}\n[Shortening ≥20pts = likely sharp money. Factor into your confidence/recommendation.]\n--- END LINE MOVEMENT ---`;
+                console.log(`[v0] [ANALYZE] Injected ${_moves.length} line movement signals`);
+              }
+            } catch {
+              // Non-critical — skip if Supabase is unavailable
+            }
           }
         } catch {
           // Non-fatal — fall through to Kalshi fallback below

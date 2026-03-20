@@ -202,6 +202,7 @@ const STATIC_FALLBACK_PLAYERS: NFBCPlayer[] = [
 
 let adpCache: NFBCPlayer[] | null = null;
 let lastFetched = 0;
+let adpFromDB = false;
 
 // ── Delimiter-agnostic parser ─────────────────────────────────────────────────
 
@@ -404,6 +405,12 @@ export async function loadADPFromSupabase(sport = 'mlb', allowStale = false): Pr
 export function clearADPCache(): void {
   adpCache = null;
   lastFetched = 0;
+  adpFromDB = false;
+}
+
+/** Returns true only when the current ADP data came from a real user upload in Supabase. */
+export function isADPFromUserUpload(): boolean {
+  return adpFromDB;
 }
 
 /**
@@ -432,16 +439,19 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
       purgeADPFromSupabase('mlb').catch(() => {});
       adpCache = STATIC_FALLBACK_PLAYERS;
       lastFetched = now;
+      adpFromDB = false;
       return STATIC_FALLBACK_PLAYERS;
     } else {
       console.log(`[v0] [ADP] Serving ${dbData.length} MLB players from Supabase (user upload)`);
       adpCache = dbData;
       lastFetched = now;
+      adpFromDB = true;
       return dbData;
     }
   }
 
   console.log(`[v0] [ADP] No MLB ADP upload found — serving static fallback (${STATIC_FALLBACK_PLAYERS.length} players)`);
+  adpFromDB = false;
   return STATIC_FALLBACK_PLAYERS;
 }
 

@@ -15,8 +15,8 @@
  */
 
 import type { InsightCard } from '@/lib/cards-generator';
-import { getProjections, currentSeasonFor } from '@/lib/fantasy/projections-cache';
-import { getADPData, type NFBCPlayer } from '@/lib/adp-data';
+import { getProjections, currentSeasonFor, currentNFBCDraftYear } from '@/lib/fantasy/projections-cache';
+import { getADPData, isADPFromUserUpload, type NFBCPlayer } from '@/lib/adp-data';
 
 // ============================================================================
 // Archived 2025 NFL season data (PPR, final season projections)
@@ -963,7 +963,9 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
 
   // ── MLB ──────────────────────────────────────────────────────────────────
   if (isMLB) {
-    const mlbSeason = currentSeasonFor('mlb');
+    // Use the draft year (always current calendar year) for the label so pre-season
+    // runs (Jan-Mar) show the upcoming season (e.g. 2026) rather than the previous one.
+    const mlbSeason = currentNFBCDraftYear();
 
     // 1. Try to use the user-uploaded NFBC ADP board as the primary player list.
     //    If unavailable fall back to the static MLB_PROJECTIONS_2025 snapshot.
@@ -973,7 +975,9 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
       const nfbcPlayers = await getADPData();
       if (nfbcPlayers.length > 10) {
         mlbPlayers = buildMLBFromNFBC(nfbcPlayers);
-        isNFBCData = true;
+        // Only flag as real NFBC data when it came from a user upload in Supabase,
+        // not when it is the built-in static fallback.
+        isNFBCData = isADPFromUserUpload();
       }
     } catch { /* fall back to static snapshot */ }
 

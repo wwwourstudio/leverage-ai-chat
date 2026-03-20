@@ -14,18 +14,6 @@
     },
     "app/api/picks/route.ts": {
       "maxDuration": 15
-    },
-    "app/api/cron/odds/route.ts": {
-      "maxDuration": 20
-    },
-    "app/api/cron/projections/route.ts": {
-      "maxDuration": 30
-    },
-    "app/api/cron/picks/route.ts": {
-      "maxDuration": 20
-    },
-    "app/api/cron/train/route.ts": {
-      "maxDuration": 60
     }
   },
   "crons": [
@@ -43,7 +31,7 @@
     },
     {
       "path": "/api/cron/projections",
-      "schedule": "0 */2 * * *"
+      "schedule": "0 0,8,16 * * *"
     },
     {
       "path": "/api/cron/picks",

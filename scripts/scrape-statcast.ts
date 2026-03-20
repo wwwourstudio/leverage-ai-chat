@@ -58,17 +58,21 @@ const SUPABASE_SERVICE_ROLE_KEY: string =
 
 const STATCAST_ERA_START = '2015-03-01';
 
-const START_DATE: string = (() => {
-  const raw = process.env.START_DATE || STATCAST_ERA_START;
-  return raw === 'earliest' ? STATCAST_ERA_START : raw;
-})();
-
-const END_DATE: string = (() => {
-  const raw = process.env.END_DATE;
-  if (raw) return raw;
+function yesterday(): string {
   const d = new Date();
   d.setDate(d.getDate() - 1);
   return d.toISOString().slice(0, 10);
+}
+
+const END_DATE: string = (() => {
+  const raw = process.env.END_DATE;
+  return raw || yesterday();
+})();
+
+const START_DATE: string = (() => {
+  const raw = process.env.START_DATE;
+  if (!raw) return END_DATE;                        // daily incremental default: yesterday only
+  return raw === 'earliest' ? STATCAST_ERA_START : raw;
 })();
 
 const CONCURRENT_REQUESTS: number = parseInt(process.env.CONCURRENT_REQUESTS ?? '4', 10);

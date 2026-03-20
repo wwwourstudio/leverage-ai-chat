@@ -202,6 +202,7 @@ const STATIC_FALLBACK_PLAYERS: NFBCPlayer[] = [
 
 let adpCache: NFBCPlayer[] | null = null;
 let lastFetched = 0;
+let adpFromDB = false;
 
 // ── Delimiter-agnostic parser ─────────────────────────────────────────────────
 
@@ -219,10 +220,21 @@ function normalisePlayerName(raw: string): string {
 }
 
 /**
- * Strip surrounding double-quotes from a CSV field value.
+ * Strip surrounding double-quotes from a TSV field value.
  */
 function stripQuotes(s: string): string {
   return s.replace(/^"|"$/g, '').trim();
+}
+
+/**
+ * Quote-aware CSV row tokenizer.
+ * Correctly handles fields like `"Ohtani, Shohei"` and `"UT,P"` without splitting on
+ * the commas inside the quotes — the standard NFBC export uses this format.
+ */
+function parseCsvRow(line: string): string[] {
+  return line.match(/("(?:[^"]|"")*"|[^,]*)(?:,|$)/g)
+    ?.map(c => c.replace(/,$/, '').replace(/^"|"$/g, '').replace(/""/g, '"').trim())
+    ?? line.split(',').map(c => c.trim());
 }
 
 /**
@@ -232,6 +244,9 @@ function stripQuotes(s: string): string {
  *
  * Expected columns (names may vary slightly): Rank, Player, ADP / Overall ADP,
  * Position(s) / Pos, Team
+ *
+ * For CSV format, uses a quote-aware tokenizer so player names like "Ohtani, Shohei"
+ * and multi-position strings like "UT,P" are kept as single fields.
  */
 export function parseTSV(raw: string): NFBCPlayer[] {
   const lines = raw.split('\n').filter(l => l.trim().length > 0);
@@ -240,7 +255,13 @@ export function parseTSV(raw: string): NFBCPlayer[] {
   // Auto-detect delimiter — TSV has tabs, CSV has commas
   const delimiter = lines[0].includes('\t') ? '\t' : ',';
 
-  const headers = lines[0].split(delimiter).map(h => stripQuotes(h).toLowerCase());
+  // For TSV, simple split is safe (player names never contain tabs).
+  // For CSV, use the quote-aware tokenizer so "Last, First" stays as one field.
+  const splitRow = delimiter === '\t'
+    ? (line: string) => line.split('\t').map(stripQuotes)
+    : parseCsvRow;
+
+  const headers = splitRow(lines[0]).map(h => h.toLowerCase());
 
   // Resolve column indices dynamically
   const col = (candidates: string[]): number => {
@@ -261,7 +282,7 @@ export function parseTSV(raw: string): NFBCPlayer[] {
   const players: NFBCPlayer[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(delimiter).map(stripQuotes);
+    const cols = splitRow(lines[i]);
     if (cols.length < 2) continue;
 
     const rawName = playerIdx !== -1 ? (cols[playerIdx] ?? '').trim() : '';
@@ -404,6 +425,12 @@ export async function loadADPFromSupabase(sport = 'mlb', allowStale = false): Pr
 export function clearADPCache(): void {
   adpCache = null;
   lastFetched = 0;
+  adpFromDB = false;
+}
+
+/** Returns true only when the current ADP data came from a real user upload in Supabase. */
+export function isADPFromUserUpload(): boolean {
+  return adpFromDB;
 }
 
 /**
@@ -432,16 +459,19 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
       purgeADPFromSupabase('mlb').catch(() => {});
       adpCache = STATIC_FALLBACK_PLAYERS;
       lastFetched = now;
+      adpFromDB = false;
       return STATIC_FALLBACK_PLAYERS;
     } else {
       console.log(`[v0] [ADP] Serving ${dbData.length} MLB players from Supabase (user upload)`);
       adpCache = dbData;
       lastFetched = now;
+      adpFromDB = true;
       return dbData;
     }
   }
 
   console.log(`[v0] [ADP] No MLB ADP upload found — serving static fallback (${STATIC_FALLBACK_PLAYERS.length} players)`);
+  adpFromDB = false;
   return STATIC_FALLBACK_PLAYERS;
 }
 

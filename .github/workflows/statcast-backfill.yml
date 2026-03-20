@@ -94,14 +94,60 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # ── 6. Verify DB connectivity ─────────────────────────────────────────────
+      #
+      #  DATABASE_URL must be one of these two Supabase formats:
+      #
+      #  A) Direct connection (recommended for scripts):
+      #     postgresql://postgres:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres
+      #
+      #  B) Pooler connection (note: username MUST include project ref):
+      #     postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:6543/postgres
+      #
+      #  Get the correct string from: Supabase Dashboard → Settings → Database
+      #  → "Connection string" (copy the URI, not the psql command).
+      #
       - name: Verify database connection
         run: |
           node -e "
+            const url = process.env.DATABASE_URL || '';
+            if (!url) { console.error('ERROR: DATABASE_URL secret is not set. Go to repo Settings → Secrets → Actions and add DATABASE_URL.'); process.exit(1); }
+            // Print URL structure without credentials for debugging
+            try {
+              const u = new URL(url);
+              const host = u.hostname;
+              const user = u.username;
+              const isPooler = host.includes('pooler.supabase.com');
+              const isDirect = host.includes('.supabase.co') && !isPooler;
+              console.log('  URL host :', host);
+              console.log('  URL user :', user);
+              console.log('  URL port :', u.port || '5432');
+              console.log('  Type     :', isPooler ? 'Pooler' : isDirect ? 'Direct' : 'Unknown');
+              if (isPooler && !user.includes('.')) {
+                console.error('');
+                console.error('CONFIG ERROR: Pooler URL detected but username does not include project ref.');
+                console.error('  Got     : ' + user);
+                console.error('  Expected: postgres.YOUR_PROJECT_REF');
+                console.error('');
+                console.error('Fix: In GitHub → Settings → Secrets → DATABASE_URL, use:');
+                console.error('  postgresql://postgres.PROJECT_REF:PASSWORD@' + host + ':' + (u.port||'6543') + '/postgres');
+                process.exit(1);
+              }
+            } catch (e) { console.error('DATABASE_URL is not a valid URL:', e.message); process.exit(1); }
             const { Pool } = require('pg');
-            const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+            const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
             pool.query('SELECT current_database()')
               .then(r => { console.log('DB OK:', r.rows[0].current_database); pool.end(); })
-              .catch(e => { console.error('DB FAIL:', e.message); process.exit(1); });
+              .catch(e => {
+                console.error('DB FAIL:', e.message);
+                if (e.message.includes('Tenant or user not found')) {
+                  console.error('');
+                  console.error('This error means your DATABASE_URL credentials are wrong for this Supabase project.');
+                  console.error('Go to: Supabase Dashboard → Settings → Database → Connection string → URI');
+                  console.error('Copy the full URI and update your GitHub secret DATABASE_URL.');
+                }
+                pool.end();
+                process.exit(1);
+              });
           "
 
       # ── 7. Run scraper ────────────────────────────────────────────────────────

@@ -71,7 +71,7 @@ jobs:
     # Only on the 10:00 full run or manual trigger
     if: |
       github.event_name == 'workflow_dispatch' && (inputs.job == 'projections' || inputs.job == 'all') ||
-      github.event_name == 'schedule' && (github.event.schedule == '0 10 * * *' || github.event.schedule == '0 3 * * *')
+      github.event_name == 'schedule' && github.event.schedule == '0 3 * * *'
     steps:
       - name: Call /api/cron/projections
         timeout-minutes: 5

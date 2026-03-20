@@ -215,6 +215,7 @@ async function parseCsvFile(filePath: string): Promise<RawRow[]> {
       trim:               true,
       relax_column_count: true,
       cast:               false,
+      bom:                true,   // strip UTF-8 BOM (﻿) that Baseball Savant sometimes emits
     };
     fs.createReadStream(filePath)
       .pipe(csvParse(opts))

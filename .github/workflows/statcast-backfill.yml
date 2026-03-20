@@ -8,17 +8,13 @@
 #   • Scheduled:  04:00 UTC daily (well after the last MLB west-coast game)
 #
 # REQUIRED SECRETS  (Settings → Secrets and variables → Actions → New secret)
-#   DATABASE_URL          Postgres connection string (Supabase direct connection)
+#   SUPABASE_URL              Your project URL: https://xxxx.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY Service role key (from Supabase → Settings → API)
 #
 # OPTIONAL VARS  (Settings → Secrets and variables → Actions → Variables)
 #   SCRAPER_START_DATE    Override START_DATE (e.g. "2024-04-01").
 #   SCRAPER_END_DATE      Override END_DATE.  Defaults to yesterday.
 #   SCRAPER_DRY_RUN       Set to "true" to run without DB writes (smoke-test).
-#
-# PERFORMANCE NOTE
-#   Full historical backfill may take 12–24 h.  The resume file is NOT
-#   persisted between runs in the default setup — run locally for resumable
-#   multi-day backfill or uncomment the cache steps below.
 # =============================================================================
 
 name: Statcast Backfill / Daily Ingest
@@ -51,14 +47,15 @@ jobs:
     timeout-minutes: 360    # 6 h — generous for large date ranges
 
     env:
-      NODE_ENV:            production
-      DATABASE_URL:        ${{ secrets.DATABASE_URL }}
-      START_DATE:          ${{ github.event.inputs.start_date || vars.SCRAPER_START_DATE || '' }}
-      END_DATE:            ${{ github.event.inputs.end_date   || vars.SCRAPER_END_DATE   || '' }}
-      DRY_RUN:             ${{ github.event.inputs.dry_run    || vars.SCRAPER_DRY_RUN    || 'false' }}
-      CONCURRENT_REQUESTS: '4'
-      BATCH_SIZE:          '500'
-      RESUME_FILE:         '.statcast_resume.json'
+      NODE_ENV:                 production
+      SUPABASE_URL:             ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      START_DATE:               ${{ github.event.inputs.start_date || vars.SCRAPER_START_DATE || '' }}
+      END_DATE:                 ${{ github.event.inputs.end_date   || vars.SCRAPER_END_DATE   || '' }}
+      DRY_RUN:                  ${{ github.event.inputs.dry_run    || vars.SCRAPER_DRY_RUN    || 'false' }}
+      CONCURRENT_REQUESTS:      '4'
+      BATCH_SIZE:               '50'
+      RESUME_FILE:              '.statcast_resume.json'
 
     steps:
       # ── 1. Checkout ──────────────────────────────────────────────────────────
@@ -78,93 +75,15 @@ jobs:
           node-version: '20'
           cache: 'pnpm'
 
-      # ── 4. (Optional) Restore resume file from cache ─────────────────────────
-      #  Uncomment to enable cross-run resume support.
-      #
-      # - name: Restore resume state cache
-      #   uses: actions/cache@v4
-      #   id: resume-cache
-      #   with:
-      #     path: .statcast_resume.json
-      #     key: statcast-resume-${{ runner.os }}-${{ github.run_id }}
-      #     restore-keys: statcast-resume-${{ runner.os }}-
-
-      # ── 5. Install dependencies ───────────────────────────────────────────────
+      # ── 4. Install dependencies ───────────────────────────────────────────────
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # ── 6. Verify DB connectivity ─────────────────────────────────────────────
-      #
-      #  DATABASE_URL must be one of these two Supabase formats:
-      #
-      #  A) Direct connection (recommended for scripts):
-      #     postgresql://postgres:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres
-      #
-      #  B) Pooler connection (note: username MUST include project ref):
-      #     postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:6543/postgres
-      #
-      #  Get the correct string from: Supabase Dashboard → Settings → Database
-      #  → "Connection string" (copy the URI, not the psql command).
-      #
-      - name: Verify database connection
-        run: |
-          node -e "
-            const url = process.env.DATABASE_URL || '';
-            if (!url) { console.error('ERROR: DATABASE_URL secret is not set. Go to repo Settings → Secrets → Actions and add DATABASE_URL.'); process.exit(1); }
-            // Print URL structure without credentials for debugging
-            try {
-              const u = new URL(url);
-              const host = u.hostname;
-              const user = u.username;
-              const isPooler = host.includes('pooler.supabase.com');
-              const isDirect = host.includes('.supabase.co') && !isPooler;
-              console.log('  URL host :', host);
-              console.log('  URL user :', user);
-              console.log('  URL port :', u.port || '5432');
-              console.log('  Type     :', isPooler ? 'Pooler' : isDirect ? 'Direct' : 'Unknown');
-              if (isPooler && !user.includes('.')) {
-                console.error('');
-                console.error('CONFIG ERROR: Pooler URL detected but username does not include project ref.');
-                console.error('  Got     : ' + user);
-                console.error('  Expected: postgres.YOUR_PROJECT_REF');
-                console.error('');
-                console.error('Fix: In GitHub → Settings → Secrets → DATABASE_URL, use:');
-                console.error('  postgresql://postgres.PROJECT_REF:PASSWORD@' + host + ':' + (u.port||'6543') + '/postgres');
-                process.exit(1);
-              }
-            } catch (e) { console.error('DATABASE_URL is not a valid URL:', e.message); process.exit(1); }
-            const { Pool } = require('pg');
-            const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
-            pool.query('SELECT current_database()')
-              .then(r => { console.log('DB OK:', r.rows[0].current_database); pool.end(); })
-              .catch(e => {
-                console.error('DB FAIL:', e.message);
-                if (e.message.includes('Tenant or user not found')) {
-                  console.error('');
-                  console.error('This error means your DATABASE_URL credentials are wrong for this Supabase project.');
-                  console.error('Go to: Supabase Dashboard → Settings → Database → Connection string → URI');
-                  console.error('Copy the full URI and update your GitHub secret DATABASE_URL.');
-                }
-                pool.end();
-                process.exit(1);
-              });
-          "
-
-      # ── 7. Run scraper ────────────────────────────────────────────────────────
+      # ── 5. Run scraper ────────────────────────────────────────────────────────
       - name: Run Statcast scraper
         run: pnpm scrape
 
-      # ── 8. (Optional) Save resume file to cache ───────────────────────────────
-      #  Uncomment if you uncommented step 4 above.
-      #
-      # - name: Save resume state cache
-      #   if: always()
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: .statcast_resume.json
-      #     key: statcast-resume-${{ runner.os }}-${{ github.run_id }}
-
-      # ── 9. Upload resume file as artifact (always, for debugging) ─────────────
+      # ── 6. Upload resume file as artifact (always, for debugging) ─────────────
       - name: Upload resume state artifact
         if: always()
         uses: actions/upload-artifact@v4

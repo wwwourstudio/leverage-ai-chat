@@ -39,15 +39,15 @@
     },
     {
       "path": "/api/cron/odds",
-      "schedule": "* * * * *"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron/projections",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 */2 * * *"
     },
     {
       "path": "/api/cron/picks",
-      "schedule": "*/5 * * * *"
+      "schedule": "30 * * * *"
     },
     {
       "path": "/api/cron/train",

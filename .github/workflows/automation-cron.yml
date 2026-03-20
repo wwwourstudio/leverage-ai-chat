@@ -1,0 +1,129 @@
+# =============================================================================
+# .github/workflows/automation-cron.yml
+#
+# Runs the four automation cron routes that can't be scheduled via
+# vercel.json on the free (Hobby) plan (2-cron limit).
+#
+# SCHEDULES
+#   04:00 UTC  odds + picks refresh  (after overnight line movements settle)
+#   10:00 UTC  odds + projections + picks refresh  (before afternoon games)
+#   17:00 UTC  odds + picks refresh  (prime-time lines)
+#   03:00 UTC  training run  (after all games finish)
+#
+# REQUIRED SECRETS  (Settings → Secrets and variables → Actions → New secret)
+#   CRON_SECRET   Same value as the CRON_SECRET env var in your Vercel project
+#   APP_URL       Your Vercel deployment URL, e.g. https://v0-leverage-ai-chat.vercel.app
+#
+# MANUAL TRIGGER
+#   Actions → "Automation Cron Jobs" → Run workflow → choose job
+# =============================================================================
+
+name: Automation Cron Jobs
+
+on:
+  schedule:
+    # Odds + picks refresh — 3× daily  (UTC: 04:00, 10:00, 17:00)
+    - cron: '0 4  * * *'
+    - cron: '0 10 * * *'
+    - cron: '0 17 * * *'
+    # Full run (includes projections + training) — daily at 03:00 UTC
+    - cron: '0 3  * * *'
+
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Which job to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - odds
+          - projections
+          - picks
+          - train
+
+jobs:
+  # ── Odds ingest ──────────────────────────────────────────────────────────────
+  odds:
+    name: Odds Ingest
+    runs-on: ubuntu-latest
+    # Skip at 03:00 UTC (train-only run) unless manually triggered
+    if: |
+      github.event_name == 'workflow_dispatch' && (inputs.job == 'odds' || inputs.job == 'all') ||
+      github.event_name == 'schedule' && github.event.schedule != '0 3 * * *'
+    steps:
+      - name: Call /api/cron/odds
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/odds")
+          echo "Response: $STATUS"
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+            echo "::error::odds cron returned HTTP $STATUS"
+            exit 1
+          fi
+
+  # ── MLB projections refresh ──────────────────────────────────────────────────
+  projections:
+    name: MLB Projections
+    runs-on: ubuntu-latest
+    # Only on the 10:00 full run or manual trigger
+    if: |
+      github.event_name == 'workflow_dispatch' && (inputs.job == 'projections' || inputs.job == 'all') ||
+      github.event_name == 'schedule' && (github.event.schedule == '0 10 * * *' || github.event.schedule == '0 3 * * *')
+    steps:
+      - name: Call /api/cron/projections
+        timeout-minutes: 5
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 280 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/projections")
+          echo "Response: $STATUS"
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+            echo "::error::projections cron returned HTTP $STATUS"
+            exit 1
+          fi
+
+  # ── Picks re-score + enrol ───────────────────────────────────────────────────
+  picks:
+    name: Picks Refresh
+    runs-on: ubuntu-latest
+    needs: odds
+    # Run after odds on all schedule triggers, or manual
+    if: |
+      always() &&
+      (github.event_name == 'workflow_dispatch' && (inputs.job == 'picks' || inputs.job == 'all') ||
+       github.event_name == 'schedule' && github.event.schedule != '0 3 * * *')
+    steps:
+      - name: Call /api/cron/picks
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/picks")
+          echo "Response: $STATUS"
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+            echo "::error::picks cron returned HTTP $STATUS"
+            exit 1
+          fi
+
+  # ── Model training ───────────────────────────────────────────────────────────
+  train:
+    name: Model Training
+    runs-on: ubuntu-latest
+    # Only on the 03:00 UTC run or manual trigger
+    if: |
+      github.event_name == 'workflow_dispatch' && (inputs.job == 'train' || inputs.job == 'all') ||
+      github.event_name == 'schedule' && github.event.schedule == '0 3 * * *'
+    steps:
+      - name: Call /api/cron/train
+        timeout-minutes: 2
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 55 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/train")
+          echo "Response: $STATUS"
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+            echo "::error::train cron returned HTTP $STATUS"
+            exit 1
+          fi

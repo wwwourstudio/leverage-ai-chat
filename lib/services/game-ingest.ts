@@ -1,17 +1,19 @@
 /**
  * Game Ingest Service
  *
- * Persists MLB Stats API game schedule data to `teams`, `players`, and `games`
- * tables so downstream queries can join by stable IDs rather than fuzzy names.
+ * Persists MLB Stats API game schedule data to `teams`, `players`, and
+ * `mlb_games` tables so downstream queries can join by stable IDs rather than
+ * fuzzy names.  Uses mlb_games (not games) to avoid conflict with the existing
+ * api.games table used by the odds / arbitrage infrastructure.
  *
  * Called fire-and-forget from projection-pipeline.ts after each successful
  * `fetchTodaysGames()` call.  All errors are swallowed — ingest failures must
  * never block the pick-generation pipeline.
  *
  * Upsert keys:
- *   teams   → id (abbreviation)
- *   players → id (MLBAM ID as text)
- *   games   → id (gamePk as text)
+ *   teams     → id (abbreviation)
+ *   players   → id (MLBAM ID as text)
+ *   mlb_games → id (gamePk as text)
  */
 
 import { getIngestClient } from './ingest-client.server';
@@ -121,10 +123,10 @@ async function upsertGames(db: any, games: MLBGame[]): Promise<void> {
   }));
 
   const { error } = await db
-    .from('games')
+    .from('mlb_games')
     .upsert(rows, { onConflict: 'id', ignoreDuplicates: false });
 
-  if (error) console.warn('[game-ingest] games upsert failed:', error.message);
+  if (error) console.warn('[game-ingest] mlb_games upsert failed:', error.message);
 }
 
 // ── Public entry point ────────────────────────────────────────────────────────
@@ -144,7 +146,7 @@ export async function persistGames(games: MLBGame[]): Promise<void> {
     await upsertTeams(db, games);
     await upsertPlayers(db, games);
     await upsertGames(db, games);
-    console.log(`[game-ingest] Persisted ${games.length} games, teams, and lineup players`);
+    console.log(`[game-ingest] Persisted ${games.length} mlb_games, teams, and lineup players`);
   } catch (err) {
     console.warn('[game-ingest] Unexpected error:', err instanceof Error ? err.message : String(err));
   }
@@ -163,9 +165,9 @@ export async function updateGameWeather(
   if (!db) return;
 
   const { error } = await db
-    .from('games')
+    .from('mlb_games')
     .update({ weather, updated_at: new Date().toISOString() })
     .eq('id', String(gamePk));
 
-  if (error) console.warn('[game-ingest] weather update failed:', error.message);
+  if (error) console.warn('[game-ingest] mlb_games weather update failed:', error.message);
 }

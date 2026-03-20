@@ -9,7 +9,7 @@
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
-    "scrape": "ts-node --project tsconfig.json --transpile-only scripts/scrape-statcast.ts"
+    "scrape": "ts-node --project tsconfig.scripts.json --transpile-only scripts/scrape-statcast.ts"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.0",

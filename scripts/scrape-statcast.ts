@@ -345,16 +345,12 @@ async function main(): Promise<void> {
     auth: { persistSession: false },
   });
 
-  // Quick connectivity test via RPC
+  // Quick connectivity test — any response (even a DB error) means we're connected
   console.log('  Testing Supabase connection...');
-  const { error: testError } = await supabase.rpc('upsert_statcast_event', {
-    p_row: { sv_id: '__connection_test__' },
-  });
-  // The function will throw a DB error (sv_id is not a real event) but as long
-  // as we get a response (even an error) the connection is working.
-  // A null error here means the test row was accepted — unlikely but fine.
-  if (testError && testError.message.includes('fetch')) {
-    console.error('FATAL: Cannot reach Supabase:', testError.message);
+  try {
+    await supabase.rpc('upsert_statcast_event', { p_row: { sv_id: '__connection_test__' } });
+  } catch (testErr) {
+    console.error('FATAL: Cannot reach Supabase:', (testErr as Error).message);
     process.exit(1);
   }
   console.log('  DB connected ✓');

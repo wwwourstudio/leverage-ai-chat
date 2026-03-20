@@ -57,10 +57,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as https from 'https';
 import { URL } from 'url';
-import { parse as csvParse, Options as CsvOptions } from 'csv-parse';
-import { Pool, PoolClient } from 'pg';
+import { parse as csvParse } from 'csv-parse';
+import type { Options as CsvOptions } from 'csv-parse';
+import { Pool } from 'pg';
+import type { PoolClient } from 'pg';
 import Bottleneck from 'bottleneck';
-import pRetry, { FailedAttemptError } from 'p-retry';
+import pRetry from 'p-retry';
+import type { FailedAttemptError } from 'p-retry';
 import 'dotenv/config';
 
 // =============================================================================

@@ -491,14 +491,15 @@ export async function POST(request: NextRequest) {
       enrichedPrompt += `\n\n[Context: User is asking about ${context.sport.toUpperCase()} — provide expert analysis using your knowledge. No live odds needed for this question.]`;
     } else if (context.isPoliticalMarket || context.selectedCategory === 'kalshi') {
       // Pre-fetch actual Kalshi markets so the AI describes real data, not hallucinated markets.
-      // The 60s in-memory cache means card generation (running in parallel) reuses this data
-      // at zero extra API cost. A 3s timeout prevents blocking the AI call on a slow fetch.
+      // Fetch 50 markets (matching the card generator's needs) so the 60s in-memory cache is
+      // warm enough for card generation to reuse without a second API call.
+      // A 3s timeout prevents blocking the AI call on a slow fetch.
       try {
         const { fetchElectionMarkets, fetchKalshiMarketsWithRetry } = await import('@/lib/kalshi/index');
         const sub = (context.kalshiSubcategory || '').toLowerCase();
         const fetchMarkets = sub === 'politics' || sub === 'elections' || sub === 'election'
-          ? fetchElectionMarkets({ limit: 10 })
-          : fetchKalshiMarketsWithRetry({ limit: 10, maxRetries: 1 });
+          ? fetchElectionMarkets({ limit: 50 })
+          : fetchKalshiMarketsWithRetry({ limit: 50, maxRetries: 1 });
         const markets = await Promise.race([
           fetchMarkets,
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
@@ -787,7 +788,7 @@ export async function POST(request: NextRequest) {
       keys: {
         XAI_API_KEY:    !!xaiApiKey,
         ODDS_API_KEY:   !!oddsApiKey,
-        KALSHI_API_KEY: !!(process.env.KALSHI_API_KEY),
+        KALSHI_API_KEY: !!(process.env.KALSHI_API_KEY_ID && process.env.KALSHI_PRIVATE_KEY),
       },
     });
     let aiText = '';

@@ -452,6 +452,9 @@ export async function POST(request: NextRequest) {
     // Holds Kalshi sports markets fetched during prompt enrichment so the card
     // pipeline can reuse them without a second API call.
     let kalshiSportsFallbackMarkets: any[] | null = null;
+    // Track which data sources were actually injected into the AI prompt (for pipeline log)
+    let serverFetchedOdds = false;
+    let statcastInjected = false;
 
     if (context.oddsData?.events?.length > 0) {
       const oddsPreview = context.oddsData.events
@@ -524,7 +527,57 @@ export async function POST(request: NextRequest) {
         enrichedPrompt += `\n\n[Context: This is a Kalshi prediction market query. Answer directly with prediction market analysis, probability edge, and trading recommendations. Do NOT ask the user to choose a sports platform or area — the user is already on the Kalshi tab. Analyze the specific market or topic asked about.]`;
       }
     } else if (context.hasBettingIntent && context.sport && !context.isPoliticalMarket && !hasADPIntent) {
-      // Odds API returned no games for this sport — use Kalshi sports markets as an
+      // Client didn't include live odds — try fetching from the Odds API server-side first.
+      // This covers cases where the user typed directly in chat without the UI pre-fetching odds.
+      const _oddsKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+      if (_oddsKey && context.sport !== 'none') {
+        try {
+          const { fetchLiveOdds } = await import('@/lib/odds/index');
+          const _serverEvents = await Promise.race([
+            fetchLiveOdds(context.sport, { apiKey: _oddsKey, markets: ['h2h', 'spreads', 'totals'], regions: ['us'], oddsFormat: 'american' }),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
+          ]).catch(() => null);
+          if (Array.isArray(_serverEvents) && _serverEvents.length > 0) {
+            const oddsPreview = (_serverEvents as any[])
+              .slice(0, 8)
+              .map((e: any) => {
+                const lines: string[] = [`${e.away_team} @ ${e.home_team}`];
+                for (const book of (e.bookmakers || []).slice(0, 2)) {
+                  const h2h    = book.markets?.find((m: any) => m.key === 'h2h');
+                  const spread = book.markets?.find((m: any) => m.key === 'spreads');
+                  const total  = book.markets?.find((m: any) => m.key === 'totals');
+                  if (h2h) {
+                    const home = h2h.outcomes?.find((o: any) => o.name === e.home_team);
+                    const away = h2h.outcomes?.find((o: any) => o.name === e.away_team);
+                    lines.push(`  ML (${book.title}): ${e.away_team} ${(away?.price ?? 0) > 0 ? '+' : ''}${away?.price ?? 'N/A'} | ${e.home_team} ${(home?.price ?? 0) > 0 ? '+' : ''}${home?.price ?? 'N/A'}`);
+                  }
+                  if (spread) {
+                    const home = spread.outcomes?.find((o: any) => o.name === e.home_team);
+                    const away = spread.outcomes?.find((o: any) => o.name === e.away_team);
+                    lines.push(`  Spread (${book.title}): ${e.away_team} ${(away?.point ?? 0) > 0 ? '+' : ''}${away?.point ?? ''} (${(away?.price ?? 0) > 0 ? '+' : ''}${away?.price ?? 'N/A'}) | ${e.home_team} ${(home?.point ?? 0) > 0 ? '+' : ''}${home?.point ?? ''} (${(home?.price ?? 0) > 0 ? '+' : ''}${home?.price ?? 'N/A'})`);
+                  }
+                  if (total) {
+                    const over  = total.outcomes?.find((o: any) => o.name === 'Over');
+                    const under = total.outcomes?.find((o: any) => o.name === 'Under');
+                    lines.push(`  Total (${book.title}): O${over?.point ?? ''} (${(over?.price ?? 0) > 0 ? '+' : ''}${over?.price ?? 'N/A'}) | U${under?.point ?? ''} (${(under?.price ?? 0) > 0 ? '+' : ''}${under?.price ?? 'N/A'})`);
+                  }
+                }
+                return lines.join('\n');
+              })
+              .join('\n\n');
+            enrichedPrompt += `\n\n--- REAL LIVE ODDS DATA (use ONLY these numbers for odds/lines) ---\nSport: ${context.sport}\n\n${oddsPreview}\n--- END ODDS DATA ---`;
+            serverFetchedOdds = true;
+            console.log(`[v0] [ANALYZE] Server-fetched ${_serverEvents.length} ${context.sport} games from Odds API`);
+          }
+        } catch {
+          // Non-fatal — fall through to Kalshi fallback below
+        }
+      }
+
+      if (serverFetchedOdds) {
+        // Odds API delivered real lines — no need for Kalshi fallback
+      } else {
+      // Odds API returned no games or key missing — use Kalshi sports markets as an
       // independent probability signal (win/loss futures, player props, championship markets).
       // Skip for ADP queries: the NFBC system prompt + ADP tool already provides the right context.
       // Maps the internal sport key to the search term Kalshi understands.
@@ -563,12 +616,52 @@ export async function POST(request: NextRequest) {
         console.warn(`[KALSHI] Sports market fetch failed for ${sportKw}:`, err instanceof Error ? err.message : String(err));
         enrichedPrompt += `\n\n[Context: Live ${context.sport.toUpperCase()} sportsbook odds are unavailable. Provide expert betting analysis and value picks from your knowledge.]`;
       }
+      } // end else (Kalshi fallback when Odds API had no data)
     } else if (hasADPIntent && context.sport) {
       // ADP/draft query — NFBC system prompt + ADP tool provide all context; no odds data needed
       enrichedPrompt += `\n\n[Context: Fantasy draft/ADP query for ${context.sport.toUpperCase()}. Use the query_adp tool and your NFBC expertise to answer. Focus on draft value, positional scarcity, and roster construction — not sportsbook odds.]`;
     } else if (!context.hasBettingIntent && !context.sport && !context.isPoliticalMarket) {
       // General question — answer from knowledge
       enrichedPrompt += `\n\n[Context: General question — answer with your full expert knowledge about sports betting, fantasy, DFS, or prediction markets as appropriate.]`;
+    }
+
+    // ── Statcast enrichment for MLB queries ───────────────────────────────────
+    // Inject top barrel rate / exit velocity leaders so the AI has real Statcast
+    // context for any MLB question, not just explicit Statcast-mode queries.
+    // Skipped for ADP and non-MLB queries.
+    if (isMLBQuery && !hasADPIntent && !context.isPoliticalMarket) {
+      try {
+        const { getStatcastData, queryStatcast } = await import('@/lib/baseball-savant');
+        const { players: statcastPlayers } = await Promise.race([
+          getStatcastData(),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)),
+        ]);
+        if (statcastPlayers.length > 0) {
+          // Top 5 batters by barrel rate
+          const batters = queryStatcast(statcastPlayers, { playerType: 'batter', limit: 5 })
+            .sort((a, b) => b.barrelRate - a.barrelRate);
+          // Top 5 pitchers by lowest xSLG allowed
+          const pitchers = queryStatcast(statcastPlayers, { playerType: 'pitcher', limit: 5 })
+            .sort((a, b) => a.xslg - b.xslg);
+          const fmtB = (p: (typeof batters)[0]) =>
+            `  ${p.name}: Barrel% ${p.barrelRate.toFixed(1)}, xwOBA ${p.xwoba.toFixed(3)}, HardHit% ${p.hardHitPct.toFixed(1)}, ExitVelo ${p.exitVelocity.toFixed(1)} mph`;
+          const fmtP = (p: (typeof pitchers)[0]) =>
+            `  ${p.name}: xSLG-allowed ${p.xslg.toFixed(3)}, Barrel%-allowed ${p.barrelRate.toFixed(1)}, xwOBA-against ${p.xwoba.toFixed(3)}`;
+          const section = [
+            `--- MLB STATCAST LEADERS (${new Date().getFullYear() - (new Date().getMonth() + 1 >= 4 ? 0 : 1)} season) ---`,
+            'Top Batters by Barrel Rate:',
+            ...batters.map(fmtB),
+            'Top Pitchers (lowest xSLG allowed):',
+            ...pitchers.map(fmtP),
+            '--- END STATCAST ---',
+          ].join('\n');
+          enrichedPrompt += `\n\n${section}`;
+          statcastInjected = true;
+          console.log(`[v0] [ANALYZE] Injected Statcast leaders: ${batters.length} batters, ${pitchers.length} pitchers`);
+        }
+      } catch {
+        // Non-critical — skip if Baseball Savant is unreachable
+      }
     }
 
     // Market Intelligence signal injection (non-blocking, 2s timeout)
@@ -666,7 +759,7 @@ export async function POST(request: NextRequest) {
 
       } else if (!context.isPoliticalMarket && context.selectedCategory === 'dfs') {
         // DFS tab: fetch real player prop lines
-        cardFetchPromise = generateContextualCards('dfs', context.sport ?? undefined, 3).catch(() => []);
+        cardFetchPromise = generateContextualCards('dfs', context.sport ?? undefined, 6).catch(() => []);
 
       } else if (!context.isPoliticalMarket && (context.hasFantasyIntent || hasADPIntent) && (!context.hasBettingIntent || context.selectedCategory === 'fantasy' || hasADPIntent)) {
         // Fantasy: warm projection cache (fire-and-forget) then generate fantasy cards
@@ -687,12 +780,12 @@ export async function POST(request: NextRequest) {
             });
         }
         cardFetchPromise = import('@/lib/fantasy/cards/fantasy-card-generator')
-          .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 3, context.sport ?? undefined, {
+          .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 6, context.sport ?? undefined, {
             teamCount: context.leagueSize ?? undefined,
             scoringFormat: context.leagueScoringFormat ?? undefined,
             isStartSit: hasStartSitIntent,
           }))
-          .catch(() => generateContextualCards('fantasy', context.sport ?? undefined, 3).catch(() => []));
+          .catch(() => generateContextualCards('fantasy', context.sport ?? undefined, 6).catch(() => []));
 
       } else if (!context.isPoliticalMarket && context.hasPlayerIntent) {
         // Player-specific: Statcast/VPE cards.
@@ -770,10 +863,10 @@ export async function POST(request: NextRequest) {
       model:    primaryModel,
       fastPath: useFastPath,
       sources: {
-        odds:        hasClientOddsData,
+        odds:        hasClientOddsData || serverFetchedOdds,
         kalshi:      !!(kalshiSportsFallbackMarkets?.length) || context.isPoliticalMarket || context.selectedCategory === 'kalshi',
         adp:         hasADPIntent,
-        statcast:    expectsStatcastJSON,
+        statcast:    expectsStatcastJSON || statcastInjected,
         projections: hasMLBProjectionIntent,
         fantasy:     !!(context.hasFantasyIntent),
       },

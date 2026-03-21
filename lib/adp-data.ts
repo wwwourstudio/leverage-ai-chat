@@ -263,8 +263,18 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 
   const headers = splitRow(lines[0]).map(h => h.toLowerCase());
 
-  // Resolve column indices dynamically
+  // Resolve column indices dynamically.
+  // Strategy: exact match first, then "ends with" (so "overall adp" matches "adp" but
+  // "player id" does NOT match "player"), then full substring fallback.
   const col = (candidates: string[]): number => {
+    for (const c of candidates) {
+      const exact = headers.findIndex(h => h === c);
+      if (exact !== -1) return exact;
+    }
+    for (const c of candidates) {
+      const endsWith = headers.findIndex(h => h.endsWith(` ${c}`));
+      if (endsWith !== -1) return endsWith;
+    }
     for (const c of candidates) {
       const idx = headers.findIndex(h => h.includes(c));
       if (idx !== -1) return idx;
@@ -292,7 +302,14 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 
     const rank      = rankIdx  !== -1 ? parseInt(cols[rankIdx]  ?? '', 10) : i;
     const adp       = adpIdx   !== -1 ? parseFloat(cols[adpIdx] ?? '')     : rank;
-    const positions = posIdx   !== -1 ? (cols[posIdx]  ?? '').trim()       : '';
+    // Normalise SHGN position abbreviations to NFBC/standard fantasy format:
+    //   "P"  → "SP"  (SHGN uses "P" for pitchers, fantasy tools expect "SP")
+    //   remove spaces after commas so "UT, P" → "UT,P"
+    const rawPos    = posIdx   !== -1 ? (cols[posIdx]  ?? '').trim()       : '';
+    const positions = rawPos
+      .split(',')
+      .map(p => { const s = p.trim(); return s === 'P' ? 'SP' : s; })
+      .join(',');
     const team      = teamIdx  !== -1 ? (cols[teamIdx] ?? '').trim()       : '';
 
     const safeRank  = isNaN(rank) ? i : rank;

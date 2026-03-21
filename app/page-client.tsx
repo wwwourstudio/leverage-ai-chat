@@ -776,7 +776,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     return () => { cancelled = true; };
   }, [selectedCategory, selectedSport]);
 
-  const generateContextualSuggestions = (userMessage: string, responseCards: InsightCard[]) => {
+  const generateContextualSuggestions = useCallback((userMessage: string, responseCards: InsightCard[]) => {
     const msgLower = userMessage.toLowerCase();
     const suggestions: Array<{ label: string; icon: any; category: string }> = [];
 
@@ -1016,7 +1016,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
     // Return 5-7 unique suggestions for optimal UX
     return uniqueSuggestions.slice(0, 7);
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory]);
 
   const handleFollowUp = (action: 'correlated' | 'metrics', cardData?: any) => {
     console.log('[v0] Generating follow-up response:', action);
@@ -1195,11 +1196,14 @@ No preamble. Start directly with section 1.`;
       hasBettingIntent: ['betting', 'odds', 'moneyline', 'spread', 'totals', 'arbitrage'].includes(cardType),
     };
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userMessage: prompt, context }),
+        signal: controller.signal,
       });
       let result: APIResponse;
       if (!res.ok) {
@@ -1236,8 +1240,14 @@ No preamble. Start directly with section 1.`;
         return;
       }
       setCardAnalysisMap((prev: any) => ({ ...prev, [cardKey]: { loading: false, content: result.text ?? null, error: null } }));
-    } catch {
-      setCardAnalysisMap((prev: any) => ({ ...prev, [cardKey]: { loading: false, content: null, error: 'Network error — please try again' } }));
+    } catch (err: unknown) {
+      const isAbort = err instanceof Error && err.name === 'AbortError';
+      setCardAnalysisMap((prev: any) => ({
+        ...prev,
+        [cardKey]: { loading: false, content: null, error: isAbort ? 'Request timed out — please try again' : 'Network error — please try again' },
+      }));
+    } finally {
+      clearTimeout(timeoutId);
     }
   };
 

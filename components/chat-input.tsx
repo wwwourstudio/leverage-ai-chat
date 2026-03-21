@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, type FormEvent } from 'react';
+import { useState, useRef, useEffect, type FormEvent } from 'react';
 import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles } from 'lucide-react';
 
 interface FileAttachment {
@@ -34,6 +34,8 @@ interface ChatInputProps {
   placeholder?: string;
 }
 
+const MAX_CHARS = 2000;
+
 export function ChatInput({
   input,
   onInputChange,
@@ -54,51 +56,64 @@ export function ChatInput({
 }: ChatInputProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const defaultPlaceholder = lastUserQuery
-    ? `Follow up on your ${lastUserQuery.toLowerCase().includes('nba') ? 'NBA' : lastUserQuery.toLowerCase().includes('nfl') ? 'NFL' : lastUserQuery.toLowerCase().includes('kalshi') ? 'Kalshi' : lastUserQuery.toLowerCase().includes('dfs') ? 'DFS' : lastUserQuery.toLowerCase().includes('fantasy') ? 'fantasy' : 'sports'} analysis or ask something new...`
-    : 'Ask about betting odds, fantasy, DFS, or Kalshi markets...';
+  // Auto-resize textarea height as content grows (max ~6 lines / 160px)
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+  }, [input]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+  const defaultPlaceholder = placeholder ?? (lastUserQuery
+    ? `Follow up on your ${
+        lastUserQuery.toLowerCase().includes('nba') ? 'NBA' :
+        lastUserQuery.toLowerCase().includes('nfl') ? 'NFL' :
+        lastUserQuery.toLowerCase().includes('kalshi') ? 'Kalshi' :
+        lastUserQuery.toLowerCase().includes('dfs') ? 'DFS' :
+        lastUserQuery.toLowerCase().includes('fantasy') ? 'fantasy' : 'sports'
+      } analysis or ask something new...`
+    : selectedCategory === 'fantasy'
+      ? 'Ask about draft picks, waiver wire, ADP values...'
+      : selectedCategory === 'dfs'
+        ? 'Build a DFS lineup, find value plays, compare salaries...'
+        : selectedCategory === 'kalshi'
+          ? 'Ask about prediction markets, implied odds, edge...'
+          : 'Ask about betting odds, fantasy, DFS, or Kalshi markets...');
+
+  // Enter = submit, Shift+Enter = newline
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       onSubmit(e as unknown as FormEvent);
     }
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); };
+  const handleDragEnter = (e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); };
   const handleDragLeave = (e: React.DragEvent) => {
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setIsDragOver(false);
-    }
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false);
   };
-
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
     const dropped = await onFileDrop(e.dataTransfer.files);
-    if (dropped.length > 0) {
-      onFilesAdded(dropped);
-    }
+    if (dropped.length > 0) onFilesAdded(dropped);
   };
+
+  const charsLeft = MAX_CHARS - input.length;
+  const nearLimit = charsLeft <= 200;
+  const overLimit = charsLeft < 0;
 
   return (
     <>
-      {/* File Upload Preview */}
+      {/* File attachment previews */}
       {uploadedFiles.length > 0 && (
-        <div className="mb-4 space-y-2">
-          <div className="flex items-center gap-2 mb-2">
-            <Paperclip className="w-4 h-4 text-blue-400" />
-            <span className="text-xs font-bold text-[var(--text-muted)]">
+        <div className="mb-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <Paperclip className="w-3.5 h-3.5 text-blue-400" />
+            <span className="text-xs font-semibold text-[var(--text-muted)]">
               {uploadedFiles.length} file{uploadedFiles.length !== 1 ? 's' : ''} attached
             </span>
           </div>
@@ -106,33 +121,26 @@ export function ChatInput({
             {uploadedFiles.map((file) => (
               <div
                 key={file.id}
-                className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl group/file hover:border-[oklch(0.30_0.02_280)] transition-all"
+                className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl group/file hover:border-[var(--border-hover)] transition-colors"
               >
-                {file.type === 'image' ? (
-                  <ImageIcon className="w-4 h-4 text-blue-400" />
-                ) : (
-                  <FileText className="w-4 h-4 text-green-400" />
-                )}
-                <span className="text-xs font-bold text-white/80 max-w-[120px] truncate">
-                  {file.name}
-                </span>
-                <span className="text-xs text-[var(--text-muted)]">
-                  {(file.size / 1024).toFixed(1)} KB
-                </span>
-                {/* Save to profile */}
+                {file.type === 'image'
+                  ? <ImageIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  : <FileText className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                <span className="text-xs font-medium text-foreground/80 max-w-[120px] truncate">{file.name}</span>
+                <span className="text-[10px] text-[var(--text-faint)]">{(file.size / 1024).toFixed(1)} KB</span>
                 <button
                   onClick={() => onSaveFile(file)}
-                  className="p-1 hover:bg-blue-900/40 rounded transition-all"
-                  title="Save file to profile"
+                  className="p-0.5 rounded hover:bg-blue-900/40 transition-colors"
+                  title="Save to profile"
                 >
-                  <Bookmark className="w-3.5 h-3.5 text-[var(--text-muted)] hover:text-blue-400" />
+                  <Bookmark className="w-3 h-3 text-[var(--text-muted)] hover:text-blue-400" />
                 </button>
                 <button
                   onClick={() => onRemoveFile(file.id)}
-                  className="p-1 hover:bg-gray-700/50 rounded transition-all"
-                  title="Remove file"
+                  className="p-0.5 rounded hover:bg-white/10 transition-colors"
+                  title="Remove"
                 >
-                  <X className="w-3.5 h-3.5 text-[var(--text-muted)] hover:text-red-400" />
+                  <X className="w-3 h-3 text-[var(--text-muted)] hover:text-red-400" />
                 </button>
               </div>
             ))}
@@ -140,7 +148,7 @@ export function ChatInput({
         </div>
       )}
 
-      {/* Drag-and-drop + form wrapper */}
+      {/* Drag-and-drop + form */}
       <div
         onDragOver={handleDragOver}
         onDragEnter={handleDragEnter}
@@ -151,15 +159,15 @@ export function ChatInput({
         {isDragOver && (
           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed border-blue-500/60 bg-blue-500/10 pointer-events-none">
             <div className="flex flex-col items-center gap-1">
-              <Paperclip className="w-6 h-6 text-blue-400" />
-              <span className="text-sm font-bold text-blue-300">Drop files here</span>
-              <span className="text-xs text-blue-400/70">Images, CSV, TXT, JSON</span>
+              <Paperclip className="w-5 h-5 text-blue-400" />
+              <span className="text-sm font-semibold text-blue-300">Drop files here</span>
+              <span className="text-xs text-blue-400/70">Images, CSV, TSV, TXT, JSON</span>
             </div>
           </div>
         )}
 
         <form onSubmit={onSubmit} className="flex items-end gap-2 md:gap-3">
-          {/* Hidden File Input */}
+          {/* Hidden file input */}
           <input
             ref={fileInputRef}
             type="file"
@@ -169,93 +177,109 @@ export function ChatInput({
             className="hidden"
           />
 
-          {/* Attach button — hidden on mobile (moved to status bar row below) */}
-
+          {/* Textarea wrapper */}
           <div className="flex-1 relative group/input focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:shadow-lg focus-within:shadow-blue-500/10 rounded-2xl transition-all duration-300">
-            <input
-              type="text"
+            <textarea
+              ref={textareaRef}
+              rows={1}
               value={input}
-              onChange={(e: any) => onInputChange(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value.length <= MAX_CHARS) onInputChange(e.target.value);
+              }}
               onKeyDown={handleKeyDown}
-              placeholder={placeholder ?? defaultPlaceholder}
-              className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[oklch(0.28_0.02_280)] focus:border-blue-500/40 rounded-2xl px-3 py-2.5 md:px-6 md:pr-32 font-medium text-white placeholder-[var(--text-faint)] focus:outline-none transition-all backdrop-blur-sm shadow-inner text-xs md:text-base"
+              placeholder={defaultPlaceholder}
               disabled={isTyping}
-              maxLength={500}
-              style={{ minHeight: '44px' }}
+              className="w-full resize-none bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[oklch(0.28_0.02_280)] focus:border-blue-500/40 rounded-2xl px-3 py-2.5 md:px-5 md:pr-28 font-medium text-foreground placeholder-[var(--text-faint)] focus:outline-none transition-all backdrop-blur-sm shadow-inner text-sm leading-relaxed overflow-hidden"
+              style={{ minHeight: '44px', maxHeight: '160px' }}
             />
-            {/* Attach + char count — inside input on desktop only */}
-            <div className="hidden md:flex absolute right-5 top-1/2 -translate-y-1/2 items-center gap-3">
+
+            {/* Attach + char counter — desktop only, inside input */}
+            <div className="hidden md:flex absolute right-4 bottom-2.5 items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="p-2 hover:bg-[var(--bg-elevated)] rounded-lg transition-all group/attach border-none bg-transparent"
+                className="p-1.5 hover:bg-[var(--bg-elevated)] rounded-lg transition-colors border-none bg-transparent"
                 title="Attach image or CSV file"
                 disabled={isTyping}
               >
-                <Paperclip className="w-4.5 h-4.5 text-[var(--text-muted)] group-hover/attach:text-blue-400 transition-colors" />
+                <Paperclip className="w-4 h-4 text-[var(--text-muted)] hover:text-blue-400 transition-colors" />
               </button>
-              <span className={`text-xs font-bold transition-colors ${input.length > 450 ? 'text-orange-400' : 'text-[var(--text-faint)]'}`}>
-                {input.length}/500
-              </span>
+              {nearLimit && (
+                <span className={`text-xs font-semibold tabular-nums ${overLimit ? 'text-red-400' : 'text-orange-400'}`}>
+                  {charsLeft}
+                </span>
+              )}
             </div>
           </div>
 
+          {/* Send / Stop */}
           {isTyping ? (
             <button
               type="button"
               onClick={onStopGeneration}
-              className="flex-shrink-0 relative bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white rounded-2xl px-3 md:px-8 transition-all duration-300 shadow-xl shadow-red-900/30 flex items-center gap-2.5 font-bold group overflow-hidden active:scale-95"
+              className="shrink-0 bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white rounded-2xl px-3 md:px-7 transition-all duration-200 shadow-lg shadow-red-900/30 flex items-center gap-2 font-semibold active:scale-95"
               style={{ minHeight: '44px' }}
             >
-              <X className="w-5 h-5 relative z-10" />
-              <span className="hidden md:inline text-sm relative z-10 tracking-wide">Stop</span>
+              <X className="w-4 h-4" />
+              <span className="hidden md:inline text-sm">Stop</span>
             </button>
           ) : (
             <button
               type="submit"
-              disabled={!input.trim() && uploadedFiles.length === 0}
-              className="flex-shrink-0 relative bg-gradient-to-r from-[oklch(0.32_0.09_260)] via-[oklch(0.28_0.08_265)] to-[oklch(0.26_0.07_270)] hover:from-[oklch(0.28_0.12_155)] hover:via-[oklch(0.26_0.11_158)] hover:to-[oklch(0.24_0.10_160)] disabled:from-[var(--bg-elevated)] disabled:to-[var(--bg-surface)] disabled:cursor-not-allowed text-white rounded-2xl px-3 md:px-8 transition-all duration-300 shadow-xl shadow-blue-500/20 hover:shadow-[0_0_24px_oklch(0.45_0.18_155/0.4)] disabled:shadow-none flex items-center gap-2.5 font-bold group overflow-hidden active:scale-95 disabled:hover:scale-100"
+              disabled={(!input.trim() && uploadedFiles.length === 0) || overLimit}
+              className="shrink-0 relative bg-gradient-to-br from-[oklch(0.32_0.09_260)] to-[oklch(0.26_0.07_270)] hover:from-[oklch(0.28_0.12_155)] hover:to-[oklch(0.24_0.10_160)] disabled:from-[var(--bg-elevated)] disabled:to-[var(--bg-surface)] disabled:cursor-not-allowed text-white rounded-2xl px-3 md:px-7 transition-all duration-200 shadow-lg shadow-blue-500/20 hover:shadow-[0_0_20px_oklch(0.45_0.18_155/0.4)] disabled:shadow-none flex items-center gap-2 font-semibold overflow-hidden active:scale-95 disabled:hover:scale-100 group/send"
               style={{ minHeight: '44px' }}
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-              <Send className="w-5 h-5 relative z-10" />
-              <span className="hidden md:inline text-sm relative z-10 tracking-wide">Analyze</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 -translate-x-full group-hover/send:translate-x-full transition-transform duration-600 pointer-events-none" />
+              <Send className="w-4 h-4 relative z-10" />
+              <span className="hidden md:inline text-sm relative z-10">Analyze</span>
             </button>
           )}
         </form>
-      </div>{/* end drag-and-drop wrapper */}
+      </div>
 
+      {/* Status bar */}
       <div className="flex items-center justify-between mt-2 px-1">
-        {/* Mobile: attach button on left; Desktop: label text */}
+        {/* Mobile attach */}
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="sm:hidden flex-shrink-0 p-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[oklch(0.30_0.02_280)] active:scale-95 transition-all"
+          className="sm:hidden shrink-0 p-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] active:scale-95 transition-all"
           title="Attach file"
           disabled={isTyping}
         >
           <Paperclip className="w-3.5 h-3.5 text-[var(--text-muted)]" />
         </button>
-        <p className="hidden sm:block text-[10px] font-bold text-[var(--text-faint)]">
-          Betting • Fantasy • DFS • Kalshi • Real-time AI Analysis
+
+        <p className="hidden sm:block text-[10px] font-semibold text-[var(--text-faint)] tracking-wide">
+          Betting · Fantasy · DFS · Kalshi · Real-time AI
         </p>
+
         <div className="flex items-center gap-2 ml-auto">
+          {/* Shift+Enter hint — only visible while typing */}
+          {input.length > 0 && (
+            <span className="hidden md:inline text-[10px] text-[var(--text-faint)]">
+              Shift+Enter for new line
+            </span>
+          )}
+
           <button
             onClick={onOpenStripe}
-            className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-md border transition-all cursor-pointer hover:opacity-80 ${
+            className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-md border transition-all cursor-pointer hover:opacity-80 ${
               creditsRemaining <= 3
                 ? 'text-orange-400 bg-orange-500/10 border-orange-500/30'
                 : 'text-[var(--text-muted)] bg-[var(--bg-overlay)] border-[var(--border-subtle)]'
             }`}
           >
-            <Sparkles className="w-3 h-3" />
+            <Sparkles className="w-2.5 h-2.5" />
             <span>{creditsRemaining} {creditsRemaining === 1 ? 'credit' : 'credits'}</span>
           </button>
-          <div className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--text-faint)]">
-            <div className="relative flex items-center justify-center">
-              <div className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-lg shadow-green-500/50"></div>
-              <div className="absolute inset-0 bg-green-400 rounded-full animate-ping"></div>
-            </div>
+
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold text-[var(--text-faint)]">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+            </span>
             <span className="hidden sm:inline">All systems operational</span>
             <span className="sm:hidden">Online</span>
           </div>

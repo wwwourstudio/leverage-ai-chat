@@ -15,22 +15,39 @@
  *
  * ─── Architecture ────────────────────────────────────────────────────────────
  * calculateMatchupFactor(ctx) =
- *   positionalFactor(lineup + platoon + protection + team + bullpen)
- *   × calculatePitchMixVuln(ctx)          ← NEW multiplicative sub-component
+ *   positionalFactor(lineup + flyball + HR9 + protection + team + bullpen)
+ *   × calculatePlatoonFactor(ctx)          ← continuous platoon split multiplier
+ *   × calculatePitchMixVuln(ctx)           ← arsenal vulnerability multiplier
  *
- * Pitch mix is applied as a multiplier, not an additive term, because it scales
- * ALL the positional/platoon/bullpen signals uniformly rather than shifting the
- * origin.  A great matchup slot with bad arsenal is still suppressed by ~25-30%;
- * a weak slot against a 4-seam-dominant pitcher is amplified proportionally.
+ * Both sub-factors are multiplicative so they scale all positional/structural
+ * signals uniformly.  Additive terms set the baseline; multiplicative terms
+ * dial it up or down based on context-specific quality.
+ *
+ * ─── Platoon Split Score convention ─────────────────────────────────────────
+ * batter_platoon_score  [-1, +1]:
+ *   +1  = extreme advantage vs opposite-hand pitchers (LHB crushes RHP, RHB crushes LHP)
+ *    0  = even splits (switch hitters, or truly balanced batter)
+ *   -1  = reverse split (better vs same-hand — rare but real)
+ *   Compute: tanh((wOBA_vs_opp_hand - wOBA_vs_same_hand) / 0.08)
+ *
+ * pitcher_platoon_score [-1, +1]:
+ *   +1  = extreme vulnerability to opposite-hand batters
+ *    0  = even splits
+ *   -1  = reverse split (better vs opposite-hand batters — rare)
+ *   Compute: tanh((wOBA_allowed_vs_opp_hand - wOBA_allowed_vs_same_hand) / 0.08)
+ *
+ * Both scores are "positive = normal platoon direction" so the integration is
+ * symmetric: when batter faces opposite-hand pitcher both scores contribute
+ * positively; when same-hand both flip negative, creating a natural suppress.
  *
  * ─── Output range ────────────────────────────────────────────────────────────
- * matchup_factor is clamped to [0.75, 1.70].
- *   0.75 — worst case: bad slot, same-hand, groundball artist, low HR/FB, elite pen
+ * matchup_factor is clamped to [0.70, 1.80].
+ *   0.70 — worst: bad slot, strong same-hand platoon ace, elite pen, GB arsenal
  *   1.00 — neutral baseline
- *   1.70 — best case: cleanup LHB, flyball 4-seam RHP 55% (14%+ HR/FB), weak pen
+ *   1.80 — best: cleanup LHB vs 4-seam RHP, bilateral +0.8 platoon edge, weak pen
  *
  * ─── Stack layers ────────────────────────────────────────────────────────────
- *   0. Matchup Engine  (this file: lineup + platoon + pitch mix + bullpen)
+ *   0. Matchup Engine  (this file: lineup + platoon score + pitch mix + bullpen)
  *   1. Context Engine  (park factors + weather)
  *   2. Learned ML Model (consumes matchup_factor as feature)
  *   3. Real-Time Odds + Sharp money signals
@@ -76,10 +93,44 @@ export interface LineupContext {
   protection_score: number;
 
   /**
-   * True when batter and pitcher are opposite-handed (classic platoon split).
-   * Pre-computed; must be consistent with batter_hand / pitcher_hand.
+   * Normalized platoon split score for the batter [-1, +1].
+   *
+   * Positive = batter performs better vs OPPOSITE-hand pitchers (normal platoon).
+   * Negative = batter performs better vs SAME-hand pitchers (reverse split).
+   * Zero     = even splits (switch hitters or neutral batters).
+   *
+   * Typical values:
+   *   Classic LHB power hitter:  +0.60 to +0.85 (much better vs RHP)
+   *   Pull-heavy RHB:            +0.45 to +0.70 (better vs LHP)
+   *   Switch hitter:             -0.10 to +0.10
+   *   Reverse-split batter:      negative (rare; e.g. some RHB crush same-hand)
+   *
+   * Compute from wOBA splits:
+   *   LHB: tanh((wOBA_vs_RHP - wOBA_vs_LHP) / 0.08)
+   *   RHB: tanh((wOBA_vs_LHP - wOBA_vs_RHP) / 0.08)
+   *   Use normalizePlatoonDelta() helper below for preprocessing.
    */
-  platoon_advantage: boolean;
+  batter_platoon_score: number;
+
+  /**
+   * Normalized platoon split score for the pitcher [-1, +1].
+   *
+   * Positive = pitcher is more vulnerable to OPPOSITE-hand batters (normal platoon).
+   * Negative = pitcher more vulnerable to SAME-hand batters (reverse split).
+   * Zero     = even splits.
+   *
+   * Typical values:
+   *   Standard RHP with good breaking ball: +0.35 to +0.60 (worse vs LHB)
+   *   Standard LHP:                         +0.30 to +0.55 (worse vs RHB)
+   *   Sidearm/slot dependent pitcher:       |score| > 0.70
+   *   Reverse-split pitcher:                negative (unusual)
+   *
+   * Compute from wOBA-allowed splits:
+   *   RHP: tanh((wOBA_allowed_vs_LHB - wOBA_allowed_vs_RHB) / 0.08)
+   *   LHP: tanh((wOBA_allowed_vs_RHB - wOBA_allowed_vs_LHB) / 0.08)
+   *   Use normalizePlatoonDelta() helper below for preprocessing.
+   */
+  pitcher_platoon_score: number;
 
   /**
    * MLB rank of the batter's team by HR output (1 = most HRs, 30 = fewest).
@@ -157,6 +208,59 @@ export const LINEUP_SLOT_HR_MULTIPLIERS: Record<number, number> = {
   9: 0.85,  // Ninth: lowest HR rate position; pitchers pitch to put-away counts
 };
 
+// ─── Platoon split helpers ────────────────────────────────────────────────────
+
+/**
+ * Weight applied to platoon_edge inside the matchup factor multiplier.
+ * Tuned so that a bilateral maximum edge (+1.0 batter, +1.0 pitcher → edge=1.0)
+ * scales factor by ×1.25 and a bilateral minimum (−1.0, −1.0 → edge=−1.0)
+ * scales by ×0.75.  Range of the multiplier: [0.75, 1.25] for this sub-factor.
+ * Backtest target: 0.20–0.30 based on observed ~15-30% HR swing in extreme splits.
+ */
+export const PLATOON_WEIGHT = 0.25;
+
+/**
+ * Normalize a raw wOBA (or ISO/HR-rate) split delta into a platoon score [-1, +1].
+ *
+ * The delta must be pre-oriented so that positive = advantage vs opposite hand:
+ *   - For batters:   delta = wOBA_vs_opp_hand_pitcher - wOBA_vs_same_hand_pitcher
+ *   - For pitchers:  delta = wOBA_allowed_vs_opp_hand - wOBA_allowed_vs_same_hand
+ *
+ * tanh(x / 0.08) maps the typical league platoon delta range:
+ *   ±0.020 → ±0.24  (minor split)
+ *   ±0.045 → ±0.49  (moderate split — ~50th pct among qualified hitters)
+ *   ±0.080 → ±0.76  (strong split)
+ *   ±0.120 → ±0.90  (extreme split)
+ *   ±0.200 → ±0.99  (saturates near ±1)
+ *
+ * @param delta  wOBA or HR-rate difference, pre-oriented (opposite minus same)
+ */
+export function normalizePlatoonDelta(delta: number): number {
+  return Math.tanh(delta / 0.08);
+}
+
+/**
+ * Compute the combined platoon edge for a specific batter-pitcher matchup.
+ *
+ * The edge is the average of:
+ *   - batter's contribution: how much advantage the batter has vs THIS pitcher's hand
+ *   - pitcher's contribution: how vulnerable the pitcher is to THIS batter's hand
+ *
+ * Sign logic (both scores are "positive = normal platoon"):
+ *   - Opposite-hand matchup (LHB vs RHP / RHB vs LHP): both scores contribute
+ *     positively → edge > 0 → factor boost
+ *   - Same-hand matchup: both scores are negated → edge < 0 → factor suppression
+ *   - Switch hitters always treated as opposite-hand (they always pick the favorable side)
+ *
+ * @returns platoon_edge in roughly [-1, +1]
+ */
+export function calculatePlatoonEdge(ctx: LineupContext): number {
+  const isOppositeHand = ctx.batter_hand === 'S' || ctx.batter_hand !== ctx.pitcher_hand;
+  const batter_edge  = isOppositeHand ?  ctx.batter_platoon_score : -ctx.batter_platoon_score;
+  const pitcher_edge = isOppositeHand ?  ctx.pitcher_platoon_score : -ctx.pitcher_platoon_score;
+  return (batter_edge + pitcher_edge) / 2;
+}
+
 // ─── Pitch mix vulnerability ──────────────────────────────────────────────────
 
 /**
@@ -222,39 +326,26 @@ export function calculatePitchMixVuln(ctx: LineupContext): number {
 /**
  * Calculate the composite matchup factor for a single batter-pitcher context.
  *
- * Positional component contributions (additive):
- *   Lineup slot multiplier  — multiplicative base [0.85, 1.22]
- *   Platoon advantage       — +0.12 (LvR), +0.08 (RvL), +0.04 (S); −0.04 same-hand
+ * Additive positional components (combined into positionalFactor):
+ *   Lineup slot multiplier  — base [0.85, 1.22] by batting order position
  *   Fly-ball vulnerability  — deviation from 40% league avg × 0.06
- *   HR/9 vs hand            — (HR9 − 1.1) × 0.20 (most predictive pitcher factor)
- *   Protection score        — score × 0.05 (conservative; research shows weak effect)
+ *   HR/9 vs hand            — (HR9 − 1.1) × 0.20 (strongest single pitcher stat)
+ *   Protection score        — score × 0.05 (conservative; mild empirical effect)
  *   Team power context      — +0.05 (top-8), +0.02 (top-15), −0.04 (bottom-8)
- *   Bullpen HR/9            — +0.04 if pen HR9 > 1.4; −0.06 if < 1.0
+ *   Bullpen HR/9            — +0.04 weak pen; −0.06 elite pen
  *
- * Then the positional factor is multiplied by calculatePitchMixVuln(ctx):
- *   Pitch mix vuln [0.75, 1.45] scales the entire positional factor
+ * Multiplicative sub-factors (applied in sequence):
+ *   Platoon factor          — 1 + platoon_edge × 0.25; edge derived from
+ *                             batter_platoon_score and pitcher_platoon_score
+ *   Pitch mix vuln          — calculatePitchMixVuln [0.75, 1.45]
  *
- * @returns matchup_factor clamped to [0.75, 1.70]
+ * @returns matchup_factor clamped to [0.70, 1.80]
  */
 export function calculateMatchupFactor(ctx: LineupContext): number {
   // ── 1. Lineup slot base (multiplicative — scales every additive term below)
   let factor = LINEUP_SLOT_HR_MULTIPLIERS[ctx.lineup_slot] ?? 0.95;
 
-  // ── 2. Platoon and handedness ─────────────────────────────────────────────
-  // Asymmetric by handedness: LHB vs RHP has the largest empirical HR split
-  if (ctx.platoon_advantage) {
-    if (ctx.batter_hand === 'L' && ctx.pitcher_hand === 'R') {
-      factor += 0.12;  // classic lefty power edge vs righties (~8-15% HR boost)
-    } else if (ctx.batter_hand === 'R' && ctx.pitcher_hand === 'L') {
-      factor += 0.08;  // righty vs lefty: real but smaller split
-    } else if (ctx.batter_hand === 'S') {
-      factor += 0.04;  // switch hitters get partial benefit (they pick best side)
-    }
-  } else {
-    factor -= 0.04;    // same-hand penalty: pitcher has better breaking ball angle
-  }
-
-  // ── 3. Pitcher fly-ball / HR vulnerability ────────────────────────────────
+  // ── 2. Pitcher fly-ball / HR vulnerability ────────────────────────────────
   // Normalized around 40% league avg; linear relationship to HR allowed rate
   const fb_deviation = (ctx.pitcher_flyball_pct - 40) / 10;
   factor += fb_deviation * 0.06;  // ±0.06 per 10 pct pts above/below 40%
@@ -263,11 +354,10 @@ export function calculateMatchupFactor(ctx: LineupContext): number {
   // Baseline: 1.1 HR/9 (league avg); weight 0.20 per unit deviation
   factor += (ctx.pitcher_hr9_vs_hand - 1.1) * 0.20;
 
-  // ── 4. Lineup protection (conservative weight — effect is smaller than intuition)
-  // Research shows mild or null net impact on individual HR rate; keep at 0.05
-  factor += ctx.protection_score * 0.05;  // max +5% for elite protection
+  // ── 3. Lineup protection (conservative weight — mild empirical effect)
+  factor += ctx.protection_score * 0.05;
 
-  // ── 5. Team power context ─────────────────────────────────────────────────
+  // ── 4. Team power context ─────────────────────────────────────────────────
   if (ctx.team_power_rank <= 8) {
     factor += 0.05;    // top power offenses: pitchers must throw strikes
   } else if (ctx.team_power_rank <= 15) {
@@ -276,23 +366,37 @@ export function calculateMatchupFactor(ctx: LineupContext): number {
     factor -= 0.04;    // weak lineups: pitchers can nibble and punt
   }
 
-  // ── 6. Opposing bullpen HR/9 ──────────────────────────────────────────────
+  // ── 5. Opposing bullpen HR/9 ──────────────────────────────────────────────
   if (ctx.opposing_bullpen_hr9 > 1.4) {
     factor += 0.04;    // weak pen = HR opportunity in innings 7-9
   } else if (ctx.opposing_bullpen_hr9 < 1.0) {
     factor -= 0.06;    // elite pen significantly reduces late-game HR chances
   }
 
-  // ── 7. Pitch mix vulnerability (multiplicative sub-factor) ────────────────
-  // Applied as a multiplier so it scales all positional/platoon/bullpen signals
-  // rather than simply shifting the origin.  A great matchup slot is still
-  // suppressed by a sweeper-heavy arsenal; a weak slot is still amplified by
-  // a flat 4-seam dominant arm.
+  // ── 6. Platoon Split Score (multiplicative) ───────────────────────────────
+  // Replaces the old binary platoon_advantage flag with a continuous multiplier
+  // derived from normalized batter and pitcher split scores.
+  //
+  // platoon_edge = avg(batter_contribution, pitcher_contribution)
+  //   Opposite-hand matchup: both scores positive → edge > 0 → boost
+  //   Same-hand matchup:     both scores negated  → edge < 0 → suppress
+  //   Bilateral max (+0.80, +0.80): edge = +0.80 → ×1.20  (+20%)
+  //   Bilateral min (−0.80, −0.80): edge = −0.80 → ×0.80  (−20%)
+  //   Reverse-split batter (−0.50) vs opposite-hand pitcher (+0.50):
+  //     edge = 0 → neutral (batter disadvantage cancels pitcher vulnerability)
+  const platoonEdge   = calculatePlatoonEdge(ctx);
+  const platoonFactor = 1 + platoonEdge * PLATOON_WEIGHT;
+  factor *= platoonFactor;
+
+  // ── 7. Pitch mix vulnerability (multiplicative) ───────────────────────────
+  // Applied after platoon so it scales the platoon-adjusted factor.
+  // A great platoon edge vs a sweeper-heavy ace is still suppressed;
+  // a bad platoon vs a flat 4-seam arm is still amplified.
   const pitchVuln = calculatePitchMixVuln(ctx);
   factor *= pitchVuln;
 
-  // Clamp: wider range now that pitch mix can push extreme stacking scenarios
-  return Math.max(0.75, Math.min(1.70, factor));
+  // Clamp: platoon × pitch mix compound can push further than either alone
+  return Math.max(0.70, Math.min(1.80, factor));
 }
 
 // ─── Matchup quality label ────────────────────────────────────────────────────
@@ -334,35 +438,38 @@ export function isFadeSignal(matchupFactor: number, marketMovePts: number): bool
  * Useful for debugging, dashboard display, and test assertions.
  */
 export interface MatchupBreakdown {
-  // Positional components (additive)
+  // Additive positional components
   slotMultiplier: number;
-  platoonBoost: number;
   flyballBoost: number;
   hr9Contribution: number;
   protectionBoost: number;
   teamPowerBoost: number;
   bullpenAdjustment: number;
-  positionalFactor: number;   // sum of additive components before pitch mix
+  /** Sum of all additive components above — the structural baseline */
+  positionalFactor: number;
 
-  // Pitch mix sub-factor (multiplicative)
-  pitchMixVuln: number;       // output of calculatePitchMixVuln
+  // Platoon sub-factor (multiplicative — applied after positionalFactor)
+  /** Batter platoon score as passed in ctx [-1, +1] */
+  batPlatoonScore: number;
+  /** Pitcher platoon score as passed in ctx [-1, +1] */
+  pitPlatoonScore: number;
+  /** Combined platoon edge = (batter_contribution + pitcher_contribution) / 2 */
+  platoonEdge: number;
+  /** 1 + platoon_edge × PLATOON_WEIGHT; the actual multiplier applied */
+  platoonMultiplier: number;
 
-  rawFactor: number;          // positionalFactor * pitchMixVuln before clamping
-  clampedFactor: number;      // final output of calculateMatchupFactor
+  // Pitch mix sub-factor (multiplicative — applied after platoon)
+  pitchMixVuln: number;
+
+  /** positionalFactor × platoonMultiplier × pitchMixVuln, before clamping */
+  rawFactor: number;
+  /** Final output of calculateMatchupFactor */
+  clampedFactor: number;
   label: string;
 }
 
 export function explainMatchupFactor(ctx: LineupContext): MatchupBreakdown {
   const slotMultiplier = LINEUP_SLOT_HR_MULTIPLIERS[ctx.lineup_slot] ?? 0.95;
-
-  let platoonBoost = 0;
-  if (ctx.platoon_advantage) {
-    if (ctx.batter_hand === 'L' && ctx.pitcher_hand === 'R') platoonBoost = 0.12;
-    else if (ctx.batter_hand === 'R' && ctx.pitcher_hand === 'L') platoonBoost = 0.08;
-    else if (ctx.batter_hand === 'S') platoonBoost = 0.04;
-  } else {
-    platoonBoost = -0.04;
-  }
 
   const flyballBoost    = ((ctx.pitcher_flyball_pct - 40) / 10) * 0.06;
   const hr9Contribution = (ctx.pitcher_hr9_vs_hand - 1.1) * 0.20;
@@ -379,26 +486,30 @@ export function explainMatchupFactor(ctx: LineupContext): MatchupBreakdown {
 
   const positionalFactor =
     slotMultiplier +
-    platoonBoost +
     flyballBoost +
     hr9Contribution +
     protectionBoost +
     teamPowerBoost +
     bullpenAdjustment;
 
-  const pitchMixVuln  = calculatePitchMixVuln(ctx);
-  const rawFactor     = positionalFactor * pitchMixVuln;
-  const clampedFactor = Math.max(0.75, Math.min(1.70, rawFactor));
+  const platoonEdge      = calculatePlatoonEdge(ctx);
+  const platoonMultiplier = 1 + platoonEdge * PLATOON_WEIGHT;
+  const pitchMixVuln     = calculatePitchMixVuln(ctx);
+  const rawFactor        = positionalFactor * platoonMultiplier * pitchMixVuln;
+  const clampedFactor    = Math.max(0.70, Math.min(1.80, rawFactor));
 
   return {
     slotMultiplier,
-    platoonBoost,
     flyballBoost,
     hr9Contribution,
     protectionBoost,
     teamPowerBoost,
     bullpenAdjustment,
     positionalFactor,
+    batPlatoonScore:  ctx.batter_platoon_score,
+    pitPlatoonScore:  ctx.pitcher_platoon_score,
+    platoonEdge,
+    platoonMultiplier,
     pitchMixVuln,
     rawFactor,
     clampedFactor,

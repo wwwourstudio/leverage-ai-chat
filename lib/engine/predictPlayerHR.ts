@@ -26,6 +26,7 @@
 
 import { calculateMatchupFactor, explainMatchupFactor } from './matchup';
 import type { LineupContext, MatchupBreakdown } from './matchup';
+export { normalizePlatoonDelta } from './matchup';
 
 import { buildHitterFeatures, computeWeatherAdjustment } from '@/lib/mlb-projections/feature-engineering';
 import type { WeatherConditions } from '@/lib/mlb-projections/feature-engineering';
@@ -82,6 +83,14 @@ export interface PitcherContext {
    * League avg ≈ 0.11.
    */
   hrAllowedPerFb: number;
+  /**
+   * Normalized platoon split score for the pitcher [-1, +1].
+   * Positive = pitcher is more vulnerable to opposite-hand batters (normal platoon).
+   * Negative = reverse split.  0 = even splits.
+   * Compute: tanh((wOBA_allowed_vs_opp_hand - wOBA_allowed_vs_same_hand) / 0.08)
+   * Use normalizePlatoonDelta() from matchup.ts for preprocessing.
+   */
+  platoonScore: number;
   /** Whiff % (optional — used for DFS matchup score) */
   whiffPct?: number;
 }
@@ -120,6 +129,16 @@ export interface HRPredictionInput {
 
   /** Game-level context */
   game: GameContext;
+
+  /**
+   * Normalized platoon split score for the batter [-1, +1].
+   * Positive = batter has advantage vs opposite-hand pitchers (normal platoon).
+   * Negative = reverse split.  0 = even splits (switch hitters, neutral batters).
+   * Compute: tanh((wOBA_vs_opp_hand - wOBA_vs_same_hand) / 0.08)
+   * Use normalizePlatoonDelta() from matchup.ts for preprocessing.
+   * Defaults to 0 (neutral) when omitted.
+   */
+  batterPlatoonScore?: number;
 
   /** Best available American odds from market (null = no live market) */
   bestAmericanOdds: number | null;
@@ -222,9 +241,12 @@ export async function predictPlayerHR(input: HRPredictionInput): Promise<HRPredi
     pitcher_flyball_pct:        pitcher.flyballPct,
     pitcher_hr9_vs_hand:        pitcher.hr9VsHand,
     protection_score:           (game.prevBatterOPS + game.nextBatterOPS) / 2,
-    platoon_advantage:          batter.bats !== pitcher.throws,
     team_power_rank:            game.teamPowerRank,
     opposing_bullpen_hr9:       game.bullpenHr9,
+    // Platoon split scores [-1, +1] — continuous replacement for binary platoon flag
+    // Positive = advantage vs opposite hand (normal platoon); negative = reverse split
+    batter_platoon_score:       input.batterPlatoonScore ?? 0,
+    pitcher_platoon_score:      pitcher.platoonScore,
     // Pitch mix / arsenal fields
     pitcher_four_seam_pct:      pitcher.fourSeamPct,
     pitcher_breaking_usage:     pitcher.breakingPct,

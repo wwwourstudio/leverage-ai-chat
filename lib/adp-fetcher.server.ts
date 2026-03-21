@@ -58,8 +58,16 @@ function extractCookies(headers: Headers): string {
  */
 async function loginToFantasyPros(email: string, password: string): Promise<string> {
   // Step 1 — GET login page to receive csrftoken cookie
+  // Use a full browser-like header set to avoid bot-detection pages that omit the CSRF form
   const loginPageRes = await fetch(FP_LOGIN, {
-    headers: { 'User-Agent': FP_UA, Accept: 'text/html' },
+    headers: {
+      'User-Agent':      FP_UA,
+      Accept:            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Cache-Control':   'no-cache',
+      Pragma:            'no-cache',
+    },
     redirect: 'follow',
     signal: AbortSignal.timeout(10_000),
   });
@@ -70,19 +78,21 @@ async function loginToFantasyPros(email: string, password: string): Promise<stri
   const cookieJar1 = extractCookies(loginPageRes.headers);
   const pageHtml   = await loginPageRes.text();
 
-  // FantasyPros sometimes sends csrftoken as a cookie, sometimes only in the HTML form
-  let csrfToken: string;
+  // CSRF token may live in the cookie, an HTML form input, or a <meta> tag
+  let csrfToken: string | undefined;
   const cookieCsrf = cookieJar1.match(/csrftoken=([^;]+)/);
   if (cookieCsrf) {
     csrfToken = cookieCsrf[1];
   } else {
-    // Fall back to the hidden <input name="csrfmiddlewaretoken"> in the page HTML
-    const htmlCsrf = pageHtml.match(/name=["']csrfmiddlewaretoken["'][^>]+value=["']([^"']+)["']/)
-                  ?? pageHtml.match(/value=["']([^"']+)["'][^>]+name=["']csrfmiddlewaretoken["']/);
-    if (!htmlCsrf) {
-      throw new Error('FantasyPros login: could not find csrfmiddlewaretoken in login page');
-    }
-    csrfToken = htmlCsrf[1];
+    const htmlCsrf =
+      pageHtml.match(/name=["']csrfmiddlewaretoken["'][^>]*value=["']([^"']+)["']/) ??
+      pageHtml.match(/value=["']([^"']+)["'][^>]*name=["']csrfmiddlewaretoken["']/) ??
+      pageHtml.match(/<meta[^>]+name=["']csrf-?token["'][^>]*content=["']([^"']+)["']/i);
+    if (htmlCsrf) csrfToken = htmlCsrf[1];
+  }
+
+  if (!csrfToken) {
+    throw new Error('FantasyPros login: could not find CSRF token in login page (possible bot-detection block)');
   }
 
   // Step 2 — POST credentials
@@ -284,25 +294,33 @@ export async function scrapeESPN(sport: 'mlb' | 'nfl'): Promise<NFBCPlayer[]> {
     `/seasons/${ESPN_SEASON[sport]}/segments/0/leaguedefaults/${ESPN_LEAGUE[sport]}` +
     `?scoringPeriodId=1&view=kona_player_info`;
 
-  // X-Fantasy-Filter tells ESPN to sort by ADP and return a large player pool
+  // X-Fantasy-Filter: sort by ADP and pull a large player pool.
+  // Keep the filter minimal — extra fields (e.g. filterRanksForScoringPeriodIds)
+  // cause HTTP 400 on the leaguedefaults endpoint.
   const fantasyFilter = JSON.stringify({
     players: {
       filterStatus: { value: ['FREEAGENT', 'ONTEAM', 'WAIVERS'] },
       limit: 600,
       offset: 0,
       sortAverageDraftPositionProcessed: { sortPriority: 1, sortAsc: true },
-      filterRanksForScoringPeriodIds: { value: [1] },
     },
   });
 
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent':       FP_UA,
-      Accept:             'application/json',
-      'X-Fantasy-Filter': fantasyFilter,
-    },
-    signal: AbortSignal.timeout(12_000),
-  });
+  const headers: Record<string, string> = {
+    'User-Agent':       FP_UA,
+    Accept:             'application/json',
+    'X-Fantasy-Filter': fantasyFilter,
+  };
+
+  let res = await fetch(url, { headers, signal: AbortSignal.timeout(12_000) });
+
+  // If the filtered request is rejected, retry without the filter header
+  if (res.status === 400) {
+    console.warn(`[v0] [ADP/fetcher] ESPN ${sport.toUpperCase()} 400 with filter — retrying without filter`);
+    const { 'X-Fantasy-Filter': _removed, ...plainHeaders } = headers;
+    res = await fetch(url, { headers: plainHeaders, signal: AbortSignal.timeout(12_000) });
+  }
+
   if (!res.ok) throw new Error(`ESPN ${sport.toUpperCase()} HTTP ${res.status}`);
 
   const json = await res.json() as unknown;

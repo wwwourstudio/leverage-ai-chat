@@ -1215,6 +1215,43 @@ async function _generateContextualCards(
         markets = await fetchFinanceMarkets(count * 5);
       } else if (sub === 'trending') {
         markets = await fetchTopMarketsByVolume(count);
+      } else if (['culture', 'entertainment', 'arts', 'pop culture', 'awards', 'tv', 'film',
+                  'music', 'movies', 'celebrity', 'oscars', 'emmys', 'grammys'].includes(sub)) {
+        // Entertainment/culture markets — search Kalshi for relevant terms
+        markets = await fetchKalshiMarketsWithRetry({
+          search: 'entertainment',
+          status: 'open',
+          limit: Math.max(count * 3, 30),
+          maxRetries: 1,
+        });
+        if (markets.length === 0) {
+          // Kalshi doesn't reliably carry entertainment markets — show placeholder
+          console.warn('[v0] [CARDS-GEN] No entertainment/culture Kalshi markets found — showing placeholder');
+          cards.push({
+            type: CARD_TYPES.KALSHI_INSIGHT,
+            title: 'No Entertainment Markets Currently Available',
+            icon: 'TrendingUp',
+            category: 'KALSHI',
+            subcategory: 'Entertainment',
+            gradient: 'from-purple-700 to-pink-800',
+            status: CARD_STATUS.NEUTRAL,
+            realData: false,
+            data: {
+              iconLabel: 'entertainment',
+              yesPct: 50,
+              noPct: 50,
+              edgeScore: 0,
+              signal: 'Kalshi does not currently list entertainment/culture prediction markets. Check kalshi.com for the latest available markets.',
+              note: 'Try switching to Politics, Sports, or Finance for active markets.',
+              volumeTier: 'Thin',
+              spreadLabel: 'N/A',
+              priceDirection: 'flat',
+              priceChange: 0,
+            },
+          });
+          if (cards.length > 0) setCachedCards(cards, 'kalshi', sport);
+          return cards;
+        }
       } else {
         // No sub-filter — fetch a broad set of open markets sorted by volume.
         // fetchKalshiMarketsWithRetry will skip retries if the API legitimately
@@ -1284,7 +1321,9 @@ async function _generateContextualCards(
         }
       }
 
-      console.log(`[v0] [CARDS-GEN] Kalshi fetched ${markets.length} markets`);
+      // Drop any markets that aren't open (can appear in API responses despite status filter)
+      markets = markets.filter((m: any) => !m.status || m.status === 'open');
+      console.log(`[v0] [CARDS-GEN] Kalshi fetched ${markets.length} open markets`);
 
       if (markets.length > 0) {
         // Sort by volume descending (most liquid = most relevant)

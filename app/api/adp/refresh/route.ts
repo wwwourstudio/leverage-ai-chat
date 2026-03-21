@@ -1,86 +1,82 @@
 /**
- * ADP Refresh Endpoint
+ * GET /api/adp/refresh
  *
  * Ensures the Supabase `nfbc_adp` table always has current data.
- * Called by Vercel Cron at 06:00 UTC daily.
+ * Called by Vercel Cron at 06:00 UTC daily and by GitHub Actions.
  *
  * Strategy:
- *  1. Load current Supabase ADP (allow stale).
- *  2. If rows exist AND they were written within the last 20 hours → skip
- *     (nightly cron + 20h window avoids double-writes on deploys / retries).
- *  3. Otherwise, seed from the compiled static fallback dataset.
- *     When a real third-party ADP endpoint becomes available, replace the
- *     `loadLatestADP()` call below with a live fetch.
+ *  1. If Supabase already has rows for the sport → skip (preserve user-uploaded data).
+ *  2. Otherwise seed from the compiled static fallback dataset so the AI
+ *     query_adp tool always returns something meaningful.
  *
- * The static fallback is always available — this guarantees the AI tool
- * (`query_adp`) returns data even before any user has uploaded a TSV.
+ * Note: nfc.shgn.com uses a JavaScript-triggered download button with no
+ * server-accessible URL.  Live ADP data must be uploaded manually via the
+ * ADP upload UI (POST /api/adp/upload) after downloading the TSV from SHGN.
  *
  * Auth: validated by CRON_SECRET header (set via Vercel environment variable).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getADPData, saveADPToSupabase, loadADPFromSupabase, type NFBCPlayer } from '@/lib/adp-data';
+import { getADPData, saveADPToSupabase, loadADPFromSupabase, clearADPCache } from '@/lib/adp-data';
 
-// ── NFL ADP is defined separately ─────────────────────────────────────────────
-// Lazy import keeps the large static dataset out of the initial bundle for
-// routes that don't need it.
-async function loadLatestADP(sport: 'mlb' | 'nfl'): Promise<NFBCPlayer[]> {
-  if (sport === 'nfl') {
-    const { getNFLADPData } = await import('@/lib/nfl-adp-data');
-    return getNFLADPData(true);
-  }
-  // MLB: return the compiled static fallback (already imported by adp-data.ts)
-  return getADPData(true);
-}
+export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  // Validate cron secret — Vercel passes it as the Authorization header
-  // when using the `vercel.json` cron configuration.
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = request.headers.get('authorization');
-
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const results: Record<string, { seeded: number; skipped: boolean; error?: string }> = {};
+  const startedAt = Date.now();
+  const results: Record<string, { seeded: number; skipped: boolean; source: string; error?: string }> = {};
 
-  for (const sport of ['mlb', 'nfl'] as const) {
-    try {
-      // Check if Supabase already has fresh data (written in the last 20 hours)
-      const existing = await loadADPFromSupabase(sport, true);
-      if (existing && existing.length > 0) {
-        // Skip — user has uploaded their own board; don't overwrite it
-        results[sport] = { seeded: existing.length, skipped: true };
-        console.log(`[ADP/refresh] ${sport.toUpperCase()}: ${existing.length} rows already in DB — skipping seed`);
-        continue;
-      }
-
-      // No DB data — seed from compiled static dataset
-      const players = await loadLatestADP(sport);
-      if (players.length === 0) {
-        results[sport] = { seeded: 0, skipped: false };
-        continue;
-      }
-
-      await saveADPToSupabase(players, sport);
-      results[sport] = { seeded: players.length, skipped: false };
-      console.log(`[ADP/refresh] ${sport.toUpperCase()}: seeded ${players.length} players into Supabase`);
-
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      results[sport] = { seeded: 0, skipped: false, error: msg };
-      console.error(`[ADP/refresh] ${sport.toUpperCase()} error:`, msg);
+  // ── MLB ───────────────────────────────────────────────────────────────────────
+  try {
+    const existing = await loadADPFromSupabase('mlb', true);
+    if (existing && existing.length > 0) {
+      results.mlb = { seeded: existing.length, skipped: true, source: 'supabase_existing' };
+      console.log(`[v0] [ADP/refresh] MLB: ${existing.length} rows already in DB — skipping seed`);
+    } else {
+      const players = await getADPData(true);
+      await saveADPToSupabase(players, 'mlb');
+      clearADPCache();
+      results.mlb = { seeded: players.length, skipped: false, source: 'static_fallback' };
+      console.log(`[v0] [ADP/refresh] MLB: seeded ${players.length} players from static fallback`);
     }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    results.mlb = { seeded: 0, skipped: false, source: 'error', error: msg };
+    console.error('[v0] [ADP/refresh] MLB error:', msg);
+  }
+
+  // ── NFL ───────────────────────────────────────────────────────────────────────
+  try {
+    const existing = await loadADPFromSupabase('nfl', true);
+    if (existing && existing.length > 0) {
+      results.nfl = { seeded: existing.length, skipped: true, source: 'supabase_existing' };
+    } else {
+      const { getNFLADPData } = await import('@/lib/nfl-adp-data');
+      const players = await getNFLADPData(true);
+      if (players.length > 0) {
+        await saveADPToSupabase(players, 'nfl');
+        results.nfl = { seeded: players.length, skipped: false, source: 'static_fallback' };
+        console.log(`[v0] [ADP/refresh] NFL: seeded ${players.length} players from static fallback`);
+      } else {
+        results.nfl = { seeded: 0, skipped: false, source: 'empty' };
+      }
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    results.nfl = { seeded: 0, skipped: false, source: 'error', error: msg };
+    console.error('[v0] [ADP/refresh] NFL error:', msg);
   }
 
   return NextResponse.json({
     success: true,
     timestamp: new Date().toISOString(),
+    durationMs: Date.now() - startedAt,
     results,
   });
 }
-
-// Allow Vercel Cron to call this via GET
-export const dynamic = 'force-dynamic';
-export const maxDuration = 30;

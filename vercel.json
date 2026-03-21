@@ -26,6 +26,9 @@
     },
     "app/api/cron/train/route.ts": {
       "maxDuration": 60
+    },
+    "app/api/adp/refresh/route.ts": {
+      "maxDuration": 30
     }
   },
   "crons": [

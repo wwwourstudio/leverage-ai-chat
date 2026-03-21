@@ -110,7 +110,7 @@ function shouldUseFastModel(
 // Validates at the HTTP boundary so malformed bodies fail fast with a clean 400
 // instead of propagating undefined/oversized values deep into the pipeline.
 const AnalyzeBodySchema = z.object({
-  userMessage:        z.string().min(1, 'Message is required').max(8000, 'Message too long'),
+  userMessage:        z.string().min(1, 'Message is required').max(24000, 'Message too long'),
   existingCards:      z.array(z.any()).max(50).optional().default([]),
   context:            z.record(z.any()).optional().default({}),
   customInstructions: z.string().max(2000).optional(),

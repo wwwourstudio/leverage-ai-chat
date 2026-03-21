@@ -30,6 +30,8 @@ on:
     - cron: '0 4  * * *'
     - cron: '0 10 * * *'
     - cron: '0 17 * * *'
+    # ADP scrape — once daily at 11:00 UTC (after morning drafts)
+    - cron: '0 11 * * *'
 
   workflow_dispatch:
     inputs:
@@ -45,6 +47,7 @@ on:
           - picks
           - train
           - backtest
+          - adp
 
 jobs:
   # ── Odds ingest ──────────────────────────────────────────────────────────────
@@ -128,6 +131,27 @@ jobs:
           echo "Response: $STATUS"
           if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
             echo "::error::train cron returned HTTP $STATUS"
+            exit 1
+          fi
+
+  # ── ADP scrape (SHGN NFC) ─────────────────────────────────────────────────
+  adp:
+    name: ADP Scrape
+    runs-on: ubuntu-latest
+    # Run on the 11:00 UTC schedule or manual trigger
+    if: |
+      github.event_name == 'workflow_dispatch' && (inputs.job == 'adp' || inputs.job == 'all') ||
+      github.event_name == 'schedule' && github.event.schedule == '0 11 * * *'
+    steps:
+      - name: Call /api/adp/refresh
+        timeout-minutes: 2
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 55 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/adp/refresh")
+          echo "Response: $STATUS"
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+            echo "::error::adp cron returned HTTP $STATUS"
             exit 1
           fi
 

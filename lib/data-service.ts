@@ -48,18 +48,17 @@ const CACHE_DURATION = {
 const cache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_MAX_SIZE = 100; // prevent unbounded growth
 
-/** Evict expired entries; if still over max, remove oldest first. */
+/** Evict expired entries; if still over max, remove oldest first (single O(n log n) pass). */
 function evictCache(): void {
   const now = Date.now();
-  // Remove stale entries
+  const maxTtl = Math.max(CACHE_DURATION.CARDS, CACHE_DURATION.INSIGHTS, CACHE_DURATION.ODDS);
   for (const [key, entry] of cache) {
-    const maxTtl = Math.max(CACHE_DURATION.CARDS, CACHE_DURATION.INSIGHTS, CACHE_DURATION.ODDS);
     if (now - entry.timestamp > maxTtl) cache.delete(key);
   }
-  // If still over limit, evict oldest
-  while (cache.size > CACHE_MAX_SIZE) {
-    const oldest = [...cache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
-    if (oldest) cache.delete(oldest[0]);
+  if (cache.size > CACHE_MAX_SIZE) {
+    const overage = cache.size - CACHE_MAX_SIZE;
+    const byAge = [...cache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp);
+    for (let i = 0; i < overage; i++) cache.delete(byAge[i][0]);
   }
 }
 

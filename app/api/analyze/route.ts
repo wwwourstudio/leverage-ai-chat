@@ -28,6 +28,34 @@ import { getGrokApiKey } from '@/lib/config';
 import { logger, LogCategory } from '@/lib/logger';
 import { getMarketIntelligenceSummary } from '@/lib/market-intelligence';
 import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
+
+// ── Response deduplication cache ─────────────────────────────────────────────
+// Prevents identical queries (e.g. double-taps, retry on same message) from
+// hitting the Grok API a second time within the TTL window.
+// Module-level: survives across requests on the same warm serverless instance.
+const DEDUP_CACHE_TTL_MS = 60_000; // 1 minute
+const DEDUP_CACHE_MAX = 50;
+const dedupCache = new Map<number, { text: string; cards: unknown[]; confidence: number; ts: number }>();
+
+/** djb2 hash — fast, good distribution, no external deps */
+function djb2(str: string): number {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = (((h << 5) + h) ^ str.charCodeAt(i)) | 0;
+  return h >>> 0;
+}
+
+/** Evict expired dedup entries; if still over max, remove the 5 oldest in one sort pass. */
+function evictDedupCache(): void {
+  const now = Date.now();
+  for (const [k, v] of dedupCache) {
+    if (now - v.ts > DEDUP_CACHE_TTL_MS) dedupCache.delete(k);
+  }
+  if (dedupCache.size > DEDUP_CACHE_MAX) {
+    const overage = dedupCache.size - DEDUP_CACHE_MAX + 5; // evict a small batch to amortise the sort cost
+    const byAge = [...dedupCache.entries()].sort((a, b) => a[1].ts - b[1].ts);
+    for (let i = 0; i < Math.min(overage, byAge.length); i++) dedupCache.delete(byAge[i][0]);
+  }
+}
 import { createClient } from '@/lib/supabase/server';
 
 // ============================================================================
@@ -161,7 +189,51 @@ export async function POST(request: NextRequest) {
       );
     }
     const body = parsed.data as AnalyzeRequestBody;
-    const { userMessage, existingCards = [], context = {}, customInstructions } = body;
+    const { existingCards = [], context = {}, customInstructions } = body;
+
+    // ── Guardrail 1: File-size guard ─────────────────────────────────────────
+    // The client caps file rows at 100 (chat-input) but we add a server-side
+    // safety net: replace inline file blocks > 50 data rows with a summary so
+    // the enriched prompt stays well within the 12k-token budget.
+    const userMessage = (() => {
+      if (!body.userMessage.includes('[File:')) return body.userMessage;
+      return body.userMessage.replace(
+        /(\[File:\s*[^\]]+\s*\((\d+)\s+rows?\)\])([\s\S]*?)(?=\n\[File:|$)/gi,
+        (_m, hdr, rowStr, content) => {
+          const rowCount = parseInt(rowStr, 10);
+          if (rowCount <= 50) return _m;
+          const lines = content.trimStart().split('\n');
+          const headerRow = lines[0] ?? '';
+          const dataRows  = lines.slice(1, 51).join('\n');
+          return `${hdr}\n${headerRow}\n${dataRows}\n[... ${rowCount - 50} more rows saved server-side — use query_adp tool for lookups]\n[ADP_FILE_SUMMARY_MODE: true]`;
+        },
+      );
+    })();
+
+    // ── Guardrail 4: Response deduplication ──────────────────────────────────
+    // Hash the first 600 chars of the user message (enough to fingerprint intent
+    // without being affected by file-content variance in long messages).
+    const queryHash = djb2(userMessage.slice(0, 600));
+    evictDedupCache();
+    const dedupHit = dedupCache.get(queryHash);
+    if (dedupHit) {
+      console.log(`[API/analyze] Dedup cache hit (hash ${queryHash}) — skipping Grok call`);
+      const enc = new TextEncoder();
+      const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+      const writer = writable.getWriter();
+      const payload = JSON.stringify({
+        type: 'done', success: true,
+        text: dedupHit.text + '\n\n*[Response cached — identical query within the last minute]*',
+        cards: dedupHit.cards, confidence: dedupHit.confidence,
+        sources: [{ name: 'Response Cache', type: 'cache', reliability: 95 }],
+        modelUsed: 'cache',
+      });
+      writer.write(enc.encode(`data: ${payload}\n\n`));
+      writer.close();
+      return new Response(readable, {
+        headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' },
+      });
+    }
 
     // Inject live date into system prompt
     const now = new Date();
@@ -189,6 +261,13 @@ export async function POST(request: NextRequest) {
       return msgLower;
     })();
 
+    // Declare hasADPIntent early — used by sport-detection layer 0 and later
+    // intent routing. Must be before the TEAM_TO_SPORT / inferredSport block to
+    // avoid a TDZ ReferenceError.
+    const hasADPIntent =
+      ['adp', 'nfbc', 'nffc', 'average draft', 'draft position', 'draft rank', 'draft order', 'nfbc board', 'nffc board']
+        .some(k => rawQueryLower.includes(k));
+
     // ── Team-name → sport inference ──────────────────────────────────────────
     // When context.sport is absent or 'none', scan the user message for known
     // team nicknames and infer the sport so card generation and model routing
@@ -214,6 +293,28 @@ export async function POST(request: NextRequest) {
 
     let inferredSport = context?.sport && context.sport !== 'none' ? context.sport : undefined;
     if (!inferredSport) {
+      // Layer 0: MLB force-lock — highest priority.
+      // Fires before team/player/stat layers to prevent NBA/generic fallback
+      // when MLB player names, fantasy-baseball abbreviations, or ADP terms appear.
+      const MLB_FORCE_TERMS = [
+        // Fantasy / ADP meta-keywords
+        'nfbc', 'nffc', '5x5', 'roto', 'saves+holds', 'shgn',
+        'adp board', 'draft board', 'mock draft', 'fantasy baseball',
+        // Statcast / baseball-specific stats not used in other sports
+        'barrel rate', 'exit velocity', 'xwoba', 'babip', 'xfip', 'fip',
+        'statcast', 'baseball savant', 'spin rate', 'whiff rate',
+        // MLB team abbreviations (caps) — e.g. "LAD starter" or "NYY lineup"
+        ' lad ', ' nyy ', ' bos ', ' hou ', ' chc ', ' atl ', ' sd ',
+        ' sea ', ' kc ', ' cle ', ' det ', ' tb ', ' mil ', ' cin ',
+        // Player names not yet in PLAYER_SPORT_MAP
+        'witt jr', 'de la cruz', 'caminero', 'raleigh', 'skubal', 'skenes',
+        'judge', 'crochet', 'kurtz',
+      ];
+      if (MLB_FORCE_TERMS.some(t => msgLower.includes(t))) {
+        inferredSport = 'mlb';
+      }
+    }
+    if (!inferredSport) {
       // Layer 1: team nicknames (fastest, most reliable)
       for (const [team, sportName] of Object.entries(TEAM_TO_SPORT)) {
         if (msgLower.includes(team)) { inferredSport = sportName; break; }
@@ -235,10 +336,12 @@ export async function POST(request: NextRequest) {
     if (inferredSport && !context.sport) {
       context.sport = inferredSport;
     }
-
-    const hasADPIntent =
-      ['adp', 'nfbc', 'nffc', 'average draft', 'draft position', 'draft rank', 'draft order', 'nfbc board', 'nffc board']
-        .some(k => rawQueryLower.includes(k));
+    // ADP queries with no explicit sport default to MLB — this app is MLB-first.
+    // NFFC/football signals detected above already set inferredSport = 'nfl'.
+    if (hasADPIntent && !context.sport) {
+      context.sport = 'mlb';
+      console.log('[API/analyze] ADP intent with no sport — defaulting to MLB');
+    }
 
     // Start/sit intent: user wants daily matchup-based start or sit advice.
     const START_SIT_KEYWORDS = [
@@ -902,6 +1005,20 @@ export async function POST(request: NextRequest) {
 
       cardPromise = Promise.resolve(resolvedCards);
     }
+    // ── Guardrail 3: Token budget guard ──────────────────────────────────────
+    // Hard cap: 12k prompt tokens (~48k chars). If the enriched prompt exceeds
+    // this, truncate inline file sections rather than cutting arbitrary content.
+    const TOKEN_BUDGET_CHARS = 48_000;
+    if (enrichedPrompt.length > TOKEN_BUDGET_CHARS) {
+      const before = enrichedPrompt.length;
+      // Prefer to shrink inline file blocks first (they're already summarised)
+      enrichedPrompt = enrichedPrompt
+        .replace(/\[File:[^\]]+\]\n[\s\S]*?\n\[\.\.\. \d+ more rows[^\]]*\]/g, '[File: (truncated — use query_adp tool)]')
+        .slice(0, TOKEN_BUDGET_CHARS);
+      enrichedPrompt += '\n\n[CONTEXT TRIMMED — token budget. Full data available via query_adp tool.]';
+      console.warn(`[API/analyze] Token budget: trimmed ${before} → ${enrichedPrompt.length} chars (~${Math.ceil(before / 4)} → 12k tokens)`);
+    }
+
     // ── AI generation starts now ──────────────────────────────────────────────
 
     const xaiApiKey = getGrokApiKey();
@@ -1695,6 +1812,16 @@ export async function POST(request: NextRequest) {
               ? `NFFC ${new Date().getFullYear()} NFL ADP Board`
               : `NFBC ${new Date().getFullYear()} ADP Board`;
             sources.push({ name: adpBoardName, type: 'api' as const, reliability: 97 });
+          }
+
+          // ── Guardrail 4: store successful response in dedup cache ────────────
+          if (aiText && !usedFallback) {
+            dedupCache.set(queryHash, {
+              text: aiText,
+              cards,
+              confidence: trustMetrics.finalConfidence,
+              ts: Date.now(),
+            });
           }
 
           // Send done event with full metadata

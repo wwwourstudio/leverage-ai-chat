@@ -64,7 +64,9 @@ function setCached<T>(key: string, data: T) {
 }
 
 const SAVANT_BASE = 'https://baseballsavant.mlb.com';
-const SEASON = 2025; // Last complete MLB season (2026 hasn't started)
+// Use last complete MLB season (season runs Apr–Oct; before April the prior year is most recent).
+const now = new Date();
+const SEASON = now.getMonth() < 3 /* Jan–Mar */ ? now.getFullYear() - 1 : now.getFullYear();
 
 /**
  * Fetch Statcast hitter leaderboard (top batters by xwOBA).

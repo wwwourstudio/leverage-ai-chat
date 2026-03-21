@@ -330,82 +330,106 @@ function computeVBDGeneric(
 // Updated for 2026 season — includes offseason roster moves.
 // ============================================================================
 
-const MLB_PROJECTIONS_2025: GenericPlayer[] = [
-  // OFs — sorted by projected pts
-  { name: 'Aaron Judge',           team: 'NYY', pos: 'OF', pts: 54.8, adp: 1.1  },
-  { name: 'Shohei Ohtani',         team: 'LAD', pos: 'OF', pts: 53.6, adp: 2.2  },
-  { name: 'Ronald Acuna Jr.',      team: 'ATL', pos: 'OF', pts: 52.4, adp: 3.1  },
-  { name: 'Mookie Betts',          team: 'LAD', pos: 'OF', pts: 48.8, adp: 5.3  },
-  { name: 'Juan Soto',             team: 'NYM', pos: 'OF', pts: 47.2, adp: 6.8  },
-  { name: 'Kyle Tucker',           team: 'CHC', pos: 'OF', pts: 45.1, adp: 9.3  },
-  { name: 'Julio Rodriguez',       team: 'SEA', pos: 'OF', pts: 43.6, adp: 12.4 },
-  { name: 'Yordan Alvarez',        team: 'HOU', pos: 'OF', pts: 39.8, adp: 19.3 },
-  { name: 'Fernando Tatis Jr.',    team: 'SD',  pos: 'OF', pts: 38.4, adp: 24.6 },
-  { name: 'Corbin Carroll',        team: 'ARI', pos: 'OF', pts: 36.2, adp: 30.1 },
-  { name: 'Randy Arozarena',       team: 'SEA', pos: 'OF', pts: 33.8, adp: 38.4 },
-  // SSs
-  { name: 'Elly De La Cruz',       team: 'CIN', pos: 'SS', pts: 44.8, adp: 7.5  },
-  { name: 'Jose Ramirez',          team: 'CLE', pos: 'SS', pts: 44.2, adp: 8.8  },
-  { name: 'Bobby Witt Jr.',        team: 'KC',  pos: 'SS', pts: 43.1, adp: 10.2 },
-  { name: 'Corey Seager',          team: 'TEX', pos: 'SS', pts: 39.4, adp: 20.6 },
-  { name: 'Gunnar Henderson',      team: 'BAL', pos: 'SS', pts: 37.8, adp: 26.3 },
-  { name: 'Trea Turner',           team: 'PHI', pos: 'SS', pts: 35.6, adp: 33.7 },
+// 2026 NFBC consensus pre-season ADP snapshot (updated March 2026).
+// Used only when the live NFBC ADP Supabase table is empty.
+const MLB_PROJECTIONS_2026: GenericPlayer[] = [
+  // OFs
+  { name: 'Aaron Judge',           team: 'NYY', pos: 'OF', pts: 54.8, adp: 1.9  },
+  { name: 'Shohei Ohtani',         team: 'LAD', pos: 'OF', pts: 53.2, adp: 1.2  },
+  { name: 'Ronald Acuna Jr.',      team: 'ATL', pos: 'OF', pts: 51.6, adp: 6.2  },
+  { name: 'Juan Soto',             team: 'NYM', pos: 'OF', pts: 48.4, adp: 4.3  },
+  { name: 'Kyle Tucker',           team: 'CHC', pos: 'OF', pts: 45.8, adp: 15.4 },
+  { name: 'Julio Rodriguez',       team: 'SEA', pos: 'OF', pts: 43.2, adp: 9.6  },
+  { name: 'Yordan Alvarez',        team: 'HOU', pos: 'OF', pts: 41.4, adp: 23.1 },
+  { name: 'Fernando Tatis Jr.',    team: 'SD',  pos: 'OF', pts: 39.6, adp: 14.4 },
+  { name: 'Corbin Carroll',        team: 'ARI', pos: 'OF', pts: 37.8, adp: 12.4 },
+  { name: 'Jackson Merrill',       team: 'SD',  pos: 'OF', pts: 36.4, adp: 39.2 },
+  { name: 'Jackson Chourio',       team: 'MIL', pos: 'OF', pts: 35.2, adp: 20.7 },
+  { name: 'Randy Arozarena',       team: 'SEA', pos: 'OF', pts: 33.8, adp: 92.6 },
+  // SSs / MIs
+  { name: 'Bobby Witt Jr.',        team: 'KC',  pos: 'SS', pts: 46.2, adp: 3.2  },
+  { name: 'Elly De La Cruz',       team: 'CIN', pos: 'SS', pts: 44.6, adp: 8.1  },
+  { name: 'Jose Ramirez',          team: 'CLE', pos: 'SS', pts: 43.8, adp: 5.4  },
+  { name: 'Gunnar Henderson',      team: 'BAL', pos: 'SS', pts: 40.2, adp: 15.2 },
+  { name: 'Corey Seager',          team: 'TEX', pos: 'SS', pts: 38.6, adp: 25.5 },
+  { name: 'Trea Turner',           team: 'PHI', pos: 'SS', pts: 35.4, adp: 34.9 },
+  { name: 'Mookie Betts',          team: 'LAD', pos: 'SS', pts: 42.6, adp: 28.8 },
   // 1Bs
-  { name: 'Freddie Freeman',       team: 'LAD', pos: '1B', pts: 42.3, adp: 13.1 },
-  { name: 'Matt Olson',            team: 'ATL', pos: '1B', pts: 40.8, adp: 17.4 },
-  { name: 'Vladimir Guerrero Jr.', team: 'NYM', pos: '1B', pts: 38.2, adp: 25.8 },
-  { name: 'Pete Alonso',           team: 'NYM', pos: '1B', pts: 36.4, adp: 32.2 },
-  { name: 'Christian Walker',      team: 'HOU', pos: '1B', pts: 32.8, adp: 44.6 },
+  { name: 'Freddie Freeman',       team: 'LAD', pos: '1B', pts: 42.8, adp: 31.4 },
+  { name: 'Vladimir Guerrero Jr.', team: 'NYM', pos: '1B', pts: 41.2, adp: 19.6 },
+  { name: 'Bryce Harper',          team: 'PHI', pos: '1B', pts: 39.6, adp: 29.6 },
+  { name: 'Pete Alonso',           team: 'NYM', pos: '1B', pts: 36.2, adp: 57.5 },
+  { name: 'Matt Olson',            team: 'ATL', pos: '1B', pts: 34.8, adp: 44.6 },
   // 2Bs
-  { name: 'Jose Altuve',           team: 'HOU', pos: '2B', pts: 36.8, adp: 29.4 },
-  { name: 'Marcus Semien',         team: 'TEX', pos: '2B', pts: 34.6, adp: 36.1 },
-  { name: 'Ozzie Albies',          team: 'ATL', pos: '2B', pts: 33.2, adp: 42.8 },
-  { name: 'Jeff McNeil',           team: 'NYM', pos: '2B', pts: 30.2, adp: 50.3 },
+  { name: 'Ozzie Albies',          team: 'ATL', pos: '2B', pts: 36.4, adp: 37.6 },
+  { name: 'Marcus Semien',         team: 'TEX', pos: '2B', pts: 33.8, adp: 76.6 },
+  { name: 'Bryson Stott',          team: 'PHI', pos: '2B', pts: 31.4, adp: 55.3 },
   // 3Bs
-  { name: 'Austin Riley',          team: 'ATL', pos: '3B', pts: 38.8, adp: 21.4 },
-  { name: 'Rafael Devers',         team: 'BOS', pos: '3B', pts: 36.6, adp: 31.1 },
-  { name: 'Nolan Arenado',         team: 'STL', pos: '3B', pts: 33.4, adp: 41.8 },
-  { name: 'Manny Machado',         team: 'SD',  pos: '3B', pts: 32.1, adp: 46.2 },
+  { name: 'Junior Caminero',       team: 'TB',  pos: '3B', pts: 40.4, adp: 17.4 },
+  { name: 'Alex Bregman',          team: 'BOS', pos: '3B', pts: 36.8, adp: 47.4 },
+  { name: 'Rafael Devers',         team: 'BOS', pos: '3B', pts: 35.6, adp: 36.2 },
+  { name: 'Jazz Chisholm Jr.',     team: 'NYY', pos: '3B', pts: 34.2, adp: 20.9 },
+  { name: 'Manny Machado',         team: 'SD',  pos: '3B', pts: 31.8, adp: 65.3 },
   // Cs
-  { name: 'Adley Rutschman',       team: 'BAL', pos: 'C',  pts: 34.8, adp: 34.4 },
-  { name: 'Will Smith',            team: 'LAD', pos: 'C',  pts: 32.6, adp: 42.2 },
-  { name: 'William Contreras',     team: 'MIL', pos: 'C',  pts: 30.4, adp: 51.6 },
-  { name: 'Sean Murphy',           team: 'ATL', pos: 'C',  pts: 28.8, adp: 59.1 },
-  // SPs — updated for 2026 season
-  { name: 'Zack Wheeler',          team: 'PHI', pos: 'SP', pts: 40.2, adp: 15.4 },
-  { name: 'Paul Skenes',           team: 'PIT', pos: 'SP', pts: 39.4, adp: 17.8 },
-  { name: 'Spencer Strider',       team: 'ATL', pos: 'SP', pts: 38.6, adp: 20.3 },
-  { name: 'Gerrit Cole',           team: 'NYY', pos: 'SP', pts: 36.2, adp: 25.7 },
-  { name: 'Logan Webb',            team: 'SF',  pos: 'SP', pts: 34.8, adp: 30.5 },
-  { name: 'Zac Gallen',            team: 'ARI', pos: 'SP', pts: 33.4, adp: 35.8 },
-  { name: 'Dylan Cease',           team: 'SD',  pos: 'SP', pts: 32.2, adp: 40.1 },
-  { name: 'Max Fried',             team: 'NYY', pos: 'SP', pts: 31.4, adp: 43.7 },
-  { name: 'Corbin Burnes',         team: 'ARI', pos: 'SP', pts: 30.6, adp: 47.3 },
-  { name: 'Yoshinobu Yamamoto',    team: 'LAD', pos: 'SP', pts: 29.8, adp: 51.2 },
-  { name: 'Sandy Alcantara',       team: 'MIA', pos: 'SP', pts: 28.4, adp: 56.6 },
-  { name: 'Shane McClanahan',      team: 'TB',  pos: 'SP', pts: 27.6, adp: 62.1 },
+  { name: 'Cal Raleigh',           team: 'SEA', pos: 'C',  pts: 36.4, adp: 18.5 },
+  { name: 'Adley Rutschman',       team: 'BAL', pos: 'C',  pts: 33.8, adp: 38.7 },
+  { name: 'William Contreras',     team: 'MIL', pos: 'C',  pts: 30.2, adp: 51.4 },
+  { name: 'Will Smith',            team: 'LAD', pos: 'C',  pts: 29.4, adp: 50.3 },
+  // SPs
+  { name: 'Tarik Skubal',          team: 'DET', pos: 'SP', pts: 43.2, adp: 7.3  },
+  { name: 'Paul Skenes',           team: 'PIT', pos: 'SP', pts: 41.4, adp: 11.3 },
+  { name: 'Garrett Crochet',       team: 'BOS', pos: 'SP', pts: 39.6, adp: 13.2 },
+  { name: 'Zack Wheeler',          team: 'PHI', pos: 'SP', pts: 38.8, adp: 24.1 },
+  { name: 'Gerrit Cole',           team: 'NYY', pos: 'SP', pts: 36.4, adp: 10.1 },
+  { name: 'Logan Webb',            team: 'SF',  pos: 'SP', pts: 34.6, adp: 26.3 },
+  { name: 'Shota Imanaga',         team: 'CHC', pos: 'SP', pts: 33.8, adp: 40.4 },
+  { name: 'Corbin Burnes',         team: 'ARI', pos: 'SP', pts: 32.4, adp: 32.2 },
+  { name: 'Max Fried',             team: 'NYY', pos: 'SP', pts: 31.8, adp: 121.6 },
+  { name: 'Dylan Cease',           team: 'SD',  pos: 'SP', pts: 30.6, adp: 52.8 },
+  { name: 'Spencer Strider',       team: 'ATL', pos: 'SP', pts: 29.8, adp: 30.8 },
+  { name: 'Shane McClanahan',      team: 'TB',  pos: 'SP', pts: 28.4, adp: 42.1 },
   // RPs
-  { name: 'Edwin Diaz',            team: 'NYM', pos: 'RP', pts: 28.4, adp: 57.1 },
-  { name: 'Ryan Helsley',          team: 'STL', pos: 'RP', pts: 27.8, adp: 60.6 },
-  { name: 'Josh Hader',            team: 'HOU', pos: 'RP', pts: 27.2, adp: 64.3 },
-  { name: 'Felix Bautista',        team: 'BAL', pos: 'RP', pts: 26.6, adp: 69.4 },
-  { name: 'Devin Williams',        team: 'MIL', pos: 'RP', pts: 25.8, adp: 75.2 },
+  { name: 'Ryan Helsley',          team: 'STL', pos: 'RP', pts: 29.6, adp: 27.6 },
+  { name: 'Josh Hader',            team: 'HOU', pos: 'RP', pts: 28.4, adp: 33.7 },
+  { name: 'Emmanuel Clase',        team: 'CLE', pos: 'RP', pts: 27.8, adp: 35.4 },
+  { name: 'Felix Bautista',        team: 'BAL', pos: 'RP', pts: 26.4, adp: 75.4 },
 ];
 
 const MLB_REPLACEMENT_RANKS: Record<string, number> = {
   OF: 9, '1B': 4, '2B': 3, '3B': 3, SS: 5, C: 3, SP: 9, RP: 4,
 };
 
-const ALL_MLB_VBD: PlayerVBD[] = computeVBDGeneric(MLB_PROJECTIONS_2025, MLB_REPLACEMENT_RANKS);
+const ALL_MLB_VBD: PlayerVBD[] = computeVBDGeneric(MLB_PROJECTIONS_2026, MLB_REPLACEMENT_RANKS);
 const MLB_TIER_CLIFFS: TierCliff[] = detectCliffs(ALL_MLB_VBD);
 
-function getMLBWaiverTargets(): WaiverTarget[] {
-  return [
-    { name: 'Corbin Carroll',    team: 'ARI', pos: 'OF', faabBid: 28, faabPct: 14, breakoutScore: 2.1, reason: 'Leadoff slot locked in; ARI offense surging — +18% HR rate last 30 days', rostered: 42 },
-    { name: 'Sandy Alcantara',   team: 'MIA', pos: 'SP', faabBid: 22, faabPct: 11, breakoutScore: 1.9, reason: 'Post-TJ velocity back to 97 mph; K/9 climbed to 9.8 over last 4 starts', rostered: 31 },
-    { name: 'William Contreras', team: 'MIL', pos: 'C',  faabBid: 18, faabPct: 9,  breakoutScore: 1.6, reason: 'Top-5 C in H2H leagues; .298 BA with 8 HR in last 30 days', rostered: 58 },
-    { name: 'Ryan Helsley',      team: 'STL', pos: 'RP', faabBid: 15, faabPct: 7,  breakoutScore: 1.4, reason: 'Locked-in closer role; 14 saves with sub-1.00 WHIP this season', rostered: 67 },
-  ];
+/** Derive waiver targets dynamically from VBD data: players with positive VBD but high ADP (undervalued). */
+function getMLBWaiverTargets(vbd: PlayerVBD[]): WaiverTarget[] {
+  // Sort by VBD descending; prefer players with ADP > 50 (available in most leagues).
+  const candidates = vbd
+    .filter(p => p.vbd > 0 && p.adp > 50)
+    .sort((a, b) => b.vbd - a.vbd)
+    .slice(0, 8);
+
+  if (candidates.length === 0) {
+    // Absolute fallback: just top VBD players
+    return vbd.sort((a, b) => b.vbd - a.vbd).slice(0, 4).map((p, i) => ({
+      name: p.name, team: p.team, pos: p.pos,
+      faabBid: Math.max(5, 30 - i * 5),
+      faabPct: Math.max(3, 15 - i * 3),
+      breakoutScore: +(p.vbd / 10).toFixed(1),
+      reason: `ADP ${p.adp} · +${p.vbd} VBD above replacement · Tier ${p.tier}`,
+      rostered: Math.round(Math.max(10, 80 - p.adp * 0.5)),
+    }));
+  }
+
+  return candidates.slice(0, 4).map((p, i) => ({
+    name: p.name, team: p.team, pos: p.pos,
+    faabBid: Math.max(5, Math.round(35 - i * 6)),
+    faabPct: Math.max(3, Math.round(18 - i * 4)),
+    breakoutScore: +(p.vbd / 8).toFixed(1),
+    reason: `ADP ${p.adp} — +${p.vbd} VBD above ${p.pos} replacement · Tier ${p.tier} value`,
+    rostered: Math.round(Math.max(10, 70 - p.adp * 0.4)),
+  }));
 }
 
 // ============================================================================
@@ -968,8 +992,8 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
     const mlbSeason = currentNFBCDraftYear();
 
     // 1. Try to use the user-uploaded NFBC ADP board as the primary player list.
-    //    If unavailable fall back to the static MLB_PROJECTIONS_2025 snapshot.
-    let mlbPlayers: GenericPlayer[] = MLB_PROJECTIONS_2025;
+    //    If unavailable fall back to the static MLB_PROJECTIONS_2026 snapshot.
+    let mlbPlayers: GenericPlayer[] = MLB_PROJECTIONS_2026;
     let isNFBCData = false;
     try {
       const nfbcPlayers = await getADPData();
@@ -983,6 +1007,19 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
 
     const mlbVBD = computeVBDGeneric(mlbPlayers, MLB_REPLACEMENT_RANKS);
     const mlbCliffs = detectCliffs(mlbVBD);
+
+    // Build a pitcher Statcast lookup for SP card reason enrichment.
+    // Keyed by lowercase name → pitcher-allowed metrics (xwOBA, barrel%, hard-hit%).
+    const statcastSPMap = new Map<string, { xwoba: number; barrelRate: number; hardHitPct: number }>();
+    try {
+      const { getStatcastData } = await import('@/lib/baseball-savant');
+      const { players: scAll } = await getStatcastData();
+      for (const p of scAll) {
+        if (p.playerType === 'pitcher' && p.name) {
+          statcastSPMap.set(p.name.toLowerCase(), { xwoba: p.xwoba, barrelRate: p.barrelRate, hardHitPct: p.hardHitPct });
+        }
+      }
+    } catch { /* non-critical — reason strings fall back to VBD/ADP */ }
 
     // ── Start/Sit mode: return matchup-focused cards instead of VBD/draft ──
     if (leagueOptions?.isStartSit) {
@@ -1000,17 +1037,20 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
           data: {
             fantasyCardType: 'draft_recommendation',
             sport: 'MLB',
-            round: 1, pick: 1, overallPick: 1,
-            bestPick: {
-              name: streamSP.name, team: streamSP.team, pos: streamSP.pos,
-              vbd: streamSP.vbd, pts: streamSP.pts, adp: streamSP.adp, tier: streamSP.tier,
-              reason: `Streaming SP — Tier ${streamSP.tier} arm facing weak lineup. Start in favourable ballpark weeks.`,
-            },
-            leveragePicks: mlbVBD.filter(p => p.pos === 'SP' && p.tier === 3).slice(1, 4).map(p => ({
-              name: p.name, team: p.team, pos: p.pos,
-              vbd: p.vbd, pts: p.pts, adp: p.adp, tier: p.tier,
-              reason: `Streaming option — use only vs weak lineups`,
-            })),
+            bestPick: (() => {
+              const sc = statcastSPMap.get(streamSP.name.toLowerCase());
+              const reason = sc
+                ? `ADP ${streamSP.adp} · xwOBA against ${sc.xwoba.toFixed(3)} · Barrel% ${sc.barrelRate.toFixed(1)}% · Tier ${streamSP.tier} arm`
+                : `ADP ${streamSP.adp} · +${streamSP.vbd} VBD vs SP replacement · Tier ${streamSP.tier} arm`;
+              return { name: streamSP.name, team: streamSP.team, pos: streamSP.pos, vbd: streamSP.vbd, pts: streamSP.pts, adp: streamSP.adp, tier: streamSP.tier, reason };
+            })(),
+            leveragePicks: mlbVBD.filter(p => p.pos === 'SP' && p.tier === 3).slice(1, 4).map(p => {
+              const sc = statcastSPMap.get(p.name.toLowerCase());
+              const reason = sc
+                ? `xwOBA ${sc.xwoba.toFixed(3)} · Barrel% ${sc.barrelRate.toFixed(1)}% · ADP ${p.adp}`
+                : `ADP ${p.adp} · +${p.vbd} VBD vs replacement`;
+              return { name: p.name, team: p.team, pos: p.pos, vbd: p.vbd, pts: p.pts, adp: p.adp, tier: p.tier, reason };
+            }),
             tierCliffAlerts: [],
             status: 'sleeper',
           },
@@ -1092,7 +1132,7 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
           metadata: { realData: true, dataSource: `Baseball Savant ${mlbSeason}` },
         });
       } else {
-        const targets = getMLBWaiverTargets();
+        const targets = getMLBWaiverTargets(mlbVBD);
         cards.push({
           type: 'FANTASY_WAIVER',
           title: 'MLB Waiver Wire Targets',
@@ -1116,24 +1156,36 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
     if (cards.length < count) {
       const spPlayers = mlbVBD.filter(p => p.pos === 'SP').sort((a, b) => b.vbd - a.vbd).slice(0, 5);
       const bestSP = spPlayers[0];
-      cards.push({
-        type: 'FANTASY_DRAFT',
-        title: 'MLB Draft Board — SP Targets',
-        icon: 'Target',
-        category: 'FANTASY',
-        subcategory: `MLB ${mlbSeason} • SP Rankings`,
-        gradient: 'from-indigo-600 to-purple-700',
-        data: {
-          fantasyCardType: 'draft_recommendation',
-          sport: 'MLB',
-          round: 2, pick: 3, overallPick: 15,
-          bestPick: bestSP ? { name: bestSP.name, team: bestSP.team, pos: bestSP.pos, vbd: bestSP.vbd, pts: bestSP.pts, adp: bestSP.adp, tier: bestSP.tier, reason: `VBD +${bestSP.vbd} above SP replacement. Tier ${bestSP.tier} arm.` } : null,
-          leveragePicks: spPlayers.slice(1, 4).map(p => ({ name: p.name, team: p.team, pos: p.pos, vbd: p.vbd, pts: p.pts, adp: p.adp, tier: p.tier, reason: `Tier ${p.tier} SP — elite ERA/WHIP/K combo at ADP ${p.adp}` })),
-          tierCliffAlerts: mlbCliffs.slice(0, 2).map(c => `${c.pos}: ${c.dropPct.toFixed(1)}% drop after ${c.cliffAfterName}`),
-          status: 'target',
-        },
-        metadata: { realData: isNFBCData, dataSource: isNFBCData ? mlbDataSource : `MLB ${mlbSeason} Draft Engine` },
-      });
+      if (bestSP) {
+        const bestSPSC = statcastSPMap.get(bestSP.name.toLowerCase());
+        const bestReason = bestSPSC
+          ? `ADP ${bestSP.adp} · xwOBA against ${bestSPSC.xwoba.toFixed(3)} · Barrel% ${bestSPSC.barrelRate.toFixed(1)}% · Tier ${bestSP.tier}`
+          : `ADP ${bestSP.adp} · +${bestSP.vbd} VBD above SP replacement · Tier ${bestSP.tier} arm`;
+        const dataSource = isNFBCData ? mlbDataSource : (statcastSPMap.size > 0 ? `Baseball Savant + ADP ${mlbSeason}` : `MLB ${mlbSeason} Draft Engine`);
+        cards.push({
+          type: 'FANTASY_DRAFT',
+          title: `MLB SP Rankings — ${mlbSeason} Targets`,
+          icon: 'Target',
+          category: 'FANTASY',
+          subcategory: `MLB ${mlbSeason} • SP by VBD${statcastSPMap.size > 0 ? ' + Statcast' : ''}`,
+          gradient: 'from-indigo-600 to-purple-700',
+          data: {
+            fantasyCardType: 'draft_recommendation',
+            sport: 'MLB',
+            bestPick: { name: bestSP.name, team: bestSP.team, pos: bestSP.pos, vbd: bestSP.vbd, pts: bestSP.pts, adp: bestSP.adp, tier: bestSP.tier, reason: bestReason },
+            leveragePicks: spPlayers.slice(1, 4).map(p => {
+              const sc = statcastSPMap.get(p.name.toLowerCase());
+              const reason = sc
+                ? `xwOBA ${sc.xwoba.toFixed(3)} · Barrel% ${sc.barrelRate.toFixed(1)}% · ADP ${p.adp}`
+                : `ADP ${p.adp} · +${p.vbd} VBD vs replacement`;
+              return { name: p.name, team: p.team, pos: p.pos, vbd: p.vbd, pts: p.pts, adp: p.adp, tier: p.tier, reason };
+            }),
+            tierCliffAlerts: mlbCliffs.filter(c => c.pos === 'SP').slice(0, 2).map(c => `SP: ${c.dropPct.toFixed(1)}% value drop after ${c.cliffAfterName}`),
+            status: 'target',
+          },
+          metadata: { realData: isNFBCData || statcastSPMap.size > 0, dataSource },
+        });
+      }
     }
 
     // ── VPE card — Vortex Projection Engine rankings from live Statcast ──────

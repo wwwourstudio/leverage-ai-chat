@@ -7,6 +7,13 @@ import { getPlayerHeadshotUrl } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Shell, PosBadge, TierBadge, type FantasyCardProps } from './shared';
 
+function dispatchPlayerClick(name: string, pos: string, team: string, adp?: number) {
+  const meta = [team, pos].filter(Boolean).join(' ');
+  const adpLabel = adp ? ` · ADP ${adp}` : '';
+  const query = `Analyze ${name}${meta ? ` (${meta}${adpLabel})` : ''} — recent stats, season projections, and draft value`;
+  window.dispatchEvent(new CustomEvent('leveragePlayerClick', { detail: { query, category: 'fantasy' } }));
+}
+
 export const DraftCard = memo(function DraftCard({ data, ...p }: FantasyCardProps) {
   const { bestPick, leveragePicks = [], tierCliffAlerts = [], sport } = data;
   const avatarSport = sport?.toLowerCase() || p.category?.toLowerCase();
@@ -31,16 +38,25 @@ export const DraftCard = memo(function DraftCard({ data, ...p }: FantasyCardProp
               <div className="flex items-center gap-1.5 flex-wrap">
                 <PosBadge pos={bestPick.pos} />
                 <TierBadge tier={bestPick.tier} />
-                <span className="text-sm font-black text-white">{bestPick.name}</span>
+                <button
+                  className="text-sm font-black text-white hover:text-teal-300 transition-colors text-left"
+                  onClick={() => dispatchPlayerClick(bestPick.name, bestPick.pos, bestPick.team, bestPick.adp)}
+                  title={`Analyze ${bestPick.name}`}
+                >
+                  {bestPick.name}
+                </button>
                 <span className="text-xs text-[oklch(0.48_0.01_280)]">{bestPick.team}</span>
               </div>
               {bestPick.reason && (
                 <p className="text-[11px] text-[oklch(0.48_0.01_280)] mt-1 leading-relaxed">{bestPick.reason}</p>
               )}
             </div>
-            <div className="flex flex-col items-end shrink-0">
+            <div className="flex flex-col items-end shrink-0 gap-0.5">
               <span className="text-base font-black text-teal-400 tabular-nums">+{bestPick.vbd}</span>
               <span className="text-[8px] text-[oklch(0.35_0.01_280)]">VBD</span>
+              {bestPick.adp != null && (
+                <span className="text-[9px] font-bold text-[oklch(0.38_0.01_280)] tabular-nums">ADP {bestPick.adp}</span>
+              )}
             </div>
           </div>
         </div>
@@ -72,11 +88,22 @@ export const DraftCard = memo(function DraftCard({ data, ...p }: FantasyCardProp
                   size="xs"
                 />
                 <PosBadge pos={lp.pos} />
-                <span className="text-xs font-bold text-white flex-1 truncate">{lp.name}</span>
+                <button
+                  className="text-xs font-bold text-white flex-1 truncate text-left hover:text-amber-300 transition-colors"
+                  onClick={() => dispatchPlayerClick(lp.name, lp.pos, lp.team, lp.adp)}
+                  title={`Analyze ${lp.name}`}
+                >
+                  {lp.name}
+                </button>
                 <span className="text-[10px] text-[oklch(0.42_0.01_280)] truncate max-w-[110px] hidden sm:block">{lp.reason}</span>
-                <span className={cn('text-xs font-black tabular-nums shrink-0', i === 0 ? 'text-amber-400' : 'text-white')}>
-                  +{lp.vbd}
-                </span>
+                <div className="flex flex-col items-end shrink-0">
+                  <span className={cn('text-xs font-black tabular-nums', i === 0 ? 'text-amber-400' : 'text-white')}>
+                    +{lp.vbd}
+                  </span>
+                  {lp.adp != null && (
+                    <span className="text-[8px] text-[oklch(0.32_0.01_280)] tabular-nums">{lp.adp}</span>
+                  )}
+                </div>
               </div>
             ))}
           </div>

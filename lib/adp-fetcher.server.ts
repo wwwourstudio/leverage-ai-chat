@@ -289,14 +289,12 @@ function parseESPNResponse(
 }
 
 export async function scrapeESPN(sport: 'mlb' | 'nfl'): Promise<NFBCPlayer[]> {
+  // Use the /players endpoint — leaguedefaults is for league settings, not ADP data
   const url =
     `https://lm-api-reads.fantasy.espn.com/apis/v3/games/${ESPN_GAME[sport]}` +
-    `/seasons/${ESPN_SEASON[sport]}/segments/0/leaguedefaults/${ESPN_LEAGUE[sport]}` +
-    `?scoringPeriodId=1&view=kona_player_info`;
+    `/seasons/${ESPN_SEASON[sport]}/players?scoringPeriodId=0&view=kona_player_info`;
 
-  // X-Fantasy-Filter: sort by ADP and pull a large player pool.
-  // Keep the filter minimal — extra fields (e.g. filterRanksForScoringPeriodIds)
-  // cause HTTP 400 on the leaguedefaults endpoint.
+  // X-Fantasy-Filter: sort by ADP and pull a large player pool
   const fantasyFilter = JSON.stringify({
     players: {
       filterStatus: { value: ['FREEAGENT', 'ONTEAM', 'WAIVERS'] },
@@ -306,20 +304,14 @@ export async function scrapeESPN(sport: 'mlb' | 'nfl'): Promise<NFBCPlayer[]> {
     },
   });
 
-  const headers: Record<string, string> = {
-    'User-Agent':       FP_UA,
-    Accept:             'application/json',
-    'X-Fantasy-Filter': fantasyFilter,
-  };
-
-  let res = await fetch(url, { headers, signal: AbortSignal.timeout(12_000) });
-
-  // If the filtered request is rejected, retry without the filter header
-  if (res.status === 400) {
-    console.warn(`[v0] [ADP/fetcher] ESPN ${sport.toUpperCase()} 400 with filter — retrying without filter`);
-    const { 'X-Fantasy-Filter': _removed, ...plainHeaders } = headers;
-    res = await fetch(url, { headers: plainHeaders, signal: AbortSignal.timeout(12_000) });
-  }
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent':       FP_UA,
+      Accept:             'application/json',
+      'X-Fantasy-Filter': fantasyFilter,
+    },
+    signal: AbortSignal.timeout(15_000),
+  });
 
   if (!res.ok) throw new Error(`ESPN ${sport.toUpperCase()} HTTP ${res.status}`);
 

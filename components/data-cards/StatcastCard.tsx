@@ -287,7 +287,11 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
                   {data.subcategory ?? conf.label}
                 </span>
               </div>
-              <h3 className={`font-black text-white leading-tight truncate ${isHero ? 'text-base' : 'text-sm'}`}>
+              <h3
+                className={`font-black text-white leading-tight truncate ${isHero ? 'text-base' : 'text-sm'}${onAnalyze ? ' cursor-pointer hover:text-blue-300 transition-colors' : ''}`}
+                onClick={onAnalyze}
+                title={onAnalyze ? `Analyze ${data.title}` : undefined}
+              >
                 {data.title}
               </h3>
             </div>

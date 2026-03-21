@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { extractMLBJson, parseMarkdownBettingText, type MLBAnalysis } from '../../lib/utils/mlb-json-parser';
 
 describe('extractMLBJson', () => {

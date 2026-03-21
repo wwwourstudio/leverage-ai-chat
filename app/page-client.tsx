@@ -2337,8 +2337,7 @@ No preamble. Start directly with section 1.`;
       const tabCount  = (input.match(/\t/g) ?? []).length;
       if (lineCount > 20 && tabCount > lineCount) {
         toast.error(
-          '📊 That looks like raw ADP/spreadsheet data. Download the TSV from SHGN, then use the ADP Upload button (📎) to import it — the AI will have full access to all rows for draft analysis.',
-          { duration: 7000 }
+          '📊 That looks like raw ADP/spreadsheet data. Use the ADP Upload button (📎) to import it — the AI will have full access to all rows for draft analysis.'
         );
         return;
       }

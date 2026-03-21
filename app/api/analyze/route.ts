@@ -1486,8 +1486,8 @@ export async function POST(request: NextRequest) {
                 const usage = await streamResult.usage;
                 if (usage) {
                   tokenUsage = {
-                    promptTokens: usage.promptTokens ?? 0,
-                    completionTokens: usage.completionTokens ?? 0,
+                    promptTokens: usage.inputTokens ?? 0,
+                    completionTokens: usage.outputTokens ?? 0,
                     totalTokens: usage.totalTokens ?? 0,
                   };
                 }
@@ -1725,7 +1725,7 @@ export async function POST(request: NextRequest) {
             }
 
             if (parsedStatcast) {
-              const statcastCard: InsightCard = { icon: '⚾', ...parsedStatcast };
+              const statcastCard: InsightCard = { icon: '⚾', ...parsedStatcast } as InsightCard;
               cards = [statcastCard, ...cards.slice(0, 5)];
               pendingStatcastCard = null;
               const metricLines = ((parsedStatcast.summary_metrics as { label: string; value: string }[] | undefined) ?? [])
@@ -1746,10 +1746,7 @@ export async function POST(request: NextRequest) {
               // Only warn when expectsStatcastJSON=true; prose is correct for all other paths.
               const preview = aiText.slice(0, 120).replace(/\n/g, ' ');
               logger.warn(LogCategory.API, '[API/analyze] MLB Statcast JSON not found in response — prose fallback', {
-                previewChars: preview,
-                responseLength: aiText.length,
-                hasCodeFence: aiText.includes('```'),
-                hasBrace: aiText.includes('{'),
+                metadata: { previewChars: preview, responseLength: aiText.length, hasCodeFence: aiText.includes('```'), hasBrace: aiText.includes('{') },
               });
             }
           }

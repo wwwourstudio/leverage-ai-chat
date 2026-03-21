@@ -69,7 +69,7 @@ function resolvePlayerGame(
     // Check away lineup
     const awayBatter = game.awayLineup?.find(b => nameFuzzyMatch(b.fullName, playerName));
     if (awayBatter) {
-      const pitcher = game.probablePitcherHome ?? game.probableHomePitcher;
+      const pitcher = game.probableHomePitcher;
       if (!pitcher) continue;
       return { game, pitcher, batterEntry: awayBatter, isHome: false };
     }

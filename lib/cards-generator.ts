@@ -10,7 +10,7 @@
  */
 
 import { unstable_cache } from 'next/cache';
-import { CARD_TYPES, SPORT_KEYS, sportToApi, apiToSport, getSportGradient } from '@/lib/constants';
+import { CARD_TYPES, CARD_STATUS, SPORT_KEYS, sportToApi, apiToSport, getSportGradient } from '@/lib/constants';
 import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
 import { logger, LogCategory } from '@/lib/logger';
 
@@ -1923,7 +1923,7 @@ export function cardsToPromptContext(cards: InsightCard[]): string {
     }
 
     // ── Kalshi / prediction market cards ─────────────────────────────────────
-    if (card.type === CARD_TYPES.KALSHI || card.type === 'kalshi') {
+    if (card.type === CARD_TYPES.KALSHI_INSIGHT || card.type === CARD_TYPES.KALSHI_MARKET || card.type === 'kalshi') {
       const title = String(d.market ?? d.title ?? card.title ?? '');
       const parts: string[] = [`Kalshi: ${title}`];
       if (d.yesPrice !== undefined) parts.push(`YES: ${d.yesPrice}¢`);
@@ -1936,7 +1936,7 @@ export function cardsToPromptContext(cards: InsightCard[]): string {
     // ── Player prop / prop-hit-rate cards ────────────────────────────────────
     if (
       card.type === CARD_TYPES.PLAYER_PROP ||
-      card.type === CARD_TYPES.PROP_HIT_RATE ||
+      card.type === 'prop-hit-rate' ||
       card.type === 'player-prop' ||
       card.type === 'prop-hit-rate'
     ) {
@@ -1951,7 +1951,7 @@ export function cardsToPromptContext(cards: InsightCard[]): string {
     }
 
     // ── Arbitrage cards ───────────────────────────────────────────────────────
-    if (card.type === CARD_TYPES.ARBITRAGE || card.type === 'arbitrage') {
+    if (card.type === CARD_TYPES.ARBITRAGE_OPPORTUNITY || card.type === 'arbitrage') {
       const parts: string[] = [`Arb: ${card.title}`];
       if (d.profit) parts.push(`Profit: ${d.profit}`);
       if (d.book1 && d.book2) parts.push(`Books: ${d.book1} vs ${d.book2}`);

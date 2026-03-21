@@ -23,7 +23,11 @@ let _model: { predict: (x: number[][]) => Promise<number> } | null = null;
 async function getModel() {
   if (_model) return _model;
 
-  // Dynamic import so tfjs-node is never bundled into edge/client chunks
+  // Dynamic import so tfjs-node is never bundled into edge/client chunks.
+  // @tensorflow/tfjs-node is an optional peer dep — if not installed the
+  // runtime catch returns null and the caller falls back gracefully.
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-expect-error — optional dep may not be installed
   const tf = await import('@tensorflow/tfjs-node').catch(() => null);
 
   if (!tf) {

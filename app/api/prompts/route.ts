@@ -127,7 +127,7 @@ Return a JSON array of 5 objects: [{"label": "Short label (3-5 words)", "query":
     model: createXai({ apiKey })('grok-3-fast'),
     system: systemPrompt,
     prompt: userPrompt,
-    maxTokens: 600,
+    maxOutputTokens: 600,
     temperature: 0.8,
   }).then(({ text }) => {
     const jsonMatch = text.match(/\[[\s\S]*\]/);

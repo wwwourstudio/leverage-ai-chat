@@ -984,6 +984,19 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
     const mlbVBD = computeVBDGeneric(mlbPlayers, MLB_REPLACEMENT_RANKS);
     const mlbCliffs = detectCliffs(mlbVBD);
 
+    // Build a pitcher Statcast lookup for SP card reason enrichment.
+    // Keyed by lowercase name → pitcher-allowed metrics (xwOBA, barrel%, hard-hit%).
+    const statcastSPMap = new Map<string, { xwoba: number; barrelRate: number; hardHitPct: number }>();
+    try {
+      const { getStatcastData } = await import('@/lib/baseball-savant');
+      const { players: scAll } = await getStatcastData();
+      for (const p of scAll) {
+        if (p.playerType === 'pitcher' && p.name) {
+          statcastSPMap.set(p.name.toLowerCase(), { xwoba: p.xwoba, barrelRate: p.barrelRate, hardHitPct: p.hardHitPct });
+        }
+      }
+    } catch { /* non-critical — reason strings fall back to VBD/ADP */ }
+
     // ── Start/Sit mode: return matchup-focused cards instead of VBD/draft ──
     if (leagueOptions?.isStartSit) {
       const startSitCards = await generateMLBStartSitCards(mlbVBD, String(mlbSeason), leagueOptions);
@@ -1000,17 +1013,20 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
           data: {
             fantasyCardType: 'draft_recommendation',
             sport: 'MLB',
-            round: 1, pick: 1, overallPick: 1,
-            bestPick: {
-              name: streamSP.name, team: streamSP.team, pos: streamSP.pos,
-              vbd: streamSP.vbd, pts: streamSP.pts, adp: streamSP.adp, tier: streamSP.tier,
-              reason: `Streaming SP — Tier ${streamSP.tier} arm facing weak lineup. Start in favourable ballpark weeks.`,
-            },
-            leveragePicks: mlbVBD.filter(p => p.pos === 'SP' && p.tier === 3).slice(1, 4).map(p => ({
-              name: p.name, team: p.team, pos: p.pos,
-              vbd: p.vbd, pts: p.pts, adp: p.adp, tier: p.tier,
-              reason: `Streaming option — use only vs weak lineups`,
-            })),
+            bestPick: (() => {
+              const sc = statcastSPMap.get(streamSP.name.toLowerCase());
+              const reason = sc
+                ? `ADP ${streamSP.adp} · xwOBA against ${sc.xwoba.toFixed(3)} · Barrel% ${sc.barrelRate.toFixed(1)}% · Tier ${streamSP.tier} arm`
+                : `ADP ${streamSP.adp} · +${streamSP.vbd} VBD vs SP replacement · Tier ${streamSP.tier} arm`;
+              return { name: streamSP.name, team: streamSP.team, pos: streamSP.pos, vbd: streamSP.vbd, pts: streamSP.pts, adp: streamSP.adp, tier: streamSP.tier, reason };
+            })(),
+            leveragePicks: mlbVBD.filter(p => p.pos === 'SP' && p.tier === 3).slice(1, 4).map(p => {
+              const sc = statcastSPMap.get(p.name.toLowerCase());
+              const reason = sc
+                ? `xwOBA ${sc.xwoba.toFixed(3)} · Barrel% ${sc.barrelRate.toFixed(1)}% · ADP ${p.adp}`
+                : `ADP ${p.adp} · +${p.vbd} VBD vs replacement`;
+              return { name: p.name, team: p.team, pos: p.pos, vbd: p.vbd, pts: p.pts, adp: p.adp, tier: p.tier, reason };
+            }),
             tierCliffAlerts: [],
             status: 'sleeper',
           },
@@ -1116,24 +1132,36 @@ async function generateNonNFLFantasyCards(sport: string, count: number, leagueOp
     if (cards.length < count) {
       const spPlayers = mlbVBD.filter(p => p.pos === 'SP').sort((a, b) => b.vbd - a.vbd).slice(0, 5);
       const bestSP = spPlayers[0];
-      cards.push({
-        type: 'FANTASY_DRAFT',
-        title: 'MLB Draft Board — SP Targets',
-        icon: 'Target',
-        category: 'FANTASY',
-        subcategory: `MLB ${mlbSeason} • SP Rankings`,
-        gradient: 'from-indigo-600 to-purple-700',
-        data: {
-          fantasyCardType: 'draft_recommendation',
-          sport: 'MLB',
-          round: 2, pick: 3, overallPick: 15,
-          bestPick: bestSP ? { name: bestSP.name, team: bestSP.team, pos: bestSP.pos, vbd: bestSP.vbd, pts: bestSP.pts, adp: bestSP.adp, tier: bestSP.tier, reason: `VBD +${bestSP.vbd} above SP replacement. Tier ${bestSP.tier} arm.` } : null,
-          leveragePicks: spPlayers.slice(1, 4).map(p => ({ name: p.name, team: p.team, pos: p.pos, vbd: p.vbd, pts: p.pts, adp: p.adp, tier: p.tier, reason: `Tier ${p.tier} SP — elite ERA/WHIP/K combo at ADP ${p.adp}` })),
-          tierCliffAlerts: mlbCliffs.slice(0, 2).map(c => `${c.pos}: ${c.dropPct.toFixed(1)}% drop after ${c.cliffAfterName}`),
-          status: 'target',
-        },
-        metadata: { realData: isNFBCData, dataSource: isNFBCData ? mlbDataSource : `MLB ${mlbSeason} Draft Engine` },
-      });
+      if (bestSP) {
+        const bestSPSC = statcastSPMap.get(bestSP.name.toLowerCase());
+        const bestReason = bestSPSC
+          ? `ADP ${bestSP.adp} · xwOBA against ${bestSPSC.xwoba.toFixed(3)} · Barrel% ${bestSPSC.barrelRate.toFixed(1)}% · Tier ${bestSP.tier}`
+          : `ADP ${bestSP.adp} · +${bestSP.vbd} VBD above SP replacement · Tier ${bestSP.tier} arm`;
+        const dataSource = isNFBCData ? mlbDataSource : (statcastSPMap.size > 0 ? `Baseball Savant + ADP ${mlbSeason}` : `MLB ${mlbSeason} Draft Engine`);
+        cards.push({
+          type: 'FANTASY_DRAFT',
+          title: `MLB SP Rankings — ${mlbSeason} Targets`,
+          icon: 'Target',
+          category: 'FANTASY',
+          subcategory: `MLB ${mlbSeason} • SP by VBD${statcastSPMap.size > 0 ? ' + Statcast' : ''}`,
+          gradient: 'from-indigo-600 to-purple-700',
+          data: {
+            fantasyCardType: 'draft_recommendation',
+            sport: 'MLB',
+            bestPick: { name: bestSP.name, team: bestSP.team, pos: bestSP.pos, vbd: bestSP.vbd, pts: bestSP.pts, adp: bestSP.adp, tier: bestSP.tier, reason: bestReason },
+            leveragePicks: spPlayers.slice(1, 4).map(p => {
+              const sc = statcastSPMap.get(p.name.toLowerCase());
+              const reason = sc
+                ? `xwOBA ${sc.xwoba.toFixed(3)} · Barrel% ${sc.barrelRate.toFixed(1)}% · ADP ${p.adp}`
+                : `ADP ${p.adp} · +${p.vbd} VBD vs replacement`;
+              return { name: p.name, team: p.team, pos: p.pos, vbd: p.vbd, pts: p.pts, adp: p.adp, tier: p.tier, reason };
+            }),
+            tierCliffAlerts: mlbCliffs.filter(c => c.pos === 'SP').slice(0, 2).map(c => `SP: ${c.dropPct.toFixed(1)}% value drop after ${c.cliffAfterName}`),
+            status: 'target',
+          },
+          metadata: { realData: isNFBCData || statcastSPMap.size > 0, dataSource },
+        });
+      }
     }
 
     // ── VPE card — Vortex Projection Engine rankings from live Statcast ──────

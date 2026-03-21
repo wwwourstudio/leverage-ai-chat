@@ -15,6 +15,7 @@ import { ADPCard } from './ADPCard';
 import { ADPUploadModal } from '@/components/ADPUploadModal';
 import { MLBProjectionCard } from './MLBProjectionCard';
 import { VPECard } from './VPECard';
+import { HRPredictionCard } from './HRPredictionCard';
 
 interface CardData {
   id?: string;
@@ -181,6 +182,13 @@ export function DynamicCardRenderer({
         error={error}
         isHero={isHero}
       />
+    );
+  }
+
+  // LeverageMetrics v3 HR Prediction card (exact match — must come before 'prediction' catch-all)
+  if (cardType === 'hr_prediction_card') {
+    return withOverlays(
+      <HRPredictionCard data={card.data as any} />
     );
   }
 

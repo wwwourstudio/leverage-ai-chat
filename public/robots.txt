@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /api/
+Disallow: /auth/
+Allow: /
+
+Sitemap: https://v0-leverage-ai-chat.vercel.app/sitemap.xml

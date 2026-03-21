@@ -1451,10 +1451,30 @@ export async function POST(request: NextRequest) {
             // Abort if the first token doesn't arrive within the timeout budget
             const firstTokenTimer = setTimeout(() => abortCtrl.abort(new Error('Primary timeout')), primaryTimeoutMs);
 
+            // Max chars to stream before truncating a runaway response
+            const RESPONSE_CHAR_LIMIT = 8_000;
+
             try {
               let gotFirstToken = false;
+              let responseTruncated = false;
               for await (const delta of streamResult.textStream) {
                 if (!gotFirstToken) { gotFirstToken = true; clearTimeout(firstTokenTimer); }
+                if (responseTruncated) continue; // drain the stream without emitting
+                if (aiText.length + delta.length > RESPONSE_CHAR_LIMIT) {
+                  // Emit the remaining chars up to the cap, then inject a notice
+                  const remaining = RESPONSE_CHAR_LIMIT - aiText.length;
+                  if (remaining > 0) {
+                    const partial = delta.slice(0, remaining);
+                    aiText += partial;
+                    controller.enqueue(sseChunk({ type: 'text', delta: partial }));
+                  }
+                  const notice = '\n\n---\n_Response truncated — ask me to continue or be more specific._';
+                  aiText += notice;
+                  controller.enqueue(sseChunk({ type: 'text', delta: notice }));
+                  responseTruncated = true;
+                  console.warn(`[API/analyze] Response truncated at ${RESPONSE_CHAR_LIMIT} chars`);
+                  continue;
+                }
                 aiText += delta;
                 controller.enqueue(sseChunk({ type: 'text', delta }));
               }
@@ -1466,8 +1486,8 @@ export async function POST(request: NextRequest) {
                 const usage = await streamResult.usage;
                 if (usage) {
                   tokenUsage = {
-                    promptTokens: usage.promptTokens ?? 0,
-                    completionTokens: usage.completionTokens ?? 0,
+                    promptTokens: usage.inputTokens ?? 0,
+                    completionTokens: usage.outputTokens ?? 0,
                     totalTokens: usage.totalTokens ?? 0,
                   };
                 }
@@ -1545,7 +1565,7 @@ export async function POST(request: NextRequest) {
                   const hr = hrResult.result;
                   pendingHRPredictionCard = {
                     type:       'hr_prediction_card',
-                    title:      `${hr.player} — HR Prediction`,
+                    title:      `${hr.player ?? 'Player'} — HR Prediction`,
                     icon:       '💣',
                     category:   'MLB',
                     subcategory: 'HR Prop · v3 Engine',
@@ -1555,6 +1575,26 @@ export async function POST(request: NextRequest) {
                     data:       hr,
                   };
                   console.log('[API/analyze] HR prediction card built for:', hr.player);
+                } else {
+                  // Tool didn't fire or returned undefined — emit a degraded card so the
+                  // UI slot is never silently empty when the user asked for a HR prediction.
+                  pendingHRPredictionCard = {
+                    type:       'hr_prediction_card',
+                    title:      'HR Prediction',
+                    icon:       '💣',
+                    category:   'MLB',
+                    subcategory: 'HR Prop · v3 Engine',
+                    gradient:   'from-rose-600/20 via-red-900/15 to-slate-900/40',
+                    status:     'neutral',
+                    realData:   false,
+                    data:       {
+                      success: false,
+                      error:   'Live MLB data unavailable — prediction could not be generated.',
+                      player:  'Unknown',
+                      type:    'hr_prediction_card',
+                    },
+                  };
+                  console.warn('[API/analyze] HR prediction tool did not fire — emitting degraded card');
                 }
               }
 
@@ -1705,7 +1745,7 @@ export async function POST(request: NextRequest) {
             }
 
             if (parsedStatcast) {
-              const statcastCard: InsightCard = { icon: '⚾', ...parsedStatcast };
+              const statcastCard: InsightCard = { icon: '⚾', ...parsedStatcast } as InsightCard;
               cards = [statcastCard, ...cards.slice(0, 5)];
               pendingStatcastCard = null;
               const metricLines = ((parsedStatcast.summary_metrics as { label: string; value: string }[] | undefined) ?? [])
@@ -1726,10 +1766,7 @@ export async function POST(request: NextRequest) {
               // Only warn when expectsStatcastJSON=true; prose is correct for all other paths.
               const preview = aiText.slice(0, 120).replace(/\n/g, ' ');
               logger.warn(LogCategory.API, '[API/analyze] MLB Statcast JSON not found in response — prose fallback', {
-                previewChars: preview,
-                responseLength: aiText.length,
-                hasCodeFence: aiText.includes('```'),
-                hasBrace: aiText.includes('{'),
+                metadata: { previewChars: preview, responseLength: aiText.length, hasCodeFence: aiText.includes('```'), hasBrace: aiText.includes('{') },
               });
             }
           }

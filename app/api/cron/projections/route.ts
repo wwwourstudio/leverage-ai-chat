@@ -40,10 +40,9 @@ export async function GET(req: NextRequest) {
     // The pipeline fetches today's games internally from the MLB Stats API
     const result = await runProjectionPipeline({
       date: todayET(),
-      persist: true, // write to Supabase fantasy_players / mlb_projections
     });
 
-    const playerCount = Array.isArray(result) ? result.length : result?.players?.length ?? 0;
+    const playerCount = Array.isArray(result) ? result.length : 0;
 
     console.log(
       `[v0] [cron/projections] Projected ${playerCount} players in ${Date.now() - startedAt}ms`,

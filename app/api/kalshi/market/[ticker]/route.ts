@@ -21,9 +21,10 @@ const TICKER_TTL   = 30_000;
 
 export async function GET(
   request: Request,
-  { params }: { params: { ticker: string } },
+  { params }: { params: Promise<{ ticker: string }> },
 ) {
-  const ticker    = params.ticker?.toUpperCase();
+  const { ticker: tickerRaw } = await params;
+  const ticker    = tickerRaw?.toUpperCase();
   const { searchParams } = new URL(request.url);
   const modelProb = parseFloat(searchParams.get('modelProb') || 'NaN');
 

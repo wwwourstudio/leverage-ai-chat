@@ -88,13 +88,13 @@ const ODDS_ROW = {
  * provided data (or error) for that table.
  */
 function buildSupabaseMock(overrides: {
-  playerData?:  typeof PLAYER_ROW | null;
+  playerData?:  Record<string, unknown> | null;
   playerError?: { message: string } | null;
-  pitcherData?: typeof PITCHER_ROW | null;
+  pitcherData?: Record<string, unknown> | null;
   pitcherError?:{ message: string } | null;
   gameData?:    typeof GAME_ROW | null;
   gameError?:   { message: string } | null;
-  oddsData?:    typeof ODDS_ROW | null;
+  oddsData?:    { implied_prob: number | null; american_odds: number } | null;
 } = {}) {
   const {
     playerData   = PLAYER_ROW,

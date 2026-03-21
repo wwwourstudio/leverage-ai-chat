@@ -34,9 +34,22 @@ export async function GET(req: NextRequest) {
   const startedAt = Date.now();
 
   try {
-    // Fetch live odds for the primary sport markets
+    // Fetch live odds for all primary sport markets in parallel.
+    // fetchLiveOdds requires a sportKey; the cron loops through all active sports.
     const { fetchLiveOdds } = await import('@/lib/unified-odds-fetcher');
-    const oddsResult = await fetchLiveOdds();
+    const apiKey = process.env.ODDS_API_KEY ?? '';
+    const activeSports = [
+      'basketball_nba',
+      'americanfootball_nfl',
+      'baseball_mlb',
+      'icehockey_nhl',
+    ];
+    const settled = await Promise.allSettled(
+      activeSports.map(sk => fetchLiveOdds(sk, { apiKey })),
+    );
+    const oddsResult = settled.flatMap(r =>
+      r.status === 'fulfilled' ? (Array.isArray(r.value) ? r.value : []) : [],
+    );
 
     console.log(
       `[v0] [cron/odds] Fetched ${oddsResult?.length ?? 0} markets in ${Date.now() - startedAt}ms`,

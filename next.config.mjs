@@ -1,10 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   images: {
     unoptimized: true,
+  },
+  experimental: {
+    cpus: 2,
   },
   // Allow iframe embedding for v0 preview.
   // X-Frame-Options SAMEORIGIN is a legacy fallback — modern browsers use

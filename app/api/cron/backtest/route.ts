@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, errors }, { status: 500 });
   }
 
-  const picks = (picksRaw ?? []) as PickResult[];
+  const picks = (picksRaw ?? []) as unknown as PickResult[];
 
   if (picks.length < 5) {
     const msg = `Insufficient picks for backtesting: ${picks.length} (need ≥5 settled)`;

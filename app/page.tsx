@@ -7,7 +7,10 @@
  * @module app/page-wrapper
  */
 
-export const dynamic = 'force-dynamic';
+// ISR: re-render the static shell at most once per minute.
+// User-specific data (auth, credits, instructions, chats) is fetched
+// client-side via /api/init so the page shell stays cacheable.
+export const revalidate = 60;
 
 import { Suspense } from 'react';
 import { loadServerData, type ServerDataResult } from '@/lib/server-data-loader';

@@ -12,10 +12,7 @@ interface Metric {
   value: string;
 }
 
-interface LightboxSection {
-  title: string;
-  metrics: Metric[];
-}
+// LightboxSection is imported from AnalysisLightbox above — no local redeclaration needed.
 
 interface StatcastCardData {
   type: string;

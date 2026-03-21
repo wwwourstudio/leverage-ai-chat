@@ -99,8 +99,8 @@ export interface GameContext {
   /** League HR rank of the batter's team (1 = most HRs) */
   teamPowerRank: number;
 
-  /** Opposing bullpen quality score 0–1 */
-  bullpenDepthScore: number;
+  /** Opposing bullpen HR/9 allowed (league avg ≈ 1.2; lower = tougher pen) */
+  bullpenHr9: number;
 }
 
 /** Full input bundle for one batter-pitcher-game prediction */
@@ -213,11 +213,11 @@ export async function predictPlayerHR(input: HRPredictionInput): Promise<HRPredi
     batter_hand:              batter.bats,
     pitcher_hand:             pitcher.throws,
     pitcher_flyball_pct:      pitcher.flyballPct,
-    pitcher_hr_per_9_vs_hand: pitcher.hr9VsHand,
+    pitcher_hr9_vs_hand:      pitcher.hr9VsHand,
     protection_score:         (game.prevBatterOPS + game.nextBatterOPS) / 2,
     platoon_advantage:        batter.bats !== pitcher.throws,
     team_power_rank:          game.teamPowerRank,
-    opposing_bullpen_depth:   game.bullpenDepthScore,
+    opposing_bullpen_hr9:     game.bullpenHr9,
   };
 
   const matchupFactor   = calculateMatchupFactor(lineupCtx);

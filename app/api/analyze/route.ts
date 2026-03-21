@@ -640,7 +640,7 @@ export async function POST(request: NextRequest) {
         const sub = (context.kalshiSubcategory || '').toLowerCase();
         const fetchMarkets = sub === 'politics' || sub === 'elections' || sub === 'election'
           ? fetchElectionMarkets({ limit: 50 })
-          : fetchKalshiMarketsWithRetry({ limit: 50, maxRetries: 1 });
+          : fetchKalshiMarketsWithRetry({ limit: 50, maxRetries: 3 });
         const markets = await Promise.race([
           fetchMarkets,
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
@@ -733,8 +733,15 @@ export async function POST(request: NextRequest) {
               // Non-critical — skip if Supabase is unavailable
             }
           }
-        } catch {
-          // Non-fatal — fall through to Kalshi fallback below
+        } catch (oddsErr) {
+          // Non-fatal — fall through to Kalshi fallback below.
+          // Downgrade 4xx errors (invalid API key, quota exceeded) to warn
+          // so they don't appear as error-level logs when the path is handled.
+          const oddsStatus = (oddsErr as any)?.status ?? (oddsErr as any)?.statusCode;
+          const oddsMsg = oddsErr instanceof Error ? oddsErr.message : String(oddsErr);
+          if (oddsStatus && oddsStatus >= 400 && oddsStatus < 500) {
+            console.warn('[v0] [ANALYZE] Odds API ' + oddsStatus + ' — ' + oddsMsg + '. Using Kalshi fallback.');
+          }
         }
       }
 
@@ -757,7 +764,7 @@ export async function POST(request: NextRequest) {
       try {
         const { fetchKalshiMarketsWithRetry, generateKalshiCards } = await import('@/lib/kalshi/index');
         const markets = await Promise.race([
-          fetchKalshiMarketsWithRetry({ search: sportKw, limit: 10, maxRetries: 1 }),
+          fetchKalshiMarketsWithRetry({ search: sportKw, limit: 10, maxRetries: 3 }),
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)),
         ]).catch(() => null);
         if (markets && (markets as any[]).length > 0) {

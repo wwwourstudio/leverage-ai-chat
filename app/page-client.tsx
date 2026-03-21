@@ -265,6 +265,15 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [showLimitNotification, setShowLimitNotification] = useState(false);
   const [_chatsRemaining, setChatsRemaining] = useState(5);
   const [creditsRemaining, setCreditsRemaining] = useState(15);
+
+  // Sync creditsRemaining from localStorage on mount so visitors see their real
+  // remaining balance immediately, not the hardcoded default of 15.
+  // Runs once client-side — safe because localStorage is browser-only.
+  useEffect(() => {
+    const data = getCreditData();
+    setCreditsRemaining(data.credits);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -442,6 +451,18 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       if (typeof init.instructions === 'string' && init.instructions) {
         setCustomInstructions(init.instructions);
         localStorage.setItem('leverage_custom_instructions', init.instructions);
+      }
+      // Keep quick-actions in sync when user logs in mid-session (same seeding
+      // as the page-load useEffect, so users and visitors see identical prompts).
+      if (Array.isArray(init.defaultPrompts) && init.defaultPrompts.length > 0) {
+        setAiQuickActions(
+          init.defaultPrompts.map((p: { label: string; query: string }) => ({
+            label: p.label,
+            icon: Sparkles,
+            category: selectedCategory,
+            query: p.query,
+          }))
+        );
       }
     } catch {
       loadInstructionsFromLocalStorage();

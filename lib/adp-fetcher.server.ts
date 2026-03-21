@@ -1,9 +1,15 @@
 /**
  * ADP live data fetchers — server-only.
  *
- * Provides FantasyPros CSV and ESPN JSON scrapers for MLB and NFL ADP.
- * Both the on-demand path in adp-data.ts and the cron refresh route import
- * from here so scraper logic lives in one place.
+ * Provides FantasyPros CSV (with optional account login) and ESPN JSON scrapers
+ * for MLB and NFL ADP. Both the on-demand path in adp-data.ts and the cron
+ * refresh route import from here so scraper logic lives in one place.
+ *
+ * FantasyPros auth (optional):
+ *   Set FANTASYPROS_EMAIL and FANTASYPROS_PASSWORD in your Vercel env vars.
+ *   When present, the scraper logs in first to obtain a session cookie, which
+ *   unlocks the full CSV export (more players, more scoring formats).
+ *   When absent, an unauthenticated request is attempted.
  *
  * Source priority: FantasyPros CSV → ESPN JSON → (caller handles static)
  */
@@ -12,66 +18,171 @@ import { parseTSV, type NFBCPlayer } from '@/lib/adp-data';
 
 // ── FantasyPros ────────────────────────────────────────────────────────────────
 
+const FP_BASE  = 'https://www.fantasypros.com';
+const FP_LOGIN = `${FP_BASE}/accounts/login/`;
+
 const FP_UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
-const FP_URLS: Record<'mlb' | 'nfl', string[]> = {
-  // Try the primary export URL first; fall back to the alternate endpoint
-  mlb: [
-    'https://www.fantasypros.com/mlb/adp/overall.php?export=csv',
-    'https://partners.fantasypros.com/api/v1/consensus-rankings.php?sport=MLB&scoring=STANDARD&type=STD&year=2026&week=0&num_teams=12&export=1',
-  ],
-  nfl: [
-    'https://www.fantasypros.com/nfl/adp/half-point-ppr-overall.php?export=csv',
-    'https://www.fantasypros.com/nfl/adp/ppr-overall.php?export=csv',
-  ],
+const FP_URLS: Record<'mlb' | 'nfl', string> = {
+  mlb: `${FP_BASE}/mlb/adp/overall.php?export=csv`,
+  nfl: `${FP_BASE}/nfl/adp/half-point-ppr-overall.php?export=csv`,
 };
 
-export async function scrapeFantasyPros(sport: 'mlb' | 'nfl'): Promise<NFBCPlayer[]> {
-  const urls = FP_URLS[sport];
-  let lastErr: Error = new Error('No URLs tried');
-
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, {
-        headers: {
-          'User-Agent': FP_UA,
-          Accept: 'text/csv,text/plain,*/*',
-          Referer: 'https://www.fantasypros.com/',
-          'Accept-Language': 'en-US,en;q=0.9',
-        },
-        redirect: 'follow',
-        signal: AbortSignal.timeout(12_000),
-      });
-
-      if (!res.ok) {
-        lastErr = new Error(`HTTP ${res.status} from ${url}`);
-        continue;
+/** Parse Set-Cookie headers and return a cookie jar string. */
+function extractCookies(headers: Headers): string {
+  // Node fetch exposes multiple Set-Cookie values via getSetCookie() or raw headers
+  const cookies: string[] = [];
+  // getSetCookie is available in Node 18+ / undici
+  if (typeof (headers as unknown as { getSetCookie?: () => string[] }).getSetCookie === 'function') {
+    cookies.push(
+      ...(headers as unknown as { getSetCookie: () => string[] })
+        .getSetCookie()
+        .map(c => c.split(';')[0].trim()),
+    );
+  } else {
+    // Fallback: iterate raw header entries
+    headers.forEach((value, name) => {
+      if (name.toLowerCase() === 'set-cookie') {
+        cookies.push(value.split(';')[0].trim());
       }
+    });
+  }
+  return cookies.join('; ');
+}
 
-      const text = await res.text();
-
-      // Guard: FantasyPros sometimes returns an HTML login wall
-      if (text.trimStart().startsWith('<')) {
-        lastErr = new Error(`HTML response (login wall?) from ${url}`);
-        continue;
-      }
-
-      const players = parseTSV(text);
-      if (players.length < 50) {
-        lastErr = new Error(`Only ${players.length} players from ${url}`);
-        continue;
-      }
-
-      // FantasyPros uses "/" as position separator ("SP/DH") — normalise to ","
-      return players.map(p => ({ ...p, positions: p.positions.replace(/\//g, ',') }));
-    } catch (err) {
-      lastErr = err instanceof Error ? err : new Error(String(err));
-    }
+/**
+ * Log in to FantasyPros and return a cookie string with the session.
+ * FantasyPros uses Django: fetch a CSRF token first, then POST credentials.
+ */
+async function loginToFantasyPros(email: string, password: string): Promise<string> {
+  // Step 1 — GET login page to receive csrftoken cookie
+  const loginPageRes = await fetch(FP_LOGIN, {
+    headers: { 'User-Agent': FP_UA, Accept: 'text/html' },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!loginPageRes.ok) {
+    throw new Error(`FantasyPros login page returned HTTP ${loginPageRes.status}`);
   }
 
-  throw lastErr;
+  const cookieJar1 = extractCookies(loginPageRes.headers);
+  // Extract csrftoken value from the cookie jar
+  const csrfMatch = cookieJar1.match(/csrftoken=([^;]+)/);
+  if (!csrfMatch) {
+    throw new Error('FantasyPros login: could not find csrftoken in login page cookies');
+  }
+  const csrfToken = csrfMatch[1];
+
+  // Step 2 — POST credentials
+  const body = new URLSearchParams({
+    username: email,
+    password,
+    csrfmiddlewaretoken: csrfToken,
+  });
+
+  const loginRes = await fetch(FP_LOGIN, {
+    method: 'POST',
+    headers: {
+      'User-Agent':     FP_UA,
+      'Content-Type':  'application/x-www-form-urlencoded',
+      Referer:          FP_LOGIN,
+      Cookie:           cookieJar1,
+      'X-CSRFToken':    csrfToken,
+    },
+    body: body.toString(),
+    redirect: 'follow',
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  const cookieJar2 = extractCookies(loginRes.headers);
+  const merged = mergeCookies(cookieJar1, cookieJar2);
+
+  if (!merged.includes('sessionid=')) {
+    throw new Error('FantasyPros login: no sessionid cookie in response — check credentials');
+  }
+
+  console.log('[v0] [ADP/fetcher] FantasyPros login successful');
+  return merged;
+}
+
+/** Merge two cookie jar strings, letting jar2 override jar1 for matching names. */
+function mergeCookies(jar1: string, jar2: string): string {
+  const map = new Map<string, string>();
+  for (const c of [...jar1.split('; '), ...jar2.split('; ')]) {
+    const eq = c.indexOf('=');
+    if (eq > 0) map.set(c.slice(0, eq), c);
+  }
+  return [...map.values()].join('; ');
+}
+
+/** Cached session cookie — reused across serverless warm invocations. */
+let fpSessionCookie: string | null = null;
+let fpSessionFetchedAt = 0;
+const FP_SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+async function getFantasyProsCookie(): Promise<string | null> {
+  const email    = process.env.FANTASYPROS_EMAIL;
+  const password = process.env.FANTASYPROS_PASSWORD;
+  if (!email || !password) return null; // no creds configured — anonymous attempt
+
+  const now = Date.now();
+  if (fpSessionCookie && now - fpSessionFetchedAt < FP_SESSION_TTL_MS) {
+    return fpSessionCookie;
+  }
+
+  fpSessionCookie    = await loginToFantasyPros(email, password);
+  fpSessionFetchedAt = now;
+  return fpSessionCookie;
+}
+
+export async function scrapeFantasyPros(sport: 'mlb' | 'nfl'): Promise<NFBCPlayer[]> {
+  const url     = FP_URLS[sport];
+  let cookieJar = '';
+
+  try {
+    const session = await getFantasyProsCookie();
+    if (session) cookieJar = session;
+  } catch (err) {
+    // Login failed — fall through to anonymous attempt, log the reason
+    console.warn('[v0] [ADP/fetcher] FantasyPros login failed, trying anonymously:', err instanceof Error ? err.message : err);
+    fpSessionCookie    = null;
+    fpSessionFetchedAt = 0;
+  }
+
+  const headers: Record<string, string> = {
+    'User-Agent':      FP_UA,
+    Accept:            'text/csv,text/plain,*/*',
+    Referer:           `${FP_BASE}/`,
+    'Accept-Language': 'en-US,en;q=0.9',
+  };
+  if (cookieJar) headers['Cookie'] = cookieJar;
+
+  const res = await fetch(url, {
+    headers,
+    redirect: 'follow',
+    signal: AbortSignal.timeout(12_000),
+  });
+
+  if (!res.ok) throw new Error(`FantasyPros ${sport.toUpperCase()} HTTP ${res.status}`);
+
+  const text = await res.text();
+
+  if (text.trimStart().startsWith('<')) {
+    // Session may have expired — clear cache so next call re-logs in
+    fpSessionCookie    = null;
+    fpSessionFetchedAt = 0;
+    throw new Error(`FantasyPros ${sport.toUpperCase()} returned HTML (login wall)`);
+  }
+
+  const players = parseTSV(text);
+  if (players.length < 50) {
+    throw new Error(`FantasyPros ${sport.toUpperCase()}: only ${players.length} players parsed`);
+  }
+
+  // FantasyPros uses "/" as position separator ("SP/DH") — normalise to ","
+  return players.map(p => ({ ...p, positions: p.positions.replace(/\//g, ',') }));
 }
 
 // ── ESPN ───────────────────────────────────────────────────────────────────────

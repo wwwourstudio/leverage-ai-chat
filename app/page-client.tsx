@@ -1375,8 +1375,16 @@ No preamble. Start directly with section 1.`;
         hasPlayerIntent,
         playerName: detectedPlayerName,
         previousMessages: messages.slice(-5).map((m: any) => ({ role: m.role, content: m.content || '' })),
-        // Pass Kalshi sub-category pill value when in Kalshi mode
-        kalshiSubcategory: selectedCategory === 'kalshi' && selectedSport ? selectedSport : undefined,
+        // Pass Kalshi sub-category pill value when in Kalshi mode.
+        // Only forward values that are actual Kalshi sub-categories — never sport
+        // slugs like 'nba' or 'nfl', which are sports-odds concepts, not Kalshi ones.
+        kalshiSubcategory: selectedCategory === 'kalshi' && selectedSport &&
+          ['politics', 'elections', 'election', 'sports', 'sport', 'weather', 'climate',
+           'finance', 'financials', 'economics', 'crypto', 'companies',
+           'trending', 'culture', 'entertainment', 'arts', 'pop culture',
+           'awards', 'tv', 'film', 'music', 'movies', 'celebrity',
+           'oscars', 'emmys', 'grammys'].includes(selectedSport.toLowerCase())
+          ? selectedSport : undefined,
         // Pass selected tab so the API can route DFS vs fantasy correctly
         selectedCategory,
         // Pass league settings so server-side card generation uses the correct size/format
@@ -1931,76 +1939,188 @@ No preamble. Start directly with section 1.`;
   generateRealResponseRef.current = generateRealResponse;
 
   // Helper functions for context extraction
+  // ─── Sport keyword tables ────────────────────────────────────────────────
+  // Checked in order: league acronym → sport-specific terms → team names.
+  // History inheritance only fires when the current message has NO match here.
+  const MLB_KEYWORDS = [
+    // League / generic
+    'mlb', 'baseball', 'adp',
+    // Positions
+    ' 1b', ' 2b', ' 3b', ' ss', ' of', ' sp', ' rp', ' dh', ' lf', ' cf', ' rf',
+    '(1b)', '(2b)', '(3b)', '(ss)', '(of)', '(sp)', '(rp)', '(dh)', '(lf)', '(cf)', '(rf)',
+    // Terms
+    'pitcher', 'pitching', 'batter', 'batting', 'strikeout', 'strikeouts', 'home run', 'home runs',
+    'era', 'whip', 'ops', 'slugging', 'bullpen', 'closer', 'reliever', 'rotation',
+    'waiver wire', 'starting pitcher', 'starting pitchers', 'innings pitched',
+    'batting average', 'on-base', 'stolen base', 'rbi', 'statcast', 'exit velocity',
+    'spin rate', 'launch angle', 'park factor', 'savant',
+    // All 30 MLB teams
+    'yankees', 'red sox', 'blue jays', 'rays', 'orioles',
+    'white sox', 'guardians', 'tigers', 'royals', 'twins',
+    'astros', 'rangers', 'mariners', 'athletics', 'angels',
+    'braves', 'mets', 'phillies', 'marlins', 'nationals',
+    'cubs', 'cardinals', 'brewers', 'reds', 'pirates',
+    'dodgers', 'giants', 'padres', 'diamondbacks', 'rockies',
+    // Common team abbreviations used in player analysis cards
+    ' nyy', ' bos', ' tor', ' tb', ' bal',
+    ' cws', ' cle', ' det', ' kc', ' min',
+    ' hou', ' tex', ' sea', ' ath', ' laa',
+    ' atl', ' nym', ' phi', ' mia', ' wsh',
+    ' chc', ' stl', ' mil', ' cin', ' pit',
+    ' lad', ' sf', ' sd', ' ari', ' col',
+    '(nyy)', '(bos)', '(tor)', '(tb)', '(bal)',
+    '(cws)', '(cle)', '(det)', '(kc)', '(min)',
+    '(hou)', '(tex)', '(sea)', '(ath)', '(laa)',
+    '(atl)', '(nym)', '(phi)', '(mia)', '(wsh)',
+    '(chc)', '(stl)', '(mil)', '(cin)', '(pit)',
+    '(lad)', '(sf)', '(sd)', '(ari)', '(col)',
+  ];
+
+  const NBA_KEYWORDS = [
+    // League / generic
+    'nba', 'basketball',
+    // Positions (use word boundary pattern — avoid false matches like "pgs")
+    ' pg', ' sg', ' sf', ' pf',
+    '(pg)', '(sg)', '(sf)', '(pf)',
+    // Terms
+    'points prop', 'assists prop', 'rebounds prop', 'three-pointer', '3-pointer',
+    'triple double', 'double double', 'nba prop', 'nba odds', 'nba bet',
+    'field goal', 'free throw', 'plus/minus', 'plus minus',
+    // All 30 NBA teams
+    'celtics', 'nets', 'knicks', 'sixers', '76ers', 'raptors',
+    'bulls', 'cavaliers', 'pistons', 'pacers', 'bucks',
+    'hawks', 'hornets', 'heat', 'magic', 'wizards',
+    'nuggets', 'timberwolves', 'thunder', 'trail blazers', 'blazers', 'jazz',
+    'warriors', 'clippers', 'lakers', 'suns', 'kings',
+    'mavericks', 'mavs', 'rockets', 'grizzlies', 'pelicans', 'spurs',
+    // Common team abbreviations used in player analysis cards
+    ' bos', ' bkn', ' nyk', ' phi', ' tor',
+    ' chi', ' cle', ' det', ' ind', ' mil',
+    ' atl', ' cha', ' mia', ' orl', ' was',
+    ' den', ' min', ' okc', ' por', ' uta',
+    ' gsw', ' lac', ' lal', ' phx', ' sac',
+    ' dal', ' hou', ' mem', ' nop', ' sas',
+    '(bos)', '(bkn)', '(nyk)', '(phi)', '(tor)',
+    '(chi)', '(cle)', '(det)', '(ind)', '(mil)',
+    '(atl)', '(cha)', '(mia)', '(orl)', '(was)',
+    '(den)', '(min)', '(okc)', '(por)', '(uta)',
+    '(gsw)', '(lac)', '(lal)', '(phx)', '(sac)',
+    '(dal)', '(hou)', '(mem)', '(nop)', '(sas)',
+    // Well-known players whose names alone signal NBA
+    'jokic', 'lebron', 'curry', 'giannis', 'luka', 'doncic', 'embiid',
+    'tatum', 'jayson', 'durant', 'westbrook', 'harden', 'lillard',
+    'butler', 'booker', 'davis', 'adebayo', 'mitchell', 'morant',
+  ];
+
+  const NFL_KEYWORDS = [
+    // League / generic
+    'nfl', 'football',
+    // Positions
+    ' qb', ' wr', ' rb', ' te', ' k ', ' def',
+    '(qb)', '(wr)', '(rb)', '(te)', '(k)', '(def)',
+    // Terms
+    'touchdown', 'passing yards', 'rushing yards', 'receiving yards',
+    'fantasy lineup', 'start sit', 'flex play', 'flex pick',
+    'cornerback', 'wide receiver', 'running back', 'tight end', 'quarterback',
+    'nfl prop', 'nfl odds', 'super bowl', 'playoff seed',
+    // All 32 NFL teams
+    'patriots', 'dolphins', 'jets', 'bills',
+    'ravens', 'bengals', 'browns', 'steelers',
+    'titans', 'colts', 'texans', 'jaguars',
+    'chiefs', 'raiders', 'chargers', 'broncos',
+    'cowboys', 'eagles', 'giants', 'commanders',
+    'bears', 'lions', 'packers',
+    'vikings', 'falcons', 'panthers', 'saints', 'buccaneers',
+    'rams', 'seahawks', 'cardinals', '49ers',
+    // Common abbreviations
+    ' ne', ' mia', ' nyj', ' buf',
+    ' bal', ' cin', ' cle', ' pit',
+    ' ten', ' ind', ' hou', ' jax',
+    ' kc', ' lv', ' lac', ' den',
+    ' dal', ' phi', ' nyg', ' was',
+    ' chi', ' det', ' gb', ' min',
+    ' atl', ' car', ' no', ' tb',
+    ' lar', ' sea', ' ari', ' sf',
+    '(ne)', '(mia)', '(nyj)', '(buf)',
+    '(bal)', '(cin)', '(cle)', '(pit)',
+    '(ten)', '(ind)', '(hou)', '(jax)',
+    '(kc)', '(lv)', '(lac)', '(den)',
+    '(dal)', '(phi)', '(nyg)', '(was)',
+    '(chi)', '(det)', '(gb)', '(min)',
+    '(atl)', '(car)', '(no)', '(tb)',
+    '(lar)', '(sea)', '(ari)', '(sf)',
+    // Well-known players
+    'mahomes', 'lamar', 'burrow', 'allen', 'hurts', 'purdy',
+    'waddle', 'jaylen waddle', 'garrett wilson', 'davante', 'stefon diggs',
+    'kelce', 'mccaffrey', 'henry', 'chubb', 'ekeler',
+  ];
+
+  const NHL_KEYWORDS = [
+    'nhl', 'hockey',
+    ' lw', ' rw', ' d ',
+    '(lw)', '(rw)', '(d)',
+    'goalie', 'goaltender', 'power play', 'penalty kill', 'faceoff',
+    'goals against', 'save percentage', 'stanley cup',
+    'bruins', 'sabres', 'red wings', 'panthers', 'canadiens',
+    'senators', 'lightning', 'maple leafs', 'hurricanes', 'blue jackets',
+    'devils', 'islanders', 'rangers', 'flyers', 'penguins',
+    'coyotes', 'blackhawks', 'avalanche', 'stars', 'wild',
+    'predators', 'blues', 'jets', 'ducks', 'flames', 'oilers',
+    'kings', 'sharks', 'golden knights', 'canucks', 'kraken',
+  ];
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const detectSportFromText = (text: string): string | null => {
+    const t = text.toLowerCase();
+    // NFBC/NFFC must come first — TSV data can contain "nba" inside player names
+    if (t.includes('nfbc') || t.includes('nffc') || t.includes('nfbkc') || t.includes('tgfbi')) return 'mlb';
+    // Check league acronyms first (fastest, most reliable)
+    if (t.includes('nba') || t.includes('basketball')) return 'nba';
+    if (t.includes('nfl') || t.includes('football')) return 'nfl';
+    if (t.includes('mlb') || t.includes('baseball')) return 'mlb';
+    if (t.includes('nhl') || t.includes('hockey')) return 'nhl';
+    if (t.includes('ncaa')) return t.includes('basketball') ? 'ncaab' : 'ncaaf';
+    // Deep scan: team names, positions, sport-specific terms
+    // MLB checked before NBA/NFL to catch "(ATH 1B)", "Dodgers", "strikeout", etc.
+    if (MLB_KEYWORDS.some(k => t.includes(k))) return 'mlb';
+    if (NBA_KEYWORDS.some(k => t.includes(k))) return 'nba';
+    if (NFL_KEYWORDS.some(k => t.includes(k))) return 'nfl';
+    if (NHL_KEYWORDS.some(k => t.includes(k))) return 'nhl';
+    return null;
+  };
+
   const extractSport = (message: string, conversationHistory?: Array<{ role: string; content: string }>): string | null => {
-    const msgLower = message.toLowerCase();
-    
     console.log('[v0] Extracting sport from:', message);
 
-    // NFBC/NFFC fantasy baseball platforms must be checked BEFORE NBA —
-    // TSV uploads may contain strings like "nba" inside player/team data
-    if (msgLower.includes('nfbc') || msgLower.includes('nffc') ||
-        msgLower.includes('nfbkc') || msgLower.includes('tgfbi')) {
-      console.log('[v0] Detected sport: MLB (NFBC/NFFC fantasy platform)');
-      return 'mlb';
+    // Always try to detect sport directly from the current message first
+    const direct = detectSportFromText(message);
+    if (direct) {
+      console.log('[v0] Detected sport:', direct.toUpperCase());
+      return direct;
     }
 
-    // Basketball
-    if (msgLower.includes('nba') || msgLower.includes('basketball')) {
-      console.log('[v0] Detected sport: NBA');
-      return 'nba';
-    }
-
-    // Football
-    if (msgLower.includes('nfl') || msgLower.includes('football')) {
-      console.log('[v0] Detected sport: NFL');
-      return 'nfl';
-    }
-
-    // Baseball - enhanced detection for fantasy baseball
-    if (msgLower.includes('mlb') || msgLower.includes('baseball') ||
-        msgLower.includes('adp')) {
-      console.log('[v0] Detected sport: MLB (baseball/fantasy baseball)');
-      return 'mlb';
-    }
-    
-    // Hockey
-    if (msgLower.includes('nhl') || msgLower.includes('hockey')) {
-      console.log('[v0] Detected sport: NHL');
-      return 'nhl';
-    }
-    
-    // NCAA
-    if (msgLower.includes('ncaa')) {
-      const sport = msgLower.includes('basketball') ? 'ncaab' : 'ncaaf';
-      console.log('[v0] Detected sport:', sport);
-      return sport;
-    }
-    
     // Check for contextual references that indicate user is continuing a conversation
     const contextualKeywords = [
-      'this game', 'that game', 'the game', 'same game', 
+      'this game', 'that game', 'the game', 'same game',
       'this match', 'that match', 'the match', 'same match',
       'these props', 'those props', 'these players', 'those players',
       'this parlay', 'that parlay', 'for this', 'for that',
       'correlated', 'same-game', 'sgp'
     ];
-    
-    const hasContextualReference = contextualKeywords.some(keyword => msgLower.includes(keyword));
-    
-    // If no sport found in current message and (conversation history exists OR has contextual keywords), check recent messages
+    const hasContextualReference = contextualKeywords.some(k => message.toLowerCase().includes(k));
+
+    // Only inherit from history when the message has no sport signals at all
     if ((conversationHistory && conversationHistory.length > 0) || hasContextualReference) {
       if (hasContextualReference) {
         console.log('[v0] Contextual reference detected, checking conversation history...');
       } else {
         console.log('[v0] No sport in current message, checking conversation history...');
       }
-      
-      // Check last 5 messages (newest first) for sport context
       if (conversationHistory) {
         for (let i = conversationHistory.length - 1; i >= Math.max(0, conversationHistory.length - 5); i--) {
           const historicalMsg = conversationHistory[i];
-          if (historicalMsg && historicalMsg.content) {
-            const historicalSport = extractSportFromText(historicalMsg.content);
+          if (historicalMsg?.content) {
+            const historicalSport = detectSportFromText(historicalMsg.content);
             if (historicalSport) {
               console.log('[v0] Inherited sport from conversation history:', historicalSport);
               return historicalSport;
@@ -2009,26 +2129,14 @@ No preamble. Start directly with section 1.`;
         }
       }
     }
-    
+
     console.log('[v0] No specific sport detected');
     return null;
   };
 
-  // Helper to extract sport from text without recursion
+  // Helper to extract sport from text without recursion (delegates to shared detector)
   const extractSportFromText = (text: string): string | null => {
-    const textLower = text.toLowerCase();
-    
-    if (textLower.includes('nfbc') || textLower.includes('nffc') ||
-        textLower.includes('nfbkc') || textLower.includes('tgfbi')) return 'mlb';
-    if (textLower.includes('nba') || textLower.includes('basketball')) return 'nba';
-    if (textLower.includes('nfl') || textLower.includes('football')) return 'nfl';
-    if (textLower.includes('mlb') || textLower.includes('baseball')) return 'mlb';
-    if (textLower.includes('nhl') || textLower.includes('hockey')) return 'nhl';
-    if (textLower.includes('ncaa')) {
-      return textLower.includes('basketball') ? 'ncaab' : 'ncaaf';
-    }
-    
-    return null;
+    return detectSportFromText(text);
   };
 
   const extractMarketType = (message: string): string | null => {

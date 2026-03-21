@@ -31,15 +31,21 @@ export async function GET(request: NextRequest) {
 
         // Prefer cookie-based session auth; fall back to x-user-id header for
         // legacy callers (e.g. InsightsDashboard passing userId as a header).
-        const { data: { user } } = await supabase.auth.getUser();
+        // 5s timeout prevents hanging when Supabase is slow or the connection pool is full.
+        const timeout = <T>(ms: number): Promise<T> =>
+          new Promise<T>((_, reject) => setTimeout(() => reject(new Error('supabase timeout')), ms));
+
+        const { data: { user } } = await Promise.race([
+          supabase.auth.getUser(),
+          timeout<{ data: { user: null } }>(5_000),
+        ]);
         const userId = user?.id ?? request.headers.get('x-user-id');
 
         if (userId) {
-          const { data, error } = await supabase
-            .from('user_insights')
-            .select('*')
-            .eq('user_id', userId)
-            .single();
+          const { data, error } = await Promise.race([
+            supabase.from('user_insights').select('*').eq('user_id', userId).single(),
+            timeout<{ data: null; error: Error }>(5_000),
+          ]);
 
           if (!error && data) {
             return NextResponse.json({

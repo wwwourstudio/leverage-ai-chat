@@ -572,7 +572,7 @@ export const PLAYER_SPORT_MAP: Record<string, string> = {
   judge: 'mlb', witt: 'mlb', raleigh: 'mlb', skubal: 'mlb',
   skenes: 'mlb', crochet: 'mlb', caminero: 'mlb', kurtz: 'mlb',
   henderson: 'mlb', ramirez: 'mlb', wheeler: 'mlb', burnes: 'mlb',
-  cole: 'mlb', degrom: 'mlb', snell: 'mlb', rodon: 'mlb',
+  cole: 'mlb', snell: 'mlb', rodon: 'mlb',
   // ── NHL ──────────────────────────────────────────────────────────────────
   mcdavid: 'nhl', crosby: 'nhl', mackinnon: 'nhl', ovechkin: 'nhl',
   draisaitl: 'nhl', marner: 'nhl', hedman: 'nhl', pastrnak: 'nhl',

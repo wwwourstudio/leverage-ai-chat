@@ -44,15 +44,16 @@ function djb2(str: string): number {
   return h >>> 0;
 }
 
-/** Evict expired dedup entries; trim to DEDUP_CACHE_MAX if needed. */
+/** Evict expired dedup entries; if still over max, remove the 5 oldest in one sort pass. */
 function evictDedupCache(): void {
   const now = Date.now();
   for (const [k, v] of dedupCache) {
     if (now - v.ts > DEDUP_CACHE_TTL_MS) dedupCache.delete(k);
   }
   if (dedupCache.size > DEDUP_CACHE_MAX) {
-    const oldest = [...dedupCache.entries()].sort((a, b) => a[1].ts - b[1].ts)[0];
-    if (oldest) dedupCache.delete(oldest[0]);
+    const overage = dedupCache.size - DEDUP_CACHE_MAX + 5; // evict a small batch to amortise the sort cost
+    const byAge = [...dedupCache.entries()].sort((a, b) => a[1].ts - b[1].ts);
+    for (let i = 0; i < Math.min(overage, byAge.length); i++) dedupCache.delete(byAge[i][0]);
   }
 }
 import { createClient } from '@/lib/supabase/server';
@@ -260,6 +261,13 @@ export async function POST(request: NextRequest) {
       return msgLower;
     })();
 
+    // Declare hasADPIntent early — used by sport-detection layer 0 and later
+    // intent routing. Must be before the TEAM_TO_SPORT / inferredSport block to
+    // avoid a TDZ ReferenceError.
+    const hasADPIntent =
+      ['adp', 'nfbc', 'nffc', 'average draft', 'draft position', 'draft rank', 'draft order', 'nfbc board', 'nffc board']
+        .some(k => rawQueryLower.includes(k));
+
     // ── Team-name → sport inference ──────────────────────────────────────────
     // When context.sport is absent or 'none', scan the user message for known
     // team nicknames and infer the sport so card generation and model routing
@@ -334,10 +342,6 @@ export async function POST(request: NextRequest) {
       context.sport = 'mlb';
       console.log('[API/analyze] ADP intent with no sport — defaulting to MLB');
     }
-
-    const hasADPIntent =
-      ['adp', 'nfbc', 'nffc', 'average draft', 'draft position', 'draft rank', 'draft order', 'nfbc board', 'nffc board']
-        .some(k => rawQueryLower.includes(k));
 
     // Start/sit intent: user wants daily matchup-based start or sit advice.
     const START_SIT_KEYWORDS = [

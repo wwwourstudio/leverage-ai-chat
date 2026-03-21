@@ -68,12 +68,22 @@ async function loginToFantasyPros(email: string, password: string): Promise<stri
   }
 
   const cookieJar1 = extractCookies(loginPageRes.headers);
-  // Extract csrftoken value from the cookie jar
-  const csrfMatch = cookieJar1.match(/csrftoken=([^;]+)/);
-  if (!csrfMatch) {
-    throw new Error('FantasyPros login: could not find csrftoken in login page cookies');
+  const pageHtml   = await loginPageRes.text();
+
+  // FantasyPros sometimes sends csrftoken as a cookie, sometimes only in the HTML form
+  let csrfToken: string;
+  const cookieCsrf = cookieJar1.match(/csrftoken=([^;]+)/);
+  if (cookieCsrf) {
+    csrfToken = cookieCsrf[1];
+  } else {
+    // Fall back to the hidden <input name="csrfmiddlewaretoken"> in the page HTML
+    const htmlCsrf = pageHtml.match(/name=["']csrfmiddlewaretoken["'][^>]+value=["']([^"']+)["']/)
+                  ?? pageHtml.match(/value=["']([^"']+)["'][^>]+name=["']csrfmiddlewaretoken["']/);
+    if (!htmlCsrf) {
+      throw new Error('FantasyPros login: could not find csrfmiddlewaretoken in login page');
+    }
+    csrfToken = htmlCsrf[1];
   }
-  const csrfToken = csrfMatch[1];
 
   // Step 2 — POST credentials
   const body = new URLSearchParams({
@@ -229,7 +239,13 @@ function parseESPNResponse(
 
   for (const entry of list) {
     const e = entry as Record<string, unknown>;
-    const adp = typeof e.averageDraftPosition === 'number' ? e.averageDraftPosition : 0;
+    // ESPN uses averageDraftPositionProcessed (post-processing) or averageDraftPosition
+    const adp =
+      (typeof e.averageDraftPositionProcessed === 'number' && e.averageDraftPositionProcessed > 0
+        ? e.averageDraftPositionProcessed
+        : typeof e.averageDraftPosition === 'number'
+          ? e.averageDraftPosition
+          : 0);
     if (adp <= 0) continue;
 
     const p = e.player as Record<string, unknown> | undefined;
@@ -268,10 +284,22 @@ export async function scrapeESPN(sport: 'mlb' | 'nfl'): Promise<NFBCPlayer[]> {
     `/seasons/${ESPN_SEASON[sport]}/segments/0/leaguedefaults/${ESPN_LEAGUE[sport]}` +
     `?scoringPeriodId=1&view=kona_player_info`;
 
+  // X-Fantasy-Filter tells ESPN to sort by ADP and return a large player pool
+  const fantasyFilter = JSON.stringify({
+    players: {
+      filterStatus: { value: ['FREEAGENT', 'ONTEAM', 'WAIVERS'] },
+      limit: 600,
+      offset: 0,
+      sortAverageDraftPositionProcessed: { sortPriority: 1, sortAsc: true },
+      filterRanksForScoringPeriodIds: { value: [1] },
+    },
+  });
+
   const res = await fetch(url, {
     headers: {
-      'User-Agent': FP_UA,
-      Accept: 'application/json',
+      'User-Agent':       FP_UA,
+      Accept:             'application/json',
+      'X-Fantasy-Filter': fantasyFilter,
     },
     signal: AbortSignal.timeout(12_000),
   });

@@ -6,7 +6,7 @@
  * and by GitHub Actions for manual/scheduled runs.
  *
  * Strategy:
- *  1. Scrape https://nfc.shgn.com/adp/baseball (HTML table parse, no API key needed).
+ *  1. Scrape https://nfc.shgn.com/adp/baseball — fetches the TSV download, no API key needed.
  *  2. If scrape succeeds and returns ≥ 50 players → save to Supabase (overwrites stale data).
  *  3. If scrape fails → only seed from static fallback when Supabase is empty
  *     (preserves any previously-scraped or user-uploaded board).
@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getADPData,
+  parseTSV,
   saveADPToSupabase,
   loadADPFromSupabase,
   clearADPCache,
@@ -26,151 +27,96 @@ import {
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
-// ── HTML helpers ───────────────────────────────────────────────────────────────
-
-function stripHtml(raw: string): string {
-  return raw
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-/**
- * Parses the NFC SHGN ADP HTML table into NFBCPlayer records.
- *
- * Column detection is header-driven so it survives minor layout changes.
- * Expected columns (case-insensitive): Rank, Player, Team, Pos, ADP
- * Optional columns: Min, Max, % Drafted
- */
-function parseShgnHtml(html: string): NFBCPlayer[] {
-  const players: NFBCPlayer[] = [];
-
-  // Find the first <table> that contains ADP data (look for "adp" in the table text)
-  const tableMatches = html.match(/<table[\s\S]*?<\/table>/gi) ?? [];
-  let table = tableMatches.find(t => /adp/i.test(t)) ?? tableMatches[0];
-  if (!table) {
-    console.warn('[v0] [ADP/scrape] No <table> found in SHGN HTML');
-    return players;
-  }
-
-  // Extract all <tr> rows
-  const rows = table.match(/<tr[\s\S]*?<\/tr>/gi) ?? [];
-  if (rows.length < 2) {
-    console.warn('[v0] [ADP/scrape] Table has fewer than 2 rows');
-    return players;
-  }
-
-  // ── Parse header row ────────────────────────────────────────────────────────
-  const headerCells = (rows[0].match(/<t[hd][^>]*>[\s\S]*?<\/t[hd]>/gi) ?? []).map(c =>
-    stripHtml(c).toLowerCase(),
-  );
-
-  const colIdx = (terms: string[]): number =>
-    headerCells.findIndex(h => terms.some(t => h.includes(t)));
-
-  const rankIdx   = colIdx(['rank', '#', 'overall']);
-  const playerIdx = colIdx(['player', 'name']);
-  const teamIdx   = colIdx(['team', 'tm']);
-  const posIdx    = colIdx(['pos', 'elig', 'position']);
-  const adpIdx    = colIdx(['adp', 'avg pick', 'average']);
-
-  if (playerIdx === -1 || adpIdx === -1) {
-    console.warn(
-      '[v0] [ADP/scrape] Could not locate Player or ADP column in headers:',
-      headerCells,
-    );
-    return players;
-  }
-
-  console.log(`[v0] [ADP/scrape] Column map — rank:${rankIdx} player:${playerIdx} team:${teamIdx} pos:${posIdx} adp:${adpIdx}`);
-
-  // ── Parse data rows ─────────────────────────────────────────────────────────
-  for (let i = 1; i < rows.length; i++) {
-    const cells = (rows[i].match(/<t[hd][^>]*>[\s\S]*?<\/t[hd]>/gi) ?? []).map(c =>
-      stripHtml(c),
-    );
-    if (cells.length < 2) continue;
-
-    const rawName  = cells[playerIdx] ?? '';
-    const rawAdp   = cells[adpIdx]    ?? '';
-
-    if (!rawName || rawName.toLowerCase() === 'player') continue; // skip sub-headers
-
-    const adp  = parseFloat(rawAdp);
-    if (isNaN(adp) || adp <= 0) continue;
-
-    const rank = rankIdx !== -1
-      ? parseInt(cells[rankIdx] ?? '', 10) || i
-      : i;
-
-    const team      = teamIdx !== -1 ? (cells[teamIdx] ?? '').toUpperCase().trim() : '';
-    const positions = posIdx  !== -1 ? (cells[posIdx]  ?? '').trim()               : '';
-
-    // Normalise name: SHGN uses "First Last", also handle "Last, First"
-    const displayName = rawName.includes(',')
-      ? rawName.split(',').map(s => s.trim()).reverse().join(' ')
-      : rawName;
-
-    // playerName stored in "Last, First" for compatibility with existing NFBCPlayer type
-    const playerName = rawName.includes(',')
-      ? rawName
-      : (() => {
-          const parts = rawName.trim().split(/\s+/);
-          return parts.length >= 2
-            ? `${parts.slice(1).join(' ')}, ${parts[0]}`
-            : rawName;
-        })();
-
-    const safeRank   = rank > 0 ? rank : i;
-    const safeAdp    = adp;
-    const valueDelta = Math.round((safeAdp - safeRank) * 10) / 10;
-
-    players.push({
-      rank:        safeRank,
-      playerName,
-      displayName,
-      adp:         safeAdp,
-      positions,
-      team,
-      valueDelta,
-      isValuePick: valueDelta > 15,
-    });
-  }
-
-  return players.sort((a, b) => a.rank - b.rank);
-}
-
 // ── Scraper ────────────────────────────────────────────────────────────────────
 
-async function scrapeShgnADP(): Promise<NFBCPlayer[]> {
-  const url = 'https://nfc.shgn.com/adp/baseball';
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; LeverageAI/1.0; +https://leverage.ai)',
-      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-    },
-    // 15-second hard timeout — Vercel function max is 30s
-    signal: AbortSignal.timeout(15_000),
-  });
+const SHGN_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (compatible; LeverageAI/1.0; +https://leverage.ai)',
+  Accept: 'text/tab-separated-values, text/csv, text/plain, */*',
+  'Accept-Language': 'en-US,en;q=0.5',
+};
 
-  if (!res.ok) {
-    throw new Error(`SHGN returned HTTP ${res.status} ${res.statusText}`);
+/**
+ * Fetch TSV from SHGN and parse with the existing parseTSV() parser.
+ *
+ * Tries candidate URLs in order; the first response that looks like a valid
+ * TSV (contains tabs, has ≥ 2 lines) wins.  Falls back to fetching the HTML
+ * page and scanning for a TSV/CSV download link if none of the direct
+ * endpoints respond.
+ */
+async function scrapeShgnADP(): Promise<NFBCPlayer[]> {
+  const base = 'https://nfc.shgn.com/adp/baseball';
+
+  // ── 1. Try known TSV endpoint patterns ─────────────────────────────────────
+  const candidates = [
+    `${base}.tsv`,
+    `${base}/download`,
+    `${base}/export`,
+    `${base}?format=tsv`,
+    `${base}?export=1`,
+  ];
+
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url, {
+        headers: SHGN_HEADERS,
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!res.ok) continue;
+
+      const text = await res.text();
+      if (!text.includes('\t') || text.split('\n').length < 5) continue;
+
+      const players = parseTSV(text);
+      if (players.length >= 50) {
+        console.log(`[v0] [ADP/scrape] Got ${players.length} players from ${url}`);
+        return players;
+      }
+    } catch {
+      // try next candidate
+    }
   }
 
-  const html = await res.text();
-  console.log(`[v0] [ADP/scrape] Fetched ${html.length} bytes from SHGN`);
+  // ── 2. Fetch HTML and look for a TSV/CSV download link ─────────────────────
+  const htmlRes = await fetch(base, {
+    headers: { ...SHGN_HEADERS, Accept: 'text/html,*/*' },
+    signal: AbortSignal.timeout(12_000),
+  });
 
-  const players = parseShgnHtml(html);
-  console.log(`[v0] [ADP/scrape] Parsed ${players.length} players from SHGN HTML`);
+  if (!htmlRes.ok) {
+    throw new Error(`SHGN returned HTTP ${htmlRes.status} ${htmlRes.statusText}`);
+  }
 
-  return players;
+  const html = await htmlRes.text();
+
+  // Find href attributes that point to tsv/csv/download/export endpoints
+  const linkRe = /href="([^"]*(?:tsv|csv|download|export)[^"]*)"/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = linkRe.exec(html)) !== null) {
+    const href = match[1];
+    const downloadUrl = href.startsWith('http')
+      ? href
+      : `https://nfc.shgn.com${href.startsWith('/') ? '' : '/'}${href}`;
+
+    try {
+      const dlRes = await fetch(downloadUrl, {
+        headers: SHGN_HEADERS,
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!dlRes.ok) continue;
+
+      const text = await dlRes.text();
+      const players = parseTSV(text);
+      if (players.length >= 50) {
+        console.log(`[v0] [ADP/scrape] Got ${players.length} players from linked file ${downloadUrl}`);
+        return players;
+      }
+    } catch {
+      // try next link
+    }
+  }
+
+  throw new Error('Could not locate SHGN TSV — no candidate URL returned valid data');
 }
 
 // ── Route handler ──────────────────────────────────────────────────────────────

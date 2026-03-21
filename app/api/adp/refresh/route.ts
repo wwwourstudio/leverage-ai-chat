@@ -29,9 +29,14 @@ export const maxDuration = 30;
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const cronSecret = process.env.CRON_SECRET;
-  const authHeader = request.headers.get('authorization');
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (cronSecret) {
+    const authHeader  = request.headers.get('authorization');
+    const querySecret = request.nextUrl.searchParams.get('secret');
+    const validHeader = authHeader === `Bearer ${cronSecret}`;
+    const validQuery  = querySecret === cronSecret;
+    if (!validHeader && !validQuery) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
   }
 
   const startedAt = Date.now();

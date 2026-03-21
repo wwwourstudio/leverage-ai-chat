@@ -285,6 +285,11 @@ let adpCache: NFBCPlayer[] | null = null;
 let lastFetched = 0;
 let adpFromDB = false;
 
+// Cooldown for live-fetch attempts: 15 minutes between retries when both
+// FantasyPros and ESPN are unreachable (avoids hammering external APIs).
+const LIVE_FETCH_COOLDOWN_MS = 15 * 60 * 1000;
+let lastLiveFetchAttempt = 0;
+
 // ── Delimiter-agnostic parser ─────────────────────────────────────────────────
 
 /**
@@ -532,9 +537,10 @@ export function isADPFromUserUpload(): boolean {
 }
 
 /**
- * Returns the NFBC MLB ADP player list.
- * Data comes exclusively from Supabase (populated by user TSV uploads).
- * Falls back to the static pre-season dataset when no upload exists yet.
+ * Returns the MLB ADP player list.
+ * Priority: in-memory cache → Supabase → live fetch (FantasyPros/ESPN) → static fallback.
+ * Live fetches are attempted when the DB is empty and at most once per LIVE_FETCH_COOLDOWN_MS
+ * to avoid hammering external APIs when they are unreachable.
  */
 export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
   const now = Date.now();
@@ -543,32 +549,47 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
     return adpCache;
   }
 
-  // User-uploaded data lives in Supabase — always authoritative, no TTL check
+  // Supabase is always authoritative (user uploads + cron data)
   const dbData = await loadADPFromSupabase('mlb', true);
   if (dbData && dbData.length > 0) {
-    // Validate data quality: if the majority of display names are purely numeric
-    // (e.g. NFBC player IDs like "10231") the upload was malformed — purge and fall back to static.
+    // Validate quality: purge if majority of display names are numeric IDs (bad upload)
     const numericCount = dbData.filter(p => /^\d+$/.test((p.displayName ?? '').trim())).length;
     if (numericCount > dbData.length * 0.3) {
-      console.warn(`[v0] [ADP] Supabase data has ${numericCount}/${dbData.length} numeric display names — upload malformed, purging from DB and falling back to static`);
-      // Delete the bad rows so we don't re-check on every request.
-      // Cache the static fallback immediately so subsequent requests skip Supabase
-      // while the async purge completes (prevents the warning from firing on every hit).
+      console.warn(`[v0] [ADP] Supabase data has ${numericCount}/${dbData.length} numeric display names — purging malformed upload`);
       purgeADPFromSupabase('mlb').catch(() => {});
       adpCache = STATIC_FALLBACK_PLAYERS;
       lastFetched = now;
       adpFromDB = false;
       return STATIC_FALLBACK_PLAYERS;
-    } else {
-      console.log(`[v0] [ADP] Serving ${dbData.length} MLB players from Supabase (user upload)`);
-      adpCache = dbData;
-      lastFetched = now;
-      adpFromDB = true;
-      return dbData;
+    }
+    console.log(`[v0] [ADP] Serving ${dbData.length} MLB players from Supabase`);
+    adpCache = dbData;
+    lastFetched = now;
+    adpFromDB = true;
+    return dbData;
+  }
+
+  // DB is empty — attempt a live fetch (server-side only, respects cooldown)
+  if (typeof window === 'undefined' && now - lastLiveFetchAttempt > LIVE_FETCH_COOLDOWN_MS) {
+    lastLiveFetchAttempt = now;
+    try {
+      const { fetchLiveADP } = await import('@/lib/adp-fetcher.server');
+      const { players, source } = await fetchLiveADP('mlb');
+      if (players.length > 0) {
+        // Persist for future requests; fire-and-forget
+        saveADPToSupabase(players, 'mlb').catch(() => {});
+        adpCache = players;
+        lastFetched = now;
+        adpFromDB = false;
+        console.log(`[v0] [ADP] Live fetch succeeded (${source}): ${players.length} MLB players`);
+        return players;
+      }
+    } catch (err) {
+      console.warn('[v0] [ADP] Live fetch failed — falling back to static:', err instanceof Error ? err.message : err);
     }
   }
 
-  console.log(`[v0] [ADP] No MLB ADP upload found — serving static fallback (${STATIC_FALLBACK_PLAYERS.length} players)`);
+  console.log(`[v0] [ADP] No live data available — serving static fallback (${STATIC_FALLBACK_PLAYERS.length} players)`);
   adpFromDB = false;
   return STATIC_FALLBACK_PLAYERS;
 }

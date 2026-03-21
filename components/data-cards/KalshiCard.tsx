@@ -699,13 +699,13 @@ export const KalshiCard = memo(function KalshiCard({
 
         <Divider />
 
-        {/* Order book depth (when available) */}
-        {hasOrderBook && (
+        {/* Order book depth (when available — active markets only) */}
+        {isActive && hasOrderBook && (
           <OrderBookMini bids={d.orderbookBids} asks={d.orderbookAsks} />
         )}
 
-        {/* Buy price chips (when no order book) */}
-        {hasPrices && !hasOrderBook && (
+        {/* Buy price chips (when no order book — active markets only) */}
+        {isActive && hasPrices && !hasOrderBook && (
           <PriceChips
             yesBid={yesBid} yesAsk={yesAsk}
             noBid={noBid}   noAsk={noAsk}
@@ -764,8 +764,8 @@ export const KalshiCard = memo(function KalshiCard({
             </button>
           )}
 
-          {/* YES / NO trade buttons */}
-          {hasSpecificMarket && (
+          {/* YES / NO trade buttons — only for active (open) markets */}
+          {isActive && hasSpecificMarket && (
             <div className="grid grid-cols-2 gap-2">
               {/* YES */}
               <a

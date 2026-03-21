@@ -164,39 +164,22 @@ export async function loadServerData(options: FetchOptions = {}): Promise<Server
     console.warn('[v0] Server: ⚠ Missing API keys:', missingKeys.join(', '));
   }
 
-  // Cards are no longer pre-loaded on the welcome screen.
-  // They are only generated on-demand for actual AI responses.
-  // This saves ~4 Odds API calls per page load.
+  // Cards and auth are not pre-loaded on the server — both are fetched
+  // client-side to keep the page shell fully static (ISR-compatible).
+  // Cards: generated on-demand for actual AI responses (saves ~4 Odds API calls).
+  // Auth: hydrated by Supabase onAuthStateChange + /api/init on mount.
+  // Reading cookies() here would prevent ISR static rendering.
   const cardsResult = { cards: [] as any[], sources: [] as string[], errors: [] as string[] };
-  const [sessionResult] = await Promise.all([
-    fetchUserSession(),
-  ]);
-
-  // Fetch user-specific insights if authenticated
-  let insightsResult = { insights: null, errors: [] as string[] };
-  if (sessionResult.session?.user?.id) {
-    insightsResult = await fetchUserInsights(sessionResult.session.user.id);
-  }
 
   const loadTime = Date.now() - startTime;
   console.log(`[v0] Server: ✓ Data load complete in ${loadTime}ms`);
 
-  // Aggregate all errors
-  const allErrors = [
-    ...cardsResult.errors,
-    ...sessionResult.errors,
-    ...insightsResult.errors,
-    ...envValidation.errors,
-  ];
-
-  if (allErrors.length > 0) {
-    console.error('[v0] Server: Errors during data load:', allErrors);
-  }
+  const allErrors = [...envValidation.errors];
 
   return {
     initialCards: cardsResult.cards,
-    initialInsights: insightsResult.insights,
-    userSession: sessionResult.session,
+    initialInsights: null,
+    userSession: null,
     serverTime: new Date().toISOString(),
     missingKeys,
     envErrors: envValidation.errors,

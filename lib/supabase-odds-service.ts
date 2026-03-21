@@ -72,63 +72,36 @@ export class SupabaseOddsService {
   }
 
   /**
-   * Store odds in cache
+   * Store odds in cache via process_odds_batch RPC.
+   * Uses service-role client when available (required for RPC execute permission).
    */
-  async storeOdds(sport: string, sportKey: string, games: any[]) {
-    if (!this.supabase) return false;
+  async storeOdds(_sport: string, _sportKey: string, games: any[]) {
+    if (!games.length) return false;
 
-    // Map API response to actual live_odds_cache schema:
-    // event_id, event_name, sport, sportsbook, market_type, odds_data,
-    // commence_time, implied_probability, fetched_at, expires_at, source
-    const records: any[] = [];
-    for (const game of games) {
-      const firstBook = game.bookmakers?.[0];
-      if (!firstBook) continue;
-
-      for (const market of firstBook.markets || []) {
-        records.push({
-          event_id: game.id,
-          event_name: `${game.away_team} @ ${game.home_team}`,
-          sport: sportKey,
-          sportsbook: firstBook.key || firstBook.title,
-          market_type: market.key, // h2h, spreads, totals
-          odds_data: { outcomes: market.outcomes, bookmakers: game.bookmakers },
-          commence_time: game.commence_time,
-          implied_probability: null,
-          fetched_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + CACHE_TTL).toISOString(),
-          source: 'the-odds-api',
-        });
-      }
-    }
-
-    if (records.length === 0) return false;
-
-    // Delete stale entries for this sport, then insert fresh data.
-    // This avoids upsert conflict issues since there's no unique constraint
-    // on (event_id, market_type, sportsbook).
+    // Use service-role client when available — process_odds_batch is granted to service_role.
+    // Fall back to anon client (will fail silently if permissions aren't extended).
+    let client = this.supabase;
     try {
-      await this.supabase
-        .from('live_odds_cache')
-        .delete()
-        .eq('sport', sportKey)
-        .lt('expires_at', new Date().toISOString());
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (url && serviceKey) {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { createClient } = require('@supabase/supabase-js');
+        client = createClient(url, serviceKey, { db: { schema: 'api' } });
+      }
     } catch (_) {
-      // Non-critical cleanup; continue with insert
+      // fall through to anon client
     }
 
-    const { error } = await this.supabase
-      .from('live_odds_cache')
-      .insert(records);
+    if (!client) return false;
+
+    const { error } = await client.rpc('process_odds_batch', { p_payload: games });
 
     if (error) {
-      // Silently ignore duplicate key, constraint, and schema-cache violations.
-      // PGRST204 = column not found in schema cache (live_odds_cache schema mismatch — non-blocking)
-      const code = (error as any).code as string;
       const msg: string = (error as any).message ?? '';
-      if (!['23505', 'PGRST204', 'PGRST205', '42P10'].includes(code) &&
-          !msg.includes('schema cache')) {
-        console.error('[Supabase] Error storing odds:', error);
+      // Ignore permission errors when service key is absent — non-blocking
+      if (!msg.includes('permission') && !msg.includes('42501')) {
+        console.error('[Supabase] process_odds_batch error:', msg);
       }
       return false;
     }

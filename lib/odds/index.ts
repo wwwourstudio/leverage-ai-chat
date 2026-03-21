@@ -192,7 +192,7 @@ async function retryWithBackoff<T>(
       
       // Don't retry on client errors (except rate limiting)
       if (status && status >= 400 && status < 500 && status !== 429) {
-        console.error(`${LOG_PREFIXES.API} Non-retryable error ${status} for ${operationKey}`);
+        console.warn(`${LOG_PREFIXES.API} Non-retryable error ${status} for ${operationKey} — not retrying`);
         throw error;
       }
       

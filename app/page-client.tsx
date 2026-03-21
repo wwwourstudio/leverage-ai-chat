@@ -646,6 +646,19 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           const creditData = getCreditData();
           localStorage.setItem('userCredits', JSON.stringify({ ...creditData, credits: bal }));
         }
+        // Hydrate default prompts — eliminates the separate /api/prompts cold-start.
+        // The prompts useEffect below still runs when category/sport changes to fetch
+        // AI-generated, context-specific suggestions; this just covers the first paint.
+        if (Array.isArray(init.defaultPrompts) && init.defaultPrompts.length > 0) {
+          setAiQuickActions(
+            init.defaultPrompts.map((p: { label: string; query: string }) => ({
+              label: p.label,
+              icon: null, // icon resolved from import at render time
+              category: selectedCategory,
+              query: p.query,
+            }))
+          );
+        }
       })
       .catch(err => {
         console.error('[v0] Error loading initial data:', err);
@@ -2445,6 +2458,15 @@ No preamble. Start directly with section 1.`;
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() && uploadedFiles.length === 0) return;
+
+    // Debounce: if a stream is already in flight, abort it before starting a new one.
+    // This prevents log-visible "4 POSTs in 3 minutes" stacking where each request
+    // triggers its own Grok call + Kalshi fetch before the previous stream completes.
+    if (isTyping) {
+      abortControllerRef.current?.abort();
+      // Let the abort propagate (setIsTyping(false) runs in generateRealResponse's
+      // finally block) then fall through to start the new request immediately.
+    }
 
     // Check if user has credits
     if (!consumeCredit()) {

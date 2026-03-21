@@ -121,6 +121,18 @@ async function fetchChats(supabase: Awaited<ReturnType<typeof import('@/lib/supa
   }
 }
 
+// Default prompts included in init so the client doesn't need a separate
+// /api/prompts cold-start on every page load. These match the static fallbacks
+// in /api/prompts/route.ts — the prompts endpoint still runs when the user
+// switches category/sport to get AI-generated, context-specific suggestions.
+const DEFAULT_INIT_PROMPTS = [
+  { label: 'Best line value today', query: 'Which games today have the best line value and where is sharp money pointing?' },
+  { label: 'Fade public picks', query: 'Which teams are heavily bet by the public but have weak value according to the closing line?' },
+  { label: 'Over/under edges', query: 'What totals are best to target today based on pace stats and weather?' },
+  { label: 'Live line movement', query: 'Which lines have moved the most in the last 24 hours and what is driving the move?' },
+  { label: 'Parlay value picks', query: "Build a 3-leg parlay with positive EV based on today's schedule and closing line value." },
+];
+
 export async function GET() {
   // 10s overall timeout — the route's maxDuration enforces this at the
   // infrastructure level, but we also resolve early if all parallel
@@ -150,6 +162,10 @@ export async function GET() {
       credits: creditsData,
       insights,
       chats,
+      // Bundling default prompts here eliminates the separate /api/prompts cold-start
+      // on every page load. The client uses these immediately; /api/prompts is still
+      // called when the user changes category/sport for AI-generated suggestions.
+      defaultPrompts: DEFAULT_INIT_PROMPTS,
     });
   } catch (err) {
     console.error('[API/init] Error:', err);
@@ -160,6 +176,7 @@ export async function GET() {
       credits: { credits: 0, source: 'guest' },
       insights: DEFAULT_INSIGHTS,
       chats: [],
+      defaultPrompts: DEFAULT_INIT_PROMPTS,
     });
   }
 }

@@ -19,11 +19,24 @@ const STATIC_PATTERNS = [
 ];
 
 // ─── Install ──────────────────────────────────────────────────────────────────
+// Do NOT call self.skipWaiting() here. Calling it immediately causes every open
+// tab to re-register and re-fire all page-load API calls in the same second
+// (the "SW update storm" visible in logs). Instead we wait for an explicit
+// SKIP_WAITING message from the client before activating the new worker.
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION).then((cache) => cache.addAll(PRECACHE_URLS))
   );
-  self.skipWaiting();
+  // Intentionally omitting self.skipWaiting() — see comment above.
+});
+
+// ─── Message: client-triggered skip-waiting ───────────────────────────────────
+// The PWARegister component posts { type: 'SKIP_WAITING' } after detecting a
+// new version. This gates the takeover so it only happens once and deliberately.
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // ─── Activate ─────────────────────────────────────────────────────────────────

@@ -426,11 +426,26 @@ export function parseTSV(raw: string): NFBCPlayer[] {
 // Uses the service role key (bypasses RLS) so no user session is needed.
 // Falls back silently — persistence failures never break the ADP tool.
 
-export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): Promise<void> {
-  if (typeof window !== 'undefined') return; // server-only
+/**
+ * Saves players to Supabase nfbc_adp table.
+ * Returns the number of rows saved (0 means nothing was written).
+ * Throws when called from the upload route so errors surface to the user.
+ * Silent-fails (returns 0) when called from background paths (cron, scraper).
+ */
+export async function saveADPToSupabase(
+  players: NFBCPlayer[],
+  sport = 'mlb',
+  throwOnError = false,
+): Promise<number> {
+  if (typeof window !== 'undefined') return 0; // server-only
   try {
     const supabase = await getADPSupabaseClient();
-    if (!supabase) return;
+    if (!supabase) {
+      const msg = '[v0] [ADP] No Supabase client — check SUPABASE_SERVICE_ROLE_KEY env var';
+      if (throwOnError) throw new Error(msg);
+      console.warn(msg);
+      return 0;
+    }
     const now = new Date().toISOString();
     const rows = players.map(p => ({
       rank: p.rank,
@@ -455,20 +470,27 @@ export async function saveADPToSupabase(players: NFBCPlayer[], sport = 'mlb'): P
     if (deleteError) {
       console.warn('[v0] [ADP] Supabase delete failed (non-critical):', deleteError.message);
     }
-    // Insert in batches of 50 to stay well within payload limits
-    const BATCH = 50;
+    // Insert in batches of 100 to stay well within payload limits
+    const BATCH = 100;
+    let saved = 0;
     for (let i = 0; i < rows.length; i += BATCH) {
       const { error } = await supabase
         .from('nfbc_adp')
         .insert(rows.slice(i, i + BATCH));
       if (error) {
-        console.warn('[v0] [ADP] Supabase insert batch failed:', error.message);
-        return;
+        const msg = `[v0] [ADP] Supabase insert batch failed: ${error.message}`;
+        if (throwOnError) throw new Error(msg);
+        console.warn(msg);
+        break;
       }
+      saved += rows.slice(i, i + BATCH).length;
     }
-    console.log(`[v0] [ADP] Saved ${players.length} ${sport.toUpperCase()} ADP players to Supabase`);
+    console.log(`[v0] [ADP] Saved ${saved} ${sport.toUpperCase()} ADP players to Supabase`);
+    return saved;
   } catch (err) {
+    if (throwOnError) throw err;
     console.warn('[v0] [ADP] saveADPToSupabase failed (non-critical):', err);
+    return 0;
   }
 }
 

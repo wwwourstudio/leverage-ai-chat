@@ -43,7 +43,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await saveADPToSupabase(players, sport);
+    const saved = await saveADPToSupabase(players, sport, true /* throwOnError */);
+
+    if (saved === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Players were parsed but none were saved to the database. Check that SUPABASE_SERVICE_ROLE_KEY is set in your environment variables.' },
+        { status: 500 },
+      );
+    }
 
     // Clear in-process cache so the next query reads fresh data
     if (sport === 'mlb') {
@@ -52,13 +59,13 @@ export async function POST(req: NextRequest) {
       clearNFLADPCache();
     }
 
-    console.log(`[v0] [ADP] User uploaded ${players.length} ${sport.toUpperCase()} ADP players`);
+    console.log(`[v0] [ADP] User uploaded ${saved} ${sport.toUpperCase()} ADP players`);
 
     return NextResponse.json({
       success: true,
-      count: players.length,
+      count: saved,
       sport,
-      message: `Successfully imported ${players.length} ${sport.toUpperCase()} players. Data is now live for all users.`,
+      message: `Successfully imported ${saved} ${sport.toUpperCase()} players. Data is now live for all users.`,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

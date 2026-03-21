@@ -462,11 +462,13 @@ export async function POST(request: NextRequest) {
     // as "[File: ADP.tsv (N rows)]\nCol1\tCol2\t...\n...". If this message has
     // ADP intent we extract and save to Supabase right now so that the query_adp
     // tool (called later) returns the real uploaded data instead of static fallback.
-    if (hasADPIntent && userMessage.includes('[File:')) {
+    if (hasADPIntent && body.userMessage.includes('[File:')) {
       // Find all inline file blocks: "[File: name (N rows)]\n<content up to next [File: or end>"
+      // IMPORTANT: use body.userMessage (original) not userMessage (truncated to 50 rows)
+      // so we save the full file, not just the first 50 players.
       const fileBlockRe = /\[File:\s*([^\]]+\.(?:tsv|csv))[^\]]*\]\n([\s\S]*?)(?=\n\[File:|$)/gi;
       let fileMatch;
-      while ((fileMatch = fileBlockRe.exec(userMessage)) !== null) {
+      while ((fileMatch = fileBlockRe.exec(body.userMessage)) !== null) {
         const fileName = (fileMatch[1] ?? '').toLowerCase();
         const rawContent = fileMatch[2] ?? '';
         if (!rawContent.trim()) continue;

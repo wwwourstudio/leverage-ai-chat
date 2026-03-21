@@ -72,9 +72,16 @@ export interface PitcherContext {
   /** Release height ft */
   releaseHeight: number;
   /** Pitch mix fractions (0–100 each, should sum to 100) */
-  fastballPct: number;
-  breakingPct: number;
-  offspeedPct: number;
+  fastballPct: number;     // all fastball types combined
+  fourSeamPct: number;     // 4-seam specifically (primary HR risk pitch)
+  breakingPct: number;     // slider + sweeper + curveball + cutter
+  offspeedPct: number;     // changeup + splitter
+  /**
+   * HR per fly ball allowed (HR/FB ratio).
+   * Most predictive single stabilizing metric for pitcher HR propensity.
+   * League avg ≈ 0.11.
+   */
+  hrAllowedPerFb: number;
   /** Whiff % (optional — used for DFS matchup score) */
   whiffPct?: number;
 }
@@ -209,15 +216,21 @@ export async function predictPlayerHR(input: HRPredictionInput): Promise<HRPredi
 
   // ── Layer 0: Matchup Engine ──────────────────────────────────────────────
   const lineupCtx: LineupContext = {
-    lineup_slot:              game.lineupSlot,
-    batter_hand:              batter.bats,
-    pitcher_hand:             pitcher.throws,
-    pitcher_flyball_pct:      pitcher.flyballPct,
-    pitcher_hr9_vs_hand:      pitcher.hr9VsHand,
-    protection_score:         (game.prevBatterOPS + game.nextBatterOPS) / 2,
-    platoon_advantage:        batter.bats !== pitcher.throws,
-    team_power_rank:          game.teamPowerRank,
-    opposing_bullpen_hr9:     game.bullpenHr9,
+    lineup_slot:                game.lineupSlot,
+    batter_hand:                batter.bats,
+    pitcher_hand:               pitcher.throws,
+    pitcher_flyball_pct:        pitcher.flyballPct,
+    pitcher_hr9_vs_hand:        pitcher.hr9VsHand,
+    protection_score:           (game.prevBatterOPS + game.nextBatterOPS) / 2,
+    platoon_advantage:          batter.bats !== pitcher.throws,
+    team_power_rank:            game.teamPowerRank,
+    opposing_bullpen_hr9:       game.bullpenHr9,
+    // Pitch mix / arsenal fields
+    pitcher_four_seam_pct:      pitcher.fourSeamPct,
+    pitcher_breaking_usage:     pitcher.breakingPct,
+    pitcher_offspeed_usage:     pitcher.offspeedPct,
+    pitcher_fastball_velo:      pitcher.avgVelocity,
+    pitcher_hr_allowed_per_fb:  pitcher.hrAllowedPerFb,
   };
 
   const matchupFactor   = calculateMatchupFactor(lineupCtx);

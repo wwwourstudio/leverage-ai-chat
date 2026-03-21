@@ -38,30 +38,14 @@ interface OddsEvent {
 }
 
 interface StoredOddsRow {
-  event_id: string;
-  event_name: string;
+  game_id: string;
   home_team: string;
   away_team: string;
   commence_time: string;
-  market_type: string;
-  sportsbook: string;
-  home_odds?: number;
-  away_odds?: number;
-  home_implied_prob?: number;
-  away_implied_prob?: number;
-  home_spread?: number;
-  home_spread_odds?: number;
-  away_spread?: number;
-  away_spread_odds?: number;
-  over_total?: number;
-  over_odds?: number;
-  under_total?: number;
-  under_odds?: number;
-  raw_odds_data: any;
-  source: string;
-  api_requests_remaining?: number;
-  fetched_at: string;
-  expires_at: string;
+  h2h_odds: any[] | null;
+  spreads: any[] | null;
+  totals: any[] | null;
+  cached_at: string;
 }
 
 /**
@@ -78,16 +62,6 @@ function getSupabaseClient() {
   return createClient(supabaseUrl, serviceKey, { db: { schema: 'api' } });
 }
 
-/**
- * Calculate implied probability from American odds
- */
-function calculateImpliedProbability(americanOdds: number): number {
-  if (americanOdds > 0) {
-    return 100 / (americanOdds + 100);
-  } else {
-    return Math.abs(americanOdds) / (Math.abs(americanOdds) + 100);
-  }
-}
 
 /**
  * Store odds data for a specific sport
@@ -113,73 +87,30 @@ export async function storeOddsData(
 
     for (const event of events) {
       try {
-        const eventName = `${event.away_team} @ ${event.home_team}`;
+        // Aggregate all bookmakers' markets into per-type JSONB arrays
+        const h2hOdds: any[] = [];
+        const spreadsOdds: any[] = [];
+        const totalsOdds: any[] = [];
 
-        // Process each bookmaker's markets
         for (const bookmaker of event.bookmakers || []) {
           for (const market of bookmaker.markets || []) {
-            const row: StoredOddsRow = {
-              event_id: event.id,
-              event_name: eventName,
-              home_team: event.home_team,
-              away_team: event.away_team,
-              commence_time: event.commence_time,
-              market_type: market.key,
-              sportsbook: bookmaker.key,
-              raw_odds_data: {
-                sport_key: event.sport_key,
-                sport_title: event.sport_title,
-                bookmaker: bookmaker.title,
-                market: market,
-              },
-              source: 'the-odds-api',
-              api_requests_remaining: metadata.remainingRequests ? parseInt(metadata.remainingRequests) : undefined,
-              fetched_at: new Date().toISOString(),
-              expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(), // 5 minutes
-            };
-
-            // Extract odds based on market type
-            if (market.key === 'h2h') {
-              const homeOutcome = market.outcomes.find((o) => o.name === event.home_team);
-              const awayOutcome = market.outcomes.find((o) => o.name === event.away_team);
-
-              if (homeOutcome) {
-                row.home_odds = homeOutcome.price;
-                row.home_implied_prob = calculateImpliedProbability(homeOutcome.price);
-              }
-              if (awayOutcome) {
-                row.away_odds = awayOutcome.price;
-                row.away_implied_prob = calculateImpliedProbability(awayOutcome.price);
-              }
-            } else if (market.key === 'spreads') {
-              const homeOutcome = market.outcomes.find((o) => o.name === event.home_team);
-              const awayOutcome = market.outcomes.find((o) => o.name === event.away_team);
-
-              if (homeOutcome && 'point' in homeOutcome) {
-                row.home_spread = (homeOutcome as any).point;
-                row.home_spread_odds = homeOutcome.price;
-              }
-              if (awayOutcome && 'point' in awayOutcome) {
-                row.away_spread = (awayOutcome as any).point;
-                row.away_spread_odds = awayOutcome.price;
-              }
-            } else if (market.key === 'totals') {
-              const overOutcome = market.outcomes.find((o) => o.name === 'Over');
-              const underOutcome = market.outcomes.find((o) => o.name === 'Under');
-
-              if (overOutcome && 'point' in overOutcome) {
-                row.over_total = (overOutcome as any).point;
-                row.over_odds = overOutcome.price;
-              }
-              if (underOutcome && 'point' in underOutcome) {
-                row.under_total = (underOutcome as any).point;
-                row.under_odds = underOutcome.price;
-              }
-            }
-
-            rows.push(row);
+            const entry = { bookmaker: bookmaker.key, outcomes: market.outcomes };
+            if (market.key === 'h2h') h2hOdds.push(entry);
+            else if (market.key === 'spreads') spreadsOdds.push(entry);
+            else if (market.key === 'totals') totalsOdds.push(entry);
           }
         }
+
+        rows.push({
+          game_id:       event.id,
+          home_team:     event.home_team,
+          away_team:     event.away_team,
+          commence_time: event.commence_time,
+          h2h_odds:      h2hOdds.length    ? h2hOdds    : null,
+          spreads:       spreadsOdds.length ? spreadsOdds : null,
+          totals:        totalsOdds.length  ? totalsOdds  : null,
+          cached_at:     new Date().toISOString(),
+        });
       } catch (eventError: any) {
         errors.push(`Event ${event.id}: ${eventError.message}`);
         console.error(`[v0] Error processing event ${event.id}:`, eventError);
@@ -191,9 +122,9 @@ export async function storeOddsData(
       return { success: true, stored: 0, errors };
     }
 
-    // Batch insert with upsert behavior
+    // Upsert on game_id (unique per sport table)
     const { data, error } = await supabase.from(tableName).upsert(rows, {
-      onConflict: 'event_id,sportsbook,market_type,fetched_at',
+      onConflict: 'game_id',
       ignoreDuplicates: false,
     });
 
@@ -228,11 +159,13 @@ export async function getRecentOdds(
   try {
     const supabase = getSupabaseClient();
 
+    // Sport tables use cached_at; treat rows older than 5 min as expired
+    const freshSince = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from(tableName)
       .select('*')
-      .gt('expires_at', new Date().toISOString())
-      .order('fetched_at', { ascending: false })
+      .gt('cached_at', freshSince)
+      .order('cached_at', { ascending: false })
       .limit(limit);
 
     if (error) {
@@ -271,7 +204,7 @@ export async function cleanupExpiredOdds(): Promise<{ success: boolean; message:
       const { error, count } = await supabase
         .from(tableName)
         .delete()
-        .lt('expires_at', cutoffTime);
+        .lt('cached_at', cutoffTime);
 
       if (error) {
         console.error(`[v0] Error cleaning up ${tableName}:`, error);

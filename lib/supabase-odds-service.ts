@@ -1,12 +1,3 @@
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-/** Convert American odds to implied probability (0-1) */
-function oddsToImpliedProb(americanOdds: number): number {
-  if (americanOdds > 0) {
-    return 100 / (americanOdds + 100);
-  }
-  return Math.abs(americanOdds) / (Math.abs(americanOdds) + 100);
-}
 
 /**
  * Safely get Supabase client. Uses createBrowserClient on client,
@@ -55,9 +46,9 @@ export class SupabaseOddsService {
       const { data, error } = await this.supabase
         .from('live_odds_cache')
         .select('*')
-        .eq('sport', sport)
+        .eq('sport_key', sport)
         .gt('expires_at', new Date().toISOString())
-        .order('fetched_at', { ascending: false })
+        .order('cached_at', { ascending: false })
         .limit(50);
 
       if (error) {
@@ -132,56 +123,39 @@ export class SupabaseOddsService {
     }
 
     // Map API data to the actual sport table schema:
-    // event_id, event_name, home_team, away_team, commence_time,
-    // home_odds, away_odds, home_implied_prob, away_implied_prob,
-    // home_spread, home_spread_odds, away_spread, away_spread_odds,
-    // over_total, over_odds, under_total, under_odds,
-    // sportsbook, market_type, source, raw_odds_data,
-    // api_requests_remaining, fetched_at, expires_at
+    // game_id, home_team, away_team, commence_time,
+    // h2h_odds (jsonb), spreads (jsonb), totals (jsonb), cached_at
     const records = games.map((game: any) => {
-      const firstBook = game.bookmakers?.[0];
-      const h2h = firstBook?.markets?.find((m: any) => m.key === 'h2h');
-      const spreads = firstBook?.markets?.find((m: any) => m.key === 'spreads');
-      const totals = firstBook?.markets?.find((m: any) => m.key === 'totals');
+      // Aggregate all bookmakers' markets into JSONB blobs keyed by market type
+      const h2hOdds: any[] = [];
+      const spreadsOdds: any[] = [];
+      const totalsOdds: any[] = [];
 
-      const homeH2h = h2h?.outcomes?.find((o: any) => o.name === game.home_team);
-      const awayH2h = h2h?.outcomes?.find((o: any) => o.name === game.away_team);
-      const homeSpread = spreads?.outcomes?.find((o: any) => o.name === game.home_team);
-      const awaySpread = spreads?.outcomes?.find((o: any) => o.name === game.away_team);
-      const overTotal = totals?.outcomes?.find((o: any) => o.name === 'Over');
-      const underTotal = totals?.outcomes?.find((o: any) => o.name === 'Under');
+      for (const book of game.bookmakers || []) {
+        for (const market of book.markets || []) {
+          const entry = { bookmaker: book.key, outcomes: market.outcomes };
+          if (market.key === 'h2h') h2hOdds.push(entry);
+          else if (market.key === 'spreads') spreadsOdds.push(entry);
+          else if (market.key === 'totals') totalsOdds.push(entry);
+        }
+      }
 
       return {
-        event_id: game.id,
-        event_name: `${game.away_team} @ ${game.home_team}`,
+        game_id: game.id,
         home_team: game.home_team,
         away_team: game.away_team,
         commence_time: game.commence_time,
-        home_odds: homeH2h?.price ?? null,
-        away_odds: awayH2h?.price ?? null,
-        home_implied_prob: homeH2h?.price ? oddsToImpliedProb(homeH2h.price) : null,
-        away_implied_prob: awayH2h?.price ? oddsToImpliedProb(awayH2h.price) : null,
-        home_spread: homeSpread?.point ?? null,
-        home_spread_odds: homeSpread?.price ?? null,
-        away_spread: awaySpread?.point ?? null,
-        away_spread_odds: awaySpread?.price ?? null,
-        over_total: overTotal?.point ?? null,
-        over_odds: overTotal?.price ?? null,
-        under_total: underTotal?.point ?? null,
-        under_odds: underTotal?.price ?? null,
-        sportsbook: firstBook?.key || firstBook?.title || 'unknown',
-        market_type: 'h2h', // primary market type
-        source: 'the-odds-api',
-        raw_odds_data: { bookmakers: game.bookmakers },
-        fetched_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + CACHE_TTL).toISOString(),
+        h2h_odds:  h2hOdds.length   ? h2hOdds   : null,
+        spreads:   spreadsOdds.length ? spreadsOdds : null,
+        totals:    totalsOdds.length  ? totalsOdds  : null,
+        cached_at: new Date().toISOString(),
       };
     });
 
     try {
       const { error } = await this.supabase
         .from(tableName)
-        .upsert(records, { onConflict: 'event_id' });
+        .upsert(records, { onConflict: 'game_id' });
 
       if (error) {
         // Silently ignore permission / constraint / schema-cache errors.

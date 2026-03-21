@@ -686,7 +686,7 @@ STEP 1 — ALWAYS call query_statcast FIRST to retrieve real metrics before gene
 NEVER invent barrel rates, exit velocities, xwOBA, or any other Statcast metric. NEVER skip calling the tool.
   - If the tool returns players with real numeric values, use those values in the card.
   - If the tool returns an empty players array, it means the player wasn't found in the dataset.
-    In that case: output a prose response (not JSON) explaining the player isn't in the 2025 dataset
+    In that case: output a prose response (not JSON) explaining the player wasn't found in the Statcast dataset
     and suggesting the user try a different name or ask about a top-tier player.
   - NEVER output a JSON card with "N/A" as any metric value. If you don't have real data, output prose.
 

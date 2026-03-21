@@ -407,53 +407,45 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     }
   };
 
-  // Load custom AI instructions — from API if logged in, localStorage otherwise
-  const loadInstructionsFromApi = async () => {
-    try {
-      const res = await fetch('/api/user/instructions');
-      const data = await res.json();
-      if (typeof data.instructions === 'string') {
-        setCustomInstructions(data.instructions);
-        // Keep localStorage in sync as offline fallback
-        localStorage.setItem('leverage_custom_instructions', data.instructions);
-        return;
-      }
-    } catch {
-      // ignore
-    }
-    // Fallback to localStorage
+  // Load instructions from localStorage fallback only (server instructions come via /api/init)
+  const loadInstructionsFromLocalStorage = () => {
     const stored = localStorage.getItem('leverage_custom_instructions') || '';
     setCustomInstructions(stored);
   };
 
-  // Load credits from Supabase on login
-  const loadCreditsFromSupabase = async (authId: string) => {
+  // Fetch profile ID for credit sync — credits and instructions come via /api/init.
+  const loadProfileId = async (authId: string) => {
     try {
       const supabase = createClient();
-
-      // Use /api/credits for user_credits (server route bypasses RLS 403 that affects browser client).
-      // Fetch profile and credits in parallel.
-      const [profileResult, creditsJson] = await Promise.all([
-        supabase.from('user_profiles').select('id, credits_remaining').eq('user_id', authId).single(),
-        fetch('/api/credits').then(r => r.json()).catch(() => ({ success: false, credits: 0 })),
-      ]);
-
-      const profile = profileResult.data;
-      const purchasedBalance: number = creditsJson?.credits ?? 0;
-
-      if (profile) {
-        setSupabaseProfileId(profile.id);
-        // Use purchased balance if it exists; otherwise fall back to profile credits
-        const dbCredits = purchasedBalance > 0 ? purchasedBalance : (profile.credits_remaining ?? MESSAGE_LIMIT);
-        setCreditsRemaining(dbCredits);
-        const creditData = getCreditData();
-        localStorage.setItem('userCredits', JSON.stringify({ ...creditData, credits: dbCredits }));
-        return dbCredits;
-      }
-    } catch (err) {
-      console.error('[Credits] Failed to load from Supabase:', err);
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('user_id', authId)
+        .single();
+      if (profile?.id) setSupabaseProfileId(profile.id);
+    } catch {
+      // Non-critical — credit sync will be skipped without a profile ID
     }
-    return null;
+  };
+
+  // Fetch credits + instructions from /api/init and apply to state.
+  const loadInitData = async () => {
+    try {
+      const res = await fetch('/api/init');
+      const init = await res.json();
+      if (init.credits?.credits != null) {
+        const bal: number = init.credits.credits;
+        setCreditsRemaining(bal);
+        const creditData = getCreditData();
+        localStorage.setItem('userCredits', JSON.stringify({ ...creditData, credits: bal }));
+      }
+      if (typeof init.instructions === 'string' && init.instructions) {
+        setCustomInstructions(init.instructions);
+        localStorage.setItem('leverage_custom_instructions', init.instructions);
+      }
+    } catch {
+      loadInstructionsFromLocalStorage();
+    }
   };
 
   const consumeCredit = () => {
@@ -530,9 +522,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
             email: user.email || ''
           });
-          // Load credits and instructions from Supabase
-          loadCreditsFromSupabase(user.id);
-          loadInstructionsFromApi();
+          // Load profile ID for credit sync (credits/instructions come via the page-load /api/init)
+          loadProfileId(user.id);
           // Load persisted chat threads from Supabase
           loadThreads().then(threads => {
             if (threads.length > 0) {
@@ -556,8 +547,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           });
         } else {
           // Not logged in — load instructions from localStorage
-          const stored = localStorage.getItem('leverage_custom_instructions') || '';
-          setCustomInstructions(stored);
+          loadInstructionsFromLocalStorage();
         }
 
         // Listen for auth changes (OAuth redirect, signout, etc.)
@@ -570,9 +560,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             });
             setShowLoginModal(false);
             setShowSignupModal(false);
-            // Load credits and instructions from Supabase on auth change
-            loadCreditsFromSupabase(session.user.id);
-            loadInstructionsFromApi();
+            // Load profile ID + refresh credits/instructions via /api/init on auth change
+            loadProfileId(session.user.id);
+            loadInitData();
           } else {
             setIsLoggedIn(false);
             setUser(null);
@@ -644,10 +634,17 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             return newMessages;
           });
         }
-        // Hydrate custom instructions for anonymous/non-auth visitors
+        // Hydrate custom instructions
         if (typeof init.instructions === 'string' && init.instructions) {
           setCustomInstructions(init.instructions);
           localStorage.setItem('leverage_custom_instructions', init.instructions);
+        }
+        // Hydrate credits (replaces /api/credits cold-start call)
+        if (init.credits?.credits != null) {
+          const bal: number = init.credits.credits;
+          setCreditsRemaining(bal);
+          const creditData = getCreditData();
+          localStorage.setItem('userCredits', JSON.stringify({ ...creditData, credits: bal }));
         }
       })
       .catch(err => {

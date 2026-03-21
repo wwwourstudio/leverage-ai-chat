@@ -1682,10 +1682,23 @@ export async function POST(request: NextRequest) {
               } catch (fallbackErr) {
                 const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
                 console.error('[API/analyze] Fallback also failed:', fallbackMsg);
-                aiText = generateFallbackResponse(userMessage, context);
-                modelUsed = fallbackMsg.includes('timeout') ? 'Fallback (timeout)' : 'Fallback (API error — check XAI_API_KEY)';
+                // Surface rate-limit and auth errors as SSE error events so the
+                // client can show a meaningful message instead of a silent fallback.
+                const primaryStatus = (streamErr as Record<string, unknown>)?.statusCode as number | undefined;
+                const isRateLimit = primaryStatus === 429 || fallbackMsg.includes('429') || fallbackMsg.toLowerCase().includes('rate limit');
+                const isAuthError = primaryStatus === 401 || fallbackMsg.includes('401') || fallbackMsg.toLowerCase().includes('unauthorized');
+                if (isRateLimit || isAuthError) {
+                  const errMsg = isRateLimit
+                    ? 'AI rate limit reached — please wait a moment and try again.'
+                    : 'AI API key error — contact support if this persists.';
+                  controller.enqueue(sseChunk({ type: 'error', message: errMsg }));
+                  aiText = errMsg;
+                } else {
+                  aiText = generateFallbackResponse(userMessage, context);
+                  controller.enqueue(sseChunk({ type: 'text', delta: aiText }));
+                }
+                modelUsed = isRateLimit ? 'Fallback (rate limited)' : isAuthError ? 'Fallback (auth error)' : fallbackMsg.includes('timeout') ? 'Fallback (timeout)' : 'Fallback (API error — check XAI_API_KEY)';
                 usedFallback = true;
-                controller.enqueue(sseChunk({ type: 'text', delta: aiText }));
               }
             }
           } else {

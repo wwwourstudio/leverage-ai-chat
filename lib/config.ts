@@ -165,7 +165,8 @@ export const isOddsApiConfigured = () =>
   !!getOddsApiKey();
 
 export const isKalshiConfigured = () =>
-  !!(process.env.KALSHI_API_KEY_ID && process.env.KALSHI_PRIVATE_KEY);
+  // Support both KALSHI_ACCESS_KEY (new spec) and KALSHI_API_KEY_ID (legacy)
+  !!((process.env.KALSHI_ACCESS_KEY || process.env.KALSHI_API_KEY_ID) && process.env.KALSHI_PRIVATE_KEY);
 
 /**
  * Check if Supabase is properly configured (detailed status)

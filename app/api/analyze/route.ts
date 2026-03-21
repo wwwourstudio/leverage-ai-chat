@@ -287,6 +287,19 @@ export async function POST(request: NextRequest) {
       HR_PREDICTION_KEYWORDS.some(k => rawQueryLower.includes(k)) &&
       (rawQueryLower.includes('hr') || rawQueryLower.includes('homer') || rawQueryLower.includes('home run'));
 
+    // Kalshi tool intent: fires when user explicitly wants live market data or prices
+    // via the tool (distinct from the existing isPoliticalMarket prompt-enrichment path
+    // which injects Kalshi data as context without a tool call).
+    const KALSHI_TOOL_KEYWORDS = [
+      'kalshi market', 'prediction market', 'kalshi price', 'kalshi odds',
+      'what\'s the price on', 'current price on', 'market price for',
+      'show kalshi', 'list kalshi', 'kalshi election', 'kalshi trump',
+      'yes price', 'no price', 'yes/no price', 'edge on yes', 'edge on no',
+    ];
+    const hasKalshiToolIntent =
+      (context?.isPoliticalMarket || context?.selectedCategory === 'kalshi') &&
+      KALSHI_TOOL_KEYWORDS.some(k => rawQueryLower.includes(k));
+
     // MLB Projection Engine intent: projection/DFS/fantasy/betting queries that need
     // the LeverageMetrics algorithm (Monte Carlo, HR model, breakout scores).
     const MLB_PROJECTION_KEYWORDS = [
@@ -1218,6 +1231,79 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // ── Kalshi Market Tools ───────────────────────────────────────────────────────
+    const kalshiGetMarketsParams = z.object({
+      category: z.enum(['election', 'sports', 'weather', 'finance', 'trending', 'all'])
+        .optional()
+        .describe('Market category (default: all)'),
+      search:   z.string().optional().describe('Free-text search in market titles'),
+      limit:    z.number().optional().describe('Number of markets to return (default: 10, max: 50)'),
+    });
+    const kalshiGetMarketsTool = tool({
+      description:
+        'Fetch live Kalshi prediction market data. Use when user asks to "show Kalshi markets", ' +
+        '"list election markets", "what are the top Kalshi markets", or any question about ' +
+        'prediction market availability, categories, or current YES/NO prices across markets.',
+      inputSchema: kalshiGetMarketsParams,
+      execute: async ({ category = 'all', search, limit = 10 }: z.infer<typeof kalshiGetMarketsParams>) => {
+        console.log('[API/analyze] kalshi_get_markets tool called:', { category, search, limit });
+        try {
+          const qs = new URLSearchParams({ category, limit: String(Math.min(limit, 50)) });
+          if (search) qs.set('search', search);
+          const res = await fetch(
+            `${process.env.NEXTAUTH_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'}/api/kalshi/markets?${qs}`,
+            { signal: AbortSignal.timeout(8000) },
+          ).catch(() => null);
+          if (!res?.ok) {
+            const { fetchKalshiMarkets, fetchTopMarketsByVolume } = await import('@/lib/kalshi/index');
+            const markets = category === 'trending'
+              ? await fetchTopMarketsByVolume(limit)
+              : await fetchKalshiMarkets({ search, limit });
+            return { success: true, markets: markets.slice(0, limit), count: markets.length };
+          }
+          return res.json();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error('[API/analyze] kalshi_get_markets error:', msg);
+          return { success: false, error: msg, markets: [] };
+        }
+      },
+    });
+
+    const kalshiGetPriceParams = z.object({
+      ticker:    z.string().describe('Kalshi market ticker (e.g. KXBT-25DEC25-T45000, FED-25DEC-ABOVE)'),
+      modelProb: z.number().optional().describe('Your model probability [0,1] for edge calculation'),
+    });
+    const kalshiGetPriceTool = tool({
+      description:
+        'Get the current YES/NO price for a specific Kalshi market by ticker. ' +
+        'Use when user asks "current price on [ticker]", "what\'s [ticker] trading at", ' +
+        '"what\'s the edge on [ticker]", or "should I buy yes/no on [market]". ' +
+        'Provide modelProb to get an edge calculation vs the market price.',
+      inputSchema: kalshiGetPriceParams,
+      execute: async ({ ticker, modelProb }: z.infer<typeof kalshiGetPriceParams>) => {
+        console.log('[API/analyze] kalshi_get_price tool called:', { ticker, modelProb });
+        try {
+          const { getMarketByTicker } = await import('@/lib/kalshi/index');
+          const { KalshiClient }      = await import('@/lib/kalshi/kalshiClient');
+          const market = await getMarketByTicker(ticker.toUpperCase());
+          if (!market) return { success: false, error: `Market "${ticker}" not found`, market: null };
+          const edge = (modelProb != null && modelProb >= 0 && modelProb <= 1)
+            ? KalshiClient.computeEdge(modelProb, market.yesBid, market.yesAsk)
+            : null;
+          return {
+            success: true,
+            market,
+            edge,
+            kalshiUrl: `https://kalshi.com/markets/${market.eventTicker || ticker}/${ticker.toUpperCase()}`,
+          };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { success: false, error: msg, market: null };
+        }
+      },
+    });
+
     // ── SSE streaming response — wraps AI generation + post-processing ──────────
     const encoder = new TextEncoder();
     const sseChunk = (data: object) => encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
@@ -1240,8 +1326,9 @@ export async function POST(request: NextRequest) {
               abortSignal: abortCtrl.signal,
               ...(hasADPIntent && { tools: { query_adp: adpTool }, stopWhen: stepCountIs(3) }),
               ...(hasHRPredictionIntent && { tools: { predict_hr: predictHRTool }, stopWhen: stepCountIs(2) }),
-              ...(!hasHRPredictionIntent && hasMLBProjectionIntent && { tools: { query_mlb_projections: mlbProjectionTool }, stopWhen: stepCountIs(3) }),
-              ...(!hasHRPredictionIntent && !hasMLBProjectionIntent && isMLBStatcastMode && { tools: { query_statcast: statcastTool }, stopWhen: stepCountIs(3) }),
+              ...(hasKalshiToolIntent && !hasHRPredictionIntent && !hasADPIntent && { tools: { kalshi_get_markets: kalshiGetMarketsTool, kalshi_get_price: kalshiGetPriceTool }, stopWhen: stepCountIs(2) }),
+              ...(!hasHRPredictionIntent && !hasKalshiToolIntent && hasMLBProjectionIntent && { tools: { query_mlb_projections: mlbProjectionTool }, stopWhen: stepCountIs(3) }),
+              ...(!hasHRPredictionIntent && !hasKalshiToolIntent && !hasMLBProjectionIntent && isMLBStatcastMode && { tools: { query_statcast: statcastTool }, stopWhen: stepCountIs(3) }),
             });
 
             // Abort if the first token doesn't arrive within the timeout budget

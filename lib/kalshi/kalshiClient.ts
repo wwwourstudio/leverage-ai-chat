@@ -117,14 +117,21 @@ export class KalshiClient {
     apiKeyId?: string;
     demo?: boolean;
   }) {
-    this.apiKey = options?.apiKey || process.env.KALSHI_PRIVATE_KEY || '';
-    this.apiKeyId = options?.apiKeyId || process.env.KALSHI_API_KEY_ID || '';
-    this.baseUrl = options?.demo
+    // Support both KALSHI_ACCESS_KEY (new) and KALSHI_API_KEY_ID (legacy) env vars
+    this.apiKey = options?.apiKey
+      || process.env.KALSHI_PRIVATE_KEY
+      || '';
+    this.apiKeyId = options?.apiKeyId
+      || process.env.KALSHI_ACCESS_KEY
+      || process.env.KALSHI_API_KEY_ID
+      || '';
+    const isDemoEnv = process.env.KALSHI_ENV === 'demo';
+    this.baseUrl = (options?.demo || isDemoEnv)
       ? 'https://demo-api.kalshi.co/trade-api/v2'
       : 'https://api.elections.kalshi.com/trade-api/v2';
   }
 
-  // ─── RSA-SHA256 Signature ─────────────────────────────────────────────────
+  // ─── RSA-PSS Signature (Kalshi requires PSS, not PKCS1v15) ───────────────
 
   private buildSignature(method: string, path: string, timestampMs: number): string {
     const rawKey = this.apiKey.replace(/\\n/g, '\n');
@@ -135,7 +142,11 @@ export class KalshiClient {
     const sign = createSign('RSA-SHA256');
     sign.update(msg);
     sign.end();
-    return sign.sign({ key: privateKey, padding: constants.RSA_PKCS1_PADDING }, 'base64');
+    // Kalshi requires RSA-PSS with SHA-256 and salt length = digest length (32)
+    return sign.sign(
+      { key: privateKey, padding: constants.RSA_PKCS1_PSS_PADDING, saltLength: 32 },
+      'base64',
+    );
   }
 
   private authHeaders(method: string, path: string): HeadersInit {

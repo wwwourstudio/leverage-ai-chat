@@ -8,8 +8,11 @@
 
 import crypto from 'crypto';
 
-const KALSHI_TRADING_URL = 'https://api.elections.kalshi.com/trade-api/v2';
-const KALSHI_FALLBACK_URL = 'https://api.elections.kalshi.com/trade-api/v2';
+const _IS_DEMO = process.env.KALSHI_ENV === 'demo';
+const KALSHI_TRADING_URL = _IS_DEMO
+  ? 'https://demo-api.kalshi.co/trade-api/v2'
+  : 'https://api.elections.kalshi.com/trade-api/v2';
+const KALSHI_FALLBACK_URL = KALSHI_TRADING_URL;
 
 export interface KalshiMarket {
   ticker: string;
@@ -116,13 +119,18 @@ function cacheMarkets(cacheKey: string, markets: KalshiMarket[], ttlMs: number =
   console.log(`[KALSHI] Cached ${markets.length} markets with ${ttlMs / 1000}s TTL`);
 }
 
-/** Build auth headers with RSA-SHA256 signing when credentials are available */
-function buildHeaders(url: string = ''): Record<string, string> {
+/**
+ * Build auth headers with RSA-PSS signing when credentials are available.
+ * Public endpoints (GET /markets) work without auth — signing is best-effort.
+ * Supports both KALSHI_ACCESS_KEY (new) and KALSHI_API_KEY_ID (legacy).
+ */
+function buildHeaders(url: string = '', method: string = 'GET'): Record<string, string> {
   const headers: Record<string, string> = {
     'Accept': 'application/json',
     'User-Agent': 'LeverageAI/1.0',
   };
-  const keyId  = process.env.KALSHI_API_KEY_ID;
+  // Support new KALSHI_ACCESS_KEY name as well as legacy KALSHI_API_KEY_ID
+  const keyId  = process.env.KALSHI_ACCESS_KEY || process.env.KALSHI_API_KEY_ID;
   const rawKey = process.env.KALSHI_PRIVATE_KEY?.replace(/\\n/g, '\n');
   // Wrap bare base64 in PEM headers if needed
   const privateKey = rawKey && !rawKey.includes('-----')
@@ -130,22 +138,23 @@ function buildHeaders(url: string = ''): Record<string, string> {
     : rawKey;
   if (keyId && privateKey && url) {
     try {
-      const { pathname, search } = new URL(url);
+      const { pathname } = new URL(url);
       const timestamp = Date.now().toString();
-      // Kalshi docs: sign only the path, NOT query params
-      const message   = `${timestamp}GET${pathname}`;
-      const sign      = crypto.createSign('RSA-SHA256');
+      // Kalshi docs: sign timestamp + METHOD + path (no query params)
+      const message = `${timestamp}${method.toUpperCase()}${pathname}`;
+      const sign    = crypto.createSign('RSA-SHA256');
       sign.update(message);
       sign.end();
+      // Kalshi requires RSA-PSS padding, salt length = digest length (32 bytes for SHA-256)
       const signature = sign.sign(
-        { key: privateKey, padding: crypto.constants.RSA_PKCS1_PSS_PADDING },
+        { key: privateKey, padding: crypto.constants.RSA_PKCS1_PSS_PADDING, saltLength: 32 },
         'base64',
       );
       headers['KALSHI-ACCESS-KEY']       = keyId;
       headers['KALSHI-ACCESS-TIMESTAMP'] = timestamp;
       headers['KALSHI-ACCESS-SIGNATURE'] = signature;
     } catch (err) {
-      console.error('[KALSHI] RSA sign failed:', err);
+      console.error('[KALSHI] RSA sign failed (auth will be skipped):', err instanceof Error ? err.message : err);
     }
   }
   return headers;

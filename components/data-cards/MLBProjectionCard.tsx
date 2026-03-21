@@ -194,7 +194,15 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
           </div>
           <div className="flex items-start justify-between gap-2 pr-16">
             <div>
-              <h3 className={cn('font-black text-white leading-tight', isHero ? 'text-lg' : 'text-sm')}>
+              <h3
+                className={cn(
+                  'font-black text-white leading-tight',
+                  isHero ? 'text-lg' : 'text-sm',
+                  onAnalyze && 'cursor-pointer hover:text-blue-300 transition-colors',
+                )}
+                onClick={onAnalyze}
+                title={onAnalyze ? `Analyze ${playerName}` : undefined}
+              >
                 {playerName}
               </h3>
               {(team || position) && (

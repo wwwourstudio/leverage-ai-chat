@@ -1533,7 +1533,13 @@ No preamble. Start directly with section 1.`;
           } else if (res.status >= 500) {
             errorMsg = 'Server error — AI is temporarily unavailable. Please retry.';
           } else {
-            errorMsg = `Request failed (${res.status})`;
+            // Try to surface the actual server error (e.g. "Message too long")
+            try {
+              const parsed = JSON.parse(text);
+              errorMsg = parsed.error || parsed.message || `Request failed (${res.status})`;
+            } catch {
+              errorMsg = `Request failed (${res.status})`;
+            }
           }
           return { success: false, error: errorMsg, httpStatus: res.status } as APIResponse & { httpStatus?: number };
         }
@@ -2312,6 +2318,22 @@ No preamble. Start directly with section 1.`;
       return;
     }
 
+    // Guard: detect raw TSV/CSV pasted directly into the chat box.
+    // The ADP upload modal is the right path for bulk tabular data — sending
+    // 1000+ rows through the chat both exceeds the message limit and wastes
+    // tokens on formatting rather than analysis.
+    if (input.trim()) {
+      const lineCount = input.split('\n').filter(Boolean).length;
+      const tabCount  = (input.match(/\t/g) ?? []).length;
+      if (lineCount > 20 && tabCount > lineCount) {
+        toast.error(
+          '📊 That looks like raw ADP/spreadsheet data. Download the TSV from SHGN, then use the ADP Upload button (📎) to import it — the AI will have full access to all rows for draft analysis.',
+          { duration: 7000 }
+        );
+        return;
+      }
+    }
+
     // Capture files before clearing — generateRealResponse needs the content
     const currentFiles = [...uploadedFiles];
 
@@ -2374,9 +2396,14 @@ No preamble. Start directly with section 1.`;
       for (const f of currentFiles) {
         if (f.data?.headers && f.data?.rows) {
           // CSV/TSV: include up to 500 rows
+          // Cap at 100 rows for the AI prompt — full data is uploaded via the
+          // ADP endpoint; sending thousands of rows here wastes context window.
+          const AI_ROW_LIMIT = 100;
           const headers = f.data.headers.join('\t');
-          const rows = f.data.rows.slice(0, 500).map((r: string[]) => r.join('\t')).join('\n');
-          const truncated = f.data.rows.length > 500 ? `\n[... ${f.data.rows.length - 500} more rows truncated]` : '';
+          const rows = f.data.rows.slice(0, AI_ROW_LIMIT).map((r: string[]) => r.join('\t')).join('\n');
+          const truncated = f.data.rows.length > AI_ROW_LIMIT
+            ? `\n[... ${f.data.rows.length - AI_ROW_LIMIT} more rows — full dataset uploaded to ADP database]`
+            : '';
           fileSections.push(`[File: ${f.name} (${f.data.rows.length} rows)]\n${headers}\n${rows}${truncated}`);
         } else if (f.textContent) {
           // TXT / JSON

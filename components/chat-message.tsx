@@ -269,10 +269,17 @@ function formatRelativeTime(date: Date): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
+/** Chars before we collapse an assistant message. ~2 full screens of text. */
+const COLLAPSE_THRESHOLD = 3000;
+
 export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, onCopy, onRetry }: ChatMessageProps) {
   const [isEditing, setIsEditing] = React.useState(false);
   const [editContent, setEditContent] = React.useState(message.content);
   const [showTrust, setShowTrust] = React.useState(false);
+  const isLong = !message.role || message.role === 'assistant'
+    ? message.content.length > COLLAPSE_THRESHOLD
+    : false;
+  const [expanded, setExpanded] = React.useState(false);
 
   const handleSaveEdit = () => {
     onEdit?.(editContent);
@@ -339,8 +346,35 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
               )}
               {isUser ? (
                 <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+              ) : isLong && !expanded ? (
+                <>
+                  <MarkdownContent text={message.content.slice(0, COLLAPSE_THRESHOLD)} />
+                  <div className="mt-3 pt-2 border-t border-[oklch(0.20_0.015_280)]">
+                    <button
+                      onClick={() => setExpanded(true)}
+                      className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+                    >
+                      <span>Show full response</span>
+                      <span className="text-[oklch(0.42_0.01_280)]">
+                        ({Math.ceil((message.content.length - COLLAPSE_THRESHOLD) / 1000)}k more chars)
+                      </span>
+                    </button>
+                  </div>
+                </>
               ) : (
-                <MarkdownContent text={message.content} />
+                <>
+                  <MarkdownContent text={message.content} />
+                  {isLong && expanded && (
+                    <div className="mt-3 pt-2 border-t border-[oklch(0.20_0.015_280)]">
+                      <button
+                        onClick={() => setExpanded(false)}
+                        className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                      >
+                        Collapse response
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
 
               {!isUser && (

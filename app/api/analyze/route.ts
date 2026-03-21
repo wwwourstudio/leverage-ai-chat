@@ -1451,10 +1451,30 @@ export async function POST(request: NextRequest) {
             // Abort if the first token doesn't arrive within the timeout budget
             const firstTokenTimer = setTimeout(() => abortCtrl.abort(new Error('Primary timeout')), primaryTimeoutMs);
 
+            // Max chars to stream before truncating a runaway response
+            const RESPONSE_CHAR_LIMIT = 8_000;
+
             try {
               let gotFirstToken = false;
+              let responseTruncated = false;
               for await (const delta of streamResult.textStream) {
                 if (!gotFirstToken) { gotFirstToken = true; clearTimeout(firstTokenTimer); }
+                if (responseTruncated) continue; // drain the stream without emitting
+                if (aiText.length + delta.length > RESPONSE_CHAR_LIMIT) {
+                  // Emit the remaining chars up to the cap, then inject a notice
+                  const remaining = RESPONSE_CHAR_LIMIT - aiText.length;
+                  if (remaining > 0) {
+                    const partial = delta.slice(0, remaining);
+                    aiText += partial;
+                    controller.enqueue(sseChunk({ type: 'text', delta: partial }));
+                  }
+                  const notice = '\n\n---\n_Response truncated — ask me to continue or be more specific._';
+                  aiText += notice;
+                  controller.enqueue(sseChunk({ type: 'text', delta: notice }));
+                  responseTruncated = true;
+                  console.warn(`[API/analyze] Response truncated at ${RESPONSE_CHAR_LIMIT} chars`);
+                  continue;
+                }
                 aiText += delta;
                 controller.enqueue(sseChunk({ type: 'text', delta }));
               }

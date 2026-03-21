@@ -653,7 +653,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           setAiQuickActions(
             init.defaultPrompts.map((p: { label: string; query: string }) => ({
               label: p.label,
-              icon: null, // icon resolved from import at render time
+              icon: Sparkles,
               category: selectedCategory,
               query: p.query,
             }))

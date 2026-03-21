@@ -568,6 +568,11 @@ export const PLAYER_SPORT_MAP: Record<string, string> = {
   kershaw: 'mlb', goldschmidt: 'mlb', arenado: 'mlb', machado: 'mlb',
   degrom: 'mlb', scherzer: 'mlb', soto: 'mlb', alvarez: 'mlb',
   freedman: 'mlb', correa: 'mlb', bogaerts: 'mlb', semien: 'mlb',
+  // MLB 2026 stars — force-lock against NBA/generic fallback
+  judge: 'mlb', witt: 'mlb', raleigh: 'mlb', skubal: 'mlb',
+  skenes: 'mlb', crochet: 'mlb', caminero: 'mlb', kurtz: 'mlb',
+  henderson: 'mlb', ramirez: 'mlb', wheeler: 'mlb', burnes: 'mlb',
+  cole: 'mlb', degrom: 'mlb', snell: 'mlb', rodon: 'mlb',
   // ── NHL ──────────────────────────────────────────────────────────────────
   mcdavid: 'nhl', crosby: 'nhl', mackinnon: 'nhl', ovechkin: 'nhl',
   draisaitl: 'nhl', marner: 'nhl', hedman: 'nhl', pastrnak: 'nhl',
@@ -647,7 +652,18 @@ CLARIFICATION RULE — CRITICAL: If the user's message has NO specific sport, te
 - Keep your ENTIRE response to just that question + the numbered list. Nothing else.
 - Once the user specifies, proceed with full expert analysis immediately.
 
-NEVER say "I cannot provide analysis" or "real-time data unavailable" for general strategy questions. If you genuinely need one piece of info to be specific, ask ONE focused question.` as const;
+NEVER say "I cannot provide analysis" or "real-time data unavailable" for general strategy questions. If you genuinely need one piece of info to be specific, ask ONE focused question.
+
+MLB 2026 — SPORT LOCK:
+- You are MLB-first for all fantasy baseball, ADP, Statcast, and draft analysis.
+- When any of these appear → treat as MLB, no exceptions: Ohtani, Judge, Witt Jr., Soto, Skubal, Skenes, Raleigh, De La Cruz, Caminero, Kurtz, Crochet, ADP, NFBC, NFFC, 5×5 Roto, ERA, WHIP, BABIP, xFIP, Statcast, barrel rate, exit velocity, draft board.
+- Team abbreviations LAD, NYY, BOS, HOU, CHC, ATL, SD, SEA, KC, CLE, DET, TB, MIL, CIN → always MLB.
+
+ADP FILE HANDLING:
+- When a user message begins with or contains "[File:" followed by tab-separated player data, or "[ADP_FILE_SUMMARY_MODE: true]" → the full ADP dataset has been saved server-side.
+- Respond with: "✅ ADP file loaded (N players). Sport locked → MLB."
+- Then offer: A) Riser report B) Mock draft C) Sleeper analysis D) Value gaps
+- Do NOT output raw rows. Reference "the uploaded ADP board" and use query_adp tool for lookups.` as const;
 
 // MLB Statcast Analysis Addendum
 // Injected ONLY when context.sport === 'mlb' — appended after SYSTEM_PROMPT.

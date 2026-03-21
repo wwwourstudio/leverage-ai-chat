@@ -1,0 +1,202 @@
+'use client';
+
+import { memo } from 'react';
+
+// ─── Types (mirrors HRPredictionBridgeOutput from hr-prediction-bridge.ts) ────
+
+interface HRPredictionData {
+  type: 'hr_prediction_card';
+  player: string;
+  probability: number;          // 0–1
+  impliedOdds: number | null;   // American odds (+650, -110, etc.)
+  edge: number;                 // model − market implied prob
+  components: {
+    baseRate: number;
+    parkFactor: number;
+    weatherFactor: number;
+    matchupFactor: number;
+    mlAdjusted?: number;
+  };
+  confidence: 'low' | 'medium' | 'high';
+  pitcherName?: string;
+  venue?: string;
+  gameTime?: string;
+  dataSource?: 'statcast_db' | 'mlb_api_fallback';
+  warnings?: string[];
+  // error path
+  success?: boolean;
+  error?: string;
+}
+
+interface HRPredictionCardProps {
+  data: HRPredictionData;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmtPct(n: number): string {
+  return `${(n * 100).toFixed(1)}%`;
+}
+
+function fmtOdds(american: number | null): string {
+  if (american == null) return '—';
+  return american >= 0 ? `+${american}` : `${american}`;
+}
+
+function fmtEdge(edge: number): string {
+  const sign = edge >= 0 ? '+' : '';
+  return `${sign}${(edge * 100).toFixed(1)}pp`;
+}
+
+function impliedFromProb(prob: number): number {
+  // Approximate American odds from probability (no vig)
+  if (prob >= 0.5) return -Math.round((prob / (1 - prob)) * 100);
+  return Math.round(((1 - prob) / prob) * 100);
+}
+
+const CONFIDENCE_CONFIG = {
+  high:   { label: 'High',   color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/30' },
+  medium: { label: 'Medium', color: 'text-amber-400',   bg: 'bg-amber-500/15',   border: 'border-amber-500/30'   },
+  low:    { label: 'Low',    color: 'text-rose-400',    bg: 'bg-rose-500/15',     border: 'border-rose-500/30'   },
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredictionCardProps) {
+  // Error state
+  if (!data.success && data.error) {
+    return (
+      <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-300">
+        <p className="font-semibold mb-1">⚠ HR Prediction unavailable</p>
+        <p className="text-rose-400/80">{data.error}</p>
+      </div>
+    );
+  }
+
+  const confCfg      = CONFIDENCE_CONFIG[data.confidence ?? 'low'];
+  const modelOdds    = impliedFromProb(data.probability);
+  const hasEdge      = data.impliedOdds != null && Math.abs(data.edge) > 0.005;
+  const edgePositive = data.edge > 0;
+
+  // Component breakdown bars (relative to each factor's typical range)
+  const factors: Array<{ label: string; value: number; range: [number, number]; fmt?: (v: number) => string }> = [
+    { label: 'Base Rate',      value: data.components.baseRate,      range: [0, 0.20],       fmt: fmtPct  },
+    { label: 'Park Factor',    value: data.components.parkFactor,    range: [0.85, 1.35],    fmt: v => v.toFixed(2) },
+    { label: 'Weather',        value: data.components.weatherFactor, range: [0.85, 1.25],    fmt: v => v.toFixed(2) },
+    { label: 'Matchup',        value: data.components.matchupFactor, range: [0.70, 1.80],    fmt: v => v.toFixed(2) },
+  ];
+
+  return (
+    <div className="rounded-2xl border border-rose-500/25 bg-gradient-to-br from-rose-600/20 via-red-900/15 to-slate-900/40 overflow-hidden shadow-lg">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">💣</span>
+          <div>
+            <p className="text-xs font-semibold text-rose-400 uppercase tracking-wider">HR Prop — v3 Engine</p>
+            <p className="text-white font-bold text-base leading-tight">{data.player}</p>
+          </div>
+        </div>
+        <div className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${confCfg.bg} ${confCfg.border} ${confCfg.color}`}>
+          {confCfg.label} confidence
+        </div>
+      </div>
+
+      {/* Venue / pitcher strip */}
+      {(data.pitcherName || data.venue) && (
+        <div className="px-4 pb-2 text-xs text-slate-400 flex items-center gap-3">
+          {data.pitcherName && <span>vs {data.pitcherName}</span>}
+          {data.venue && <span>· {data.venue}</span>}
+          {data.dataSource === 'mlb_api_fallback' && (
+            <span className="text-amber-500/70">· estimated</span>
+          )}
+        </div>
+      )}
+
+      {/* Primary probability */}
+      <div className="px-4 py-3 flex items-end gap-6 border-t border-rose-500/10">
+        <div>
+          <p className="text-xs text-slate-400 mb-0.5">HR Probability</p>
+          <p className="text-4xl font-black text-white tabular-nums">
+            {fmtPct(data.probability)}
+          </p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Fair odds: {fmtOdds(modelOdds)}
+          </p>
+        </div>
+
+        {/* Edge vs market */}
+        {hasEdge && (
+          <div className={`ml-auto text-right px-3 py-2 rounded-lg border ${
+            edgePositive
+              ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
+              : 'bg-rose-500/10   border-rose-500/25   text-rose-400'
+          }`}>
+            <p className="text-xs font-medium opacity-70 mb-0.5">Edge vs market</p>
+            <p className="text-lg font-bold tabular-nums">{fmtEdge(data.edge)}</p>
+            <p className="text-xs opacity-60">mkt: {fmtOdds(data.impliedOdds)}</p>
+          </div>
+        )}
+
+        {!hasEdge && (
+          <div className="ml-auto text-right px-3 py-2 rounded-lg border border-slate-700/40 bg-slate-800/20 text-slate-500">
+            <p className="text-xs font-medium mb-0.5">Market odds</p>
+            <p className="text-lg font-bold tabular-nums">{fmtOdds(data.impliedOdds ?? null)}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Component breakdown */}
+      <div className="px-4 py-3 border-t border-rose-500/10 space-y-2">
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Factor breakdown</p>
+        {factors.map(f => {
+          const [lo, hi] = f.range;
+          const pct = Math.max(0, Math.min(100, ((f.value - lo) / (hi - lo)) * 100));
+          const isNeutral = Math.abs(f.value - 1.0) < 0.02 && f.label !== 'Base Rate';
+          const barColor = isNeutral
+            ? 'bg-slate-500'
+            : f.value >= 1.0 || f.label === 'Base Rate'
+            ? 'bg-rose-500'
+            : 'bg-slate-600';
+
+          return (
+            <div key={f.label} className="flex items-center gap-3">
+              <p className="text-xs text-slate-400 w-24 flex-shrink-0">{f.label}</p>
+              <div className="flex-1 h-1.5 bg-slate-700/50 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${barColor}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <p className="text-xs font-mono text-slate-300 w-12 text-right flex-shrink-0">
+                {f.fmt ? f.fmt(f.value) : f.value.toFixed(3)}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Warnings */}
+      {data.warnings && data.warnings.length > 0 && (
+        <div className="px-4 pb-4 pt-1">
+          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5 space-y-1">
+            {data.warnings.map((w, i) => (
+              <p key={i} className="text-xs text-amber-400/80 flex items-start gap-1.5">
+                <span className="mt-0.5 flex-shrink-0">⚠</span>
+                <span>{w}</span>
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="px-4 pb-3 pt-1 flex items-center justify-between text-xs text-slate-600">
+        <span>LeverageMetrics v3 · platoon ±1 · pitch mix vuln</span>
+        {data.dataSource && (
+          <span>{data.dataSource === 'statcast_db' ? '⚾ Statcast' : '🌐 MLB API'}</span>
+        )}
+      </div>
+    </div>
+  );
+});

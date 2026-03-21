@@ -267,6 +267,39 @@ export async function POST(request: NextRequest) {
       (!context?.hasBettingIntent || !!context?.hasPlayerIntent) &&
       !(!!context?.hasFantasyIntent && !context?.hasPlayerIntent);
 
+    // ── HR Prediction intent ────────────────────────────────────────────────
+    // Fires when user asks about a specific player's HR probability for today.
+    // Distinct from hasMLBProjectionIntent (slate-level DFS/fantasy) — this is
+    // a single-player, probability-first query that calls the v3 prediction engine
+    // with platoon scores ± 1, pitch mix vuln, and live market edge.
+    const HR_PREDICTION_KEYWORDS = [
+      'will he hit', 'will he homer', 'chance of', 'probability of',
+      'hr tonight', 'homer tonight', 'home run tonight',
+      'hit a hr', 'hit a homer', 'hit a home run',
+      'odds of hitting', 'predict his hr', 'predict hr',
+      'what are the odds', 'hr prediction', 'home run prediction',
+      'hr probability', 'home run probability',
+    ];
+    const hasHRPredictionIntent =
+      isMLBQuery &&
+      !hasADPIntent &&
+      !hasStartSitIntent &&
+      HR_PREDICTION_KEYWORDS.some(k => rawQueryLower.includes(k)) &&
+      (rawQueryLower.includes('hr') || rawQueryLower.includes('homer') || rawQueryLower.includes('home run'));
+
+    // Kalshi tool intent: fires when user explicitly wants live market data or prices
+    // via the tool (distinct from the existing isPoliticalMarket prompt-enrichment path
+    // which injects Kalshi data as context without a tool call).
+    const KALSHI_TOOL_KEYWORDS = [
+      'kalshi market', 'prediction market', 'kalshi price', 'kalshi odds',
+      'what\'s the price on', 'current price on', 'market price for',
+      'show kalshi', 'list kalshi', 'kalshi election', 'kalshi trump',
+      'yes price', 'no price', 'yes/no price', 'edge on yes', 'edge on no',
+    ];
+    const hasKalshiToolIntent =
+      (context?.isPoliticalMarket || context?.selectedCategory === 'kalshi') &&
+      KALSHI_TOOL_KEYWORDS.some(k => rawQueryLower.includes(k));
+
     // MLB Projection Engine intent: projection/DFS/fantasy/betting queries that need
     // the LeverageMetrics algorithm (Monte Carlo, HR model, breakout scores).
     const MLB_PROJECTION_KEYWORDS = [
@@ -897,16 +930,18 @@ export async function POST(request: NextRequest) {
         kalshi:      !!(kalshiSportsFallbackMarkets?.length) || context.isPoliticalMarket || context.selectedCategory === 'kalshi',
         adp:         hasADPIntent,
         statcast:    expectsStatcastJSON || statcastInjected,
-        projections: hasMLBProjectionIntent,
-        fantasy:     !!(context.hasFantasyIntent),
+        projections:   hasMLBProjectionIntent,
+        hrPrediction:  hasHRPredictionIntent,
+        fantasy:       !!(context.hasFantasyIntent),
       },
       intent: {
-        betting:    !!(context.hasBettingIntent),
-        fantasy:    !!(context.hasFantasyIntent),
-        player:     !!(context.hasPlayerIntent),
-        political:  !!(context.isPoliticalMarket),
-        adp:        hasADPIntent,
-        ambiguous:  isAmbiguous,
+        betting:       !!(context.hasBettingIntent),
+        fantasy:       !!(context.hasFantasyIntent),
+        player:        !!(context.hasPlayerIntent),
+        political:     !!(context.isPoliticalMarket),
+        adp:           hasADPIntent,
+        hrPrediction:  hasHRPredictionIntent,
+        ambiguous:     isAmbiguous,
       },
       keys: {
         XAI_API_KEY:    !!xaiApiKey,
@@ -921,6 +956,7 @@ export async function POST(request: NextRequest) {
     let pendingADPCard: InsightCard | null = null;
     let pendingADPUploadCard: InsightCard | null = null;
     let pendingStatcastCard: InsightCard | null = null;
+    let pendingHRPredictionCard: InsightCard | null = null;
     let skipStatcastJSON = false;
 
     // Card types that can come from the MLB_ANALYSIS_ADDENDUM JSON output
@@ -1156,6 +1192,118 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // ── HR Prediction Tool (v3 engine: platoon scores + pitch mix vuln) ─────────
+    // Called when user asks about a specific player's HR probability today.
+    // Uses hr-prediction-bridge to resolve player name → game → pitcher → v3 output.
+    const hrPredictionParams = z.object({
+      player:  z.string().describe('Full or partial player name, e.g. "Aaron Judge", "Judge", "Ohtani"'),
+      date:    z.string().optional().describe('Game date YYYY-MM-DD — defaults to today'),
+    });
+    const predictHRTool = tool({
+      description:
+        'Predict the probability that a specific MLB batter hits a home run in today\'s game, ' +
+        'using the v3 LeverageMetrics HR engine (lineup slot, platoon split scores ±1, ' +
+        'pitcher pitch mix vulnerability, park factor, weather, and live market edge). ' +
+        'Use for ANY question asking about a player\'s HR probability, chance, or odds tonight. ' +
+        'Returns probability (0–1), American odds equivalent, edge vs market, and component breakdown.',
+      inputSchema: hrPredictionParams,
+      execute: async ({ player, date }: z.infer<typeof hrPredictionParams>) => {
+        console.log('[API/analyze] predictHR tool called:', { player, date });
+        try {
+          const { predictHRForPlayer } = await import('@/lib/engine/hr-prediction-bridge');
+          const result = await predictHRForPlayer({ playerName: player, date });
+          return {
+            success:      true,
+            type:         'hr_prediction_card',
+            player,
+            ...result,
+          };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          console.error('[API/analyze] predictHR tool error:', msg);
+          return {
+            success: false,
+            error:   msg,
+            player,
+            type:    'hr_prediction_card',
+          };
+        }
+      },
+    });
+
+    // ── Kalshi Market Tools ───────────────────────────────────────────────────────
+    const kalshiGetMarketsParams = z.object({
+      category: z.enum(['election', 'sports', 'weather', 'finance', 'trending', 'all'])
+        .optional()
+        .describe('Market category (default: all)'),
+      search:   z.string().optional().describe('Free-text search in market titles'),
+      limit:    z.number().optional().describe('Number of markets to return (default: 10, max: 50)'),
+    });
+    const kalshiGetMarketsTool = tool({
+      description:
+        'Fetch live Kalshi prediction market data. Use when user asks to "show Kalshi markets", ' +
+        '"list election markets", "what are the top Kalshi markets", or any question about ' +
+        'prediction market availability, categories, or current YES/NO prices across markets.',
+      inputSchema: kalshiGetMarketsParams,
+      execute: async ({ category = 'all', search, limit = 10 }: z.infer<typeof kalshiGetMarketsParams>) => {
+        console.log('[API/analyze] kalshi_get_markets tool called:', { category, search, limit });
+        try {
+          const qs = new URLSearchParams({ category, limit: String(Math.min(limit, 50)) });
+          if (search) qs.set('search', search);
+          const res = await fetch(
+            `${process.env.NEXTAUTH_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'}/api/kalshi/markets?${qs}`,
+            { signal: AbortSignal.timeout(8000) },
+          ).catch(() => null);
+          if (!res?.ok) {
+            const { fetchKalshiMarkets, fetchTopMarketsByVolume } = await import('@/lib/kalshi/index');
+            const markets = category === 'trending'
+              ? await fetchTopMarketsByVolume(limit)
+              : await fetchKalshiMarkets({ search, limit });
+            return { success: true, markets: markets.slice(0, limit), count: markets.length };
+          }
+          return res.json();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error('[API/analyze] kalshi_get_markets error:', msg);
+          return { success: false, error: msg, markets: [] };
+        }
+      },
+    });
+
+    const kalshiGetPriceParams = z.object({
+      ticker:    z.string().describe('Kalshi market ticker (e.g. KXBT-25DEC25-T45000, FED-25DEC-ABOVE)'),
+      modelProb: z.number().optional().describe('Your model probability [0,1] for edge calculation'),
+    });
+    const kalshiGetPriceTool = tool({
+      description:
+        'Get the current YES/NO price for a specific Kalshi market by ticker. ' +
+        'Use when user asks "current price on [ticker]", "what\'s [ticker] trading at", ' +
+        '"what\'s the edge on [ticker]", or "should I buy yes/no on [market]". ' +
+        'Provide modelProb to get an edge calculation vs the market price.',
+      inputSchema: kalshiGetPriceParams,
+      execute: async ({ ticker, modelProb }: z.infer<typeof kalshiGetPriceParams>) => {
+        console.log('[API/analyze] kalshi_get_price tool called:', { ticker, modelProb });
+        try {
+          const { getMarketByTicker } = await import('@/lib/kalshi/index');
+          const { KalshiClient }      = await import('@/lib/kalshi/kalshiClient');
+          const market = await getMarketByTicker(ticker.toUpperCase());
+          if (!market) return { success: false, error: `Market "${ticker}" not found`, market: null };
+          const edge = (modelProb != null && modelProb >= 0 && modelProb <= 1)
+            ? KalshiClient.computeEdge(modelProb, market.yesBid, market.yesAsk)
+            : null;
+          return {
+            success: true,
+            market,
+            edge,
+            kalshiUrl: `https://kalshi.com/markets/${market.eventTicker || ticker}/${ticker.toUpperCase()}`,
+          };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { success: false, error: msg, market: null };
+        }
+      },
+    });
+
     // ── SSE streaming response — wraps AI generation + post-processing ──────────
     const encoder = new TextEncoder();
     const sseChunk = (data: object) => encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
@@ -1177,8 +1325,10 @@ export async function POST(request: NextRequest) {
               maxRetries: 0,
               abortSignal: abortCtrl.signal,
               ...(hasADPIntent && { tools: { query_adp: adpTool }, stopWhen: stepCountIs(3) }),
-              ...(hasMLBProjectionIntent && { tools: { query_mlb_projections: mlbProjectionTool }, stopWhen: stepCountIs(3) }),
-              ...(!hasMLBProjectionIntent && isMLBStatcastMode && { tools: { query_statcast: statcastTool }, stopWhen: stepCountIs(3) }),
+              ...(hasHRPredictionIntent && { tools: { predict_hr: predictHRTool }, stopWhen: stepCountIs(2) }),
+              ...(hasKalshiToolIntent && !hasHRPredictionIntent && !hasADPIntent && { tools: { kalshi_get_markets: kalshiGetMarketsTool, kalshi_get_price: kalshiGetPriceTool }, stopWhen: stepCountIs(2) }),
+              ...(!hasHRPredictionIntent && !hasKalshiToolIntent && hasMLBProjectionIntent && { tools: { query_mlb_projections: mlbProjectionTool }, stopWhen: stepCountIs(3) }),
+              ...(!hasHRPredictionIntent && !hasKalshiToolIntent && !hasMLBProjectionIntent && isMLBStatcastMode && { tools: { query_statcast: statcastTool }, stopWhen: stepCountIs(3) }),
             });
 
             // Abort if the first token doesn't arrive within the timeout budget
@@ -1268,6 +1418,26 @@ export async function POST(request: NextRequest) {
                 data: { sport: isNFLResult ? 'nfl' : 'mlb' },
               };
             }
+                }
+              }
+
+              // HR Prediction tool results
+              if (hasHRPredictionIntent) {
+                const hrResult = allToolResults.find((tr: any) => tr.toolName === 'predict_hr');
+                if (hrResult?.result) {
+                  const hr = hrResult.result;
+                  pendingHRPredictionCard = {
+                    type:       'hr_prediction_card',
+                    title:      `${hr.player} — HR Prediction`,
+                    icon:       '💣',
+                    category:   'MLB',
+                    subcategory: 'HR Prop · v3 Engine',
+                    gradient:   'from-rose-600/20 via-red-900/15 to-slate-900/40',
+                    status:     hr.success ? 'edge' : 'neutral',
+                    realData:   true,
+                    data:       hr,
+                  };
+                  console.log('[API/analyze] HR prediction card built for:', hr.player);
                 }
               }
 
@@ -1370,6 +1540,7 @@ export async function POST(request: NextRequest) {
           // ── Post-processing: cards, trust metrics, done event ─────────────────
           let cards: InsightCard[] = await cardPromise.catch(() => []);
 
+          if (pendingHRPredictionCard) cards = [pendingHRPredictionCard, ...cards.slice(0, 4)];
           if (pendingADPCard) cards = [pendingADPCard, ...cards.slice(0, 5)];
           if (pendingADPUploadCard) cards = [...cards, pendingADPUploadCard];
 

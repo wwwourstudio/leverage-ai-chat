@@ -4,7 +4,6 @@ const nextConfig = {
     unoptimized: true,
   },
   experimental: {
-    workerThreads: true,
     cpus: 2,
   },
   // Allow iframe embedding for v0 preview.

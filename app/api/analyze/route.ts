@@ -1565,7 +1565,7 @@ export async function POST(request: NextRequest) {
                   const hr = hrResult.result;
                   pendingHRPredictionCard = {
                     type:       'hr_prediction_card',
-                    title:      `${hr.player} — HR Prediction`,
+                    title:      `${hr.player ?? 'Player'} — HR Prediction`,
                     icon:       '💣',
                     category:   'MLB',
                     subcategory: 'HR Prop · v3 Engine',
@@ -1575,6 +1575,26 @@ export async function POST(request: NextRequest) {
                     data:       hr,
                   };
                   console.log('[API/analyze] HR prediction card built for:', hr.player);
+                } else {
+                  // Tool didn't fire or returned undefined — emit a degraded card so the
+                  // UI slot is never silently empty when the user asked for a HR prediction.
+                  pendingHRPredictionCard = {
+                    type:       'hr_prediction_card',
+                    title:      'HR Prediction',
+                    icon:       '💣',
+                    category:   'MLB',
+                    subcategory: 'HR Prop · v3 Engine',
+                    gradient:   'from-rose-600/20 via-red-900/15 to-slate-900/40',
+                    status:     'neutral',
+                    realData:   false,
+                    data:       {
+                      success: false,
+                      error:   'Live MLB data unavailable — prediction could not be generated.',
+                      player:  'Unknown',
+                      type:    'hr_prediction_card',
+                    },
+                  };
+                  console.warn('[API/analyze] HR prediction tool did not fire — emitting degraded card');
                 }
               }
 

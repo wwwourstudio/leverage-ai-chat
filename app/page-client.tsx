@@ -628,24 +628,43 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     })();
   }, []);
 
-  // Initialize credits and load real insights on mount
+  // Batch page-load data fetch — /api/init calls all 4 endpoints in parallel
+  // server-side to reduce cold-start round-trips.
   useEffect(() => {
-    fetch('/api/insights')
+    fetch('/api/init')
       .then(r => r.json())
-      .then(insights => {
-        setMessages((prev: Message[]) => {
-          const newMessages = [...prev];
-          if (newMessages[0]?.isWelcome) {
-            newMessages[0] = {
-              ...newMessages[0],
-              insights
-            };
-          }
-          return newMessages;
-        });
+      .then(init => {
+        // Hydrate welcome message insights
+        if (init.insights) {
+          setMessages((prev: Message[]) => {
+            const newMessages = [...prev];
+            if (newMessages[0]?.isWelcome) {
+              newMessages[0] = { ...newMessages[0], insights: init.insights };
+            }
+            return newMessages;
+          });
+        }
+        // Hydrate custom instructions for anonymous/non-auth visitors
+        if (typeof init.instructions === 'string' && init.instructions) {
+          setCustomInstructions(init.instructions);
+          localStorage.setItem('leverage_custom_instructions', init.instructions);
+        }
       })
       .catch(err => {
         console.error('[v0] Error loading initial data:', err);
+        // Fall back to individual insights endpoint
+        fetch('/api/insights')
+          .then(r => r.json())
+          .then(insights => {
+            setMessages((prev: Message[]) => {
+              const newMessages = [...prev];
+              if (newMessages[0]?.isWelcome) {
+                newMessages[0] = { ...newMessages[0], insights };
+              }
+              return newMessages;
+            });
+          })
+          .catch(() => {});
       });
   }, []);
 

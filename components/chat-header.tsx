@@ -110,7 +110,6 @@ export function ChatHeader({
             <span className="text-[10px] font-semibold text-[oklch(0.42_0.01_280)]">Live</span>
           </div>
         </div>
-        </div>
 
         {/* Right: export/share + user actions */}
         <div className="flex items-center gap-2 md:gap-3">

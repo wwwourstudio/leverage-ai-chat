@@ -150,7 +150,7 @@ export function ChatInput({
           </div>
         )}
 
-        <form onSubmit={onSubmit} className="flex items-end gap-2">
+        <form onSubmit={onSubmit} className="flex items-center gap-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -174,7 +174,7 @@ export function ChatInput({
               style={{ minHeight: '48px', maxHeight: '160px' }}
             />
             {/* Desktop: attach + char counter */}
-            <div className="hidden md:flex absolute right-3.5 bottom-2.5 items-center gap-2">
+            <div className="hidden md:flex absolute right-3.5 top-1/2 -translate-y-1/2 items-center gap-2">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -198,7 +198,7 @@ export function ChatInput({
               type="button"
               onClick={onStopGeneration}
               className="shrink-0 flex items-center gap-2 bg-gradient-to-br from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white rounded-2xl px-4 md:px-6 font-semibold transition-all active:scale-95 shadow-lg shadow-red-900/25"
-              style={{ minHeight: '48px' }}
+              style={{ height: '48px' }}
             >
               <X className="w-4 h-4" />
               <span className="hidden md:inline text-sm">Stop</span>
@@ -208,7 +208,7 @@ export function ChatInput({
               type="submit"
               disabled={(!input.trim() && uploadedFiles.length === 0) || overLimit}
               className="shrink-0 relative flex items-center gap-2 bg-gradient-to-br from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:from-[oklch(0.16_0.01_280)] disabled:to-[oklch(0.14_0.01_280)] disabled:cursor-not-allowed text-white rounded-2xl px-4 md:px-6 font-semibold transition-all duration-200 shadow-lg shadow-emerald-600/20 hover:shadow-emerald-500/30 disabled:shadow-none active:scale-95 disabled:hover:scale-100 overflow-hidden group/send"
-              style={{ minHeight: '48px' }}
+              style={{ height: '48px' }}
             >
               <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 -translate-x-full group-hover/send:translate-x-full transition-transform duration-500 pointer-events-none" />
               <Send className="w-4 h-4 relative z-10" />

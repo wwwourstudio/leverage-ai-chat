@@ -558,28 +558,34 @@ export function clearADPCache(): void {
 }
 
 /**
- * Reads and parses `public/adp/ADP.csv` from the project root.
- * This is the shipped CSV file that serves as the primary data source
- * when Supabase is empty (i.e. no user upload has been made yet).
+ * Reads and parses a local ADP CSV from the project's public/ directory.
+ * Tries the following paths in order so both naming conventions work:
+ *   1. public/adp/ADP.csv          (clean subdirectory layout)
+ *   2. public/adp - ADP.csv        (space-in-filename variant)
  * Server-side only — returns null in browser contexts.
  */
 async function loadADPFromCSV(): Promise<NFBCPlayer[] | null> {
   if (typeof window !== 'undefined') return null;
-  try {
-    const csvPath = path.join(process.cwd(), 'public', 'adp', 'ADP.csv');
-    const text = fs.readFileSync(csvPath, 'utf-8');
-    if (!text.trim()) return null;
-    const players = parseTSV(text);
-    if (players.length === 0) {
-      console.warn('[v0] [ADP] public/adp/ADP.csv parsed to 0 players — check file format');
-      return null;
+  const candidates = [
+    path.join(process.cwd(), 'public', 'adp', 'ADP.csv'),
+    path.join(process.cwd(), 'public', 'adp - ADP.csv'),
+  ];
+  for (const csvPath of candidates) {
+    try {
+      const text = fs.readFileSync(csvPath, 'utf-8');
+      if (!text.trim()) continue;
+      const players = parseTSV(text);
+      if (players.length === 0) {
+        console.warn(`[v0] [ADP] ${path.basename(csvPath)} parsed to 0 players — check column headers (expected: Rank, Player, Team, Position(s), ADP)`);
+        continue;
+      }
+      console.log(`[v0] [ADP] Loaded ${players.length} MLB players from ${csvPath}`);
+      return players;
+    } catch {
+      // File not found or unreadable — try next candidate
     }
-    console.log(`[v0] [ADP] Loaded ${players.length} MLB players from public/adp/ADP.csv`);
-    return players;
-  } catch {
-    // File not found or unreadable — silently return null so fallback chain continues
-    return null;
   }
+  return null;
 }
 
 /** Returns true only when the current ADP data came from a real user upload in Supabase. */
@@ -589,9 +595,9 @@ export function isADPFromUserUpload(): boolean {
 
 /**
  * Returns the MLB ADP player list.
- * Priority: in-memory cache → Supabase → live fetch (FantasyPros/ESPN) → static fallback.
- * Live fetches are attempted when the DB is empty and at most once per LIVE_FETCH_COOLDOWN_MS
- * to avoid hammering external APIs when they are unreachable.
+ * Priority: in-memory cache → Supabase → local CSV → live fetch → static fallback.
+ * The local CSV at public/adp/ADP.csv (or public/adp - ADP.csv) is checked before
+ * attempting any external network requests, so the app works fully offline.
  */
 export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
   const now = Date.now();
@@ -600,7 +606,7 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
     return adpCache;
   }
 
-  // Supabase is always authoritative (user uploads + cron data)
+  // 1. Supabase — authoritative (user uploads + previously seeded CSV data)
   const dbData = await loadADPFromSupabase('mlb', true);
   if (dbData && dbData.length > 0) {
     // Validate quality: purge if majority of display names are numeric IDs (bad upload)
@@ -620,14 +626,24 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
     return dbData;
   }
 
-  // DB is empty — attempt a live fetch (server-side only, respects cooldown)
+  // 2. Local CSV file — checked before any network calls so the app works without
+  //    external API access. Seeds Supabase on first load for faster subsequent reads.
+  const csvData = await loadADPFromCSV();
+  if (csvData && csvData.length > 0) {
+    adpCache = csvData;
+    lastFetched = now;
+    adpFromDB = false;
+    saveADPToSupabase(csvData, 'mlb').catch(() => {}); // seed DB for future cold starts
+    return csvData;
+  }
+
+  // 3. Live fetch from FantasyPros / ESPN (server-side only, respects 15-min cooldown)
   if (typeof window === 'undefined' && now - lastLiveFetchAttempt > LIVE_FETCH_COOLDOWN_MS) {
     lastLiveFetchAttempt = now;
     try {
       const { fetchLiveADP } = await import('@/lib/adp-fetcher.server');
       const { players, source } = await fetchLiveADP('mlb');
       if (players.length > 0) {
-        // Persist for future requests; fire-and-forget
         saveADPToSupabase(players, 'mlb').catch(() => {});
         adpCache = players;
         lastFetched = now;
@@ -636,23 +652,15 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
         return players;
       }
     } catch (err) {
-      console.warn('[v0] [ADP] Live fetch failed — falling back to static:', err instanceof Error ? err.message : err);
+      console.warn('[v0] [ADP] Live fetch failed:', err instanceof Error ? err.message : err);
     }
   }
 
-  // Try the shipped CSV file at public/adp/ADP.csv before falling back to the
-  // hardcoded static dataset. This lets data be updated by replacing a single file.
-  const csvData = await loadADPFromCSV();
-  if (csvData && csvData.length > 0) {
-    adpCache = csvData;
-    lastFetched = now;
-    adpFromDB = false;
-    // Seed Supabase from the CSV so subsequent cold starts are fast
-    saveADPToSupabase(csvData, 'mlb').catch(() => {});
-    return csvData;
-  }
-
-  console.log(`[v0] [ADP] No live data available — serving static fallback (${STATIC_FALLBACK_PLAYERS.length} players)`);
+  // 4. Hardcoded static fallback
+  console.log(
+    `[v0] [ADP] All sources failed — serving static fallback (${STATIC_FALLBACK_PLAYERS.length} players). ` +
+    `To use your own data, place ADP.csv at public/adp/ADP.csv or public/adp - ADP.csv`,
+  );
   adpFromDB = false;
   return STATIC_FALLBACK_PLAYERS;
 }

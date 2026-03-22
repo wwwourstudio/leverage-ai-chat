@@ -741,7 +741,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current);
     cardsRefreshIntervalRef.current = setInterval(refreshCards, REFRESH_INTERVAL);
     return () => { if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current); };
-  }, [messages.length, lastUserQuery]);
+  }, [lastUserQuery]);
 
   // Start with empty chat history - user creates real chats
   // Use serverData.serverTime for the initial timestamp to avoid SSR/client hydration mismatch (#418).
@@ -1778,7 +1778,9 @@ No preamble. Start directly with section 1.`;
         // Success path - process the analysis result.
         // If the server returns cards, use them. Otherwise fall back to
         // the cards we already have from the SSR welcome message.
-        const responseCards = (analysisResult.cards && analysisResult.cards.length > 0)
+        // Use server cards when present (including explicit empty []);
+        // only fall back to previous-message cards when server returned undefined (no card attempt)
+        const responseCards = analysisResult.cards !== undefined
           ? analysisResult.cards
           : availableCards;
 

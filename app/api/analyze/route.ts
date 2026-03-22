@@ -985,7 +985,7 @@ export async function POST(request: NextRequest) {
             });
         }
         cardFetchPromise = import('@/lib/fantasy/cards/fantasy-card-generator')
-          .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 6, context.sport ?? undefined, {
+          .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 6, context.sport || undefined, {
             teamCount: context.leagueSize ?? undefined,
             scoringFormat: context.leagueScoringFormat ?? undefined,
             isStartSit: hasStartSitIntent,

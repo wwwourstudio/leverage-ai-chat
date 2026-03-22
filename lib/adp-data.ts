@@ -11,6 +11,10 @@
 // Supabase persistence helpers — dynamic import keeps @supabase/supabase-js out of client bundle
 import { getADPSupabaseClient } from '@/lib/supabase/adp-client.server';
 
+// Node.js built-ins — only available server-side (guard with typeof window check)
+import fs from 'fs';
+import path from 'path';
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface NFBCPlayer {
@@ -553,6 +557,31 @@ export function clearADPCache(): void {
   adpFromDB = false;
 }
 
+/**
+ * Reads and parses `public/adp/ADP.csv` from the project root.
+ * This is the shipped CSV file that serves as the primary data source
+ * when Supabase is empty (i.e. no user upload has been made yet).
+ * Server-side only — returns null in browser contexts.
+ */
+async function loadADPFromCSV(): Promise<NFBCPlayer[] | null> {
+  if (typeof window !== 'undefined') return null;
+  try {
+    const csvPath = path.join(process.cwd(), 'public', 'adp', 'ADP.csv');
+    const text = fs.readFileSync(csvPath, 'utf-8');
+    if (!text.trim()) return null;
+    const players = parseTSV(text);
+    if (players.length === 0) {
+      console.warn('[v0] [ADP] public/adp/ADP.csv parsed to 0 players — check file format');
+      return null;
+    }
+    console.log(`[v0] [ADP] Loaded ${players.length} MLB players from public/adp/ADP.csv`);
+    return players;
+  } catch {
+    // File not found or unreadable — silently return null so fallback chain continues
+    return null;
+  }
+}
+
 /** Returns true only when the current ADP data came from a real user upload in Supabase. */
 export function isADPFromUserUpload(): boolean {
   return adpFromDB;
@@ -609,6 +638,18 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
     } catch (err) {
       console.warn('[v0] [ADP] Live fetch failed — falling back to static:', err instanceof Error ? err.message : err);
     }
+  }
+
+  // Try the shipped CSV file at public/adp/ADP.csv before falling back to the
+  // hardcoded static dataset. This lets data be updated by replacing a single file.
+  const csvData = await loadADPFromCSV();
+  if (csvData && csvData.length > 0) {
+    adpCache = csvData;
+    lastFetched = now;
+    adpFromDB = false;
+    // Seed Supabase from the CSV so subsequent cold starts are fast
+    saveADPToSupabase(csvData, 'mlb').catch(() => {});
+    return csvData;
   }
 
   console.log(`[v0] [ADP] No live data available — serving static fallback (${STATIC_FALLBACK_PLAYERS.length} players)`);

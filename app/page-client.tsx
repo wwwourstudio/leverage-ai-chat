@@ -300,6 +300,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [selectedSport, setSelectedSport] = useState<string>('');
   const [_cardsRefreshedAt, setCardsRefreshedAt] = useState<Date | null>(null);
   const cardsRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const fetchedForQueryRef = useRef<string | null>(null);
   // Tracks an in-flight createThread() call so saveMessage can await it instead of
   // firing against a placeholder ID ('chat-1' or 'chat-{timestamp}').
   const pendingThreadRef = useRef<Promise<import('@/lib/chat-service').ChatThread | null> | null>(null);
@@ -708,15 +709,24 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       const hasCards = messages.some((m: any) => m.role === 'assistant' && m.cards && m.cards.length > 0);
       if (!hasCards || !lastUserQuery) return;
 
+      // Guard: skip if we already fetched for this exact query+category combination
+      const fetchKey = `${lastUserQuery}::${selectedCategory}`;
+      if (fetchedForQueryRef.current === fetchKey) return;
+      fetchedForQueryRef.current = fetchKey;
+
       try {
         const msgLow = (lastUserQuery || '').toLowerCase();
+        const hasFantasyOrDFSQuery = /\b(adp|draft|waiver|sleeper|fantasy|dfs|best ball|lineup|vbd|tier|rank)\b/i.test(lastUserQuery || '');
         const detectedCategory = (
           msgLow.includes('kalshi') ||
           msgLow.includes('prediction market') ||
           msgLow.includes('championship winner') ||
           msgLow.includes('contract pricing') ||
           msgLow.includes('winner contract')
-        ) ? 'kalshi' : selectedCategory;
+        ) ? 'kalshi'
+          : (selectedCategory === 'fantasy' || selectedCategory === 'dfs') && !hasFantasyOrDFSQuery
+          ? 'betting'  // don't load ADP/fantasy cards for non-fantasy queries even if fantasy tab is active
+          : selectedCategory;
         const freshCards = await fetchDynamicCards({ userContext: lastUserQuery, category: detectedCategory, limit: 4 });
         if (freshCards.length === 0) return;
 
@@ -787,7 +797,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   }, []);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    });
   };
 
   useEffect(() => {
@@ -1784,14 +1796,14 @@ No preamble. Start directly with section 1.`;
           ? analysisResult.cards
           : availableCards;
 
-        console.log('[v0] Analysis:', {
+        console.log('[v0] Analysis:', JSON.stringify({
           ok: analysisResult.success,
           serverCards: analysisResult.cards?.length ?? 0,
-          responseCards: responseCards.length,   // cards that will actually render
-          fallbackCards: availableCards.length,  // pre-existing cards used only if server returns none
+          responseCards: responseCards.length,
+          fallbackCards: availableCards.length,
           confidence: analysisResult.trustMetrics?.finalConfidence,
           fallback: analysisResult.useFallback,
-        });
+        }));
 
         // Enrich trust metrics with real metadata so TrustMetricsDisplay can show
         // sources, model name, processing time, and live-data badges.

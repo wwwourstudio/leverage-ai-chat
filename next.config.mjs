@@ -10,6 +10,8 @@ const nextConfig = {
   experimental: {
     cpus: 2,
   },
+  // Turbopack (default in Next.js 16) — empty config silences the webpack/turbopack conflict warning
+  turbopack: {},
   // Prevent webpack from attempting to bundle Node.js built-ins for the browser bundle.
   // This guards against any server-only libraries (fs, net, tls, crypto) that might be
   // transitively imported in client code, avoiding "Module not found: Can't resolve 'fs'" errors.

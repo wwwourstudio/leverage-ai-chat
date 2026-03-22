@@ -66,14 +66,15 @@ interface CachedCards {
 const CARD_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
 const cardCacheMap = new Map<string, CachedCards>();
 
-/** Build a stable cache key from category + sport */
-function makeCacheKey(category?: string, sport?: string): string {
-  return `${category ?? 'all'}:${sport ?? ''}`;
+/** Build a stable cache key from category + sport + first 80 chars of userContext */
+function makeCacheKey(category?: string, sport?: string, userContext?: string): string {
+  const contextSlug = userContext ? userContext.trim().toLowerCase().substring(0, 80) : '';
+  return `${category ?? 'all'}:${sport ?? ''}:${contextSlug}`;
 }
 
-/** Retrieve cached cards if still fresh for the given category+sport */
-export function getCachedCards(category?: string, sport?: string, count: number = 6): InsightCard[] | null {
-  const key = makeCacheKey(category, sport);
+/** Retrieve cached cards if still fresh for the given category+sport+userContext */
+export function getCachedCards(category?: string, sport?: string, count: number = 6, userContext?: string): InsightCard[] | null {
+  const key = makeCacheKey(category, sport, userContext);
   const entry = cardCacheMap.get(key);
   if (!entry) return null;
   if (Date.now() - entry.timestamp > CARD_CACHE_TTL) {
@@ -83,9 +84,9 @@ export function getCachedCards(category?: string, sport?: string, count: number 
   return entry.cards.slice(0, count);
 }
 
-/** Store cards in the in-memory cache under the given category+sport key */
-function setCachedCards(cards: InsightCard[], category: string, sport?: string): void {
-  const key = makeCacheKey(category, sport);
+/** Store cards in the in-memory cache under the given category+sport+userContext key */
+function setCachedCards(cards: InsightCard[], category: string, sport?: string, userContext?: string): void {
+  const key = makeCacheKey(category, sport, userContext);
   cardCacheMap.set(key, { cards, timestamp: Date.now(), category });
 }
 
@@ -748,11 +749,12 @@ async function _generateContextualCards(
   // 'all' has its own mixed-mode block below and must NOT trigger multiSport (betting-only).
   multiSport: boolean = !sport && (!category || category === 'betting'),
   kalshiSubcategory?: string,
-  options?: { playerName?: string }
+  options?: { playerName?: string; userContext?: string }
 ): Promise<InsightCard[]> {
+  const userContext = options?.userContext;
   // Check in-memory cache first to avoid redundant API calls
   // (SSR page load populates this, /api/analyze reuses it)
-  const cached = getCachedCards(category, sport, count);
+  const cached = getCachedCards(category, sport, count, userContext);
   if (cached && cached.length > 0) {
     logger.debug(LogCategory.CACHE, 'cards_cache_hit', { metadata: { count: cached.length, category, sport } });
     return cached;
@@ -1878,7 +1880,7 @@ async function _generateContextualCards(
 
   // Populate the in-memory cache so subsequent calls (e.g. /api/analyze) reuse these
   if (cards.length > 0) {
-    setCachedCards(cards, category || 'all', sport);
+    setCachedCards(cards, category || 'all', sport, userContext);
   }
 
   // Add weather cards for outdoor sports if betting category

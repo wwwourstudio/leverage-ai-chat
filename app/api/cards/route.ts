@@ -10,14 +10,14 @@ import { validateBenford } from '@/lib/benford-validator';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { sport, category, limit = 3 } = body;
+    const { sport, category, limit = 3, userContext } = body;
 
     const clampedLimit = Math.min(Math.max(Number(limit) || 3, 1), 15);
 
     // 20s hard timeout — prevents this route from hanging until Vercel's 60s wall clock
     // if an upstream API (odds, weather, kalshi) is slow or unresponsive.
     const cards = await Promise.race([
-      generateContextualCards(category ?? undefined, sport ?? undefined, clampedLimit),
+      generateContextualCards(category ?? undefined, sport ?? undefined, clampedLimit, undefined, undefined, { userContext: userContext ?? undefined }),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('card generation timed out')), 20_000),
       ),

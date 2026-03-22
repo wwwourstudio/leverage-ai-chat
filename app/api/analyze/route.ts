@@ -29,6 +29,18 @@ import { logger, LogCategory } from '@/lib/logger';
 import { getMarketIntelligenceSummary } from '@/lib/market-intelligence';
 import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
 
+// ── MLB parenthetical detection constants ────────────────────────────────────
+// Used by Layer -1 sport detection to parse patterns like "Juan Soto (NYM OF)"
+const MLB_TEAM_ABBREVS = new Set([
+  'NYM','NYY','BOS','LAD','SFG','SF','CHC','CHW','HOU','ATL',
+  'PHI','MIL','STL','ARI','SD','SDP','COL','CIN','PIT','MIA',
+  'MIN','CLE','DET','KC','KCR','TEX','OAK','ATH','SEA',
+  'TB','TBR','BAL','TOR','LAA','WSH','WSN',
+]);
+const MLB_POSITION_ABBREVS = new Set([
+  'OF','SP','RP','CP','1B','2B','3B','SS','DH','LF','CF','RF','C',
+]);
+
 // ── Response deduplication cache ─────────────────────────────────────────────
 // Prevents identical queries (e.g. double-taps, retry on same message) from
 // hitting the Grok API a second time within the TTL window.
@@ -329,8 +341,22 @@ export async function POST(request: NextRequest) {
 
     let detectedSport: string | undefined;
 
+    // Layer -1: Parenthetical MLB team/position abbreviation detection (highest priority)
+    // Catches patterns like "Juan Soto (NYM OF)", "Gerrit Cole (NYY SP)", "Cal Raleigh (SEA C)"
+    const parenMatches = [...userMessage.matchAll(/\(([^)]+)\)/g)];
+    for (const match of parenMatches) {
+      const tokens = match[1].trim().split(/\s+/);
+      for (const token of tokens) {
+        if (MLB_TEAM_ABBREVS.has(token) || MLB_POSITION_ABBREVS.has(token)) {
+          detectedSport = 'mlb';
+          break;
+        }
+      }
+      if (detectedSport) break;
+    }
+
     // Layer 0: MLB force-lock — highest priority
-    if (MLB_FORCE_TERMS.some(t => msgLower.includes(t))) {
+    if (!detectedSport && MLB_FORCE_TERMS.some(t => msgLower.includes(t))) {
       detectedSport = 'mlb';
     }
     // Layer 1: unambiguous team nicknames
@@ -1020,8 +1046,11 @@ export async function POST(request: NextRequest) {
         }
 
       } else {
-        // General / fallback
-        cardFetchPromise = generateContextualCards(category, context.sport ?? undefined, 6, false, context.kalshiSubcategory).catch(() => []);
+        // General / fallback — avoid triggering ADP/fantasy cards when there's no fantasy intent
+        const isFantasyOrDFSCategory = category === 'fantasy' || category === 'dfs';
+        const hasFantasyOrADPIntent = context.hasFantasyIntent || hasADPIntent;
+        const effectiveCategory = isFantasyOrDFSCategory && !hasFantasyOrADPIntent ? 'betting' : category;
+        cardFetchPromise = generateContextualCards(effectiveCategory, context.sport ?? undefined, 6, false, context.kalshiSubcategory).catch(() => []);
       }
 
       // Await with a generous timeout — cards typically resolve in 600-900ms.

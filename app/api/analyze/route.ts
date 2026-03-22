@@ -413,6 +413,8 @@ export async function POST(request: NextRequest) {
       'what\'s the price on', 'current price on', 'market price for',
       'show kalshi', 'list kalshi', 'kalshi election', 'kalshi trump',
       'yes price', 'no price', 'yes/no price', 'edge on yes', 'edge on no',
+      'championship winner', 'contract pricing', 'championship contract',
+      'winner contract', 'market contract', 'implied odds',
     ];
     const hasKalshiToolIntent =
       (context?.isPoliticalMarket || context?.selectedCategory === 'kalshi') &&

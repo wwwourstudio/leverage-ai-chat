@@ -710,8 +710,13 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
       try {
         const msgLow = (lastUserQuery || '').toLowerCase();
-        const detectedCategory = (msgLow.includes('kalshi') || msgLow.includes('prediction market'))
-          ? 'kalshi' : selectedCategory;
+        const detectedCategory = (
+          msgLow.includes('kalshi') ||
+          msgLow.includes('prediction market') ||
+          msgLow.includes('championship winner') ||
+          msgLow.includes('contract pricing') ||
+          msgLow.includes('winner contract')
+        ) ? 'kalshi' : selectedCategory;
         const freshCards = await fetchDynamicCards({ userContext: lastUserQuery, category: detectedCategory, limit: 4 });
         if (freshCards.length === 0) return;
 
@@ -827,6 +832,14 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   }, [selectedCategory, selectedSport]);
 
   const generateContextualSuggestions = useCallback((userMessage: string, responseCards: InsightCard[]) => {
+    // Deduplicate: if this exact message has already produced suggestions and the current
+    // call carries no new card data (e.g. error/partial branch firing after success branch),
+    // skip regeneration and return the existing suggestions unchanged.
+    if (userMessage === lastSuggestionQueryRef.current && responseCards.length === 0) {
+      return suggestedPrompts;
+    }
+    lastSuggestionQueryRef.current = userMessage;
+
     const msgLower = userMessage.toLowerCase();
     const suggestions: Array<{ label: string; icon: any; category: string }> = [];
 
@@ -1067,7 +1080,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     // Return 5-7 unique suggestions for optimal UX
     return uniqueSuggestions.slice(0, 7);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory]);
+  }, [selectedCategory, suggestedPrompts]);
 
   const handleFollowUp = (action: 'correlated' | 'metrics', cardData?: any) => {
     console.log('[v0] Generating follow-up response:', action);
@@ -1313,6 +1326,10 @@ No preamble. Start directly with section 1.`;
     abortControllerRef.current = null;
     setIsTyping(false);
   };
+
+  // Tracks the last query for which suggestions were generated — prevents duplicate
+  // runs when multiple response branches (success/partial/error) fire for the same message.
+  const lastSuggestionQueryRef = useRef<string>('');
 
   // Listen for player-name clicks dispatched from fantasy/DFS cards.
   // Using a ref so the effect doesn't need generateRealResponse as a dependency.

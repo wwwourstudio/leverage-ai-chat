@@ -1129,8 +1129,10 @@ export async function fetchTopMarketsByVolume(
 ): Promise<KalshiMarket[]> {
   const markets = await fetchKalshiMarketsWithRetry({ status, limit: Math.max(n * 5, 200), maxRetries: 2 });
   const sorted = markets.sort((a, b) => (b.volume24h || b.volume) - (a.volume24h || a.volume));
-  // Prefer markets that have real price signals (not stuck at the 50¢ fallback with zero volume)
-  const withActivity = sorted.filter(m => (m.volume > 0 || m.volume24h > 0) && (m.yesBid > 0 || m.yesAsk > 0 || m.lastPrice > 0));
+  // Prefer markets that have real price signals (not stuck at the 50¢ fallback with zero volume).
+  // Use OR logic so markets with valid price data but no recorded volume (e.g. new listings) are
+  // still included — the old AND requirement was too strict and caused collapse to 0–1 results.
+  const withActivity = sorted.filter(m => (m.volume > 0 || m.volume24h > 0) || (m.yesBid > 0 || m.yesAsk > 0 || m.lastPrice > 0));
   // Fall back to all sorted markets if not enough active ones
   return (withActivity.length >= n ? withActivity : sorted).slice(0, n);
 }

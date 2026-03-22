@@ -1215,6 +1215,14 @@ async function _generateContextualCards(
         markets = await fetchFinanceMarkets(count * 5);
       } else if (sub === 'trending') {
         markets = await fetchTopMarketsByVolume(count);
+        if (markets.length < count) {
+          // Volume data may be sparse — fall back to a broader open-market fetch ranked by volume
+          const broadMarkets = await fetchKalshiMarketsWithRetry({ status: 'open', limit: 200, maxRetries: 2 });
+          const ranked = broadMarkets
+            .sort((a: any, b: any) => (b.volume24h || b.volume || 0) - (a.volume24h || a.volume || 0))
+            .slice(0, count);
+          if (ranked.length > markets.length) markets = ranked;
+        }
       } else if (['culture', 'entertainment', 'arts', 'pop culture', 'awards', 'tv', 'film',
                   'music', 'movies', 'celebrity', 'oscars', 'emmys', 'grammys'].includes(sub)) {
         // Entertainment/culture markets — search Kalshi for relevant terms

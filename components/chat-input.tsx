@@ -178,7 +178,7 @@ export function ChatInput({
           />
 
           {/* Textarea wrapper */}
-          <div className="flex-1 relative group/input focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:shadow-lg focus-within:shadow-blue-500/10 rounded-2xl transition-all duration-300">
+          <div className="flex-1 relative rounded-2xl transition-all duration-200">
             <textarea
               ref={textareaRef}
               rows={1}
@@ -189,7 +189,7 @@ export function ChatInput({
               onKeyDown={handleKeyDown}
               placeholder={defaultPlaceholder}
               disabled={isTyping}
-              className="w-full resize-none bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[oklch(0.28_0.02_280)] focus:border-blue-500/40 rounded-2xl px-3 py-2.5 md:px-5 md:pr-28 font-medium text-foreground placeholder-[var(--text-faint)] focus:outline-none transition-all backdrop-blur-sm shadow-inner text-sm leading-relaxed overflow-hidden"
+              className="w-full resize-none bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[oklch(0.28_0.02_280)] focus:border-[oklch(0.38_0.06_260)] rounded-2xl px-3 py-2.5 md:px-5 md:pr-28 font-medium text-foreground placeholder-[var(--text-faint)] focus:outline-none transition-colors backdrop-blur-sm shadow-inner text-sm leading-relaxed overflow-hidden"
               style={{ minHeight: '44px', maxHeight: '160px', height: '44px' }}
             />
 

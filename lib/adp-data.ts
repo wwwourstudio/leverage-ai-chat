@@ -11,9 +11,6 @@
 // Supabase persistence helpers — dynamic import keeps @supabase/supabase-js out of client bundle
 import { getADPSupabaseClient } from '@/lib/supabase/adp-client.server';
 
-// Node.js built-ins — only available server-side (guard with typeof window check)
-import fs from 'fs';
-import path from 'path';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -559,33 +556,17 @@ export function clearADPCache(): void {
 
 /**
  * Reads and parses a local ADP CSV from the project's public/ directory.
- * Tries the following paths in order so both naming conventions work:
- *   1. public/adp/ADP.csv          (clean subdirectory layout)
- *   2. public/adp - ADP.csv        (space-in-filename variant)
- * Server-side only — returns null in browser contexts.
+ * Delegates to adp-csv-loader.server.ts to keep Node.js built-ins (fs, path)
+ * out of the client bundle.
  */
 async function loadADPFromCSV(): Promise<NFBCPlayer[] | null> {
   if (typeof window !== 'undefined') return null;
-  const candidates = [
-    path.join(process.cwd(), 'public', 'adp', 'ADP.csv'),
-    path.join(process.cwd(), 'public', 'adp - ADP.csv'),
-  ];
-  for (const csvPath of candidates) {
-    try {
-      const text = fs.readFileSync(csvPath, 'utf-8');
-      if (!text.trim()) continue;
-      const players = parseTSV(text);
-      if (players.length === 0) {
-        console.warn(`[v0] [ADP] ${path.basename(csvPath)} parsed to 0 players — check column headers (expected: Rank, Player, Team, Position(s), ADP)`);
-        continue;
-      }
-      console.log(`[v0] [ADP] Loaded ${players.length} MLB players from ${csvPath}`);
-      return players;
-    } catch {
-      // File not found or unreadable — try next candidate
-    }
+  try {
+    const { loadADPFromCSV: loadFromServer } = await import('@/lib/adp-csv-loader.server');
+    return loadFromServer(parseTSV);
+  } catch {
+    return null;
   }
-  return null;
 }
 
 /** Returns true only when the current ADP data came from a real user upload in Supabase. */

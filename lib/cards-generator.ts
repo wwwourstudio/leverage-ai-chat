@@ -1321,8 +1321,11 @@ async function _generateContextualCards(
         }
       }
 
-      // Drop any markets that aren't open (can appear in API responses despite status filter)
-      markets = markets.filter((m: any) => !m.status || m.status === 'open');
+      // Drop markets that are definitively closed.
+      // The Kalshi lib normalises status → 'active' (not 'open'), so we accept both.
+      // Only exclude when status is explicitly a closed/settled/resolved value.
+      const CLOSED_STATUSES = new Set(['closed', 'settled', 'resolved', 'finalized']);
+      markets = markets.filter((m: any) => !m.status || !CLOSED_STATUSES.has(m.status));
       console.log(`[v0] [CARDS-GEN] Kalshi fetched ${markets.length} open markets`);
 
       if (markets.length > 0) {

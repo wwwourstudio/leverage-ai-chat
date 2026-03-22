@@ -90,8 +90,16 @@ export class SupabaseOddsService {
 
     if (error) {
       const msg: string = (error as any).message ?? '';
-      // Ignore permission errors when service key is absent — non-blocking
-      if (!msg.includes('permission') && !msg.includes('42501')) {
+      // Silently skip known non-blocking error classes:
+      //   - permission denied (42501) — service key absent
+      //   - schema cache miss — process_odds_batch RPC not deployed to this DB
+      //   - function not found — same as above, different pg error text
+      const isSilent = msg.includes('permission')
+        || msg.includes('42501')
+        || msg.includes('schema cache')
+        || msg.includes('Could not find the function')
+        || msg.includes('function') && msg.includes('does not exist');
+      if (!isSilent) {
         console.error('[Supabase] process_odds_batch error:', msg);
       }
       return false;

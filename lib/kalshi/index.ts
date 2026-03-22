@@ -1143,7 +1143,7 @@ export async function fetchTopMarketsByVolume(
 export function generateKalshiCards(markets: KalshiMarket[]): any[] {
   console.log('[KALSHI] Generating cards for', markets.length, 'markets');
 
-  return markets.slice(0, 3).map((market, index) => {
+  return markets.slice(0, 6).map((market, index) => {
     const yesProb = market.yesPrice / 100;
     const noProb = market.noPrice / 100;
     const confidence = Math.abs(yesProb - 0.5) * 2;

@@ -13,6 +13,7 @@ import {
   HTTP_STATUS,
   ERROR_MESSAGES,
   NFBC_DRAFT_YEAR,
+  NFL_SEASON_YEAR,
   PLAYER_SPORT_MAP,
   STAT_SPORT_MAP,
   LOG_PREFIXES,
@@ -947,6 +948,29 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── NFL data-provenance context (fires for ANY NFL query with no live odds) ─────────────
+    // This app has no live NFL stats API. Without live odds/props injected above, any NFL
+    // player stats in the response come purely from Grok's training data, which may predate
+    // or incompletely cover the most recent NFL season. Inject explicit framing so the AI
+    // doesn't silently hallucinate stats or label stale data as current.
+    const isNFLQuery = (context.sport ?? '').includes('football') || (context.sport ?? '') === 'nfl' || (context.sport ?? '') === '';
+    const hasLiveNFLOdds = (context.oddsData?.events?.length ?? 0) > 0;
+    if (isNFLQuery && !hasLiveNFLOdds && !context.isPoliticalMarket) {
+      const now2 = new Date();
+      const month = now2.getMonth() + 1;
+      const isOffseason = month >= 3 && month <= 8; // Mar–Aug = NFL offseason
+      const isPlayoffs = month === 1 || month === 2; // Jan–Feb = NFL playoffs/Super Bowl
+      const isRegularSeason = month >= 9 || month === 12; // Sep–Dec = regular season
+      const phaseLabel = isOffseason
+        ? `${NFL_SEASON_YEAR} NFL season is complete (Super Bowl concluded ~Feb ${NFL_SEASON_YEAR + 1}). It is currently the ${NFL_SEASON_YEAR + 1} offseason (free agency, draft prep, rookie minis).`
+        : isPlayoffs
+        ? `The ${NFL_SEASON_YEAR} NFL regular season is complete; playoffs are in progress.`
+        : isRegularSeason
+        ? `The ${NFL_SEASON_YEAR} NFL regular season is in progress.`
+        : `NFL offseason.`;
+      enrichedPrompt += `\n\n[NFL Season Context — ${NFL_SEASON_YEAR}]\n${phaseLabel}\nIMPORTANT: No live NFL stats are available in this session. Any player stats, snap counts, yards, TDs, or performance metrics you provide are sourced from your training knowledge and may be incomplete for the ${NFL_SEASON_YEAR} season. Label all AI-sourced stats as "(${NFL_SEASON_YEAR} season — AI estimate)" and encourage the user to verify at NFL.com, Pro Football Reference, or ESPN for official figures.`;
+    }
+
     // Fantasy-specific context injection — only when fantasy is the primary intent.
     // Mirrors the card-generation guard (line ~640): betting takes priority over fantasy
     // when both intents are detected, so don't pollute a live-odds betting prompt with
@@ -955,8 +979,8 @@ export async function POST(request: NextRequest) {
       const sport = context.sport || '';
       const isNFL = sport.includes('football') || sport === '';
       if (isNFL) {
-        // NFL 2025 season is complete (Super Bowl ~Feb 2026) — tell AI to focus on 2026 offseason
-        enrichedPrompt += `\n\n[Fantasy Context: The 2025 NFL regular season and playoffs are complete. Fantasy advice should now address the 2026 offseason: free agency moves, rookie targets, ADP for 2026 redraft leagues, and dynasty/devy strategy. The card data shows 2025 historical stats as reference.]`;
+        // NFL season complete — tell AI to focus on the upcoming offseason/draft cycle
+        enrichedPrompt += `\n\n[Fantasy Context: The ${NFL_SEASON_YEAR} NFL regular season and playoffs are complete. Fantasy advice should address the ${NFL_SEASON_YEAR + 1} offseason: free agency moves, rookie targets, ADP for ${NFL_SEASON_YEAR + 1} redraft leagues, and dynasty/devy strategy. Any stats referenced are ${NFL_SEASON_YEAR} season figures from AI training data — label them as "(${NFL_SEASON_YEAR} — AI estimate)" and encourage verification.]`;
       } else {
         // In-season sport (NBA, MLB, NHL, etc.) — tell AI to use its current knowledge
         const sportName = sport.replace(/^(americanfootball|basketball|baseball|icehockey|soccer|mma)_?/, '').toUpperCase().replace(/_/g, ' ') || sport.toUpperCase();

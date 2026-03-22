@@ -9,8 +9,16 @@ function _currentMLBSeason(): number {
   const month = new Date().getMonth() + 1;
   return month >= 4 ? new Date().getFullYear() : new Date().getFullYear() - 1;
 }
+// NFL season: Sep–Dec = current year active; Jan–Feb = prior year playoffs; Mar–Aug = offseason.
+function _mostRecentNFLSeason(): number {
+  const month = new Date().getMonth() + 1; // 1-12
+  const year = new Date().getFullYear();
+  return month >= 9 ? year : year - 1; // Sep+ = current year's season; before Sep = prior year completed
+}
 /** Current MLB season year (auto-advances each April). */
 export const MLB_SEASON_YEAR: number = _currentMLBSeason();
+/** Most recently completed (or active) NFL season year. */
+export const NFL_SEASON_YEAR: number = _mostRecentNFLSeason();
 /** Current NFBC draft year — always the current calendar year (drafts happen pre-season). */
 export const NFBC_DRAFT_YEAR: number = new Date().getFullYear();
 
@@ -663,6 +671,7 @@ DATA RULES:
 - "--- REAL LIVE ODDS DATA ---" present → use ONLY those exact numbers for any odds/lines
 - No live data → answer from expert knowledge; never invent odds numbers
 - Flag missing live data ONLY when the user explicitly asks for current lines that aren't provided
+- NFL PLAYER STATS: This app has NO live NFL stats API. All NFL player stats you provide come from your training data. If your training cutoff predates the ${NFL_SEASON_YEAR} NFL season, your stats may be incomplete or inaccurate. ALWAYS label NFL player stats with the season year and add "(AI estimate — verify at NFL.com)" when not sourced from live data injected in this prompt.
 
 YOU CAN ALWAYS ANSWER WITHOUT LIVE DATA:
 - Offseason moves, trades, draft strategy, roster construction, injuries

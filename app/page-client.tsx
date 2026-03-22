@@ -18,7 +18,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { fetchDynamicCards, type DynamicCard } from '@/lib/data-service';
-import { API_ENDPOINTS, PLAYER_HEADSHOT_IDS } from '@/lib/constants';
+import { API_ENDPOINTS, PLAYER_HEADSHOT_IDS, sportToApi } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/client';
 const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ default: m.AuthModals })), { ssr: false });
 import { TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, MessageSquare, Clock, Star, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, X, CheckCheck, AlertTriangle, BarChart, Info, FileText, ImageIcon, Loader2 } from 'lucide-react';
@@ -37,7 +37,7 @@ import { ChatHeader } from '@/components/chat-header';
 import { SuggestedPrompts } from '@/components/suggested-prompts';
 import { ChatInput } from '@/components/chat-input';
 import { loadThreads, createThread, updateThread, deleteThread, loadMessages, saveMessage } from '@/lib/chat-service';
-import { generateNoDataMessage } from '@/lib/seasonal-context';
+import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
 
 interface FileAttachment {
   id: string;
@@ -301,6 +301,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [_cardsRefreshedAt, setCardsRefreshedAt] = useState<Date | null>(null);
   const cardsRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fetchedForQueryRef = useRef<string | null>(null);
+  // Dedup guard — prevents double-fire when onPromptClick and handleSubmit both
+  // call generateRealResponse for the same message within the same tick.
+  const analyzingMessageRef = useRef<string | null>(null);
   // Tracks an in-flight createThread() call so saveMessage can await it instead of
   // firing against a placeholder ID ('chat-1' or 'chat-{timestamp}').
   const pendingThreadRef = useRef<Promise<import('@/lib/chat-service').ChatThread | null> | null>(null);
@@ -1361,6 +1364,15 @@ No preamble. Start directly with section 1.`;
   }, []);
 
   const generateRealResponse = async (userMessage: string, imageAttachments?: Array<{ name: string; base64: string; mimeType: string }>) => {
+    // Dedup guard: suppress duplicate calls for the same message (e.g. onPromptClick
+    // and handleSubmit both firing within the same event loop tick).
+    const msgKey = userMessage.trim().slice(0, 200);
+    if (analyzingMessageRef.current === msgKey) {
+      console.log('[v0] Duplicate analyze suppressed for:', msgKey.slice(0, 60));
+      return;
+    }
+    analyzingMessageRef.current = msgKey;
+
     // Cancel any in-flight request
     abortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -1999,6 +2011,8 @@ No preamble. Start directly with section 1.`;
       setIsClarificationPills(false);
     } finally {
       setIsTyping(false);
+      // Clear in-flight guard so the same message can be re-sent after completion.
+      analyzingMessageRef.current = null;
     }
   };
   // Keep the ref current so the player-click event handler always calls the latest version
@@ -2192,7 +2206,13 @@ No preamble. Start directly with section 1.`;
           if (historicalMsg?.content) {
             const historicalSport = detectSportFromText(historicalMsg.content);
             if (historicalSport) {
-              console.log('[v0] Inherited sport from conversation history:', historicalSport);
+              // Don't inherit an offseason sport — it has no live games to query.
+              const seasonInfo = getSeasonInfo(sportToApi(historicalSport));
+              if (!seasonInfo.isInSeason) {
+                console.log(`[v0] Skipping inherited sport '${historicalSport}' — currently offseason`);
+                continue;
+              }
+              console.log('[v0] Inherited sport from conversation history:', historicalSport.toUpperCase());
               return historicalSport;
             }
           }

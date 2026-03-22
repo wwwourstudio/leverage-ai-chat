@@ -1,4 +1,8 @@
 /** @type {import('next').NextConfig} */
+// Note: "SES Removing unpermitted intrinsics" console warnings (5x on load) originate
+// from Stripe.js's built-in lockdown-install.js security sandbox — one log per intrinsic
+// removed. These are informational, not errors, and cannot be suppressed without removing
+// Stripe. They do not affect functionality in production.
 const nextConfig = {
   images: {
     unoptimized: true,

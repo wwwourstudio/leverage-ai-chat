@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, memo } from 'react';
+import { memo } from 'react';
 import { Sparkles } from 'lucide-react';
 import { DynamicCardRenderer } from './DynamicCardRenderer';
-import { CompactCard } from './CompactCard';
 import { cn } from '@/lib/utils';
 
 interface CardData {
@@ -53,27 +52,13 @@ export const CardLayout = memo(function CardLayout({
   trustScore,
   trustLevel,
 }: CardLayoutProps) {
-  const [heroIndex, setHeroIndex] = useState(0);
-  const [transitioning, setTransitioning] = useState(false);
-
   if (!cards || cards.length === 0) return null;
 
-  // Hero card is the currently selected one
-  const heroCard = cards[heroIndex] ?? cards[0];
-  // Suggested cards are the rest (up to 5), excluding the hero
-  const suggestedCards = cards.filter((_, i) => i !== heroIndex).slice(0, 5);
+  const heroCard = cards[0];
+  // All cards after the first, up to 5
+  const suggestedCards = cards.slice(1, 6);
 
   const insight = aiInsight ? extractInsightBlurb(aiInsight) : null;
-
-  function selectHero(index: number) {
-    if (index === heroIndex) return;
-    setTransitioning(true);
-    // Brief fade-out then swap
-    setTimeout(() => {
-      setHeroIndex(index);
-      setTransitioning(false);
-    }, 120);
-  }
 
   return (
     <div className="mt-4 space-y-2.5 w-full">
@@ -84,13 +69,10 @@ export const CardLayout = memo(function CardLayout({
           className="absolute -inset-1 rounded-3xl opacity-20 blur-xl pointer-events-none transition-opacity duration-500"
           aria-hidden="true"
         />
-        <div className={cn(
-          'transition-opacity duration-150',
-          transitioning ? 'opacity-0' : 'opacity-100',
-        )}>
+        <div>
           <DynamicCardRenderer
             card={heroCard}
-            index={heroIndex}
+            index={0}
             isHero
             onAnalyze={onAnalyze ? () => onAnalyze(heroCard) : undefined}
             trustScore={trustScore}
@@ -107,39 +89,22 @@ export const CardLayout = memo(function CardLayout({
         )}
       </div>
 
-      {/* ── Suggested Cards Row ──────────────────────────────────────── */}
+      {/* ── Additional Cards Grid ────────────────────────────────────── */}
       {suggestedCards.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-1.5 px-0.5">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-blue-500/70">
-              More Markets
-            </p>
-            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-900/60 text-[8px] font-black text-blue-400/80">
-              {suggestedCards.length}
-            </span>
-          </div>
+        <div className="space-y-2">
           <div className={cn(
-            'grid gap-2',
-            suggestedCards.length === 1 ? 'grid-cols-1' :
-            suggestedCards.length === 2 ? 'grid-cols-1 sm:grid-cols-2' :
-            suggestedCards.length <= 4 ? 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4' :
-            'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5',
+            'grid gap-3',
+            suggestedCards.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2',
           )}>
             {suggestedCards.map((card, i) => {
-              // originalIndex is used only for hero navigation, not for the key.
-              // Using cards.indexOf for the key caused duplicate keys when the array
-              // contained repeated references (indexOf always returns the first match).
-              const originalIndex = cards.indexOf(card);
-              // Key must be unique among siblings — use the map position `i` as
-              // the tiebreaker so identical card types never collide.
               const key = card.id ?? `${card.type}-${i}`;
               return (
-                <CompactCard
+                <DynamicCardRenderer
                   key={key}
                   card={card}
-                  index={i}
-                  isActive={false}
-                  onClick={() => selectHero(originalIndex)}
+                  index={i + 1}
+                  isHero={false}
+                  onAnalyze={onAnalyze ? () => onAnalyze(card) : undefined}
                 />
               );
             })}

@@ -1,59 +1,21 @@
-/**
- * GET /api/adp
- *
- * Reads the local ADP CSV file and returns the parsed player list as JSON.
- * Tries the following paths in order:
- *   1. public/adp/ADP.csv
- *   2. public/adp - ADP.csv   (space-in-filename variant)
- *
- * This endpoint is used by client-side components that need ADP data without
- * going through the full getADPData() server function. It does NOT hit Supabase
- * or any external API — CSV only.
- */
-import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-import { parseTSV } from '@/lib/adp-data';
+import { loadADP } from '@/lib/adp';
 
-export const runtime = 'nodejs';
+export const dynamic = 'force-static';
 
-const CSV_CANDIDATES = [
-  path.join(process.cwd(), 'public', 'adp', 'ADP.csv'),
-  path.join(process.cwd(), 'public', 'adp - ADP.csv'),
-];
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const position = searchParams.get('position')?.toUpperCase();
+  const limit = parseInt(searchParams.get('limit') ?? '300');
 
-export async function GET() {
-  for (const csvPath of CSV_CANDIDATES) {
-    let text: string;
-    try {
-      text = fs.readFileSync(csvPath, 'utf-8');
-    } catch {
-      continue; // file not found — try next candidate
-    }
+  const players = loadADP();
 
-    if (!text.trim()) continue;
+  const filtered = position
+    ? players.filter(p => p.position === position)
+    : players;
 
-    const players = parseTSV(text);
-    if (players.length === 0) {
-      console.warn(`[v0] [ADP] GET /api/adp: ${path.basename(csvPath)} parsed to 0 players — check column headers`);
-      continue;
-    }
-
-    console.log(`[v0] [ADP] GET /api/adp: serving ${players.length} players from ${path.basename(csvPath)}`);
-    return NextResponse.json({
-      success: true,
-      count: players.length,
-      source: path.basename(csvPath),
-      players,
-    });
-  }
-
-  return NextResponse.json(
-    {
-      success: false,
-      error: 'ADP CSV not found. Place your file at public/adp/ADP.csv or public/adp - ADP.csv',
-      tried: CSV_CANDIDATES,
-    },
-    { status: 404 },
-  );
+  return Response.json({
+    players: filtered.slice(0, limit),
+    count: filtered.length,
+    source: 'local_csv',
+  });
 }

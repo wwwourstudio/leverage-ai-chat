@@ -1357,8 +1357,11 @@ export async function generateFantasyCards(
   leagueOptions?: LeagueOptions
 ): Promise<InsightCard[]> {
   // Non-NFL sport → don't show NFL player data; return sport-branded cards instead
-  const isNFL = !sport || sport.includes('football') || sport === '';
+  // Only treat as NFL when sport is explicitly nfl/football; null/undefined/'' → not NFL
+  const isNFL = !!sport && (sport === 'nfl' || sport.includes('football') || sport.startsWith('americanfootball'));
   if (!isNFL) {
+    // No sport context at all — skip card generation to avoid generating wrong-sport cards
+    if (!sport) return [];
     // Detect start/sit intent from the message if caller didn't set isStartSit explicitly
     const msgL = userMessage.toLowerCase();
     const isStartSit = leagueOptions?.isStartSit ??

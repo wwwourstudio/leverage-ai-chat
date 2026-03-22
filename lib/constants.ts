@@ -557,6 +557,14 @@ export const PLAYER_SPORT_MAP: Record<string, string> = {
   prescott: 'nfl', purdy: 'nfl', stroud: 'nfl', stafford: 'nfl',
   mccaffrey: 'nfl', ekeler: 'nfl', diggs: 'nfl', metcalf: 'nfl',
   kupp: 'nfl', rodgers: 'nfl', lafleur: 'nfl', belichick: 'nfl',
+  // NFL skill players frequently queried for DFS / fantasy start-sit
+  barkley: 'nfl', saquon: 'nfl',
+  'derrick henry': 'nfl', pollard: 'nfl',
+  hill: 'nfl', lamb: 'nfl', 'ceedee lamb': 'nfl',
+  jefferson: 'nfl', chase: 'nfl',
+  adams: 'nfl', thielen: 'nfl', pickens: 'nfl', lazard: 'nfl',
+  'josh allen': 'nfl', 'lamar jackson': 'nfl',
+  andrews: 'nfl', hockenson: 'nfl',
   // ── NBA ──────────────────────────────────────────────────────────────────
   curry: 'nba', doncic: 'nba', embiid: 'nba', tatum: 'nba',
   durant: 'nba', jokic: 'nba', harden: 'nba', lillard: 'nba',
@@ -586,6 +594,15 @@ export const PLAYER_SPORT_MAP: Record<string, string> = {
  */
 export const STAT_SPORT_MAP: Array<{ term: string; sport: string }> = [
   // NFL (most specific first)
+  { term: 'run defense', sport: 'nfl' },
+  { term: 'rush defense', sport: 'nfl' },
+  { term: 'red zone targets', sport: 'nfl' },
+  { term: 'snap count', sport: 'nfl' },
+  { term: 'offensive line', sport: 'nfl' },
+  { term: 'running back', sport: 'nfl' },
+  { term: 'wide receiver', sport: 'nfl' },
+  { term: 'tight end', sport: 'nfl' },
+  { term: 'backup rb', sport: 'nfl' },
   { term: 'passing yards', sport: 'nfl' },
   { term: 'rushing yards', sport: 'nfl' },
   { term: 'receiving yards', sport: 'nfl' },
@@ -594,12 +611,15 @@ export const STAT_SPORT_MAP: Array<{ term: string; sport: string }> = [
   { term: 'touchdown passes', sport: 'nfl' },
   { term: 'fantasy football', sport: 'nfl' },
   // MLB
+  { term: 'earned run average', sport: 'mlb' },
   { term: 'batting average', sport: 'mlb' },
   { term: 'home run', sport: 'mlb' },
   { term: 'stolen base', sport: 'mlb' },
   { term: 'strikeout', sport: 'mlb' },
   { term: 'on-base', sport: 'mlb' },
   { term: 'whip', sport: 'mlb' },
+  { term: 'bullpen', sport: 'mlb' },
+  { term: 'closer', sport: 'mlb' },
   // NBA
   { term: 'three-pointer', sport: 'nba' },
   { term: 'three pointer', sport: 'nba' },
@@ -610,6 +630,7 @@ export const STAT_SPORT_MAP: Array<{ term: string; sport: string }> = [
   { term: 'goals against', sport: 'nhl' },
   { term: 'power play', sport: 'nhl' },
   { term: 'penalty kill', sport: 'nhl' },
+  { term: 'goalie saves', sport: 'nhl' },
 ] as const;
 
 // System Prompt Template

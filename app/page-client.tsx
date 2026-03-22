@@ -300,6 +300,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [selectedSport, setSelectedSport] = useState<string>('');
   const [_cardsRefreshedAt, setCardsRefreshedAt] = useState<Date | null>(null);
   const cardsRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const fetchedForQueryRef = useRef<string | null>(null);
   // Tracks an in-flight createThread() call so saveMessage can await it instead of
   // firing against a placeholder ID ('chat-1' or 'chat-{timestamp}').
   const pendingThreadRef = useRef<Promise<import('@/lib/chat-service').ChatThread | null> | null>(null);
@@ -708,10 +709,24 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       const hasCards = messages.some((m: any) => m.role === 'assistant' && m.cards && m.cards.length > 0);
       if (!hasCards || !lastUserQuery) return;
 
+      // Guard: skip if we already fetched for this exact query+category combination
+      const fetchKey = `${lastUserQuery}::${selectedCategory}`;
+      if (fetchedForQueryRef.current === fetchKey) return;
+      fetchedForQueryRef.current = fetchKey;
+
       try {
         const msgLow = (lastUserQuery || '').toLowerCase();
-        const detectedCategory = (msgLow.includes('kalshi') || msgLow.includes('prediction market'))
-          ? 'kalshi' : selectedCategory;
+        const hasFantasyOrDFSQuery = /\b(adp|draft|waiver|sleeper|fantasy|dfs|best ball|lineup|vbd|tier|rank)\b/i.test(lastUserQuery || '');
+        const detectedCategory = (
+          msgLow.includes('kalshi') ||
+          msgLow.includes('prediction market') ||
+          msgLow.includes('championship winner') ||
+          msgLow.includes('contract pricing') ||
+          msgLow.includes('winner contract')
+        ) ? 'kalshi'
+          : (selectedCategory === 'fantasy' || selectedCategory === 'dfs') && !hasFantasyOrDFSQuery
+          ? 'betting'  // don't load ADP/fantasy cards for non-fantasy queries even if fantasy tab is active
+          : selectedCategory;
         const freshCards = await fetchDynamicCards({ userContext: lastUserQuery, category: detectedCategory, limit: 4 });
         if (freshCards.length === 0) return;
 
@@ -736,7 +751,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current);
     cardsRefreshIntervalRef.current = setInterval(refreshCards, REFRESH_INTERVAL);
     return () => { if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current); };
-  }, [messages.length, lastUserQuery]);
+  }, [lastUserQuery]);
 
   // Start with empty chat history - user creates real chats
   // Use serverData.serverTime for the initial timestamp to avoid SSR/client hydration mismatch (#418).
@@ -782,7 +797,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   }, []);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    });
   };
 
   useEffect(() => {
@@ -827,6 +844,14 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   }, [selectedCategory, selectedSport]);
 
   const generateContextualSuggestions = useCallback((userMessage: string, responseCards: InsightCard[]) => {
+    // Deduplicate: if this exact message has already produced suggestions and the current
+    // call carries no new card data (e.g. error/partial branch firing after success branch),
+    // skip regeneration and return the existing suggestions unchanged.
+    if (userMessage === lastSuggestionQueryRef.current && responseCards.length === 0) {
+      return suggestedPrompts;
+    }
+    lastSuggestionQueryRef.current = userMessage;
+
     const msgLower = userMessage.toLowerCase();
     const suggestions: Array<{ label: string; icon: any; category: string }> = [];
 
@@ -1067,7 +1092,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     // Return 5-7 unique suggestions for optimal UX
     return uniqueSuggestions.slice(0, 7);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory]);
+  }, [selectedCategory, suggestedPrompts]);
 
   const handleFollowUp = (action: 'correlated' | 'metrics', cardData?: any) => {
     console.log('[v0] Generating follow-up response:', action);
@@ -1313,6 +1338,10 @@ No preamble. Start directly with section 1.`;
     abortControllerRef.current = null;
     setIsTyping(false);
   };
+
+  // Tracks the last query for which suggestions were generated — prevents duplicate
+  // runs when multiple response branches (success/partial/error) fire for the same message.
+  const lastSuggestionQueryRef = useRef<string>('');
 
   // Listen for player-name clicks dispatched from fantasy/DFS cards.
   // Using a ref so the effect doesn't need generateRealResponse as a dependency.
@@ -1702,14 +1731,6 @@ No preamble. Start directly with section 1.`;
       setVerifyStage('analyzing');
       const analysisResult = await fetchAnalysis();
 
-      console.log('[v0] Analysis:', {
-        ok: analysisResult.success,
-        cards: analysisResult.cards?.length ?? 0,
-        confidence: analysisResult.trustMetrics?.finalConfidence,
-        fallback: analysisResult.useFallback,
-        clientCards: availableCards.length,
-      });
-
       // Handle API errors with smart fallback
       const processingTime = Date.now() - startTime;
       let newMessage: Message;
@@ -1769,9 +1790,20 @@ No preamble. Start directly with section 1.`;
         // Success path - process the analysis result.
         // If the server returns cards, use them. Otherwise fall back to
         // the cards we already have from the SSR welcome message.
-        const responseCards = (analysisResult.cards && analysisResult.cards.length > 0)
+        // Use server cards when present (including explicit empty []);
+        // only fall back to previous-message cards when server returned undefined (no card attempt)
+        const responseCards = analysisResult.cards !== undefined
           ? analysisResult.cards
           : availableCards;
+
+        console.log('[v0] Analysis:', JSON.stringify({
+          ok: analysisResult.success,
+          serverCards: analysisResult.cards?.length ?? 0,
+          responseCards: responseCards.length,
+          fallbackCards: availableCards.length,
+          confidence: analysisResult.trustMetrics?.finalConfidence,
+          fallback: analysisResult.useFallback,
+        }));
 
         // Enrich trust metrics with real metadata so TrustMetricsDisplay can show
         // sources, model name, processing time, and live-data badges.

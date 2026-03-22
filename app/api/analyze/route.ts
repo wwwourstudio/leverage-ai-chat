@@ -29,6 +29,18 @@ import { logger, LogCategory } from '@/lib/logger';
 import { getMarketIntelligenceSummary } from '@/lib/market-intelligence';
 import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
 
+// ── MLB parenthetical detection constants ────────────────────────────────────
+// Used by Layer -1 sport detection to parse patterns like "Juan Soto (NYM OF)"
+const MLB_TEAM_ABBREVS = new Set([
+  'NYM','NYY','BOS','LAD','SFG','SF','CHC','CHW','HOU','ATL',
+  'PHI','MIL','STL','ARI','SD','SDP','COL','CIN','PIT','MIA',
+  'MIN','CLE','DET','KC','KCR','TEX','OAK','ATH','SEA',
+  'TB','TBR','BAL','TOR','LAA','WSH','WSN',
+]);
+const MLB_POSITION_ABBREVS = new Set([
+  'OF','SP','RP','CP','1B','2B','3B','SS','DH','LF','CF','RF','C',
+]);
+
 // ── Response deduplication cache ─────────────────────────────────────────────
 // Prevents identical queries (e.g. double-taps, retry on same message) from
 // hitting the Grok API a second time within the TTL window.
@@ -306,49 +318,76 @@ export async function POST(request: NextRequest) {
       // Note: 'panthers' → NFL Panthers vs NHL Panthers (ambiguous, omitted)
     };
 
+    // context.sport is a HINT from the client (persisted tab selection / previous query).
+    // Always run all detection layers against the query text; if they produce a different
+    // sport, the query text wins — this prevents stale NBA/etc. tab state from poisoning
+    // sport routing for unambiguous queries like "Saquon Barkley against the Cowboys".
     let inferredSport = context?.sport && context.sport !== 'none' ? context.sport : undefined;
-    if (!inferredSport) {
-      // Layer 0: MLB force-lock — highest priority.
-      // Fires before team/player/stat layers to prevent NBA/generic fallback
-      // when MLB player names, fantasy-baseball abbreviations, or ADP terms appear.
-      const MLB_FORCE_TERMS = [
-        // Fantasy / ADP meta-keywords
-        'nfbc', 'nffc', '5x5', 'roto', 'saves+holds', 'shgn',
-        'adp board', 'draft board', 'mock draft', 'fantasy baseball',
-        // Statcast / baseball-specific stats not used in other sports
-        'barrel rate', 'exit velocity', 'xwoba', 'babip', 'xfip', 'fip',
-        'statcast', 'baseball savant', 'spin rate', 'whiff rate',
-        // MLB team abbreviations (caps) — e.g. "LAD starter" or "NYY lineup"
-        ' lad ', ' nyy ', ' bos ', ' hou ', ' chc ', ' atl ', ' sd ',
-        ' sea ', ' kc ', ' cle ', ' det ', ' tb ', ' mil ', ' cin ',
-        // Player names not yet in PLAYER_SPORT_MAP
-        'witt jr', 'de la cruz', 'caminero', 'raleigh', 'skubal', 'skenes',
-        'judge', 'crochet', 'kurtz',
-      ];
-      if (MLB_FORCE_TERMS.some(t => msgLower.includes(t))) {
-        inferredSport = 'mlb';
+
+    const MLB_FORCE_TERMS = [
+      // Fantasy / ADP meta-keywords
+      'nfbc', 'nffc', '5x5', 'roto', 'saves+holds', 'shgn',
+      'adp board', 'draft board', 'mock draft', 'fantasy baseball',
+      // Statcast / baseball-specific stats not used in other sports
+      'barrel rate', 'exit velocity', 'xwoba', 'babip', 'xfip', 'fip',
+      'statcast', 'baseball savant', 'spin rate', 'whiff rate',
+      // MLB team abbreviations (caps) — e.g. "LAD starter" or "NYY lineup"
+      ' lad ', ' nyy ', ' bos ', ' hou ', ' chc ', ' atl ', ' sd ',
+      ' sea ', ' kc ', ' cle ', ' det ', ' tb ', ' mil ', ' cin ',
+      // Player names not yet in PLAYER_SPORT_MAP
+      'witt jr', 'de la cruz', 'caminero', 'raleigh', 'skubal', 'skenes',
+      'judge', 'crochet', 'kurtz',
+    ];
+
+    let detectedSport: string | undefined;
+
+    // Layer -1: Parenthetical MLB team/position abbreviation detection (highest priority)
+    // Catches patterns like "Juan Soto (NYM OF)", "Gerrit Cole (NYY SP)", "Cal Raleigh (SEA C)"
+    const parenMatches = [...userMessage.matchAll(/\(([^)]+)\)/g)];
+    for (const match of parenMatches) {
+      const tokens = match[1].trim().split(/\s+/);
+      for (const token of tokens) {
+        if (MLB_TEAM_ABBREVS.has(token) || MLB_POSITION_ABBREVS.has(token)) {
+          detectedSport = 'mlb';
+          break;
+        }
       }
+      if (detectedSport) break;
     }
-    if (!inferredSport) {
-      // Layer 1: team nicknames (fastest, most reliable)
+
+    // Layer 0: MLB force-lock — highest priority
+    if (!detectedSport && MLB_FORCE_TERMS.some(t => msgLower.includes(t))) {
+      detectedSport = 'mlb';
+    }
+    // Layer 1: unambiguous team nicknames
+    if (!detectedSport) {
       for (const [team, sportName] of Object.entries(TEAM_TO_SPORT)) {
-        if (msgLower.includes(team)) { inferredSport = sportName; break; }
+        if (msgLower.includes(team)) { detectedSport = sportName; break; }
       }
     }
-    if (!inferredSport) {
-      // Layer 2: well-known player last names (handles "Mahomes passing yards", "Ohtani HR", etc.)
+    // Layer 2: well-known player last names
+    if (!detectedSport) {
       for (const [player, sportName] of Object.entries(PLAYER_SPORT_MAP)) {
-        if (msgLower.includes(player)) { inferredSport = sportName; break; }
+        if (msgLower.includes(player)) { detectedSport = sportName; break; }
       }
     }
-    if (!inferredSport) {
-      // Layer 3: sport-specific statistical vocabulary (longest match wins — iterate most-specific first)
+    // Layer 3: sport-specific statistical vocabulary (most-specific terms first)
+    if (!detectedSport) {
       for (const { term, sport: sportName } of STAT_SPORT_MAP) {
-        if (msgLower.includes(term)) { inferredSport = sportName; break; }
+        if (msgLower.includes(term)) { detectedSport = sportName; break; }
       }
     }
+
+    // Override stale context sport when query text clearly signals a different sport
+    if (detectedSport) {
+      if (detectedSport !== inferredSport && inferredSport) {
+        console.log(`[API/analyze] Sport override: context='${inferredSport}' → detected='${detectedSport}' from query signals`);
+      }
+      inferredSport = detectedSport;
+    }
+
     // Merge inferred sport back into context so downstream handlers pick it up
-    if (inferredSport && !context.sport) {
+    if (inferredSport) {
       context.sport = inferredSport;
     }
     // ADP queries with no explicit sport default to MLB — this app is MLB-first.
@@ -413,6 +452,8 @@ export async function POST(request: NextRequest) {
       'what\'s the price on', 'current price on', 'market price for',
       'show kalshi', 'list kalshi', 'kalshi election', 'kalshi trump',
       'yes price', 'no price', 'yes/no price', 'edge on yes', 'edge on no',
+      'championship winner', 'contract pricing', 'championship contract',
+      'winner contract', 'market contract', 'implied odds',
     ];
     const hasKalshiToolIntent =
       (context?.isPoliticalMarket || context?.selectedCategory === 'kalshi') &&
@@ -970,7 +1011,7 @@ export async function POST(request: NextRequest) {
             });
         }
         cardFetchPromise = import('@/lib/fantasy/cards/fantasy-card-generator')
-          .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 6, context.sport ?? undefined, {
+          .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 6, context.sport || undefined, {
             teamCount: context.leagueSize ?? undefined,
             scoringFormat: context.leagueScoringFormat ?? undefined,
             isStartSit: hasStartSitIntent,
@@ -1005,8 +1046,11 @@ export async function POST(request: NextRequest) {
         }
 
       } else {
-        // General / fallback
-        cardFetchPromise = generateContextualCards(category, context.sport ?? undefined, 6, false, context.kalshiSubcategory).catch(() => []);
+        // General / fallback — avoid triggering ADP/fantasy cards when there's no fantasy intent
+        const isFantasyOrDFSCategory = category === 'fantasy' || category === 'dfs';
+        const hasFantasyOrADPIntent = context.hasFantasyIntent || hasADPIntent;
+        const effectiveCategory = isFantasyOrDFSCategory && !hasFantasyOrADPIntent ? 'betting' : category;
+        cardFetchPromise = generateContextualCards(effectiveCategory, context.sport ?? undefined, 6, false, context.kalshiSubcategory).catch(() => []);
       }
 
       // Await with a generous timeout — cards typically resolve in 600-900ms.

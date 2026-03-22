@@ -59,11 +59,14 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea height as content grows (max ~6 lines / 160px)
+  // Wrap in RAF to avoid forced reflow (write then synchronous layout read)
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+    requestAnimationFrame(() => {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+    });
   }, [input]);
 
   const defaultPlaceholder = placeholder ?? (lastUserQuery

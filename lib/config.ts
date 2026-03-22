@@ -164,9 +164,21 @@ export const isGrokConfigured = () =>
 export const isOddsApiConfigured = () =>
   !!getOddsApiKey();
 
-export const isKalshiConfigured = () =>
-  // Support both KALSHI_ACCESS_KEY (new spec) and KALSHI_API_KEY_ID (legacy)
-  !!((process.env.KALSHI_ACCESS_KEY || process.env.KALSHI_API_KEY_ID) && process.env.KALSHI_PRIVATE_KEY);
+export const isKalshiConfigured = () => {
+  // Support bearer-only mode (KALSHI_API_KEY) for unauthenticated public endpoints,
+  // and full RSA-signed mode (KALSHI_ACCESS_KEY/KALSHI_API_KEY_ID + KALSHI_PRIVATE_KEY).
+  const hasRsaKey = process.env.KALSHI_PRIVATE_KEY;
+  const hasKeyId = process.env.KALSHI_ACCESS_KEY || process.env.KALSHI_API_KEY_ID || process.env.KALSHI_API_KEY;
+  if (!hasKeyId) {
+    // No key at all — log once per process start (server-side only)
+    if (typeof window === 'undefined') {
+      console.warn('[Leverage AI] No Kalshi API key found (set KALSHI_ACCESS_KEY, KALSHI_API_KEY_ID, or KALSHI_API_KEY) — Kalshi markets will use unauthenticated requests');
+    }
+    return false;
+  }
+  // Has at least a bearer key (unauthenticated fetch is possible)
+  return !!(hasKeyId && hasRsaKey) || !!process.env.KALSHI_API_KEY;
+};
 
 /**
  * Check if Supabase is properly configured (detailed status)
@@ -444,6 +456,7 @@ const OPTIONAL_ENV_VARS: Record<string, string> = {
   WEATHER_API_KEY:       'Weather API key for outdoor sports',
   STRIPE_SECRET_KEY:     'Stripe secret key for payments',
   STRIPE_PUBLISHABLE_KEY:'Stripe publishable key for payments',
+  KALSHI_API_KEY:        'Kalshi API key (bearer token for public market data)',
   KALSHI_API_KEY_ID:     'Kalshi API key ID (for authenticated trading)',
   KALSHI_PRIVATE_KEY:    'Kalshi RSA private key (for authenticated trading)',
 };

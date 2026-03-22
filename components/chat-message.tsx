@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { TrustMetricsDisplay } from '@/components/trust-metrics-display';
-import { Shield, Copy, Edit3, CheckCheck, X, Zap, Brain, AlertCircle, Info, RotateCcw, ChevronDown, ChevronUp, Check, TrendingUp } from 'lucide-react';
+import { Shield, Copy, Edit3, CheckCheck, X, Zap, Brain, AlertCircle, Info, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Message {
@@ -14,8 +14,8 @@ interface Message {
   sources?: any[];
   modelUsed?: string;
   processingTime?: number;
-  isPartial?: boolean;
-  isError?: boolean;
+  isPartial?: boolean;  // stream interrupted; content shows what arrived before the break
+  isError?: boolean;    // request failed with no usable content
 }
 
 interface ChatMessageProps {
@@ -27,55 +27,111 @@ interface ChatMessageProps {
 
 /** Render inline markdown: **bold**, _italic_, `code` */
 function renderInline(text: string): React.ReactNode {
+  // Fast path: no markers present
   if (!text.includes('**') && !text.includes('_') && !text.includes('`')) return text;
+
   const parts: React.ReactNode[] = [];
   let remaining = text;
   let key = 0;
+
   while (remaining.length > 0) {
+    // Find the earliest marker
     const boldIdx = remaining.indexOf('**');
     const italicIdx = (() => {
       let idx = remaining.indexOf('_');
+      // Avoid treating mid-word underscores (e.g. snake_case) as italic markers
       while (idx !== -1) {
         const before = idx > 0 ? remaining[idx - 1] : ' ';
         const after = idx + 1 < remaining.length ? remaining[idx + 1] : ' ';
-        if (/\w/.test(before) && /\w/.test(after)) { idx = remaining.indexOf('_', idx + 1); } else { break; }
+        if (/\w/.test(before) && /\w/.test(after)) {
+          idx = remaining.indexOf('_', idx + 1);
+        } else {
+          break;
+        }
       }
       return idx;
     })();
     const codeIdx = remaining.indexOf('`');
-    const candidates = [boldIdx !== -1 ? boldIdx : Infinity, italicIdx !== -1 ? italicIdx : Infinity, codeIdx !== -1 ? codeIdx : Infinity];
+
+    const candidates = [
+      boldIdx !== -1 ? boldIdx : Infinity,
+      italicIdx !== -1 ? italicIdx : Infinity,
+      codeIdx !== -1 ? codeIdx : Infinity,
+    ];
     const earliest = Math.min(...candidates);
-    if (earliest === Infinity) { parts.push(<React.Fragment key={key++}>{remaining}</React.Fragment>); break; }
-    if (earliest > 0) { parts.push(<React.Fragment key={key++}>{remaining.slice(0, earliest)}</React.Fragment>); remaining = remaining.slice(earliest); }
+
+    if (earliest === Infinity) {
+      parts.push(<React.Fragment key={key++}>{remaining}</React.Fragment>);
+      break;
+    }
+
+    // Emit text before the marker
+    if (earliest > 0) {
+      parts.push(<React.Fragment key={key++}>{remaining.slice(0, earliest)}</React.Fragment>);
+      remaining = remaining.slice(earliest);
+    }
+
+    // Bold: **text**
     if (remaining.startsWith('**')) {
       const close = remaining.indexOf('**', 2);
-      if (close === -1) { parts.push(<React.Fragment key={key++}>{remaining}</React.Fragment>); break; }
-      parts.push(<strong key={key++} className="font-semibold text-white">{remaining.slice(2, close)}</strong>);
-      remaining = remaining.slice(close + 2); continue;
+      if (close === -1) {
+        parts.push(<React.Fragment key={key++}>{remaining}</React.Fragment>);
+        break;
+      }
+      parts.push(
+        <strong key={key++} className="font-bold text-white">
+          {remaining.slice(2, close)}
+        </strong>
+      );
+      remaining = remaining.slice(close + 2);
+      continue;
     }
+
+    // Inline code: `code`
     if (remaining.startsWith('`')) {
       const close = remaining.indexOf('`', 1);
-      if (close === -1) { parts.push(<React.Fragment key={key++}>{remaining}</React.Fragment>); break; }
-      parts.push(<code key={key++} className="px-1.5 py-0.5 rounded-md bg-[oklch(0.16_0.015_280)] text-emerald-300 font-mono text-[0.82em] border border-[oklch(0.22_0.015_280)]">{remaining.slice(1, close)}</code>);
-      remaining = remaining.slice(close + 1); continue;
+      if (close === -1) {
+        parts.push(<React.Fragment key={key++}>{remaining}</React.Fragment>);
+        break;
+      }
+      parts.push(
+        <code key={key++} className="px-1.5 py-0.5 rounded bg-[oklch(0.18_0.015_280)] text-blue-300 font-mono text-[0.85em]">
+          {remaining.slice(1, close)}
+        </code>
+      );
+      remaining = remaining.slice(close + 1);
+      continue;
     }
+
+    // Italic: _text_
     if (remaining.startsWith('_')) {
       const close = remaining.indexOf('_', 1);
-      if (close === -1) { parts.push(<React.Fragment key={key++}>{remaining}</React.Fragment>); break; }
-      parts.push(<em key={key++} className="italic text-[oklch(0.72_0.008_85)]">{remaining.slice(1, close)}</em>);
-      remaining = remaining.slice(close + 1); continue;
+      if (close === -1) {
+        parts.push(<React.Fragment key={key++}>{remaining}</React.Fragment>);
+        break;
+      }
+      parts.push(
+        <em key={key++} className="italic text-[oklch(0.75_0.005_85)]">
+          {remaining.slice(1, close)}
+        </em>
+      );
+      remaining = remaining.slice(close + 1);
+      continue;
     }
+
+    // Should not reach here; advance one char to prevent infinite loop
     parts.push(<React.Fragment key={key++}>{remaining[0]}</React.Fragment>);
     remaining = remaining.slice(1);
   }
+
   return <>{parts}</>;
 }
 
+/** Lightweight markdown renderer — handles **bold**, _italic_, `code`, ``` blocks, ## headers, - bullets */
 function MarkdownContent({ text }: { text: string }) {
   const lines = text.split('\n');
   const elements: React.ReactNode[] = [];
   let bulletBuffer: string[] = [];
-  let numberedBuffer: string[] = [];
   let codeBuffer: string[] = [];
   let inCodeBlock = false;
   let codeLang = '';
@@ -83,10 +139,10 @@ function MarkdownContent({ text }: { text: string }) {
   const flushBullets = (key: string) => {
     if (bulletBuffer.length === 0) return;
     elements.push(
-      <ul key={`ul-${key}`} className="space-y-1.5 my-2.5 ml-0.5">
+      <ul key={`ul-${key}`} className="space-y-1.5 my-2 ml-1">
         {bulletBuffer.map((item, i) => (
-          <li key={i} className="flex gap-2.5 text-sm leading-relaxed text-[oklch(0.80_0.006_85)]">
-            <span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 shrink-0" aria-hidden="true" />
+          <li key={i} className="flex gap-2 text-sm leading-relaxed text-[oklch(0.82_0.005_85)]">
+            <span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" aria-hidden="true" />
             <span>{renderInline(item)}</span>
           </li>
         ))}
@@ -95,13 +151,14 @@ function MarkdownContent({ text }: { text: string }) {
     bulletBuffer = [];
   };
 
+  let numberedBuffer: string[] = [];
   const flushNumbered = (key: string) => {
     if (numberedBuffer.length === 0) return;
     elements.push(
-      <ol key={`ol-${key}`} className="space-y-1.5 my-2.5 ml-0.5">
+      <ol key={`ol-${key}`} className="space-y-1.5 my-2 ml-1">
         {numberedBuffer.map((item, i) => (
-          <li key={i} className="flex gap-2.5 text-sm leading-relaxed text-[oklch(0.80_0.006_85)]">
-            <span className="mt-0.5 min-w-[18px] h-[18px] rounded bg-[oklch(0.22_0.025_260)] text-[oklch(0.60_0.02_260)] text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
+          <li key={i} className="flex gap-2 text-sm leading-relaxed text-[oklch(0.82_0.005_85)]">
+            <span className="mt-0.5 min-w-[18px] h-[18px] rounded bg-blue-500/20 text-blue-400 text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
             <span>{renderInline(item)}</span>
           </li>
         ))}
@@ -113,68 +170,114 @@ function MarkdownContent({ text }: { text: string }) {
   const flushCode = (key: string) => {
     if (codeBuffer.length === 0) return;
     elements.push(
-      <div key={`code-${key}`} className="my-3 rounded-xl overflow-hidden border border-[oklch(0.20_0.018_280)] shadow-lg shadow-black/20">
+      <div key={`code-${key}`} className="my-2 rounded-lg overflow-hidden border border-[oklch(0.22_0.02_280)]">
         {codeLang && (
-          <div className="flex items-center justify-between px-4 py-2 bg-[oklch(0.14_0.014_280)] border-b border-[oklch(0.20_0.018_280)]">
-            <span className="text-[10px] font-mono text-emerald-400/80 uppercase tracking-wider">{codeLang}</span>
-            <span className="flex gap-1.5">
-              {['bg-red-500/50','bg-yellow-500/50','bg-green-500/50'].map((c,i) => <span key={i} className={`w-2 h-2 rounded-full ${c}`} />)}
-            </span>
+          <div className="px-3 py-1 bg-[oklch(0.16_0.015_280)] text-[10px] font-mono text-[oklch(0.45_0.01_280)] uppercase tracking-wide border-b border-[oklch(0.22_0.02_280)]">
+            {codeLang}
           </div>
         )}
-        <pre className="px-4 py-3.5 bg-[oklch(0.09_0.01_280)] text-[13px] font-mono text-[oklch(0.78_0.008_280)] overflow-x-auto leading-relaxed">
+        <pre className="px-4 py-3 bg-[oklch(0.10_0.01_280)] text-sm font-mono text-[oklch(0.78_0.005_280)] overflow-x-auto leading-relaxed">
           <code>{codeBuffer.join('\n')}</code>
         </pre>
       </div>
     );
-    codeBuffer = []; codeLang = '';
+    codeBuffer = [];
+    codeLang = '';
   };
-
-  const flushAll = (key: string) => { flushBullets(key); flushNumbered(key); };
 
   lines.forEach((line, i) => {
     const trimmed = line.trim();
-    if (trimmed.startsWith('```')) {
-      if (!inCodeBlock) { flushAll(String(i)); inCodeBlock = true; codeLang = trimmed.slice(3).trim(); }
-      else { inCodeBlock = false; flushCode(String(i)); }
-      return;
-    }
-    if (inCodeBlock) { codeBuffer.push(line); return; }
 
-    if (trimmed.startsWith('### ')) {
-      flushAll(String(i));
-      elements.push(<p key={i} className="text-[11px] font-bold text-[oklch(0.55_0.04_280)] mt-3 mb-1 uppercase tracking-widest">{trimmed.slice(4)}</p>);
+    // Fenced code block toggle
+    if (trimmed.startsWith('```')) {
+      if (!inCodeBlock) {
+        flushBullets(String(i));
+        inCodeBlock = true;
+        codeLang = trimmed.slice(3).trim();
+      } else {
+        inCodeBlock = false;
+        flushCode(String(i));
+      }
       return;
     }
-    if (trimmed.startsWith('## ')) {
-      flushAll(String(i));
+
+    if (inCodeBlock) {
+      codeBuffer.push(line);
+      return;
+    }
+
+    // ### Headers (h3)
+    if (trimmed.startsWith('### ')) {
+      flushBullets(String(i));
+      flushNumbered(String(i));
       elements.push(
-        <div key={i} className="flex items-center gap-2 mt-4 mb-2">
-          <div className="h-px flex-1 bg-gradient-to-r from-[oklch(0.28_0.025_260)] to-transparent" />
-          <p className="text-[12px] font-bold text-[oklch(0.65_0.05_260)] uppercase tracking-wider px-1">{trimmed.slice(3)}</p>
-          <div className="h-px flex-1 bg-gradient-to-l from-[oklch(0.28_0.025_260)] to-transparent" />
-        </div>
+        <p key={i} className="text-[12px] font-bold text-blue-300/80 mt-2 mb-0.5 uppercase tracking-wide">
+          {trimmed.slice(4)}
+        </p>
       );
       return;
     }
+
+    // ## Headers (h2)
+    if (trimmed.startsWith('## ')) {
+      flushBullets(String(i));
+      flushNumbered(String(i));
+      elements.push(
+        <p key={i} className="text-[13px] font-bold text-blue-400 mt-3 mb-1 uppercase tracking-wide">
+          {trimmed.slice(3)}
+        </p>
+      );
+      return;
+    }
+
+    // # Headers (h1)
     if (trimmed.startsWith('# ')) {
-      flushAll(String(i));
-      elements.push(<p key={i} className="text-[15px] font-bold text-white mt-4 mb-2 tracking-tight">{trimmed.slice(2)}</p>);
+      flushBullets(String(i));
+      elements.push(
+        <p key={i} className="text-sm font-black text-white mt-3 mb-1">
+          {trimmed.slice(2)}
+        </p>
+      );
       return;
     }
-    if (/^[-•*]\s/.test(trimmed)) { flushNumbered(String(i)); bulletBuffer.push(trimmed.slice(2).trim()); return; }
-    if (/^\d+\.\s/.test(trimmed)) { flushBullets(String(i)); numberedBuffer.push(trimmed.replace(/^\d+\.\s/, '').trim()); return; }
+
+    // Bullet points (- or • or *)
+    if (/^[-•*]\s/.test(trimmed)) {
+      bulletBuffer.push(trimmed.slice(2).trim());
+      return;
+    }
+
+    // Numbered list
+    if (/^\d+\.\s/.test(trimmed)) {
+      flushBullets(String(i));
+      numberedBuffer.push(trimmed.replace(/^\d+\.\s/, '').trim());
+      return;
+    }
+
+    // Empty line — flush bullets and add a gap
     if (trimmed === '') {
-      flushAll(String(i));
-      if (elements.length > 0) elements.push(<div key={`gap-${i}`} className="h-1.5" />);
+      flushBullets(String(i));
+      flushNumbered(String(i));
+      if (elements.length > 0) {
+        elements.push(<div key={`gap-${i}`} className="h-1" />);
+      }
       return;
     }
-    flushAll(String(i));
-    elements.push(<p key={i} className="text-sm leading-relaxed text-[oklch(0.82_0.006_85)]">{renderInline(trimmed)}</p>);
+
+    // Regular paragraph
+    flushBullets(String(i));
+    flushNumbered(String(i));
+    elements.push(
+      <p key={i} className="text-sm leading-relaxed text-[oklch(0.82_0.005_85)]">
+        {renderInline(trimmed)}
+      </p>
+    );
   });
 
-  flushAll('end');
-  if (inCodeBlock) flushCode('eof');
+  flushBullets('end');
+  flushNumbered('end');
+  if (inCodeBlock) flushCode('eof'); // unclosed fence — render what we have
+
   return <div className="space-y-0.5">{elements}</div>;
 }
 
@@ -188,22 +291,21 @@ function formatRelativeTime(date: Date): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
+/** Chars before we collapse an assistant message. ~2 full screens of text. */
 const COLLAPSE_THRESHOLD = 3000;
 
 export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, onCopy, onRetry }: ChatMessageProps) {
   const [isEditing, setIsEditing] = React.useState(false);
   const [editContent, setEditContent] = React.useState(message.content);
   const [showTrust, setShowTrust] = React.useState(false);
-  const [copied, setCopied] = React.useState(false);
-  const isLong = message.role === 'assistant' && message.content.length > COLLAPSE_THRESHOLD;
+  const isLong = !message.role || message.role === 'assistant'
+    ? message.content.length > COLLAPSE_THRESHOLD
+    : false;
   const [expanded, setExpanded] = React.useState(false);
 
-  const handleSaveEdit = () => { onEdit?.(editContent); setIsEditing(false); };
-
-  const handleCopy = () => {
-    onCopy?.();
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
+  const handleSaveEdit = () => {
+    onEdit?.(editContent);
+    setIsEditing(false);
   };
 
   const isUser = message.role === 'user';
@@ -212,220 +314,208 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
     <div
       role="article"
       aria-label={isUser ? 'User message' : 'AI response'}
-      className={cn('flex gap-3 group/msg', isUser ? 'justify-end' : 'justify-start')}
+      className={cn('flex gap-3 animate-fade-in-up', isUser ? 'justify-end' : 'justify-start')}
     >
       {/* AI avatar */}
       {!isUser && (
         <div className="shrink-0 mt-0.5">
           <div className="relative w-7 h-7">
-            <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-emerald-500/30 to-teal-600/30 blur-sm" />
-            <div className="relative w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md shadow-emerald-500/20">
-              <TrendingUp className="w-3.5 h-3.5 text-white" />
+            <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 opacity-20 blur-sm" />
+            <div className="relative w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-md shadow-blue-500/25">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-white"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
             </div>
           </div>
         </div>
       )}
-
-      <div className={cn('min-w-0', isUser ? 'max-w-[78%]' : 'max-w-[82%] flex-1')}>
-        {/* User message bubble */}
-        {isUser ? (
-          isEditing ? (
-            <div className="space-y-2.5 bg-[oklch(0.14_0.02_260)] border border-[oklch(0.28_0.04_260)] rounded-2xl rounded-tr-sm px-4 py-3">
+      <div className={cn('max-w-3xl', isUser ? 'order-2' : 'flex-1')}>
+        <div className={cn(
+          'rounded-2xl px-5 py-4',
+          isUser
+            ? 'bg-gradient-to-br from-[oklch(0.30_0.07_260)] to-[oklch(0.24_0.05_265)] text-white shadow-lg shadow-[oklch(0.15_0.04_260)/0.3] min-w-[200px] border border-[oklch(0.38_0.06_260)]'
+            : message.isError
+              ? 'bg-red-950/20 border border-l-[3px] border-red-800/40 border-l-red-500/60 shadow-sm'
+              : message.isPartial
+                ? 'bg-[oklch(0.12_0.015_280)] border border-l-[3px] border-[oklch(0.22_0.02_280)] border-l-amber-500/60 shadow-sm'
+                : 'bg-[oklch(0.12_0.015_280)] border border-l-[3px] border-[oklch(0.22_0.02_280)] border-l-[oklch(0.45_0.06_260)] shadow-sm',
+        )}>
+          {isEditing ? (
+            <div className="space-y-3">
               <textarea
                 value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
-                className="w-full bg-transparent text-white rounded-lg focus:outline-none text-sm resize-none min-h-[80px]"
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditContent(e.target.value)}
+                className="w-full bg-[oklch(0.10_0.01_280)] text-white rounded-lg p-3 min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
               <div className="flex gap-2">
-                <button onClick={handleSaveEdit} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs text-white font-medium transition-colors">
-                  <CheckCheck className="w-3.5 h-3.5" /> Save
+                <button
+                  onClick={handleSaveEdit}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center gap-2 text-sm text-white"
+                >
+                  <CheckCheck className="w-4 h-4" />
+                  Save
                 </button>
-                <button onClick={() => setIsEditing(false)} className="flex items-center gap-1.5 px-3 py-1.5 bg-[oklch(0.22_0.01_280)] hover:bg-[oklch(0.28_0.01_280)] rounded-lg text-xs text-white/70 font-medium transition-colors">
-                  <X className="w-3.5 h-3.5" /> Cancel
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center gap-2 text-sm text-white"
+                >
+                  <X className="w-4 h-4" />
+                  Cancel
                 </button>
               </div>
             </div>
           ) : (
-            <div className="relative group/user">
-              <div className="bg-gradient-to-br from-[oklch(0.32_0.08_260)] via-[oklch(0.28_0.07_265)] to-[oklch(0.24_0.06_270)] text-white rounded-2xl rounded-tr-sm px-4 py-3 shadow-lg shadow-[oklch(0.15_0.04_260)/0.25] border border-[oklch(0.38_0.06_260)/0.5]">
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
-              </div>
-              {/* Hover actions */}
-              <div className="absolute -bottom-5 right-0 hidden group-hover/user:flex items-center gap-1 opacity-0 group-hover/user:opacity-100 transition-all duration-150">
-                {onEdit && (
-                  <button onClick={() => setIsEditing(true)} className="p-1 rounded hover:bg-[oklch(0.18_0.01_280)] text-[oklch(0.40_0.01_280)] hover:text-white/70 transition-colors">
-                    <Edit3 className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            </div>
-          )
-        ) : (
-          /* AI response */
-          <div className={cn(
-            'rounded-2xl rounded-tl-sm border shadow-sm overflow-hidden',
-            message.isError
-              ? 'bg-[oklch(0.10_0.02_15)] border-red-900/40 border-l-2 border-l-red-500/70'
-              : message.isPartial
-                ? 'bg-[oklch(0.10_0.012_280)] border-[oklch(0.20_0.018_280)] border-l-2 border-l-amber-500/60'
-                : 'bg-[oklch(0.105_0.012_280)] border-[oklch(0.20_0.018_280)]',
-          )}>
-            {/* Top accent line for normal messages */}
-            {!message.isError && !message.isPartial && (
-              <div className="h-px w-full bg-gradient-to-r from-emerald-500/30 via-teal-500/20 to-transparent" />
-            )}
-
-            <div className="px-5 py-4">
-              {/* Error / partial banners */}
-              {message.isError && (
-                <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-red-900/30">
-                  <div className="w-5 h-5 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">
-                    <AlertCircle className="w-3 h-3 text-red-400" />
-                  </div>
-                  <span className="text-xs font-semibold text-red-400">Response failed</span>
-                  {onRetry && (
-                    <button onClick={onRetry} className="ml-auto flex items-center gap-1 text-xs text-red-400 hover:text-red-300 bg-red-950/40 hover:bg-red-900/50 px-2.5 py-1 rounded-lg transition-colors font-medium">
-                      <RotateCcw className="w-3 h-3" /> Retry
-                    </button>
-                  )}
+            <>
+              {/* Error / partial banners — shown above message content for assistant turns */}
+              {!isUser && message.isError && (
+                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-red-800/30">
+                  <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                  <span className="text-xs text-red-400 font-medium">Response failed</span>
                 </div>
               )}
-              {message.isPartial && (
-                <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-amber-900/25">
+              {!isUser && message.isPartial && (
+                <div className="flex items-center gap-2 mb-2">
                   <Info className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span className="text-xs text-amber-400 font-medium">Partial response</span>
-                  {onRetry && (
-                    <button onClick={onRetry} className="ml-auto flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 bg-amber-950/40 px-2 py-0.5 rounded-lg transition-colors">
-                      <RotateCcw className="w-3 h-3" /> Retry
-                    </button>
-                  )}
+                  <span className="text-xs text-amber-400">Partial response</span>
                 </div>
               )}
-
-              {/* Message content */}
-              {isLong && !expanded ? (
+              {isUser ? (
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+              ) : isLong && !expanded ? (
                 <>
                   <MarkdownContent text={message.content.slice(0, COLLAPSE_THRESHOLD)} />
-                  <button
-                    onClick={() => setExpanded(true)}
-                    className="mt-3 flex items-center gap-1.5 text-xs text-[oklch(0.50_0.04_260)] hover:text-[oklch(0.65_0.06_260)] transition-colors group/exp"
-                  >
-                    <ChevronDown className="w-3.5 h-3.5 group-hover/exp:translate-y-0.5 transition-transform" />
-                    <span>Show full response</span>
-                    <span className="text-[oklch(0.38_0.01_280)]">({Math.ceil((message.content.length - COLLAPSE_THRESHOLD) / 1000)}k more)</span>
-                  </button>
+                  <div className="mt-3 pt-2 border-t border-[oklch(0.20_0.015_280)]">
+                    <button
+                      onClick={() => setExpanded(true)}
+                      className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+                    >
+                      <span>Show full response</span>
+                      <span className="text-[oklch(0.42_0.01_280)]">
+                        ({Math.ceil((message.content.length - COLLAPSE_THRESHOLD) / 1000)}k more chars)
+                      </span>
+                    </button>
+                  </div>
                 </>
               ) : (
                 <>
                   <MarkdownContent text={message.content} />
                   {isLong && expanded && (
-                    <button
-                      onClick={() => setExpanded(false)}
-                      className="mt-3 flex items-center gap-1.5 text-xs text-[oklch(0.50_0.04_260)] hover:text-[oklch(0.65_0.06_260)] transition-colors"
-                    >
-                      <ChevronUp className="w-3.5 h-3.5" /> Collapse
-                    </button>
+                    <div className="mt-3 pt-2 border-t border-[oklch(0.20_0.015_280)]">
+                      <button
+                        onClick={() => setExpanded(false)}
+                        className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                      >
+                        Collapse response
+                      </button>
+                    </div>
                   )}
                 </>
               )}
-            </div>
 
-            {/* Footer metadata bar */}
-            <div className="px-5 py-2.5 bg-[oklch(0.085_0.008_280)] border-t border-[oklch(0.16_0.014_280)] flex items-center gap-3">
-              {/* Model chip */}
-              {message.modelUsed && (
-                <span className="flex items-center gap-1 text-[10px] font-semibold text-[oklch(0.45_0.02_280)] bg-[oklch(0.14_0.012_280)] border border-[oklch(0.20_0.015_280)] rounded-md px-1.5 py-0.5">
-                  <Brain className="w-2.5 h-2.5 text-[oklch(0.45_0.05_290)]" />
-                  {message.modelUsed.replace(/grok-[34](-fast)?/i, 'Grok 4').replace('Grok 3', 'Grok 4')}
-                </span>
-              )}
+              {!isUser && (
+                <div className="mt-3 pt-2.5 border-t border-[oklch(0.20_0.015_280)]">
+                  <div className="flex items-center gap-3 flex-wrap text-[11px] text-[oklch(0.42_0.01_280)]">
+                    {/* Model + processing time */}
+                    {(message.modelUsed || message.processingTime) && (
+                      <span className="flex items-center gap-1">
+                        <Brain className="w-3 h-3 text-purple-500/70" />
+                        {message.modelUsed && (
+                          <span className="font-semibold text-[oklch(0.50_0.01_280)]">
+                            {message.modelUsed.replace(/grok-[34](-fast)?/i, 'Grok 4').replace('Grok 3', 'Grok 4')}
+                          </span>
+                        )}
+                        {message.processingTime && (
+                          <span className="flex items-center gap-0.5 text-[oklch(0.42_0.01_280)]">
+                            <Zap className="w-2.5 h-2.5 text-yellow-500/60" />
+                            {message.processingTime}ms
+                          </span>
+                        )}
+                      </span>
+                    )}
 
-              {/* Processing time */}
-              {message.processingTime && (
-                <span className="flex items-center gap-1 text-[10px] text-[oklch(0.40_0.01_280)]">
-                  <Zap className="w-2.5 h-2.5 text-yellow-500/50" />
-                  {message.processingTime < 1000 ? `${message.processingTime}ms` : `${(message.processingTime/1000).toFixed(1)}s`}
-                </span>
-              )}
+                    {/* Confidence */}
+                    {message.confidence != null && (
+                      <span className={`font-bold px-1.5 py-0.5 rounded border text-[10px] ${
+                        message.confidence >= 80
+                          ? 'text-blue-400 bg-blue-950/30 border-blue-800/30'
+                          : message.confidence >= 60
+                            ? 'text-amber-400 bg-amber-950/20 border-amber-800/20'
+                            : 'text-[oklch(0.45_0.01_280)] bg-[oklch(0.14_0.01_280)] border-[oklch(0.20_0.01_280)]'
+                      }`}>
+                        {message.confidence}%
+                      </span>
+                    )}
+                    {/* Sources */}
+                    {message.sources && message.sources.length > 0 && (
+                      <span className="text-[oklch(0.40_0.01_280)]">
+                        {message.sources.length} source{message.sources.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
 
-              {/* Confidence badge */}
-              {message.confidence != null && (
-                <span className={cn(
-                  'text-[10px] font-bold px-1.5 py-0.5 rounded-md border',
-                  message.confidence >= 80
-                    ? 'text-emerald-400 bg-emerald-950/40 border-emerald-800/40'
-                    : message.confidence >= 60
-                      ? 'text-amber-400 bg-amber-950/30 border-amber-800/30'
-                      : 'text-[oklch(0.45_0.01_280)] bg-[oklch(0.14_0.01_280)] border-[oklch(0.20_0.01_280)]'
-                )}>
-                  {message.confidence}% conf
-                </span>
-              )}
+                    {/* Action buttons */}
+                    {/* Retry button — prominent red/amber when error/partial, subtle otherwise */}
+                    {onRetry && (
+                      <button
+                        onClick={onRetry}
+                        title="Retry"
+                        className={cn(
+                          'flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] transition-all',
+                          message.isError
+                            ? 'text-red-400 bg-red-950/30 hover:bg-red-900/40 hover:text-red-300'
+                            : message.isPartial
+                              ? 'text-amber-400 bg-amber-950/30 hover:bg-amber-900/40 hover:text-amber-300'
+                              : 'opacity-60 hover:opacity-100 text-[oklch(0.42_0.01_280)] hover:text-blue-400 hover:bg-[oklch(0.18_0.01_280)]',
+                        )}
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        {(message.isError || message.isPartial) && <span>Retry</span>}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        onCopy?.();
+                        (document.activeElement as HTMLElement)?.setAttribute('data-copied', '1');
+                        setTimeout(() => (document.activeElement as HTMLElement)?.removeAttribute('data-copied'), 1800);
+                      }}
+                      title="Copy response"
+                      className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 hover:bg-[oklch(0.18_0.01_280)] rounded px-1 py-0.5 transition-all"
+                    >
+                      <Copy className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      title="Edit"
+                      className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 hover:bg-[oklch(0.18_0.01_280)] rounded px-1 py-0.5 transition-all"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                    </button>
+                    {message.trustMetrics && (
+                      <button
+                        onClick={() => setShowTrust((v: any) => !v)}
+                        title="Trust metrics"
+                        className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 hover:bg-[oklch(0.18_0.01_280)] rounded px-1 py-0.5 transition-all"
+                      >
+                        <Shield className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
 
-              {/* Sources count */}
-              {message.sources && message.sources.length > 0 && (
-                <span className="text-[10px] text-[oklch(0.40_0.01_280)]">
-                  {message.sources.length} source{message.sources.length !== 1 ? 's' : ''}
-                </span>
-              )}
-
-              {/* Spacer */}
-              <div className="flex-1" />
-
-              {/* Action buttons */}
-              {onRetry && !message.isError && !message.isPartial && (
-                <button
-                  onClick={onRetry}
-                  title="Retry"
-                  className="p-1 rounded-md text-[oklch(0.38_0.01_280)] hover:text-white/60 hover:bg-[oklch(0.16_0.01_280)] transition-all opacity-0 group-hover/msg:opacity-100"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                </button>
-              )}
-              <button
-                onClick={handleCopy}
-                title="Copy response"
-                className="p-1 rounded-md text-[oklch(0.38_0.01_280)] hover:text-white/60 hover:bg-[oklch(0.16_0.01_280)] transition-all opacity-0 group-hover/msg:opacity-100"
-              >
-                {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-              </button>
-              {onEdit && (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  title="Edit"
-                  className="p-1 rounded-md text-[oklch(0.38_0.01_280)] hover:text-white/60 hover:bg-[oklch(0.16_0.01_280)] transition-all opacity-0 group-hover/msg:opacity-100"
-                >
-                  <Edit3 className="w-3 h-3" />
-                </button>
-              )}
-              {message.trustMetrics && (
-                <button
-                  onClick={() => setShowTrust(v => !v)}
-                  title="Trust metrics"
-                  className={cn(
-                    'p-1 rounded-md transition-all opacity-0 group-hover/msg:opacity-100',
-                    showTrust ? 'text-emerald-400 bg-emerald-950/40 opacity-100' : 'text-[oklch(0.38_0.01_280)] hover:text-white/60 hover:bg-[oklch(0.16_0.01_280)]'
+                  {showTrust && message.trustMetrics && (
+                    <div className="mt-3">
+                      <TrustMetricsDisplay metrics={message.trustMetrics} showDetails={true} />
+                    </div>
                   )}
-                >
-                  <Shield className="w-3 h-3" />
-                </button>
+                </div>
               )}
-            </div>
-
-            {/* Trust panel */}
-            {showTrust && message.trustMetrics && (
-              <div className="px-5 py-3 bg-[oklch(0.08_0.008_280)] border-t border-[oklch(0.16_0.014_280)]">
-                <TrustMetricsDisplay metrics={message.trustMetrics} showDetails={true} />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Timestamp */}
+            </>
+          )}
+        </div>
+        {/* Timestamp — suppressHydrationWarning because Date.now() differs between SSR and client */}
         {message.timestamp && (
           <p
             suppressHydrationWarning
-            className={cn('text-[10px] mt-1.5 text-[oklch(0.34_0.006_280)]', isUser ? 'text-right pr-1' : 'text-left pl-1')}
+            className={cn(
+              'text-[10px] mt-1 text-[oklch(0.38_0.008_280)]',
+              isUser ? 'text-right' : 'text-left'
+            )}
           >
             {formatRelativeTime(message.timestamp)}
           </p>

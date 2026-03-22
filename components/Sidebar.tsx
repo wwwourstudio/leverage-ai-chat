@@ -141,18 +141,24 @@ const ChatCard = memo(function ChatCard({
     <div
       onClick={() => onSelectChat(chat.id)}
       className={cn(
-        'group relative rounded-xl cursor-pointer transition-all duration-200 overflow-hidden',
+        'group relative rounded-xl p-2.5 cursor-pointer transition-all duration-200 overflow-hidden',
         tagAccentClass(chat.tags),
         isActive
-          ? 'bg-[oklch(0.13_0.015_270)] border border-emerald-500/25 shadow-md shadow-emerald-900/20'
-          : 'bg-[oklch(0.10_0.01_280)] border border-[oklch(0.16_0.012_280)] hover:bg-[oklch(0.125_0.012_280)] hover:border-[oklch(0.24_0.018_280)]',
+          ? 'bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10 border border-blue-500/30 shadow-lg shadow-blue-500/10'
+          : 'bg-[oklch(0.10_0.01_280)] border border-[oklch(0.14_0.01_280)] hover:bg-[oklch(0.13_0.01_280)] hover:border-[oklch(0.22_0.01_280)]',
       )}
     >
-      {isActive && <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent" />}
-      <div className="p-2.5 flex items-start justify-between gap-2">
+      {isActive && (
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-blue-500/40 to-transparent" />
+      )}
+      <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
+          {/* Title row */}
           <div className="flex items-center gap-1.5 mb-1 group/title">
-            <MessageSquare className={cn('w-3 h-3 flex-shrink-0', isActive ? 'text-emerald-400' : 'text-[oklch(0.35_0.01_280)]')} />
+            <MessageSquare className={cn(
+              'w-3 h-3 flex-shrink-0 transition-colors',
+              isActive ? 'text-blue-400' : 'text-[oklch(0.35_0.01_280)]',
+            )} />
             {isEditing ? (
               <div className="flex-1 flex items-center gap-1">
                 <input
@@ -161,60 +167,82 @@ const ChatCard = memo(function ChatCard({
                   onChange={(e: any) => setEditingChatTitle(e.target.value)}
                   onKeyDown={(e: any) => onKeyDownChatTitle(e, chat.id)}
                   onBlur={() => onSaveChatTitle(chat.id)}
-                  className="flex-1 bg-[oklch(0.14_0.015_280)] border border-emerald-500/40 rounded-md px-2 py-0.5 text-xs font-bold text-white focus:outline-none focus:ring-1 focus:ring-emerald-500/30"
+                  className="flex-1 bg-[oklch(0.14_0.015_280)] border border-blue-500/50 rounded-md px-2 py-0.5 text-xs font-bold text-white focus:outline-none focus:ring-1 focus:ring-blue-500/40"
                   autoFocus
                   onClick={(e: any) => e.stopPropagation()}
                 />
-                <button onClick={(e: any) => { e.stopPropagation(); onSaveChatTitle(chat.id); }} className="p-0.5 hover:bg-[oklch(0.18_0.01_280)] rounded">
+                <button
+                  onClick={(e: any) => { e.stopPropagation(); onSaveChatTitle(chat.id); }}
+                  className="p-0.5 hover:bg-[oklch(0.18_0.01_280)] rounded transition-all"
+                >
                   <CheckCircle className="w-3 h-3 text-emerald-400" />
                 </button>
               </div>
             ) : (
               <div className="flex-1 flex items-center gap-1 min-w-0">
-                <h3 className="text-[11px] font-semibold text-white truncate flex-1 leading-tight">{chat.title}</h3>
+                <h3 className="text-xs font-bold text-white truncate flex-1">{chat.title}</h3>
                 <button
                   onClick={(e: any) => onEditChatTitle(chat.id, chat.title, e)}
                   className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-[oklch(0.18_0.01_280)] rounded transition-all flex-shrink-0"
+                  title="Edit title"
                 >
-                  <Edit3 className="w-2.5 h-2.5 text-[oklch(0.38_0.01_280)] hover:text-white/60" />
+                  <Edit3 className="w-2.5 h-2.5 text-[oklch(0.40_0.01_280)] hover:text-blue-400" />
                 </button>
               </div>
             )}
           </div>
-          <p className="text-[10px] text-[oklch(0.40_0.008_280)] truncate mb-1.5 leading-snug pl-[18px]">
+
+          {/* Preview */}
+          <p className="text-[11px] text-[oklch(0.42_0.01_280)] truncate mb-1.5 leading-tight pl-[18px]">
             {chat.preview}
           </p>
+
+          {/* Tags + timestamp */}
           <div className="flex items-center justify-between gap-2 pl-[18px]">
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-wrap">
               {chat.tags.slice(0, 2).map((tag, i) => (
-                <span key={i} className="px-1.5 py-0.5 bg-[oklch(0.14_0.012_280)] border border-[oklch(0.20_0.014_280)] rounded text-[8px] font-bold text-[oklch(0.42_0.015_280)] uppercase tracking-wider">
+                <span
+                  key={i}
+                  className="px-1.5 py-0.5 bg-[oklch(0.13_0.01_280)] border border-[oklch(0.18_0.01_280)] rounded text-[9px] font-semibold text-[oklch(0.40_0.01_280)] uppercase tracking-wide"
+                >
                   {tag}
                 </span>
               ))}
             </div>
-            <span suppressHydrationWarning className="text-[9px] text-[oklch(0.32_0.008_280)] whitespace-nowrap">
+            <span suppressHydrationWarning className="text-[9px] text-[oklch(0.32_0.01_280)] whitespace-nowrap">
               {formatRelativeTime(chat.timestamp)}
             </span>
           </div>
         </div>
-        <div className="flex flex-col gap-0.5 shrink-0 mt-0.5">
+
+        {/* Action buttons */}
+        <div className="flex flex-col gap-0.5 flex-shrink-0">
           <button
             onClick={(e: any) => onStarChat(chat.id, e)}
-            className={cn('p-1 rounded-md hover:bg-[oklch(0.16_0.01_280)] transition-all', chat.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100')}
+            className={cn(
+              'p-1 rounded-md hover:bg-[oklch(0.16_0.01_280)] transition-all',
+              chat.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+            )}
+            title={chat.starred ? 'Unstar' : 'Star'}
           >
-            <Star className={cn('w-3 h-3', chat.starred ? 'text-yellow-400 fill-yellow-400' : 'text-[oklch(0.38_0.01_280)]')} />
+            <Star className={cn(
+              'w-3 h-3',
+              chat.starred ? 'text-yellow-400 fill-yellow-400' : 'text-[oklch(0.40_0.01_280)]',
+            )} />
           </button>
           <button
             onClick={(e: any) => onDeleteChat(chat.id, e)}
-            className="p-1 rounded-md hover:bg-red-950/40 opacity-0 group-hover:opacity-100 transition-all"
+            className="p-1 rounded-md hover:bg-[oklch(0.16_0.01_280)] opacity-0 group-hover:opacity-100 transition-all"
+            title="Delete"
           >
-            <Trash2 className="w-3 h-3 text-[oklch(0.36_0.01_280)] hover:text-red-400 transition-colors" />
+            <Trash2 className="w-3 h-3 text-[oklch(0.38_0.01_280)] hover:text-red-400 transition-colors" />
           </button>
         </div>
       </div>
     </div>
   );
 });
+
 /** Format timestamp relative to now */
 function formatRelativeTime(date: Date): string {
   const now = Date.now();

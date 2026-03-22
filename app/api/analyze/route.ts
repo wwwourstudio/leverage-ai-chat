@@ -29,6 +29,20 @@ import { logger, LogCategory } from '@/lib/logger';
 import { getMarketIntelligenceSummary } from '@/lib/market-intelligence';
 import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
 
+// ── Prediction market / political detection constants ─────────────────────────
+// Used by Layer -2 sport detection — checked FIRST before any sports signals.
+// Prevents stale client sport context (e.g. 'nfl') from poisoning Kalshi queries.
+const MARKET_SIGNALS = [
+  'kalshi', 'polymarket', 'prediction market', 'prediction markets',
+  'senate', 'senate seat', 'congress', 'house seat', 'governor',
+  'election market', 'ballot', 'referendum',
+  'fed rate', 'federal reserve', 'interest rate cut', 'fomc',
+  'recession', 'gdp growth', 'inflation rate',
+  'yes/no market', 'contract price', 'implied probability',
+  'political market', 'event contract', 'will trump', 'will biden',
+  'will democrats', 'will republicans',
+];
+
 // ── MLB parenthetical detection constants ────────────────────────────────────
 // Used by Layer -1 sport detection to parse patterns like "Juan Soto (NYM OF)"
 const MLB_TEAM_ABBREVS = new Set([
@@ -341,18 +355,29 @@ export async function POST(request: NextRequest) {
 
     let detectedSport: string | undefined;
 
-    // Layer -1: Parenthetical MLB team/position abbreviation detection (highest priority)
+    // Layer -2: Prediction markets / political detection (absolute highest priority)
+    // Prevents NFL/sports context bleed for Kalshi and political queries.
+    // Must run before any sports-layer so "Senate seat markets" never routes to NFL.
+    if (MARKET_SIGNALS.some(signal => msgLower.includes(signal))) {
+      detectedSport = 'markets';
+      console.log('[API/analyze] Detected category: prediction_markets (Layer -2)');
+    }
+
+    // Layer -1: Parenthetical MLB team/position abbreviation detection
     // Catches patterns like "Juan Soto (NYM OF)", "Gerrit Cole (NYY SP)", "Cal Raleigh (SEA C)"
-    const parenMatches = [...userMessage.matchAll(/\(([^)]+)\)/g)];
-    for (const match of parenMatches) {
-      const tokens = match[1].trim().split(/\s+/);
-      for (const token of tokens) {
-        if (MLB_TEAM_ABBREVS.has(token) || MLB_POSITION_ABBREVS.has(token)) {
-          detectedSport = 'mlb';
-          break;
+    // Skip if Layer -2 already identified a prediction market (don't override 'markets' with 'mlb')
+    if (!detectedSport) {
+      const parenMatches = [...userMessage.matchAll(/\(([^)]+)\)/g)];
+      for (const match of parenMatches) {
+        const tokens = match[1].trim().split(/\s+/);
+        for (const token of tokens) {
+          if (MLB_TEAM_ABBREVS.has(token) || MLB_POSITION_ABBREVS.has(token)) {
+            detectedSport = 'mlb';
+            break;
+          }
         }
+        if (detectedSport) break;
       }
-      if (detectedSport) break;
     }
 
     // Layer 0: MLB force-lock — highest priority
@@ -386,8 +411,15 @@ export async function POST(request: NextRequest) {
       inferredSport = detectedSport;
     }
 
-    // Merge inferred sport back into context so downstream handlers pick it up
-    if (inferredSport) {
+    // Merge inferred sport back into context so downstream handlers pick it up.
+    // 'markets' is a virtual sport used only for routing — do NOT set context.sport
+    // to 'markets' because sports-card handlers don't know that key. Instead,
+    // flag as a political market and clear stale sport so Kalshi routing fires.
+    if (inferredSport === 'markets') {
+      context.isPoliticalMarket = true;
+      context.sport = undefined;
+      console.log('[API/analyze] Routing to Kalshi pipeline (sport=markets → isPoliticalMarket=true)');
+    } else if (inferredSport) {
       context.sport = inferredSport;
     }
     // ADP queries with no explicit sport default to MLB — this app is MLB-first.

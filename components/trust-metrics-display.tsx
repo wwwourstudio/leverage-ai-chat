@@ -31,6 +31,161 @@ interface TrustMetricsDisplayProps {
   showDetails?: boolean;
 }
 
+// ── Flag metadata: human-readable titles + explanations ──────────────────────
+
+const FLAG_META: Record<string, { title: string; explanation: string; showOddsChart?: boolean }> = {
+  odds_impossible: {
+    title: 'Invalid Odds Detected',
+    explanation:
+      'The AI cited moneyline odds that cannot exist at any real sportsbook. Valid US moneylines range from -100 to -3000 (favorites) or +100 to +3000 (underdogs). Values between -99 and +99 are mathematically undefined in this format.',
+    showOddsChart: true,
+  },
+  odds_range: {
+    title: 'Implausible Odds',
+    explanation:
+      'One or more odds values cited are outside the realistic range used by sportsbooks. This suggests the AI may have confused percentage probabilities (e.g. 32%) with moneyline odds (e.g. +320). Treat these specific numbers with caution.',
+    showOddsChart: true,
+  },
+  odds_mismatch: {
+    title: 'Odds Not Verified by Live Data',
+    explanation:
+      'The AI cited specific odds that don\'t match today\'s live bookmaker lines. The odds may be outdated, from a different game, or fabricated. Always confirm odds directly with your sportsbook before placing a bet.',
+  },
+  extreme_probability: {
+    title: 'Unrealistic Win Probability',
+    explanation:
+      'A win probability above 97% is essentially never valid in sports betting — even the heaviest favorites carry meaningful upset risk. This kind of claim is a strong signal of AI overconfidence or hallucination.',
+  },
+  high_probability: {
+    title: 'High Confidence Claim',
+    explanation:
+      'Win probabilities above 90% are rare even for heavy favorites. Verify this against the implied probability in the actual moneyline odds before acting on it.',
+  },
+  guaranty_language: {
+    title: '"Guaranteed" Language Used',
+    explanation:
+      'No sports bet is ever guaranteed. Phrases like "sure thing" or "can\'t lose" are hallucination signals — no legitimate analyst or model makes such claims.',
+  },
+};
+
+function getFlagMeta(type: string) {
+  return (
+    FLAG_META[type] ?? {
+      title: type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+      explanation: '',
+    }
+  );
+}
+
+/** Mini visual showing the valid moneyline range vs an invalid zone */
+function OddsRangeChart({ badValues }: { badValues: number[] }) {
+  return (
+    <div className="mt-2 rounded-md bg-gray-900/60 border border-gray-700/40 p-2.5">
+      <p className="text-[9px] font-semibold text-gray-400 mb-1.5 uppercase tracking-wide">How moneyline odds work</p>
+
+      {/* Range bar */}
+      <div className="relative flex items-center gap-0.5 h-5 text-[8px]">
+        {/* Favorite side (negative) */}
+        <div className="flex-1 h-3 rounded-l bg-emerald-600/50 border border-emerald-500/40 flex items-center justify-center text-emerald-300 font-mono">
+          -3000 → -100
+        </div>
+        {/* Dead zone */}
+        <div className="w-16 h-3 bg-red-600/60 border border-red-500/50 flex items-center justify-center text-red-300 font-mono text-[7px]">
+          -99…+99 ✗
+        </div>
+        {/* Underdog side (positive) */}
+        <div className="flex-1 h-3 rounded-r bg-emerald-600/50 border border-emerald-500/40 flex items-center justify-center text-emerald-300 font-mono">
+          +100 → +3000
+        </div>
+      </div>
+
+      <div className="flex justify-between mt-1 text-[8px] text-gray-500">
+        <span className="text-emerald-500">Heavy favorite</span>
+        <span className="text-red-400 font-semibold">Invalid zone</span>
+        <span className="text-emerald-500">Heavy underdog</span>
+      </div>
+
+      {/* The flagged values */}
+      {badValues.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {badValues.map((v) => (
+            <span key={v} className="px-1.5 py-0.5 rounded bg-red-500/20 border border-red-500/40 text-red-300 font-mono text-[9px]">
+              {v > 0 ? '+' : ''}{v} ✗
+            </span>
+          ))}
+        </div>
+      )}
+
+      <p className="text-[8px] text-gray-500 mt-1.5">
+        Favorites are listed as negative (e.g. <span className="text-gray-300 font-mono">-150</span>), underdogs as positive (e.g. <span className="text-gray-300 font-mono">+130</span>). A value like <span className="text-red-400 font-mono">-49</span> has no meaning in this format.
+      </p>
+    </div>
+  );
+}
+
+/** Extract the bad odds values from a flag message, e.g. "-49, -32, -29" → [-49, -32, -29] */
+function extractBadOddsFromMessage(message: string): number[] {
+  const matches = message.match(/[+-]?\d+/g);
+  return matches ? matches.map(Number).filter((n) => Math.abs(n) < 100) : [];
+}
+
+/** Groups odds_impossible flags into one block, renders all other flags individually */
+function FlagsList({ flags }: { flags: Array<{ type: string; message: string; severity: 'info' | 'warning' | 'error' }> }) {
+  // Collect all impossible/implausible odds values into one chart
+  const oddsFlags = flags.filter((f) => f.type === 'odds_impossible' || f.type === 'odds_range');
+  const otherFlags = flags.filter((f) => f.type !== 'odds_impossible' && f.type !== 'odds_range');
+
+  const allBadOdds: number[] = [];
+  for (const f of oddsFlags) {
+    allBadOdds.push(...extractBadOddsFromMessage(f.message));
+  }
+
+  const renderFlag = (flag: { type: string; message: string; severity: 'info' | 'warning' | 'error' }, i: number) => {
+    const meta = getFlagMeta(flag.type);
+    const fc =
+      flag.severity === 'error'
+        ? 'bg-red-500/10 border-red-500/30 text-red-400'
+        : flag.severity === 'warning'
+          ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
+          : 'bg-blue-500/10 border-blue-500/30 text-blue-400';
+    return (
+      <div key={i} className={`rounded-lg border px-2.5 py-2 text-[10px] ${fc}`}>
+        <div className="flex items-center gap-1.5 font-semibold mb-0.5">
+          <AlertTriangle className="w-3 h-3 shrink-0" />
+          {meta.title}
+        </div>
+        {meta.explanation && (
+          <p className="text-[9px] opacity-80 leading-relaxed">{meta.explanation}</p>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-1.5">
+      {/* Grouped odds flags */}
+      {oddsFlags.length > 0 && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-2 text-[10px] text-red-400">
+          <div className="flex items-center gap-1.5 font-semibold mb-0.5">
+            <AlertTriangle className="w-3 h-3 shrink-0" />
+            AI Cited Invalid Odds
+          </div>
+          <p className="text-[9px] opacity-80 leading-relaxed">
+            The AI mentioned specific odds that don't exist in any real sportsbook. Valid US moneylines are always{' '}
+            <span className="font-mono text-red-300">-100</span> or lower (favorites) or{' '}
+            <span className="font-mono text-red-300">+100</span> or higher (underdogs).
+            Values between -99 and +99 are not valid odds — the AI likely confused odds with percentages or made them up.
+          </p>
+          <OddsRangeChart badValues={[...new Set(allBadOdds)]} />
+        </div>
+      )}
+
+      {/* All other flags */}
+      {otherFlags.map((flag, i) => renderFlag(flag, i))}
+    </div>
+  );
+}
+
 const METRIC_DEFS = [
   {
     key: 'benfordIntegrity' as const,
@@ -250,24 +405,7 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
 
       {/* ── Flags ────────────────────────────────────────────── */}
       {metrics.flags && metrics.flags.length > 0 && (
-        <div className="space-y-1">
-          {metrics.flags.map((flag, i) => {
-            const fc = flag.severity === 'error'
-              ? 'bg-red-500/10 border-red-500/30 text-red-400'
-              : flag.severity === 'warning'
-                ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
-                : 'bg-blue-500/10 border-blue-500/30 text-blue-400';
-            return (
-              <div key={i} className={`flex items-start gap-2 px-2.5 py-1.5 rounded-lg border text-[10px] ${fc}`}>
-                <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-bold capitalize">{flag.type}: </span>
-                  <span>{flag.message}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <FlagsList flags={metrics.flags} />
       )}
 
       {/* ── Attribution ──────────────────────────────────────── */}

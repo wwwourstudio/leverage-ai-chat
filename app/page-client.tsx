@@ -2114,12 +2114,16 @@ No preamble. Start directly with section 1.`;
     if (t.includes('mlb') || t.includes('baseball')) return 'mlb';
     if (t.includes('nhl') || t.includes('hockey')) return 'nhl';
     if (t.includes('ncaa')) return t.includes('basketball') ? 'ncaab' : 'ncaaf';
-    // Deep scan: team names, positions, sport-specific terms
-    // MLB checked before NBA/NFL to catch "(ATH 1B)", "Dodgers", "strikeout", etc.
-    if (MLB_KEYWORDS.some(k => t.includes(k))) return 'mlb';
+    // Deep scan: team names, positions, sport-specific terms.
+    // NBA/NFL/NHL team names are checked BEFORE MLB because some abbreviations
+    // overlap across leagues (e.g. ATL=Braves/Hawks, MIA=Marlins/Heat, HOU=Astros/Rockets).
+    // NBA/NFL team full names (lakers, warriors, chiefs, eagles) are unambiguous and
+    // fire here. MLB-specific position codes (1B, SP, RP) and stat terms (ERA, WHIP)
+    // are unique to baseball and still correctly identify MLB queries when checked last.
     if (NBA_KEYWORDS.some(k => t.includes(k))) return 'nba';
     if (NFL_KEYWORDS.some(k => t.includes(k))) return 'nfl';
     if (NHL_KEYWORDS.some(k => t.includes(k))) return 'nhl';
+    if (MLB_KEYWORDS.some(k => t.includes(k))) return 'mlb';
     return null;
   };
 

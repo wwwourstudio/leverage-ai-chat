@@ -273,22 +273,37 @@ export async function POST(request: NextRequest) {
     // team nicknames and infer the sport so card generation and model routing
     // use the correct sport context instead of falling through to 'all'.
     const TEAM_TO_SPORT: Record<string, string> = {
-      // NBA
+      // NBA — unambiguous team nicknames only
       cavaliers: 'nba', cavs: 'nba', mavericks: 'nba', mavs: 'nba',
       lakers: 'nba', celtics: 'nba', warriors: 'nba', bucks: 'nba',
       heat: 'nba', knicks: 'nba', nets: 'nba', sixers: 'nba',
       suns: 'nba', nuggets: 'nba', clippers: 'nba', thunder: 'nba',
-      // NFL
+      raptors: 'nba', timberwolves: 'nba', pelicans: 'nba', grizzlies: 'nba',
+      rockets: 'nba', spurs: 'nba', jazz: 'nba', magic: 'nba',
+      wizards: 'nba', pistons: 'nba', pacers: 'nba', hornets: 'nba',
+      '76ers': 'nba', blazers: 'nba',
+      // NFL — unambiguous nicknames only (giants/cardinals/panthers/rangers are ambiguous)
       cowboys: 'nfl', patriots: 'nfl', chiefs: 'nfl', eagles: 'nfl',
       packers: 'nfl', ravens: 'nfl', bills: 'nfl', rams: 'nfl',
-      niners: 'nfl', broncos: 'nfl', steelers: 'nfl', bengals: 'nfl',
-      // MLB
+      niners: 'nfl', '49ers': 'nfl', broncos: 'nfl', steelers: 'nfl',
+      bengals: 'nfl', buccaneers: 'nfl', jaguars: 'nfl', titans: 'nfl',
+      colts: 'nfl', texans: 'nfl', raiders: 'nfl', chargers: 'nfl',
+      commanders: 'nfl', falcons: 'nfl', saints: 'nfl', seahawks: 'nfl',
+      // MLB — unambiguous nicknames only (giants/cardinals removed — ambiguous with NFL)
       yankees: 'mlb', dodgers: 'mlb', cubs: 'mlb', astros: 'mlb',
-      braves: 'mlb', mets: 'mlb', 'red sox': 'mlb', cardinals: 'mlb',
-      giants: 'mlb', phillies: 'mlb', padres: 'mlb', mariners: 'mlb',
-      // NHL
-      penguins: 'nhl', rangers: 'nhl', bruins: 'nhl', lightning: 'nhl',
-      oilers: 'nhl', avalanche: 'nhl', panthers: 'nhl', maple: 'nhl',
+      braves: 'mlb', mets: 'mlb', 'red sox': 'mlb',
+      phillies: 'mlb', padres: 'mlb', mariners: 'mlb', guardians: 'mlb',
+      brewers: 'mlb', reds: 'mlb', pirates: 'mlb', nationals: 'mlb',
+      marlins: 'mlb', royals: 'mlb', twins: 'mlb', diamondbacks: 'mlb',
+      rockies: 'mlb', orioles: 'mlb',
+      // NHL — unambiguous nicknames only (panthers removed — ambiguous with NFL)
+      penguins: 'nhl', bruins: 'nhl', lightning: 'nhl',
+      oilers: 'nhl', avalanche: 'nhl', 'maple leafs': 'nhl', canucks: 'nhl',
+      flames: 'nhl', jets: 'nhl', predators: 'nhl', blues: 'nhl',
+      // Note: 'rangers' → NHL Rangers vs MLB Rangers (ambiguous, omitted)
+      // Note: 'giants' → NFL Giants vs MLB Giants (ambiguous, omitted)
+      // Note: 'cardinals' → NFL Cardinals vs MLB Cardinals (ambiguous, omitted)
+      // Note: 'panthers' → NFL Panthers vs NHL Panthers (ambiguous, omitted)
     };
 
     let inferredSport = context?.sport && context.sport !== 'none' ? context.sport : undefined;

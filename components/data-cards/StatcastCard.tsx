@@ -329,9 +329,11 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
 
         {/* ── Footer ── */}
         <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between gap-2">
-          {/* Statcast logo + recency note */}
+          {/* Statcast source badge + recency note */}
           <div className="flex items-center gap-1.5">
-            <img src="/statcast-logo.png" alt="Statcast" className="h-3.5 w-auto opacity-75" />
+            <span className="text-[9px] font-bold uppercase tracking-widest text-gray-500 border border-gray-700/40 rounded px-1.5 py-0.5">
+              Baseball Savant
+            </span>
             {data.last_updated && (
               <span className="text-[9px] text-gray-600">· {data.last_updated}</span>
             )}

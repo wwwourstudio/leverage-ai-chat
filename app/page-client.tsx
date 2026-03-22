@@ -1719,14 +1719,6 @@ No preamble. Start directly with section 1.`;
       setVerifyStage('analyzing');
       const analysisResult = await fetchAnalysis();
 
-      console.log('[v0] Analysis:', {
-        ok: analysisResult.success,
-        cards: analysisResult.cards?.length ?? 0,
-        confidence: analysisResult.trustMetrics?.finalConfidence,
-        fallback: analysisResult.useFallback,
-        clientCards: availableCards.length,
-      });
-
       // Handle API errors with smart fallback
       const processingTime = Date.now() - startTime;
       let newMessage: Message;
@@ -1789,6 +1781,15 @@ No preamble. Start directly with section 1.`;
         const responseCards = (analysisResult.cards && analysisResult.cards.length > 0)
           ? analysisResult.cards
           : availableCards;
+
+        console.log('[v0] Analysis:', {
+          ok: analysisResult.success,
+          serverCards: analysisResult.cards?.length ?? 0,
+          responseCards: responseCards.length,   // cards that will actually render
+          fallbackCards: availableCards.length,  // pre-existing cards used only if server returns none
+          confidence: analysisResult.trustMetrics?.finalConfidence,
+          fallback: analysisResult.useFallback,
+        });
 
         // Enrich trust metrics with real metadata so TrustMetricsDisplay can show
         // sources, model name, processing time, and live-data badges.

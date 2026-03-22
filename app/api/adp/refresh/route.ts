@@ -1,16 +1,13 @@
 /**
  * GET /api/adp/refresh
  *
- * Seeds Supabase nfbc_adp with live ADP from FantasyPros and ESPN.
+ * Seeds Supabase nfbc_adp from the local CSV or static fallback data.
  * Called by Vercel Cron at 06:00 UTC daily.
  *
  * Strategy for each sport:
- *  1. Try FantasyPros CSV export (consensus ADP, most widely-used source).
- *  2. If FantasyPros fails, try ESPN Fantasy JSON API.
- *  3. If both live sources fail and DB is empty, seed from static fallback.
- *
- * Live data always overwrites stale cron-seeded rows so ADP stays current.
- * Scraper logic lives in lib/adp-fetcher.server.ts (shared with on-demand path).
+ *  1. If DB already has data, keep it (skip re-seed to avoid unnecessary writes).
+ *  2. If DB is empty, seed from the local CSV (public/adp/ADP.csv) via getADPData()
+ *     which reads CSV → static fallback in that order.
  *
  * Auth: validated by CRON_SECRET header (Vercel env var).
  */
@@ -22,7 +19,6 @@ import {
   loadADPFromSupabase,
   clearADPCache,
 } from '@/lib/adp-data';
-import { fetchLiveADP } from '@/lib/adp-fetcher.server';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -44,37 +40,28 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   for (const sport of ['mlb', 'nfl'] as const) {
     try {
-      let source: string;
-      let players;
+      // If DB already has data for this sport, keep it — no need to re-seed
+      const existing = await loadADPFromSupabase(sport, true);
+      if (existing && existing.length > 0) {
+        results[sport] = { seeded: existing.length, skipped: true, source: 'supabase_existing' };
+        console.log(`[v0] [ADP/refresh] ${sport.toUpperCase()}: DB has ${existing.length} rows — keeping existing`);
+        continue;
+      }
 
-      try {
-        const live = await fetchLiveADP(sport);
-        players = live.players;
-        source  = live.source;
-      } catch (liveErr) {
-        // Both live sources failed — only seed static if DB is empty
-        console.warn(`[v0] [ADP/refresh] Both live sources failed for ${sport.toUpperCase()}:`, liveErr instanceof Error ? liveErr.message : liveErr);
-        const existing = await loadADPFromSupabase(sport, true);
-        if (existing && existing.length > 0) {
-          results[sport] = { seeded: existing.length, skipped: true, source: 'supabase_existing' };
-          console.log(`[v0] [ADP/refresh] ${sport.toUpperCase()}: DB has ${existing.length} rows — keeping existing`);
-          continue;
-        }
-        // DB is also empty — seed static fallback
-        if (sport === 'nfl') {
-          const { getNFLADPData } = await import('@/lib/nfl-adp-data');
-          players = await getNFLADPData(true);
-        } else {
-          players = await getADPData(true);
-        }
-        source = 'static_fallback';
+      // DB is empty — seed from local CSV or static fallback
+      let players;
+      if (sport === 'nfl') {
+        const { getNFLADPData } = await import('@/lib/nfl-adp-data');
+        players = await getNFLADPData(true);
+      } else {
+        players = await getADPData(true);
       }
 
       if (players.length > 0) {
         await saveADPToSupabase(players, sport);
         clearADPCache();
-        results[sport] = { seeded: players.length, skipped: false, source };
-        console.log(`[v0] [ADP/refresh] ${sport.toUpperCase()}: saved ${players.length} players from ${source}`);
+        results[sport] = { seeded: players.length, skipped: false, source: 'local_csv_or_static' };
+        console.log(`[v0] [ADP/refresh] ${sport.toUpperCase()}: seeded ${players.length} players from local data`);
       } else {
         results[sport] = { seeded: 0, skipped: false, source: 'empty' };
       }

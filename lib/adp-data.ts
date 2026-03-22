@@ -286,10 +286,6 @@ let adpCache: NFBCPlayer[] | null = null;
 let lastFetched = 0;
 let adpFromDB = false;
 
-// Cooldown for live-fetch attempts: 15 minutes between retries when both
-// FantasyPros and ESPN are unreachable (avoids hammering external APIs).
-const LIVE_FETCH_COOLDOWN_MS = 15 * 60 * 1000;
-let lastLiveFetchAttempt = 0;
 
 // ── Delimiter-agnostic parser ─────────────────────────────────────────────────
 
@@ -618,29 +614,10 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
     return csvData;
   }
 
-  // 3. Live fetch from FantasyPros / ESPN (server-side only, respects 15-min cooldown)
-  if (typeof window === 'undefined' && now - lastLiveFetchAttempt > LIVE_FETCH_COOLDOWN_MS) {
-    lastLiveFetchAttempt = now;
-    try {
-      const { fetchLiveADP } = await import('@/lib/adp-fetcher.server');
-      const { players, source } = await fetchLiveADP('mlb');
-      if (players.length > 0) {
-        saveADPToSupabase(players, 'mlb').catch(() => {});
-        adpCache = players;
-        lastFetched = now;
-        adpFromDB = false;
-        console.log(`[v0] [ADP] Live fetch succeeded (${source}): ${players.length} MLB players`);
-        return players;
-      }
-    } catch (err) {
-      console.warn('[v0] [ADP] Live fetch failed:', err instanceof Error ? err.message : err);
-    }
-  }
-
-  // 4. Hardcoded static fallback
+  // 3. Hardcoded static fallback
   console.log(
-    `[v0] [ADP] All sources failed — serving static fallback (${STATIC_FALLBACK_PLAYERS.length} players). ` +
-    `To use your own data, place ADP.csv at public/adp/ADP.csv or public/adp - ADP.csv`,
+    `[v0] [ADP] No CSV or DB data — using static fallback (${STATIC_FALLBACK_PLAYERS.length} players). ` +
+    `Place ADP.csv at public/adp/ADP.csv to use local data.`,
   );
   adpFromDB = false;
   return STATIC_FALLBACK_PLAYERS;

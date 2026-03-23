@@ -534,6 +534,31 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     return updated;
   };
 
+  // Restore fantasy league from Supabase (called on login / auth change)
+  const loadFantasyLeagueFromDB = async () => {
+    try {
+      const res = await fetch('/api/fantasy/leagues');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.leagues) && data.leagues.length > 0) {
+        const dbLeague = data.leagues[0];
+        const userTeam = (dbLeague.fantasy_teams ?? []).find((t: any) => t.is_user_team);
+        const restored: FantasyLeague = {
+          sport: dbLeague.sport,
+          platform: dbLeague.platform,
+          teams: dbLeague.league_size,
+          leagueType: dbLeague.scoring_type,
+          teamName: userTeam?.team_name || dbLeague.name,
+          leagueName: dbLeague.name,
+          setupComplete: true,
+          scoring: dbLeague.scoring_type === 'ppr' ? 'PPR'
+                 : dbLeague.scoring_type === 'half_ppr' ? 'Half-PPR' : 'Standard',
+        };
+        setFantasyLeague(restored);
+        localStorage.setItem('leverage_fantasy_league', JSON.stringify(restored));
+      }
+    } catch { /* non-critical — localStorage fallback already loaded */ }
+  };
+
   // Check Supabase auth session on mount and sync credits
   useEffect(() => {
     (async () => {
@@ -549,6 +574,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           });
           // Load profile ID for credit sync (credits/instructions come via the page-load /api/init)
           loadProfileId(user.id);
+          // Restore fantasy league from DB (overrides localStorage if a DB record exists)
+          loadFantasyLeagueFromDB();
           // Load persisted chat threads from Supabase
           loadThreads().then(threads => {
             if (threads.length > 0) {
@@ -588,6 +615,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             // Load profile ID + refresh credits/instructions via /api/init on auth change
             loadProfileId(session.user.id);
             loadInitData();
+            // Restore fantasy league from DB on sign-in
+            loadFantasyLeagueFromDB();
           } else {
             setIsLoggedIn(false);
             setUser(null);
@@ -4448,7 +4477,7 @@ No preamble. Start directly with section 1.`;
                         ))}
                       </div>
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           if (!fantasySetupData.teamName?.trim()) return;
                           const league: FantasyLeague = {
                             sport: fantasySetupData.sport || 'nfl',
@@ -4461,6 +4490,26 @@ No preamble. Start directly with section 1.`;
                             // legacy compat
                             scoring: fantasySetupData.leagueType === 'ppr' ? 'PPR' : fantasySetupData.leagueType === 'half_ppr' ? 'Half-PPR' : 'Standard',
                           };
+                          // Persist to Supabase when logged in
+                          if (isLoggedIn) {
+                            try {
+                              const res = await fetch('/api/fantasy/leagues', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  name: league.leagueName,
+                                  sport: league.sport,
+                                  platform: league.platform,
+                                  leagueSize: league.teams,
+                                  scoringType: league.leagueType,
+                                  teams: [{ name: league.teamName, draftPosition: 1 }],
+                                }),
+                              });
+                              if (!res.ok) console.warn('[fantasy] League DB save failed:', res.status);
+                            } catch (err) {
+                              console.warn('[fantasy] League DB save error:', err);
+                            }
+                          }
                           localStorage.setItem('leverage_fantasy_league', JSON.stringify(league));
                           setFantasyLeague(league);
                           setFantasySetupStep(0);

@@ -1114,7 +1114,12 @@ export async function POST(request: NextRequest) {
         if (resolvedPlayerName && !context.playerName) {
           console.log(`[API/analyze] parseIntent extracted playerName="${resolvedPlayerName}" from query`);
         }
-        cardFetchPromise = generateContextualCards('player', context.sport ?? undefined, 3, false, undefined, { playerName: resolvedPlayerName }).catch(() => []);
+        cardFetchPromise = Promise.all([
+          generateContextualCards('player', context.sport ?? undefined, 1, false, undefined, { playerName: resolvedPlayerName }),
+          generateContextualCards('betting', context.sport ?? undefined, 3).catch(() => []),
+        ]).then(([playerCards, supplementaryCards]) =>
+          [...playerCards, ...supplementaryCards].slice(0, 6)
+        ).catch(() => []);
 
       } else if (!context.isPoliticalMarket && (context.isSportsQuery || context.hasBettingIntent)) {
         // Betting/sports with no client odds: fetch from server
@@ -1865,7 +1870,14 @@ export async function POST(request: NextRequest) {
           let cards: InsightCard[] = await cardPromise.catch(() => []);
 
           if (pendingHRPredictionCard) cards = [pendingHRPredictionCard, ...cards.slice(0, 4)];
-          if (pendingADPCard) cards = [pendingADPCard, ...cards.slice(0, 5)];
+          if (pendingADPCard) {
+            if (context.hasPlayerIntent) {
+              // Player card stays as hero; ADP card goes after it as a thumbnail
+              cards = [cards[0], pendingADPCard, ...cards.slice(1, 5)].filter(Boolean) as InsightCard[];
+            } else {
+              cards = [pendingADPCard, ...cards.slice(0, 5)];
+            }
+          }
           if (pendingADPUploadCard) cards = [...cards, pendingADPUploadCard];
 
           // MLB Statcast: parse Grok's JSON response into a card.

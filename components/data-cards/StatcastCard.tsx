@@ -2,6 +2,7 @@
 
 import { useState, memo } from 'react';
 import { AnalysisLightbox, type LightboxSection } from './AnalysisLightbox';
+import { getPlayerHeadshotUrl } from '@/lib/constants';
 
 // ---------------------------------------------------------------------------
 // Types (mirrors the JSON shape the MLB AI prompt returns)
@@ -249,6 +250,7 @@ function FlatDataMetrics({ data }: { data: Record<string, string | number> }) {
 
 export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero = false }: StatcastCardProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   const cardType   = (data.type ?? '').toLowerCase();
   const conf       = TYPE_CONFIG[cardType] ?? DEFAULT_TYPE_CONF;
@@ -258,6 +260,10 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
   const hasSummaryMetrics = Array.isArray(data.summary_metrics) && data.summary_metrics.length > 0;
   const sections: LightboxSection[] = data.lightbox?.sections ?? [];
   const hasLightbox = sections.length > 0;
+
+  const playerName = (data.data as Record<string, unknown> | undefined)?.playerName as string ?? data.title ?? '';
+  const headshotUrl = ((data.data as Record<string, unknown> | undefined)?.headshotUrl as string | null | undefined)
+    ?? getPlayerHeadshotUrl(playerName);
 
   return (
     <>
@@ -271,11 +277,20 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
           {/* Icon + breadcrumb + title */}
           <div className="flex items-center gap-2.5 min-w-0">
             <div
-              className={`flex items-center justify-center flex-shrink-0 rounded-xl ${conf.iconBg} border ${conf.accentBorder} ${
+              className={`flex items-center justify-center flex-shrink-0 rounded-xl ${conf.iconBg} border ${conf.accentBorder} overflow-hidden ${
                 isHero ? 'w-11 h-11 text-xl' : 'w-9 h-9 text-lg'
               }`}
             >
-              {conf.emoji}
+              {headshotUrl && !imgError ? (
+                <img
+                  src={headshotUrl}
+                  alt={playerName}
+                  className="w-full h-full object-cover"
+                  onError={() => setImgError(true)}
+                />
+              ) : (
+                conf.emoji
+              )}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 mb-0.5">
@@ -332,7 +347,10 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
           {/* Statcast source badge + recency note */}
           <div className="flex items-center gap-1.5">
             <span className="text-[9px] font-bold uppercase tracking-widest text-gray-500 border border-gray-700/40 rounded px-1.5 py-0.5">
-              Baseball Savant
+              {(data.data as Record<string, unknown> | undefined)?.sport === 'NFL' ? 'NFL Stats'
+                : (data.data as Record<string, unknown> | undefined)?.sport === 'NBA' ? 'NBA Stats'
+                : (data.data as Record<string, unknown> | undefined)?.sport === 'NHL' ? 'NHL Stats'
+                : 'Baseball Savant'}
             </span>
             {data.last_updated && (
               <span className="text-[9px] text-gray-600">· {data.last_updated}</span>

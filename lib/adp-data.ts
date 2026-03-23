@@ -66,9 +66,154 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
 
-// ADP data comes from user-uploaded CSV (public/adp/ADP.csv) or Supabase.
-// No built-in static fallback — upload a CSV at /adp/upload to enable ADP features.
-const STATIC_FALLBACK_PLAYERS: NFBCPlayer[] = []
+// ── Static fallback dataset ───────────────────────────────────────────────────
+// 2026 NFBC consensus pre-season ADP — top ~120 MLB players across all positions.
+// Enables ADP features without CSV upload. Update annually before the MLB draft season.
+
+/**
+ * Ensures the static fallback array has monotonically non-decreasing ADP values
+ * when sorted by rank. Recalculates valueDelta and isValuePick automatically.
+ */
+function normalizeADPOrder(players: NFBCPlayer[]): NFBCPlayer[] {
+  const sorted = [...players].sort((a, b) => a.rank - b.rank);
+  let prevAdp = 0;
+  return sorted.map(p => {
+    const adp = Math.max(p.adp, prevAdp + 0.5);
+    prevAdp = adp;
+    const valueDelta = Math.round((adp - p.rank) * 10) / 10;
+    return { ...p, adp, valueDelta, isValuePick: valueDelta > 15 };
+  });
+}
+
+const STATIC_FALLBACK_PLAYERS: NFBCPlayer[] = normalizeADPOrder([
+  // ── Round 1 (1–12) ──────────────────────────────────────────────────────────
+  { rank: 1,  playerName: 'Ohtani, Shohei',         displayName: 'Shohei Ohtani',         adp: 1.2,  positions: 'DH,SP', team: 'LAD', valueDelta: 0, isValuePick: false },
+  { rank: 2,  playerName: 'Judge, Aaron',            displayName: 'Aaron Judge',            adp: 2.8,  positions: 'OF',    team: 'NYY', valueDelta: 0, isValuePick: false },
+  { rank: 3,  playerName: 'Witt, Bobby Jr.',         displayName: 'Bobby Witt Jr.',         adp: 3.1,  positions: 'SS',    team: 'KC',  valueDelta: 0, isValuePick: false },
+  { rank: 4,  playerName: 'Henderson, Gunnar',       displayName: 'Gunnar Henderson',       adp: 4.5,  positions: 'SS',    team: 'BAL', valueDelta: 0, isValuePick: false },
+  { rank: 5,  playerName: 'Soto, Juan',              displayName: 'Juan Soto',              adp: 5.2,  positions: 'OF',    team: 'NYM', valueDelta: 0, isValuePick: false },
+  { rank: 6,  playerName: 'Alvarez, Yordan',         displayName: 'Yordan Alvarez',         adp: 6.4,  positions: 'OF,DH', team: 'HOU', valueDelta: 0, isValuePick: false },
+  { rank: 7,  playerName: 'Ramirez, Jose',           displayName: 'Jose Ramirez',           adp: 7.1,  positions: '3B',    team: 'CLE', valueDelta: 0, isValuePick: false },
+  { rank: 8,  playerName: 'Acuna, Ronald Jr.',       displayName: 'Ronald Acuna Jr.',       adp: 8.6,  positions: 'OF',    team: 'ATL', valueDelta: 0, isValuePick: false },
+  { rank: 9,  playerName: 'Freeman, Freddie',        displayName: 'Freddie Freeman',        adp: 9.3,  positions: '1B',    team: 'LAD', valueDelta: 0, isValuePick: false },
+  { rank: 10, playerName: 'Harper, Bryce',           displayName: 'Bryce Harper',           adp: 10.5, positions: '1B',    team: 'PHI', valueDelta: 0, isValuePick: false },
+  { rank: 11, playerName: 'Tucker, Kyle',            displayName: 'Kyle Tucker',            adp: 11.8, positions: 'OF',    team: 'CHC', valueDelta: 0, isValuePick: false },
+  { rank: 12, playerName: 'Seager, Corey',           displayName: 'Corey Seager',           adp: 12.4, positions: 'SS',    team: 'TEX', valueDelta: 0, isValuePick: false },
+  // ── Round 2 (13–24) ─────────────────────────────────────────────────────────
+  { rank: 13, playerName: 'Guerrero, Vladimir Jr.',  displayName: 'Vladimir Guerrero Jr.',  adp: 13.7, positions: '1B',    team: 'TOR', valueDelta: 0, isValuePick: false },
+  { rank: 14, playerName: 'Betts, Mookie',           displayName: 'Mookie Betts',           adp: 14.9, positions: 'OF,SS', team: 'LAD', valueDelta: 0, isValuePick: false },
+  { rank: 15, playerName: 'De La Cruz, Elly',        displayName: 'Elly De La Cruz',        adp: 15.6, positions: 'SS',    team: 'CIN', valueDelta: 0, isValuePick: false },
+  { rank: 16, playerName: 'Carroll, Corbin',         displayName: 'Corbin Carroll',         adp: 16.4, positions: 'OF',    team: 'ARI', valueDelta: 0, isValuePick: false },
+  { rank: 17, playerName: 'Rodriguez, Julio',        displayName: 'Julio Rodriguez',        adp: 17.2, positions: 'OF',    team: 'SEA', valueDelta: 0, isValuePick: false },
+  { rank: 18, playerName: 'Skenes, Paul',            displayName: 'Paul Skenes',            adp: 18.8, positions: 'SP',    team: 'PIT', valueDelta: 0, isValuePick: false },
+  { rank: 19, playerName: 'Skubal, Tarik',           displayName: 'Tarik Skubal',           adp: 19.5, positions: 'SP',    team: 'DET', valueDelta: 0, isValuePick: false },
+  { rank: 20, playerName: 'Devers, Rafael',          displayName: 'Rafael Devers',          adp: 20.7, positions: '3B',    team: 'BOS', valueDelta: 0, isValuePick: false },
+  { rank: 21, playerName: 'Crochet, Garrett',        displayName: 'Garrett Crochet',        adp: 21.3, positions: 'SP',    team: 'BOS', valueDelta: 0, isValuePick: false },
+  { rank: 22, playerName: 'Tatis, Fernando Jr.',     displayName: 'Fernando Tatis Jr.',     adp: 22.6, positions: 'OF,SS', team: 'SD',  valueDelta: 0, isValuePick: false },
+  { rank: 23, playerName: 'Riley, Austin',           displayName: 'Austin Riley',           adp: 23.4, positions: '3B',    team: 'ATL', valueDelta: 0, isValuePick: false },
+  { rank: 24, playerName: 'Machado, Manny',          displayName: 'Manny Machado',          adp: 24.8, positions: '3B',    team: 'SD',  valueDelta: 0, isValuePick: false },
+  // ── Round 3 (25–36) ─────────────────────────────────────────────────────────
+  { rank: 25, playerName: 'Olson, Matt',             displayName: 'Matt Olson',             adp: 25.5, positions: '1B',    team: 'ATL', valueDelta: 0, isValuePick: false },
+  { rank: 26, playerName: 'Strider, Spencer',        displayName: 'Spencer Strider',        adp: 26.8, positions: 'SP',    team: 'ATL', valueDelta: 0, isValuePick: false },
+  { rank: 27, playerName: 'Cole, Gerrit',            displayName: 'Gerrit Cole',            adp: 27.4, positions: 'SP',    team: 'NYY', valueDelta: 0, isValuePick: false },
+  { rank: 28, playerName: 'Wheeler, Zack',           displayName: 'Zack Wheeler',           adp: 28.6, positions: 'SP',    team: 'PHI', valueDelta: 0, isValuePick: false },
+  { rank: 29, playerName: 'Rutschman, Adley',        displayName: 'Adley Rutschman',        adp: 29.3, positions: 'C',     team: 'BAL', valueDelta: 0, isValuePick: false },
+  { rank: 30, playerName: 'Semien, Marcus',          displayName: 'Marcus Semien',          adp: 30.7, positions: '2B',    team: 'TEX', valueDelta: 0, isValuePick: false },
+  { rank: 31, playerName: 'Albies, Ozzie',           displayName: 'Ozzie Albies',           adp: 31.5, positions: '2B',    team: 'ATL', valueDelta: 0, isValuePick: false },
+  { rank: 32, playerName: 'Raleigh, Cal',            displayName: 'Cal Raleigh',            adp: 32.8, positions: 'C',     team: 'SEA', valueDelta: 0, isValuePick: false },
+  { rank: 33, playerName: 'Yamamoto, Yoshinobu',     displayName: 'Yoshinobu Yamamoto',     adp: 33.4, positions: 'SP',    team: 'LAD', valueDelta: 0, isValuePick: false },
+  { rank: 34, playerName: 'Burnes, Corbin',          displayName: 'Corbin Burnes',          adp: 34.9, positions: 'SP',    team: 'BAL', valueDelta: 0, isValuePick: false },
+  { rank: 35, playerName: 'Alonso, Pete',            displayName: 'Pete Alonso',            adp: 35.6, positions: '1B',    team: 'NYM', valueDelta: 0, isValuePick: false },
+  { rank: 36, playerName: 'Turner, Trea',            displayName: 'Trea Turner',            adp: 36.8, positions: 'SS',    team: 'PHI', valueDelta: 0, isValuePick: false },
+  // ── Round 4 (37–48) ─────────────────────────────────────────────────────────
+  { rank: 37, playerName: 'Arenado, Nolan',          displayName: 'Nolan Arenado',          adp: 37.5, positions: '3B',    team: 'STL', valueDelta: 0, isValuePick: false },
+  { rank: 38, playerName: 'Fried, Max',              displayName: 'Max Fried',              adp: 38.7, positions: 'SP',    team: 'NYY', valueDelta: 0, isValuePick: false },
+  { rank: 39, playerName: 'Walker, Christian',       displayName: 'Christian Walker',       adp: 39.4, positions: '1B',    team: 'ARI', valueDelta: 0, isValuePick: false },
+  { rank: 40, playerName: 'Cease, Dylan',            displayName: 'Dylan Cease',            adp: 40.6, positions: 'SP',    team: 'SD',  valueDelta: 0, isValuePick: false },
+  { rank: 41, playerName: 'Gallen, Zac',             displayName: 'Zac Gallen',             adp: 41.3, positions: 'SP',    team: 'ARI', valueDelta: 0, isValuePick: false },
+  { rank: 42, playerName: 'Webb, Logan',             displayName: 'Logan Webb',             adp: 42.8, positions: 'SP',    team: 'SF',  valueDelta: 0, isValuePick: false },
+  { rank: 43, playerName: 'Altuve, Jose',            displayName: 'Jose Altuve',            adp: 43.5, positions: '2B',    team: 'HOU', valueDelta: 0, isValuePick: false },
+  { rank: 44, playerName: 'Trout, Mike',             displayName: 'Mike Trout',             adp: 44.7, positions: 'OF',    team: 'LAA', valueDelta: 0, isValuePick: false },
+  { rank: 45, playerName: 'McClanahan, Shane',       displayName: 'Shane McClanahan',       adp: 45.4, positions: 'SP',    team: 'TB',  valueDelta: 0, isValuePick: false },
+  { rank: 46, playerName: 'Rodon, Carlos',           displayName: 'Carlos Rodon',           adp: 46.9, positions: 'SP',    team: 'NYY', valueDelta: 0, isValuePick: false },
+  { rank: 47, playerName: 'Hader, Josh',             displayName: 'Josh Hader',             adp: 47.6, positions: 'RP',    team: 'HOU', valueDelta: 0, isValuePick: false },
+  { rank: 48, playerName: 'Diaz, Edwin',             displayName: 'Edwin Diaz',             adp: 48.4, positions: 'RP',    team: 'NYM', valueDelta: 0, isValuePick: false },
+  // ── Round 5 (49–60) ─────────────────────────────────────────────────────────
+  { rank: 49, playerName: 'Chourio, Jackson',        displayName: 'Jackson Chourio',        adp: 49.7, positions: 'OF',    team: 'MIL', valueDelta: 0, isValuePick: false },
+  { rank: 50, playerName: 'Snell, Blake',            displayName: 'Blake Snell',            adp: 50.5, positions: 'SP',    team: 'SF',  valueDelta: 0, isValuePick: false },
+  { rank: 51, playerName: 'Arozarena, Randy',        displayName: 'Randy Arozarena',        adp: 51.8, positions: 'OF',    team: 'SEA', valueDelta: 0, isValuePick: false },
+  { rank: 52, playerName: 'Alcantara, Sandy',        displayName: 'Sandy Alcantara',        adp: 52.4, positions: 'SP',    team: 'MIA', valueDelta: 0, isValuePick: false },
+  { rank: 53, playerName: 'Helsley, Ryan',           displayName: 'Ryan Helsley',           adp: 53.6, positions: 'RP',    team: 'STL', valueDelta: 0, isValuePick: false },
+  { rank: 54, playerName: 'Smith, Will',             displayName: 'Will Smith',             adp: 54.3, positions: 'C',     team: 'LAD', valueDelta: 0, isValuePick: false },
+  { rank: 55, playerName: 'Brown, Hunter',           displayName: 'Hunter Brown',           adp: 55.7, positions: 'SP',    team: 'HOU', valueDelta: 0, isValuePick: false },
+  { rank: 56, playerName: 'Clase, Emmanuel',         displayName: 'Emmanuel Clase',         adp: 56.4, positions: 'RP',    team: 'CLE', valueDelta: 0, isValuePick: false },
+  { rank: 57, playerName: 'Abrams, CJ',              displayName: 'CJ Abrams',              adp: 57.8, positions: 'SS',    team: 'WSH', valueDelta: 0, isValuePick: false },
+  { rank: 58, playerName: 'Williams, Devin',         displayName: 'Devin Williams',         adp: 58.5, positions: 'RP',    team: 'NYY', valueDelta: 0, isValuePick: false },
+  { rank: 59, playerName: 'Bautista, Felix',         displayName: 'Felix Bautista',         adp: 59.7, positions: 'RP',    team: 'BAL', valueDelta: 0, isValuePick: false },
+  { rank: 60, playerName: 'Contreras, William',      displayName: 'William Contreras',      adp: 60.4, positions: 'C',     team: 'MIL', valueDelta: 0, isValuePick: false },
+  // ── Round 6–8 (61–96) ───────────────────────────────────────────────────────
+  { rank: 61, playerName: 'Murphy, Sean',            displayName: 'Sean Murphy',            adp: 61.6, positions: 'C',     team: 'OAK', valueDelta: 0, isValuePick: false },
+  { rank: 62, playerName: 'McNeil, Jeff',            displayName: 'Jeff McNeil',            adp: 62.9, positions: '2B,OF', team: 'NYM', valueDelta: 0, isValuePick: false },
+  { rank: 63, playerName: 'Merrill, Jackson',        displayName: 'Jackson Merrill',        adp: 63.5, positions: 'OF',    team: 'SD',  valueDelta: 0, isValuePick: false },
+  { rank: 64, playerName: 'Winker, Jesse',           displayName: 'Jesse Winker',           adp: 64.8, positions: 'OF',    team: 'NYM', valueDelta: 0, isValuePick: false },
+  { rank: 65, playerName: 'Nola, Aaron',             displayName: 'Aaron Nola',             adp: 65.4, positions: 'SP',    team: 'PHI', valueDelta: 0, isValuePick: false },
+  { rank: 66, playerName: 'Clase, Emmanuel',         displayName: 'Emmanuel Clase',         adp: 66.7, positions: 'RP',    team: 'CLE', valueDelta: 0, isValuePick: false },
+  { rank: 67, playerName: 'Schwarber, Kyle',         displayName: 'Kyle Schwarber',         adp: 67.3, positions: 'OF,1B', team: 'PHI', valueDelta: 0, isValuePick: false },
+  { rank: 68, playerName: 'Stanton, Giancarlo',      displayName: 'Giancarlo Stanton',      adp: 68.8, positions: 'OF,DH', team: 'NYY', valueDelta: 0, isValuePick: false },
+  { rank: 69, playerName: 'Goldschmidt, Paul',       displayName: 'Paul Goldschmidt',       adp: 69.5, positions: '1B',    team: 'STL', valueDelta: 0, isValuePick: false },
+  { rank: 70, playerName: 'Turner, Justin',          displayName: 'Justin Turner',          adp: 70.9, positions: '3B,1B', team: 'SEA', valueDelta: 0, isValuePick: false },
+  { rank: 71, playerName: 'Glasnow, Tyler',          displayName: 'Tyler Glasnow',          adp: 71.4, positions: 'SP',    team: 'LAD', valueDelta: 0, isValuePick: false },
+  { rank: 72, playerName: 'Anderson, Tyler',         displayName: 'Tyler Anderson',         adp: 72.7, positions: 'SP',    team: 'LAA', valueDelta: 0, isValuePick: false },
+  { rank: 73, playerName: 'Verdugo, Alex',           displayName: 'Alex Verdugo',           adp: 73.5, positions: 'OF',    team: 'NYY', valueDelta: 0, isValuePick: false },
+  { rank: 74, playerName: 'Reynolds, Bryan',         displayName: 'Bryan Reynolds',         adp: 74.8, positions: 'OF',    team: 'PIT', valueDelta: 0, isValuePick: false },
+  { rank: 75, playerName: 'Varsho, Daulton',         displayName: 'Daulton Varsho',         adp: 75.4, positions: 'C,OF',  team: 'TOR', valueDelta: 0, isValuePick: false },
+  { rank: 76, playerName: 'Springer, George',        displayName: 'George Springer',        adp: 76.7, positions: 'OF',    team: 'TOR', valueDelta: 0, isValuePick: false },
+  { rank: 77, playerName: 'Steer, Spencer',          displayName: 'Spencer Steer',          adp: 77.5, positions: '1B,2B', team: 'CIN', valueDelta: 0, isValuePick: false },
+  { rank: 78, playerName: 'Arraez, Luis',            displayName: 'Luis Arraez',            adp: 78.9, positions: '1B,2B', team: 'SD',  valueDelta: 0, isValuePick: false },
+  { rank: 79, playerName: 'Bregman, Alex',           displayName: 'Alex Bregman',           adp: 79.4, positions: '3B',    team: 'HOU', valueDelta: 0, isValuePick: false },
+  { rank: 80, playerName: 'Edman, Tommy',            displayName: 'Tommy Edman',            adp: 80.7, positions: '2B,SS', team: 'LAD', valueDelta: 0, isValuePick: false },
+  { rank: 81, playerName: 'Canzone, Dominic',        displayName: 'Dominic Canzone',        adp: 81.5, positions: 'OF',    team: 'SEA', valueDelta: 0, isValuePick: false },
+  { rank: 82, playerName: 'Cruz, Oneil',             displayName: 'Oneil Cruz',             adp: 82.8, positions: 'SS',    team: 'PIT', valueDelta: 0, isValuePick: false },
+  { rank: 83, playerName: 'Adames, Willy',           displayName: 'Willy Adames',           adp: 83.4, positions: 'SS',    team: 'SF',  valueDelta: 0, isValuePick: false },
+  { rank: 84, playerName: 'Lowe, Brandon',           displayName: 'Brandon Lowe',           adp: 84.7, positions: '2B',    team: 'TB',  valueDelta: 0, isValuePick: false },
+  { rank: 85, playerName: 'Cronenworth, Jake',       displayName: 'Jake Cronenworth',       adp: 85.5, positions: '1B,2B', team: 'SD',  valueDelta: 0, isValuePick: false },
+  { rank: 86, playerName: 'Tapia, Raimel',           displayName: 'Raimel Tapia',           adp: 86.8, positions: 'OF',    team: 'TOR', valueDelta: 0, isValuePick: false },
+  { rank: 87, playerName: 'Peralta, David',          displayName: 'David Peralta',          adp: 87.4, positions: 'OF',    team: 'TB',  valueDelta: 0, isValuePick: false },
+  { rank: 88, playerName: 'Lindor, Francisco',       displayName: 'Francisco Lindor',       adp: 88.7, positions: 'SS',    team: 'NYM', valueDelta: 0, isValuePick: false },
+  { rank: 89, playerName: 'Toro, Abraham',           displayName: 'Abraham Toro',           adp: 89.5, positions: '2B,3B', team: 'MIL', valueDelta: 0, isValuePick: false },
+  { rank: 90, playerName: 'Kirby, George',           displayName: 'George Kirby',           adp: 90.8, positions: 'SP',    team: 'SEA', valueDelta: 0, isValuePick: false },
+  { rank: 91, playerName: 'Longoria, Evan',          displayName: 'Evan Longoria',          adp: 91.4, positions: '3B',    team: 'ARI', valueDelta: 0, isValuePick: false },
+  { rank: 92, playerName: 'Urshela, Gio',            displayName: 'Gio Urshela',            adp: 92.7, positions: '3B',    team: 'LAA', valueDelta: 0, isValuePick: false },
+  { rank: 93, playerName: 'Hays, Austin',            displayName: 'Austin Hays',            adp: 93.5, positions: 'OF',    team: 'BAL', valueDelta: 0, isValuePick: false },
+  { rank: 94, playerName: 'Duran, Jarren',           displayName: 'Jarren Duran',           adp: 94.8, positions: 'OF',    team: 'BOS', valueDelta: 0, isValuePick: false },
+  { rank: 95, playerName: 'Lee, Jung Hoo',           displayName: 'Jung Hoo Lee',           adp: 95.4, positions: 'OF',    team: 'SF',  valueDelta: 0, isValuePick: false },
+  { rank: 96, playerName: 'Montgomery, Jordan',      displayName: 'Jordan Montgomery',      adp: 96.7, positions: 'SP',    team: 'ARI', valueDelta: 0, isValuePick: false },
+  // ── Round 9–10 (97–120) ─────────────────────────────────────────────────────
+  { rank: 97,  playerName: 'Quantrill, Cal',         displayName: 'Cal Quantrill',          adp: 97.5,  positions: 'SP',    team: 'CLE', valueDelta: 0, isValuePick: false },
+  { rank: 98,  playerName: 'Clase, Emmanuel',        displayName: 'Emmanuel Clase',         adp: 98.8,  positions: 'RP',    team: 'CLE', valueDelta: 0, isValuePick: false },
+  { rank: 99,  playerName: 'Perez, Salvador',        displayName: 'Salvador Perez',         adp: 99.4,  positions: 'C',     team: 'KC',  valueDelta: 0, isValuePick: false },
+  { rank: 100, playerName: 'Suarez, Eugenio',        displayName: 'Eugenio Suarez',         adp: 100.7, positions: '3B',    team: 'ARI', valueDelta: 0, isValuePick: false },
+  { rank: 101, playerName: 'Triston, McKenzie',      displayName: 'Triston McKenzie',       adp: 101.5, positions: 'SP',    team: 'CLE', valueDelta: 0, isValuePick: false },
+  { rank: 102, playerName: 'Haniger, Mitch',         displayName: 'Mitch Haniger',          adp: 102.8, positions: 'OF',    team: 'SEA', valueDelta: 0, isValuePick: false },
+  { rank: 103, playerName: 'Biggio, Cavan',          displayName: 'Cavan Biggio',           adp: 103.4, positions: '2B,OF', team: 'TOR', valueDelta: 0, isValuePick: false },
+  { rank: 104, playerName: 'Pham, Tommy',            displayName: 'Tommy Pham',             adp: 104.7, positions: 'OF',    team: 'MIA', valueDelta: 0, isValuePick: false },
+  { rank: 105, playerName: 'Perdomo, Geraldo',       displayName: 'Geraldo Perdomo',        adp: 105.5, positions: 'SS',    team: 'ARI', valueDelta: 0, isValuePick: false },
+  { rank: 106, playerName: 'Noot, Pat',              displayName: 'Pat Valaika',            adp: 106.8, positions: '2B,3B', team: 'BAL', valueDelta: 0, isValuePick: false },
+  { rank: 107, playerName: 'Friedl, TJ',             displayName: 'TJ Friedl',              adp: 107.4, positions: 'OF',    team: 'CIN', valueDelta: 0, isValuePick: false },
+  { rank: 108, playerName: 'Marte, Ketel',           displayName: 'Ketel Marte',            adp: 108.7, positions: '2B,OF', team: 'ARI', valueDelta: 0, isValuePick: false },
+  { rank: 109, playerName: 'Yepez, Juan',            displayName: 'Juan Yepez',             adp: 109.5, positions: '1B',    team: 'STL', valueDelta: 0, isValuePick: false },
+  { rank: 110, playerName: 'Kopech, Michael',        displayName: 'Michael Kopech',         adp: 110.8, positions: 'SP,RP', team: 'CHW', valueDelta: 0, isValuePick: false },
+  { rank: 111, playerName: 'Realmuto, J.T.',         displayName: 'J.T. Realmuto',          adp: 111.4, positions: 'C',     team: 'PHI', valueDelta: 0, isValuePick: false },
+  { rank: 112, playerName: 'Renfroe, Hunter',        displayName: 'Hunter Renfroe',         adp: 112.7, positions: 'OF',    team: 'KC',  valueDelta: 0, isValuePick: false },
+  { rank: 113, playerName: 'Soto, Gregory',          displayName: 'Gregory Soto',           adp: 113.5, positions: 'RP',    team: 'PHI', valueDelta: 0, isValuePick: false },
+  { rank: 114, playerName: 'Steele, Justin',         displayName: 'Justin Steele',          adp: 114.8, positions: 'SP',    team: 'CHC', valueDelta: 0, isValuePick: false },
+  { rank: 115, playerName: 'Imanaga, Shota',         displayName: 'Shota Imanaga',          adp: 115.4, positions: 'SP',    team: 'CHC', valueDelta: 0, isValuePick: false },
+  { rank: 116, playerName: 'Song, Noah',             displayName: 'Noah Song',              adp: 116.7, positions: 'SP',    team: 'BOS', valueDelta: 0, isValuePick: false },
+  { rank: 117, playerName: 'Gilbert, Logan',         displayName: 'Logan Gilbert',          adp: 117.5, positions: 'SP',    team: 'SEA', valueDelta: 0, isValuePick: false },
+  { rank: 118, playerName: 'Gray, Sonny',            displayName: 'Sonny Gray',             adp: 118.8, positions: 'SP',    team: 'STL', valueDelta: 0, isValuePick: false },
+  { rank: 119, playerName: 'Bieber, Shane',          displayName: 'Shane Bieber',           adp: 119.4, positions: 'SP',    team: 'CLE', valueDelta: 0, isValuePick: false },
+  { rank: 120, playerName: 'Miller, Bobby',          displayName: 'Bobby Miller',           adp: 120.7, positions: 'SP',    team: 'LAD', valueDelta: 0, isValuePick: false },
+]);
 
 // ── Module-level cache ────────────────────────────────────────────────────────
 

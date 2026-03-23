@@ -759,7 +759,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           : (selectedCategory === 'fantasy' || selectedCategory === 'dfs') && !hasFantasyOrDFSQuery
           ? 'betting'  // don't load ADP/fantasy cards for non-fantasy queries even if fantasy tab is active
           : selectedCategory;
-        const freshCards = await fetchDynamicCards({ userContext: lastUserQuery, category: detectedCategory, limit: 4 });
+        const refreshSport = extractSportFromText(lastUserQuery) || undefined;
+        const freshCards = await fetchDynamicCards({ sport: refreshSport, userContext: lastUserQuery, category: detectedCategory, limit: 4 });
         if (freshCards.length === 0) return;
 
         const converted = freshCards.map(convertToInsightCard);
@@ -4560,26 +4561,25 @@ No preamble. Start directly with section 1.`;
               selectedSport={selectedSport}
               clarificationMode={isClarificationPills}
               onPromptClick={(submitText) => {
-                setInput(submitText);
-                setTimeout(() => {
-                  const userMessage: Message = { id: crypto.randomUUID(), role: 'user', content: submitText, timestamp: new Date() };
-                  setMessages((prev: Message[]) => [...prev, userMessage]);
-                  setChats((prevChats: Chat[]) => prevChats.map((chat: Chat) => {
-                    if (chat.id === activeChat) {
-                      const updatedChat = { ...chat };
-                      updatedChat.preview = submitText.slice(0, 50) + (submitText.length > 50 ? '...' : '');
-                      updatedChat.timestamp = new Date();
-                      if (chat.title === 'New Analysis') {
-                        const words = submitText.split(' ').slice(0, 5).join(' ');
-                        updatedChat.title = words + (submitText.split(' ').length > 5 ? '...' : '');
-                      }
-                      return updatedChat;
+                // Do NOT set input before the async path — it briefly populates the
+                // textarea and opens a race window where Enter or a double-click fires
+                // handleSubmit concurrently, adding the message twice.
+                const userMessage: Message = { id: crypto.randomUUID(), role: 'user', content: submitText, timestamp: new Date() };
+                setMessages((prev: Message[]) => [...prev, userMessage]);
+                setChats((prevChats: Chat[]) => prevChats.map((chat: Chat) => {
+                  if (chat.id === activeChat) {
+                    const updatedChat = { ...chat };
+                    updatedChat.preview = submitText.slice(0, 50) + (submitText.length > 50 ? '...' : '');
+                    updatedChat.timestamp = new Date();
+                    if (chat.title === 'New Analysis') {
+                      const words = submitText.split(' ').slice(0, 5).join(' ');
+                      updatedChat.title = words + (submitText.split(' ').length > 5 ? '...' : '');
                     }
-                    return chat;
-                  }));
-                  setInput('');
-                  generateRealResponse(submitText);
-                }, 0);
+                    return updatedChat;
+                  }
+                  return chat;
+                }));
+                generateRealResponse(submitText);
               }}
             />
 

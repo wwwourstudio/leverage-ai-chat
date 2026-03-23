@@ -1804,17 +1804,19 @@ No preamble. Start directly with section 1.`;
         // the cards we already have from the SSR welcome message.
         // Use server cards when present (including explicit empty []);
         // only fall back to previous-message cards when server returned undefined (no card attempt)
-        const responseCards = analysisResult.cards !== undefined
-          ? analysisResult.cards
-          : availableCards;
+        const serverCardCount = analysisResult.cards?.length ?? 0;
+        const useFallback = serverCardCount === 0 && availableCards.length > 0;
+        const responseCards = serverCardCount > 0
+          ? analysisResult.cards!
+          : (useFallback ? availableCards : []);
 
         console.log('[v0] Analysis:', JSON.stringify({
           ok: analysisResult.success,
-          serverCards: analysisResult.cards?.length ?? 0,
+          serverCards: serverCardCount,
           responseCards: responseCards.length,
-          fallbackCards: availableCards.length,
+          fallbackCards: useFallback ? availableCards.length : 0,
           confidence: analysisResult.trustMetrics?.finalConfidence,
-          fallback: analysisResult.useFallback,
+          fallback: useFallback,
         }));
 
         // Enrich trust metrics with real metadata so TrustMetricsDisplay can show
@@ -1869,7 +1871,7 @@ No preamble. Start directly with section 1.`;
         setMessages((prev: Message[]) => prev.map(m =>
           m.id === streamingMessageId
             ? { ...m, isStreaming: false,
-                cards: newMessage.cards ?? m.cards ?? [],
+                cards: newMessage.cards || [],
                 confidence: newMessage.confidence,
                 sources: newMessage.sources, modelUsed: newMessage.modelUsed,
                 processingTime: newMessage.processingTime, trustMetrics: newMessage.trustMetrics,
@@ -2160,12 +2162,26 @@ No preamble. Start directly with section 1.`;
     if (t.includes('mlb') || t.includes('baseball')) return 'mlb';
     if (t.includes('nhl') || t.includes('hockey')) return 'nhl';
     if (t.includes('ncaa')) return t.includes('basketball') ? 'ncaab' : 'ncaaf';
+    // ── Position-first disambiguation ──────────────────────────────────────
+    // Check sport-specific position abbreviations BEFORE team name keywords.
+    // This prevents ambiguous team abbreviations (PHI, MIA, HOU, ATL) from
+    // winning over position codes that uniquely identify the sport.
+    // Only codes that are NOT common English words are checked aggressively.
+    // MLB positions unique to baseball (sp, rp, cp, 1b, 2b, 3b, ss, dh, lf, cf, rf):
+    if (/(?:^|[\s(])(?:sp|rp|cp|1b|2b|3b|ss|dh|lf|cf|rf)(?:[\s).,]|$)/.test(t)) return 'mlb';
+    // "OF" is a common English word — only match when preceded by a 2-3 char
+    // team abbreviation token (e.g. "PHI OF", "(NYM OF)", "TB OF"):
+    if (/(?:^|[\s(])[a-z]{2,3}\s+of(?:[\s).,]|$)/.test(t)) return 'mlb';
+    // NBA positions (pg, sg, pf — unique, not common English words; sf excluded: San Francisco):
+    if (/(?:^|[\s(])(?:pg|sg|pf)(?:[\s).,]|$)/.test(t)) return 'nba';
+    // NFL positions (qb, wr, rb, te — unique, not common English words):
+    if (/(?:^|[\s(])(?:qb|wr|rb|te)(?:[\s).,]|$)/.test(t)) return 'nfl';
     // Deep scan: team names, positions, sport-specific terms.
     // NBA/NFL/NHL team names are checked BEFORE MLB because some abbreviations
     // overlap across leagues (e.g. ATL=Braves/Hawks, MIA=Marlins/Heat, HOU=Astros/Rockets).
     // NBA/NFL team full names (lakers, warriors, chiefs, eagles) are unambiguous and
-    // fire here. MLB-specific position codes (1B, SP, RP) and stat terms (ERA, WHIP)
-    // are unique to baseball and still correctly identify MLB queries when checked last.
+    // fire here. The position-first block above ensures MLB queries with position
+    // codes (OF, SP, RP, etc.) are detected before ambiguous team abbreviations fire.
     if (NBA_KEYWORDS.some(k => t.includes(k))) return 'nba';
     if (NFL_KEYWORDS.some(k => t.includes(k))) return 'nfl';
     if (NHL_KEYWORDS.some(k => t.includes(k))) return 'nhl';

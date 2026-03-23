@@ -2145,13 +2145,13 @@ No preamble. Start directly with section 1.`;
     'rams', 'seahawks', 'cardinals', '49ers',
     // Common abbreviations
     ' ne', ' mia', ' nyj', ' buf',
-    ' bal', ' cin', ' cle', ' pit',
+    ' bal', ' cin', ' cle',
     ' ten', ' ind', ' hou', ' jax',
     ' kc', ' lv', ' lac', ' den',
     ' dal', ' phi', ' nyg', ' was',
     ' chi', ' det', ' gb', ' min',
-    ' atl', ' car', ' no', ' tb',
-    ' lar', ' sea', ' ari', ' sf',
+    ' atl', ' car', ' tb',
+    ' lar', ' ari', ' sf',
     '(ne)', '(mia)', '(nyj)', '(buf)',
     '(bal)', '(cin)', '(cle)', '(pit)',
     '(ten)', '(ind)', '(hou)', '(jax)',
@@ -2198,9 +2198,9 @@ No preamble. Start directly with section 1.`;
     // Only codes that are NOT common English words are checked aggressively.
     // MLB positions unique to baseball (sp, rp, cp, 1b, 2b, 3b, ss, dh, lf, cf, rf):
     if (/(?:^|[\s(])(?:sp|rp|cp|1b|2b|3b|ss|dh|lf|cf|rf)(?:[\s).,]|$)/.test(t)) return 'mlb';
-    // "OF" is a common English word — only match when preceded by a 2-3 char
-    // team abbreviation token (e.g. "PHI OF", "(NYM OF)", "TB OF"):
-    if (/(?:^|[\s(])[a-z]{2,3}\s+of(?:[\s).,]|$)/.test(t)) return 'mlb';
+    // "OF" and "C" (catcher) are ambiguous as standalone tokens — only match when
+    // preceded by a 2-3 char team abbreviation (e.g. "PHI OF", "(NYM OF)", "(SEA C)"):
+    if (/(?:^|[\s(])[a-z]{2,3}\s+(?:of|c)(?:[\s).,]|$)/.test(t)) return 'mlb';
     // NBA positions (pg, sg, pf — unique, not common English words; sf excluded: San Francisco):
     if (/(?:^|[\s(])(?:pg|sg|pf)(?:[\s).,]|$)/.test(t)) return 'nba';
     // NFL positions (qb, wr, rb, te — unique, not common English words):

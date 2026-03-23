@@ -889,42 +889,72 @@ export async function POST(request: NextRequest) {
     // Inject top barrel rate / exit velocity leaders so the AI has real Statcast
     // context for any MLB question, not just explicit Statcast-mode queries.
     // Skipped for ADP and non-MLB queries.
+    //
+    // Strategy: DB-first (instant, no external API) → fall back to Baseball Savant
+    // when the statcast_daily table is empty (first ever request or after schema reset).
+    // The fallback warms the DB so subsequent cold-starts skip the full 1546-row fetch.
     if (isMLBQuery && !hasADPIntent && !context.isPoliticalMarket) {
+      const STATCAST_SEASON = new Date().getFullYear() - (new Date().getMonth() + 1 >= 4 ? 0 : 1);
       try {
-        const { getStatcastData, queryStatcast } = await import('@/lib/baseball-savant');
-        const { players: statcastPlayers } = await Promise.race([
-          getStatcastData(),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)),
+        // ① Try DB first — avoids Baseball Savant API call and 1546-row upsert on warm runs
+        const { getTopStatcastLeadersFromDB } = await import('@/lib/services/statcast-ingest');
+        const { batters: dbBatters, pitchers: dbPitchers } = await Promise.race([
+          getTopStatcastLeadersFromDB(STATCAST_SEASON, 5),
+          new Promise<{ batters: never[]; pitchers: never[] }>(
+            resolve => setTimeout(() => resolve({ batters: [], pitchers: [] }), 800)
+          ),
         ]);
-        if (statcastPlayers.length > 0) {
-          // Top 5 batters by barrel rate
-          const batters = queryStatcast(statcastPlayers, { playerType: 'batter', limit: 5 })
-            .sort((a, b) => b.barrelRate - a.barrelRate);
-          // Top 5 pitchers by lowest xSLG allowed
-          const pitchers = queryStatcast(statcastPlayers, { playerType: 'pitcher', limit: 5 })
-            .sort((a, b) => a.xslg - b.xslg);
-          const fmtB = (p: (typeof batters)[0]) =>
-            `  ${p.name}: Barrel% ${p.barrelRate.toFixed(1)}, xwOBA ${p.xwoba.toFixed(3)}, HardHit% ${p.hardHitPct.toFixed(1)}, ExitVelo ${p.exitVelocity.toFixed(1)} mph`;
-          const fmtP = (p: (typeof pitchers)[0]) =>
-            `  ${p.name}: xSLG-allowed ${p.xslg.toFixed(3)}, Barrel%-allowed ${p.barrelRate.toFixed(1)}, xwOBA-against ${p.xwoba.toFixed(3)}`;
-          const section = [
-            `--- MLB STATCAST LEADERS (${new Date().getFullYear() - (new Date().getMonth() + 1 >= 4 ? 0 : 1)} season) ---`,
+
+        if (dbBatters.length >= 3 && dbPitchers.length >= 3) {
+          // DB warm — use cached leaders directly
+          const fmtB = (p: Record<string, unknown>) =>
+            `  ${p.player_name}: Barrel% ${Number(p.barrel_rate ?? 0).toFixed(1)}, xwOBA ${Number(p.xwoba ?? 0).toFixed(3)}, HardHit% ${Number(p.hard_hit_pct ?? 0).toFixed(1)}, ExitVelo ${Number(p.avg_exit_velocity ?? 0).toFixed(1)} mph`;
+          const fmtP = (p: Record<string, unknown>) =>
+            `  ${p.player_name}: xSLG-allowed ${Number(p.xslg ?? 0).toFixed(3)}, Barrel%-allowed ${Number(p.barrel_rate ?? 0).toFixed(1)}, xwOBA-against ${Number(p.xwoba ?? 0).toFixed(3)}`;
+          enrichedPrompt += `\n\n${[
+            `--- MLB STATCAST LEADERS (${STATCAST_SEASON} season) ---`,
             'Top Batters by Barrel Rate:',
-            ...batters.map(fmtB),
+            ...dbBatters.map(fmtB),
             'Top Pitchers (lowest xSLG allowed):',
-            ...pitchers.map(fmtP),
+            ...dbPitchers.map(fmtP),
             '--- END STATCAST ---',
-          ].join('\n');
-          enrichedPrompt += `\n\n${section}`;
+          ].join('\n')}`;
           statcastInjected = true;
-          console.log(`[v0] [ANALYZE] Injected Statcast leaders: ${batters.length} batters, ${pitchers.length} pitchers`);
-          // Persist to statcast_daily so future requests read from DB (fire-and-forget)
-          void import('@/lib/services/statcast-ingest').then(({ persistStatcastLeaders }) =>
-            persistStatcastLeaders(statcastPlayers)
-          ).catch(() => {/* non-critical */});
+          console.log(`[v0] [ANALYZE] Injected Statcast leaders from DB: ${dbBatters.length} batters, ${dbPitchers.length} pitchers`);
+        } else {
+          // ② DB cold — fetch from Baseball Savant and warm the DB for next time
+          const { getStatcastData, queryStatcast } = await import('@/lib/baseball-savant');
+          const { players: statcastPlayers } = await Promise.race([
+            getStatcastData(),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)),
+          ]);
+          if (statcastPlayers.length > 0) {
+            const batters = queryStatcast(statcastPlayers, { playerType: 'batter', limit: 5 })
+              .sort((a, b) => b.barrelRate - a.barrelRate);
+            const pitchers = queryStatcast(statcastPlayers, { playerType: 'pitcher', limit: 5 })
+              .sort((a, b) => a.xslg - b.xslg);
+            const fmtB = (p: (typeof batters)[0]) =>
+              `  ${p.name}: Barrel% ${p.barrelRate.toFixed(1)}, xwOBA ${p.xwoba.toFixed(3)}, HardHit% ${p.hardHitPct.toFixed(1)}, ExitVelo ${p.exitVelocity.toFixed(1)} mph`;
+            const fmtP = (p: (typeof pitchers)[0]) =>
+              `  ${p.name}: xSLG-allowed ${p.xslg.toFixed(3)}, Barrel%-allowed ${p.barrelRate.toFixed(1)}, xwOBA-against ${p.xwoba.toFixed(3)}`;
+            enrichedPrompt += `\n\n${[
+              `--- MLB STATCAST LEADERS (${STATCAST_SEASON} season) ---`,
+              'Top Batters by Barrel Rate:',
+              ...batters.map(fmtB),
+              'Top Pitchers (lowest xSLG allowed):',
+              ...pitchers.map(fmtP),
+              '--- END STATCAST ---',
+            ].join('\n')}`;
+            statcastInjected = true;
+            console.log(`[v0] [ANALYZE] Injected Statcast leaders: ${batters.length} batters, ${pitchers.length} pitchers`);
+            // Warm the DB so subsequent cold-starts skip this fetch (fire-and-forget)
+            void import('@/lib/services/statcast-ingest').then(({ persistStatcastLeaders }) =>
+              persistStatcastLeaders(statcastPlayers)
+            ).catch(() => {/* non-critical */});
+          }
         }
       } catch {
-        // Non-critical — skip if Baseball Savant is unreachable
+        // Non-critical — skip if DB and Baseball Savant are both unreachable
       }
     }
 

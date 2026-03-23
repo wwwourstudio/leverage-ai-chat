@@ -545,9 +545,11 @@ export interface InsightCard {
 async function buildPlayerCards(playerName?: string, sport?: string): Promise<InsightCard[]> {
   if (!playerName) return [];
 
-  // For non-MLB sports use VPE fallback (Statcast is MLB-only)
+  // For non-MLB sports return a generic player profile card (Statcast is MLB-only)
   const normalizedSport = sport ? sportToApi(sport) : undefined;
-  if (normalizedSport && !normalizedSport.includes('baseball')) return [];
+  if (normalizedSport && !normalizedSport.includes('baseball')) {
+    return buildGenericPlayerCard(playerName, normalizedSport);
+  }
 
   try {
     const { getStatcastData } = await import('@/lib/baseball-savant');
@@ -568,6 +570,8 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
     }
 
     const name: string = player.name ?? player.player_name ?? playerName;
+    const { getPlayerHeadshotUrl } = await import('@/lib/constants');
+    const headshotUrl = getPlayerHeadshotUrl(name) ?? getPlayerHeadshotUrl(playerName) ?? null;
     // StatcastPlayer uses camelCase — check those first, then fall back to snake_case
     // variants that may appear in raw CSV-derived objects or legacy data sources.
     const ev       = player.exitVelocity   ?? player.avg_exit_velocity  ?? player.exit_velocity_avg;
@@ -602,7 +606,7 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
       gradient: 'from-blue-600/75 via-blue-900/55 to-slate-900/40',
       status,
       summary_metrics: metrics,
-      data: { playerName: name, realData: true },
+      data: { playerName: name, realData: true, headshotUrl },
       trend_note: `Live Statcast data from Baseball Savant`,
       last_updated: new Date().toLocaleDateString(),
       metadata: { realData: true, source: 'Baseball Savant Statcast' },
@@ -614,6 +618,40 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
     console.warn('[v0] [PLAYER CARDS] Failed to fetch Statcast data:', err);
     return [];
   }
+}
+
+async function buildGenericPlayerCard(playerName: string, sport: string): Promise<InsightCard[]> {
+  const sportName = sport.includes('basketball') ? 'NBA'
+    : sport.includes('football') ? 'NFL'
+    : sport.includes('hockey') ? 'NHL'
+    : sport.toUpperCase();
+
+  const sportEmojis: Record<string, string> = { NBA: '🏀', NFL: '🏈', NHL: '🏒' };
+  const sportGradients: Record<string, string> = {
+    NBA: 'from-orange-600/75 via-orange-900/55 to-slate-900/40',
+    NFL: 'from-blue-600/75 via-blue-900/55 to-slate-900/40',
+    NHL: 'from-cyan-600/75 via-cyan-900/55 to-slate-900/40',
+  };
+
+  const { getPlayerHeadshotUrl } = await import('@/lib/constants');
+  const headshotUrl = getPlayerHeadshotUrl(playerName);
+
+  const card: InsightCard = {
+    type: CARD_TYPES.STATCAST_SUMMARY,
+    title: playerName,
+    icon: sportEmojis[sportName] ?? '📊',
+    category: sportName,
+    subcategory: 'Player Profile',
+    gradient: sportGradients[sportName] ?? 'from-purple-600/75 via-purple-900/55 to-slate-900/40',
+    status: 'edge',
+    summary_metrics: [],
+    data: { playerName, realData: false, headshotUrl, sport: sportName },
+    trend_note: `Ask for detailed ${sportName} player analysis`,
+    last_updated: new Date().toLocaleDateString(),
+    metadata: { realData: false, source: 'Leverage AI' },
+  };
+
+  return [card];
 }
 
 async function buildVPECards(limit: number): Promise<InsightCard[]> {

@@ -732,6 +732,27 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       });
   }, []);
 
+  // Fetch live cards for the welcome screen on mount.
+  // Runs once after hydration; non-critical (welcome shows without cards on error).
+  useEffect(() => {
+    fetchDynamicCards({ category: 'betting', limit: 3 })
+      .then(cards => {
+        if (!cards.length) return;
+        const insightCards = cards.map(c => convertToInsightCard(c));
+        setMessages(prev => {
+          const msgs = [...prev];
+          if (msgs[0]?.isWelcome) {
+            msgs[0] = { ...msgs[0], cards: insightCards };
+          }
+          return msgs;
+        });
+      })
+      .catch(() => {
+        // Non-critical — welcome screen renders fine without cards
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Auto-refresh cards every 5 minutes when the conversation has AI cards
   useEffect(() => {
     const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes

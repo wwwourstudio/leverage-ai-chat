@@ -96,6 +96,12 @@ export class KalshiWebSocket {
       // Running server-side (Next.js SSR) — skip
       return;
     }
+    // Kalshi WS requires ECDSA auth via server-side credentials (KALSHI_PRIVATE_KEY)
+    // that cannot be accessed from the browser. Connection is opt-in: set
+    // NEXT_PUBLIC_KALSHI_WS_ENABLED=1 only when a server-side token relay is in place.
+    if (!process.env.NEXT_PUBLIC_KALSHI_WS_ENABLED) {
+      return;
+    }
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return; // already connected / connecting
     }

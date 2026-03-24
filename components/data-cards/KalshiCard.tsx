@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo, useState, useEffect, useCallback, useId } from 'react';
+import React, { memo, useState, useEffect, useCallback, useId, useRef } from 'react';
 import {
   TrendingUp, Vote, Trophy, CloudRain,
   Cpu, Film, Globe, Clock,
@@ -9,6 +9,7 @@ import {
   Activity, Zap, TrendingDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useKalshiStore } from '@/lib/store/kalshi-store';
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
@@ -530,6 +531,30 @@ export const KalshiCard = memo(function KalshiCard({
   const [animated, setAnimated] = useState(false);
   const [trades, setTrades]     = useState<Array<{ price: number }> | null>(null);
 
+  // ── Real-time WebSocket price overlay ──────────────────────────────────────
+  const livePrice  = useKalshiStore(s => d.ticker ? s.getPrice(d.ticker as string) : undefined);
+  const [priceFlash, setPriceFlash] = useState(false);
+  const prevMid    = useRef<number | null>(null);
+
+  // Subscribe to this ticker's real-time updates while the card is mounted
+  useEffect(() => {
+    if (!d.ticker) return;
+    const { subscribe, unsubscribe } = useKalshiStore.getState();
+    subscribe([d.ticker as string]);
+    return () => unsubscribe([d.ticker as string]);
+  }, [d.ticker]);
+
+  // Brief green flash when the live price mid changes
+  useEffect(() => {
+    if (!livePrice) return;
+    if (prevMid.current !== null && prevMid.current !== livePrice.yesMid) {
+      setPriceFlash(true);
+      const t = setTimeout(() => setPriceFlash(false), 700);
+      return () => clearTimeout(t);
+    }
+    prevMid.current = livePrice.yesMid;
+  }, [livePrice?.yesMid]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Mount animation
   useEffect(() => {
     const t = setTimeout(() => setAnimated(true), 80);
@@ -573,10 +598,15 @@ export const KalshiCard = memo(function KalshiCard({
   const marketCat   = (d.subcategory || subcategory || category || 'Prediction').toUpperCase();
   const accentColor = getCategoryAccent(d.iconLabel);
 
-  const yesBid: number | null = typeof d.yesBid === 'number' && d.yesBid > 0 ? d.yesBid : null;
-  const yesAsk: number | null = typeof d.yesAsk === 'number' && d.yesAsk > 0 ? d.yesAsk : null;
-  const noBid:  number | null = typeof d.noBid  === 'number' && d.noBid  > 0 ? d.noBid  : null;
-  const noAsk:  number | null = typeof d.noAsk  === 'number' && d.noAsk  > 0 ? d.noAsk  : null;
+  // Use live WebSocket prices when available; fall back to REST data from props
+  const yesBid: number | null = (livePrice && livePrice.yesBid > 0) ? livePrice.yesBid
+    : (typeof d.yesBid === 'number' && d.yesBid > 0 ? d.yesBid : null);
+  const yesAsk: number | null = (livePrice && livePrice.yesAsk > 0) ? livePrice.yesAsk
+    : (typeof d.yesAsk === 'number' && d.yesAsk > 0 ? d.yesAsk : null);
+  const noBid:  number | null = (livePrice && livePrice.noBid > 0) ? livePrice.noBid
+    : (typeof d.noBid  === 'number' && d.noBid  > 0 ? d.noBid  : null);
+  const noAsk:  number | null = (livePrice && livePrice.noAsk > 0) ? livePrice.noAsk
+    : (typeof d.noAsk  === 'number' && d.noAsk  > 0 ? d.noAsk  : null);
   const hasPrices = yesBid !== null || yesAsk !== null || noBid !== null || noAsk !== null;
 
   const hasOrderBook =
@@ -645,12 +675,15 @@ export const KalshiCard = memo(function KalshiCard({
             )}
           </div>
 
-          {/* Live / Closed badge */}
+          {/* Live / Closed badge — shows WS indicator when real-time data is streaming */}
           {isActive ? (
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full shrink-0"
-                 style={{ backgroundColor: YES_COLOR + '0d', border: `1px solid ${YES_COLOR}22` }}>
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: YES_COLOR }} />
-              <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: YES_COLOR }}>Live</span>
+                 style={{ backgroundColor: YES_COLOR + '0d', border: `1px solid ${livePrice ? YES_COLOR + '55' : YES_COLOR + '22'}` }}>
+              <span className={cn('w-1.5 h-1.5 rounded-full', livePrice ? 'animate-pulse' : '')}
+                    style={{ backgroundColor: YES_COLOR }} />
+              <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: YES_COLOR }}>
+                {livePrice ? 'WS Live' : 'Live'}
+              </span>
             </div>
           ) : (
             <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full shrink-0"
@@ -706,11 +739,16 @@ export const KalshiCard = memo(function KalshiCard({
 
         {/* Buy price chips (when no order book — active markets only) */}
         {isActive && hasPrices && !hasOrderBook && (
-          <PriceChips
-            yesBid={yesBid} yesAsk={yesAsk}
-            noBid={noBid}   noAsk={noAsk}
-            spread={typeof d.spread === 'number' ? d.spread : undefined}
-          />
+          <div className={cn(
+            'rounded-xl transition-colors duration-700',
+            priceFlash ? 'bg-emerald-500/8' : 'bg-transparent',
+          )}>
+            <PriceChips
+              yesBid={yesBid} yesAsk={yesAsk}
+              noBid={noBid}   noAsk={noAsk}
+              spread={typeof d.spread === 'number' ? d.spread : undefined}
+            />
+          </div>
         )}
 
         {/* Market stats */}

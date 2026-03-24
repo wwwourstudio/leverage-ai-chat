@@ -20,6 +20,7 @@ import dynamic from 'next/dynamic';
 import { fetchDynamicCards, type DynamicCard } from '@/lib/data-service';
 import { API_ENDPOINTS, PLAYER_HEADSHOT_IDS, sportToApi } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/client';
+import { useKalshiStore } from '@/lib/store/kalshi-store';
 const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ default: m.AuthModals })), { ssr: false });
 import { TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, MessageSquare, Clock, Star, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, X, CheckCheck, AlertTriangle, BarChart, Info, FileText, ImageIcon, Loader2 } from 'lucide-react';
 import { CardLayout } from '@/components/data-cards/CardLayout';
@@ -731,6 +732,14 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           })
           .catch(() => {});
       });
+  }, []);
+
+  // Initialize the Kalshi WebSocket store once on mount (client-side only).
+  // The WS itself only opens when a KalshiCard subscribes to a ticker — this
+  // just wires up the price-update and connection-change listeners.
+  useEffect(() => {
+    const cleanup = useKalshiStore.getState().initWS();
+    return cleanup;
   }, []);
 
   // Fetch live cards for the welcome screen on mount.

@@ -284,6 +284,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [showStripeLightbox, setShowStripeLightbox] = useState(false);
   const [showUserLightbox, setShowUserLightbox] = useState(false);
   const [customInstructions, setCustomInstructions] = useState('');
+  const [deepThink, setDeepThink] = useState(false);
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(!!serverData?.userSession);
   const [user, setUser] = useState<{ name: string; email: string; avatar?: string } | null>(
@@ -1648,7 +1649,7 @@ No preamble. Start directly with section 1.`;
         const res = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userMessage: contextualUserMessage, existingCards: availableCards, context, customInstructions: customInstructions || undefined, imageAttachments: imageAttachments?.length ? imageAttachments : undefined }),
+          body: JSON.stringify({ userMessage: contextualUserMessage, existingCards: availableCards, context, customInstructions: customInstructions || undefined, imageAttachments: imageAttachments?.length ? imageAttachments : undefined, deepThink }),
           signal: controller.signal,
         });
         if (!res.ok) {
@@ -4593,6 +4594,8 @@ No preamble. Start directly with section 1.`;
               onOpenStripe={() => setShowStripeLightbox(true)}
               lastUserQuery={lastUserQuery}
               selectedCategory={selectedCategory}
+              deepThink={deepThink}
+              onToggleDeepThink={() => setDeepThink((v) => !v)}
             />
           </div>
         </div>

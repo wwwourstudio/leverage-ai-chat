@@ -9,6 +9,7 @@ import {
   NFBC_ADP_ADDENDUM,
   MLB_PROJECTION_ADDENDUM,
   FANTASY_STARTSIT_ADDENDUM,
+  DEEP_THINK_ADDENDUM,
   DEFAULT_SOURCES,
   HTTP_STATUS,
   ERROR_MESSAGES,
@@ -100,6 +101,7 @@ interface AnalyzeRequestBody {
   existingCards?: InsightCard[];
   customInstructions?: string;
   imageAttachments?: ImageAttachment[];
+  deepThink?: boolean;
   context?: {
     sport?: string | null;
     marketType?: string | null;
@@ -170,6 +172,7 @@ const AnalyzeBodySchema = z.object({
   context:            z.record(z.any()).optional().default({}),
   customInstructions: z.string().max(2000).optional(),
   imageAttachments:   z.array(z.any()).max(5).optional().default([]),
+  deepThink:          z.boolean().optional().default(false),
 });
 
 export async function POST(request: NextRequest) {
@@ -542,9 +545,12 @@ export async function POST(request: NextRequest) {
       return sanitized;
     };
 
-    const systemPrompt = customInstructions?.trim()
+    const baseWithProfile = customInstructions?.trim()
       ? `${baseWithAddendum}\n\n## USER PROFILE & BETTING PREFERENCES\n${sanitizeCustomInstructions(customInstructions)}`
       : baseWithAddendum;
+    const systemPrompt = body.deepThink
+      ? `${baseWithProfile}${DEEP_THINK_ADDENDUM}`
+      : baseWithProfile;
 
     // ── Auto-save inline TSV/CSV ADP uploads ─────────────────────────────────────
     // When a user drags a TSV file into the chat, the content is embedded inline
@@ -1184,11 +1190,12 @@ export async function POST(request: NextRequest) {
     const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
     const hasClientOddsData = !!(context.oddsData?.events?.length);
     // Route DFS, pure-fantasy, file-upload, off-season, and ambiguous queries directly to
-    // grok-3-fast (3-6s). Reserve grok-4 for live-odds betting analysis only.
-    // ADP queries override to grok-4: reliable tool use requires the stronger model.
-    // isAmbiguous queries only need a short clarification reply — no need for grok-4.
-    const useFastPath = hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context));
-    const primaryModel = useFastPath ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.MODEL_NAME;
+    // grok-3-fast (3-6s). Reserve grok-3 for live-odds betting analysis.
+    // deepThink overrides everything: always use grok-4 with extended reasoning.
+    // ADP queries override to primary: reliable tool use requires the stronger model.
+    // isAmbiguous queries only need a short clarification reply — no need for primary.
+    const useFastPath = body.deepThink ? false : (hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context)));
+    const primaryModel = body.deepThink ? 'grok-4' : (useFastPath ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.MODEL_NAME);
     // Always log the resolved model so failures are immediately traceable in Vercel logs
     logger.info(LogCategory.AI, 'model_selected', {
       metadata: { model: primaryModel, fastPath: useFastPath, hasADPIntent, sport: context?.sport ?? null },
@@ -1580,6 +1587,35 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // ── get_live_odds tool — fetches real-time sportsbook odds on demand ─────────
+    // Triggered as a fallback when the user has betting intent but the pre-fetch
+    // did not inject odds (e.g. wrong sport detected, follow-up question, etc.).
+    const getLiveOddsParams = z.object({
+      sport: z.string().describe('Sport key: basketball_nba | americanfootball_nfl | baseball_mlb | icehockey_nhl'),
+    });
+    const getLiveOddsTool = tool({
+      description: "Fetch current sportsbook odds for a sport. Use when the user asks about a game, spread, moneyline, or total and live odds aren't already provided in the context.",
+      inputSchema: getLiveOddsParams,
+      execute: async ({ sport }: z.infer<typeof getLiveOddsParams>) => {
+        console.log('[API/analyze] get_live_odds tool called:', { sport });
+        try {
+          const oddsKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+          if (!oddsKey) return { error: 'Odds API key not configured' };
+          const { fetchLiveOdds } = await import('@/lib/odds/index');
+          const data = await fetchLiveOdds(sport, {
+            apiKey: oddsKey,
+            markets: ['h2h', 'spreads', 'totals'],
+            regions: ['us'],
+            oddsFormat: 'american',
+          });
+          return data;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { error: msg };
+        }
+      },
+    });
+
     // ── SSE streaming response — wraps AI generation + post-processing ──────────
     const encoder = new TextEncoder();
     const sseChunk = (data: object) => encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
@@ -1605,6 +1641,10 @@ export async function POST(request: NextRequest) {
               ...(hasKalshiToolIntent && !hasHRPredictionIntent && !hasADPIntent && { tools: { kalshi_get_markets: kalshiGetMarketsTool, kalshi_get_price: kalshiGetPriceTool }, stopWhen: stepCountIs(2) }),
               ...(!hasHRPredictionIntent && !hasKalshiToolIntent && hasMLBProjectionIntent && { tools: { query_mlb_projections: mlbProjectionTool }, stopWhen: stepCountIs(3) }),
               ...(!hasHRPredictionIntent && !hasKalshiToolIntent && !hasMLBProjectionIntent && isMLBStatcastMode && { tools: { query_statcast: statcastTool }, stopWhen: stepCountIs(3) }),
+              // Fallback: betting intent but no tool matched and no odds pre-injected → let Grok fetch live odds
+              ...(!hasADPIntent && !hasHRPredictionIntent && !hasKalshiToolIntent && !hasMLBProjectionIntent && !isMLBStatcastMode && context.hasBettingIntent && !serverFetchedOdds && { tools: { get_live_odds: getLiveOddsTool }, stopWhen: stepCountIs(2) }),
+              // Deep Think: raise tool round-trips so complex multi-step analysis can call multiple tools
+              ...(body.deepThink && { maxSteps: 5 }),
             });
 
             // Abort if the first token doesn't arrive within the timeout budget

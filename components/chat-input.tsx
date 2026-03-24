@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, type FormEvent } from 'react';
-import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles } from 'lucide-react';
+import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles, Brain } from 'lucide-react';
 
 interface FileAttachment {
   id: string;
@@ -32,6 +32,8 @@ interface ChatInputProps {
   lastUserQuery: string;
   selectedCategory: string;
   placeholder?: string;
+  deepThink?: boolean;
+  onToggleDeepThink?: () => void;
 }
 
 const MAX_CHARS = 2000;
@@ -53,6 +55,8 @@ export function ChatInput({
   lastUserQuery,
   selectedCategory,
   placeholder,
+  deepThink = false,
+  onToggleDeepThink,
 }: ChatInputProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -214,6 +218,24 @@ export function ChatInput({
               )}
             </div>
           </div>
+
+          {/* Deep Think toggle */}
+          {onToggleDeepThink && (
+            <button
+              type="button"
+              onClick={onToggleDeepThink}
+              disabled={isTyping}
+              title={deepThink ? 'Deep Think ON — uses Grok 4 for complex analysis. Click to disable.' : 'Deep Think — uses Grok 4 for step-by-step reasoning'}
+              className={`shrink-0 p-2.5 rounded-xl transition-all duration-200 border ${
+                deepThink
+                  ? 'bg-indigo-600/20 border-indigo-500/60 text-indigo-300 shadow-[0_0_12px_oklch(0.5_0.2_270/0.3)]'
+                  : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-indigo-500/40 hover:text-indigo-400'
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
+              style={{ height: '44px', width: '44px' }}
+            >
+              <Brain className="w-4 h-4 mx-auto" />
+            </button>
+          )}
 
           {/* Send / Stop */}
           {isTyping ? (

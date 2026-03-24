@@ -184,7 +184,7 @@ async function checkDatabase(): Promise<ServiceHealth> {
       };
     }
     
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseKey, { db: { schema: 'api' } });
     
     // Test basic connectivity with a simple query against an existing table
     const { error } = await supabase

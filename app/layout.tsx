@@ -12,6 +12,26 @@ export const metadata: Metadata = {
   description: 'All-in-one AI-powered platform for sports betting, NFC fantasy football (NFBC/NFFC/NFBKC), DFS lineup optimization, and Kalshi financial prediction markets. Real-time odds analysis, draft strategy, auction values, and market insights.',
   generator: 'v0.app',
   manifest: '/manifest.json',
+  openGraph: {
+    type: 'website',
+    siteName: 'Leverage AI',
+    title: 'Leverage AI — Sports Betting • Fantasy • DFS • Kalshi',
+    description: 'AI-powered sports intelligence: live odds, DFS lineup optimizer, fantasy draft strategy, and Kalshi prediction markets — all in one platform.',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Leverage AI — Powered by Grok AI',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Leverage AI — Sports Betting • Fantasy • DFS • Kalshi',
+    description: 'AI-powered sports intelligence: live odds, DFS optimizer, fantasy strategy, and Kalshi markets.',
+    images: ['/og-image.png'],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',

@@ -20,6 +20,7 @@ import dynamic from 'next/dynamic';
 import { fetchDynamicCards, type DynamicCard } from '@/lib/data-service';
 import { API_ENDPOINTS, PLAYER_HEADSHOT_IDS, sportToApi } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/client';
+import { useKalshiStore } from '@/lib/store/kalshi-store';
 const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ default: m.AuthModals })), { ssr: false });
 import { TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, MessageSquare, Clock, Star, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, X, CheckCheck, AlertTriangle, BarChart, Info, FileText, ImageIcon, Loader2 } from 'lucide-react';
 import { CardLayout } from '@/components/data-cards/CardLayout';
@@ -284,6 +285,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [showStripeLightbox, setShowStripeLightbox] = useState(false);
   const [showUserLightbox, setShowUserLightbox] = useState(false);
   const [customInstructions, setCustomInstructions] = useState('');
+  const [deepThink, setDeepThink] = useState(false);
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(!!serverData?.userSession);
   const [user, setUser] = useState<{ name: string; email: string; avatar?: string } | null>(
@@ -732,6 +734,35 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       });
   }, []);
 
+  // Initialize the Kalshi WebSocket store once on mount (client-side only).
+  // The WS itself only opens when a KalshiCard subscribes to a ticker — this
+  // just wires up the price-update and connection-change listeners.
+  useEffect(() => {
+    const cleanup = useKalshiStore.getState().initWS();
+    return cleanup;
+  }, []);
+
+  // Fetch live cards for the welcome screen on mount.
+  // Runs once after hydration; non-critical (welcome shows without cards on error).
+  useEffect(() => {
+    fetchDynamicCards({ category: 'betting', limit: 3 })
+      .then(cards => {
+        if (!cards.length) return;
+        const insightCards = cards.map(c => convertToInsightCard(c));
+        setMessages(prev => {
+          const msgs = [...prev];
+          if (msgs[0]?.isWelcome) {
+            msgs[0] = { ...msgs[0], cards: insightCards };
+          }
+          return msgs;
+        });
+      })
+      .catch(() => {
+        // Non-critical — welcome screen renders fine without cards
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Auto-refresh cards every 5 minutes when the conversation has AI cards
   useEffect(() => {
     const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
@@ -1129,58 +1160,30 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
   const handleFollowUp = (action: 'correlated' | 'metrics', cardData?: any) => {
     console.log('[v0] Generating follow-up response:', action);
-    
+
     // Check if user has credits
     if (!consumeCredit()) {
       console.log('[v0] No credits remaining, showing purchase modal');
       return;
     }
 
-    setIsTyping(true);
-    
-    setTimeout(() => {
-      let responseText = '';
-      let responseCards: InsightCard[] = [];
+    // Delegate to the real AI pipeline with a contextual query so the response
+    // is grounded in live data instead of drawing from the stale unifiedCards array
+    // (which is always empty since demo cards were removed).
+    const cardTitle = cardData?.title ?? '';
+    const query = action === 'correlated'
+      ? `Show me correlated betting opportunities related to: ${cardTitle}. Include cross-market plays with positive expected value.`
+      : `Provide a deep metric analysis for: ${cardTitle}. Include key performance indicators, historical accuracy, and statistical significance.`;
 
-      if (action === 'correlated') {
-        responseText = "**Correlated Opportunities Identified**\n\n**Cross-Platform Analysis:** I've scanned multiple markets to find plays that correlate with your original opportunity.\n\n**Synergy Rating:** High - These plays share common factors and can be stacked for increased leverage\n\n**Strategic Value:** Combining these opportunities creates portfolio diversification while maintaining edge\n\n**Here are the correlated plays:**";
-        responseCards = [unifiedCards[1], unifiedCards[3], unifiedCards[5]];
-      } else {
-        responseText = "**Deep Metric Analysis**\n\n**Data Validation:** All metrics cross-referenced with historical databases and real-time market feeds\n\n**Statistical Significance:** Each data point has been tested for reliability and predictive value\n\n**Actionable Insights:** Below is a granular breakdown of key performance indicators and their implications\n\n**Detailed metric breakdown:**";
-        responseCards = [unifiedCards[2], unifiedCards[6]];
-      }
-
-      const aiMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: responseText,
-        timestamp: new Date(),
-        cards: responseCards,
-        sources: [
-          { name: 'Grok 4 (xAI)', type: 'model', reliability: 96 },
-          { name: 'The Odds API (Live)', type: 'api', reliability: 97 },
-          { name: 'Historical Database', type: 'database', reliability: 92 },
-        ],
-        modelUsed: 'Grok 4',
-        processingTime: 950,
-        trustMetrics: {
-          benfordIntegrity: 91,
-          oddsAlignment: 93,
-          marketConsensus: 89,
-          historicalAccuracy: 95,
-          finalConfidence: 92,
-          trustLevel: 'high',
-          riskLevel: 'low',
-          adjustedTone: 'Strong signal — live data verified',
-          flags: [],
-          modelUsed: 'Grok 4',
-          hasLiveOdds: true,
-        }
-      };
-
-      setMessages((prev: Message[]) => [...prev, aiMessage]);
-      setIsTyping(false);
-    }, 1000);
+    const userMsg: Message = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: query,
+      timestamp: new Date(),
+    };
+    setMessages((prev: Message[]) => [...prev, userMsg]);
+    setInput('');
+    generateRealResponse(query);
   };
 
   // Generate inline card-type-specific analysis without adding a new chat message
@@ -1655,7 +1658,7 @@ No preamble. Start directly with section 1.`;
         const res = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userMessage: contextualUserMessage, existingCards: availableCards, context, customInstructions: customInstructions || undefined, imageAttachments: imageAttachments?.length ? imageAttachments : undefined }),
+          body: JSON.stringify({ userMessage: contextualUserMessage, existingCards: availableCards, context, customInstructions: customInstructions || undefined, imageAttachments: imageAttachments?.length ? imageAttachments : undefined, deepThink }),
           signal: controller.signal,
         });
         if (!res.ok) {
@@ -4600,6 +4603,8 @@ No preamble. Start directly with section 1.`;
               onOpenStripe={() => setShowStripeLightbox(true)}
               lastUserQuery={lastUserQuery}
               selectedCategory={selectedCategory}
+              deepThink={deepThink}
+              onToggleDeepThink={() => setDeepThink((v) => !v)}
             />
           </div>
         </div>

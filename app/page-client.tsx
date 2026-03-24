@@ -1150,58 +1150,30 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
   const handleFollowUp = (action: 'correlated' | 'metrics', cardData?: any) => {
     console.log('[v0] Generating follow-up response:', action);
-    
+
     // Check if user has credits
     if (!consumeCredit()) {
       console.log('[v0] No credits remaining, showing purchase modal');
       return;
     }
 
-    setIsTyping(true);
-    
-    setTimeout(() => {
-      let responseText = '';
-      let responseCards: InsightCard[] = [];
+    // Delegate to the real AI pipeline with a contextual query so the response
+    // is grounded in live data instead of drawing from the stale unifiedCards array
+    // (which is always empty since demo cards were removed).
+    const cardTitle = cardData?.title ?? '';
+    const query = action === 'correlated'
+      ? `Show me correlated betting opportunities related to: ${cardTitle}. Include cross-market plays with positive expected value.`
+      : `Provide a deep metric analysis for: ${cardTitle}. Include key performance indicators, historical accuracy, and statistical significance.`;
 
-      if (action === 'correlated') {
-        responseText = "**Correlated Opportunities Identified**\n\n**Cross-Platform Analysis:** I've scanned multiple markets to find plays that correlate with your original opportunity.\n\n**Synergy Rating:** High - These plays share common factors and can be stacked for increased leverage\n\n**Strategic Value:** Combining these opportunities creates portfolio diversification while maintaining edge\n\n**Here are the correlated plays:**";
-        responseCards = [unifiedCards[1], unifiedCards[3], unifiedCards[5]];
-      } else {
-        responseText = "**Deep Metric Analysis**\n\n**Data Validation:** All metrics cross-referenced with historical databases and real-time market feeds\n\n**Statistical Significance:** Each data point has been tested for reliability and predictive value\n\n**Actionable Insights:** Below is a granular breakdown of key performance indicators and their implications\n\n**Detailed metric breakdown:**";
-        responseCards = [unifiedCards[2], unifiedCards[6]];
-      }
-
-      const aiMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: responseText,
-        timestamp: new Date(),
-        cards: responseCards,
-        sources: [
-          { name: 'Grok 4 (xAI)', type: 'model', reliability: 96 },
-          { name: 'The Odds API (Live)', type: 'api', reliability: 97 },
-          { name: 'Historical Database', type: 'database', reliability: 92 },
-        ],
-        modelUsed: 'Grok 4',
-        processingTime: 950,
-        trustMetrics: {
-          benfordIntegrity: 91,
-          oddsAlignment: 93,
-          marketConsensus: 89,
-          historicalAccuracy: 95,
-          finalConfidence: 92,
-          trustLevel: 'high',
-          riskLevel: 'low',
-          adjustedTone: 'Strong signal — live data verified',
-          flags: [],
-          modelUsed: 'Grok 4',
-          hasLiveOdds: true,
-        }
-      };
-
-      setMessages((prev: Message[]) => [...prev, aiMessage]);
-      setIsTyping(false);
-    }, 1000);
+    const userMsg: Message = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: query,
+      timestamp: new Date(),
+    };
+    setMessages((prev: Message[]) => [...prev, userMsg]);
+    setInput('');
+    generateRealResponse(query);
   };
 
   // Generate inline card-type-specific analysis without adding a new chat message

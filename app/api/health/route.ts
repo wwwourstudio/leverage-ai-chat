@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getOddsApiKey, isOddsApiConfigured } from '@/lib/config';
+import { getOddsApiKey, isOddsApiConfigured, getGrokApiKey } from '@/lib/config';
 
 interface ServiceHealth {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -17,12 +17,14 @@ interface HealthCheckResponse {
     weather: ServiceHealth;
     kalshi: ServiceHealth;
     database: ServiceHealth;
+    grok: ServiceHealth;
   };
   environment: {
     oddsApiConfigured: boolean;
     weatherApiConfigured: boolean;
     kalshiApiConfigured: boolean;
     databaseConfigured: boolean;
+    grokConfigured: boolean;
   };
 }
 
@@ -221,32 +223,71 @@ async function checkDatabase(): Promise<ServiceHealth> {
   }
 }
 
+async function checkGrokAPI(): Promise<ServiceHealth> {
+  const startTime = Date.now();
+  const apiKey = getGrokApiKey();
+
+  if (!apiKey) {
+    return { status: 'unhealthy', error: 'XAI_API_KEY not configured' };
+  }
+
+  try {
+    const { generateText } = await import('ai');
+    const { createXai } = await import('@ai-sdk/xai');
+    const result = await generateText({
+      model: createXai({ apiKey })('grok-3-fast'),
+      prompt: '1',
+      maxOutputTokens: 1,
+      maxRetries: 0,
+      abortSignal: AbortSignal.timeout(8000),
+    });
+    const responseTime = Date.now() - startTime;
+    return {
+      status: 'healthy',
+      responseTime,
+      details: { model: 'grok-3-fast', tokensUsed: result.usage?.totalTokens ?? 1 },
+    };
+  } catch (err) {
+    const responseTime = Date.now() - startTime;
+    const msg = err instanceof Error ? err.message : String(err);
+    const isAuth = msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('api key');
+    const isTimeout = msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('aborted');
+    return {
+      status: isAuth ? 'unhealthy' : 'degraded',
+      responseTime,
+      error: isAuth ? 'Invalid XAI_API_KEY' : isTimeout ? 'Grok API timeout (>8s)' : msg,
+      details: { configured: true },
+    };
+  }
+}
+
 /**
  * GET /api/health
  * Returns health status of all external API integrations and services
  */
 export async function GET() {
   console.log('[v0] [API/health] Running health checks...');
-  
+
   const startTime = Date.now();
-  
+
   // Run all health checks in parallel
-  const [odds, weather, kalshi, database] = await Promise.all([
+  const [odds, weather, kalshi, database, grok] = await Promise.all([
     checkOddsAPI(),
     checkWeatherAPI(),
     checkKalshiAPI(),
-    checkDatabase()
+    checkDatabase(),
+    checkGrokAPI(),
   ]);
-  
+
   const totalTime = Date.now() - startTime;
-  
-  // Determine overall status
-  const statuses = [odds.status, weather.status, database.status]; // Kalshi is optional
-  const overallStatus = 
+
+  // Determine overall status — Grok and Kalshi are both required core services
+  const statuses = [odds.status, weather.status, database.status, grok.status];
+  const overallStatus =
     statuses.includes('unhealthy') ? 'unhealthy' :
     statuses.includes('degraded') ? 'degraded' :
     'healthy';
-  
+
   const response: HealthCheckResponse = {
     status: overallStatus,
     timestamp: new Date().toISOString(),
@@ -254,14 +295,16 @@ export async function GET() {
       odds,
       weather,
       kalshi,
-      database
+      database,
+      grok,
     },
     environment: {
       oddsApiConfigured: isOddsApiConfigured(),
-      weatherApiConfigured: true, // Open-Meteo doesn't require API key
+      weatherApiConfigured: true,
       kalshiApiConfigured: !!(process.env.KALSHI_API_KEY_ID && process.env.KALSHI_PRIVATE_KEY),
-      databaseConfigured: !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-    }
+      databaseConfigured: !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+      grokConfigured: !!getGrokApiKey(),
+    },
   };
   
   console.log(`[v0] [API/health] ✓ Health check complete in ${totalTime}ms - Status: ${overallStatus.toUpperCase()}`);

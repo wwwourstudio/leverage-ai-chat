@@ -2195,9 +2195,15 @@ No preamble. Start directly with section 1.`;
     // fire here. The position-first block above ensures MLB queries with position
     // codes (OF, SP, RP, etc.) are detected before ambiguous team abbreviations fire.
     if (NBA_KEYWORDS.some(k => t.includes(k))) return 'nba';
-    if (NFL_KEYWORDS.some(k => t.includes(k))) return 'nfl';
+    // For NFL vs MLB, score both and pick the winner — "giants" appears in both
+    // keyword lists so a query like "Yankees vs Giants" would wrongly fire NFL first.
+    const nflCount = NFL_KEYWORDS.filter(k => t.includes(k)).length;
+    const mlbCount = MLB_KEYWORDS.filter(k => t.includes(k)).length;
+    if (nflCount > 0 || mlbCount > 0) {
+      // MLB wins ties (baseball season active; NFL is offseason Mar–Aug)
+      return mlbCount >= nflCount ? 'mlb' : 'nfl';
+    }
     if (NHL_KEYWORDS.some(k => t.includes(k))) return 'nhl';
-    if (MLB_KEYWORDS.some(k => t.includes(k))) return 'mlb';
     return null;
   };
 

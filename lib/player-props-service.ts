@@ -393,7 +393,7 @@ export function playerPropToCard(prop: PlayerProp): any {
   const statLabel = statTypeDisplay[prop.statType] || prop.statType;
   
   return {
-    type: 'PLAYER_PROP',
+    type: 'player-prop',
     title: `${prop.playerName} - ${statLabel}`,
     icon: 'User',
     category: prop.sport.toUpperCase(),

@@ -26,7 +26,7 @@ import type { StatcastPlayer } from '@/lib/baseball-savant';
 import { generateContextualCards, oddsEventsToBettingCards, cardsToPromptContext, type InsightCard } from '@/lib/cards-generator';
 import { parseIntent } from '@/lib/card-pipeline';
 import { detectHallucinations } from '@/lib/hallucination-detector';
-import { getGrokApiKey } from '@/lib/config';
+import { getGrokApiKey, getOddsApiKey } from '@/lib/config';
 import { logger, LogCategory } from '@/lib/logger';
 import { getMarketIntelligenceSummary } from '@/lib/market-intelligence';
 import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
@@ -762,7 +762,7 @@ export async function POST(request: NextRequest) {
     } else if (context.hasBettingIntent && context.sport && !context.isPoliticalMarket && !hasADPIntent) {
       // Client didn't include live odds — try fetching from the Odds API server-side first.
       // This covers cases where the user typed directly in chat without the UI pre-fetching odds.
-      const _oddsKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+      const _oddsKey = getOddsApiKey();
       if (_oddsKey && context.sport !== 'none') {
         try {
           const { fetchLiveOdds } = await import('@/lib/odds/index');
@@ -1187,7 +1187,7 @@ export async function POST(request: NextRequest) {
     // ── AI generation starts now ──────────────────────────────────────────────
 
     const xaiApiKey = getGrokApiKey();
-    const oddsApiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+    const oddsApiKey = getOddsApiKey();
     const hasClientOddsData = !!(context.oddsData?.events?.length);
     // Route DFS, pure-fantasy, file-upload, off-season, and ambiguous queries directly to
     // grok-3-fast (3-6s). Reserve grok-3 for live-odds betting analysis.
@@ -1599,7 +1599,7 @@ export async function POST(request: NextRequest) {
       execute: async ({ sport }: z.infer<typeof getLiveOddsParams>) => {
         console.log('[API/analyze] get_live_odds tool called:', { sport });
         try {
-          const oddsKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+          const oddsKey = getOddsApiKey();
           if (!oddsKey) return { error: 'Odds API key not configured' };
           const { fetchLiveOdds } = await import('@/lib/odds/index');
           const data = await fetchLiveOdds(sport, {

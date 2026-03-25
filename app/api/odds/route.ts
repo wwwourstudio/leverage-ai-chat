@@ -6,6 +6,7 @@ import {
   BETTING_REGIONS,
 } from '@/lib/odds/index';
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/lib/constants';
+import { getOddsApiKey } from '@/lib/config';
 
 // ============================================================================
 // POST /api/odds
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+    const apiKey = getOddsApiKey();
     if (!apiKey) {
       console.error('[API/odds] ODDS_API_KEY is not configured — set it in Vercel environment variables');
       return NextResponse.json(

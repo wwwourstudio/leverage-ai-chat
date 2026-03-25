@@ -23,6 +23,7 @@ import { fetchTodaysGames } from '@/lib/mlb-projections/mlb-stats-api';
 import type { MLBGame, MLBPitcher, MLBBatter } from '@/lib/mlb-projections/mlb-stats-api';
 import { projectSinglePlayer } from '@/lib/mlb-projections/projection-pipeline';
 import { getParkFactor, getWeatherFactor } from '@/lib/engine/context';
+import { fetchWeatherForLocation, weatherHRFactor } from '@/lib/weather/index';
 import {
   calculateMatchupFactor,
   calculatePlatoonEdge,
@@ -283,15 +284,34 @@ export async function predictHRForPlayer(
   // ── 7. Layer 1: park + weather ────────────────────────────────────────────
   const parkFactor = getParkFactor(stadiumSlug);
 
-  // Weather: MLB Stats API doesn't expose real-time weather — use seasonal estimate
-  // TODO: wire Open-Meteo call here using game.venueLat / game.venueLon
-  const weatherFactor = getWeatherFactor({
-    stadium:        stadiumSlug,
-    temperature:    72,   // default until weather fetch is added
-    wind_speed:     5,
-    wind_direction: 'none',
-    humidity:       50,
+  // Fetch live weather from Open-Meteo using the venue's GPS coordinates.
+  // Falls back to seasonal averages on timeout or API error (non-blocking).
+  let weatherFactor = getWeatherFactor({
+    stadium: stadiumSlug, temperature: 72, wind_speed: 5, wind_direction: 'none', humidity: 50,
   });
+  try {
+    const lat = game.venueLat;
+    const lon = game.venueLon;
+    if (lat && lon) {
+      const wx = await Promise.race([
+        fetchWeatherForLocation(lat, lon),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 3000)),
+      ]);
+      if (wx) {
+        // Use weatherHRFactor with available fields; windDeg=0 (North) is a conservative
+        // default when the current conditions API doesn't include wind direction.
+        weatherFactor = weatherHRFactor({
+          temp: wx.temperature,
+          windSpeed: wx.windSpeed,
+          windDeg: 0, // direction unavailable from /current endpoint
+          homeTeam: game.homeTeam ?? undefined,
+        });
+        warnings.push(`Live weather: ${wx.temperature}°F, wind ${wx.windSpeed} mph`);
+      }
+    }
+  } catch {
+    // Non-critical — seasonal default already set above
+  }
 
   // ── 8. Rule-based HR probability ─────────────────────────────────────────
   const pitcherHrPerPa = pitcherHr9 / 36; // HR/9 → per-PA rate (~36 AB/9 innings)

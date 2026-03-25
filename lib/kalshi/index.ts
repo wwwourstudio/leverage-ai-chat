@@ -409,9 +409,11 @@ async function _fetchKalshiPageInner(queryParams: URLSearchParams): Promise<Kals
         return { markets: [], cursor: null };
       }
 
+      // ── Quality / sanity filters ──────────────────────────────────────────
       // Reject titles shorter than 10 chars or that look like raw ticker symbols
       // (all-caps + digits + dashes/dots/%, e.g. "KXBT-25DEC25-T45000")
       const TICKER_RE = /^[A-Z0-9\-\.%]+$/;
+
       // Internal cross-category / multi-leg markets have UUID-like hex segments in their
       // event_ticker (e.g. "KXMVECROSSCATEGORY-S20269C2BE3773B8"). These markets don't
       // have public Kalshi web pages, so they produce 404 deep links.
@@ -421,6 +423,15 @@ async function _fetchKalshiPageInner(queryParams: URLSearchParams): Promise<Kals
       // F,E,B), so a date like "26DEC2026" or "26FEB2026" produces a 9-char all-hex sequence
       // that would incorrectly match at {8,}. Real UUID segments are ≥ 12 chars.
       const HEX_SEGMENT_RE = /-[0-9a-f]{12,}/i;
+
+      // Political series-ticker prefixes — these markets are always valid and have
+      // public Kalshi pages even when their event_ticker contains a hex-like segment
+      // (some KXUSGOV* and KXUSHOUSE* event tickers include short hash suffixes).
+      // Markets whose seriesTicker starts with one of these prefixes bypass the hex
+      // rejection rules entirely.
+      const POLITICAL_SERIES_PREFIXES = [
+        'KXUSSENATE', 'KXUSHOUSE', 'KXUSGOV', 'PRES', 'POTUS',
+      ];
       const rawCount = data.markets.length;
 
       // Rejection counters — logged once per page so we can diagnose filter drift
@@ -431,6 +442,14 @@ async function _fetchKalshiPageInner(queryParams: URLSearchParams): Promise<Kals
         .filter((m: KalshiMarket) => {
           if (!m.title || m.title.length < 10) { rejShort++; return false; }
           if (TICKER_RE.test(m.title)) { rejTicker++; return false; }
+
+          // Political series markets are always valid — they have public Kalshi
+          // pages and real liquidity even when their event_ticker carries a
+          // short hash suffix. Bypass both hex checks for these markets.
+          const seriesUpper = (m.seriesTicker || '').toUpperCase();
+          const isPolitical = POLITICAL_SERIES_PREFIXES.some(p => seriesUpper.startsWith(p));
+          if (isPolitical) return true;
+
           // Exclude internal cross-category markets (no public Kalshi URLs)
           if (m.eventTicker && HEX_SEGMENT_RE.test(m.eventTicker)) { rejHexEvent++; return false; }
           if (m.ticker && HEX_SEGMENT_RE.test(m.ticker)) { rejHexTicker++; return false; }
@@ -800,7 +819,28 @@ export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
 }
 
 /**
- * Fetch election-related markets from Kalshi
+ * Fetch political / election markets from Kalshi using exact series_ticker
+ * filtering.
+ *
+ * Strategy (in order of reliability):
+ *  1. PRIMARY — query /markets?series_ticker=<X>&status=open for each
+ *     known political series prefix (KXUSSENATE, KXUSHOUSE, KXUSGOV, PRES,
+ *     POTUS). This is exact, not keyword-based, so results are deterministic
+ *     and not susceptible to the Kalshi title-search non-determinism bug.
+ *  2. FALLBACK — if all series queries return 0 results (possible when the
+ *     Kalshi API does not support the series_ticker param on this deployment),
+ *     fall back to keyword title searches using terms that are specific to
+ *     political markets (e.g. "senate", "house representatives", "governor").
+ *  3. BROAD FALLBACK — if both targeted paths yield 0 results, fetch a broad
+ *     open-markets page and apply the `isElectionMarket` filter client-side.
+ *
+ * The `isElectionMarket` guard accepts any market whose `category` was already
+ * normalised to 'Politics' by normalizeCategoryLabel (which maps all known
+ * political series prefixes → 'Politics') OR whose title/subtitle contains a
+ * canonical political keyword.
+ *
+ * @param options.year   - Filter results to this election year (default: 2026)
+ * @param options.limit  - Maximum markets to return (default: 20)
  */
 export async function fetchElectionMarkets(options?: {
   year?: number;
@@ -808,63 +848,108 @@ export async function fetchElectionMarkets(options?: {
 }): Promise<KalshiMarket[]> {
   const { year = 2026, limit = 20 } = options || {};
 
-  console.log('[KALSHI] Fetching election markets for year:', year);
+  console.log('[KALSHI] fetchElectionMarkets — year:', year, 'limit:', limit);
 
+  // ── Canonical political series tickers ──────────────────────────────────
+  // These are the definitive Kalshi series IDs for US political markets.
+  // Add new entries here when Kalshi introduces new political series (e.g.
+  // KXUSLOCAL for state/local races).
+  const POLITICAL_SERIES: string[] = [
+    'KXUSSENATE',
+    'KXUSHOUSE',
+    'KXUSGOV',
+    'PRES',
+    'POTUS',
+  ];
+
+  // ── Election keyword list for secondary/fallback path ───────────────────
+  // Intentionally shorter than the old list to minimise extraneous matches.
+  // 'ballot', '2024', '2028' are omitted — too broad and produce false hits.
   const ELECTION_KEYWORDS = [
     'election', 'senate', 'house', 'congress', 'midterm',
-    'governor', 'president', 'harris', 'trump', 'republican',
-    'democrat', 'ballot', 'primary', 'gop',
+    'governor', 'president', 'republican', 'democrat',
+    'primary', 'gop', 'ballot initiative',
   ];
 
   function isElectionMarket(market: KalshiMarket): boolean {
-    // normalizeCategoryLabel maps political series tickers (KXUSSENATE*, KXUSHOUSE*,
-    // KXUSGOV*, PRES, POTUS) to 'Politics'. Accept those directly — their titles
-    // often won't contain the keyword list but they are definitively election markets.
+    // normalizeCategoryLabel maps KXUSSENATE*, KXUSHOUSE*, KXUSGOV*, PRES,
+    // POTUS → 'Politics'. Accept those directly without keyword scanning.
     if (market.category === 'Politics') return true;
     const text = `${market.title} ${market.subtitle}`.toLowerCase();
-    // Do NOT use text.includes(year.toString()) here — that would match any 2026 market
-    // (Grammy Awards, NBA Finals, etc.) and produce completely wrong election cards.
     return ELECTION_KEYWORDS.some(k => text.includes(k));
   }
-
-  // Reduced to 4 targeted strategies (previously 7) to stay within Kalshi rate limits.
-  // The Kalshi `title` search param does not reliably act as a substring filter —
-  // it often returns the top-50 open markets regardless of the search term —
-  // so we filter client-side after each fetch.
-  const searchStrategies: Array<Parameters<typeof fetchKalshiMarkets>[0]> = [
-    { search: `senate ${year}` },
-    { search: `house ${year}` },
-    { search: `governor ${year}` },
-    { search: 'midterm' },
-  ];
 
   const seen = new Set<string>();
   const electionMarkets: KalshiMarket[] = [];
 
-  for (const strategy of searchStrategies) {
-    if (electionMarkets.length >= limit) break;
+  // ── Strategy 1: series_ticker exact queries (primary path) ─────────────
+  // Run all series queries in parallel to minimise latency. Each call goes
+  // through the shared circuit-breaker so it benefits from the same fault
+  // tolerance as the main fetchKalshiMarkets path.
+  console.log('[KALSHI] fetchElectionMarkets — trying series_ticker queries:', POLITICAL_SERIES);
 
-    const markets = await fetchKalshiMarkets({ ...strategy, limit: 50 });
+  const seriesResults = await Promise.allSettled(
+    POLITICAL_SERIES.map(series =>
+      fetchKalshiPage(new URLSearchParams({
+        series_ticker: series,
+        status: 'open',
+        limit: String(Math.min(limit * 4, 200)),
+      }))
+    )
+  );
 
-    for (const market of markets) {
-      if (seen.has(market.ticker)) continue;
-      seen.add(market.ticker);
-      if (isElectionMarket(market)) {
+  for (const result of seriesResults) {
+    if (result.status !== 'fulfilled') continue;
+    for (const market of result.value.markets) {
+      if (!seen.has(market.ticker)) {
+        seen.add(market.ticker);
         electionMarkets.push(market);
+        if (electionMarkets.length >= limit) break;
+      }
+    }
+    if (electionMarkets.length >= limit) break;
+  }
+
+  console.log(`[KALSHI] fetchElectionMarkets — series_ticker path yielded: ${electionMarkets.length} markets`);
+
+  // ── Strategy 2: keyword title searches (fallback) ──────────────────────
+  // Used when the series_ticker param is unrecognised by this Kalshi endpoint
+  // version and all series queries return the generic top-50 open markets.
+  if (electionMarkets.length === 0) {
+    console.log('[KALSHI] fetchElectionMarkets — series_ticker yielded 0, trying keyword fallback');
+
+    const keywordSearches = [
+      `senate ${year}`,
+      `house ${year}`,
+      `governor ${year}`,
+      'midterm',
+      'congress',
+    ];
+
+    for (const search of keywordSearches) {
+      if (electionMarkets.length >= limit) break;
+
+      const markets = await fetchKalshiMarkets({ search, limit: 50 });
+      for (const market of markets) {
+        if (seen.has(market.ticker)) continue;
+        seen.add(market.ticker);
+        if (isElectionMarket(market)) {
+          electionMarkets.push(market);
+        }
+      }
+
+      // Brief pause to stay within Kalshi's per-second rate limit
+      if (electionMarkets.length < limit) {
+        await new Promise(r => setTimeout(r, 200));
       }
     }
 
-    // Brief pause between strategies to stay within Kalshi's rate limit
-    // (4 rapid sequential requests already saturate the limit in production).
-    if (electionMarkets.length < limit) {
-      await new Promise(r => setTimeout(r, 200));
-    }
+    console.log(`[KALSHI] fetchElectionMarkets — keyword fallback yielded: ${electionMarkets.length} markets`);
   }
 
-  // Fallback: if no matches after all strategies, fetch a broad set and filter.
-  // This handles the case where the Kalshi API returns unrelated markets for all searches.
+  // ── Strategy 3: broad fetch + client-side filter (last resort) ──────────
   if (electionMarkets.length === 0) {
-    console.log('[KALSHI] No election markets from targeted searches — falling back to broad fetch');
+    console.log('[KALSHI] fetchElectionMarkets — all targeted paths returned 0, broad-fetch fallback');
     try {
       const broad = await fetchKalshiMarketsWithRetry({ limit: 200, maxRetries: 2 });
       for (const market of broad) {
@@ -873,11 +958,11 @@ export async function fetchElectionMarkets(options?: {
         }
       }
     } catch {
-      // Non-critical fallback
+      // Non-critical — surface the empty array to the caller
     }
   }
 
-  console.log(`[KALSHI] Found ${electionMarkets.length} election markets for ${year}`);
+  console.log(`[KALSHI] fetchElectionMarkets — final count: ${electionMarkets.length} for ${year}`);
   return electionMarkets.slice(0, limit);
 }
 

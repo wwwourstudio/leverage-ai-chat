@@ -72,37 +72,66 @@ export async function GET(req: NextRequest) {
       `[v0] [cron/odds] Fetched ${oddsResult?.length ?? 0} games in ${Date.now() - startedAt}ms`,
     );
 
-    // ── Persist to live_odds_cache via SECURITY DEFINER RPC ───────────────
-    // Direct .upsert() fails because the live constraint is named uq_live_odds_game,
-    // not just the game_id column. The RPC uses the correct constraint + bypasses RLS.
+    // ── Persist: upsert games → get UUIDs → upsert live_odds_cache ───────────
+    // live_odds_cache.game_id_uuid is a NOT NULL FK to api.games(id).
+    // Step 1: upsert api.games (unique on external_id) to get stable UUIDs.
+    // Step 2: upsert api.live_odds_cache (unique on sport_key,home_team,away_team).
     let cached = 0;
     if (oddsResult.length > 0) {
       try {
         const expires = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-        const rpcRows = oddsResult
-          .filter((g: any) => g?.id && g?.home_team && g?.away_team)
-          .map((game: any) => ({
-            sport: SPORT_KEY_TO_LABEL[game.sport_key as string] ?? game.sport_key ?? 'Unknown',
-            sport_key: game.sport_key ?? '',
-            game_id: game.id,
-            home_team: game.home_team,
-            away_team: game.away_team,
-            commence_time: game.commence_time,
-            bookmakers: game.bookmakers ?? [],
-            markets: (game.bookmakers ?? []).flatMap((b: any) => b.markets ?? []),
-            expires_at: expires,
-          }));
+        const validGames = oddsResult.filter((g: any) => g?.id && g?.home_team && g?.away_team);
 
-        if (rpcRows.length > 0) {
+        if (validGames.length > 0) {
           const supabase = getServiceClient();
-          const { error } = await supabase
-            .from('live_odds_cache')
-            .upsert(rpcRows, { onConflict: 'game_id' });
-          if (error) {
-            console.error('[v0] [cron/odds] live_odds_cache upsert error:', error.message);
-          } else {
-            cached = rpcRows.length;
-            console.log(`[v0] [cron/odds] Cached ${cached} games`);
+
+          // Step 1 — upsert games, get UUIDs back
+          const gameRows = validGames.map((g: any) => ({
+            external_id: g.id,
+            sport: g.sport_key ?? '',
+            home_team: g.home_team,
+            away_team: g.away_team,
+            commence_time: g.commence_time,
+          }));
+          const { data: upsertedGames, error: gamesErr } = await supabase
+            .from('games')
+            .upsert(gameRows, { onConflict: 'external_id' })
+            .select('id, external_id');
+          if (gamesErr) {
+            console.error('[v0] [cron/odds] games upsert error:', gamesErr.message);
+          }
+
+          // Build external_id → uuid map
+          const gameIdMap: Record<string, string> = {};
+          for (const row of (upsertedGames ?? [])) {
+            if (row.external_id) gameIdMap[row.external_id] = row.id;
+          }
+
+          // Step 2 — upsert live_odds_cache with resolved game_id_uuid
+          const cacheRows = validGames
+            .filter((g: any) => gameIdMap[g.id])
+            .map((g: any) => ({
+              sport: SPORT_KEY_TO_LABEL[g.sport_key as string] ?? g.sport_key ?? 'Unknown',
+              sport_key: g.sport_key ?? '',
+              home_team: g.home_team,
+              away_team: g.away_team,
+              commence_time: g.commence_time,
+              bookmakers: g.bookmakers ?? [],
+              markets: (g.bookmakers ?? []).flatMap((b: any) => b.markets ?? []),
+              expires_at: expires,
+              game_id_uuid: gameIdMap[g.id],
+            }));
+
+          if (cacheRows.length > 0) {
+            const { error: cacheErr } = await supabase
+              .from('live_odds_cache')
+              .upsert(cacheRows, { onConflict: 'sport_key,home_team,away_team' });
+            if (cacheErr) {
+              console.error('[v0] [cron/odds] live_odds_cache upsert error:', cacheErr.message);
+            } else {
+              cached = cacheRows.length;
+              console.log(`[v0] [cron/odds] Cached ${cached} games`);
+            }
           }
         }
       } catch (cacheErr) {

@@ -559,7 +559,7 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
     ]);
 
     const lowerName = playerName.toLowerCase();
-    const player = (Array.isArray(data) ? data : []).find((p: any) => {
+    const player = data.players.find((p: any) => {
       const pName = (p.name ?? p.player_name ?? '').toLowerCase();
       return pName.includes(lowerName) || lowerName.includes(pName);
     });
@@ -569,18 +569,19 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
       return [];
     }
 
-    const name: string = player.name ?? player.player_name ?? playerName;
+    const p = player as any;
+    const name: string = p.name ?? p.player_name ?? playerName;
     const { getPlayerHeadshotUrl } = await import('@/lib/constants');
     const headshotUrl = getPlayerHeadshotUrl(name) ?? getPlayerHeadshotUrl(playerName) ?? null;
     // StatcastPlayer uses camelCase — check those first, then fall back to snake_case
     // variants that may appear in raw CSV-derived objects or legacy data sources.
-    const ev       = player.exitVelocity   ?? player.avg_exit_velocity  ?? player.exit_velocity_avg;
-    const hardHit  = player.hardHitPct     ?? player.hard_hit_percent   ?? player.hard_hit_pct;
-    const barrel   = player.barrelRate     ?? player.barrel_batted_rate ?? player.barrel_pct ?? player.barrel_rate;
-    const xba      = player.xba            ?? player.expected_batting_average;
-    const xslg     = player.xslg           ?? player.expected_slg;
-    const xwoba    = player.xwoba          ?? player.expected_woba;
-    const sweetSpot = player.sweetSpotPct  ?? player.sweet_spot_percent ?? player.sweet_spot_pct;
+    const ev       = p.exitVelocity   ?? p.avg_exit_velocity  ?? p.exit_velocity_avg;
+    const hardHit  = p.hardHitPct     ?? p.hard_hit_percent   ?? p.hard_hit_pct;
+    const barrel   = p.barrelRate     ?? p.barrel_batted_rate ?? p.barrel_pct ?? p.barrel_rate;
+    const xba      = p.xba            ?? p.expected_batting_average;
+    const xslg     = p.xslg           ?? p.expected_slg;
+    const xwoba    = p.xwoba          ?? p.expected_woba;
+    const sweetSpot = p.sweetSpotPct  ?? p.sweet_spot_percent ?? p.sweet_spot_pct;
 
     const metrics = [
       ev != null ? { label: 'Avg Exit Velocity', value: `${Number(ev).toFixed(1)} mph` } : null,

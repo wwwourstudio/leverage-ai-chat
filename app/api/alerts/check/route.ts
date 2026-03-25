@@ -69,8 +69,13 @@ export async function GET() {
           triggered.push({ id: alert.id, title: alert.title });
           console.log(`[Alerts] Fired alert "${alert.title}" for user ${alert.user_id}`);
 
-          // Dispatch to non-in_app channels
-          const channels: string[] = (alert as Record<string, unknown>).notify_channels as string[] ?? ['in_app'];
+          // Dispatch to non-in_app channels.
+          // notify_channels is a DB column (TEXT[]); fall back to condition JSONB for
+          // rows created before the column was added.
+          const channels: string[] =
+            (alert.notify_channels as string[] | null) ??
+            (alert.condition?.notify_channels as string[] | null) ??
+            ['in_app'];
           for (const ch of channels) {
             if (ch === 'in_app') continue; // handled client-side via triggered[] response
             if (ch === 'webhook') {
@@ -116,29 +121,33 @@ async function evaluateAlert(
   switch (alert.alert_type) {
     case 'odds_change':
     case 'line_movement': {
-      // Trigger if any odds entry for this sport/team has moved beyond the threshold
+      // Trigger if any odds entry for this sport/team has moved beyond the threshold.
+      // Schema columns: line_change (amount), timestamp (when recorded), home_team/away_team (not team_name).
       let query = supabase
         .from('line_movement')
-        .select('movement_amount')
-        .order('recorded_at', { ascending: false })
+        .select('line_change')
+        .order('timestamp', { ascending: false })
         .limit(10);
 
       if (alert.sport) query = query.ilike('sport', `%${alert.sport}%`);
-      if (alert.team) query = query.ilike('team_name', `%${alert.team}%`);
+      if (alert.team) {
+        query = query.or(`home_team.ilike.%${alert.team}%,away_team.ilike.%${alert.team}%`);
+      }
 
       const { data } = await query;
       if (!data?.length) return false;
       if (threshold === null) return true; // any movement counts
-      return data.some((row: { movement_amount: number }) =>
-        Math.abs(row.movement_amount) >= threshold
+      return data.some((row: { line_change: number }) =>
+        Math.abs(row.line_change) >= threshold
       );
     }
 
     case 'arbitrage': {
-      // Trigger if any arbitrage opportunity exceeds the threshold ROI
+      // Trigger if any arbitrage opportunity exceeds the threshold ROI.
+      // Schema column: profit_margin (not roi_percentage).
       let query = supabase
         .from('arbitrage_opportunities')
-        .select('roi_percentage')
+        .select('profit_margin')
         .order('detected_at', { ascending: false })
         .limit(10);
 
@@ -147,15 +156,16 @@ async function evaluateAlert(
       const { data } = await query;
       if (!data?.length) return false;
       if (threshold === null) return true;
-      return data.some((row: { roi_percentage: number }) => row.roi_percentage >= threshold);
+      return data.some((row: { profit_margin: number }) => row.profit_margin >= threshold);
     }
 
     case 'player_prop': {
-      // Trigger if a player prop line changed recently
+      // Trigger if a player prop line changed recently.
+      // Table: player_props_markets (not player_props). Sort by fetched_at (not updated_at).
       let query = supabase
-        .from('player_props')
+        .from('player_props_markets')
         .select('line')
-        .order('updated_at', { ascending: false })
+        .order('fetched_at', { ascending: false })
         .limit(5);
 
       if (alert.player) query = query.ilike('player_name', `%${alert.player}%`);
@@ -166,11 +176,12 @@ async function evaluateAlert(
     }
 
     case 'kalshi_price': {
-      // Trigger if a Kalshi market price crosses the threshold
+      // Trigger if a Kalshi market price crosses the threshold.
+      // Sort by cached_at (not updated_at — that column doesn't exist on kalshi_markets).
       let query = supabase
         .from('kalshi_markets')
         .select('yes_price')
-        .order('updated_at', { ascending: false })
+        .order('cached_at', { ascending: false })
         .limit(5);
 
       if (alert.team) query = query.ilike('title', `%${alert.team}%`);
@@ -187,7 +198,8 @@ async function evaluateAlert(
     }
 
     case 'market_intelligence': {
-      // Trigger when a high-severity market anomaly was detected in the last 5 minutes
+      // Trigger when a high-severity market anomaly was detected in the last 5 minutes.
+      // market_anomalies is populated by the market-intelligence engine when running.
       const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       const { data: anomalies } = await supabase
         .from('market_anomalies')

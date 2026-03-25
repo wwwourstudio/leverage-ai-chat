@@ -362,7 +362,8 @@ CREATE TABLE IF NOT EXISTS user_alerts (
   alert_type        TEXT        NOT NULL
                                 CHECK (alert_type IN (
                                   'odds_change','line_movement','player_prop',
-                                  'arbitrage','kalshi_price','game_start'
+                                  'arbitrage','kalshi_price','game_start',
+                                  'market_intelligence'
                                 )),
   sport             TEXT,
   team              TEXT,
@@ -375,6 +376,7 @@ CREATE TABLE IF NOT EXISTS user_alerts (
   last_triggered_at TIMESTAMPTZ,
   title             TEXT        NOT NULL,
   description       TEXT,
+  notify_channels   TEXT[]      NOT NULL DEFAULT ARRAY['in_app'],
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at        TIMESTAMPTZ
 );

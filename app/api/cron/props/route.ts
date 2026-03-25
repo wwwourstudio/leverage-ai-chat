@@ -2,9 +2,9 @@
  * GET /api/cron/props
  *
  * Ingest Layer — MLB player props refresh.
- * Fetches prop markets from The Odds API (event-level endpoint) for the next
- * 3 upcoming MLB games and upserts them into api.player_props_markets so the
- * card generator can read from cache instead of hitting the API on every request.
+ * Fetches batter/pitcher prop markets from The Odds API game-level endpoint
+ * and upserts into api.player_props_markets so the card generator reads from
+ * cache instead of hitting the live API on every request.
  *
  * Vercel Cron schedule: every 10 minutes  (*\/10 * * * *)
  * Auth: CRON_SECRET query param or header
@@ -24,25 +24,6 @@ function getServiceClient() {
   return createClient(url, key, { db: { schema: 'api' } });
 }
 
-const MLB_PROP_MARKETS = [
-  'player_home_runs',
-  'player_hits',
-  'player_total_bases',
-  'player_rbis',
-  'player_runs',
-  'player_stolen_bases',
-  'player_hits_runs_rbis',
-  'player_singles',
-  'player_doubles',
-  'player_walks',
-  'player_strikeouts',
-  'pitcher_strikeouts',
-  'pitcher_hits_allowed',
-  'pitcher_walks',
-  'pitcher_earned_runs',
-  'pitcher_outs',
-];
-
 export async function GET(req: NextRequest) {
   // ── Auth ──────────────────────────────────────────────────────────────────
   const cronSecret = process.env.CRON_SECRET;
@@ -57,99 +38,95 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const startedAt = Date.now();
   const apiKey = process.env.ODDS_API_KEY ?? '';
   if (!apiKey) {
     return NextResponse.json({ ok: false, error: 'ODDS_API_KEY not set' }, { status: 500 });
   }
 
+  const startedAt = Date.now();
+  const sport = 'baseball_mlb';
+
   try {
-    const baseUrl = 'https://api.the-odds-api.com/v4';
-    const sport = 'baseball_mlb';
+    // Game-level endpoint — batter_* and pitcher_* markets are available here
+    const url =
+      `https://api.the-odds-api.com/v4/sports/${sport}/odds/` +
+      `?apiKey=${apiKey}&regions=us` +
+      `&markets=batter_hits,batter_total_bases,batter_home_runs,pitcher_strikeouts` +
+      `&oddsFormat=american`;
 
-    // Step 1 — fetch upcoming events to get event IDs
-    const eventsResp = await fetch(`${baseUrl}/sports/${sport}/events?apiKey=${apiKey}`, {
-      signal: AbortSignal.timeout(10_000),
-    });
+    const resp = await fetch(url, { signal: AbortSignal.timeout(15_000) });
 
-    if (!eventsResp.ok) {
-      const msg = `Events fetch failed: HTTP ${eventsResp.status}`;
+    if (!resp.ok) {
+      const msg = `Odds API returned HTTP ${resp.status}`;
       console.warn(`[v0] [cron/props] ${msg}`);
+      // 422 = no active props yet; treat as empty rather than error
+      if (resp.status === 422) {
+        return NextResponse.json({ ok: true, inserted: 0, note: 'No active prop markets' });
+      }
       return NextResponse.json({ ok: false, error: msg }, { status: 502 });
     }
 
-    const events: any[] = await eventsResp.json();
-    if (!events.length) {
-      console.log('[v0] [cron/props] No upcoming MLB events');
-      return NextResponse.json({ ok: true, inserted: 0, note: 'No upcoming events' });
+    const games: any[] = await resp.json();
+    if (!games.length) {
+      return NextResponse.json({ ok: true, inserted: 0, note: 'No upcoming games' });
     }
 
-    const marketsParam = MLB_PROP_MARKETS.join(',');
-    // Limit to first 3 events to stay within Odds API quota
-    const eventsToFetch = events.slice(0, 3);
-    const allRows: Record<string, object> = {};
+    // Deduplicate by (player_name, stat_type, bookmaker, game_id) — the unique
+    // constraint that exists in the live DB as player_props_unique_prop
+    const seen = new Map<string, object>();
 
-    await Promise.allSettled(
-      eventsToFetch.map(async (event: any) => {
-        const url = `${baseUrl}/sports/${sport}/events/${event.id}/odds?apiKey=${apiKey}&regions=us&markets=${marketsParam}&oddsFormat=american`;
-        try {
-          const resp = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-          if (!resp.ok) return; // 422 = no props yet, 429 = rate limit — skip silently
+    for (const game of games) {
+      for (const bookmaker of game.bookmakers ?? []) {
+        for (const market of bookmaker.markets ?? []) {
+          // Group outcomes by player name
+          const byPlayer: Record<string, { line: number | null; over: number | null; under: number | null }> = {};
 
-          const data = await resp.json();
-          if (!data.bookmakers?.length) return;
-
-          for (const bookmaker of data.bookmakers) {
-            for (const market of bookmaker.markets ?? []) {
-              // Group outcomes by player name
-              const byPlayer: Record<string, { line: number | null; over: number | null; under: number | null }> = {};
-              for (const outcome of market.outcomes ?? []) {
-                const name = outcome.description || outcome.name;
-                if (!byPlayer[name]) byPlayer[name] = { line: null, over: null, under: null };
-                if (outcome.name === 'Over') {
-                  byPlayer[name].over = outcome.price;
-                  byPlayer[name].line = outcome.point ?? byPlayer[name].line;
-                } else if (outcome.name === 'Under') {
-                  byPlayer[name].under = outcome.price;
-                  byPlayer[name].line = outcome.point ?? byPlayer[name].line;
-                }
-              }
-
-              for (const [playerName, pd] of Object.entries(byPlayer)) {
-                if (pd.over == null || pd.under == null) continue;
-                const id = `${event.id}-${playerName}-${market.key}`;
-                allRows[id] = {
-                  id,
-                  sport,
-                  game_id: event.id,
-                  player_name: playerName,
-                  stat_type: market.key.replace(/^player_/, ''),
-                  line: pd.line,
-                  over_odds: pd.over,
-                  under_odds: pd.under,
-                  bookmaker: bookmaker.title,
-                  game_time: event.commence_time,
-                  home_team: event.home_team,
-                  away_team: event.away_team,
-                  fetched_at: new Date().toISOString(),
-                };
-              }
+          for (const outcome of market.outcomes ?? []) {
+            const name: string = outcome.description || outcome.name;
+            if (!byPlayer[name]) byPlayer[name] = { line: null, over: null, under: null };
+            if (outcome.name === 'Over') {
+              byPlayer[name].over = outcome.price;
+              byPlayer[name].line = outcome.point ?? byPlayer[name].line;
+            } else if (outcome.name === 'Under') {
+              byPlayer[name].under = outcome.price;
+              byPlayer[name].line = outcome.point ?? byPlayer[name].line;
             }
           }
-        } catch {
-          // Per-event error — skip and continue
-        }
-      }),
-    );
 
-    const rows = Object.values(allRows);
+          for (const [playerName, pd] of Object.entries(byPlayer)) {
+            if (pd.over == null || pd.under == null) continue;
+
+            // Dedup key matches the unique constraint columns
+            const dedupeKey = `${game.id}||${playerName}||${market.key}||${bookmaker.title}`;
+            seen.set(dedupeKey, {
+              id: `${game.id}-${playerName}-${market.key}`,
+              sport,
+              game_id: game.id,
+              player_name: playerName,
+              stat_type: market.key,
+              line: pd.line,
+              over_odds: pd.over,
+              under_odds: pd.under,
+              bookmaker: bookmaker.title,
+              game_time: game.commence_time,
+              home_team: game.home_team,
+              away_team: game.away_team,
+              fetched_at: new Date().toISOString(),
+            });
+          }
+        }
+      }
+    }
+
+    const rows = Array.from(seen.values());
     let inserted = 0;
 
     if (rows.length > 0) {
       const supabase = getServiceClient();
+      // player_props_unique_prop covers (player_name, stat_type, bookmaker, game_id)
       const { error } = await supabase
         .from('player_props_markets')
-        .upsert(rows, { onConflict: 'id' });
+        .upsert(rows, { onConflict: 'player_props_unique_prop' });
 
       if (error) {
         console.error('[v0] [cron/props] Upsert error:', error);
@@ -161,12 +138,13 @@ export async function GET(req: NextRequest) {
       inserted = rows.length;
     }
 
-    console.log(`[v0] [cron/props] Upserted ${inserted} MLB props in ${Date.now() - startedAt}ms`);
+    console.log(`[v0] [cron/props] Upserted ${inserted} MLB props from ${games.length} games in ${Date.now() - startedAt}ms`);
 
     return NextResponse.json({
       ok: true,
       inserted,
-      events: eventsToFetch.length,
+      sport,
+      games: games.length,
       durationMs: Date.now() - startedAt,
       runAt: new Date().toISOString(),
     });

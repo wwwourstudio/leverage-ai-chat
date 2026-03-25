@@ -1123,12 +1123,8 @@ export async function POST(request: NextRequest) {
         if (resolvedPlayerName && !context.playerName) {
           console.log(`[API/analyze] parseIntent extracted playerName="${resolvedPlayerName}" from query`);
         }
-        cardFetchPromise = Promise.all([
-          generateContextualCards('player', context.sport ?? undefined, 1, false, undefined, { playerName: resolvedPlayerName }),
-          generateContextualCards('betting', context.sport ?? undefined, 3).catch(() => []),
-        ]).then(([playerCards, supplementaryCards]) =>
-          [...playerCards, ...supplementaryCards].slice(0, 6)
-        ).catch(() => []);
+        // Single player — show only their card, no supplementary betting cards.
+        cardFetchPromise = generateContextualCards('player', context.sport ?? undefined, 1, false, undefined, { playerName: resolvedPlayerName }).catch(() => []);
 
       } else if (!context.isPoliticalMarket && (context.isSportsQuery || context.hasBettingIntent)) {
         // Betting/sports with no client odds: fetch from server

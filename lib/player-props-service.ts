@@ -5,7 +5,19 @@
  */
 
 import { createClient } from '@/lib/supabase/client';
+import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { getSupabaseUrl, getSupabaseServiceKey } from '@/lib/config';
 import { playerPropsQueue } from '@/lib/api-request-manager';
+
+/** Use service role on server (bypasses RLS), browser anon client on client. */
+function getReadClient() {
+  if (typeof window === 'undefined') {
+    const url = getSupabaseUrl();
+    const key = getSupabaseServiceKey();
+    if (url && key) return createServiceClient(url, key, { db: { schema: 'api' } });
+  }
+  return createClient();
+}
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -41,8 +53,8 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
   const { sport, useCache = true, storeResults = true } = options;
   
   console.log(`[v0] [PLAYER-PROPS] Fetching props for ${sport}`);
-  
-  const supabase = createClient();
+
+  const supabase = getReadClient();
   
   // Try cache first
   if (useCache) {
@@ -317,7 +329,7 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
  * Get props for a specific player
  */
 export async function getPlayerProps(playerName: string, sport: string): Promise<PlayerProp[]> {
-  const supabase = createClient();
+  const supabase = getReadClient();
   
   const { data, error } = await supabase
     .from('player_props_markets')
@@ -366,7 +378,9 @@ export function playerPropToCard(prop: PlayerProp): any {
     receptions: 'Receptions', reception_yds: 'Receiving Yards',
     anytime_td: 'Anytime TD', first_td: 'First TD',
     kicking_points: 'Kicking Points', field_goals: 'Field Goals',
-    // Baseball
+    // Baseball — game-level market keys (stored by cron/props)
+    batter_hits: 'Hits', batter_total_bases: 'Total Bases', batter_home_runs: 'Home Runs',
+    // Baseball — event-level market keys (fallback API path)
     home_runs: 'Home Runs', hits: 'Hits', total_bases: 'Total Bases',
     rbis: 'RBIs', runs: 'Runs', stolen_bases: 'Stolen Bases',
     hits_runs_rbis: 'H+R+RBI', singles: 'Singles', doubles: 'Doubles',

@@ -759,7 +759,11 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       try {
         const msgLow = (lastUserQuery || '').toLowerCase();
         const hasFantasyOrDFSQuery = /\b(adp|draft|waiver|sleeper|fantasy|dfs|best ball|lineup|vbd|tier|rank)\b/i.test(lastUserQuery || '');
-        const detectedCategory = (
+        const hasPropQuery = msgLow.includes('prop') || msgLow.includes('strikeout')
+                          || msgLow.includes('hits over') || msgLow.includes('home run over')
+                          || msgLow.includes('player bet');
+        const detectedCategory = hasPropQuery ? 'props'
+          : (
           msgLow.includes('kalshi') ||
           msgLow.includes('prediction market') ||
           msgLow.includes('championship winner') ||
@@ -2297,8 +2301,11 @@ No preamble. Start directly with section 1.`;
       category = 'fantasy';
     } else if (msgLower.includes('kalshi') || msgLower.includes('market')) {
       category = 'kalshi';
+    } else if (msgLower.includes('prop') || msgLower.includes('strikeout')
+            || msgLower.includes('player bet')) {
+      category = 'props';
     }
-    
+
     console.log('[v0] Fetching dynamic cards for:', { sport, category });
     
     try {

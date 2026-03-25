@@ -457,6 +457,7 @@ export async function POST(request: NextRequest) {
       isMLBQuery &&
       !hasADPIntent &&
       !hasStartSitIntent &&
+      !context?.hasPlayerIntent &&
       (!context?.hasBettingIntent || !!context?.hasPlayerIntent) &&
       !(!!context?.hasFantasyIntent && !context?.hasPlayerIntent);
 

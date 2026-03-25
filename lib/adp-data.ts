@@ -501,9 +501,9 @@ export function isADPFromUserUpload(): boolean {
 
 /**
  * Returns the MLB ADP player list.
- * Priority: in-memory cache → Supabase → local CSV → live fetch → static fallback.
- * The local CSV at public/adp/ADP.csv (or public/adp - ADP.csv) is checked before
- * attempting any external network requests, so the app works fully offline.
+ * Priority: in-memory cache → local CSV → static fallback.
+ * Supabase is intentionally skipped — ADP is maintained by manually
+ * updating public/adp/ADP.csv; no cron or DB sync required.
  */
 export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
   const now = Date.now();
@@ -512,39 +512,18 @@ export async function getADPData(forceRefresh = false): Promise<NFBCPlayer[]> {
     return adpCache;
   }
 
-  // 1. Supabase — authoritative (user uploads + previously seeded CSV data)
-  const dbData = await loadADPFromSupabase('mlb', true);
-  if (dbData && dbData.length > 0) {
-    // Validate quality: purge if majority of display names are numeric IDs (bad upload)
-    const numericCount = dbData.filter(p => /^\d+$/.test((p.displayName ?? '').trim())).length;
-    if (numericCount > dbData.length * 0.3) {
-      console.warn(`[v0] [ADP] Supabase data has ${numericCount}/${dbData.length} numeric display names — purging malformed upload`);
-      purgeADPFromSupabase('mlb').catch(() => {});
-      adpCache = STATIC_FALLBACK_PLAYERS;
-      lastFetched = now;
-      adpFromDB = false;
-      return STATIC_FALLBACK_PLAYERS;
-    }
-    console.log(`[v0] [ADP] Serving ${dbData.length} MLB players from Supabase`);
-    adpCache = dbData;
-    lastFetched = now;
-    adpFromDB = true;
-    return dbData;
-  }
-
-  // 2. Local CSV file — checked before any network calls so the app works without
-  //    external API access. Seeds Supabase on first load for faster subsequent reads.
+  // 1. Local CSV file — source of truth; update public/adp/ADP.csv to refresh ADP data
   const csvData = await loadADPFromCSV();
   if (csvData && csvData.length > 0) {
+    console.log(`[v0] [ADP] Serving ${csvData.length} MLB players from CSV`);
     adpCache = csvData;
     lastFetched = now;
     adpFromDB = false;
-    saveADPToSupabase(csvData, 'mlb').catch(() => {}); // seed DB for future cold starts
     return csvData;
   }
 
-  // 3. No data available
-  console.warn('[v0] [ADP] No CSV or DB data — ADP features disabled. Upload a CSV at /adp/upload to enable.');
+  // 2. Static fallback (top 120 pre-season consensus)
+  console.warn('[v0] [ADP] CSV not found — using static fallback. Update public/adp/ADP.csv to refresh.');
   adpFromDB = false;
   return STATIC_FALLBACK_PLAYERS;
 }

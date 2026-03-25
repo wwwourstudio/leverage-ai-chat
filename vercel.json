@@ -27,18 +27,11 @@
     "app/api/cron/train/route.ts": {
       "maxDuration": 60
     },
-    "app/api/adp/refresh/route.ts": {
-      "maxDuration": 30
-    }
   },
   "crons": [
     {
       "path": "/api/daily-picks",
       "schedule": "0 7 * * *"
-    },
-    {
-      "path": "/api/adp/refresh",
-      "schedule": "0 6 * * *"
     }
   ]
 }

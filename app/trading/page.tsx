@@ -192,6 +192,14 @@ function OddsScanner({
           const gameTime = new Date(event.commence_time);
           const live = gameTime <= new Date();
 
+          // Devig: remove bookmaker's vig to get fair (no-vig) probabilities.
+          // noVig = implied / (impliedAway + impliedHome) for each side.
+          const impliedAway = away ? americanToImplied(away.price) : 0.5;
+          const impliedHome = home ? americanToImplied(home.price) : 0.5;
+          const vigSum = impliedAway + impliedHome;
+          const noVigAway = vigSum > 0 ? impliedAway / vigSum : 0.5;
+          const noVigHome = vigSum > 0 ? impliedHome / vigSum : 0.5;
+
           return (
             <div
               key={event.id}
@@ -215,12 +223,14 @@ function OddsScanner({
               {/* Teams */}
               <div className="space-y-1">
                 {[
-                  { team: event.away_team, outcome: away },
-                  { team: event.home_team, outcome: home },
-                ].map(({ team, outcome }) => {
+                  { team: event.away_team, outcome: away, noVig: noVigAway },
+                  { team: event.home_team, outcome: home, noVig: noVigHome },
+                ].map(({ team, outcome, noVig }) => {
                   if (!outcome) return null;
                   const implied = americanToImplied(outcome.price);
-                  const edge = 0.54 - implied; // placeholder model edge (54% model base)
+                  // Edge = no-vig fair probability minus market implied probability.
+                  // Positive edge means the devigged price is better than offered (vig slice).
+                  const edge = noVig - implied;
 
                   return (
                     <div key={team} className="flex items-center gap-2">
@@ -236,7 +246,7 @@ function OddsScanner({
                           id: `${event.id}-${team}`,
                           label: `${team} ${formatOdds(outcome.price)}`,
                           americanOdds: outcome.price,
-                          modelProb: Math.max(0.05, Math.min(0.95, implied + edge)),
+                          modelProb: Math.max(0.05, Math.min(0.95, noVig)),
                         })}
                         className="p-1 rounded-md bg-blue-900/30 hover:bg-blue-700/50 text-blue-400 hover:text-blue-200 transition-all opacity-0 group-hover:opacity-100"
                         title="Add to Kelly calculator"
@@ -889,7 +899,7 @@ export default function TradingPage() {
         <div className="mt-3 flex items-start gap-2 px-3 py-2 rounded-xl bg-[oklch(0.09_0.012_280)] border border-[oklch(0.15_0.012_280)]">
           <Info className="w-3 h-3 text-blue-400 mt-0.5 shrink-0" />
           <p className="text-[9px] text-[oklch(0.38_0.01_280)] leading-relaxed">
-            <span className="font-bold text-[oklch(0.50_0.01_280)]">Pro Terminal</span> — Kelly sizing uses ¼-Kelly (25%) by default with a 5% max position cap. Monte Carlo runs 5 000 simulations over 50 bets. Edge estimates in the odds scanner use a 54% baseline model — hover and add legs to the Kelly calculator for precise analysis with your own probability estimates. This is for informational purposes only; verify all odds before placing wagers.
+            <span className="font-bold text-[oklch(0.50_0.01_280)]">Pro Terminal</span> — Kelly sizing uses ¼-Kelly (25%) by default with a 5% max position cap. Monte Carlo runs 5 000 simulations over 50 bets. Edge estimates in the odds scanner use devigged (no-vig) fair probabilities — the vig slice shown reflects what the bookmaker takes per side. Hover and add legs to the Kelly calculator to set your own win probability for precise analysis. This is for informational purposes only; verify all odds before placing wagers.
           </p>
         </div>
       </main>

@@ -25,7 +25,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, props, count: props.length });
   } catch (err) {
     console.error('[API/props] Error:', err);
-    // Return empty props rather than 500 so OpportunitiesFeed degrades cleanly
-    return NextResponse.json({ success: true, props: [], count: 0 });
+    // Return success:false with empty props so callers can detect errors
+    // while OpportunitiesFeed still degrades gracefully (checks propsData.props array)
+    return NextResponse.json({
+      success: false,
+      props: [],
+      count: 0,
+      error: err instanceof Error ? err.message : 'Failed to fetch player props',
+    });
   }
 }

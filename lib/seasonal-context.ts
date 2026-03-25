@@ -62,7 +62,7 @@ const SPORT_SEASONS: Record<string, SportSeasonConfig> = {
   },
   'baseball_mlb': {
     name: 'MLB',
-    regularSeasonMonths: [4, 5, 6, 7, 8, 9], // Apr-Sept
+    regularSeasonMonths: [3, 4, 5, 6, 7, 8, 9], // Mar-Sept (season opens late March)
     playoffMonths: [10], // October
     offseasonMessage: 'MLB season runs late March/early April through October',
     inSeasonMessage: 'Games daily from March through September',

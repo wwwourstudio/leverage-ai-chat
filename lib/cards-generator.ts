@@ -559,7 +559,7 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
     ]);
 
     const lowerName = playerName.toLowerCase();
-    const player = (Array.isArray(data) ? data : []).find((p: any) => {
+    const player = data.players.find((p: any) => {
       const pName = (p.name ?? p.player_name ?? '').toLowerCase();
       return pName.includes(lowerName) || lowerName.includes(pName);
     });

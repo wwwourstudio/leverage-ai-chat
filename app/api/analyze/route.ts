@@ -1048,9 +1048,11 @@ export async function POST(request: NextRequest) {
       && !context.sport
       && !context.isSportsQuery
       && !context.hasBettingIntent
+      && !context.hasFantasyIntent
       && !context.isPoliticalMarket
       && context.selectedCategory !== 'kalshi'
-      && context.selectedCategory !== 'dfs';
+      && context.selectedCategory !== 'dfs'
+      && context.selectedCategory !== 'fantasy';
 
     // Cards we've already resolved (available for prompt injection before AI starts)
     let resolvedCards: InsightCard[] | null = null;

@@ -1614,11 +1614,11 @@ No preamble. Start directly with section 1.`;
         }
       }
       
-      // Collect any existing cards from previous messages (SSR welcome + prior responses)
-      // to pass to the analyze endpoint so it can return them without re-fetching.
-      // Collect existing cards from previous messages to reuse where possible.
-      // Prefer real-data cards but keep estimated cards too (needed for offseason).
-      const allPreviousCards = messages.flatMap((m: Message) => m.cards || []);
+      // Collect cards from prior AI responses to pass as context — exclude the
+      // welcome/SSR message so its pre-fetched cards never pollute a fresh query.
+      const allPreviousCards = messages
+        .filter((m: Message) => !m.isWelcome && m.role === 'assistant')
+        .flatMap((m: Message) => m.cards || []);
       const realCards = allPreviousCards.filter((c: InsightCard) => c.data?.realData !== false);
       const availableCards = (realCards.length > 0 ? realCards : allPreviousCards).slice(0, 6);
 

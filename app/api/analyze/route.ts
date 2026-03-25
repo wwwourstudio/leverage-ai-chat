@@ -1616,6 +1616,65 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // ── Line movement / sharp money tool ─────────────────────────────────────
+    const LINE_MOVEMENT_KEYWORDS = [
+      'line movement', 'line move', 'line moves', 'steam move', 'steam',
+      'sharp money', 'sharp action', 'sharp bet', 'sharps', 'movers',
+      'reverse line movement', 'rlm', 'public money', 'biggest mover',
+    ];
+    const hasLineMovementIntent = LINE_MOVEMENT_KEYWORDS.some(k => rawQueryLower.includes(k));
+
+    const getOddsMoversTool = tool({
+      description: 'Fetch the biggest game-level line movements (spreads, totals, h2h) in the last 24 hours. Use when the user asks about line movement, steam moves, sharp money, or biggest movers.',
+      inputSchema: z.object({
+        hours: z.number().optional().describe('Look-back window in hours (default 24)'),
+      }),
+      execute: async ({ hours = 24 }: { hours?: number }) => {
+        console.log('[API/analyze] get_odds_movers tool called:', { hours });
+        try {
+          const baseOrigin = process.env.VERCEL_URL
+            ? `https://${process.env.VERCEL_URL}`
+            : 'http://localhost:3000';
+          const res = await fetch(`${baseOrigin}/api/odds/movers?hours=${hours}`, { cache: 'no-store' });
+          if (!res.ok) return { movers: [] };
+          return await res.json();
+        } catch (err) {
+          return { movers: [], error: err instanceof Error ? err.message : String(err) };
+        }
+      },
+    });
+
+    // ── Best props / prop picks tool ──────────────────────────────────────────
+    const PROPS_KEYWORDS = [
+      'best props', 'prop picks', 'top props', 'player props', 'prop bets',
+      'player prop', 'best bets props', 'prop value', 'favorite prop',
+    ];
+    const hasPropsToolIntent = PROPS_KEYWORDS.some(k => rawQueryLower.includes(k));
+
+    const getPropsLatestTool = tool({
+      description: 'Fetch the latest player prop lines (over/under lines and prices). Use when the user asks about best props, prop picks, or player prop betting.',
+      inputSchema: z.object({
+        sport:  z.string().optional().describe('Sport key, e.g. basketball_nba'),
+        market: z.string().optional().describe('Market key, e.g. batter_home_runs, player_points'),
+      }),
+      execute: async ({ sport, market }: { sport?: string; market?: string }) => {
+        console.log('[API/analyze] get_props_latest tool called:', { sport, market });
+        try {
+          const baseOrigin = process.env.VERCEL_URL
+            ? `https://${process.env.VERCEL_URL}`
+            : 'http://localhost:3000';
+          const params = new URLSearchParams();
+          if (sport)  params.set('sport', sport);
+          if (market) params.set('market', market);
+          const res = await fetch(`${baseOrigin}/api/props/latest?${params}`, { cache: 'no-store' });
+          if (!res.ok) return { props: [] };
+          return await res.json();
+        } catch (err) {
+          return { props: [], error: err instanceof Error ? err.message : String(err) };
+        }
+      },
+    });
+
     // ── SSE streaming response — wraps AI generation + post-processing ──────────
     const encoder = new TextEncoder();
     const sseChunk = (data: object) => encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
@@ -1641,8 +1700,12 @@ export async function POST(request: NextRequest) {
               ...(hasKalshiToolIntent && !hasHRPredictionIntent && !hasADPIntent && { tools: { kalshi_get_markets: kalshiGetMarketsTool, kalshi_get_price: kalshiGetPriceTool }, stopWhen: stepCountIs(2) }),
               ...(!hasHRPredictionIntent && !hasKalshiToolIntent && hasMLBProjectionIntent && { tools: { query_mlb_projections: mlbProjectionTool }, stopWhen: stepCountIs(3) }),
               ...(!hasHRPredictionIntent && !hasKalshiToolIntent && !hasMLBProjectionIntent && isMLBStatcastMode && { tools: { query_statcast: statcastTool }, stopWhen: stepCountIs(3) }),
+              // Line movement / sharp money queries
+              ...(hasLineMovementIntent && { tools: { get_odds_movers: getOddsMoversTool }, stopWhen: stepCountIs(2) }),
+              // Best props queries
+              ...(hasPropsToolIntent && !hasLineMovementIntent && { tools: { get_props_latest: getPropsLatestTool }, stopWhen: stepCountIs(2) }),
               // Fallback: betting intent but no tool matched and no odds pre-injected → let Grok fetch live odds
-              ...(!hasADPIntent && !hasHRPredictionIntent && !hasKalshiToolIntent && !hasMLBProjectionIntent && !isMLBStatcastMode && context.hasBettingIntent && !serverFetchedOdds && { tools: { get_live_odds: getLiveOddsTool }, stopWhen: stepCountIs(2) }),
+              ...(!hasADPIntent && !hasHRPredictionIntent && !hasKalshiToolIntent && !hasMLBProjectionIntent && !isMLBStatcastMode && !hasLineMovementIntent && !hasPropsToolIntent && context.hasBettingIntent && !serverFetchedOdds && { tools: { get_live_odds: getLiveOddsTool }, stopWhen: stepCountIs(2) }),
               // Deep Think: raise tool round-trips so complex multi-step analysis can call multiple tools
               ...(body.deepThink && { maxSteps: 5 }),
             });

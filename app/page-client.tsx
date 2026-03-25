@@ -2091,13 +2091,7 @@ No preamble. Start directly with section 1.`;
     'nuggets', 'timberwolves', 'thunder', 'trail blazers', 'blazers', 'jazz',
     'warriors', 'clippers', 'lakers', 'suns', 'kings',
     'mavericks', 'mavs', 'rockets', 'grizzlies', 'pelicans', 'spurs',
-    // Common team abbreviations used in player analysis cards
-    ' bos', ' bkn', ' nyk', ' phi', ' tor',
-    ' chi', ' cle', ' det', ' ind', ' mil',
-    ' atl', ' cha', ' mia', ' orl', ' was',
-    ' den', ' min', ' okc', ' por', ' uta',
-    ' gsw', ' lac', ' lal', ' phx', ' sac',
-    ' dal', ' hou', ' mem', ' nop', ' sas',
+    // Team abbreviations in parenthetical card format e.g. "Tatum (BOS)"
     '(bos)', '(bkn)', '(nyk)', '(phi)', '(tor)',
     '(chi)', '(cle)', '(det)', '(ind)', '(mil)',
     '(atl)', '(cha)', '(mia)', '(orl)', '(was)',

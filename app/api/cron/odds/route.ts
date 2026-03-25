@@ -72,13 +72,14 @@ export async function GET(req: NextRequest) {
       `[v0] [cron/odds] Fetched ${oddsResult?.length ?? 0} games in ${Date.now() - startedAt}ms`,
     );
 
-    // ── Upsert into live_odds_cache ────────────────────────────────────────
+    // ── Persist to live_odds_cache via SECURITY DEFINER RPC ───────────────
+    // Direct .upsert() fails because the live constraint is named uq_live_odds_game,
+    // not just the game_id column. The RPC uses the correct constraint + bypasses RLS.
     let cached = 0;
     if (oddsResult.length > 0) {
       try {
-        const now = new Date().toISOString();
         const expires = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-        const rows = oddsResult
+        const rpcRows = oddsResult
           .filter((g: any) => g?.id && g?.home_team && g?.away_team)
           .map((game: any) => ({
             sport: SPORT_KEY_TO_LABEL[game.sport_key as string] ?? game.sport_key ?? 'Unknown',
@@ -88,23 +89,20 @@ export async function GET(req: NextRequest) {
             away_team: game.away_team,
             commence_time: game.commence_time,
             bookmakers: game.bookmakers ?? [],
-            markets: (game.bookmakers ?? []).flatMap(
-              (b: any) => b.markets ?? [],
-            ),
-            cached_at: now,
+            markets: (game.bookmakers ?? []).flatMap((b: any) => b.markets ?? []),
             expires_at: expires,
           }));
 
-        if (rows.length > 0) {
+        if (rpcRows.length > 0) {
           const supabase = getServiceClient();
-          const { error } = await supabase
-            .from('live_odds_cache')
-            .upsert(rows, { onConflict: 'game_id' });
+          const { data: rpcResult, error } = await supabase.rpc('upsert_live_odds_bulk', {
+            p_rows: rpcRows,
+          });
           if (error) {
-            console.error('[v0] [cron/odds] live_odds_cache upsert error:', error.message);
+            console.error('[v0] [cron/odds] upsert_live_odds_bulk error:', error.message);
           } else {
-            cached = rows.length;
-            console.log(`[v0] [cron/odds] Cached ${cached} games to live_odds_cache`);
+            cached = (rpcResult as number) ?? rpcRows.length;
+            console.log(`[v0] [cron/odds] Cached ${cached} games via upsert_live_odds_bulk`);
           }
         }
       } catch (cacheErr) {

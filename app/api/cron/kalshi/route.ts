@@ -58,6 +58,15 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── Kalshi key guard ────────────────────────────────────────────────────
+  const hasKey =
+    process.env.KALSHI_ACCESS_KEY ||
+    process.env.KALSHI_API_KEY_ID ||
+    process.env.KALSHI_API_KEY;
+  if (!hasKey) {
+    return NextResponse.json({ ok: true, skipped: true, reason: 'KALSHI_API_KEY not set' });
+  }
+
   const startedAt = Date.now();
 
   try {
@@ -97,7 +106,7 @@ export async function GET(req: NextRequest) {
       volume: m.volume ?? null,
       close_time: m.expiration_time ?? null,
       cached_at: now,
-      expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     }));
 
     const supabase = getServiceClient();

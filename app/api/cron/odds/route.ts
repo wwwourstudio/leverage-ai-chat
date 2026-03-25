@@ -95,14 +95,14 @@ export async function GET(req: NextRequest) {
 
         if (rpcRows.length > 0) {
           const supabase = getServiceClient();
-          const { data: rpcResult, error } = await supabase.rpc('upsert_live_odds_bulk', {
-            p_rows: rpcRows,
-          });
+          const { error } = await supabase
+            .from('live_odds_cache')
+            .upsert(rpcRows, { onConflict: 'game_id' });
           if (error) {
-            console.error('[v0] [cron/odds] upsert_live_odds_bulk error:', error.message);
+            console.error('[v0] [cron/odds] live_odds_cache upsert error:', error.message);
           } else {
-            cached = (rpcResult as number) ?? rpcRows.length;
-            console.log(`[v0] [cron/odds] Cached ${cached} games via upsert_live_odds_bulk`);
+            cached = rpcRows.length;
+            console.log(`[v0] [cron/odds] Cached ${cached} games`);
           }
         }
       } catch (cacheErr) {

@@ -765,9 +765,10 @@ export async function POST(request: NextRequest) {
       const _oddsKey = getOddsApiKey();
       if (_oddsKey && context.sport !== 'none') {
         try {
-          const { fetchLiveOdds } = await import('@/lib/odds/index');
+          const { fetchLiveOdds, validateSportKey } = await import('@/lib/odds/index');
+          const _sportKey = validateSportKey(context.sport).normalizedKey ?? context.sport;
           const _serverEvents = await Promise.race([
-            fetchLiveOdds(context.sport, { apiKey: _oddsKey, markets: ['h2h', 'spreads', 'totals'], regions: ['us'], oddsFormat: 'american' }),
+            fetchLiveOdds(_sportKey, { apiKey: _oddsKey, markets: ['h2h', 'spreads', 'totals'], regions: ['us'], oddsFormat: 'american' }),
             new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
           ]).catch(() => null);
           if (Array.isArray(_serverEvents) && _serverEvents.length > 0) {
@@ -1601,8 +1602,9 @@ export async function POST(request: NextRequest) {
         try {
           const oddsKey = getOddsApiKey();
           if (!oddsKey) return { error: 'Odds API key not configured' };
-          const { fetchLiveOdds } = await import('@/lib/odds/index');
-          const data = await fetchLiveOdds(sport, {
+          const { fetchLiveOdds, validateSportKey } = await import('@/lib/odds/index');
+          const { normalizedKey: _sportKey = sport } = validateSportKey(sport);
+          const data = await fetchLiveOdds(_sportKey, {
             apiKey: oddsKey,
             markets: ['h2h', 'spreads', 'totals'],
             regions: ['us'],

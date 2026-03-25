@@ -13,6 +13,7 @@ import path from 'path';
 import type { NFBCPlayer } from '@/lib/adp-data';
 
 const CSV_CANDIDATES = [
+  path.join(process.cwd(), 'public', 'adp', 'adp - ADP.csv'),
   path.join(process.cwd(), 'public', 'adp', 'ADP.csv'),
   path.join(process.cwd(), 'public', 'adp - ADP.csv'),
 ];

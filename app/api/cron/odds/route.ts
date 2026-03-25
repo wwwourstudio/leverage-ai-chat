@@ -14,9 +14,25 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { getSupabaseUrl, getSupabaseServiceKey } from '@/lib/config';
 
 export const runtime = 'nodejs';
 export const maxDuration = 20;
+
+function getServiceClient() {
+  const url = getSupabaseUrl();
+  const key = getSupabaseServiceKey();
+  if (!url || !key) throw new Error('Supabase service role not configured');
+  return createClient(url, key, { db: { schema: 'api' } });
+}
+
+const SPORT_KEY_TO_LABEL: Record<string, string> = {
+  baseball_mlb: 'MLB',
+  basketball_nba: 'NBA',
+  americanfootball_nfl: 'NFL',
+  icehockey_nhl: 'NHL',
+};
 
 export async function GET(req: NextRequest) {
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -53,13 +69,54 @@ export async function GET(req: NextRequest) {
     );
 
     console.log(
-      `[v0] [cron/odds] Fetched ${oddsResult?.length ?? 0} markets in ${Date.now() - startedAt}ms`,
+      `[v0] [cron/odds] Fetched ${oddsResult?.length ?? 0} games in ${Date.now() - startedAt}ms`,
     );
+
+    // ── Upsert into live_odds_cache ────────────────────────────────────────
+    let cached = 0;
+    if (oddsResult.length > 0) {
+      try {
+        const now = new Date().toISOString();
+        const expires = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+        const rows = oddsResult
+          .filter((g: any) => g?.id && g?.home_team && g?.away_team)
+          .map((game: any) => ({
+            sport: SPORT_KEY_TO_LABEL[game.sport_key as string] ?? game.sport_key ?? 'Unknown',
+            sport_key: game.sport_key ?? '',
+            game_id: game.id,
+            home_team: game.home_team,
+            away_team: game.away_team,
+            commence_time: game.commence_time,
+            bookmakers: game.bookmakers ?? [],
+            markets: (game.bookmakers ?? []).flatMap(
+              (b: any) => b.markets ?? [],
+            ),
+            cached_at: now,
+            expires_at: expires,
+          }));
+
+        if (rows.length > 0) {
+          const supabase = getServiceClient();
+          const { error } = await supabase
+            .from('live_odds_cache')
+            .upsert(rows, { onConflict: 'game_id' });
+          if (error) {
+            console.error('[v0] [cron/odds] live_odds_cache upsert error:', error.message);
+          } else {
+            cached = rows.length;
+            console.log(`[v0] [cron/odds] Cached ${cached} games to live_odds_cache`);
+          }
+        }
+      } catch (cacheErr) {
+        console.error('[v0] [cron/odds] Cache write exception:', cacheErr);
+      }
+    }
 
     return NextResponse.json({
       success: true,
       meta: {
-        marketsIngested: oddsResult?.length ?? 0,
+        gamesFetched: oddsResult?.length ?? 0,
+        gamesCached: cached,
         durationMs: Date.now() - startedAt,
         runAt: new Date().toISOString(),
       },

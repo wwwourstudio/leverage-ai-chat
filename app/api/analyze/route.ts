@@ -1060,7 +1060,7 @@ export async function POST(request: NextRequest) {
     let cardPromise: Promise<InsightCard[]>;
 
     // ── Case 1: Client sent live odds → cards built synchronously, AI already has data ──
-    if (!context.isPoliticalMarket && !isAmbiguous && (context.isSportsQuery || context.hasBettingIntent) && context.oddsData?.events?.length > 0) {
+    if (!context.isPoliticalMarket && !isAmbiguous && !context.hasPlayerIntent && (context.isSportsQuery || context.hasBettingIntent) && context.oddsData?.events?.length > 0) {
       const sportKey = context.sport || context.oddsData.sport || 'sports';
       const builtCards = oddsEventsToBettingCards(
         context.oddsData.events,

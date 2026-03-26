@@ -1525,7 +1525,7 @@ No preamble. Start directly with section 1.`;
         } else {
           if (isDev) console.log('[FANTASY INTENT] No sport detected — skipping card pregeneration');
         }
-      } else if (context.hasBettingIntent || context.isSportsQuery) {
+      } else if ((context.hasBettingIntent || context.isSportsQuery) && !context.hasPlayerIntent) {
         // Fetch sports odds for any betting-related query OR explicit sports query
         if (isDev) console.log('[ODDS FETCH ATTEMPT] Betting intent or sports query detected');
         if (isDev) console.log('[v0] === ODDS FETCH STARTING ===');

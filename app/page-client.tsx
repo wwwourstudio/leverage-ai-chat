@@ -345,8 +345,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     fetch('/api/health', { signal: controller.signal })
       .then(r => r.json())
       .then((data: any) => {
-        const allOk = data?.services && Object.values(data.services).every((s: any) => s?.status === 'healthy' || s?.status === 'ok');
-        setSystemStatus(allOk ? 'ok' : 'degraded');
+        setSystemStatus(data?.status === 'healthy' ? 'ok' : data?.status === 'unhealthy' ? 'down' : 'degraded');
       })
       .catch(() => setSystemStatus('degraded'))
       .finally(() => clearTimeout(timer));

@@ -4,14 +4,45 @@
  * Connects to wss://api.elections.kalshi.com/trade-api/ws/v2
  * No npm packages required — uses the browser's built-in WebSocket API.
  *
+ * ── Authentication & enablement ──────────────────────────────────────────────
+ * Kalshi's WebSocket endpoint requires an ECDSA-signed token that can only be
+ * produced on the server side (it depends on KALSHI_PRIVATE_KEY, which must
+ * never be exposed to the browser).
+ *
+ * To enable real-time streaming you MUST do BOTH of the following:
+ *
+ *  1. Set NEXT_PUBLIC_KALSHI_WS_ENABLED=1 in your Vercel project environment
+ *     variables (Settings → Vars). This flag is intentionally opt-in so the
+ *     WebSocket is never accidentally opened in environments where the token
+ *     relay endpoint is absent.
+ *
+ *  2. Implement the token relay endpoint at GET /api/kalshi/ws-token.
+ *     This server-side route should:
+ *       a. Verify the caller is authenticated (check Supabase session or cookie).
+ *       b. Generate a short-lived (~60 s) signed Kalshi WebSocket token using
+ *          KALSHI_ACCESS_KEY + KALSHI_PRIVATE_KEY via buildHeaders() from
+ *          lib/kalshi/index.ts.
+ *       c. Return { token: string, expiresAt: number } as JSON.
+ *     The client passes this token in the WebSocket URL query string:
+ *       wss://api.elections.kalshi.com/trade-api/ws/v2?token=<TOKEN>
+ *     or in the first "authenticate" frame after connection, depending on the
+ *     Kalshi WS protocol version you are targeting.
+ *
+ * ── Political market streaming ────────────────────────────────────────────────
+ * Use `kalshiWS.subscribePolitical()` to subscribe to all active political
+ * market tickers in one call. It fetches the current open-market list for each
+ * known political series prefix via the REST API and then subscribes to those
+ * tickers over the WebSocket. Tickers are refreshed automatically on reconnect.
+ *
  * Features:
- * - Automatic reconnection with exponential backoff (1s → 30s cap)
+ * - Automatic reconnection with exponential backoff (1 s → 30 s cap)
  * - Re-subscribes all active channels after reconnect
- * - Heartbeat ping every 30 seconds to detect stale connections
+ * - Heartbeat ping every 30 s to detect stale connections
  * - Typed message handling for market_update, orderbook_delta, trade, settlement
  *
  * Usage:
  *   kalshiWS.subscribe(['NBA-HEAT-WIN'])
+ *   await kalshiWS.subscribePolitical()        // subscribe to all political tickers
  *   const unsub = kalshiWS.onPriceUpdate((ticker, data) => { ... })
  *   // later: unsub()
  */
@@ -69,11 +100,35 @@ export type ConnectionCallback  = (connected: boolean) => void;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const WS_URL        = 'wss://api.elections.kalshi.com/trade-api/ws/v2';
+const WS_BASE_URL   = 'wss://api.elections.kalshi.com/trade-api/ws/v2';
 const HEARTBEAT_MS  = 30_000;  // ping every 30 s
 const MIN_BACKOFF   =  1_000;  // 1 s
 const MAX_BACKOFF   = 30_000;  // 30 s cap
 const MAX_RECONNECT = 10;      // stop after 10 attempts
+
+/**
+ * Known political series prefixes on Kalshi.
+ * These are used by `subscribePolitical()` to look up active tickers and
+ * subscribe to them in one call.
+ * Keep this list in sync with POLITICAL_SERIES_PREFIXES in:
+ *  - app/api/cron/kalshi/route.ts
+ *  - lib/kalshi/index.ts (fetchElectionMarkets)
+ */
+const POLITICAL_SERIES_PREFIXES: string[] = [
+  'KXUSSENATE',
+  'KXUSHOUSE',
+  'KXUSGOV',
+  'PRES',
+  'POTUS',
+];
+
+/**
+ * Token relay endpoint — implemented by the host app at GET /api/kalshi/ws-token.
+ * Must return { token: string, expiresAt: number } (expiresAt is a Unix ms timestamp).
+ * Set to null to use an unauthenticated WebSocket connection (only works for
+ * public Kalshi market channels; order management channels require auth).
+ */
+const TOKEN_RELAY_ENDPOINT = '/api/kalshi/ws-token';
 
 // ── Client ────────────────────────────────────────────────────────────────────
 
@@ -85,6 +140,10 @@ export class KalshiWebSocket {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private msgId = 1;
+
+  /** Cached WS token retrieved from the server-side token relay endpoint */
+  private wsToken: string | null = null;
+  private wsTokenExpiresAt = 0;
 
   private priceCallbacks: Set<PriceUpdateCallback>   = new Set();
   private connCallbacks:  Set<ConnectionCallback>    = new Set();
@@ -98,14 +157,15 @@ export class KalshiWebSocket {
     }
     // Kalshi WS requires ECDSA auth via server-side credentials (KALSHI_PRIVATE_KEY)
     // that cannot be accessed from the browser. Connection is opt-in: set
-    // NEXT_PUBLIC_KALSHI_WS_ENABLED=1 only when a server-side token relay is in place.
+    // NEXT_PUBLIC_KALSHI_WS_ENABLED=1 only when the /api/kalshi/ws-token relay
+    // endpoint has been implemented and deployed.
     if (!process.env.NEXT_PUBLIC_KALSHI_WS_ENABLED) {
       return;
     }
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return; // already connected / connecting
     }
-    this._open();
+    void this._openWithToken();
   }
 
   disconnect(): void {
@@ -129,6 +189,42 @@ export class KalshiWebSocket {
     } else {
       // Will send on (re)connect
       this.connect();
+    }
+  }
+
+  /**
+   * Subscribe to all currently open political market tickers.
+   *
+   * Fetches the active ticker list for each known political series prefix via
+   * the REST API (/api/kalshi/markets?category=politics) and then subscribes
+   * to those tickers over the WebSocket. Safe to call multiple times — already-
+   * subscribed tickers are deduplicated.
+   *
+   * Prerequisites:
+   *  - NEXT_PUBLIC_KALSHI_WS_ENABLED=1 must be set (otherwise this is a no-op)
+   *  - /api/kalshi/ws-token relay endpoint must exist
+   */
+  async subscribePolitical(): Promise<void> {
+    if (!process.env.NEXT_PUBLIC_KALSHI_WS_ENABLED) return;
+
+    try {
+      const resp = await fetch('/api/kalshi/markets?category=politics&limit=100');
+      if (!resp.ok) {
+        console.warn('[KALSHI WS] subscribePolitical — could not fetch political tickers:', resp.status);
+        return;
+      }
+      const data = await resp.json() as { markets?: Array<{ ticker: string }> };
+      const tickers = (data.markets ?? []).map(m => m.ticker).filter(Boolean);
+
+      if (tickers.length === 0) {
+        console.warn('[KALSHI WS] subscribePolitical — 0 political tickers returned by REST API');
+        return;
+      }
+
+      console.log(`[KALSHI WS] subscribePolitical — subscribing to ${tickers.length} political tickers`);
+      this.subscribe(tickers);
+    } catch (err) {
+      console.error('[KALSHI WS] subscribePolitical error:', err instanceof Error ? err.message : err);
     }
   }
 
@@ -162,10 +258,58 @@ export class KalshiWebSocket {
 
   // ─── Internal helpers ───────────────────────────────────────────────────────
 
-  private _open(): void {
-    console.log(`[KALSHI WS] Connecting to ${WS_URL}…`);
+  /**
+   * Fetch a short-lived WS token from the server-side token relay endpoint,
+   * then open the WebSocket with it appended as a query parameter.
+   *
+   * Token relay contract (GET /api/kalshi/ws-token):
+   *   Request:  standard session cookies / Authorization header
+   *   Response: { token: string; expiresAt: number }
+   *
+   * The token is cached until 10 s before expiry to avoid re-fetching on every
+   * reconnect attempt within the same session.
+   */
+  private async _openWithToken(): Promise<void> {
+    const now = Date.now();
+
+    // Refresh the cached token if it is absent or about to expire (within 10 s)
+    if (!this.wsToken || now >= this.wsTokenExpiresAt - 10_000) {
+      try {
+        const resp = await fetch(TOKEN_RELAY_ENDPOINT);
+        if (resp.ok) {
+          const json = await resp.json() as { token?: string; expiresAt?: number };
+          if (json.token) {
+            this.wsToken = json.token;
+            this.wsTokenExpiresAt = json.expiresAt ?? now + 60_000;
+            console.log('[KALSHI WS] Token refreshed, expires in', Math.round((this.wsTokenExpiresAt - now) / 1000), 's');
+          }
+        } else if (resp.status === 404) {
+          // Token relay not implemented — connect without a token (public channels only)
+          console.warn(
+            '[KALSHI WS] Token relay endpoint not found (' + TOKEN_RELAY_ENDPOINT + ').',
+            'Connecting without auth — only public market channels will work.',
+            'Implement GET /api/kalshi/ws-token to enable authenticated channels.',
+          );
+        } else {
+          console.warn('[KALSHI WS] Token relay returned', resp.status, '— connecting without token');
+        }
+      } catch (err) {
+        console.warn('[KALSHI WS] Failed to fetch token, connecting without auth:', err instanceof Error ? err.message : err);
+      }
+    }
+
+    // Build the WS URL — append token as query param when available
+    const wsUrl = this.wsToken
+      ? `${WS_BASE_URL}?token=${encodeURIComponent(this.wsToken)}`
+      : WS_BASE_URL;
+
+    this._open(wsUrl);
+  }
+
+  private _open(wsUrl: string = WS_BASE_URL): void {
+    console.log(`[KALSHI WS] Connecting to ${wsUrl.split('?')[0]}…`);
     try {
-      const ws = new WebSocket(WS_URL);
+      const ws = new WebSocket(wsUrl);
       this.ws = ws;
 
       ws.onopen = () => {
@@ -250,7 +394,7 @@ export class KalshiWebSocket {
     this.reconnectAttempts++;
     const delay = Math.min(MIN_BACKOFF * 2 ** (this.reconnectAttempts - 1), MAX_BACKOFF);
     console.log(`[KALSHI WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${MAX_RECONNECT})`);
-    this.reconnectTimer = setTimeout(() => this._open(), delay);
+    this.reconnectTimer = setTimeout(() => void this._openWithToken(), delay);
   }
 
   private _startHeartbeat(): void {
@@ -285,3 +429,7 @@ export class KalshiWebSocket {
 // ── Singleton ─────────────────────────────────────────────────────────────────
 // One shared WebSocket connection per browser tab / page
 export const kalshiWS = new KalshiWebSocket();
+
+// Re-export the political series prefix list so downstream components can
+// filter their ticker sets without importing from the server-only kalshi/index.ts
+export { POLITICAL_SERIES_PREFIXES };

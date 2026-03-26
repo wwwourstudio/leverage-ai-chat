@@ -233,30 +233,27 @@ async function checkGrokAPI(): Promise<ServiceHealth> {
   }
 
   try {
-    const { generateText } = await import('ai');
-    const { createXai } = await import('@ai-sdk/xai');
-    const result = await generateText({
-      model: createXai({ apiKey })(AI_CONFIG.MODEL_NAME),
-      prompt: '1',
-      maxOutputTokens: 1,
-      maxRetries: 0,
-      abortSignal: AbortSignal.timeout(8000),
+    // Use the models list endpoint — no token consumption, fast auth check
+    const response = await fetch('https://api.x.ai/v1/models', {
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+      signal: AbortSignal.timeout(5000),
     });
     const responseTime = Date.now() - startTime;
-    return {
-      status: 'healthy',
-      responseTime,
-      details: { model: AI_CONFIG.MODEL_NAME, tokensUsed: result.usage?.totalTokens ?? 1 },
-    };
+    if (response.status === 401 || response.status === 403) {
+      return { status: 'unhealthy', responseTime, error: 'Invalid XAI_API_KEY', details: { configured: true } };
+    }
+    if (!response.ok) {
+      return { status: 'degraded', responseTime, error: `HTTP ${response.status}`, details: { configured: true } };
+    }
+    return { status: 'healthy', responseTime, details: { model: AI_CONFIG.MODEL_NAME, configured: true } };
   } catch (err) {
     const responseTime = Date.now() - startTime;
     const msg = err instanceof Error ? err.message : String(err);
-    const isAuth = msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('api key');
     const isTimeout = msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('aborted');
     return {
-      status: isAuth ? 'unhealthy' : 'degraded',
+      status: 'degraded',
       responseTime,
-      error: isAuth ? 'Invalid XAI_API_KEY' : isTimeout ? 'Grok API timeout (>8s)' : msg,
+      error: isTimeout ? 'xAI API timeout (>5s)' : msg,
       details: { configured: true },
     };
   }

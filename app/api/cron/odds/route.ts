@@ -111,10 +111,12 @@ export async function GET(req: NextRequest) {
             if (row.external_id) gameIdMap[row.external_id] = row.id;
           }
 
-          // Step 2 — upsert live_odds_cache with resolved game_id_uuid
-          // Deduplicate by (sport_key, home_team, away_team) — doubleheaders would otherwise
-          // produce duplicate rows and trigger "ON CONFLICT DO UPDATE command cannot affect
-          // row a second time".
+          // Step 2 — refresh live_odds_cache using delete + insert.
+          // Avoids "ON CONFLICT DO UPDATE command cannot affect row a second time" which
+          // occurs with batch upserts when doubleheaders produce multiple games for the
+          // same (sport_key, home_team, away_team) unique key. By deleting first there
+          // is no existing row to conflict with, so a plain insert always succeeds.
+          // Deduplicate by (sport_key, home_team, away_team) — keep first game per matchup.
           const seenCache = new Set<string>();
           const cacheRows = validGames
             .filter((g: any) => {
@@ -137,11 +139,22 @@ export async function GET(req: NextRequest) {
             }));
 
           if (cacheRows.length > 0) {
+            // Delete existing rows for the sports we're about to refresh
+            const sportsInBatch = [...new Set(cacheRows.map((r: any) => r.sport_key).filter(Boolean))];
+            const { error: deleteErr } = await supabase
+              .from('live_odds_cache')
+              .delete()
+              .in('sport_key', sportsInBatch);
+            if (deleteErr) {
+              console.error('[v0] [cron/odds] live_odds_cache delete error:', deleteErr.message);
+            }
+
+            // Fresh insert — no conflict possible since we just cleared the rows
             const { error: cacheErr } = await supabase
               .from('live_odds_cache')
-              .upsert(cacheRows, { onConflict: 'sport_key,home_team,away_team' });
+              .insert(cacheRows);
             if (cacheErr) {
-              console.error('[v0] [cron/odds] live_odds_cache upsert error:', cacheErr.message);
+              console.error('[v0] [cron/odds] live_odds_cache insert error:', cacheErr.message);
             } else {
               cached = cacheRows.length;
               console.log(`[v0] [cron/odds] Cached ${cached} games`);

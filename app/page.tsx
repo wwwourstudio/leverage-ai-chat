@@ -21,7 +21,7 @@ import { CardGrid } from '@/components/data-cards/CardSkeleton';
 export type ServerDataProps = ServerDataResult;
 
 async function fetchInitialServerData(): Promise<ServerDataProps> {
-  console.log('[v0] Server: === Page Load - Fetching All Data ===');
+  if (process.env.NODE_ENV === 'development') console.log('[v0] Server: === Page Load - Fetching All Data ===');
 
   // Log environment validation for debugging
   const envValidation = validateServerEnv();
@@ -35,13 +35,15 @@ async function fetchInitialServerData(): Promise<ServerDataProps> {
     includeOdds: true,
   });
 
-  // Log data fetch results
-  console.log('[v0] Server: Data fetch summary:');
-  console.log('  - Cards:', serverData.initialCards.length);
-  console.log('  - Session:', serverData.userSession ? 'authenticated' : 'anonymous');
-  console.log('  - Sources:', serverData.dataSourcesUsed.join(', '));
-  console.log('  - Missing Keys:', serverData.missingKeys.length);
-  console.log('  - Errors:', serverData.fetchErrors.length);
+  // Log data fetch results (dev only)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[v0] Server: Data fetch summary:');
+    console.log('  - Cards:', serverData.initialCards.length);
+    console.log('  - Session:', serverData.userSession ? 'authenticated' : 'anonymous');
+    console.log('  - Sources:', serverData.dataSourcesUsed.join(', '));
+    console.log('  - Missing Keys:', serverData.missingKeys.length);
+    console.log('  - Errors:', serverData.fetchErrors.length);
+  }
 
   // Ensure all data is JSON-serializable for the RSC -> Client Component boundary.
   // Complex objects (Dates, undefined, functions) get stripped during serialization.

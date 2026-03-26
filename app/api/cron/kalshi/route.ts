@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
       req.headers.get('x-cron-secret') ??
       '';
     if (querySecret !== cronSecret && headerSecret !== cronSecret) {
-      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
   }
 

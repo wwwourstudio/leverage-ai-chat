@@ -34,6 +34,7 @@ interface ChatInputProps {
   placeholder?: string;
   deepThink?: boolean;
   onToggleDeepThink?: () => void;
+  systemStatus?: 'ok' | 'degraded' | 'down';
 }
 
 const MAX_CHARS = 2000;
@@ -57,6 +58,7 @@ export function ChatInput({
   placeholder,
   deepThink = false,
   onToggleDeepThink,
+  systemStatus = 'ok',
 }: ChatInputProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -302,11 +304,13 @@ export function ChatInput({
 
           <div className="flex items-center gap-1.5 text-[10px] font-semibold text-[var(--text-faint)]">
             <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+              {systemStatus === 'ok' && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />}
+              <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${systemStatus === 'down' ? 'bg-red-500' : systemStatus === 'degraded' ? 'bg-amber-400' : 'bg-emerald-500'}`} />
             </span>
-            <span className="hidden sm:inline">All systems operational</span>
-            <span className="sm:hidden">Online</span>
+            <span className="hidden sm:inline">
+              {systemStatus === 'down' ? 'Service disruption' : systemStatus === 'degraded' ? 'Degraded performance' : 'All systems operational'}
+            </span>
+            <span className="sm:hidden">{systemStatus === 'down' ? 'Down' : systemStatus === 'degraded' ? 'Degraded' : 'Online'}</span>
           </div>
         </div>
       </div>

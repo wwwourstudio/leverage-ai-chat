@@ -178,6 +178,19 @@ interface UnifiedAIPlatformProps {
   serverData?: ServerDataProps;
 }
 
+interface FantasyLeague {
+  sport: string;       // 'nfl' | 'mlb' | 'nba' | 'nhl'
+  platform: string;   // 'espn' | 'yahoo' | 'fantrax' | 'cbs' | 'nfbc' | 'nfl_com'
+  teams: number;
+  leagueType: string; // 'ppr' | 'half_ppr' | 'standard' | 'h2h' | 'roto' | 'roto_h2h'
+  teamName: string;
+  leagueName: string;
+  // legacy compat
+  type?: string;
+  scoring?: string;
+  setupComplete: boolean;
+}
+
 export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps) {
   const toast = useToast();
 
@@ -266,6 +279,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [showLimitNotification, setShowLimitNotification] = useState(false);
   const [_chatsRemaining, setChatsRemaining] = useState(5);
   const [creditsRemaining, setCreditsRemaining] = useState(15);
+  const [systemStatus, setSystemStatus] = useState<'ok' | 'degraded' | 'down'>('ok');
 
   // Sync creditsRemaining from localStorage on mount so visitors see their real
   // remaining balance immediately, not the hardcoded default of 15.
@@ -311,28 +325,32 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const pendingThreadRef = useRef<Promise<import('@/lib/chat-service').ChatThread | null> | null>(null);
 
   // Fantasy league setup state — must NOT read localStorage here (causes SSR hydration mismatch #418)
-  interface FantasyLeague {
-    sport: string;                // 'nfl' | 'mlb' | 'nba' | 'nhl'
-    platform: string;             // 'espn' | 'yahoo' | 'fantrax' | 'cbs' | 'nfbc' | 'nfl_com'
-    teams: number;
-    leagueType: string;           // 'ppr' | 'half_ppr' | 'standard' | 'h2h' | 'roto' | 'roto_h2h'
-    teamName: string;
-    leagueName: string;
-    // legacy compat
-    type?: string;
-    scoring?: string;
-    setupComplete: boolean;
-  }
   const [fantasyLeague, setFantasyLeague] = useState<FantasyLeague | null>(null);
   const [fantasySetupStep, setFantasySetupStep] = useState(0);
   const [fantasySetupData, setFantasySetupData] = useState<Partial<FantasyLeague>>({ sport: 'nfl', platform: 'espn', teams: 12, leagueType: 'ppr' });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   
   // Open sidebar by default on desktop (lg breakpoint = 1024px). Mobile/tablet stay closed.
   useEffect(() => {
     if (window.innerWidth >= 1024) setSidebarOpen(true);
+  }, []);
+
+  // Check actual service health once on mount; wire to the status indicator in ChatInput.
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    fetch('/api/health', { signal: controller.signal })
+      .then(r => r.json())
+      .then((data: any) => {
+        const allOk = data?.services && Object.values(data.services).every((s: any) => s?.status === 'healthy' || s?.status === 'ok');
+        setSystemStatus(allOk ? 'ok' : 'degraded');
+      })
+      .catch(() => setSystemStatus('degraded'))
+      .finally(() => clearTimeout(timer));
+    return () => { controller.abort(); clearTimeout(timer); };
   }, []);
 
   // Correct the welcome message timestamp to real local time after hydration.
@@ -2947,6 +2965,18 @@ No preamble. Start directly with section 1.`;
     }
   };
 
+  const adjustEditTextareaHeight = () => {
+    if (editTextareaRef.current) {
+      requestAnimationFrame(() => {
+        if (editTextareaRef.current) {
+          editTextareaRef.current.style.height = 'auto';
+          const newHeight = editTextareaRef.current.scrollHeight;
+          editTextareaRef.current.style.height = `${newHeight}px`;
+        }
+      });
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -3553,10 +3583,10 @@ No preamble. Start directly with section 1.`;
                   {message.role === 'assistant' && (
                     <div className="flex items-center gap-2.5 mb-2.5 flex-wrap">
                       {/* Logo mark */}
-                      <div className="relative w-7 h-7 shrink-0">
+                      <div className="relative w-7 h-7 shrink-0" role="img" aria-label="Leverage AI">
                         <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 opacity-20 blur-sm" />
                         <div className="relative w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-md shadow-blue-500/25">
-                          <TrendingUp className="w-3.5 h-3.5 text-white" />
+                          <TrendingUp className="w-3.5 h-3.5 text-white" aria-hidden="true" />
                         </div>
                       </div>
                       <span className="text-xs font-black tracking-tight text-white">Leverage<span className="text-blue-400"> AI</span></span>
@@ -3607,11 +3637,11 @@ No preamble. Start directly with section 1.`;
                     {editingMessageIndex === index ? (
                       <div className="space-y-3">
               <textarea
-                ref={textareaRef}
+                ref={editTextareaRef}
                 value={editingContent}
                 onChange={(e: any) => {
                   setEditingContent(e.target.value);
-                  adjustTextareaHeight();
+                  adjustEditTextareaHeight();
                 }}
                 onKeyDown={handleKeyDown}
                 placeholder={selectedCategory === 'all' ? "Ask about sports betting, fantasy, DFS, or prediction markets..." : 
@@ -3657,10 +3687,16 @@ No preamble. Start directly with section 1.`;
                         {/* Check if this is a detailed analysis with structured data */}
                         {message.content.includes('__DETAILED_ANALYSIS__') ? (
                           (() => {
-                            const match = message.content.match(/__DETAILED_ANALYSIS__(.+)__END_ANALYSIS__/);
+                            const match = message.content.match(/__DETAILED_ANALYSIS__(.+)__END_ANALYSIS__/s);
                             if (!match) return <p className="text-sm leading-relaxed font-medium">{message.content}</p>;
-                            
-                            const data = JSON.parse(match[1]);
+
+                            let data: any;
+                            try {
+                              data = JSON.parse(match[1]);
+                            } catch {
+                              // Malformed / truncated JSON (e.g. streaming interrupted mid-blob)
+                              return <p className="text-sm leading-relaxed font-medium">{message.content.replace(/__DETAILED_ANALYSIS__[\s\S]*?__END_ANALYSIS__/, '').trim()}</p>;
+                            }
                             const { card, metrics, overview, marketContext, riskAssessment, recommendations } = data;
                             
                             // Map card type to icon component
@@ -4591,6 +4627,7 @@ No preamble. Start directly with section 1.`;
               selectedCategory={selectedCategory}
               deepThink={deepThink}
               onToggleDeepThink={() => setDeepThink((v) => !v)}
+              systemStatus={systemStatus}
             />
           </div>
         </div>

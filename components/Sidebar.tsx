@@ -138,10 +138,12 @@ const ChatCard = memo(function ChatCard({
   const isEditing = editingChatId === chat.id;
 
   return (
-    <div
+    <button
+      type="button"
       onClick={() => onSelectChat(chat.id)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectChat(chat.id); } }}
       className={cn(
-        'group relative rounded-xl p-2.5 cursor-pointer transition-all duration-200 overflow-hidden',
+        'group relative w-full text-left rounded-xl p-2.5 cursor-pointer transition-all duration-200 overflow-hidden',
         tagAccentClass(chat.tags),
         isActive
           ? 'bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10 border border-blue-500/30 shadow-lg shadow-blue-500/10'
@@ -239,7 +241,7 @@ const ChatCard = memo(function ChatCard({
           </button>
         </div>
       </div>
-    </div>
+    </button>
   );
 });
 

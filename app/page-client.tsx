@@ -3687,7 +3687,7 @@ No preamble. Start directly with section 1.`;
                         {/* Check if this is a detailed analysis with structured data */}
                         {message.content.includes('__DETAILED_ANALYSIS__') ? (
                           (() => {
-                            const match = message.content.match(/__DETAILED_ANALYSIS__(.+)__END_ANALYSIS__/s);
+                            const match = message.content.match(/__DETAILED_ANALYSIS__([\s\S]+)__END_ANALYSIS__/);
                             if (!match) return <p className="text-sm leading-relaxed font-medium">{message.content}</p>;
 
                             let data: any;
@@ -3696,6 +3696,7 @@ No preamble. Start directly with section 1.`;
                             } catch {
                               // Malformed / truncated JSON (e.g. streaming interrupted mid-blob)
                               return <p className="text-sm leading-relaxed font-medium">{message.content.replace(/__DETAILED_ANALYSIS__[\s\S]*?__END_ANALYSIS__/, '').trim()}</p>;
+
                             }
                             const { card, metrics, overview, marketContext, riskAssessment, recommendations } = data;
                             

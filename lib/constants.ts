@@ -23,13 +23,12 @@ export const NFL_SEASON_YEAR: number = _mostRecentNFLSeason();
 export const NFBC_DRAFT_YEAR: number = new Date().getFullYear();
 
 // AI Model Configuration
-// Primary model: grok-3 — strong model for live-odds analysis, much faster than grok-4.
-// Fast-path model: grok-3-fast for intent-routing, ADP, and off-season queries.
+// All queries use grok-4. FAST_MODEL_NAME retained for fallback logic but also points to grok-4.
 export const AI_CONFIG = {
-  MODEL_NAME: 'grok-3',
-  FAST_MODEL_NAME: 'grok-3-fast',
-  MODEL_DISPLAY_NAME: 'Grok 3',
-  FAST_MODEL_DISPLAY_NAME: 'Grok 3 Fast',
+  MODEL_NAME: 'grok-4',
+  FAST_MODEL_NAME: 'grok-4',
+  MODEL_DISPLAY_NAME: 'Grok 4',
+  FAST_MODEL_DISPLAY_NAME: 'Grok 4',
   PROVIDER: 'xAI',
   API_ENDPOINT: 'https://api.x.ai/v1/chat/completions',
   DEFAULT_TEMPERATURE: 0.35,

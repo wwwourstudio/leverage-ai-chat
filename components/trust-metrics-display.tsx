@@ -398,7 +398,7 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
         )}
         {metrics.modelUsed && (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20 text-[9px] font-bold text-purple-400">
-            <Cpu className="w-2.5 h-2.5" /> {metrics.modelUsed}
+            <Cpu className="w-2.5 h-2.5" /> {metrics.modelUsed.replace(/grok-[34](-fast)?/i, 'Grok 4').replace('Grok 3', 'Grok 4')}
           </span>
         )}
       </div>

@@ -129,7 +129,7 @@ interface AnalyzeRequestBody {
 // ============================================================================
 
 /**
- * Returns true for query types where grok-3-mini is sufficient and faster:
+ * Returns true for query types that use the fast path (grok-4):
  * - DFS lineup questions (no live-odds accuracy needed)
  * - Pure fantasy queries (hasFantasyIntent && !hasBettingIntent)
  * - CSV / file uploads (user's own data, not real-time odds)
@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Per-AI-call timeouts (independent from each other and from card generation):
-  //   grok-3 primary: 52s first-token | grok-3-mini primary: 28s | fallback: 10s
+  //   grok-4 primary: ~15-30s first-token | fallback: 10s
   // Vercel serverless functions have a 60s wall-clock limit. Keeping primary+fallback
   // to ≤58s gives a small buffer for the response serialisation overhead.
   const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 28_000 : 52_000;
@@ -1060,7 +1060,7 @@ export async function POST(request: NextRequest) {
     let cardPromise: Promise<InsightCard[]>;
 
     // ── Case 1: Client sent live odds → cards built synchronously, AI already has data ──
-    if (!context.isPoliticalMarket && !isAmbiguous && !context.hasPlayerIntent && (context.isSportsQuery || context.hasBettingIntent) && context.oddsData?.events?.length > 0) {
+    if (!context.isPoliticalMarket && !isAmbiguous && !context.hasPlayerIntent && !context.hasFantasyIntent && (context.isSportsQuery || context.hasBettingIntent) && context.oddsData?.events?.length > 0) {
       const sportKey = context.sport || context.oddsData.sport || 'sports';
       const builtCards = oddsEventsToBettingCards(
         context.oddsData.events,
@@ -1189,9 +1189,8 @@ export async function POST(request: NextRequest) {
     const xaiApiKey = getGrokApiKey();
     const oddsApiKey = getOddsApiKey();
     const hasClientOddsData = !!(context.oddsData?.events?.length);
-    // Route DFS, pure-fantasy, file-upload, off-season, and ambiguous queries directly to
-    // grok-3-fast (3-6s). Reserve grok-3 for live-odds betting analysis.
-    // deepThink overrides everything: always use grok-4 with extended reasoning.
+    // All queries use grok-4. deepThink overrides to grok-4 with extended reasoning.
+    // Fast-path queries skip extended reasoning for lower latency.
     // ADP queries override to primary: reliable tool use requires the stronger model.
     // isAmbiguous queries only need a short clarification reply — no need for primary.
     const useFastPath = body.deepThink ? false : (hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context)));

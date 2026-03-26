@@ -3,6 +3,7 @@ import { generateText } from 'ai';
 import { createXai } from '@ai-sdk/xai';
 import { createClient } from '@/lib/supabase/server';
 import { getGrokApiKey } from '@/lib/config';
+import { AI_CONFIG } from '@/lib/constants';
 
 /**
  * POST /api/alerts/suggest
@@ -60,7 +61,7 @@ Respond ONLY with a JSON object (no markdown, no explanation):
 
   try {
     const { text } = await generateText({
-      model: xai('grok-3-fast'),
+      model: xai(AI_CONFIG.MODEL_NAME),
       prompt,
       maxOutputTokens: 200,
     });

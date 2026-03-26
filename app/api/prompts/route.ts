@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
 import { createXai } from '@ai-sdk/xai';
 import { getGrokApiKey } from '@/lib/config';
-import { HTTP_STATUS } from '@/lib/constants';
+import { HTTP_STATUS, AI_CONFIG } from '@/lib/constants';
 
 // ── In-memory cache (10-minute TTL) ─────────────────────────────────────────
 
@@ -124,7 +124,7 @@ export async function GET(req: NextRequest) {
 Return a JSON array of 5 objects: [{"label": "Short label (3-5 words)", "query": "Full question the user wants answered (1-2 sentences, specific and actionable)"}]`;
 
   const aiPromise = generateText({
-    model: createXai({ apiKey })('grok-3-fast'),
+    model: createXai({ apiKey })(AI_CONFIG.MODEL_NAME),
     system: systemPrompt,
     prompt: userPrompt,
     maxOutputTokens: 600,

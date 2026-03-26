@@ -86,13 +86,17 @@ export async function GET(req: NextRequest) {
           const supabase = getServiceClient();
 
           // Step 1 — upsert games, get UUIDs back
-          const gameRows = validGames.map((g: any) => ({
-            external_id: g.id,
-            sport: g.sport_key ?? '',
-            home_team: g.home_team,
-            away_team: g.away_team,
-            commence_time: g.commence_time,
-          }));
+          // Deduplicate by external_id to avoid ON CONFLICT duplicates within the batch
+          const seenExternal = new Set<string>();
+          const gameRows = validGames
+            .filter((g: any) => { if (seenExternal.has(g.id)) return false; seenExternal.add(g.id); return true; })
+            .map((g: any) => ({
+              external_id: g.id,
+              sport: g.sport_key ?? '',
+              home_team: g.home_team,
+              away_team: g.away_team,
+              commence_time: g.commence_time,
+            }));
           const { data: upsertedGames, error: gamesErr } = await supabase
             .from('games')
             .upsert(gameRows, { onConflict: 'external_id' })
@@ -108,8 +112,18 @@ export async function GET(req: NextRequest) {
           }
 
           // Step 2 — upsert live_odds_cache with resolved game_id_uuid
+          // Deduplicate by (sport_key, home_team, away_team) — doubleheaders would otherwise
+          // produce duplicate rows and trigger "ON CONFLICT DO UPDATE command cannot affect
+          // row a second time".
+          const seenCache = new Set<string>();
           const cacheRows = validGames
-            .filter((g: any) => gameIdMap[g.id])
+            .filter((g: any) => {
+              if (!gameIdMap[g.id]) return false;
+              const key = `${g.sport_key}|${g.home_team}|${g.away_team}`;
+              if (seenCache.has(key)) return false;
+              seenCache.add(key);
+              return true;
+            })
             .map((g: any) => ({
               sport: SPORT_KEY_TO_LABEL[g.sport_key as string] ?? g.sport_key ?? 'Unknown',
               sport_key: g.sport_key ?? '',

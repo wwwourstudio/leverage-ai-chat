@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getOddsApiKey, isOddsApiConfigured, getGrokApiKey } from '@/lib/config';
+import { AI_CONFIG } from '@/lib/constants';
 
 interface ServiceHealth {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -235,7 +236,7 @@ async function checkGrokAPI(): Promise<ServiceHealth> {
     const { generateText } = await import('ai');
     const { createXai } = await import('@ai-sdk/xai');
     const result = await generateText({
-      model: createXai({ apiKey })('grok-3-fast'),
+      model: createXai({ apiKey })(AI_CONFIG.MODEL_NAME),
       prompt: '1',
       maxOutputTokens: 1,
       maxRetries: 0,
@@ -245,7 +246,7 @@ async function checkGrokAPI(): Promise<ServiceHealth> {
     return {
       status: 'healthy',
       responseTime,
-      details: { model: 'grok-3-fast', tokensUsed: result.usage?.totalTokens ?? 1 },
+      details: { model: AI_CONFIG.MODEL_NAME, tokensUsed: result.usage?.totalTokens ?? 1 },
     };
   } catch (err) {
     const responseTime = Date.now() - startTime;

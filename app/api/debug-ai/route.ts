@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { generateText } from 'ai';
 import { createXai } from '@ai-sdk/xai';
 import { getOddsApiKey } from '@/lib/config';
+import { AI_CONFIG } from '@/lib/constants';
 
 export async function GET() {
   const results: Record<string, any> = {};
@@ -13,7 +14,7 @@ export async function GET() {
   } else {
     try {
       const r = await generateText({
-        model: createXai({ apiKey: xaiKey })('grok-3-mini'),
+        model: createXai({ apiKey: xaiKey })(AI_CONFIG.MODEL_NAME),
         prompt: 'Reply with the single word OK.',
         maxOutputTokens: 10,
       });

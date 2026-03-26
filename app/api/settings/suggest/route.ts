@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
     const xai = createXai({ apiKey });
     const { text } = await generateText({
-      model: xai(AI_CONFIG.FAST_MODEL_NAME ?? 'grok-3-fast'),
+      model: xai(AI_CONFIG.MODEL_NAME),
       prompt,
       maxOutputTokens: 600,
       temperature: 0.4,

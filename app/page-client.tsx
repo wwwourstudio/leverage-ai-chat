@@ -39,6 +39,7 @@ import { SuggestedPrompts } from '@/components/suggested-prompts';
 import { ChatInput } from '@/components/chat-input';
 import { loadThreads, createThread, updateThread, deleteThread, loadMessages, saveMessage } from '@/lib/chat-service';
 import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
+import { useChat, type ChatMessage as HookChatMessage } from '@/lib/hooks/useChat';
 import { WelcomeScreen } from '@/components/index/WelcomeScreen';
 import { MessageContent } from '@/components/index/MessageContent';
 import { MessageAttachments } from '@/components/index/MessageAttachments';
@@ -111,40 +112,14 @@ interface TrustMetrics {
   hasKalshi?: boolean;
 }
 
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-  cards?: InsightCard[];
-  insights?: {
-    totalValue?: number;
-    winRate?: number;
-    roi?: number;
-    activeContests?: number;
-    totalInvested?: number;
-  };
-  confidence?: number;
-  isEditing?: boolean;
-  isWelcome?: boolean;
-  editHistory?: Array<{
-    content: string;
-    timestamp: Date;
-  }>;
-  sources?: Array<{
-    name: string;
-    type: 'database' | 'api' | 'model' | 'cache';
-    reliability: number;
-    url?: string;
-  }>;
-  modelUsed?: string;
-  processingTime?: number;
-  trustMetrics?: TrustMetrics;
+interface Message extends HookChatMessage {
+  // Specialised fields not in HookChatMessage
+  cards?: InsightCard[];        // narrower than unknown[] — typed for this app
+  trustMetrics?: TrustMetrics;  // narrower than unknown — typed for this app
   attachments?: FileAttachment[];
   voted?: 'up' | 'down';
-  isStreaming?: boolean;
-  isPartial?: boolean;   // stream was interrupted; content shows what arrived before the break
-  isError?: boolean;     // request failed with no usable content
+  // isWelcome, isEditing, editHistory, insights, clarificationOptions, useFallback
+  // are inherited from HookChatMessage as optional fields
 }
 
 interface Chat {
@@ -243,34 +218,41 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // Cards are fetched on page load via /api/cards and shown on the welcome screen.
   // They are also regenerated on each AI response via /api/analyze.
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: STATIC_WELCOME,
-      // Fixed epoch fallback keeps SSR and client hydration identical (no #418 mismatch).
-      // The useEffect below corrects this to the real current time after hydration.
-      timestamp: new Date(serverData?.serverTime ?? 0),
-      isWelcome: true,
-      cards: [],
-      insights: {
-        totalValue: 0,
-        winRate: 0,
-        roi: 0,
-        activeContests: 0,
-        totalInvested: 0
-      }
-    }
-  ]);
+  const {
+    messages,
+    setMessages,
+    sendMessage: streamMessage,
+    abort: abortStream,
+  } = useChat<Message>({
+    api: '/api/analyze',
+    appendUserMessage: false, // page-client.tsx appends user messages itself
+    prepareBody: (_content, extra) => extra as Record<string, unknown>,
+    initialMessages: [
+      {
+        id: 'welcome',
+        role: 'assistant',
+        content: STATIC_WELCOME,
+        // Fixed epoch fallback keeps SSR and client hydration identical (no #418 mismatch).
+        // The useEffect below corrects this to the real current time after hydration.
+        timestamp: new Date(serverData?.serverTime ?? 0),
+        isWelcome: true,
+        cards: [],
+        insights: {
+          totalValue: 0,
+          winRate: 0,
+          roi: 0,
+          activeContests: 0,
+          totalInvested: 0,
+        },
+      } as Message,
+    ],
+  });
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const mountedRef = useRef(true);
-  useEffect(() => () => { mountedRef.current = false; }, []);
 
   // Client-side odds cache: key = sportKey, TTL = 5 minutes
   const oddsCacheRef = useRef<Map<string, { data: unknown; ts: number }>>(new Map());
 
-  const abortControllerRef = useRef<AbortController | null>(null);
   const [verifyStage, setVerifyStage] = useState<'analyzing' | 'reverifying'>('analyzing');
   const [cardAnalysisMap, setCardAnalysisMap] = useState<Record<string, { loading: boolean; content: string | null; error: string | null }>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false); // corrected to desktop-open by useEffect below
@@ -1375,8 +1357,7 @@ No preamble. Start directly with section 1.`;
   };
 
   const stopGeneration = () => {
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = null;
+    abortStream();
     setIsTyping(false);
   };
 
@@ -1411,17 +1392,12 @@ No preamble. Start directly with section 1.`;
     }
     analyzingMessageRef.current = msgKey;
 
-    // Cancel any in-flight request
-    abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+    // Cancel any in-flight request — hook manages the AbortController internally
+    abortStream();
     setIsTyping(true);
     setLastUserQuery(userMessage);
     const startTime = Date.now();
     const isDev = process.env.NODE_ENV !== 'production';
-    // Hoisted so catch/AbortError blocks can clean up the in-flight streaming message
-    let streamingMessageId: string | undefined;
-    let hadPartialContent = false; // true when stream breaks after some tokens arrived
 
     try {
       console.log('[v0] Starting real AI analysis for:', userMessage);
@@ -1645,267 +1621,102 @@ No preamble. Start directly with section 1.`;
         contextualUserMessage = `[Fantasy League Context: ${leagueCtx}]\n\n${userMessage}`;
       }
 
-      // Fetch real data — streams SSE tokens as they arrive, falls back to JSON
-      const fetchAnalysis = async (): Promise<APIResponse> => {
-        const res = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userMessage: contextualUserMessage, existingCards: availableCards, context, customInstructions: customInstructions || undefined, imageAttachments: imageAttachments?.length ? imageAttachments : undefined, deepThink }),
-          signal: controller.signal,
-        });
-        if (!res.ok) {
-          const text = await res.text().catch(() => '');
-          console.error('[v0] /api/analyze non-OK response:', res.status, text.slice(0, 200));
-          let errorMsg: string;
-          if (res.status === 429) {
-            const retryAfter = res.headers.get('Retry-After');
-            const seconds = retryAfter ? parseInt(retryAfter, 10) : 3600;
-            const mins = Math.ceil(seconds / 60);
-            errorMsg = `Rate limit reached — try again in ${mins} minute${mins !== 1 ? 's' : ''}.`;
-          } else if (res.status === 401) {
-            errorMsg = 'Sign in to continue chatting.';
-          } else if (res.status >= 500) {
-            errorMsg = 'Server error — AI is temporarily unavailable. Please retry.';
-          } else {
-            // Try to surface the actual server error (e.g. "Message too long")
-            try {
-              const parsed = JSON.parse(text);
-              errorMsg = parsed.error || parsed.message || `Request failed (${res.status})`;
-            } catch {
-              errorMsg = `Request failed (${res.status})`;
-            }
-          }
-          return { success: false, error: errorMsg, httpStatus: res.status } as APIResponse & { httpStatus?: number };
-        }
-        if (res.headers.get('Content-Type')?.includes('text/event-stream')) {
-          // ── Streaming path ───────────────────────────────────────────────
-          streamingMessageId = crypto.randomUUID();
-          setMessages((prev: any) => [...prev, {
-            id: streamingMessageId!, role: 'assistant' as const, content: '',
-            timestamp: new Date(), cards: [], isStreaming: true,
-          }]);
-          const reader = res.body!.getReader();
-          const decoder = new TextDecoder();
-          let buf = '';
-          let donePayload: APIResponse | null = null;
-          // rAF batching: accumulate token text between frames instead of calling
-          // setMessages on every single token (~100-300 per response).
-          let streamContent = '';
-          let rafHandle: ReturnType<typeof requestAnimationFrame> | null = null;
-          const flushToState = () => {
-            const snapshot = streamContent;
-            if (mountedRef.current) {
-              setMessages((prev: any) => prev.map((m: any) =>
-                m.id === streamingMessageId ? { ...m, content: snapshot } : m
-              ));
-            }
-            rafHandle = null;
-          };
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              buf += decoder.decode(value, { stream: true });
-              const parts = buf.split('\n\n');
-              buf = parts.pop() ?? '';
-              for (const part of parts) {
-                if (!part.startsWith('data: ')) continue;
-                let ev: { type: string; delta?: string; text?: string; [k: string]: any };
-                try { ev = JSON.parse(part.slice(6)); } catch { continue; }
-                if (ev.type === 'text') {
-                  streamContent += ev.delta ?? '';
-                  if (rafHandle === null) {
-                    rafHandle = requestAnimationFrame(flushToState);
-                  }
-                } else if (ev.type === 'replace') {
-                  // Intentional direct update — fires once, not per-token
-                  streamContent = ev.text ?? streamContent;
-                  if (rafHandle !== null) { cancelAnimationFrame(rafHandle); rafHandle = null; }
-                  if (mountedRef.current) {
-                    setMessages((prev: any) => prev.map((m: any) =>
-                      m.id === streamingMessageId ? { ...m, content: streamContent } : m
-                    ));
-                  }
-                } else if (ev.type === 'done') {
-                  donePayload = ev as unknown as APIResponse;
-                }
-              }
-            }
-          } catch (streamErr) {
-            // Network error or reader abort mid-stream — cancel any pending RAF and
-            // finalize the streaming message with whatever content was received so far.
-            if (rafHandle !== null) { cancelAnimationFrame(rafHandle); rafHandle = null; }
-            hadPartialContent = streamContent.length > 0;
-            if (mountedRef.current) {
-              setMessages((prev: any) => prev.map((m: any) =>
-                m.id === streamingMessageId
-                  ? { ...m, isStreaming: false, content: streamContent || m.content }
-                  : m
-              ));
-            }
-            throw streamErr; // re-throw so outer catch can handle the partial state
-          }
-          // Flush any tokens buffered in the last partial frame
-          if (rafHandle !== null) { cancelAnimationFrame(rafHandle); rafHandle = null; }
-          if (streamContent && mountedRef.current) {
-            setMessages((prev: any) => prev.map((m: any) =>
-              m.id === streamingMessageId ? { ...m, content: streamContent } : m
-            ));
-          }
-          if (!donePayload) {
-            // Stream closed cleanly but no done event — keep streamed content, return partial success
-            return { success: true, text: streamContent, cards: [], confidence: 70, sources: [], modelUsed: 'Grok 4', useFallback: false } as unknown as APIResponse;
-          }
-          return donePayload;
-        }
-        // ── JSON fallback path ───────────────────────────────────────────
-        return res.json().catch((e: unknown) => {
-          console.error('[v0] /api/analyze JSON parse error:', e);
-          return { success: false, error: 'Invalid response from server' } as APIResponse;
-        }) as Promise<APIResponse>;
-      };
-
+      // Stream the response via the useChat hook — handles SSE parsing, rAF batching,
+      // AbortController lifecycle, and streaming message state internally.
       setVerifyStage('analyzing');
-      const analysisResult = await fetchAnalysis();
+      const assistantMsg = await streamMessage(userMessage, {
+        userMessage: contextualUserMessage,
+        existingCards: availableCards,
+        context,
+        customInstructions: customInstructions || undefined,
+        imageAttachments: imageAttachments?.length ? imageAttachments : undefined,
+        deepThink,
+      });
 
-      // Handle API errors with smart fallback
+      // Hook handled the error (abort, non-OK response, stream failure) — clean up and exit.
+      if (!assistantMsg) {
+        setSuggestedPrompts(generateContextualSuggestions(userMessage, []));
+        setIsClarificationPills(false);
+        return;
+      }
+
+      // Post-process the streamed response: enrich cards and trust metrics.
       const processingTime = Date.now() - startTime;
-      let newMessage: Message;
-      
-      if (!analysisResult.success) {
-        console.log('[v0] API call failed, using available cards as fallback');
 
-        const httpStatus = (analysisResult as any).httpStatus as number | undefined;
-        // Rate-limit and auth errors: show the message directly, no cached-data fallback
-        if (httpStatus === 429 || httpStatus === 401) {
-          newMessage = {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: analysisResult.error ?? 'Request failed.',
-            timestamp: new Date(),
-            cards: [],
-            confidence: 0,
-            sources: [],
-            modelUsed: 'System',
-            processingTime,
-            isError: true,
-          } as Message;
-        } else {
-        // Use already-loaded cards rather than making another server call
-        const fallbackCards = availableCards.length > 0 ? availableCards : await selectRelevantCards(userMessage, context);
+      // Card selection: use server cards when present; fall back to pre-loaded cards
+      // only when the server returned none (undefined vs explicit []).
+      const serverCardCount = (assistantMsg.cards as unknown[])?.length ?? 0;
+      const useFallbackCards = serverCardCount === 0 && availableCards.length > 0;
+      const responseCards = serverCardCount > 0
+        ? (assistantMsg.cards as InsightCard[])
+        : (useFallbackCards ? availableCards : []);
 
-        newMessage = {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: `Here's what I can tell you based on available data:`,
-          timestamp: new Date(),
-          cards: fallbackCards,
-          confidence: 70,
-          sources: [
-            {
-              name: 'Cached Market Data',
-              type: 'cache',
-              reliability: 70
-            }
-          ],
-          modelUsed: 'Fallback',
-          processingTime,
-          trustMetrics: {
-            benfordIntegrity: 55,
-            oddsAlignment: 55,
-            marketConsensus: 55,
-            historicalAccuracy: 55,
-            finalConfidence: 55,
-            trustLevel: 'low',
-            riskLevel: 'medium',
-            adjustedTone: 'Using cached data — live analysis unavailable',
-            flags: [{ type: 'fallback', message: 'AI unavailable — showing cached market data', severity: 'warning' }]
-          }
-        };
-        }
-      } else {
-        // Success path - process the analysis result.
-        // If the server returns cards, use them. Otherwise fall back to
-        // the cards we already have from the SSR welcome message.
-        // Use server cards when present (including explicit empty []);
-        // only fall back to previous-message cards when server returned undefined (no card attempt)
-        const serverCardCount = analysisResult.cards?.length ?? 0;
-        const useFallback = serverCardCount === 0 && availableCards.length > 0;
-        const responseCards = serverCardCount > 0
-          ? analysisResult.cards!
-          : (useFallback ? availableCards : []);
-
+      if (isDev) {
         console.log('[v0] Analysis:', JSON.stringify({
-          ok: analysisResult.success,
           serverCards: serverCardCount,
           responseCards: responseCards.length,
-          fallbackCards: useFallback ? availableCards.length : 0,
-          confidence: analysisResult.trustMetrics?.finalConfidence,
-          fallback: useFallback,
+          fallbackCards: useFallbackCards ? availableCards.length : 0,
+          confidence: (assistantMsg.trustMetrics as any)?.finalConfidence,
+          fallback: useFallbackCards,
         }));
+      }
 
-        // Enrich trust metrics with real metadata so TrustMetricsDisplay can show
-        // sources, model name, processing time, and live-data badges.
-        const hasLiveOdds = !!(context?.oddsData?.events?.length > 0);
-        const hasKalshi = context?.isPoliticalMarket === true;
-        const enrichedTrustMetrics = analysisResult.trustMetrics
-          ? {
-              ...analysisResult.trustMetrics,
-              modelUsed: analysisResult.modelUsed || 'Grok 4',
-              sources: analysisResult.sources || [],
-              processingTime,
-              hasLiveOdds,
-              hasKalshi,
+      // Enrich trust metrics with real metadata so TrustMetricsDisplay can show
+      // sources, model name, processing time, and live-data badges.
+      const hasLiveOdds = !!(context?.oddsData?.events?.length > 0);
+      const hasKalshi = context?.isPoliticalMarket === true;
+      const enrichedTrustMetrics = assistantMsg.trustMetrics
+        ? {
+            ...(assistantMsg.trustMetrics as object),
+            modelUsed: assistantMsg.modelUsed || 'Grok 4',
+            sources: assistantMsg.sources || [],
+            processingTime,
+            hasLiveOdds,
+            hasKalshi,
+          }
+        : {
+            benfordIntegrity: 85,
+            oddsAlignment: hasLiveOdds ? 90 : 80,
+            marketConsensus: hasLiveOdds ? 88 : 78,
+            historicalAccuracy: 87,
+            finalConfidence: hasLiveOdds ? 88 : 82,
+            trustLevel: 'high' as const,
+            riskLevel: 'low' as const,
+            adjustedTone: hasLiveOdds ? 'Strong signal — live data verified' : 'Knowledge-based analysis',
+            flags: [],
+            modelUsed: 'Grok 4',
+            sources: assistantMsg.sources || [],
+            processingTime,
+            hasLiveOdds,
+            hasKalshi,
+          };
+
+      // Build the finalised message shape (used for Supabase persistence below)
+      const newMessage: Message = {
+        ...assistantMsg,
+        cards: responseCards,
+        confidence: assistantMsg.confidence || 85,
+        sources: assistantMsg.sources || [],
+        modelUsed: assistantMsg.modelUsed || 'Grok 4',
+        processingTime,
+        trustMetrics: enrichedTrustMetrics as TrustMetrics,
+      };
+
+      // Update the already-streamed message in state with enriched metadata.
+      // The hook has already set isStreaming: false and basic cards/confidence from
+      // the done event — this pass adds enriched trust metrics and processed cards.
+      setMessages((prev: Message[]) => prev.map(m =>
+        m.id === assistantMsg.id
+          ? { ...m,
+              cards: newMessage.cards || [],
+              confidence: newMessage.confidence,
+              sources: newMessage.sources,
+              modelUsed: newMessage.modelUsed,
+              processingTime: newMessage.processingTime,
+              trustMetrics: newMessage.trustMetrics,
             }
-          : {
-              benfordIntegrity: 85,
-              oddsAlignment: hasLiveOdds ? 90 : 80,
-              marketConsensus: hasLiveOdds ? 88 : 78,
-              historicalAccuracy: 87,
-              finalConfidence: hasLiveOdds ? 88 : 82,
-              trustLevel: 'high' as const,
-              riskLevel: 'low' as const,
-              adjustedTone: hasLiveOdds ? 'Strong signal — live data verified' : 'Knowledge-based analysis',
-              flags: [],
-              modelUsed: 'Grok 4',
-              sources: analysisResult.sources || [],
-              processingTime,
-              hasLiveOdds,
-              hasKalshi,
-            };
-
-        newMessage = {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: analysisResult.text || 'Analysis complete.',
-          timestamp: new Date(),
-          cards: responseCards,
-          confidence: analysisResult.confidence || 85,
-          sources: analysisResult.sources || [],
-          modelUsed: analysisResult.modelUsed || 'Grok 4',
-          processingTime,
-          trustMetrics: enrichedTrustMetrics,
-        };
-      }
-
-      // Add or update message in state
-      if (streamingMessageId) {
-        // Streaming: message already in state — update with final metadata.
-        // Prefer done-event text; fall back to whatever was already streamed (m.content).
-        // Use ?? [] for cards to avoid wiping existing card state with undefined.
-        setMessages((prev: Message[]) => prev.map(m =>
-          m.id === streamingMessageId
-            ? { ...m, isStreaming: false,
-                cards: newMessage.cards || [],
-                confidence: newMessage.confidence,
-                sources: newMessage.sources, modelUsed: newMessage.modelUsed,
-                processingTime: newMessage.processingTime, trustMetrics: newMessage.trustMetrics,
-                content: analysisResult.text || m.content || newMessage.content }
-            : m
-        ).slice(-30));
-      } else {
-        setMessages((prev: Message[]) => [...prev, newMessage].slice(-30));
-      }
+          : m
+      ).slice(-30));
 
       // Persist both messages to Supabase (fire-and-forget).
       // Guard: only save when we have a real Supabase UUID — not a placeholder like
@@ -1958,8 +1769,8 @@ No preamble. Start directly with section 1.`;
       }
 
       // Generate contextual suggestions — use clarificationOptions from API if ambiguous
-      if (analysisResult.clarificationOptions?.length) {
-        setSuggestedPrompts(analysisResult.clarificationOptions.map((o: string) => ({
+      if (assistantMsg.clarificationOptions?.length) {
+        setSuggestedPrompts(assistantMsg.clarificationOptions.map((o: string) => ({
           label: o,
           icon: Target,
           category: selectedCategory,
@@ -1972,37 +1783,11 @@ No preamble. Start directly with section 1.`;
       }
 
     } catch (error) {
-      // Ignore abort errors — user intentionally cancelled
-      if (error instanceof Error && error.name === 'AbortError') {
-        // Remove any in-flight streaming message so the UI is clean after cancel
-        if (streamingMessageId && mountedRef.current) {
-          setMessages((prev: Message[]) =>
-            prev.filter((m: Message) => m.id !== streamingMessageId).slice(-30)
-          );
-        }
-        return;
-      }
-      console.error('[v0] Error generating real response:', error);
+      // AbortError is handled by the hook — this catch covers errors in context
+      // building or odds fetching that occur before streamMessage() is called.
+      if (error instanceof Error && error.name === 'AbortError') return;
 
-      // Finalize any in-flight streaming message (mark it done, keep partial content)
-      if (streamingMessageId && mountedRef.current) {
-        if (hadPartialContent) {
-          // Stream produced content before breaking — preserve it as a partial response
-          // rather than discarding it and showing a separate error message.
-          setMessages((prev: Message[]) => prev.map((m: Message) =>
-            m.id === streamingMessageId
-              ? { ...m, isStreaming: false, isPartial: true,
-                  content: m.content + '\n\n*[Response interrupted — partial result]*' }
-              : m
-          ));
-          setSuggestedPrompts(generateContextualSuggestions(userMessage, []));
-          setIsClarificationPills(false);
-          return; // don't append a second error message
-        }
-        setMessages((prev: Message[]) => prev.map((m: Message) =>
-          m.id === streamingMessageId ? { ...m, isStreaming: false, isError: true } : m
-        ));
-      }
+      console.error('[v0] Error generating real response:', error);
 
       // Append a user-friendly error message — never expose raw error internals
       setMessages((prev: Message[]) => [...prev, {
@@ -2584,7 +2369,7 @@ No preamble. Start directly with section 1.`;
     // This prevents log-visible "4 POSTs in 3 minutes" stacking where each request
     // triggers its own Grok call + Kalshi fetch before the previous stream completes.
     if (isTyping) {
-      abortControllerRef.current?.abort();
+      abortStream();
       // Let the abort propagate (setIsTyping(false) runs in generateRealResponse's
       // finally block) then fall through to start the new request immediately.
     }

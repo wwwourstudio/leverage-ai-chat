@@ -25,6 +25,13 @@ export interface ChatMessage {
   isStreaming?: boolean;
   isPartial?: boolean;
   isError?: boolean;
+  // Extra optional fields for compatibility with page-client.tsx Message type
+  isWelcome?: boolean;
+  isEditing?: boolean;
+  editHistory?: Array<{ content: string; timestamp: Date }>;
+  insights?: Record<string, number | undefined>;
+  clarificationOptions?: string[];
+  useFallback?: boolean;
 }
 
 export interface UseChatOptions {
@@ -32,25 +39,24 @@ export interface UseChatOptions {
   api?: string;
   /** Messages pre-populated on mount. */
   initialMessages?: ChatMessage[];
-  /** Extra fields merged into every request body. */
+  /** Extra fields merged into every request body (used only when prepareBody is not set). */
   context?: Record<string, unknown>;
+  /**
+   * Custom request body builder. Receives (content, extra) where extra is the
+   * second argument passed to sendMessage(). When provided, this replaces the
+   * default body shape of { userMessage, context }.
+   */
+  prepareBody?: (content: string, extra?: Record<string, unknown>) => Record<string, unknown>;
+  /**
+   * Whether the hook auto-appends the user message to state before fetching.
+   * Set false when the caller manages user message appending itself.
+   * Default: true
+   */
+  appendUserMessage?: boolean;
   /** Called when a non-abort error occurs. */
   onError?: (error: Error) => void;
   /** Called after the assistant message is fully resolved. */
   onFinish?: (message: ChatMessage) => void;
-}
-
-export interface UseChatReturn {
-  messages: ChatMessage[];
-  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
-  isLoading: boolean;
-  error: Error | null;
-  /** Send a user message and stream the assistant response. */
-  sendMessage: (content: string, extra?: Record<string, unknown>) => Promise<void>;
-  /** Clear all messages. */
-  clearMessages: () => void;
-  /** Abort any in-flight request. */
-  abort: () => void;
 }
 
 // ─── SSE event shapes emitted by /api/analyze ────────────────────────────────
@@ -75,6 +81,8 @@ interface SseDoneEvent {
   processingTime?: number;
   sources?: ChatMessageSource[];
   trustMetrics?: unknown;
+  clarificationOptions?: string[];
+  useFallback?: boolean;
   [key: string]: unknown;
 }
 
@@ -93,17 +101,30 @@ type SseEvent = SseTextEvent | SseReplaceEvent | SseDoneEvent;
  *  - `{type:"text",  delta:"..."}` — streaming token, batched via rAF
  *  - `{type:"replace",text:"..."}` — full content replacement
  *  - `{type:"done",  ...}` — stream complete, carries final metadata
+ *
+ * Generic parameter T allows callers to use a richer Message type that extends
+ * ChatMessage (e.g. page-client.tsx's local Message interface).
  */
-export function useChat(options: UseChatOptions = {}): UseChatReturn {
+export function useChat<T extends ChatMessage = ChatMessage>(options: UseChatOptions = {}): {
+  messages: T[];
+  setMessages: React.Dispatch<React.SetStateAction<T[]>>;
+  isLoading: boolean;
+  error: Error | null;
+  sendMessage: (content: string, extra?: Record<string, unknown>) => Promise<T | null>;
+  clearMessages: () => void;
+  abort: () => void;
+} {
   const {
     api = '/api/analyze',
     initialMessages = [],
     context: baseContext,
+    prepareBody,
+    appendUserMessage = true,
     onError,
     onFinish,
   } = options;
 
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [messages, setMessages] = useState<T[]>(initialMessages as T[]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -127,8 +148,8 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
   }, []);
 
   const sendMessage = useCallback(
-    async (content: string, extra?: Record<string, unknown>): Promise<void> => {
-      if (!content.trim()) return;
+    async (content: string, extra?: Record<string, unknown>): Promise<T | null> => {
+      if (!content.trim()) return null;
 
       // Cancel any in-flight request
       abortControllerRef.current?.abort();
@@ -138,26 +159,28 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
       setError(null);
       setIsLoading(true);
 
-      // Append user message immediately so UI feels responsive
-      const userMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'user',
-        content,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, userMessage]);
+      if (appendUserMessage) {
+        const userMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, userMessage as T]);
+      }
 
       let streamingId: string | undefined;
       let hadPartialContent = false;
 
       try {
+        const body = prepareBody
+          ? prepareBody(content, extra)
+          : { userMessage: content, context: { ...baseContext, ...extra } };
+
         const res = await fetch(api, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userMessage: content,
-            context: { ...baseContext, ...extra },
-          }),
+          body: JSON.stringify(body),
           signal: controller.signal,
         });
 
@@ -197,7 +220,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
                 timestamp: new Date(),
                 cards: [],
                 isStreaming: true,
-              },
+              } as unknown as T,
             ]);
           }
 
@@ -214,7 +237,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
             const snapshot = streamContent;
             if (mountedRef.current) {
               setMessages((prev) =>
-                prev.map((m) => (m.id === streamingId ? { ...m, content: snapshot } : m))
+                prev.map((m) => (m.id === streamingId ? ({ ...m, content: snapshot } as T) : m))
               );
             }
             rafHandle = null;
@@ -251,7 +274,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
                   if (mountedRef.current) {
                     setMessages((prev) =>
                       prev.map((m) =>
-                        m.id === streamingId ? { ...m, content: streamContent } : m
+                        m.id === streamingId ? ({ ...m, content: streamContent } as T) : m
                       )
                     );
                   }
@@ -271,7 +294,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === streamingId
-                    ? { ...m, isStreaming: false, content: streamContent || m.content }
+                    ? ({ ...m, isStreaming: false, content: streamContent || m.content } as T)
                     : m
                 )
               );
@@ -286,12 +309,12 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
           }
           if (streamContent && mountedRef.current) {
             setMessages((prev) =>
-              prev.map((m) => (m.id === streamingId ? { ...m, content: streamContent } : m))
+              prev.map((m) => (m.id === streamingId ? ({ ...m, content: streamContent } as T) : m))
             );
           }
 
           // Finalize assistant message with done-event metadata
-          const finalMessage: Partial<ChatMessage> = donePayload
+          const finalFields: Partial<ChatMessage> = donePayload
             ? {
                 content: donePayload.text || streamContent,
                 cards: donePayload.cards || [],
@@ -300,6 +323,8 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
                 processingTime: donePayload.processingTime,
                 sources: donePayload.sources,
                 trustMetrics: donePayload.trustMetrics,
+                clarificationOptions: donePayload.clarificationOptions,
+                useFallback: donePayload.useFallback,
               }
             : { content: streamContent, cards: [] };
 
@@ -308,23 +333,23 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
               prev
                 .map((m) =>
                   m.id === streamingId
-                    ? { ...m, isStreaming: false, ...finalMessage }
+                    ? ({ ...m, isStreaming: false, ...finalFields } as T)
                     : m
                 )
                 .slice(-30)
             );
           }
 
-          if (onFinish) {
-            const finishedMsg: ChatMessage = {
-              id: streamingId,
-              role: 'assistant',
-              timestamp: new Date(),
-              ...finalMessage,
-              content: finalMessage.content ?? streamContent,
-            };
-            onFinish(finishedMsg);
-          }
+          const finishedMsg: T = {
+            id: streamingId,
+            role: 'assistant',
+            timestamp: new Date(),
+            ...finalFields,
+            content: finalFields.content ?? streamContent,
+          } as T;
+
+          onFinish?.(finishedMsg);
+          return finishedMsg;
         } else {
           // ── JSON fallback path ─────────────────────────────────────────────
           const json = await res.json().catch(() => ({
@@ -336,7 +361,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
             throw new Error(json.error || 'Request failed');
           }
 
-          const assistantMsg: ChatMessage = {
+          const assistantMsg: T = {
             id: crypto.randomUUID(),
             role: 'assistant',
             content: json.text || '',
@@ -347,12 +372,15 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
             processingTime: json.processingTime,
             sources: json.sources,
             trustMetrics: json.trustMetrics,
-          };
+            clarificationOptions: json.clarificationOptions,
+            useFallback: json.useFallback,
+          } as T;
 
           if (mountedRef.current) {
             setMessages((prev) => [...prev, assistantMsg].slice(-30));
           }
           onFinish?.(assistantMsg);
+          return assistantMsg;
         }
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
@@ -360,7 +388,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
           if (streamingId && mountedRef.current) {
             setMessages((prev) => prev.filter((m) => m.id !== streamingId).slice(-30));
           }
-          return;
+          return null;
         }
 
         const error = err instanceof Error ? err : new Error(String(err));
@@ -373,32 +401,32 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === streamingId
-                    ? {
+                    ? ({
                         ...m,
                         isStreaming: false,
                         isPartial: true,
                         content: m.content + '\n\n*[Response interrupted — partial result]*',
-                      }
+                      } as T)
                     : m
                 )
               );
             } else {
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === streamingId ? { ...m, isStreaming: false, isError: true } : m
+                  m.id === streamingId ? ({ ...m, isStreaming: false, isError: true } as T) : m
                 )
               );
             }
           }
 
           if (!hadPartialContent) {
-            const errorMsg: ChatMessage = {
+            const errorMsg: T = {
               id: crypto.randomUUID(),
               role: 'assistant',
               content: error.message || 'Something went wrong. Please try again.',
               timestamp: new Date(),
               isError: true,
-            };
+            } as T;
             setMessages((prev) => [...prev, errorMsg].slice(-30));
           }
 
@@ -406,13 +434,14 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
         }
 
         onError?.(error);
+        return null;
       } finally {
         if (mountedRef.current) {
           setIsLoading(false);
         }
       }
     },
-    [api, baseContext, onError, onFinish]
+    [api, baseContext, prepareBody, appendUserMessage, onError, onFinish]
   );
 
   return { messages, setMessages, isLoading, error, sendMessage, clearMessages, abort };

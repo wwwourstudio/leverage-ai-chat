@@ -119,8 +119,8 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
       // American Football
       'americanfootball_nfl': ['player_pass_tds', 'player_pass_yds', 'player_pass_completions', 'player_pass_attempts', 'player_pass_interceptions', 'player_rush_yds', 'player_rush_attempts', 'player_receptions', 'player_reception_yds', 'player_anytime_td', 'player_first_td', 'player_kicking_points', 'player_field_goals'],
       'americanfootball_ncaaf': ['player_pass_tds', 'player_pass_yds', 'player_rush_yds', 'player_receptions', 'player_reception_yds', 'player_anytime_td'],
-      // Baseball
-      'baseball_mlb': ['player_home_runs', 'player_hits', 'player_total_bases', 'player_rbis', 'player_runs', 'player_stolen_bases', 'player_hits_runs_rbis', 'player_singles', 'player_doubles', 'player_walks', 'player_strikeouts', 'pitcher_strikeouts', 'pitcher_hits_allowed', 'pitcher_walks', 'pitcher_earned_runs', 'pitcher_outs'],
+      // Baseball — batter_ and pitcher_ prefixes (NOT player_; sending player_* returns HTTP 422)
+      'baseball_mlb': ['batter_home_runs', 'batter_hits', 'batter_total_bases', 'batter_rbis', 'batter_runs_scored', 'batter_stolen_bases', 'batter_hits_runs_rbis', 'batter_singles', 'batter_doubles', 'batter_walks', 'batter_strikeouts', 'pitcher_strikeouts', 'pitcher_hits_allowed', 'pitcher_walks', 'pitcher_earned_runs', 'pitcher_outs'],
       // Hockey
       'icehockey_nhl': ['player_points', 'player_goals', 'player_assists', 'player_shots_on_goal', 'player_blocked_shots', 'player_power_play_points', 'goalie_saves'],
       // Soccer
@@ -253,7 +253,10 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
                 sport,
                 gameId: event.id,
                 playerName,
-                statType: market.key.replace('player_', ''),
+                statType: market.key
+                  .replace(/^batter_/, '')
+                  .replace(/^pitcher_/, 'pitcher ')
+                  .replace(/^player_/, ''),
                 line: (propData as any).line,
                 overOdds: (propData as any).over,
                 underOdds: (propData as any).under,

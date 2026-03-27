@@ -1657,7 +1657,7 @@ async function _generateContextualCards(
       console.error('[v0] [CARDS-GEN] Player props error:', error);
     }
     
-    // Fallback placeholder
+    // Fallback: props not yet posted by bookmakers (common pre-game or early season)
     cards.push({
       type: CARD_TYPES.PLAYER_PROP,
       title: 'Player Props',
@@ -1666,9 +1666,12 @@ async function _generateContextualCards(
       subcategory: 'Player Props',
       gradient: 'from-blue-600 to-cyan-600',
       data: {
-        description: 'Player-specific betting markets',
-        note: 'Loading prop markets...',
-        realData: false
+        description: 'Live player prop markets (strikeouts, hits, home runs, etc.)',
+        note: normalizedSport === 'baseball_mlb'
+          ? 'MLB props typically post 24–48 h before first pitch. Moneylines and totals are available now — ask the AI for batting or pitching analysis.'
+          : 'Prop markets not yet available from bookmakers. Check back closer to game time.',
+        tip: 'Try: "Best strikeout props today?" or "HR prop value for this slate?"',
+        realData: false,
       }
     });
   }

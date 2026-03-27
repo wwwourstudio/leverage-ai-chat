@@ -1643,12 +1643,16 @@ async function _generateContextualCards(
           storeResults: true 
         });
         
-        console.log(`[v0] [CARDS-GEN] Fetched ${props.length} player props`);
-        
+        const propsWithData = props.filter(p => p.overOdds && p.underOdds);
+        console.log(
+          `[v0] [CARDS-GEN] props: ${props.length} total | ${propsWithData.length} with O/U odds` +
+          (props.length === 0 ? ' ← fallback will render' : '')
+        );
+
         if (props.length > 0) {
           const propCards = props.slice(0, count).map(playerPropToCard);
           cards.push(...propCards);
-          console.log(`[v0] [CARDS-GEN] Added ${propCards.length} player prop cards`);
+          console.log(`[v0] [CARDS-GEN] Built ${propCards.length} prop cards (requested: ${count})`);
           if (cards.length > 0) setCachedCards(cards, 'props', normalizedSport);
           return cards;
         }

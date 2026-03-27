@@ -3320,6 +3320,8 @@ No preamble. Start directly with section 1.`;
           onOpenSettings={() => setShowSettingsLightbox(true)}
           onOpenLogin={() => setShowLoginModal(true)}
           onOpenSignup={() => setShowSignupModal(true)}
+          creditsRemaining={creditsRemaining}
+          onOpenStripe={() => setShowStripeLightbox(true)}
         />
 
         {/* Messages Container - Dynamic Data-Driven Interface */}

@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState, useCallback } from 'react';
-import { Menu, TrendingUp, Bell, Settings, LogIn, UserPlus, Download, Share2, Check, Copy } from 'lucide-react';
+import { Menu, TrendingUp, Bell, Settings, LogIn, UserPlus, Download, Share2, Check, Copy, Sparkles } from 'lucide-react';
 import { exportChatAsMarkdown, exportChatAsJSON, downloadFile, chatFilename, type ExportMessage, type ExportChat } from '@/lib/chat-export';
 
 interface ChatHeaderProps {
@@ -18,6 +18,9 @@ interface ChatHeaderProps {
   // Export / share props (optional — hidden when not provided)
   activeChat?: ExportChat | null;
   messages?: ExportMessage[];
+  // Credits / billing
+  creditsRemaining?: number;
+  onOpenStripe?: () => void;
 }
 
 export const ChatHeader = memo(function ChatHeader({
@@ -33,6 +36,8 @@ export const ChatHeader = memo(function ChatHeader({
   onOpenSignup,
   activeChat,
   messages = [],
+  creditsRemaining,
+  onOpenStripe,
 }: ChatHeaderProps) {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [shareState, setShareState] = useState<'idle' | 'loading' | 'copied'>('idle');
@@ -111,8 +116,29 @@ export const ChatHeader = memo(function ChatHeader({
           </div>
         </div>
 
-        {/* Right: export/share + user actions */}
+        {/* Right: credits + export/share + user actions */}
         <div className="flex items-center gap-2 md:gap-3">
+          {/* Credits balance — always visible, opens Stripe lightbox on click */}
+          {creditsRemaining !== undefined && onOpenStripe && (
+            <button
+              onClick={onOpenStripe}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-200 hover:opacity-90 active:scale-95 ${
+                creditsRemaining <= 3
+                  ? 'bg-orange-500/15 border-orange-500/50 text-orange-300 shadow-[0_0_10px_oklch(0.65_0.18_40/0.2)]'
+                  : creditsRemaining <= 10
+                  ? 'bg-amber-500/10 border-amber-500/40 text-amber-300'
+                  : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-white hover:border-[oklch(0.35_0.08_260)]'
+              }`}
+              title={creditsRemaining <= 3 ? 'Almost out of credits — buy more' : 'Credits remaining — click to buy more'}
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${creditsRemaining <= 3 ? 'text-orange-400' : creditsRemaining <= 10 ? 'text-amber-400' : 'text-blue-400'}`} />
+              <span className="tabular-nums">{creditsRemaining}</span>
+              <span className="hidden sm:inline">{creditsRemaining === 1 ? 'credit' : 'credits'}</span>
+              {creditsRemaining <= 3 && (
+                <span className="hidden sm:inline text-orange-400 font-bold">· Buy more</span>
+              )}
+            </button>
+          )}
           {/* Export dropdown — shown when there are messages */}
           {hasMessages && activeChat && (
             <div className="relative">

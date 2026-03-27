@@ -39,6 +39,11 @@ import { SuggestedPrompts } from '@/components/suggested-prompts';
 import { ChatInput } from '@/components/chat-input';
 import { loadThreads, createThread, updateThread, deleteThread, loadMessages, saveMessage } from '@/lib/chat-service';
 import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
+import { WelcomeScreen } from '@/components/index/WelcomeScreen';
+import { MessageContent } from '@/components/index/MessageContent';
+import { MessageAttachments } from '@/components/index/MessageAttachments';
+import { CreditModals } from '@/components/index/CreditModals';
+import { DetailedAnalysisLayout, type DetailedAnalysisData } from '@/components/index/DetailedAnalysisLayout';
 
 interface FileAttachment {
   id: string;
@@ -3544,15 +3549,7 @@ No preamble. Start directly with section 1.`;
             {/* Database Status Banner */}
             <DatabaseStatusBanner />
             {messages.length === 0 ? (
-              <div className="flex items-center justify-center h-full min-h-[400px]">
-                <div className="text-center space-y-4">
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-blue-500/30">
-                    <Sparkles className="w-8 h-8 text-white" />
-                  </div>
-                  <h3 className="text-lg font-bold text-gray-300">No messages yet</h3>
-                  <p className="text-sm text-gray-500">Start a conversation to get AI-powered insights</p>
-                </div>
-              </div>
+              <WelcomeScreen welcomeText="No messages yet" />
             ) : (
               messages.map((message: any, index: any) => {
                 // Group messages: Check if this message is from same sender as previous
@@ -3675,321 +3672,26 @@ No preamble. Start directly with section 1.`;
                           (() => {
                             const match = message.content.match(/__DETAILED_ANALYSIS__([\s\S]+)__END_ANALYSIS__/);
                             if (!match) return <p className="text-sm leading-relaxed font-medium">{message.content}</p>;
-
-                            let data: any;
+                            let analysisData: DetailedAnalysisData;
                             try {
-                              data = JSON.parse(match[1]);
+                              analysisData = JSON.parse(match[1]);
                             } catch {
-                              // Malformed / truncated JSON (e.g. streaming interrupted mid-blob)
                               return <p className="text-sm leading-relaxed font-medium">{message.content.replace(/__DETAILED_ANALYSIS__[\s\S]*?__END_ANALYSIS__/, '').trim()}</p>;
-
                             }
-                            const { card, metrics, overview, marketContext, riskAssessment, recommendations } = data;
-                            
-                            // Map card type to icon component
-                            const getCardIcon = (type: string) => {
-                              const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-                                'live-odds': Zap,
-                                'player-prop': Target,
-                                'dfs-lineup': Award,
-                                'dfs-value': DollarSign,
-                                'adp-analysis': TrendingUp,
-                                'bestball-stack': Medal,
-                                'auction-value': ShoppingCart,
-                                'kalshi-market': BarChart3,
-                                'kalshi-weather': Activity,
-                                'cross-platform': Sparkles,
-                                'ai-prediction': Sparkles,
-                              };
-                              return iconMap[type] || Sparkles;
-                            };
-                            
-                            const CardIcon = getCardIcon(card.type);
-                            
                             return (
-                              <div className="space-y-5">
-                                {/* Header Section */}
-                                <div className="flex items-start gap-3">
-                                  <div className="p-2.5 rounded-xl bg-[oklch(0.16_0.02_280)] flex-shrink-0">
-                                    <CardIcon className="w-5 h-5 text-[oklch(0.70_0.005_85)]" />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <h2 className="text-lg font-black text-[oklch(0.95_0.005_85)] truncate">{card.title}</h2>
-                                      <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wide bg-[oklch(0.16_0.02_280)] text-[oklch(0.70_0.005_85)] border border-[oklch(0.22_0.02_280)]">{card.status}</span>
-                                    </div>
-                                    <p className="text-[11px] text-[oklch(0.45_0.01_280)] font-semibold uppercase tracking-wide">
-                                      {card.category} / {card.subcategory}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                {/* Overview */}
-                                <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-4">
-                                  <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-2 flex items-center gap-2">
-                                    <Info className="w-3 h-3" />
-                                    Overview
-                                  </h3>
-                                  <p className="text-sm text-[oklch(0.80_0.005_85)] leading-relaxed">{overview}</p>
-                                </div>
-
-                                {/* Key Metrics Grid */}
-                                <div>
-                                  <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-3 flex items-center gap-2">
-                                    <BarChart className="w-3 h-3" />
-                                    Key Metrics
-                                  </h3>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    {metrics.map((metric: { label: string; value: string }, idx: number) => (
-                                      <div
-                                        key={`metric-${idx}-${metric.label}`}
-                                        className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-3 hover:border-[oklch(0.25_0.02_280)] transition-colors"
-                                      >
-                                        <div className="text-[9px] font-bold text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-1">{metric.label}</div>
-                                        <div className="text-base font-black text-[oklch(0.92_0.005_85)]">{metric.value}</div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                {/* Market Context */}
-                                <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-4">
-                                  <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-2 flex items-center gap-2">
-                                    <TrendingUp className="w-3 h-3" />
-                                    Market Context & Edge
-                                  </h3>
-                                  <p className="text-sm text-[oklch(0.80_0.005_85)] leading-relaxed">{marketContext}</p>
-                                </div>
-
-                                {/* Risk Assessment */}
-                                <div>
-                                  <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-3 flex items-center gap-2">
-                                    <Shield className="w-3 h-3" />
-                                    Risk Assessment
-                                  </h3>
-                                  <div className="grid grid-cols-3 gap-2">
-                                    <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-3">
-                                      <div className="text-[9px] font-bold text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-1">Conviction</div>
-                                      <div className="text-lg font-black text-[oklch(0.92_0.005_85)]">{riskAssessment.convictionLevel}</div>
-                                    </div>
-                                    <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-3">
-                                      <div className="text-[9px] font-bold text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-1">Risk</div>
-                                      <div className="text-sm font-black text-[oklch(0.85_0.005_85)]">{riskAssessment.riskCategory}</div>
-                                    </div>
-                                    <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-3">
-                                      <div className="text-[9px] font-bold text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-1">Position</div>
-                                      <div className="text-lg font-black text-[oklch(0.92_0.005_85)]">{riskAssessment.positionSize}</div>
-                                      <div className="text-[9px] text-[oklch(0.35_0.01_280)] mt-0.5">of bankroll</div>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Strategic Recommendations */}
-                                <div>
-                                  <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-3 flex items-center gap-2">
-                                    <Target className="w-3 h-3" />
-                                    Strategic Recommendations
-                                  </h3>
-                                  <div className="space-y-2">
-                                    {recommendations.map((rec: { label: string; value: string }, idx: number) => (
-                                      <div
-                                        key={`rec-${idx}-${rec.label}`}
-                                        className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-3.5 hover:border-[oklch(0.25_0.02_280)] transition-colors"
-                                      >
-                                        <div className="flex items-start gap-3">
-                                          <div className="w-5 h-5 rounded-md bg-[oklch(0.18_0.02_280)] flex items-center justify-center flex-shrink-0 mt-0.5">
-                                            <span className="text-[oklch(0.70_0.005_85)] text-[10px] font-black">{idx + 1}</span>
-                                          </div>
-                                          <div className="flex-1 min-w-0">
-                                            <div className="text-xs font-black text-[oklch(0.80_0.005_85)] mb-0.5">{rec.label}</div>
-                                            <div className="text-sm text-[oklch(0.55_0.01_280)] leading-relaxed">{rec.value}</div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                {/* Next Steps CTA  */}
-                                <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.015_280)] rounded-xl p-4">
-                                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                                    <p className="text-sm text-[oklch(0.60_0.01_280)] leading-relaxed">
-                                      <span className="font-bold text-[oklch(0.90_0.005_85)]">Next Steps:</span> Show correlated opportunities or dive deeper into any metric?
-                                    </p>
-                                    <button
-                                      onClick={() => {
-                                        console.log('[v0] Yes button clicked - showing correlated opportunities');
-                                        handleFollowUp('correlated', card);
-                                      }}
-                                      disabled={isTyping}
-                                      className="group relative flex items-center justify-center gap-2 px-6 py-3 bg-[oklch(0.20_0.02_280)] hover:bg-[oklch(0.25_0.02_280)] disabled:bg-[oklch(0.14_0.01_280)] disabled:cursor-not-allowed text-[oklch(0.92_0.005_85)] font-bold text-sm rounded-xl border border-[oklch(0.28_0.02_280)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] min-w-[120px] flex-shrink-0"
-                                    >
-                                      {isTyping ? (
-                                        <>
-                                          <Loader2 className="w-5 h-5 animate-spin" />
-                                          <span>Loading...</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <CheckCircle2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                                          <span className="tracking-wide">YES</span>
-                                          <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                        </>
-                                      )}
-                                    </button>
-                                  </div>
-                                  
-                                  {/* Secondary Options */}
-                                  <div className="mt-4 pt-4 border-t border-indigo-600/20">
-                                    <p className="text-xs text-gray-400 mb-3 font-semibold">Or choose a specific action:</p>
-                                    <div className="flex flex-wrap gap-2">
-                                      <button
-                                        onClick={() => {
-                                          console.log('[v0] Correlated opportunities button clicked');
-                                          handleFollowUp('correlated', card);
-                                        }}
-                                        disabled={isTyping}
-                                        className="flex items-center gap-2 px-3.5 py-2 bg-gray-800/50 hover:bg-gray-700/50 disabled:bg-gray-800/30 disabled:cursor-not-allowed border border-gray-700/50 hover:border-blue-500/50 text-gray-300 hover:text-white font-semibold text-xs rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
-                                      >
-                                        <Sparkles className="w-3.5 h-3.5" />
-                                        Correlated Plays
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          console.log('[v0] Metrics analysis button clicked');
-                                          handleFollowUp('metrics', card);
-                                        }}
-                                        disabled={isTyping}
-                                        className="flex items-center gap-2 px-3.5 py-2 bg-gray-800/50 hover:bg-gray-700/50 disabled:bg-gray-800/30 disabled:cursor-not-allowed border border-gray-700/50 hover:border-purple-500/50 text-gray-300 hover:text-white font-semibold text-xs rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
-                                      >
-                                        <BarChart className="w-3.5 h-3.5" />
-                                        Deep Metrics
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
+                              <DetailedAnalysisLayout
+                                data={analysisData}
+                                isTyping={isTyping}
+                                onFollowUp={handleFollowUp}
+                              />
                             );
                           })()
                         ) : (
-                          <div className="text-sm leading-relaxed font-medium space-y-3">
-                            {message.content.split('\n\n').map((paragraph: any, pIdx: any) => {
-                              // Check if paragraph contains bullet points
-                              if (paragraph.includes('\n**') && paragraph.includes('**')) {
-                                const lines = paragraph.split('\n');
-                                return (
-                                  <div key={`p-${pIdx}-${paragraph.slice(0, 12)}`} className="space-y-2">
-                                    {lines.map((line: any, lIdx: any) => {
-                                      // Bold text with ** **
-                                      if (line.includes('**')) {
-                                        const parts = line.split('**');
-                                        return (
-                                          <div key={`l-${lIdx}-${line.slice(0, 12)}`} className="flex items-start gap-2">
-                                            {parts.map((part: any, partIdx: any) => {
-                                              if (partIdx % 2 === 1) {
-                                                return <span key={partIdx} className="font-black text-white">{part}</span>;
-                                              } else if (part.trim()) {
-                                                return <span key={partIdx} className="text-gray-300">{part}</span>;
-                                              }
-                                              return null;
-                                            })}
-                                          </div>
-                                        );
-                                      }
-                                      return <div key={`l-${lIdx}-${line.slice(0, 12)}`}>{line}</div>;
-                                    })}
-                                  </div>
-                                );
-                              }
-                              
-                              // Regular paragraph with bold support
-                              if (paragraph.includes('**')) {
-                                const parts = paragraph.split('**');
-                                return (
-                                  <p key={`p-${pIdx}-${paragraph.slice(0, 12)}`}>
-                                    {parts.map((part: any, partIdx: any) => {
-                                      if (partIdx % 2 === 1) {
-                                        return <span key={`b-${partIdx}`} className="font-black text-white">{part}</span>;
-                                      }
-                                      return <span key={`s-${partIdx}`}>{part}</span>;
-                                    })}
-                                  </p>
-                                );
-                              }
-
-                              return <p key={`p-${pIdx}-${paragraph.slice(0, 12)}`}>{paragraph}</p>;
-                            })}
-                          </div>
+                          <MessageContent content={message.content} />
                         )}
                         
                         {/* File Attachments Display */}
-                        {message.attachments && message.attachments.length > 0 && (
-                          <div className="mt-4 space-y-3">
-                            {message.attachments.map((attachment: any) => (
-                              <div key={attachment.id}>
-                                {attachment.type === 'image' && (
-                                  <div className="relative group/img rounded-xl overflow-hidden border border-gray-700/50 bg-gray-900/50">
-                                    <img 
-                                      src={attachment.url || "/placeholder.svg"} 
-                                      alt={attachment.name}
-                                      className="w-full max-w-xl rounded-xl"
-                                    />
-                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 opacity-0 group-hover/img:opacity-100 transition-opacity">
-                                      <div className="flex items-center gap-2">
-                                        <ImageIcon className="w-4 h-4 text-gray-400" />
-                                        <span className="text-xs font-bold text-gray-300">{attachment.name}</span>
-                                        <span className="text-xs text-gray-500 ml-auto">{(attachment.size / 1024).toFixed(1)} KB</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                                
-                                {attachment.type === 'csv' && attachment.data && (
-                                  <div className="rounded-xl border border-gray-700/50 bg-gray-900/50 overflow-hidden">
-                                    <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-800/50 border-b border-gray-700/50">
-                                      <FileText className="w-4 h-4 text-green-400" />
-                                      <span className="text-xs font-bold text-gray-300">{attachment.name}</span>
-                                      <span className="text-xs text-gray-500 ml-auto">
-                                        {attachment.data.rows.length} rows × {attachment.data.headers.length} columns
-                                      </span>
-                                    </div>
-                                    <div className="overflow-x-auto max-h-96 custom-scrollbar">
-                                      <table className="w-full text-xs">
-                                        <thead className="sticky top-0 bg-gray-800/80 backdrop-blur-sm">
-                                          <tr>
-                                            {attachment.data.headers.map((header: string, idx: number) => (
-                                              <th key={`hdr-${idx}-${header}`} className="px-4 py-2.5 text-left font-bold text-gray-300 border-b border-gray-700/50">
-                                                {header}
-                                              </th>
-                                            ))}
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {attachment.data.rows.slice(0, 100).map((row: string[], rowIdx: number) => (
-                                            <tr key={rowIdx} className="hover:bg-gray-800/30 transition-colors border-b border-gray-800/30">
-                                              {row.map((cell: string, cellIdx: number) => (
-                                                <td key={cellIdx} className="px-4 py-2.5 text-gray-400 font-medium">
-                                                  {cell}
-                                                </td>
-                                              ))}
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                      {attachment.data.rows.length > 100 && (
-                                        <div className="px-4 py-3 bg-gray-800/30 text-center">
-                                          <span className="text-xs text-gray-500">
-                                            Showing first 100 rows of {attachment.data.rows.length}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        <MessageAttachments attachments={message.attachments} />
                         
                         {message.editHistory && message.editHistory.length > 0 && (
                           <div className="mt-3 pt-3 border-t border-gray-700/50">
@@ -4620,158 +4322,18 @@ No preamble. Start directly with section 1.`;
         </div>
       </div>
 
-      {/* Purchase Credits Modal */}
-      {showPurchaseModal && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm animate-backdrop-in" onClick={() => setShowPurchaseModal(false)}>
-          <div className="relative w-full md:max-w-md max-h-[90vh] md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl animate-slide-up md:animate-scale-in" onClick={(e: any) => e.stopPropagation()}>
-            <button
-              onClick={() => setShowPurchaseModal(false)}
-              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            
-            <div className="p-8">
-              <div className="text-center mb-6">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-orange-500/10 border border-orange-500/30 mb-4">
-                  <AlertCircle className="w-6 h-6 text-orange-400" />
-                </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Out of Credits</h2>
-                <p className="text-sm text-gray-400">Purchase more credits to continue using AI analysis</p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-400 mb-2">Amount (min $10)</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
-                    <input
-                      type="number"
-                      min="10"
-                      value={purchaseAmount}
-                      onChange={(e: any) => setPurchaseAmount(e.target.value)}
-                      placeholder="10"
-                      className="w-full pl-8 pr-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {[20, 50, 100, 250].map((amount) => (
-                    <button
-                      key={amount}
-                      onClick={() => setPurchaseAmount(amount.toString())}
-                      className="flex-1 min-w-[80px] px-4 py-2.5 rounded-xl border border-gray-800 bg-gray-950 hover:bg-gray-800 hover:border-gray-700 text-white font-semibold text-sm transition-all"
-                    >
-                      ${amount}
-                    </button>
-                  ))}
-                </div>
-
-                <button
-                  onClick={() => {
-                    setShowPurchaseModal(false);
-                    setShowStripeLightbox(true);
-                  }}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all"
-                >
-                  Purchase Credits
-                </button>
-
-                <div className="flex items-center justify-between pt-4 border-t border-gray-800">
-                  <button
-                    onClick={() => {
-                      setShowPurchaseModal(false);
-                      setShowStripeLightbox(true);
-                    }}
-                    className="text-sm text-blue-400 hover:text-blue-300 font-semibold transition-colors"
-                  >
-                    View Subscription
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowPurchaseModal(false);
-                      setShowLoginModal(true);
-                    }}
-                    className="text-sm text-gray-400 hover:text-gray-300 font-semibold transition-colors"
-                  >
-                    Login
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Subscription Modal */}
-      {showSubscriptionModal && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm animate-backdrop-in" onClick={() => setShowSubscriptionModal(false)}>
-          <div className="relative w-full md:max-w-md max-h-[90vh] md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl animate-slide-up md:animate-scale-in" onClick={(e: any) => e.stopPropagation()}>
-            <button
-              onClick={() => setShowSubscriptionModal(false)}
-              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            
-            <div className="p-8">
-              <div className="text-center mb-6">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-purple-500/10 border border-purple-500/30 mb-4">
-                  <Sparkles className="w-6 h-6 text-purple-400" />
-                </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Monthly Subscription</h2>
-                <p className="text-sm text-gray-400">Get 20 credits every month for continuous access</p>
-              </div>
-
-              <div className="bg-gradient-to-br from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-xl p-6 mb-6">
-                <div className="flex items-baseline justify-center mb-4">
-                  <span className="text-4xl font-black text-white">$20</span>
-                  <span className="text-gray-400 ml-2">/month</span>
-                </div>
-                <div className="space-y-2 text-sm text-gray-300">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-400" />
-                    <span>20 credits per month</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-400" />
-                    <span>Auto-renews on the 1st</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-400" />
-                    <span>Cancel anytime</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-400" />
-                    <span>Priority support</span>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={() => {
-                  setShowSubscriptionModal(false);
-                  setShowStripeLightbox(true);
-                }}
-                className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition-all mb-3"
-              >
-                Subscribe Now
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowSubscriptionModal(false);
-                  setShowStripeLightbox(true);
-                }}
-                className="w-full py-3 text-sm text-gray-400 hover:text-gray-300 font-semibold transition-colors"
-              >
-                One-time purchase instead
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Credit Modals */}
+      <CreditModals
+        showPurchase={showPurchaseModal}
+        purchaseAmount={purchaseAmount}
+        setPurchaseAmount={setPurchaseAmount}
+        onClosePurchase={() => setShowPurchaseModal(false)}
+        onStripeCheckout={() => setShowStripeLightbox(true)}
+        onLogin={() => setShowLoginModal(true)}
+        showSubscription={showSubscriptionModal}
+        onCloseSubscription={() => setShowSubscriptionModal(false)}
+        onStripeSubscription={() => setShowStripeLightbox(true)}
+      />
 
       {/* Auth Modals - extracted to separate component */}
       <AuthModals

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, type FormEvent } from 'react';
+import { memo, useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
 import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles, Brain } from 'lucide-react';
 
 interface FileAttachment {
@@ -39,7 +39,7 @@ interface ChatInputProps {
 
 const MAX_CHARS = 2000;
 
-export function ChatInput({
+export const ChatInput = memo(function ChatInput({
   input,
   onInputChange,
   onSubmit,
@@ -92,24 +92,24 @@ export function ChatInput({
           : 'Ask about betting odds, fantasy, DFS, or Kalshi markets...');
 
   // Enter = submit, Shift+Enter = newline
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       onSubmit(e as unknown as FormEvent);
     }
-  };
+  }, [onSubmit]);
 
-  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); };
-  const handleDragEnter = (e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); };
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); }, []);
+  const handleDragEnter = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); }, []);
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
     if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false);
-  };
-  const handleDrop = async (e: React.DragEvent) => {
+  }, []);
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
     const dropped = await onFileDrop(e.dataTransfer.files);
     if (dropped.length > 0) onFilesAdded(dropped);
-  };
+  }, [onFileDrop, onFilesAdded]);
 
   const charsLeft = MAX_CHARS - input.length;
   const nearLimit = charsLeft <= 200;
@@ -316,6 +316,6 @@ export function ChatInput({
       </div>
     </>
   );
-}
+});
 
 export type { FileAttachment, ChatInputProps };

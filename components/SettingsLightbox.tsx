@@ -151,10 +151,11 @@ interface SettingsLightboxProps {
   user: { name: string; email: string; avatar?: string } | null;
   onUserUpdate?: (user: { name: string; email: string; avatar?: string }) => void;
   onOpenStripe?: () => void;
+  creditsRemaining?: number;
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────
-export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenStripe }: SettingsLightboxProps) {
+export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenStripe, creditsRemaining }: SettingsLightboxProps) {
   const toast = useToast();
   const [activeTab, setActiveTab]           = useState<SettingsTab>('account');
   const [loading, setLoading]               = useState(true);
@@ -439,7 +440,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-2xl font-black text-blue-400 tabular-nums">
-                        {profileData?.credits_remaining ?? 0}
+                        {creditsRemaining ?? profileData?.credits_remaining ?? 0}
                       </span>
                       <button
                         onClick={() => { onClose(); onOpenStripe?.(); }}

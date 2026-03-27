@@ -40,17 +40,27 @@ export async function POST(request: NextRequest) {
       },
     }));
 
-    return NextResponse.json({
-      success: true,
-      cards: validatedCards,
-      count: validatedCards.length,
-      message: SUCCESS_MESSAGES.CARDS_GENERATED,
-      benfordValidation: {
-        isValid: benford.isValid,
-        score: Math.round(benford.score * 100) / 100,
-        confidence: benford.confidence,
+    return NextResponse.json(
+      {
+        success: true,
+        cards: validatedCards,
+        count: validatedCards.length,
+        message: SUCCESS_MESSAGES.CARDS_GENERATED,
+        benfordValidation: {
+          isValid: benford.isValid,
+          score: Math.round(benford.score * 100) / 100,
+          confidence: benford.confidence,
+        },
       },
-    });
+      {
+        headers: {
+          // Cards are live data — allow CDN/browser to serve a fresh copy for up to 30s
+          // before revalidating. stale-while-revalidate lets stale content be served
+          // for another 60s while a fresh fetch happens in the background.
+          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+        },
+      }
+    );
   } catch (error) {
     console.error('[API/cards] Error:', error);
     return NextResponse.json(

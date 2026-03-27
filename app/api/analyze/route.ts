@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+
+export const maxDuration = 60;
 import { streamText, generateText, tool, stepCountIs } from 'ai';
 import { createXai } from '@ai-sdk/xai';
 import { z } from 'zod';

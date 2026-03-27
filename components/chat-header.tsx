@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { memo, useState, useCallback } from 'react';
 import { Menu, TrendingUp, Bell, Settings, LogIn, UserPlus, Download, Share2, Check, Copy } from 'lucide-react';
 import { exportChatAsMarkdown, exportChatAsJSON, downloadFile, chatFilename, type ExportMessage, type ExportChat } from '@/lib/chat-export';
 
@@ -20,7 +20,7 @@ interface ChatHeaderProps {
   messages?: ExportMessage[];
 }
 
-export function ChatHeader({
+export const ChatHeader = memo(function ChatHeader({
   sidebarOpen,
   onToggleSidebar,
   isLoggedIn,
@@ -226,4 +226,4 @@ export function ChatHeader({
       </div>
     </div>
   );
-}
+});

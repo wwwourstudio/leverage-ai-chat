@@ -1525,23 +1525,10 @@ No preamble. Start directly with section 1.`;
         // Route directly to Kalshi analysis without attempting sports odds
         // Note: The /api/analyze endpoint will handle Kalshi market analysis
       } else if (context.hasFantasyIntent && (!context.hasBettingIntent || selectedCategory === 'fantasy') && selectedCategory !== 'dfs') {
-        // Fantasy intent — only generate cards when we know the sport; otherwise
-        // NFL VBD cards would flash for NBA/MLB/etc. queries.
-        if (context.sport) {
-          if (isDev) console.log('[FANTASY INTENT] Generating fantasy cards');
-          try {
-            const { generateFantasyCards } = await import('@/lib/fantasy/cards/fantasy-card-generator');
-            const fantasyCards = await generateFantasyCards(userMessage, 3, context.sport, {
-              teamCount: fantasyLeague?.setupComplete ? (fantasyLeague.teams ?? 12) : undefined,
-              scoringFormat: fantasyLeague?.setupComplete ? (fantasyLeague.leagueType ?? undefined) : undefined,
-            });
-            context.existingCards = fantasyCards;
-          } catch (err) {
-            if (isDev) console.error('[FANTASY INTENT] Card generation failed:', err);
-          }
-        } else {
-          if (isDev) console.log('[FANTASY INTENT] No sport detected — skipping card pregeneration');
-        }
+        // Fantasy intent — card generation is handled server-side by /api/analyze
+        // (which has filesystem access to read the full ADP CSV). Client-side
+        // pre-generation is intentionally skipped to avoid the static 120-player fallback.
+        if (isDev) console.log('[FANTASY INTENT] Cards will be generated server-side');
       } else if ((context.hasBettingIntent || context.isSportsQuery) && !context.hasPlayerIntent) {
         // Fetch sports odds for any betting-related query OR explicit sports query
         if (isDev) console.log('[ODDS FETCH ATTEMPT] Betting intent or sports query detected');

@@ -4149,6 +4149,7 @@ No preamble. Start directly with section 1.`;
         user={user}
         onUserUpdate={setUser}
         onOpenStripe={() => setShowStripeLightbox(true)}
+        creditsRemaining={creditsRemaining}
       />
 
       {/* Alerts Lightbox */}

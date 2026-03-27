@@ -316,8 +316,6 @@ export const ChatInput = memo(function ChatInput({
       </div>
     </>
   );
-}
-
 });
 
 export type { FileAttachment, ChatInputProps };

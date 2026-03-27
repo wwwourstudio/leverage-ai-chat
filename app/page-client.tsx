@@ -34,9 +34,9 @@ const StripeLightbox = dynamic(() => import('@/components/StripeLightbox').then(
 const UserLightbox = dynamic(() => import('@/components/UserLightbox').then(m => ({ default: m.UserLightbox })), { ssr: false });
 import { useToast } from '@/components/toast-provider';
 import { Sidebar } from '@/components/Sidebar';
-import { ChatHeader } from '@/components/chat-header';
+import { ChatHeader, ChatInput } from '@/components/chat';
 import { SuggestedPrompts } from '@/components/suggested-prompts';
-import { ChatInput } from '@/components/chat-input';
+
 import { loadThreads, createThread, updateThread, deleteThread, loadMessages, saveMessage } from '@/lib/chat-service';
 import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
 import { useChat, type ChatMessage as HookChatMessage } from '@/lib/hooks/useChat';

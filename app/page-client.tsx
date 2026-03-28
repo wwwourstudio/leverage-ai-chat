@@ -4244,14 +4244,8 @@ No preamble. Start directly with section 1.`;
       <style>
         {`
           @keyframes fadeIn {
-            from {
-              opacity: 0;
-              transform: translateY(15px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
+            from { opacity: 0; }
+            to   { opacity: 1; }
           }
           .animate-fadeIn {
             animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);

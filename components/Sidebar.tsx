@@ -55,6 +55,7 @@ export interface SidebarProps {
   setLastUserQuery: (q: string) => void;
   user: { name: string; email: string; avatar?: string } | null;
   onUserClick?: () => void;
+  isLoadingChats?: boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -358,6 +359,7 @@ export function Sidebar({
   setLastUserQuery,
   user,
   onUserClick,
+  isLoadingChats = false,
 }: SidebarProps) {
   // Avoid server/client hydration mismatch (#418): date grouping uses Date.now() which
   // differs between UTC server and local-timezone client. Defer to after mount.
@@ -510,6 +512,20 @@ export function Sidebar({
 
           {/* ── Chat list ──────────────────────────────────────────────────── */}
           <div className="flex-1 overflow-y-auto p-2 space-y-3 custom-scrollbar">
+            {/* Loading skeletons */}
+            {isLoadingChats && (
+              <div className="space-y-1.5 px-1 pt-1" aria-busy="true" aria-label="Loading chats">
+                {[1, 0.8, 0.9, 0.75, 0.85].map((w, i) => (
+                  <div key={i} className="relative flex items-center gap-2 rounded-xl bg-[oklch(0.11_0.01_280)] border border-[oklch(0.16_0.01_280)] h-[52px] px-3 overflow-hidden">
+                    <div className="w-0.5 h-full absolute left-0 top-0 bg-[oklch(0.22_0.02_260)] rounded-l-xl" />
+                    <div className="flex-1 space-y-1.5 pl-1">
+                      <div className="h-2.5 rounded-full bg-[oklch(0.16_0.01_280)] animate-pulse" style={{ width: `${w * 100}%` }} />
+                      <div className="h-2 rounded-full bg-[oklch(0.13_0.01_280)] animate-pulse" style={{ width: `${w * 60}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             {/* Starred section */}
             {starredChats.length > 0 && (
               <div className="space-y-1">

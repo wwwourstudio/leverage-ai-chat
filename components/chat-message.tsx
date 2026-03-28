@@ -4,6 +4,7 @@ import React from 'react';
 import { TrustMetricsDisplay } from '@/components/trust-metrics-display';
 import { Shield, Copy, Edit3, CheckCheck, X, Zap, Brain, AlertCircle, Info, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/components/toast-provider';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -298,6 +299,8 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
   const [isEditing, setIsEditing] = React.useState(false);
   const [editContent, setEditContent] = React.useState(message.content);
   const [showTrust, setShowTrust] = React.useState(false);
+  const [justCopied, setJustCopied] = React.useState(false);
+  const toast = useToast();
   const isLong = !message.role || message.role === 'assistant'
     ? message.content.length > COLLAPSE_THRESHOLD
     : false;
@@ -472,13 +475,14 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                     <button
                       onClick={() => {
                         onCopy?.();
-                        (document.activeElement as HTMLElement)?.setAttribute('data-copied', '1');
-                        setTimeout(() => (document.activeElement as HTMLElement)?.removeAttribute('data-copied'), 1800);
+                        setJustCopied(true);
+                        toast.success('Copied to clipboard');
+                        setTimeout(() => setJustCopied(false), 1500);
                       }}
                       title="Copy response"
                       className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 hover:bg-[oklch(0.18_0.01_280)] rounded px-1 py-0.5 transition-all"
                     >
-                      <Copy className="w-3 h-3" />
+                      {justCopied ? <CheckCheck className="w-3 h-3 text-emerald-400 animate-scale-in" /> : <Copy className="w-3 h-3" />}
                     </button>
                     <button
                       onClick={() => setIsEditing(true)}

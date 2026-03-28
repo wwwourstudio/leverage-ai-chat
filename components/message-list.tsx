@@ -1,8 +1,7 @@
 'use client';
 
-import { memo, useEffect, useState } from 'react';
-import { Sparkles, User } from 'lucide-react';
-import { TrustMetricsBadge } from './trust-metrics-display';
+import { memo, useEffect, useState, useRef, useCallback } from 'react';
+import { Sparkles, ChevronDown } from 'lucide-react';
 import { ChatMessage } from './chat-message';
 
 interface Message {
@@ -90,14 +89,97 @@ const MessageItem = memo(function MessageItem({ message }: { message: Message })
   return <ChatMessage message={message} />;
 });
 
-export const MessageList = memo(function MessageList({ messages, isTyping }: MessageListProps) {
+function formatDateLabel(date: Date): string {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86400000);
+  const msgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (msgDay.getTime() === today.getTime()) return 'Today';
+  if (msgDay.getTime() === yesterday.getTime()) return 'Yesterday';
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+}
+
+function DateSeparator({ label }: { label: string }) {
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
-      {messages.map((message) => (
-        <MessageItem key={message.id} message={message} />
-      ))}
+    <div className="flex items-center gap-3 my-2" role="separator" aria-label={label}>
+      <div className="flex-1 h-px bg-[oklch(0.20_0.015_280)]" />
+      <span className="text-[9px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)] px-2">
+        {label}
+      </span>
+      <div className="flex-1 h-px bg-[oklch(0.20_0.015_280)]" />
+    </div>
+  );
+}
+
+export const MessageList = memo(function MessageList({ messages, isTyping }: MessageListProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [showJumpBtn, setShowJumpBtn] = useState(false);
+
+  const scrollToBottom = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, []);
+
+  // Auto-scroll to bottom when new messages arrive (only if already near bottom)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distFromBottom < 300) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [messages.length, isTyping]);
+
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowJumpBtn(distFromBottom > 200);
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      className="flex-1 overflow-y-auto px-4 py-6 space-y-5 relative"
+    >
+      {messages.map((message, idx) => {
+        const prevMessage = idx > 0 ? messages[idx - 1] : null;
+        const showSeparator = prevMessage &&
+          message.timestamp &&
+          prevMessage.timestamp &&
+          !isSameDay(new Date(message.timestamp), new Date(prevMessage.timestamp));
+
+        return (
+          <div key={message.id}>
+            {showSeparator && (
+              <DateSeparator label={formatDateLabel(new Date(message.timestamp))} />
+            )}
+            <MessageItem message={message} />
+          </div>
+        );
+      })}
 
       {isTyping && <TypingIndicator />}
+
+      {showJumpBtn && (
+        <button
+          onClick={scrollToBottom}
+          aria-label="Jump to latest message"
+          className="fixed bottom-24 right-4 z-20 flex items-center gap-1.5 rounded-full px-3 py-1.5 bg-blue-600/90 hover:bg-blue-500 text-white text-xs font-bold shadow-lg animate-fade-in-up transition-colors"
+        >
+          <ChevronDown className="w-3.5 h-3.5" />
+          Latest
+        </button>
+      )}
     </div>
   );
 });

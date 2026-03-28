@@ -2,6 +2,7 @@
 
 import { memo, useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
 import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles, Brain } from 'lucide-react';
+import { useToast } from '@/components/toast-provider';
 
 interface FileAttachment {
   id: string;
@@ -63,6 +64,7 @@ export const ChatInput = memo(function ChatInput({
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const toast = useToast();
 
   // Auto-resize textarea height as content grows (max ~6 lines / 160px)
   // Wrap in RAF to avoid forced reflow (write then synchronous layout read)
@@ -114,6 +116,12 @@ export const ChatInput = memo(function ChatInput({
   const charsLeft = MAX_CHARS - input.length;
   const nearLimit = charsLeft <= 200;
   const overLimit = charsLeft < 0;
+  const charProgress = Math.min(input.length / MAX_CHARS, 1);
+  // SVG ring: r=6, circumference ≈ 37.7
+  const RING_R = 6;
+  const RING_CIRC = 2 * Math.PI * RING_R;
+  const ringOffset = RING_CIRC * (1 - charProgress);
+  const ringColor = overLimit ? '#f87171' : nearLimit ? '#fb923c' : input.length > MAX_CHARS * 0.75 ? '#facc15' : '#4b5563';
 
   return (
     <>
@@ -138,7 +146,7 @@ export const ChatInput = memo(function ChatInput({
                 <span className="text-xs font-medium text-foreground/80 max-w-[120px] truncate">{file.name}</span>
                 <span className="text-[10px] text-[var(--text-faint)]">{(file.size / 1024).toFixed(1)} KB</span>
                 <button
-                  onClick={() => onSaveFile(file)}
+                  onClick={() => { onSaveFile(file); toast.success('File saved to profile'); }}
                   className="p-0.5 rounded hover:bg-blue-900/40 transition-colors"
                   title="Save to profile"
                 >
@@ -213,9 +221,9 @@ export const ChatInput = memo(function ChatInput({
               >
                 <Paperclip className="w-4 h-4 text-[var(--text-muted)] hover:text-blue-400 transition-colors" />
               </button>
-              {nearLimit && (
-                <span className={`text-xs font-semibold tabular-nums ${overLimit ? 'text-red-400' : 'text-orange-400'}`}>
-                  {charsLeft}
+              {input.length > 0 && (
+                <span className={`text-[10px] font-semibold tabular-nums transition-colors ${overLimit ? 'text-red-400' : nearLimit ? 'text-orange-400' : 'text-[var(--text-faint)]'}`}>
+                  {input.length}/{MAX_CHARS}
                 </span>
               )}
             </div>
@@ -258,6 +266,21 @@ export const ChatInput = memo(function ChatInput({
               style={{ height: '44px' }}
             >
               <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 -translate-x-full group-hover/send:translate-x-full transition-transform duration-600 pointer-events-none" />
+              {input.length > 0 && (
+                <svg className="absolute top-1 right-1 w-4 h-4 -rotate-90" viewBox="0 0 16 16" aria-hidden="true">
+                  <circle cx="8" cy="8" r={RING_R} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="2" />
+                  <circle
+                    cx="8" cy="8" r={RING_R}
+                    fill="none"
+                    stroke={ringColor}
+                    strokeWidth="2"
+                    strokeDasharray={RING_CIRC}
+                    strokeDashoffset={ringOffset}
+                    strokeLinecap="round"
+                    style={{ transition: 'stroke-dashoffset 0.2s, stroke 0.2s' }}
+                  />
+                </svg>
+              )}
               <Send className="w-4 h-4 relative z-10" />
               <span className="hidden md:inline text-sm relative z-10">Analyze</span>
             </button>

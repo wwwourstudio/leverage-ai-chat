@@ -289,6 +289,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [deepThink, setDeepThink] = useState(false);
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(!!serverData?.userSession);
+  const [isLoadingChats, setIsLoadingChats] = useState(false);
   const [user, setUser] = useState<{ name: string; email: string; avatar?: string } | null>(
     serverData?.userSession ? {
       name: serverData.userSession.user.name,
@@ -583,7 +584,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           // Restore fantasy league from DB (overrides localStorage if a DB record exists)
           loadFantasyLeagueFromDB();
           // Load persisted chat threads from Supabase
+          setIsLoadingChats(true);
           loadThreads().then(threads => {
+            setIsLoadingChats(false);
             if (threads.length > 0) {
               setChats(threads);
               setActiveChat(threads[0].id);
@@ -2709,6 +2712,7 @@ No preamble. Start directly with section 1.`;
       setChats(chats.map((chat: any) =>
         chat.id === chatId ? { ...chat, title: editingChatTitle.trim() } : chat
       ));
+      toast.success('Chat renamed');
     }
     setEditingChatId(null);
     setEditingChatTitle('');
@@ -3303,6 +3307,7 @@ No preamble. Start directly with section 1.`;
           setLastUserQuery={setLastUserQuery}
           user={user}
           onUserClick={() => isLoggedIn ? setShowUserLightbox(true) : setShowLoginModal(true)}
+          isLoadingChats={isLoadingChats}
         />
       </div>
 
@@ -3322,6 +3327,7 @@ No preamble. Start directly with section 1.`;
           onOpenSignup={() => setShowSignupModal(true)}
           creditsRemaining={creditsRemaining}
           onOpenStripe={() => setShowStripeLightbox(true)}
+          currentSport={selectedSport || selectedCategory}
         />
 
         {/* Messages Container - Dynamic Data-Driven Interface */}
@@ -3336,7 +3342,7 @@ No preamble. Start directly with section 1.`;
             {/* Database Status Banner */}
             <DatabaseStatusBanner />
             {messages.length === 0 ? (
-              <WelcomeScreen welcomeText="No messages yet" />
+              <WelcomeScreen onPromptSelect={setInput} />
             ) : (
               messages.map((message: any, index: any) => {
                 // Group messages: Check if this message is from same sender as previous

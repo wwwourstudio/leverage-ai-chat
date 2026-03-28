@@ -824,7 +824,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const categories = [
     { id: 'all', name: 'All', icon: Layers, color: 'text-blue-400', desc: 'Everything' },
     { id: 'betting', name: 'Sports Betting', icon: TrendingUp, color: 'text-orange-400', desc: 'Live Odds & Props' },
-    { id: 'fantasy', name: 'Fantasy', icon: Trophy, color: 'text-green-400', desc: 'Season-long & Best Ball' },
+    { id: 'fantasy', name: 'Fantasy', icon: Trophy, color: 'text-violet-400', desc: 'Season-long & Best Ball' },
     { id: 'dfs', name: 'DFS Optimizer', icon: Award, color: 'text-purple-400', desc: 'DK/FD Lineups' },
     { id: 'kalshi', name: 'Kalshi Markets', icon: BarChart3, color: 'text-cyan-400', desc: 'Financial Prediction' },
   ];
@@ -2829,10 +2829,10 @@ No preamble. Start directly with section 1.`;
   const getStatusBadge = (status: string) => {
     const badges: Record<string, any> = {
       hot: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30', icon: Flame, label: 'HOT' },
-      value: { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/30', icon: DollarSign, label: 'VALUE' },
+      value: { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/30', icon: DollarSign, label: 'VALUE' },
       optimal: { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/30', icon: Award, label: 'OPTIMAL' },
       strong: { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/30', icon: CheckCircle, label: 'STRONG' },
-      target: { bg: 'bg-teal-500/20', text: 'text-teal-400', border: 'border-teal-500/30', icon: Target, label: 'TARGET' },
+      target: { bg: 'bg-violet-500/20', text: 'text-violet-400', border: 'border-violet-500/30', icon: Target, label: 'TARGET' },
       elite: { bg: 'bg-purple-600/20', text: 'text-purple-300', border: 'border-purple-600/30', icon: Medal, label: 'ELITE' },
       sleeper: { bg: 'bg-indigo-500/20', text: 'text-indigo-400', border: 'border-indigo-500/30', icon: Zap, label: 'SLEEPER' },
       opportunity: { bg: 'bg-cyan-500/20', text: 'text-cyan-400', border: 'border-cyan-500/30', icon: BarChart3, label: 'OPPORTUNITY' },
@@ -2917,7 +2917,7 @@ No preamble. Start directly with section 1.`;
               
               // Assign colors based on context
               let valueColor = 'text-gray-300';
-              if (isUpTrend) valueColor = 'text-green-400';
+              if (isUpTrend) valueColor = 'text-blue-400';
               else if (isDownTrend) valueColor = 'text-red-400';
               else if (isHighValue) valueColor = 'text-purple-400';
               else if (isDollar || isPercentage) valueColor = 'text-blue-400';
@@ -3417,25 +3417,25 @@ No preamble. Start directly with section 1.`;
 
                       {/* Verified badge */}
                       {message.sources && message.sources.length > 0 && !message.isWelcome && (
-                        <div className="flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
-                          <CheckCheck className="w-2.5 h-2.5 text-emerald-400" />
-                          <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">Live Data</span>
+                        <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md">
+                          <CheckCheck className="w-2.5 h-2.5 text-blue-400" />
+                          <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider">Live Data</span>
                         </div>
                       )}
 
                       {/* Confidence / Benford Trust Score */}
                       {message.confidence && !message.isWelcome && (
                         <div className={`flex items-center gap-1 px-2 py-0.5 rounded-md border ${
-                          message.confidence >= 85 ? 'bg-green-500/10 border-green-500/20' :
+                          message.confidence >= 85 ? 'bg-blue-500/10 border-blue-500/20' :
                           message.confidence >= 65 ? 'bg-amber-500/10 border-amber-500/20' :
                           'bg-red-500/10 border-red-500/20'
                         }`}>
                           <div className={`w-1.5 h-1.5 rounded-full ${
-                            message.confidence >= 85 ? 'bg-green-400' :
+                            message.confidence >= 85 ? 'bg-blue-400' :
                             message.confidence >= 65 ? 'bg-amber-400' : 'bg-red-400'
                           }`} />
                           <span className={`text-[9px] font-bold uppercase tracking-wider ${
-                            message.confidence >= 85 ? 'text-green-400' :
+                            message.confidence >= 85 ? 'text-blue-400' :
                             message.confidence >= 65 ? 'text-amber-400' : 'text-red-400'
                           }`}>{message.confidence}% integrity</span>
                         </div>
@@ -3660,7 +3660,7 @@ No preamble. Start directly with section 1.`;
                           </summary>
                           <div className="mt-2 flex flex-wrap gap-1.5">
                             {message.sources.map((source: any, idx: any) => {
-                              const reliabilityColor = source.reliability >= 95 ? 'text-green-500 border-green-600/20' :
+                              const reliabilityColor = source.reliability >= 95 ? 'text-blue-500 border-blue-600/20' :
                                                       source.reliability >= 90 ? 'text-blue-500 border-blue-600/20' :
                                                       'text-yellow-500 border-yellow-600/20';
                               const Icon = source.type === 'database' ? Database :
@@ -3688,14 +3688,14 @@ No preamble. Start directly with section 1.`;
                         <details className="mt-2 group/trust">
                           <summary className="cursor-pointer list-none flex flex-wrap items-center gap-1.5 text-[11px] text-gray-600 hover:text-gray-400 transition-colors">
                             <Shield className={`w-3.5 h-3.5 shrink-0 ${
-                              message.trustMetrics.trustLevel === 'high' ? 'text-emerald-500/70' :
+                              message.trustMetrics.trustLevel === 'high' ? 'text-blue-500/70' :
                               message.trustMetrics.trustLevel === 'medium' ? 'text-yellow-500/70' :
                               'text-red-500/70'
                             }`} />
                             <span className="font-semibold uppercase tracking-wide">AI Trust & Integrity</span>
                             {/* Confidence badge */}
                             <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              message.trustMetrics.trustLevel === 'high' ? 'bg-emerald-600/20 text-emerald-400' :
+                              message.trustMetrics.trustLevel === 'high' ? 'bg-blue-600/20 text-blue-400' :
                               message.trustMetrics.trustLevel === 'medium' ? 'bg-yellow-600/20 text-yellow-400' :
                               'bg-red-600/20 text-red-400'
                             }`}>
@@ -3703,7 +3703,7 @@ No preamble. Start directly with section 1.`;
                             </span>
                             {/* Live odds badge */}
                             {(message.trustMetrics as any).hasLiveOdds && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-500/80">
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/10 text-blue-500/80">
                                 LIVE
                               </span>
                             )}
@@ -3748,13 +3748,13 @@ No preamble. Start directly with section 1.`;
                             onClick={() => message.voted !== 'up' && handleVote(index, 'up')}
                             className={`p-1.5 rounded-lg transition-all group/action border ${
                               message.voted === 'up'
-                                ? 'bg-green-500/15 border-green-500/40 cursor-default'
-                                : 'hover:bg-green-500/10 active:bg-green-500/20 border-transparent hover:border-green-500/30'
+                                ? 'bg-blue-500/15 border-blue-500/40 cursor-default'
+                                : 'hover:bg-blue-500/10 active:bg-blue-500/20 border-transparent hover:border-blue-500/30'
                             }`}
                             title="This response was helpful"
                             aria-label="Mark as helpful"
                           >
-                            <ThumbsUp className={`w-3.5 h-3.5 transition-colors ${message.voted === 'up' ? 'text-green-400 fill-green-400/30' : 'text-gray-500 group-hover/action:text-green-400'}`} />
+                            <ThumbsUp className={`w-3.5 h-3.5 transition-colors ${message.voted === 'up' ? 'text-blue-400 fill-blue-400/30' : 'text-gray-500 group-hover/action:text-blue-400'}`} />
                           </button>
                           <button
                             onClick={() => message.voted !== 'down' && handleVote(index, 'down')}
@@ -3892,15 +3892,15 @@ No preamble. Start directly with section 1.`;
 
               const STEP_NAMES = ['Sport', 'Platform', 'Teams', 'Format', 'Save'];
               const btnBase = 'px-3 py-1.5 rounded-xl border text-xs font-bold transition-all';
-              const btnActive = 'border-green-400/70 bg-green-700/30 text-green-200';
-              const btnInactive = 'border-green-700/40 bg-green-900/15 text-green-400 hover:bg-green-700/20 hover:border-green-500/50';
+              const btnActive = 'border-violet-400/70 bg-violet-700/30 text-violet-200';
+              const btnInactive = 'border-violet-700/40 bg-violet-900/15 text-violet-400 hover:bg-violet-700/20 hover:border-violet-500/50';
 
               return (
-                <div className="mb-5 bg-gradient-to-br from-[oklch(0.12_0.04_145/0.5)] via-[oklch(0.09_0.01_280/0.8)] to-[oklch(0.10_0.03_145/0.3)] border border-green-700/30 rounded-2xl p-4 backdrop-blur-sm">
+                <div className="mb-5 bg-gradient-to-br from-[oklch(0.12_0.03_280/0.5)] via-[oklch(0.09_0.01_280/0.8)] to-[oklch(0.10_0.04_300/0.3)] border border-violet-700/30 rounded-2xl p-4 backdrop-blur-sm">
                   {/* Header */}
                   <div className="flex items-center gap-2 mb-3">
-                    <Trophy className="w-4 h-4 text-green-400" />
-                    <span className="text-sm font-bold text-green-300">Set up your fantasy league</span>
+                    <Trophy className="w-4 h-4 text-violet-400" />
+                    <span className="text-sm font-bold text-violet-300">Set up your fantasy league</span>
                     <span className="ml-auto text-[10px] font-bold text-gray-500 uppercase tracking-wider">
                       {STEP_NAMES[fantasySetupStep]} · {fantasySetupStep + 1}/{STEP_NAMES.length}
                     </span>
@@ -3909,8 +3909,8 @@ No preamble. Start directly with section 1.`;
                   <div className="flex items-center gap-1 mb-4">
                     {STEP_NAMES.map((name, i) => (
                       <div key={i} className="flex items-center gap-1">
-                        <div className={`w-1.5 h-1.5 rounded-full transition-all ${i < fantasySetupStep ? 'bg-green-400' : i === fantasySetupStep ? 'bg-green-300 scale-125' : 'bg-gray-700'}`} />
-                        {i < STEP_NAMES.length - 1 && <div className={`w-4 h-px transition-all ${i < fantasySetupStep ? 'bg-green-500/50' : 'bg-gray-800'}`} />}
+                        <div className={`w-1.5 h-1.5 rounded-full transition-all ${i < fantasySetupStep ? 'bg-violet-400' : i === fantasySetupStep ? 'bg-violet-300 scale-125' : 'bg-gray-700'}`} />
+                        {i < STEP_NAMES.length - 1 && <div className={`w-4 h-px transition-all ${i < fantasySetupStep ? 'bg-violet-500/50' : 'bg-gray-800'}`} />}
                       </div>
                     ))}
                   </div>
@@ -3981,7 +3981,7 @@ No preamble. Start directly with section 1.`;
                           <input type="range" min={8} max={30} step={1}
                             value={fantasySetupData.teams ?? 12}
                             onChange={(e: any) => setFantasySetupData((d: any) => ({ ...d, teams: parseInt(e.target.value) }))}
-                            className="w-full accent-green-400 cursor-pointer" />
+                            className="w-full accent-violet-400 cursor-pointer" />
                           <div className="flex justify-between text-[9px] text-gray-600"><span>8</span><span>16</span><span>24</span><span>30</span></div>
                           <div className="flex flex-wrap gap-1.5 justify-center">
                             {teamSizes.map(n => (
@@ -3993,7 +3993,7 @@ No preamble. Start directly with section 1.`;
                             ))}
                           </div>
                           <button onClick={() => setFantasySetupStep(3)}
-                            className="w-full py-2 rounded-xl bg-green-700/30 border border-green-500/40 text-green-300 text-xs font-bold hover:bg-green-700/40 transition-all">
+                            className="w-full py-2 rounded-xl bg-violet-700/30 border border-violet-500/40 text-violet-300 text-xs font-bold hover:bg-violet-700/40 transition-all">
                             Continue →
                           </button>
                         </div>
@@ -4024,12 +4024,12 @@ No preamble. Start directly with section 1.`;
                       <input type="text" placeholder="League name (e.g. The Winners Circle)"
                         value={fantasySetupData.leagueName || ''}
                         onChange={(e: any) => setFantasySetupData((d: any) => ({ ...d, leagueName: e.target.value }))}
-                        className="w-full bg-gray-900/60 border border-green-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-500/60 transition-all"
+                        className="w-full bg-gray-900/60 border border-violet-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/60 transition-all"
                         maxLength={60} />
                       <input type="text" placeholder="Your team name (e.g. Gronk's Hammers)"
                         value={fantasySetupData.teamName || ''}
                         onChange={(e: any) => setFantasySetupData((d: any) => ({ ...d, teamName: e.target.value }))}
-                        className="w-full bg-gray-900/60 border border-green-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-500/60 transition-all"
+                        className="w-full bg-gray-900/60 border border-violet-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/60 transition-all"
                         maxLength={40} />
                       {/* Summary */}
                       <div className="flex flex-wrap gap-1.5 text-[10px]">
@@ -4039,7 +4039,7 @@ No preamble. Start directly with section 1.`;
                           `${fantasySetupData.teams ?? 12} teams`,
                           leagueTypes.find(t => t.value === fantasySetupData.leagueType)?.label ?? fantasySetupData.leagueType ?? '',
                         ].map((chip, i) => (
-                          <span key={i} className="px-2 py-0.5 rounded-full bg-green-900/20 border border-green-700/30 text-green-400 font-medium">{chip}</span>
+                          <span key={i} className="px-2 py-0.5 rounded-full bg-violet-900/20 border border-violet-700/30 text-violet-400 font-medium">{chip}</span>
                         ))}
                       </div>
                       <button
@@ -4083,7 +4083,7 @@ No preamble. Start directly with section 1.`;
                           toast.success(`League saved! Welcome, ${league.teamName} 🏆`);
                         }}
                         disabled={!fantasySetupData.teamName?.trim()}
-                        className="w-full py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-green-900/20">
+                        className="w-full py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-violet-900/20">
                         Save League 🚀
                       </button>
                     </div>
@@ -4101,8 +4101,8 @@ No preamble. Start directly with section 1.`;
             {/* Show configured league context + reset button */}
             {selectedCategory === 'fantasy' && fantasyLeague?.setupComplete && isLoggedIn && (
               <div className="mb-3 flex items-center gap-2 px-1">
-                <Trophy className="w-3.5 h-3.5 text-green-500" />
-                <span className="text-[11px] font-bold text-green-400">{fantasyLeague.teamName}</span>
+                <Trophy className="w-3.5 h-3.5 text-violet-500" />
+                <span className="text-[11px] font-bold text-violet-400">{fantasyLeague.teamName}</span>
                 <span className="text-[10px] text-gray-600">
                   {fantasyLeague.sport?.toUpperCase()} · {fantasyLeague.platform?.toUpperCase()} · {fantasyLeague.teams} teams · {fantasyLeague.leagueType ?? fantasyLeague.scoring}
                 </span>

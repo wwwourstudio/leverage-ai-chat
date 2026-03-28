@@ -142,7 +142,7 @@ export const ChatInput = memo(function ChatInput({
               >
                 {file.type === 'image'
                   ? <ImageIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  : <FileText className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                  : <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
                 <span className="text-xs font-medium text-foreground/80 max-w-[120px] truncate">{file.name}</span>
                 <span className="text-[10px] text-[var(--text-faint)]">{(file.size / 1024).toFixed(1)} KB</span>
                 <button
@@ -327,8 +327,8 @@ export const ChatInput = memo(function ChatInput({
 
           <div className="flex items-center gap-1.5 text-[10px] font-semibold text-[var(--text-faint)]">
             <span className="relative flex h-1.5 w-1.5">
-              {systemStatus === 'ok' && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />}
-              <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${systemStatus === 'down' ? 'bg-red-500' : systemStatus === 'degraded' ? 'bg-amber-400' : 'bg-emerald-500'}`} />
+              {systemStatus === 'ok' && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />}
+              <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${systemStatus === 'down' ? 'bg-red-500' : systemStatus === 'degraded' ? 'bg-amber-400' : 'bg-blue-500'}`} />
             </span>
             <span className="hidden sm:inline">
               {systemStatus === 'down' ? 'Service disruption' : systemStatus === 'degraded' ? 'Degraded performance' : 'All systems operational'}

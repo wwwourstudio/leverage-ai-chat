@@ -133,7 +133,7 @@ export function MobileChatInput({
               {file.type === 'image' ? (
                 <ImageIcon className="w-3 h-3 text-blue-400 shrink-0" />
               ) : (
-                <FileText className="w-3 h-3 text-emerald-400 shrink-0" />
+                <FileText className="w-3 h-3 text-blue-400 shrink-0" />
               )}
               <span className="text-[10px] font-semibold text-gray-300 max-w-[80px] truncate">{file.name}</span>
               <button
@@ -197,7 +197,7 @@ export function MobileChatInput({
 
       <div className="flex items-center gap-2 mt-1.5 px-0.5">
         <div className="flex items-center gap-1 text-[10px] text-slate-500">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
           <span>AI Online</span>
         </div>
         <span className="ml-auto text-[10px] text-slate-600">Drop files or tap <Paperclip className="w-2.5 h-2.5 inline" /></span>

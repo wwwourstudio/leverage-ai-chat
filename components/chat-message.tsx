@@ -493,7 +493,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                       title="Copy response"
                       className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 hover:bg-[oklch(0.18_0.01_280)] rounded px-1 py-0.5 transition-all"
                     >
-                      {justCopied ? <CheckCheck className="w-3 h-3 text-emerald-400 animate-scale-in" /> : <Copy className="w-3 h-3" />}
+                      {justCopied ? <CheckCheck className="w-3 h-3 text-blue-400 animate-scale-in" /> : <Copy className="w-3 h-3" />}
                     </button>
                     <button
                       onClick={() => setIsEditing(true)}

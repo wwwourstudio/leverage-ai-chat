@@ -6,8 +6,48 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
-import { getSupabaseUrl, getSupabaseServiceKey } from '@/lib/config';
+import { getSupabaseUrl, getSupabaseServiceKey, getOddsApiKey } from '@/lib/config';
 import { playerPropsQueue } from '@/lib/api-request-manager';
+
+// ── Odds API response types ────────────────────────────────────────────────
+interface OddsApiEvent {
+  id: string;
+  sport_key: string;
+  sport_title: string;
+  commence_time: string;
+  home_team: string;
+  away_team: string;
+}
+
+interface OddsApiOutcome {
+  name: string;         // 'Over' | 'Under', or player name for alt markets
+  description?: string; // player name in prop markets
+  price: number;        // American odds integer
+  point?: number;       // line value (e.g. 0.5 for home-run props)
+}
+
+interface OddsApiMarket {
+  key: string;          // e.g. 'batter_home_runs', 'player_points'
+  last_update: string;
+  outcomes: OddsApiOutcome[];
+}
+
+interface OddsApiBookmaker {
+  key: string;
+  title: string;
+  last_update: string;
+  markets: OddsApiMarket[];
+}
+
+interface OddsApiEventOdds {
+  id: string;
+  sport_key: string;
+  commence_time: string;
+  home_team: string;
+  away_team: string;
+  bookmakers: OddsApiBookmaker[];
+}
+// ──────────────────────────────────────────────────────────────────────────
 
 /** Use service role on server (bypasses RLS), browser anon client on client. */
 function getReadClient() {
@@ -98,10 +138,10 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
     }
   }
   
-  // Fetch from Odds API
-  const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+  // Fetch from Odds API — server-only key, never expose to the client bundle
+  const apiKey = getOddsApiKey();
   if (!apiKey) {
-    console.error('[v0] [PLAYER-PROPS] No API key configured');
+    console.error('[v0] [PLAYER-PROPS] ODDS_API_KEY not configured — set it in Vercel env vars');
     return [];
   }
   
@@ -119,8 +159,8 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
       // American Football
       'americanfootball_nfl': ['player_pass_tds', 'player_pass_yds', 'player_pass_completions', 'player_pass_attempts', 'player_pass_interceptions', 'player_rush_yds', 'player_rush_attempts', 'player_receptions', 'player_reception_yds', 'player_anytime_td', 'player_first_td', 'player_kicking_points', 'player_field_goals'],
       'americanfootball_ncaaf': ['player_pass_tds', 'player_pass_yds', 'player_rush_yds', 'player_receptions', 'player_reception_yds', 'player_anytime_td'],
-      // Baseball
-      'baseball_mlb': ['player_home_runs', 'player_hits', 'player_total_bases', 'player_rbis', 'player_runs', 'player_stolen_bases', 'player_hits_runs_rbis', 'player_singles', 'player_doubles', 'player_walks', 'player_strikeouts', 'pitcher_strikeouts', 'pitcher_hits_allowed', 'pitcher_walks', 'pitcher_earned_runs', 'pitcher_outs'],
+      // Baseball — batter_ and pitcher_ prefixes (NOT player_; sending player_* returns HTTP 422)
+      'baseball_mlb': ['batter_home_runs', 'batter_hits', 'batter_total_bases', 'batter_rbis', 'batter_runs_scored', 'batter_stolen_bases', 'batter_hits_runs_rbis', 'batter_singles', 'batter_doubles', 'batter_walks', 'batter_strikeouts', 'pitcher_strikeouts', 'pitcher_hits_allowed', 'pitcher_walks', 'pitcher_earned_runs', 'pitcher_outs'],
       // Hockey
       'icehockey_nhl': ['player_points', 'player_goals', 'player_assists', 'player_shots_on_goal', 'player_blocked_shots', 'player_power_play_points', 'goalie_saves'],
       // Soccer
@@ -156,15 +196,15 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
     // Player props are only available via the event-level endpoint:
     //   GET /v4/sports/{sport}/events/{eventId}/odds?markets={market}
     // Calling the game odds endpoint with player prop markets returns HTTP 422.
-    let events: any[] = [];
+    let events: OddsApiEvent[] = [];
     try {
       const eventsUrl = `${baseUrl}/sports/${sport}/events?apiKey=${apiKey}`;
       // Route through the queue so parallel sport fetches don't all hit the
       // events endpoint simultaneously and trigger HTTP 429 rate limits.
       const eventsResp = await playerPropsQueue.enqueue(() => fetch(eventsUrl), 1);
       if (eventsResp.ok) {
-        events = await eventsResp.json();
-        console.log(`[v0] [PLAYER-PROPS] Found ${events.length} upcoming events for ${sport}`);
+        events = await eventsResp.json() as OddsApiEvent[];
+        console.log(`[v0] [PLAYER-PROPS] ${sport}: ${events.length} upcoming events`);
       } else if (eventsResp.status === 404) {
         console.log(`[v0] [PLAYER-PROPS] No active season for ${sport}, skipping props`);
         return [];
@@ -193,11 +233,11 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
     // Step 2: For each event, fetch all prop markets in one request.
     // Limit to first 3 events to avoid burning too many API credits.
     const eventsToFetch = events.slice(0, 3);
-    const fetchPromises = eventsToFetch.map((event: any, i: number) => {
+    const fetchPromises = eventsToFetch.map((event: OddsApiEvent, i: number) => {
       return playerPropsQueue.enqueue(async () => {
         const url = `${baseUrl}/sports/${sport}/events/${event.id}/odds?apiKey=${apiKey}&regions=us&markets=${marketsParam}&oddsFormat=american`;
 
-        console.log(`[v0] [PLAYER-PROPS] Fetching props for event ${i + 1}/${eventsToFetch.length}: ${event.home_team} vs ${event.away_team}`);
+        console.log(`[v0] [PLAYER-PROPS] Fetching event ${i + 1}/${eventsToFetch.length}: ${event.away_team} @ ${event.home_team}`);
 
         try {
           const response = await fetch(url);
@@ -226,19 +266,26 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
     // Wait for all requests to complete
     const results = await Promise.allSettled(fetchPromises);
 
+    // Tally responses for diagnostic logging
+    let eventsWithBookmakers = 0;
+    let eventsEmpty = 0;
+
     // Process results
     for (const result of results) {
-      if (result.status === 'rejected' || !result.value) continue;
+      if (result.status === 'rejected' || !result.value) { eventsEmpty++; continue; }
 
-      const { event, data } = result.value as { event: any; data: any };
-      if (!data.bookmakers || data.bookmakers.length === 0) continue;
+      const { event, data } = result.value as { event: OddsApiEvent; data: OddsApiEventOdds };
+      if (!data.bookmakers || data.bookmakers.length === 0) { eventsEmpty++; continue; }
+      eventsWithBookmakers++;
 
       for (const bookmaker of data.bookmakers) {
-        for (const market of (bookmaker.markets || [])) {
-          // Group outcomes by player
-          const playerProps: Record<string, any> = {};
-          for (const outcome of market.outcomes || []) {
-            const playerName = outcome.description || outcome.name;
+        for (const market of (bookmaker.markets ?? [])) {
+          // Group outcomes by player name. The Odds API uses outcome.description
+          // for the player name on prop markets; outcome.name holds 'Over'/'Under'.
+          interface PropAccum { player: string; line: number | undefined; over: number | null; under: number | null; }
+          const playerProps: Record<string, PropAccum> = {};
+          for (const outcome of (market.outcomes ?? [])) {
+            const playerName = outcome.description ?? outcome.name;
             if (!playerProps[playerName]) {
               playerProps[playerName] = { player: playerName, line: outcome.point, over: null, under: null };
             }
@@ -247,16 +294,22 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
           }
 
           for (const [playerName, propData] of Object.entries(playerProps)) {
-            if ((propData as any).over && (propData as any).under) {
+            if (propData.over !== null && propData.under !== null) {
               allProps.push({
                 id: `${event.id}-${playerName}-${market.key}`,
                 sport,
                 gameId: event.id,
                 playerName,
-                statType: market.key.replace('player_', ''),
+                // Strip batter_ prefix so keys map to the event-level display entries
+                // (e.g. batter_home_runs → home_runs → 'Home Runs').
+                // Keep pitcher_ prefix intact — display map keys include pitcher_strikeouts etc.
+                // Strip player_ for NBA/NFL where market keys use that prefix.
+                statType: market.key
+                  .replace(/^batter_/, '')
+                  .replace(/^player_/, ''),
                 line: (propData as any).line,
-                overOdds: (propData as any).over,
-                underOdds: (propData as any).under,
+                overOdds: propData.over as number,
+                underOdds: propData.under as number,
                 bookmaker: bookmaker.title,
                 gameTime: event.commence_time,
                 homeTeam: event.home_team,
@@ -268,7 +321,12 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
       }
     }
 
-    console.log(`[v0] [PLAYER-PROPS] Successfully fetched ${allProps.length} total props from ${playerPropMarkets.length} markets`);
+    console.log(
+      `[v0] [PLAYER-PROPS] ${sport}: ${allProps.length} props built` +
+      ` | events with bookmakers: ${eventsWithBookmakers}/${eventsToFetch.length}` +
+      ` | empty/failed: ${eventsEmpty}` +
+      (eventsEmpty === eventsToFetch.length ? ' ← props not yet posted by books' : '')
+    );
     
     // Store in Supabase
     if (storeResults && allProps.length > 0) {
@@ -378,14 +436,17 @@ export function playerPropToCard(prop: PlayerProp): any {
     receptions: 'Receptions', reception_yds: 'Receiving Yards',
     anytime_td: 'Anytime TD', first_td: 'First TD',
     kicking_points: 'Kicking Points', field_goals: 'Field Goals',
-    // Baseball — game-level market keys (stored by cron/props)
+    // Baseball — batter_ keys (after stripping prefix, maps to event-level entries below)
     batter_hits: 'Hits', batter_total_bases: 'Total Bases', batter_home_runs: 'Home Runs',
-    // Baseball — event-level market keys (fallback API path)
+    batter_rbis: 'RBIs', batter_runs_scored: 'Runs Scored', batter_stolen_bases: 'Stolen Bases',
+    batter_hits_runs_rbis: 'H+R+RBI', batter_singles: 'Singles', batter_doubles: 'Doubles',
+    batter_walks: 'Walks', batter_strikeouts: 'Strikeouts',
+    // Baseball — event-level keys (after stripping batter_ prefix)
     home_runs: 'Home Runs', hits: 'Hits', total_bases: 'Total Bases',
-    rbis: 'RBIs', runs: 'Runs', stolen_bases: 'Stolen Bases',
+    rbis: 'RBIs', runs: 'Runs', runs_scored: 'Runs Scored', stolen_bases: 'Stolen Bases',
     hits_runs_rbis: 'H+R+RBI', singles: 'Singles', doubles: 'Doubles',
     walks: 'Walks', strikeouts: 'Strikeouts',
-    // Pitcher stats
+    // Pitcher stats (pitcher_ prefix kept intact — these keys are in the display map directly)
     pitcher_strikeouts: 'K (Pitcher)', pitcher_hits_allowed: 'Hits Allowed',
     pitcher_walks: 'BB (Pitcher)', pitcher_earned_runs: 'Earned Runs', pitcher_outs: 'Outs',
     // Hockey

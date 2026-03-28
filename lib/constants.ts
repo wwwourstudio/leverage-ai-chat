@@ -297,6 +297,15 @@ export const CARD_TYPES = {
   PORTFOLIO:              'portfolio',
   ARBITRAGE_OPPORTUNITY:  'arbitrage',
   FANTASY_ADVICE:         'fantasy-advice',
+  // Trading terminal — new analytics signal cards
+  EV_BET:                 'ev_bet_card',
+  SHARP_MONEY:            'sharp_money_card',
+  PITCHER_FATIGUE:        'pitcher_fatigue_card',
+  BULLPEN_FATIGUE:        'bullpen_fatigue_card',
+  PITCH_MATCHUP:          'pitch_matchup_card',
+  UMPIRE_IMPACT:          'umpire_impact_card',
+  CATCHER_FRAMING:        'catcher_framing_card',
+  CLOSING_LINE:           'closing_line_card',
 } as const;
 
 // Card Status Values

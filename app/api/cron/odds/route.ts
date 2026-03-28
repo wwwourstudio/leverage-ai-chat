@@ -166,11 +166,98 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // ── Persist: odds_snapshots + closing_lines ───────────────────────────────
+    // odds_snapshots: insert one row per bookmaker/market/outcome across all games.
+    // closing_lines: when a game has started (commence_time <= now), upsert the
+    //   most recent price as the closing line for CLV tracking.
+    let snapshotsInserted = 0;
+    let closingLinesWritten = 0;
+    if (oddsResult.length > 0) {
+      try {
+        const supabase = getServiceClient();
+        const capturedAt = new Date().toISOString();
+        const nowMs = Date.now();
+
+        const snapshotRows: Record<string, unknown>[] = [];
+        const closingRows: Record<string, unknown>[] = [];
+
+        for (const game of oddsResult as any[]) {
+          if (!game?.id || !Array.isArray(game.bookmakers)) continue;
+          const gameStarted = game.commence_time && new Date(game.commence_time).getTime() <= nowMs;
+
+          for (const book of game.bookmakers) {
+            if (!Array.isArray(book.markets)) continue;
+            for (const market of book.markets) {
+              if (!Array.isArray(market.outcomes)) continue;
+              for (const outcome of market.outcomes) {
+                if (outcome.price == null) continue;
+
+                snapshotRows.push({
+                  game_id: game.id,
+                  bookmaker: book.key,
+                  market: market.key,
+                  outcome: outcome.name,
+                  price: outcome.price,
+                  point: outcome.point ?? null,
+                  captured_at: capturedAt,
+                });
+
+                // Record closing line when game has started (last price before tip-off)
+                if (gameStarted) {
+                  closingRows.push({
+                    game_id: game.id,
+                    market: market.key,
+                    outcome: outcome.name,
+                    closing_price: outcome.price,
+                    bookmaker: book.key,
+                    captured_at: capturedAt,
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        // Insert snapshots in batches of 500 to stay within Supabase row limits
+        const BATCH = 500;
+        for (let i = 0; i < snapshotRows.length; i += BATCH) {
+          const { error: snapErr } = await supabase
+            .from('odds_snapshots')
+            .insert(snapshotRows.slice(i, i + BATCH));
+          if (snapErr) {
+            console.error('[v0] [cron/odds] odds_snapshots insert error:', snapErr.message);
+          } else {
+            snapshotsInserted += Math.min(BATCH, snapshotRows.length - i);
+          }
+        }
+
+        // Upsert closing lines (one per game/market/outcome/book)
+        if (closingRows.length > 0) {
+          const { error: clvErr } = await supabase
+            .from('closing_lines')
+            .upsert(closingRows, { onConflict: 'game_id,market,outcome,bookmaker' });
+          if (clvErr) {
+            console.error('[v0] [cron/odds] closing_lines upsert error:', clvErr.message);
+          } else {
+            closingLinesWritten = closingRows.length;
+          }
+        }
+
+        if (snapshotsInserted > 0) {
+          console.log(`[v0] [cron/odds] Inserted ${snapshotsInserted} odds snapshots, ${closingLinesWritten} closing lines`);
+        }
+      } catch (snapErr) {
+        console.error('[v0] [cron/odds] Snapshot write exception:', snapErr);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       meta: {
         gamesFetched: oddsResult?.length ?? 0,
         gamesCached: cached,
+        snapshotsInserted,
+        closingLinesWritten,
         durationMs: Date.now() - startedAt,
         runAt: new Date().toISOString(),
       },

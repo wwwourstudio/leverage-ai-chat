@@ -1364,6 +1364,15 @@ No preamble. Start directly with section 1.`;
     setIsTyping(false);
   };
 
+  const handleRetryMessage = (messageId: string) => {
+    setMessages((prev: Message[]) =>
+      prev.map(m => m.id === messageId
+        ? { ...m, isPending: true, isError: false, isPartial: false, isStreaming: false, content: '', cards: [] }
+        : m)
+    );
+    generateRealResponse(lastUserQuery, undefined, messageId);
+  };
+
   // Tracks the last query for which suggestions were generated — prevents duplicate
   // runs when multiple response branches (success/partial/error) fire for the same message.
   const lastSuggestionQueryRef = useRef<string>('');
@@ -1385,7 +1394,7 @@ No preamble. Start directly with section 1.`;
     return () => window.removeEventListener('leveragePlayerClick', handler);
   }, []);
 
-  const generateRealResponse = async (userMessage: string, imageAttachments?: Array<{ name: string; base64: string; mimeType: string }>) => {
+  const generateRealResponse = async (userMessage: string, imageAttachments?: Array<{ name: string; base64: string; mimeType: string }>, optimisticAssistantId?: string) => {
     // Dedup guard: suppress duplicate calls for the same message (e.g. onPromptClick
     // and handleSubmit both firing within the same event loop tick).
     const msgKey = userMessage.trim().slice(0, 200);
@@ -1634,6 +1643,7 @@ No preamble. Start directly with section 1.`;
         customInstructions: customInstructions || undefined,
         imageAttachments: imageAttachments?.length ? imageAttachments : undefined,
         deepThink,
+        optimisticAssistantId,
       });
 
       // Hook handled the error (abort, non-OK response, stream failure) — clean up and exit.
@@ -1792,17 +1802,12 @@ No preamble. Start directly with section 1.`;
 
       console.error('[v0] Error generating real response:', error);
 
-      // Append a user-friendly error message — never expose raw error internals
-      setMessages((prev: Message[]) => [...prev, {
-        id: crypto.randomUUID(),
-        role: 'assistant' as const,
-        content: `I'm having trouble connecting to live data sources right now. Please try again in a moment.`,
-        timestamp: new Date(),
+      // Update placeholder in-place if present; otherwise append a new error message
+      const errorContent = `I'm having trouble connecting to live data sources right now. Please try again in a moment.`;
+      const errorMetadata = {
         cards: [],
         confidence: 50,
-        sources: [
-          { name: 'Cached Data', type: 'cache', reliability: 60 }
-        ],
+        sources: [{ name: 'Cached Data', type: 'cache' as const, reliability: 60 }],
         modelUsed: 'Fallback Mode',
         processingTime: Date.now() - startTime,
         trustMetrics: {
@@ -1814,13 +1819,24 @@ No preamble. Start directly with section 1.`;
           trustLevel: 'low' as const,
           riskLevel: 'high' as const,
           adjustedTone: 'Connection error — please retry',
-          flags: [{
-            type: 'connectivity',
-            message: 'Live data unavailable due to connectivity issue',
-            severity: 'warning' as const,
-          }]
+          flags: [{ type: 'connectivity', message: 'Live data unavailable due to connectivity issue', severity: 'warning' as const }],
+        },
+      };
+      setMessages((prev: Message[]) => {
+        if (optimisticAssistantId && prev.some(m => m.id === optimisticAssistantId && (m.isPending || m.isStreaming))) {
+          return prev.map(m => m.id === optimisticAssistantId
+            ? { ...m, isPending: false, isStreaming: false, isError: true, content: errorContent, ...errorMetadata }
+            : m);
         }
-      } as Message].slice(-30));
+        return [...prev, {
+          id: crypto.randomUUID(),
+          role: 'assistant' as const,
+          content: errorContent,
+          timestamp: new Date(),
+          isError: true,
+          ...errorMetadata,
+        } as Message].slice(-30);
+      });
 
       setSuggestedPrompts(generateContextualSuggestions(userMessage, []));
       setIsClarificationPills(false);
@@ -1983,6 +1999,19 @@ No preamble. Start directly with section 1.`;
     if (/(?:^|[\s(])(?:pg|sg|pf)(?:[\s).,]|$)/.test(t)) return 'nba';
     // NFL positions (qb, wr, rb, te — unique, not common English words):
     if (/(?:^|[\s(])(?:qb|wr|rb|te)(?:[\s).,]|$)/.test(t)) return 'nfl';
+    // ── Known MLB player names ────────────────────────────────────────────────
+    // Explicit player names override ambiguous team abbreviations (PHI, MIA, ATL…).
+    // Only names that are unambiguous as standalone substrings are included.
+    if ([
+      // Phillies
+      'schwarber', 'bryce harper', 'castellanos', 'trea turner', 'alec bohm',
+      'realmuto', 'aaron nola', 'zack wheeler', 'ranger suarez', 'ranger suárez',
+      // Other high-profile MLB stars
+      'ohtani', 'shohei', 'acuña', 'acuna', 'juan soto',
+      'freddie freeman', 'mookie betts', 'tatis', 'yordan alvarez',
+      'corbin burnes', 'gerrit cole', 'spencer strider',
+      'lindor', 'devers', 'vlad guerrero', 'wander franco',
+    ].some(p => t.includes(p))) return 'mlb';
     // Deep scan: team names, positions, sport-specific terms.
     // NBA/NFL/NHL team names are checked BEFORE MLB because some abbreviations
     // overlap across leagues (e.g. ATL=Braves/Hawks, MIA=Marlins/Heat, HOU=Astros/Rockets).
@@ -2001,6 +2030,13 @@ No preamble. Start directly with section 1.`;
     if (NHL_KEYWORDS.some(k => t.includes(k))) return 'nhl';
     return null;
   };
+  // Regression guard: MLB player names must override ambiguous team code matches.
+  if (process.env.NODE_ENV !== 'production') {
+    console.assert(
+      detectSportFromText('Kyle Schwarber HR prop') === 'mlb',
+      '[v0] detectSportFromText regression: "Kyle Schwarber HR prop" should return "mlb"',
+    );
+  }
 
   const extractSport = (message: string, conversationHistory?: Array<{ role: string; content: string }>): string | null => {
     console.log('[v0] Extracting sport from:', message);
@@ -2409,7 +2445,19 @@ No preamble. Start directly with section 1.`;
       attachments: currentFiles.length > 0 ? currentFiles : undefined
     };
 
-    setMessages((prev: Message[]) => [...prev, userMessage]);
+    const optimisticId = crypto.randomUUID();
+    setMessages((prev: Message[]) => [
+      ...prev,
+      userMessage,
+      {
+        id: optimisticId,
+        role: 'assistant' as const,
+        content: '',
+        timestamp: new Date(),
+        isPending: true,
+        cards: [],
+      } as Message,
+    ]);
     setUploadedFiles([]);
 
     // Update chat preview and title based on first user message
@@ -2488,7 +2536,7 @@ No preamble. Start directly with section 1.`;
     const visionAttachments = currentFiles
       .filter(f => f.type === 'image' && f.imageBase64)
       .map(f => ({ name: f.name, base64: f.imageBase64!, mimeType: f.mimeType ?? 'image/jpeg' }));
-    generateRealResponse(promptForAI, visionAttachments.length > 0 ? visionAttachments : undefined);
+    generateRealResponse(promptForAI, visionAttachments.length > 0 ? visionAttachments : undefined, optimisticId);
   };
 
   const handleNewChat = () => {
@@ -3447,6 +3495,14 @@ No preamble. Start directly with section 1.`;
                       </div>
                     ) : (
                       <>
+                        {/* Loading skeleton — shown while waiting for API response */}
+                        {message.role === 'assistant' && message.isPending && (
+                          <div className="space-y-2.5 py-1" aria-label="Loading response" aria-busy="true">
+                            <div className="h-2.5 w-48 rounded-full bg-white/10 animate-pulse" />
+                            <div className="h-2.5 w-64 rounded-full bg-white/10 animate-pulse [animation-delay:150ms]" />
+                            <div className="h-2.5 w-36 rounded-full bg-white/10 animate-pulse [animation-delay:300ms]" />
+                          </div>
+                        )}
                         {/* Error / partial banners for assistant messages */}
                         {message.role === 'assistant' && message.isError && (
                           <div className="flex items-center gap-2 mb-3 pb-2 border-b border-red-800/30">
@@ -3461,7 +3517,7 @@ No preamble. Start directly with section 1.`;
                           </div>
                         )}
                         {/* Check if this is a detailed analysis with structured data */}
-                        {message.content.includes('__DETAILED_ANALYSIS__') ? (
+                        {!message.isPending && (message.content.includes('__DETAILED_ANALYSIS__') ? (
                           (() => {
                             const match = message.content.match(/__DETAILED_ANALYSIS__([\s\S]+)__END_ANALYSIS__/);
                             if (!match) return <p className="text-sm leading-relaxed font-medium">{message.content}</p>;
@@ -3481,7 +3537,7 @@ No preamble. Start directly with section 1.`;
                           })()
                         ) : (
                           <MessageContent content={message.content} />
-                        )}
+                        ))}
                         
                         {/* File Attachments Display */}
                         <MessageAttachments attachments={message.attachments} />
@@ -3751,7 +3807,7 @@ No preamble. Start directly with section 1.`;
           })
         )}
 
-      {isTyping && (
+      {isTyping && !messages.some((m: Message) => m.isPending || m.isStreaming) && (
         <div className="flex gap-3 animate-fade-in">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-500/50 animate-pulse">
             <Sparkles className="w-4 h-4 text-white" />

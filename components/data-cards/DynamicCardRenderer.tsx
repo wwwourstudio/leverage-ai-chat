@@ -81,9 +81,29 @@ export function DynamicCardRenderer({
     icon: card.icon,
     data: card.data && typeof card.data === 'object' ? card.data : {},
     status: card.status || 'neutral',
-    realData: card.realData,
+    // cards-generator.ts sets realData inside card.data, not at the top level.
+    // Read both locations so the ESTIMATED badge and offseason filter work correctly.
+    realData: card.realData ?? (
+      card.data && typeof card.data === 'object'
+        ? (card.data as Record<string, unknown>).realData as boolean | undefined
+        : undefined
+    ),
     metadata: card.metadata,
   };
+
+  // Warn when a card claims to be real data (realData !== false) but its payload is empty.
+  // This catches generator regressions where a live card is emitted with no actual fields.
+  if (safeCard.realData !== false) {
+    const meaningfulKeys = Object.keys(safeCard.data).filter(
+      k => k !== 'realData' && k !== 'status' && safeCard.data[k] != null,
+    );
+    if (meaningfulKeys.length === 0) {
+      console.warn(
+        '[v0] [DynamicCardRenderer] Card has realData≠false but data payload is empty —',
+        safeCard.type, '/', safeCard.title,
+      );
+    }
+  }
 
   // Hide cards with no live game data — "No Games Available" placeholders and offseason stubs
   const isNoGamesCard =

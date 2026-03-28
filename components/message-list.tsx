@@ -18,11 +18,13 @@ interface Message {
   isStreaming?: boolean;
   isPartial?: boolean;
   isError?: boolean;
+  isPending?: boolean;
 }
 
 interface MessageListProps {
   messages: Message[];
   isTyping: boolean;
+  onRetryMessage?: (messageId: string) => void;
 }
 
 const TYPING_STAGES = [
@@ -85,8 +87,14 @@ function TypingIndicator() {
 // Memoized per-item component — delegates to ChatMessage for consistent rendering.
 // During streaming, only the active streaming message gets a new object reference, so React
 // bails out for all prior messages and only reconciles the one being typed.
-const MessageItem = memo(function MessageItem({ message }: { message: Message }) {
-  return <ChatMessage message={message} />;
+const MessageItem = memo(function MessageItem({
+  message,
+  onRetry,
+}: {
+  message: Message;
+  onRetry?: () => void;
+}) {
+  return <ChatMessage message={message} onRetry={onRetry} />;
 });
 
 function formatDateLabel(date: Date): string {
@@ -118,7 +126,7 @@ function DateSeparator({ label }: { label: string }) {
   );
 }
 
-export const MessageList = memo(function MessageList({ messages, isTyping }: MessageListProps) {
+export const MessageList = memo(function MessageList({ messages, isTyping, onRetryMessage }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showJumpBtn, setShowJumpBtn] = useState(false);
 
@@ -145,6 +153,10 @@ export const MessageList = memo(function MessageList({ messages, isTyping }: Mes
     setShowJumpBtn(distFromBottom > 200);
   }, []);
 
+  // Show the external TypingIndicator only when isTyping but no message is already
+  // occupying the assistant slot (pending placeholder or active streaming).
+  const hasActiveSlot = messages.some(m => m.isPending || m.isStreaming);
+
   return (
     <div
       ref={containerRef}
@@ -163,12 +175,19 @@ export const MessageList = memo(function MessageList({ messages, isTyping }: Mes
             {showSeparator && (
               <DateSeparator label={formatDateLabel(new Date(message.timestamp))} />
             )}
-            <MessageItem message={message} />
+            <MessageItem
+              message={message}
+              onRetry={
+                (message.isError || message.isPartial)
+                  ? () => onRetryMessage?.(message.id)
+                  : undefined
+              }
+            />
           </div>
         );
       })}
 
-      {isTyping && <TypingIndicator />}
+      {isTyping && !hasActiveSlot && <TypingIndicator />}
 
       {showJumpBtn && (
         <button

@@ -17,6 +17,7 @@ interface Message {
   processingTime?: number;
   isPartial?: boolean;  // stream interrupted; content shows what arrived before the break
   isError?: boolean;    // request failed with no usable content
+  isPending?: boolean;  // optimistic placeholder while API call is in flight
 }
 
 interface ChatMessageProps {
@@ -341,7 +342,16 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                 ? 'bg-[oklch(0.12_0.015_280)] border border-l-[3px] border-[oklch(0.22_0.02_280)] border-l-amber-500/60 shadow-sm'
                 : 'bg-[oklch(0.12_0.015_280)] border border-l-[3px] border-[oklch(0.22_0.02_280)] border-l-[oklch(0.45_0.06_260)] shadow-sm',
         )}>
-          {isEditing ? (
+          {/* ── Loading skeleton — shown while waiting for API response ── */}
+          {!isUser && message.isPending && (
+            <div className="space-y-2.5 py-1" aria-label="Loading response" aria-busy="true">
+              <div className="h-2.5 w-48 rounded-full bg-white/10 animate-pulse" />
+              <div className="h-2.5 w-64 rounded-full bg-white/10 animate-pulse [animation-delay:150ms]" />
+              <div className="h-2.5 w-36 rounded-full bg-white/10 animate-pulse [animation-delay:300ms]" />
+            </div>
+          )}
+
+          {!message.isPending && (isEditing ? (
             <div className="space-y-3">
               <textarea
                 value={editContent}
@@ -510,7 +520,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                 </div>
               )}
             </>
-          )}
+          ))}
         </div>
         {/* Timestamp — suppressHydrationWarning because Date.now() differs between SSR and client */}
         {message.timestamp && (

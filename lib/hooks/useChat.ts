@@ -25,6 +25,7 @@ export interface ChatMessage {
   isStreaming?: boolean;
   isPartial?: boolean;
   isError?: boolean;
+  isPending?: boolean;  // optimistic placeholder shown before SSE headers arrive
   // Extra optional fields for compatibility with page-client.tsx Message type
   isWelcome?: boolean;
   isEditing?: boolean;
@@ -104,6 +105,12 @@ type SseEvent = SseTextEvent | SseReplaceEvent | SseDoneEvent;
  *
  * Generic parameter T allows callers to use a richer Message type that extends
  * ChatMessage (e.g. page-client.tsx's local Message interface).
+ *
+ * Optimistic assistant slot:
+ *  Pass `optimisticAssistantId` in the `extra` arg to pre-create a pending
+ *  placeholder before the fetch fires. The hook transitions it from
+ *  `isPending → isStreaming → complete` (or `isError`). The field is stripped
+ *  from the request body so it never reaches the server.
  */
 export function useChat<T extends ChatMessage = ChatMessage>(options: UseChatOptions = {}): {
   messages: T[];
@@ -159,6 +166,15 @@ export function useChat<T extends ChatMessage = ChatMessage>(options: UseChatOpt
       setError(null);
       setIsLoading(true);
 
+      // Extract the client-side optimistic ID and strip it from the body so it
+      // is never sent to the server. The caller pre-creates the assistant slot
+      // with this ID; we transition it from isPending → isStreaming → complete.
+      const optimisticAssistantId = extra?.optimisticAssistantId as string | undefined;
+      const { optimisticAssistantId: _stripped, ...cleanExtra } = {
+        optimisticAssistantId: undefined as string | undefined,
+        ...extra,
+      };
+
       if (appendUserMessage) {
         const userMessage: ChatMessage = {
           id: crypto.randomUUID(),
@@ -169,13 +185,15 @@ export function useChat<T extends ChatMessage = ChatMessage>(options: UseChatOpt
         setMessages((prev) => [...prev, userMessage as T]);
       }
 
-      let streamingId: string | undefined;
+      // When an optimistic ID is provided, use it as streamingId immediately so
+      // the abort-cleanup and error paths can target the pre-created slot.
+      let streamingId: string | undefined = optimisticAssistantId;
       let hadPartialContent = false;
 
       try {
         const body = prepareBody
-          ? prepareBody(content, extra)
-          : { userMessage: content, context: { ...baseContext, ...extra } };
+          ? prepareBody(content, cleanExtra)
+          : { userMessage: content, context: { ...baseContext, ...cleanExtra } };
 
         const res = await fetch(api, {
           method: 'POST',
@@ -209,19 +227,33 @@ export function useChat<T extends ChatMessage = ChatMessage>(options: UseChatOpt
 
         if (res.headers.get('Content-Type')?.includes('text/event-stream')) {
           // ── Streaming path ─────────────────────────────────────────────────
-          streamingId = crypto.randomUUID();
-          if (mountedRef.current) {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: streamingId!,
-                role: 'assistant',
-                content: '',
-                timestamp: new Date(),
-                cards: [],
-                isStreaming: true,
-              } as unknown as T,
-            ]);
+          if (!optimisticAssistantId) {
+            // No pre-created slot — generate a fresh ID and append a new message
+            streamingId = crypto.randomUUID();
+            if (mountedRef.current) {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: streamingId!,
+                  role: 'assistant',
+                  content: '',
+                  timestamp: new Date(),
+                  cards: [],
+                  isStreaming: true,
+                } as unknown as T,
+              ]);
+            }
+          } else {
+            // Transition the pre-created pending slot to streaming state
+            if (mountedRef.current) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === optimisticAssistantId
+                    ? ({ ...m, isPending: false, isStreaming: true, content: '' } as T)
+                    : m
+                )
+              );
+            }
           }
 
           const reader = res.body!.getReader();
@@ -361,8 +393,9 @@ export function useChat<T extends ChatMessage = ChatMessage>(options: UseChatOpt
             throw new Error(json.error || 'Request failed');
           }
 
+          const msgId = optimisticAssistantId ?? crypto.randomUUID();
           const assistantMsg: T = {
-            id: crypto.randomUUID(),
+            id: msgId,
             role: 'assistant',
             content: json.text || '',
             timestamp: new Date(),
@@ -374,17 +407,24 @@ export function useChat<T extends ChatMessage = ChatMessage>(options: UseChatOpt
             trustMetrics: json.trustMetrics,
             clarificationOptions: json.clarificationOptions,
             useFallback: json.useFallback,
+            isPending: false,
           } as T;
 
           if (mountedRef.current) {
-            setMessages((prev) => [...prev, assistantMsg].slice(-30));
+            if (optimisticAssistantId) {
+              setMessages((prev) =>
+                prev.map((m) => (m.id === optimisticAssistantId ? assistantMsg : m)).slice(-30)
+              );
+            } else {
+              setMessages((prev) => [...prev, assistantMsg].slice(-30));
+            }
           }
           onFinish?.(assistantMsg);
           return assistantMsg;
         }
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
-          // User cancelled — remove any in-flight streaming message
+          // User cancelled — remove the in-flight slot (pending or streaming)
           if (streamingId && mountedRef.current) {
             setMessages((prev) => prev.filter((m) => m.id !== streamingId).slice(-30));
           }
@@ -396,30 +436,28 @@ export function useChat<T extends ChatMessage = ChatMessage>(options: UseChatOpt
 
         if (mountedRef.current) {
           if (streamingId) {
-            if (hadPartialContent) {
-              // Preserve partial content rather than discarding it
-              setMessages((prev) =>
-                prev.map((m) =>
+            // Update the existing slot (pending or streaming) to the error state.
+            // This avoids the double-message problem (blank error slot + separate error message).
+            setMessages((prev) =>
+              prev
+                .map((m) =>
                   m.id === streamingId
                     ? ({
                         ...m,
                         isStreaming: false,
-                        isPartial: true,
-                        content: m.content + '\n\n*[Response interrupted — partial result]*',
+                        isPending: false,
+                        isError: !hadPartialContent,
+                        isPartial: hadPartialContent,
+                        content: hadPartialContent
+                          ? m.content + '\n\n*[Response interrupted — partial result]*'
+                          : error.message || 'Something went wrong. Please try again.',
                       } as T)
                     : m
                 )
-              );
-            } else {
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === streamingId ? ({ ...m, isStreaming: false, isError: true } as T) : m
-                )
-              );
-            }
-          }
-
-          if (!hadPartialContent) {
+                .slice(-30)
+            );
+          } else {
+            // No slot created yet (error before fetch started) — append a new error message
             const errorMsg: T = {
               id: crypto.randomUUID(),
               role: 'assistant',

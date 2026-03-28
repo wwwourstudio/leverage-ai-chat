@@ -113,7 +113,7 @@ const TIER_LABELS: Record<string, { label: string; color: string; bg: string }> 
 };
 
 const RISK_CONFIG = [
-  { value: 'conservative', label: 'Conservative', emoji: '🛡️', desc: '~1–2% per bet', color: 'text-green-400',  border: 'border-green-500/40',  bg: 'bg-green-500/10' },
+  { value: 'conservative', label: 'Conservative', emoji: '🛡️', desc: '~1–2% per bet', color: 'text-blue-400',  border: 'border-blue-500/40',  bg: 'bg-blue-500/10' },
   { value: 'medium',       label: 'Medium',       emoji: '⚖️', desc: '~2–5% per bet', color: 'text-yellow-400', border: 'border-yellow-500/40', bg: 'bg-yellow-500/10' },
   { value: 'aggressive',   label: 'Aggressive',   emoji: '🔥', desc: '~5–10% per bet', color: 'text-red-400',   border: 'border-red-500/40',    bg: 'bg-red-500/10' },
 ];
@@ -129,7 +129,7 @@ const NOTIFICATION_CONFIG = [
   { key: 'push_notifications'   as const, label: 'Push Notifications',   desc: 'Browser push notifications',            icon: Smartphone, color: 'text-purple-400', iconBg: 'bg-purple-500/15' },
   { key: 'odds_alerts'          as const, label: 'Odds Change Alerts',   desc: 'Notified when odds shift ≥ 0.5 pts',    icon: TrendingUp, color: 'text-orange-400', iconBg: 'bg-orange-500/15' },
   { key: 'line_movement_alerts' as const, label: 'Line Movement',        desc: 'Track sharp money and steam moves',      icon: Activity,   color: 'text-cyan-400',   iconBg: 'bg-cyan-500/15' },
-  { key: 'arbitrage_alerts'     as const, label: 'Arbitrage Alerts',     desc: 'Real-time cross-book arb opportunities', icon: Zap,        color: 'text-green-400',  iconBg: 'bg-green-500/15' },
+  { key: 'arbitrage_alerts'     as const, label: 'Arbitrage Alerts',     desc: 'Real-time cross-book arb opportunities', icon: Zap,        color: 'text-violet-400',  iconBg: 'bg-violet-500/15' },
 ];
 
 const DEFAULT_PREFS: PreferencesData = {
@@ -303,7 +303,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
   };
 
   const roiDisplay = stats.roi > 0 ? `+${stats.roi.toFixed(1)}%` : `${stats.roi.toFixed(1)}%`;
-  const roiColor   = stats.roi > 0 ? 'text-green-400' : stats.roi < 0 ? 'text-red-400' : 'text-gray-400';
+  const roiColor   = stats.roi > 0 ? 'text-blue-400' : stats.roi < 0 ? 'text-red-400' : 'text-gray-400';
 
   const kellyTip = () => {
     if (!prefs.bankroll) return null;
@@ -505,7 +505,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                             className={cn(
                               'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all',
                               active
-                                ? 'bg-green-600/15 text-green-400 border-green-500/40'
+                                ? 'bg-blue-600/15 text-blue-400 border-blue-500/40'
                                 : 'bg-[oklch(0.13_0.01_280)] text-gray-400 border-[oklch(0.22_0.01_280)] hover:border-gray-500',
                             )}
                           >
@@ -678,7 +678,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                       </div>
                       <div className="p-3 bg-[oklch(0.13_0.01_280)] rounded-xl border border-[oklch(0.22_0.01_280)]">
                         <div className="flex items-center gap-1.5 mb-1">
-                          <TrendingUp className="w-3 h-3 text-green-400" />
+                          <TrendingUp className="w-3 h-3 text-blue-400" />
                           <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">ROI</span>
                         </div>
                         <p className={cn('text-2xl font-black tabular-nums', roiColor)}>{roiDisplay}</p>
@@ -689,7 +689,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                           <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">Record</span>
                         </div>
                         <p className="text-xl font-black text-white">
-                          <span className="text-green-400">{stats.wins}W</span>
+                          <span className="text-blue-400">{stats.wins}W</span>
                           <span className="text-gray-600 mx-1">–</span>
                           <span className="text-red-400">{stats.losses}L</span>
                         </p>

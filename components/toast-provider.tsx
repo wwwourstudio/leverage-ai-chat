@@ -31,7 +31,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
   }, [toast.id, onRemove]);
 
   const borderColor =
-    toast.type === 'success' ? 'border-l-emerald-500' :
+    toast.type === 'success' ? 'border-l-blue-500' :
     toast.type === 'error'   ? 'border-l-red-500' :
                                'border-l-blue-500';
 
@@ -40,7 +40,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
     toast.type === 'error'   ? '✕' : 'ℹ';
 
   const iconColor =
-    toast.type === 'success' ? 'text-emerald-400' :
+    toast.type === 'success' ? 'text-blue-400' :
     toast.type === 'error'   ? 'text-red-400' : 'text-blue-400';
 
   return (

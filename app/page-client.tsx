@@ -3647,7 +3647,7 @@ No preamble. Start directly with section 1.`;
                         {message.modelUsed && (
                           <span className="flex items-center gap-1">
                             <BookOpen className="w-3 h-3 text-purple-500/60 shrink-0" />
-                            <span>Model: <span className="text-gray-500 font-semibold">{message.modelUsed.replace('Grok 3', 'Grok 4').replace('grok-3', 'Grok 4').replace('grok-4', 'Grok 4')}</span></span>
+                            <span>Model: <span className="text-gray-500 font-semibold">{message.modelUsed.replace('grok-3-fast', 'Grok 3 Fast').replace('grok-4', 'Grok 3 Fast').replace('Grok 4', 'Grok 3 Fast')}</span></span>
                           </span>
                         )}
                         {message.processingTime && (

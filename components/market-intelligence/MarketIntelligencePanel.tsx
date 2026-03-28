@@ -233,7 +233,7 @@ export function MarketIntelligencePanel({
                   <Shield className="w-3 h-3" /> Signal Strength
                 </h3>
                 <div className="space-y-2">
-                  <SignalBar label="Benford Trust" score={report.benfordTrustScore} color="bg-emerald-500" />
+                  <SignalBar label="Benford Trust" score={report.benfordTrustScore} color="bg-blue-500" />
                   <SignalBar label="Velocity Score" score={report.velocityScore} color="bg-amber-500" />
                   <SignalBar label="Composite Signal" score={report.signalStrength} color="bg-blue-500" />
                 </div>

@@ -23,18 +23,18 @@ export const NFL_SEASON_YEAR: number = _mostRecentNFLSeason();
 export const NFBC_DRAFT_YEAR: number = new Date().getFullYear();
 
 // AI Model Configuration
-// All queries use grok-4. FAST_MODEL_NAME retained for fallback logic but also points to grok-4.
+// All queries use grok-3-fast.
 export const AI_CONFIG = {
-  MODEL_NAME: 'grok-4',
-  FAST_MODEL_NAME: 'grok-4',
-  MODEL_DISPLAY_NAME: 'Grok 4',
-  FAST_MODEL_DISPLAY_NAME: 'Grok 4',
+  MODEL_NAME: 'grok-3-fast',
+  FAST_MODEL_NAME: 'grok-3-fast',
+  MODEL_DISPLAY_NAME: 'Grok 3 Fast',
+  FAST_MODEL_DISPLAY_NAME: 'Grok 3 Fast',
   PROVIDER: 'xAI',
   API_ENDPOINT: 'https://api.x.ai/v1/chat/completions',
   DEFAULT_TEMPERATURE: 0.35,
   DEFAULT_MAX_TOKENS: 600,
   DEFAULT_PROCESSING_TIME: 950,
-  FALLBACK_MODEL: 'Grok 4',
+  FALLBACK_MODEL: 'Grok 3 Fast',
 } as const;
 
 // API Endpoints

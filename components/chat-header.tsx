@@ -133,7 +133,7 @@ export const ChatHeader = memo(function ChatHeader({
           {creditsRemaining !== undefined && onOpenStripe && (
             <button
               onClick={onOpenStripe}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-200 hover:opacity-90 active:scale-95 ${
+              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-200 hover:opacity-90 active:scale-95 ${
                 creditsRemaining <= 3
                   ? 'bg-orange-500/15 border-orange-500/50 text-orange-300 shadow-[0_0_10px_oklch(0.65_0.18_40/0.2)]'
                   : creditsRemaining <= 10

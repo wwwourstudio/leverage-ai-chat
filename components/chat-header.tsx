@@ -115,8 +115,8 @@ export const ChatHeader = memo(function ChatHeader({
           {/* Live indicator */}
           <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[oklch(0.12_0.01_280)] border border-[oklch(0.20_0.015_280)] ml-1">
             <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-60" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500" />
             </span>
             <span className="text-[10px] font-semibold text-[oklch(0.42_0.01_280)]">Live</span>
           </div>
@@ -191,7 +191,7 @@ export const ChatHeader = memo(function ChatHeader({
               title={shareState === 'copied' ? 'Link copied!' : 'Share chat'}
             >
               {shareState === 'copied' ? (
-                <Check className="w-5 h-5 text-green-400 transition-colors" />
+                <Check className="w-5 h-5 text-blue-400 transition-colors" />
               ) : shareState === 'loading' ? (
                 <Copy className="w-5 h-5 text-[var(--text-muted)] animate-pulse" />
               ) : (
@@ -216,7 +216,7 @@ export const ChatHeader = memo(function ChatHeader({
                         user.name.charAt(0).toUpperCase()
                       )}
                     </div>
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-[var(--bg-overlay)]"></div>
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-violet-500 rounded-full border-2 border-[var(--bg-overlay)]"></div>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-sm font-bold text-white">{user.name}</span>

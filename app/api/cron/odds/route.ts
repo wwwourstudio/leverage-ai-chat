@@ -77,6 +77,8 @@ export async function GET(req: NextRequest) {
     // Step 1: upsert api.games (unique on external_id) to get stable UUIDs.
     // Step 2: upsert api.live_odds_cache (unique on sport_key,home_team,away_team).
     let cached = 0;
+    // external_id → UUID map; populated in Block 1, consumed in Block 2 (snapshots)
+    const gameIdMap: Record<string, string> = {};
     if (oddsResult.length > 0) {
       try {
         const expires = new Date(Date.now() + 5 * 60 * 1000).toISOString();
@@ -105,8 +107,7 @@ export async function GET(req: NextRequest) {
             console.error('[v0] [cron/odds] games upsert error:', gamesErr.message);
           }
 
-          // Build external_id → uuid map
-          const gameIdMap: Record<string, string> = {};
+          // Populate the outer gameIdMap so Block 2 can resolve external_id → UUID
           for (const row of (upsertedGames ?? [])) {
             if (row.external_id) gameIdMap[row.external_id] = row.id;
           }
@@ -183,6 +184,9 @@ export async function GET(req: NextRequest) {
 
         for (const game of oddsResult as any[]) {
           if (!game?.id || !Array.isArray(game.bookmakers)) continue;
+          // Resolve to UUID — skip games not yet in api.games (FK constraint)
+          const gameUuid = gameIdMap[game.id];
+          if (!gameUuid) continue;
           const gameStarted = game.commence_time && new Date(game.commence_time).getTime() <= nowMs;
 
           for (const book of game.bookmakers) {
@@ -193,7 +197,7 @@ export async function GET(req: NextRequest) {
                 if (outcome.price == null) continue;
 
                 snapshotRows.push({
-                  game_id: game.id,
+                  game_id: gameUuid,
                   bookmaker: book.key,
                   market: market.key,
                   outcome: outcome.name,
@@ -205,7 +209,7 @@ export async function GET(req: NextRequest) {
                 // Record closing line when game has started (last price before tip-off)
                 if (gameStarted) {
                   closingRows.push({
-                    game_id: game.id,
+                    game_id: gameUuid,
                     market: market.key,
                     outcome: outcome.name,
                     closing_price: outcome.price,

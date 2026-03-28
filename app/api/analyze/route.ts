@@ -692,6 +692,12 @@ export async function POST(request: NextRequest) {
     let serverFetchedOdds = false;
     let statcastInjected = false;
 
+    // Valid American odds are always ≤ -100 or ≥ +100 — filter anything in-between
+    const fmtOdds = (p: unknown): string => {
+      if (typeof p !== 'number' || !Number.isFinite(p) || Math.abs(p) < 100) return 'N/A';
+      return `${p > 0 ? '+' : ''}${p}`;
+    };
+
     if (context.oddsData?.events?.length > 0) {
       const oddsPreview = context.oddsData.events
         .slice(0, 8)
@@ -704,17 +710,17 @@ export async function POST(request: NextRequest) {
             if (h2h) {
               const home = h2h.outcomes?.find((o: any) => o.name === e.home_team);
               const away = h2h.outcomes?.find((o: any) => o.name === e.away_team);
-              lines.push(`  ML (${book.title}): ${e.away_team} ${away?.price > 0 ? '+' : ''}${away?.price ?? 'N/A'} | ${e.home_team} ${home?.price > 0 ? '+' : ''}${home?.price ?? 'N/A'}`);
+              lines.push(`  ML (${book.title}): ${e.away_team} ${fmtOdds(away?.price)} | ${e.home_team} ${fmtOdds(home?.price)}`);
             }
             if (spread) {
               const home = spread.outcomes?.find((o: any) => o.name === e.home_team);
               const away = spread.outcomes?.find((o: any) => o.name === e.away_team);
-              lines.push(`  Spread (${book.title}): ${e.away_team} ${away?.point > 0 ? '+' : ''}${away?.point ?? ''} (${away?.price > 0 ? '+' : ''}${away?.price ?? 'N/A'}) | ${e.home_team} ${home?.point > 0 ? '+' : ''}${home?.point ?? ''} (${home?.price > 0 ? '+' : ''}${home?.price ?? 'N/A'})`);
+              lines.push(`  Spread (${book.title}): ${e.away_team} ${away?.point > 0 ? '+' : ''}${away?.point ?? ''} (${fmtOdds(away?.price)}) | ${e.home_team} ${home?.point > 0 ? '+' : ''}${home?.point ?? ''} (${fmtOdds(home?.price)})`);
             }
             if (total) {
               const over = total.outcomes?.find((o: any) => o.name === 'Over');
               const under = total.outcomes?.find((o: any) => o.name === 'Under');
-              lines.push(`  Total (${book.title}): O${over?.point ?? ''} (${over?.price > 0 ? '+' : ''}${over?.price ?? 'N/A'}) | U${under?.point ?? ''} (${under?.price > 0 ? '+' : ''}${under?.price ?? 'N/A'})`);
+              lines.push(`  Total (${book.title}): O${over?.point ?? ''} (${fmtOdds(over?.price)}) | U${under?.point ?? ''} (${fmtOdds(under?.price)})`);
             }
           }
           return lines.join('\n');

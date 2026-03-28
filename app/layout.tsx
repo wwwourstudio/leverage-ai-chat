@@ -5,6 +5,7 @@ import { GeistMono } from 'geist/font/mono'
 import { ToastProvider } from '@/components/toast-provider'
 import { PWARegister } from '@/components/pwa-register'
 import { GlobalErrorSuppressor } from '@/components/global-error-suppressor'
+import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -82,11 +83,18 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} dark`}>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <body className="font-sans antialiased">
-        <ToastProvider>
-          {children}
-        </ToastProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          storageKey="leverage-ai-theme"
+        >
+          <ToastProvider>
+            {children}
+          </ToastProvider>
+        </ThemeProvider>
         <Analytics />
         <PWARegister />
         <GlobalErrorSuppressor />

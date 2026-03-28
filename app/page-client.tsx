@@ -40,6 +40,7 @@ import { SuggestedPrompts } from '@/components/suggested-prompts';
 import { loadThreads, createThread, updateThread, deleteThread, loadMessages, saveMessage } from '@/lib/chat-service';
 import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
 import { useChat, type ChatMessage as HookChatMessage } from '@/lib/hooks/useChat';
+import { useTheme } from 'next-themes';
 import { WelcomeScreen } from '@/components/index/WelcomeScreen';
 import { MessageContent } from '@/components/index/MessageContent';
 import { MessageAttachments } from '@/components/index/MessageAttachments';
@@ -173,6 +174,7 @@ interface FantasyLeague {
 
 export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps) {
   const toast = useToast();
+  const { setTheme } = useTheme();
 
   // Dynamic welcome message based on time, category, and selected sport
   const getWelcomeMessage = (category: string, sport?: string, userName?: string) => {
@@ -443,6 +445,13 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         .eq('user_id', authId)
         .single();
       if (profile?.id) setSupabaseProfileId(profile.id);
+      // Sync stored theme preference to DOM
+      const { data: pref } = await supabase
+        .from('user_preferences')
+        .select('theme')
+        .eq('user_id', authId)
+        .single();
+      if (pref?.theme) setTheme(pref.theme);
     } catch {
       // Non-critical — credit sync will be skipped without a profile ID
     }

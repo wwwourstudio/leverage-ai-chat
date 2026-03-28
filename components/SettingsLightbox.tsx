@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useTheme } from 'next-themes';
 import {
   X, User, Bell, Sliders, Sparkles, Save, Loader2, CheckCircle,
   TrendingUp, CreditCard, Trophy, RotateCcw, Mail, Smartphone,
@@ -157,6 +158,7 @@ interface SettingsLightboxProps {
 // ── Main Component ─────────────────────────────────────────────────────────
 export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenStripe, creditsRemaining }: SettingsLightboxProps) {
   const toast = useToast();
+  const { setTheme } = useTheme();
   const [activeTab, setActiveTab]           = useState<SettingsTab>('account');
   const [loading, setLoading]               = useState(true);
   const [saving, setSaving]                 = useState(false);
@@ -187,7 +189,10 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
             if (stored) {
               const parsed = JSON.parse(stored);
               if (parsed.name)  setName(parsed.name);
-              if (parsed.prefs) setPrefs({ ...DEFAULT_PREFS, ...parsed.prefs });
+              if (parsed.prefs) {
+                setPrefs({ ...DEFAULT_PREFS, ...parsed.prefs });
+                setTheme(parsed.prefs?.theme ?? 'dark');
+              }
             }
           } catch { /* ignore */ }
           setLoading(false);
@@ -202,6 +207,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
         setName(data.profile.name ?? user?.name ?? '');
         setPrefs({ ...DEFAULT_PREFS, ...data.preferences });
         setStats({ ...DEFAULT_STATS, ...data.stats });
+        setTheme(data.preferences?.theme ?? 'dark');
       }
     } catch (err) {
       console.error('[Settings] loadSettings error:', err);
@@ -592,7 +598,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                         return (
                           <button
                             key={t.value}
-                            onClick={() => setPrefs((p: any) => ({ ...p, theme: t.value }))}
+                            onClick={() => { setPrefs((p: any) => ({ ...p, theme: t.value })); setTheme(t.value); }}
                             className={cn(
                               'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-xs font-semibold transition-all',
                               active

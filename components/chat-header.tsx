@@ -3,6 +3,7 @@
 import { memo, useState, useCallback } from 'react';
 import { Menu, TrendingUp, Bell, Settings, LogIn, UserPlus, Download, Share2, Check, Copy, Sparkles } from 'lucide-react';
 import { exportChatAsMarkdown, exportChatAsJSON, downloadFile, chatFilename, type ExportMessage, type ExportChat } from '@/lib/chat-export';
+import { useToast } from '@/components/toast-provider';
 
 interface ChatHeaderProps {
   sidebarOpen: boolean;
@@ -21,6 +22,8 @@ interface ChatHeaderProps {
   // Credits / billing
   creditsRemaining?: number;
   onOpenStripe?: () => void;
+  // Active sport context
+  currentSport?: string;
 }
 
 export const ChatHeader = memo(function ChatHeader({
@@ -38,9 +41,11 @@ export const ChatHeader = memo(function ChatHeader({
   messages = [],
   creditsRemaining,
   onOpenStripe,
+  currentSport,
 }: ChatHeaderProps) {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [shareState, setShareState] = useState<'idle' | 'loading' | 'copied'>('idle');
+  const toast = useToast();
 
   const hasMessages = messages.filter((m) => !('isWelcome' in m && (m as any).isWelcome)).length > 0;
 
@@ -68,6 +73,7 @@ export const ChatHeader = memo(function ChatHeader({
         const shareUrl = `${window.location.origin}/share/${data.shareToken}`;
         await navigator.clipboard.writeText(shareUrl);
         setShareState('copied');
+        toast.success('Share link copied');
         setTimeout(() => setShareState('idle'), 2500);
       } else {
         console.error('[ChatHeader] Share failed:', data.error);
@@ -114,6 +120,11 @@ export const ChatHeader = memo(function ChatHeader({
             </span>
             <span className="text-[10px] font-semibold text-[oklch(0.42_0.01_280)]">Live</span>
           </div>
+          {currentSport && currentSport !== 'all' && (
+            <span className="hidden lg:inline-flex text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-[var(--text-muted)]">
+              {currentSport.toUpperCase()}
+            </span>
+          )}
         </div>
 
         {/* Right: credits + export/share + user actions */}

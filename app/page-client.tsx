@@ -3536,7 +3536,9 @@ No preamble. Start directly with section 1.`;
                             );
                           })()
                         ) : (
-                          <MessageContent content={message.content} />
+                          <div className={(!message.isPending && message.isStreaming) ? 'content-streaming' : undefined}>
+                            <MessageContent content={message.content} />
+                          </div>
                         ))}
                         
                         {/* File Attachments Display */}

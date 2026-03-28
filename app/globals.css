@@ -306,3 +306,25 @@
 @utility animate-backdrop-in {
   animation: backdrop-in var(--duration-fast, 150ms) ease-out both;
 }
+
+/* ── Streaming cursor ─────────────────────────────────────────────────────── */
+@keyframes cursor-blink {
+  0%,  49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* Blinking insertion cursor appended inline after the last streamed character.
+   Works because both MarkdownContent and MessageContent return a wrapper <div>
+   whose direct children are block elements — the ::after on the last <p> appears
+   inline at the end of that paragraph's final line. */
+.content-streaming > :last-child::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 0.85em;
+  background-color: rgba(255, 255, 255, 0.75);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  animation: cursor-blink 1s step-end infinite;
+}

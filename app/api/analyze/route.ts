@@ -988,6 +988,39 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── MLB today's schedule injection — prevents recommending inactive pitchers ──────────────
+    // Fetches today's probable starters from the MLB Stats API (cached 10 min) and injects
+    // them as ground truth so the AI can't hallucinate start/sit advice for pitchers who
+    // aren't actually scheduled to pitch today.
+    if (isMLBQuery && !context.isPoliticalMarket) {
+      try {
+        const { fetchTodaysGames } = await import('@/lib/mlb-projections/mlb-stats-api');
+        const todaysGames = await Promise.race([
+          fetchTodaysGames(),
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000)),
+        ]).catch(() => [] as Awaited<ReturnType<typeof fetchTodaysGames>>);
+
+        if (todaysGames.length > 0) {
+          const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+          const scheduleLines = todaysGames.map((g: any) =>
+            `${g.awayTeam ?? g.away ?? 'Away'} @ ${g.homeTeam ?? g.home ?? 'Home'}` +
+            ` | Away SP: ${g.probableAwayPitcher?.fullName ?? 'TBD'}` +
+            ` | Home SP: ${g.probableHomePitcher?.fullName ?? 'TBD'}`
+          );
+          enrichedPrompt +=
+            `\n\n--- TODAY'S MLB SCHEDULE (${todayLabel}) ---\n` +
+            scheduleLines.join('\n') +
+            `\n--- END SCHEDULE ---\n` +
+            `CRITICAL: Only recommend pitchers who appear in TODAY'S SCHEDULE above. ` +
+            `If a pitcher is NOT listed, explicitly state they are not scheduled to pitch today and decline to give a start/sit recommendation for them.\n`;
+        } else {
+          enrichedPrompt += `\n\n[MLB Schedule: No games found for today or schedule unavailable. Do not make start/sit pitcher recommendations without verified schedule data.]\n`;
+        }
+      } catch {
+        // Non-blocking — skip if schedule API is unavailable
+      }
+    }
+
     // ── NFL data-provenance context (fires for ANY NFL query with no live odds) ─────────────
     // This app has no live NFL stats API. Without live odds/props injected above, any NFL
     // player stats in the response come purely from Grok's training data, which may predate

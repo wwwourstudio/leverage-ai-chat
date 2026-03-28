@@ -15,9 +15,10 @@ interface Message {
   sources?: any[];
   modelUsed?: string;
   processingTime?: number;
-  isPartial?: boolean;  // stream interrupted; content shows what arrived before the break
-  isError?: boolean;    // request failed with no usable content
-  isPending?: boolean;  // optimistic placeholder while API call is in flight
+  isPartial?: boolean;   // stream interrupted; content shows what arrived before the break
+  isError?: boolean;     // request failed with no usable content
+  isPending?: boolean;   // optimistic placeholder while API call is in flight
+  isStreaming?: boolean; // tokens are actively arriving from the SSE stream
 }
 
 interface ChatMessageProps {
@@ -408,7 +409,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                   </div>
                 </>
               ) : (
-                <>
+                <div className={(!message.isPending && message.isStreaming) ? 'content-streaming' : undefined}>
                   <MarkdownContent text={message.content} />
                   {isLong && expanded && (
                     <div className="mt-3 pt-2 border-t border-[oklch(0.20_0.015_280)]">
@@ -420,7 +421,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                       </button>
                     </div>
                   )}
-                </>
+                </div>
               )}
 
               {!isUser && (

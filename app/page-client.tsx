@@ -1983,6 +1983,19 @@ No preamble. Start directly with section 1.`;
     if (/(?:^|[\s(])(?:pg|sg|pf)(?:[\s).,]|$)/.test(t)) return 'nba';
     // NFL positions (qb, wr, rb, te — unique, not common English words):
     if (/(?:^|[\s(])(?:qb|wr|rb|te)(?:[\s).,]|$)/.test(t)) return 'nfl';
+    // ── Known MLB player names ────────────────────────────────────────────────
+    // Explicit player names override ambiguous team abbreviations (PHI, MIA, ATL…).
+    // Only names that are unambiguous as standalone substrings are included.
+    if ([
+      // Phillies
+      'schwarber', 'bryce harper', 'castellanos', 'trea turner', 'alec bohm',
+      'realmuto', 'aaron nola', 'zack wheeler', 'ranger suarez', 'ranger suárez',
+      // Other high-profile MLB stars
+      'ohtani', 'shohei', 'acuña', 'acuna', 'juan soto',
+      'freddie freeman', 'mookie betts', 'tatis', 'yordan alvarez',
+      'corbin burnes', 'gerrit cole', 'spencer strider',
+      'lindor', 'devers', 'vlad guerrero', 'wander franco',
+    ].some(p => t.includes(p))) return 'mlb';
     // Deep scan: team names, positions, sport-specific terms.
     // NBA/NFL/NHL team names are checked BEFORE MLB because some abbreviations
     // overlap across leagues (e.g. ATL=Braves/Hawks, MIA=Marlins/Heat, HOU=Astros/Rockets).
@@ -2001,6 +2014,13 @@ No preamble. Start directly with section 1.`;
     if (NHL_KEYWORDS.some(k => t.includes(k))) return 'nhl';
     return null;
   };
+  // Regression guard: MLB player names must override ambiguous team code matches.
+  if (process.env.NODE_ENV !== 'production') {
+    console.assert(
+      detectSportFromText('Kyle Schwarber HR prop') === 'mlb',
+      '[v0] detectSportFromText regression: "Kyle Schwarber HR prop" should return "mlb"',
+    );
+  }
 
   const extractSport = (message: string, conversationHistory?: Array<{ role: string; content: string }>): string | null => {
     console.log('[v0] Extracting sport from:', message);

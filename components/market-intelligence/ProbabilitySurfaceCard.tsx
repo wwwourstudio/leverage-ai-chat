@@ -27,7 +27,7 @@ interface Props {
 const COMPONENT_STYLES = [
   { key: 'sportsbook', label: 'Sportsbooks', color: 'bg-blue-500' },
   { key: 'prediction_market', label: 'Kalshi', color: 'bg-purple-500' },
-  { key: 'historical', label: 'Historical', color: 'bg-emerald-500' },
+  { key: 'historical', label: 'Historical', color: 'bg-blue-500' },
 ] as const;
 
 function pct(v: number): string {
@@ -35,7 +35,7 @@ function pct(v: number): string {
 }
 
 function probColor(prob: number): string {
-  if (prob >= 0.65) return 'text-emerald-400';
+  if (prob >= 0.65) return 'text-blue-400';
   if (prob >= 0.45) return 'text-amber-400';
   return 'text-red-400';
 }
@@ -97,7 +97,7 @@ export function ProbabilitySurfaceCard({ surfaceProbability, components, weights
             {[0.33, 0.66, 1.0].map(thresh => (
               <div
                 key={thresh}
-                className={`w-2 h-2 rounded-sm ${confidence >= thresh ? 'bg-emerald-500' : 'bg-white/15'}`}
+                className={`w-2 h-2 rounded-sm ${confidence >= thresh ? 'bg-blue-500' : 'bg-white/15'}`}
               />
             ))}
           </div>

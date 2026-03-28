@@ -321,7 +321,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
                     {file.type === 'image' ? (
                       <ImageIcon className="w-4 h-4 text-blue-400 shrink-0" />
                     ) : (
-                      <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <FileText className="w-4 h-4 text-blue-400 shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-gray-200 truncate">{file.name}</p>

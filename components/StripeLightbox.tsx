@@ -112,7 +112,7 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
                 <ArrowLeft className="w-4 h-4" />
               </button>
             )}
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-purple-600 flex items-center justify-center flex-shrink-0">
               <CreditCard className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -160,7 +160,7 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
                 onClick={() => setActiveTab('credits')}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition-all border-b-2 ${
                   activeTab === 'credits'
-                    ? 'text-green-400 border-green-400 bg-green-500/5'
+                    ? 'text-blue-400 border-blue-400 bg-blue-500/5'
                     : 'text-gray-500 border-transparent hover:text-gray-300'
                 }`}
               >
@@ -194,12 +194,12 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
                         onClick={() => { setSelectedPackage(pkg.amount); setCustomAmount(''); }}
                         className={`relative p-3 rounded-xl text-center transition-all ${
                           selectedPackage === pkg.amount
-                            ? 'bg-green-600/20 border-green-500/50 text-green-400 border-2'
+                            ? 'bg-blue-600/20 border-blue-500/50 text-blue-400 border-2'
                             : 'bg-gray-800 border border-gray-700 text-gray-300 hover:border-gray-600'
                         }`}
                       >
                         {pkg.popular && (
-                          <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-green-600 text-white text-[9px] font-bold rounded-full">
+                          <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-blue-600 text-white text-[9px] font-bold rounded-full">
                             POPULAR
                           </span>
                         )}
@@ -220,7 +220,7 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
                         value={customAmount}
                         onChange={(e: any) => { setCustomAmount(e.target.value); setSelectedPackage(null); }}
                         placeholder="Custom"
-                        className="w-full pl-7 pr-4 py-2.5 bg-gray-950 border border-gray-800 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none focus:border-green-500/50 transition-all"
+                        className="w-full pl-7 pr-4 py-2.5 bg-gray-950 border border-gray-800 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500/50 transition-all"
                       />
                     </div>
                   </div>
@@ -228,7 +228,7 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
                   <button
                     onClick={handlePurchaseCredits}
                     disabled={processing || (!selectedPackage && (!customAmount || parseInt(customAmount) < 5))}
-                    className="w-full py-3.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2"
                   >
                     {processing ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -275,7 +275,7 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
                       <div className="space-y-1.5">
                         {plan.features.map(f => (
                           <div key={f} className="flex items-center gap-2 text-xs text-gray-300">
-                            <CheckCircle className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
+                            <CheckCircle className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
                             <span>{f}</span>
                           </div>
                         ))}

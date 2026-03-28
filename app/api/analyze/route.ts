@@ -131,7 +131,7 @@ interface AnalyzeRequestBody {
 // ============================================================================
 
 /**
- * Returns true for query types that use the fast path (grok-4):
+ * Returns true for query types that use the fast path (grok-3-fast):
  * - DFS lineup questions (no live-odds accuracy needed)
  * - Pure fantasy queries (hasFantasyIntent && !hasBettingIntent)
  * - CSV / file uploads (user's own data, not real-time odds)
@@ -204,7 +204,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Per-AI-call timeouts (independent from each other and from card generation):
-  //   grok-4 primary: ~15-30s first-token | fallback: 10s
+  //   grok-3-fast primary: ~15-30s first-token | fallback: 10s
   // Vercel serverless functions have a 60s wall-clock limit. Keeping primary+fallback
   // to ≤58s gives a small buffer for the response serialisation overhead.
   const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 28_000 : 52_000;
@@ -1191,12 +1191,12 @@ export async function POST(request: NextRequest) {
     const xaiApiKey = getGrokApiKey();
     const oddsApiKey = getOddsApiKey();
     const hasClientOddsData = !!(context.oddsData?.events?.length);
-    // All queries use grok-4. deepThink overrides to grok-4 with extended reasoning.
+    // All queries use grok-3-fast. deepThink overrides to grok-3-fast with extended reasoning.
     // Fast-path queries skip extended reasoning for lower latency.
     // ADP queries override to primary: reliable tool use requires the stronger model.
     // isAmbiguous queries only need a short clarification reply — no need for primary.
     const useFastPath = body.deepThink ? false : (hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context)));
-    const primaryModel = body.deepThink ? 'grok-4' : (useFastPath ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.MODEL_NAME);
+    const primaryModel = body.deepThink ? AI_CONFIG.MODEL_NAME : (useFastPath ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.MODEL_NAME);
     // Always log the resolved model so failures are immediately traceable in Vercel logs
     logger.info(LogCategory.AI, 'model_selected', {
       metadata: { model: primaryModel, fastPath: useFastPath, hasADPIntent, sport: context?.sport ?? null },

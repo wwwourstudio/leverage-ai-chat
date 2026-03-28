@@ -35,7 +35,7 @@ interface LeagueCreatorProps {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SPORTS = [
-  { value: 'nfl' as FantasySport, label: 'Football', icon: '🏈', color: 'from-green-600 to-emerald-700', border: 'border-green-500/40 hover:border-green-400/70', selected: 'border-green-400 bg-green-500/15' },
+  { value: 'nfl' as FantasySport, label: 'Football', icon: '🏈', color: 'from-violet-600 to-purple-700', border: 'border-violet-500/40 hover:border-violet-400/70', selected: 'border-violet-400 bg-violet-500/15' },
   { value: 'mlb' as FantasySport, label: 'Baseball', icon: '⚾', color: 'from-blue-600 to-indigo-700', border: 'border-blue-500/40 hover:border-blue-400/70', selected: 'border-blue-400 bg-blue-500/15' },
   { value: 'nba' as FantasySport, label: 'Basketball', icon: '🏀', color: 'from-orange-500 to-red-600', border: 'border-orange-500/40 hover:border-orange-400/70', selected: 'border-orange-400 bg-orange-500/15' },
   { value: 'nhl' as FantasySport, label: 'Hockey', icon: '🏒', color: 'from-sky-600 to-blue-700', border: 'border-sky-500/40 hover:border-sky-400/70', selected: 'border-sky-400 bg-sky-500/15' },

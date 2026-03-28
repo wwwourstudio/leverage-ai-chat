@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 const POSITION_COLORS: Record<string, string> = {
   // NFL
   QB:        'bg-red-500/20 text-red-400 border-red-500/30',
-  RB:        'bg-green-500/20 text-green-400 border-green-500/30',
+  RB:        'bg-blue-500/20 text-blue-400 border-blue-500/30',
   WR:        'bg-blue-500/20 text-blue-400 border-blue-500/30',
   TE:        'bg-orange-500/20 text-orange-400 border-orange-500/30',
   K:         'bg-purple-500/20 text-purple-400 border-purple-500/30',
@@ -13,9 +13,9 @@ const POSITION_COLORS: Record<string, string> = {
   FLEX:      'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
   SUPERFLEX: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
   // MLB — pitchers
-  SP:        'bg-teal-500/20 text-teal-400 border-teal-500/30',
-  RP:        'bg-teal-500/20 text-teal-400 border-teal-500/30',
-  P:         'bg-teal-500/20 text-teal-400 border-teal-500/30',
+  SP:        'bg-violet-500/20 text-violet-400 border-violet-500/30',
+  RP:        'bg-violet-500/20 text-violet-400 border-violet-500/30',
+  P:         'bg-violet-500/20 text-violet-400 border-violet-500/30',
   // MLB — infield
   '1B':      'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
   '2B':      'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',

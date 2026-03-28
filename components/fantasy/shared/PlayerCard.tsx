@@ -12,7 +12,7 @@ import type { PlayerWithVBD } from '@/lib/fantasy/types';
 function getPositionAccent(position: string): { gradient: string; textCls: string } {
   // MLB — pitchers
   if (['SP', 'RP', 'P'].includes(position))
-    return { gradient: 'from-teal-500 to-teal-700',   textCls: 'text-teal-400' };
+    return { gradient: 'from-violet-500 to-violet-700', textCls: 'text-violet-400' };
   // MLB — infield
   if (['1B', '2B', '3B', 'SS'].includes(position))
     return { gradient: 'from-indigo-500 to-indigo-700', textCls: 'text-indigo-400' };
@@ -24,7 +24,7 @@ function getPositionAccent(position: string): { gradient: string; textCls: strin
     return { gradient: 'from-red-500 to-red-700',      textCls: 'text-red-400' };
   // NFL — RB
   if (position === 'RB')
-    return { gradient: 'from-green-500 to-green-700',  textCls: 'text-green-400' };
+    return { gradient: 'from-blue-500 to-blue-700',    textCls: 'text-blue-400' };
   // NFL — WR / FLEX
   if (['WR', 'FLEX', 'SUPERFLEX'].includes(position))
     return { gradient: 'from-blue-500 to-blue-700',    textCls: 'text-blue-400' };
@@ -84,7 +84,7 @@ export function PlayerCard({
         'rounded-xl bg-[oklch(0.13_0.015_280)] border border-white/10',
         'cursor-pointer select-none transition-all duration-200',
         'hover:border-white/20 hover:bg-[oklch(0.16_0.015_280)]',
-        isRecommended && 'border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-500/60',
+        isRecommended && 'border-blue-500/40 bg-blue-500/5 hover:border-blue-500/60',
         className,
       )}
     >
@@ -93,7 +93,7 @@ export function PlayerCard({
         className={cn(
           'absolute left-0 top-0 bottom-0 w-[2.5px] rounded-l-xl bg-gradient-to-b',
           accent.gradient,
-          isRecommended && 'from-emerald-400 to-emerald-600',
+          isRecommended && 'from-blue-400 to-blue-600',
         )}
       />
 
@@ -125,7 +125,7 @@ export function PlayerCard({
           className={cn(
             'flex flex-col items-center rounded-lg px-2 py-1 text-center shrink-0',
             survivalProbability > 0.7
-              ? 'bg-emerald-500/10 text-emerald-400'
+              ? 'bg-blue-500/10 text-blue-400'
               : survivalProbability > 0.3
                 ? 'bg-amber-500/10 text-amber-400'
                 : 'bg-red-500/10 text-red-400',

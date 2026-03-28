@@ -86,7 +86,7 @@ function OddsRangeChart({ badValues }: { badValues: number[] }) {
       {/* Range bar */}
       <div className="relative flex items-center gap-0.5 h-5 text-[8px]">
         {/* Favorite side (negative) */}
-        <div className="flex-1 h-3 rounded-l bg-emerald-600/50 border border-emerald-500/40 flex items-center justify-center text-emerald-300 font-mono">
+        <div className="flex-1 h-3 rounded-l bg-blue-600/50 border border-blue-500/40 flex items-center justify-center text-blue-300 font-mono">
           -3000 → -100
         </div>
         {/* Dead zone */}
@@ -94,15 +94,15 @@ function OddsRangeChart({ badValues }: { badValues: number[] }) {
           -99…+99 ✗
         </div>
         {/* Underdog side (positive) */}
-        <div className="flex-1 h-3 rounded-r bg-emerald-600/50 border border-emerald-500/40 flex items-center justify-center text-emerald-300 font-mono">
+        <div className="flex-1 h-3 rounded-r bg-blue-600/50 border border-blue-500/40 flex items-center justify-center text-blue-300 font-mono">
           +100 → +3000
         </div>
       </div>
 
       <div className="flex justify-between mt-1 text-[8px] text-gray-500">
-        <span className="text-emerald-500">Heavy favorite</span>
+        <span className="text-blue-500">Heavy favorite</span>
         <span className="text-red-400 font-semibold">Invalid zone</span>
-        <span className="text-emerald-500">Heavy underdog</span>
+        <span className="text-blue-500">Heavy underdog</span>
       </div>
 
       {/* The flagged values */}
@@ -214,14 +214,14 @@ const METRIC_DEFS = [
 ];
 
 function scoreColor(v: number) {
-  if (v >= 85) return 'text-emerald-400';
+  if (v >= 85) return 'text-blue-400';
   if (v >= 70) return 'text-blue-400';
   if (v >= 55) return 'text-yellow-400';
   return 'text-red-400';
 }
 
 function barFill(v: number) {
-  if (v >= 85) return 'bg-emerald-500';
+  if (v >= 85) return 'bg-blue-500';
   if (v >= 70) return 'bg-blue-500';
   if (v >= 55) return 'bg-yellow-500';
   return 'bg-red-500';
@@ -236,13 +236,13 @@ function scoreLabel(v: number) {
 }
 
 function trustBadgeStyle(level: 'high' | 'medium' | 'low') {
-  if (level === 'high') return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400';
+  if (level === 'high') return 'bg-blue-500/10 border-blue-500/30 text-blue-400';
   if (level === 'medium') return 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400';
   return 'bg-red-500/10 border-red-500/30 text-red-400';
 }
 
 function riskBadgeStyle(level: 'low' | 'medium' | 'high') {
-  if (level === 'low') return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+  if (level === 'low') return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
   if (level === 'medium') return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
   return 'bg-red-500/10 text-red-400 border-red-500/20';
 }
@@ -364,7 +364,7 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
           {metrics.sources.map((src, i) => {
             const Icon = sourceIcon(src.type);
             const reliColor = src.reliability >= 95
-              ? 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5'
+              ? 'text-blue-400 border-blue-500/20 bg-blue-500/5'
               : src.reliability >= 88
                 ? 'text-blue-400 border-blue-500/20 bg-blue-500/5'
                 : 'text-yellow-400 border-yellow-500/20 bg-yellow-500/5';
@@ -382,7 +382,7 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
       {/* ── Verification tags ────────────────────────────────── */}
       <div className="flex flex-wrap gap-1.5">
         {metrics.hasLiveOdds && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-bold text-emerald-400">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-[9px] font-bold text-blue-400">
             <CheckCircle2 className="w-2.5 h-2.5" /> LIVE ODDS VERIFIED
           </span>
         )}

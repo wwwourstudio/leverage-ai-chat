@@ -16,6 +16,14 @@ import { ADPUploadModal } from '@/components/ADPUploadModal';
 import { MLBProjectionCard } from './MLBProjectionCard';
 import { VPECard } from './VPECard';
 import { HRPredictionCard } from './HRPredictionCard';
+import { EVBetCard } from './EVBetCard';
+import { SharpMoneyCard } from './SharpMoneyCard';
+import { PitcherFatigueCard } from './PitcherFatigueCard';
+import { BullpenFatigueCard } from './BullpenFatigueCard';
+import { PitchMatchupCard } from './PitchMatchupCard';
+import { UmpireImpactCard } from './UmpireImpactCard';
+import { CatcherFramingCard } from './CatcherFramingCard';
+import { ClosingLineCard } from './ClosingLineCard';
 
 interface CardData {
   id?: string;
@@ -403,6 +411,144 @@ export function DynamicCardRenderer({
   if (cardType === 'portfolio') {
     return withOverlays(
       <PortfolioCard
+        type={safeCard.type}
+        title={safeCard.title}
+        category={safeCard.category}
+        subcategory={safeCard.subcategory}
+        gradient={safeCard.gradient}
+        data={safeCard.data}
+        status={safeCard.status}
+        onAnalyze={handleAnalyze}
+        isHero={isHero}
+      />
+    );
+  }
+
+  // ── Trading terminal analytics cards ──────────────────────────────────────
+
+  // Positive-EV bet cards
+  if (cardType === 'ev_bet_card') {
+    return withOverlays(
+      <EVBetCard
+        type={safeCard.type}
+        title={safeCard.title}
+        category={safeCard.category}
+        subcategory={safeCard.subcategory}
+        gradient={safeCard.gradient}
+        data={safeCard.data}
+        status={safeCard.status}
+        onAnalyze={handleAnalyze}
+        isHero={isHero}
+      />
+    );
+  }
+
+  // Sharp money / steam move cards (must come before 'insight' catch-all)
+  if (cardType === 'sharp_money_card') {
+    return withOverlays(
+      <SharpMoneyCard
+        type={safeCard.type}
+        title={safeCard.title}
+        category={safeCard.category}
+        subcategory={safeCard.subcategory}
+        gradient={safeCard.gradient}
+        data={safeCard.data}
+        status={safeCard.status}
+        onAnalyze={handleAnalyze}
+        isHero={isHero}
+      />
+    );
+  }
+
+  // Pitcher fatigue cards
+  if (cardType === 'pitcher_fatigue_card') {
+    return withOverlays(
+      <PitcherFatigueCard
+        type={safeCard.type}
+        title={safeCard.title}
+        category={safeCard.category}
+        subcategory={safeCard.subcategory}
+        gradient={safeCard.gradient}
+        data={safeCard.data}
+        status={safeCard.status}
+        onAnalyze={handleAnalyze}
+        isHero={isHero}
+      />
+    );
+  }
+
+  // Bullpen fatigue cards
+  if (cardType === 'bullpen_fatigue_card') {
+    return withOverlays(
+      <BullpenFatigueCard
+        type={safeCard.type}
+        title={safeCard.title}
+        category={safeCard.category}
+        subcategory={safeCard.subcategory}
+        gradient={safeCard.gradient}
+        data={safeCard.data}
+        status={safeCard.status}
+        onAnalyze={handleAnalyze}
+        isHero={isHero}
+      />
+    );
+  }
+
+  // Pitch type matchup cards
+  if (cardType === 'pitch_matchup_card') {
+    return withOverlays(
+      <PitchMatchupCard
+        type={safeCard.type}
+        title={safeCard.title}
+        category={safeCard.category}
+        subcategory={safeCard.subcategory}
+        gradient={safeCard.gradient}
+        data={safeCard.data}
+        status={safeCard.status}
+        onAnalyze={handleAnalyze}
+        isHero={isHero}
+      />
+    );
+  }
+
+  // Umpire strike zone impact cards
+  if (cardType === 'umpire_impact_card') {
+    return withOverlays(
+      <UmpireImpactCard
+        type={safeCard.type}
+        title={safeCard.title}
+        category={safeCard.category}
+        subcategory={safeCard.subcategory}
+        gradient={safeCard.gradient}
+        data={safeCard.data}
+        status={safeCard.status}
+        onAnalyze={handleAnalyze}
+        isHero={isHero}
+      />
+    );
+  }
+
+  // Catcher framing cards
+  if (cardType === 'catcher_framing_card') {
+    return withOverlays(
+      <CatcherFramingCard
+        type={safeCard.type}
+        title={safeCard.title}
+        category={safeCard.category}
+        subcategory={safeCard.subcategory}
+        gradient={safeCard.gradient}
+        data={safeCard.data}
+        status={safeCard.status}
+        onAnalyze={handleAnalyze}
+        isHero={isHero}
+      />
+    );
+  }
+
+  // Closing line value (CLV) tracking cards
+  if (cardType === 'closing_line_card') {
+    return withOverlays(
+      <ClosingLineCard
         type={safeCard.type}
         title={safeCard.title}
         category={safeCard.category}

@@ -1185,6 +1185,202 @@ async function _generateContextualCards(
     return cards;
   }
   
+  // ── Expected Value (EV) cards ─────────────────────────────────────────────
+  if (category === 'ev' || category === 'expected-value' || category === 'ev-bets') {
+    console.log('[v0] [CARDS-GEN] EV category — querying model_predictions for positive-EV bets');
+    try {
+      const supabase = (await import('@/lib/supabase/client')).createClient();
+      const { data: preds } = await supabase
+        .from('model_predictions')
+        .select('*')
+        .gt('expected_value', 0.05)
+        .order('expected_value', { ascending: false })
+        .limit(count);
+
+      if (preds && preds.length > 0) {
+        for (const pred of preds) {
+          const ev: number = pred.expected_value;
+          const conf: 'high' | 'medium' | 'low' = ev >= 0.10 ? 'high' : ev >= 0.05 ? 'medium' : 'low';
+          cards.push({
+            type: CARD_TYPES.EV_BET,
+            title: pred.outcome ? `${pred.market} — ${pred.outcome}` : pred.market,
+            icon: 'TrendingUp',
+            category: 'EV BETTING',
+            subcategory: `${(ev * 100).toFixed(1)}% Edge`,
+            gradient: 'from-emerald-600 to-teal-700',
+            status: conf === 'high' ? 'hot' : 'value',
+            data: {
+              market: pred.market,
+              outcome: pred.outcome,
+              bookmaker: pred.bookmaker ?? 'best book',
+              americanOdds: pred.best_price,
+              evPercent: `${(ev * 100).toFixed(1)}%`,
+              modelProbability: pred.model_probability,
+              impliedProbability: pred.model_probability - ev / (pred.best_price > 0 ? pred.best_price / 100 + 1 : 100 / Math.abs(pred.best_price) + 1),
+              quarterKelly: pred.kelly_fraction ? pred.kelly_fraction * 0.25 : null,
+              confidence: conf,
+              realData: true,
+            },
+          });
+        }
+        setCachedCards(cards, 'ev', sport);
+        return cards;
+      }
+    } catch (err) {
+      console.error('[v0] [CARDS-GEN] EV fetch error:', err);
+    }
+
+    // Fallback
+    cards.push({
+      type: CARD_TYPES.EV_BET,
+      title: 'Expected Value Scanner',
+      icon: 'TrendingUp',
+      category: 'EV BETTING',
+      subcategory: 'No Edges Found',
+      gradient: 'from-emerald-600 to-teal-700',
+      status: 'neutral',
+      data: {
+        description: 'Scanning sportsbooks for positive expected value bets',
+        note: 'EV edges appear as odds diverge from model predictions. Check back as lines move.',
+        realData: false,
+      },
+    });
+    return cards;
+  }
+
+  // ── Sharp money / steam alerts ────────────────────────────────────────────
+  if (category === 'sharp' || category === 'sharp-money' || category === 'steam') {
+    console.log('[v0] [CARDS-GEN] Sharp money category — querying line_movement table');
+    try {
+      const supabase = (await import('@/lib/supabase/client')).createClient();
+      const sinceTs = new Date(Date.now() - 30 * 60 * 1000).toISOString(); // last 30 min
+      const { data: moves } = await supabase
+        .from('line_movement')
+        .select('*')
+        .gte('created_at', sinceTs)
+        .order('created_at', { ascending: false })
+        .limit(count * 3); // over-fetch; filter below
+
+      if (moves && moves.length > 0) {
+        const sharp = moves.filter((m: any) => Math.abs(m.price_change ?? 0) >= 15);
+        const source = sharp.length > 0 ? sharp : moves;
+        for (const mv of source.slice(0, count)) {
+          const change: number = mv.price_change ?? 0;
+          const isShort = change < 0;
+          cards.push({
+            type: CARD_TYPES.SHARP_MONEY,
+            title: mv.player_name ?? mv.game_id ?? 'Line Movement',
+            icon: 'Activity',
+            category: 'SHARP MONEY',
+            subcategory: Math.abs(change) >= 15 ? 'Steam Move' : 'Line Movement',
+            gradient: isShort ? 'from-red-700 to-rose-900' : 'from-blue-600 to-indigo-800',
+            status: Math.abs(change) >= 15 ? 'alert' : 'neutral',
+            data: {
+              market: mv.market,
+              openPrice: mv.opening_price,
+              currentPrice: mv.current_price,
+              movement: Math.abs(change).toString(),
+              direction: isShort ? 'shortening' : 'lengthening',
+              isSharp: Math.abs(change) >= 15,
+              bookmaker: mv.bookmaker,
+              timestamp: new Date(mv.created_at).toLocaleTimeString(),
+              realData: true,
+            },
+          });
+        }
+        setCachedCards(cards, 'sharp', sport);
+        return cards;
+      }
+    } catch (err) {
+      console.error('[v0] [CARDS-GEN] Sharp money fetch error:', err);
+    }
+
+    // Fallback
+    cards.push({
+      type: CARD_TYPES.SHARP_MONEY,
+      title: 'Steam Move Detector',
+      icon: 'Activity',
+      category: 'SHARP MONEY',
+      subcategory: 'Monitoring',
+      gradient: 'from-red-700 to-rose-900',
+      status: 'neutral',
+      data: {
+        description: 'Monitoring all sportsbooks for rapid line movement',
+        note: 'Steam moves (15+ cent line shift in < 30 min) signal sharp syndicate action.',
+        realData: false,
+      },
+    });
+    return cards;
+  }
+
+  // ── Pitcher fatigue ───────────────────────────────────────────────────────
+  if (category === 'pitcher-fatigue' || category === 'fatigue' || category === 'pitcher') {
+    console.log('[v0] [CARDS-GEN] Pitcher fatigue category');
+    const { computePitcherFatigue } = await import('@/lib/pitcher-fatigue');
+    // Demo card with typical workload values — real data would come from MLB Stats API
+    const demoInputs = [
+      { pitcherName: 'Starter A', pitchCountLastStart: 108, inningsLastStart: 6.2, daysRest: 4, pitchCountLast7Days: 108 },
+      { pitcherName: 'Starter B', pitchCountLastStart: 118, inningsLastStart: 7.0, daysRest: 3, pitchCountLast7Days: 138 },
+    ];
+    for (const demo of demoInputs.slice(0, count)) {
+      const result = computePitcherFatigue(demo);
+      cards.push({
+        type: CARD_TYPES.PITCHER_FATIGUE,
+        title: `${demo.pitcherName} — Fatigue Report`,
+        icon: 'Wind',
+        category: 'MLB',
+        subcategory: 'Pitcher Fatigue',
+        gradient: 'from-blue-700 to-indigo-900',
+        status: result.fatigueLabel === 'at-risk' ? 'alert' : result.fatigueLabel === 'tired' ? 'neutral' : 'value',
+        data: {
+          fatigueMultiplier: result.fatigueMultiplier,
+          fatigueLabel: result.fatigueLabel,
+          pitchCountLastStart: demo.pitchCountLastStart,
+          inningsLastStart: demo.inningsLastStart,
+          daysRest: demo.daysRest,
+          pitchCountLast7Days: demo.pitchCountLast7Days,
+          bettingImpact: result.bettingImpact,
+          realData: false,
+        },
+      });
+    }
+    if (cards.length > 0) setCachedCards(cards, 'pitcher-fatigue', sport);
+    return cards;
+  }
+
+  // ── Bullpen fatigue ───────────────────────────────────────────────────────
+  if (category === 'bullpen' || category === 'bullpen-fatigue') {
+    console.log('[v0] [CARDS-GEN] Bullpen fatigue category');
+    const { computeBullpenFatigue } = await import('@/lib/bullpen-fatigue');
+    const demoTeams = [
+      { teamName: 'Home Team', inningsLast3Days: 11, pitchCountLast3Days: 195, eraLast14Days: 4.85 },
+      { teamName: 'Away Team', inningsLast3Days: 7, pitchCountLast3Days: 130, eraLast14Days: 3.62 },
+    ];
+    for (const team of demoTeams.slice(0, count)) {
+      const result = computeBullpenFatigue(team);
+      cards.push({
+        type: CARD_TYPES.BULLPEN_FATIGUE,
+        title: `${team.teamName} Bullpen`,
+        icon: 'Flame',
+        category: 'MLB',
+        subcategory: 'Bullpen Fatigue',
+        gradient: result.riskLevel === 'high' ? 'from-red-700 to-orange-900' : 'from-orange-600 to-amber-800',
+        status: result.riskLevel === 'high' ? 'alert' : 'neutral',
+        data: {
+          fatigueScore: result.fatigueScore,
+          riskLevel: result.riskLevel,
+          inningsLast3Days: team.inningsLast3Days,
+          eraLast14Days: team.eraLast14Days,
+          scoringEnvImpact: result.scoringEnvImpact,
+          signal: result.signal,
+          realData: false,
+        },
+      });
+    }
+    if (cards.length > 0) setCachedCards(cards, 'bullpen', sport);
+    return cards;
+  }
+
   // Betting/Arbitrage cards (default)
   if (category === 'betting' || !category) {
     // Try to detect real arbitrage opportunities

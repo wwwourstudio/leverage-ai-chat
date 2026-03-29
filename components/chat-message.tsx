@@ -342,9 +342,11 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
               : message.isPartial
                 ? 'bg-[oklch(0.12_0.015_280)] border border-l-[3px] border-[oklch(0.22_0.02_280)] border-l-amber-500/60 shadow-sm'
                 : 'bg-[oklch(0.12_0.015_280)] border border-l-[3px] border-[oklch(0.22_0.02_280)] border-l-[oklch(0.45_0.06_260)] shadow-sm',
+          // Hold minimum height during pending/early streaming so layout doesn't jump
+          (!isUser && (message.isPending || message.isStreaming)) ? 'min-h-[72px]' : '',
         )}>
-          {/* ── Loading skeleton — shown while waiting for API response ── */}
-          {!isUser && message.isPending && (
+          {/* ── Loading skeleton — shown while pending OR while first tokens arrive ── */}
+          {!isUser && (message.isPending || (message.isStreaming && !message.content?.trim())) && (
             <div className="space-y-2.5 py-1" aria-label="Loading response" aria-busy="true">
               <div className="h-2.5 w-48 rounded-full bg-white/10 animate-pulse" />
               <div className="h-2.5 w-64 rounded-full bg-white/10 animate-pulse [animation-delay:150ms]" />
@@ -352,7 +354,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
             </div>
           )}
 
-          {!message.isPending && (isEditing ? (
+          {!message.isPending && !(message.isStreaming && !message.content?.trim()) && (isEditing ? (
             <div className="space-y-3">
               <textarea
                 value={editContent}
@@ -409,8 +411,12 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                   </div>
                 </>
               ) : (
-                <div className={(!message.isPending && message.isStreaming) ? 'content-streaming' : undefined}>
-                  <MarkdownContent text={message.content} />
+                <div className={message.isStreaming ? 'content-streaming' : undefined}>
+                  {/* Plain text during streaming — avoids markdown re-parse jank on every token */}
+                  {message.isStreaming
+                    ? <p className="text-sm leading-relaxed text-[oklch(0.82_0.005_85)] whitespace-pre-wrap">{message.content}</p>
+                    : <MarkdownContent text={message.content} />
+                  }
                   {isLong && expanded && (
                     <div className="mt-3 pt-2 border-t border-[oklch(0.20_0.015_280)]">
                       <button
@@ -433,7 +439,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                         <Brain className="w-3 h-3 text-purple-500/70" />
                         {message.modelUsed && (
                           <span className="font-semibold text-[oklch(0.50_0.01_280)]">
-                            {message.modelUsed.replace(/grok-[34](-fast)?/i, 'Grok 4').replace('Grok 3', 'Grok 4')}
+                            {message.modelUsed.replace(/grok-3(-fast)?/gi, 'Grok 3 Fast').replace(/grok-4/gi, 'Grok 3 Fast')}
                           </span>
                         )}
                         {message.processingTime && (

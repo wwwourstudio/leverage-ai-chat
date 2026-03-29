@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
-import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles, Brain } from 'lucide-react';
+import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles, Brain, Zap } from 'lucide-react';
 import { useToast } from '@/components/toast-provider';
 
 interface FileAttachment {
@@ -229,24 +229,6 @@ export const ChatInput = memo(function ChatInput({
             </div>
           </div>
 
-          {/* Deep Think toggle */}
-          {onToggleDeepThink && (
-            <button
-              type="button"
-              onClick={onToggleDeepThink}
-              disabled={isTyping}
-              title={deepThink ? 'Deep Think ON — uses Grok 4 for complex analysis. Click to disable.' : 'Deep Think — uses Grok 4 for step-by-step reasoning'}
-              className={`shrink-0 p-2.5 rounded-xl transition-all duration-200 border ${
-                deepThink
-                  ? 'bg-indigo-600/20 border-indigo-500/60 text-indigo-300 shadow-[0_0_12px_oklch(0.5_0.2_270/0.3)]'
-                  : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-indigo-500/40 hover:text-indigo-400'
-              } disabled:opacity-40 disabled:cursor-not-allowed`}
-              style={{ height: '44px', width: '44px' }}
-            >
-              <Brain className="w-4 h-4 mx-auto" />
-            </button>
-          )}
-
           {/* Send / Stop */}
           {isTyping ? (
             <button
@@ -290,23 +272,44 @@ export const ChatInput = memo(function ChatInput({
 
       {/* Status bar */}
       <div className="flex items-center justify-between mt-2 px-1">
-        {/* Mobile attach */}
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="sm:hidden shrink-0 p-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] active:scale-95 transition-all"
-          title="Attach file"
-          disabled={isTyping}
-        >
-          <Paperclip className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-        </button>
+        {/* Left: attach (mobile) + Think Harder (all sizes) */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="sm:hidden shrink-0 p-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] active:scale-95 transition-all"
+            title="Attach file"
+            disabled={isTyping}
+          >
+            <Paperclip className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+          </button>
+
+          {/* Think Harder — moved below input, visible on all screen sizes */}
+          {onToggleDeepThink && (
+            <button
+              type="button"
+              onClick={onToggleDeepThink}
+              disabled={isTyping}
+              title={deepThink ? 'Think Harder ON — deeper reasoning. Click to disable.' : 'Think Harder — enables deeper step-by-step analysis'}
+              className={`flex items-center gap-1.5 shrink-0 px-2 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-200 border active:scale-95 ${
+                deepThink
+                  ? 'bg-indigo-600/20 border-indigo-500/60 text-indigo-300 shadow-[0_0_10px_oklch(0.5_0.2_270/0.25)]'
+                  : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-indigo-500/40 hover:text-indigo-400'
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
+            >
+              <Brain className={`w-3.5 h-3.5 ${deepThink ? 'text-indigo-300' : ''}`} />
+              <span className="hidden sm:inline">{deepThink ? 'Think Harder' : 'Think Harder'}</span>
+              {deepThink && <Zap className="w-2.5 h-2.5 text-indigo-400 hidden sm:block" />}
+            </button>
+          )}
+        </div>
 
         <p className="hidden sm:block text-[10px] font-semibold text-[var(--text-faint)] tracking-wide">
           Betting · Fantasy · DFS · Kalshi · Real-time AI
         </p>
 
-        <div className="flex items-center gap-2 ml-auto">
-          {/* Shift+Enter hint — only visible while typing */}
+        <div className="flex items-center gap-2 ml-auto sm:ml-0">
+          {/* Shift+Enter hint — only visible while typing on desktop */}
           {input.length > 0 && (
             <span className="hidden md:inline text-[10px] text-[var(--text-faint)]">
               Shift+Enter for new line
@@ -324,17 +327,6 @@ export const ChatInput = memo(function ChatInput({
             <Sparkles className="w-2.5 h-2.5" />
             <span>{creditsRemaining} {creditsRemaining === 1 ? 'credit' : 'credits'}</span>
           </button>
-
-          <div className="flex items-center gap-1.5 text-[10px] font-semibold text-[var(--text-faint)]">
-            <span className="relative flex h-1.5 w-1.5">
-              {systemStatus === 'ok' && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />}
-              <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${systemStatus === 'down' ? 'bg-red-500' : systemStatus === 'degraded' ? 'bg-amber-400' : 'bg-blue-500'}`} />
-            </span>
-            <span className="hidden sm:inline">
-              {systemStatus === 'down' ? 'Service disruption' : systemStatus === 'degraded' ? 'Degraded performance' : 'All systems operational'}
-            </span>
-            <span className="sm:hidden">{systemStatus === 'down' ? 'Down' : systemStatus === 'degraded' ? 'Degraded' : 'Online'}</span>
-          </div>
         </div>
       </div>
     </>

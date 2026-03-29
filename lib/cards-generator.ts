@@ -565,8 +565,9 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
     });
 
     if (!player) {
-      console.log(`[v0] [PLAYER CARDS] Player "${playerName}" not found in Statcast data`);
-      return [];
+      // Pitcher or player not in batter Statcast dataset — build a named player card
+      console.log(`[v0] [PLAYER CARDS] Player "${playerName}" not found in Statcast data — building named card`);
+      return buildGenericPlayerCard(playerName, normalizedSport ?? 'baseball_mlb');
     }
 
     const p = player as any;
@@ -617,6 +618,8 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
     return [card];
   } catch (err) {
     console.warn('[v0] [PLAYER CARDS] Failed to fetch Statcast data:', err);
+    // Still return a named card so the user sees something for this player
+    if (playerName) return buildGenericPlayerCard(playerName, normalizedSport ?? 'baseball_mlb');
     return [];
   }
 }
@@ -625,13 +628,15 @@ async function buildGenericPlayerCard(playerName: string, sport: string): Promis
   const sportName = sport.includes('basketball') ? 'NBA'
     : sport.includes('football') ? 'NFL'
     : sport.includes('hockey') ? 'NHL'
+    : sport.includes('baseball') ? 'MLB'
     : sport.toUpperCase();
 
-  const sportEmojis: Record<string, string> = { NBA: '🏀', NFL: '🏈', NHL: '🏒' };
+  const sportEmojis: Record<string, string> = { NBA: '🏀', NFL: '🏈', NHL: '🏒', MLB: '⚾' };
   const sportGradients: Record<string, string> = {
     NBA: 'from-orange-600/75 via-orange-900/55 to-slate-900/40',
     NFL: 'from-blue-600/75 via-blue-900/55 to-slate-900/40',
     NHL: 'from-cyan-600/75 via-cyan-900/55 to-slate-900/40',
+    MLB: 'from-blue-600/75 via-blue-900/55 to-slate-900/40',
   };
 
   const { getPlayerHeadshotUrl } = await import('@/lib/constants');
@@ -642,12 +647,12 @@ async function buildGenericPlayerCard(playerName: string, sport: string): Promis
     title: playerName,
     icon: sportEmojis[sportName] ?? '📊',
     category: sportName,
-    subcategory: 'Player Profile',
+    subcategory: 'Player Analysis',
     gradient: sportGradients[sportName] ?? 'from-purple-600/75 via-purple-900/55 to-slate-900/40',
     status: 'edge',
     summary_metrics: [],
     data: { playerName, realData: false, headshotUrl, sport: sportName },
-    trend_note: `Ask for detailed ${sportName} player analysis`,
+    trend_note: 'Full analysis in the response below',
     last_updated: new Date().toLocaleDateString(),
     metadata: { realData: false, source: 'Leverage AI' },
   };

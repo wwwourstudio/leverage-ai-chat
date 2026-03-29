@@ -38,6 +38,9 @@ importers:
       ai:
         specifier: ^6.0.0
         version: 6.0.97(zod@3.25.76)
+      bottleneck:
+        specifier: ^2.19.5
+        version: 2.19.5
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -56,6 +59,9 @@ importers:
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      p-retry:
+        specifier: ^6.2.1
+        version: 6.2.1
       react:
         specifier: ^19.2.1
         version: 19.2.4
@@ -108,9 +114,6 @@ importers:
       baseline-browser-mapping:
         specifier: ^2.10.0
         version: 2.10.0
-      bottleneck:
-        specifier: ^2.19.5
-        version: 2.19.5
       csv-parse:
         specifier: ^5.5.6
         version: 5.6.0
@@ -129,9 +132,6 @@ importers:
       node-fetch:
         specifier: ^3.3.2
         version: 3.3.2
-      p-retry:
-        specifier: ^6.2.1
-        version: 6.2.1
       pg:
         specifier: ^8.13.3
         version: 8.20.0

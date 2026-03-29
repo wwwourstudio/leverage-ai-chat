@@ -16,7 +16,7 @@
       "maxDuration": 15
     },
     "app/api/cron/odds/route.ts": {
-      "maxDuration": 20
+      "maxDuration": 30
     },
     "app/api/cron/projections/route.ts": {
       "maxDuration": 30
@@ -44,6 +44,10 @@
     {
       "path": "/api/daily-picks",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/odds",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

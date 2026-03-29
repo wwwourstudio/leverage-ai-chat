@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { ToastProvider } from '@/components/toast-provider'
@@ -96,6 +97,7 @@ export default function RootLayout({
           </ToastProvider>
         </ThemeProvider>
         <Analytics />
+        <SpeedInsights />
         <PWARegister />
         <GlobalErrorSuppressor />
       </body>

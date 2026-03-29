@@ -1169,9 +1169,22 @@ export async function POST(request: NextRequest) {
         cardFetchPromise = generateContextualCards('player', context.sport ?? undefined, 1, false, undefined, { playerName: resolvedPlayerName }).catch(() => []);
 
       } else if (!context.isPoliticalMarket && (context.isSportsQuery || context.hasBettingIntent)) {
-        // Betting/sports with no client odds: fetch from server
+        // Prop-specific queries: route to props category so real prop cards are generated
+        const PROP_CARD_KEYWORDS = [
+          'pitcher prop', 'pitcher props', 'batter prop', 'batter props',
+          'player prop', 'player props', 'prop bet', 'prop bets', 'prop pick', 'prop picks',
+          'best props', 'top props', 'strikeout prop', 'hr prop', 'k prop',
+          'hits prop', 'rbi prop', 'points prop', 'assists prop', 'rebounds prop',
+          'anytime td', 'td scorer', 'receiving yards prop', 'rushing yards prop',
+        ];
+        const hasPropCardIntent = PROP_CARD_KEYWORDS.some(k => rawQueryLower.includes(k));
         const sportKey = context.sport || undefined;
-        if (kalshiSportsFallbackMarkets && kalshiSportsFallbackMarkets.length > 0) {
+
+        if (hasPropCardIntent) {
+          cardFetchPromise = generateContextualCards('props', sportKey, 6).catch(() =>
+            generateContextualCards('betting', sportKey, 6).catch(() => [])
+          );
+        } else if (kalshiSportsFallbackMarkets && kalshiSportsFallbackMarkets.length > 0) {
           cardFetchPromise = import('@/lib/kalshi/index')
             .then(({ generateKalshiCards }) => {
               const kalshiCards = generateKalshiCards(kalshiSportsFallbackMarkets!);
@@ -1689,6 +1702,8 @@ export async function POST(request: NextRequest) {
     const PROPS_KEYWORDS = [
       'best props', 'prop picks', 'top props', 'player props', 'prop bets',
       'player prop', 'best bets props', 'prop value', 'favorite prop',
+      'pitcher props', 'pitcher prop', 'batter props', 'batter prop',
+      'strikeout prop', 'hr prop', 'k prop', 'hits prop', 'rbi prop',
     ];
     const hasPropsToolIntent = PROPS_KEYWORDS.some(k => rawQueryLower.includes(k));
 

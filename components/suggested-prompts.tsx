@@ -183,18 +183,6 @@ export function SuggestedPrompts({
         </div>
       )}
 
-      {/* Follow up on: label — shown after a real AI response */}
-      {!clarificationMode && lastUserQuery && suggestedPrompts.length > 0 && hasMessages && (
-        <div className="hidden sm:flex mb-3 px-1 items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">
-            Follow up on:
-          </span>
-          <span className="text-[11px] text-[var(--text-muted)] truncate max-w-[420px]">
-            {lastUserQuery.length > 72 ? lastUserQuery.slice(0, 72) + '\u2026' : lastUserQuery}
-          </span>
-        </div>
-      )}
-
       {/* Dynamic Contextual Suggestions or Platform Prompts */}
       <div className="relative mb-5">
         <div className="absolute left-0 inset-y-0 w-6 bg-gradient-to-r from-black to-transparent z-10 pointer-events-none" />

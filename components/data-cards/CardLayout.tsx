@@ -54,7 +54,10 @@ export const CardLayout = memo(function CardLayout({
   if (!cards || cards.length === 0) return null;
 
   const heroCard = cards[0];
-  const suggestedCards = cards.slice(1, 7);
+  // Enforce even count (2, 4, or 6) — drop the last card if odd
+  const rawSuggested = cards.slice(1, 7);
+  const evenCount = Math.floor(rawSuggested.length / 2) * 2;
+  const suggestedCards = rawSuggested.slice(0, evenCount);
   const COLS = 2;
   const totalPages = Math.ceil(suggestedCards.length / COLS);
   const insight = aiInsight ? extractInsightBlurb(aiInsight) : null;
@@ -133,8 +136,6 @@ export const CardLayout = memo(function CardLayout({
                         />
                       );
                     })}
-                    {/* Even-grid placeholder */}
-                    {pCards.length === 1 && <div className="rounded-xl" />}
                   </div>
                 );
               })}

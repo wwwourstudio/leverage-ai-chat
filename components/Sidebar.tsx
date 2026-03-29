@@ -542,21 +542,26 @@ export function Sidebar({
                   </div>
                   <span className="text-[9px] font-bold text-[oklch(0.30_0.01_280)]">{starredChats.length}</span>
                 </div>
-                {starredChats.map(chat => (
-                  <ChatCard
+                {starredChats.map((chat, i) => (
+                  <div
                     key={chat.id}
-                    chat={chat}
-                    isActive={activeChat === chat.id}
-                    editingChatId={editingChatId}
-                    editingChatTitle={editingChatTitle}
-                    setEditingChatTitle={setEditingChatTitle}
-                    onEditChatTitle={onEditChatTitle}
-                    onSaveChatTitle={onSaveChatTitle}
-                    onKeyDownChatTitle={onKeyDownChatTitle}
-                    onSelectChat={onSelectChat}
-                    onStarChat={onStarChat}
-                    onDeleteChat={onDeleteChat}
-                  />
+                    className="animate-fade-in"
+                    style={{ animationDelay: `${Math.min(i * 40, 280)}ms` }}
+                  >
+                    <ChatCard
+                      chat={chat}
+                      isActive={activeChat === chat.id}
+                      editingChatId={editingChatId}
+                      editingChatTitle={editingChatTitle}
+                      setEditingChatTitle={setEditingChatTitle}
+                      onEditChatTitle={onEditChatTitle}
+                      onSaveChatTitle={onSaveChatTitle}
+                      onKeyDownChatTitle={onKeyDownChatTitle}
+                      onSelectChat={onSelectChat}
+                      onStarChat={onStarChat}
+                      onDeleteChat={onDeleteChat}
+                    />
+                  </div>
                 ))}
               </div>
             )}
@@ -570,21 +575,26 @@ export function Sidebar({
                   </span>
                   <span className="text-[9px] font-bold text-[oklch(0.28_0.01_280)]">{group.chats.length}</span>
                 </div>
-                {group.chats.map(chat => (
-                  <ChatCard
+                {group.chats.map((chat, i) => (
+                  <div
                     key={chat.id}
-                    chat={chat}
-                    isActive={activeChat === chat.id}
-                    editingChatId={editingChatId}
-                    editingChatTitle={editingChatTitle}
-                    setEditingChatTitle={setEditingChatTitle}
-                    onEditChatTitle={onEditChatTitle}
-                    onSaveChatTitle={onSaveChatTitle}
-                    onKeyDownChatTitle={onKeyDownChatTitle}
-                    onSelectChat={onSelectChat}
-                    onStarChat={onStarChat}
-                    onDeleteChat={onDeleteChat}
-                  />
+                    className="animate-fade-in"
+                    style={{ animationDelay: `${Math.min(i * 40, 280)}ms` }}
+                  >
+                    <ChatCard
+                      chat={chat}
+                      isActive={activeChat === chat.id}
+                      editingChatId={editingChatId}
+                      editingChatTitle={editingChatTitle}
+                      setEditingChatTitle={setEditingChatTitle}
+                      onEditChatTitle={onEditChatTitle}
+                      onSaveChatTitle={onSaveChatTitle}
+                      onKeyDownChatTitle={onKeyDownChatTitle}
+                      onSelectChat={onSelectChat}
+                      onStarChat={onStarChat}
+                      onDeleteChat={onDeleteChat}
+                    />
+                  </div>
                 ))}
               </div>
             ))}

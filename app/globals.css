@@ -269,7 +269,7 @@
 }
 
 @utility animate-fade-in {
-  animation: fade-in 0.25s ease-out both;
+  animation: fade-in 0.3s ease-out both;
 }
 
 @utility animate-slide-in-left {

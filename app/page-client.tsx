@@ -3451,27 +3451,6 @@ No preamble. Start directly with section 1.`;
                         </div>
                       )}
 
-                      {/* Confidence / Benford Trust Score */}
-                      {message.confidence && !message.isWelcome && (
-                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-md border ${
-                          message.confidence >= 85 ? 'bg-blue-500/10 border-blue-500/20' :
-                          message.confidence >= 65 ? 'bg-amber-500/10 border-amber-500/20' :
-                          'bg-red-500/10 border-red-500/20'
-                        }`}>
-                          <div className={`w-1.5 h-1.5 rounded-full ${
-                            message.confidence >= 85 ? 'bg-blue-400' :
-                            message.confidence >= 65 ? 'bg-amber-400' : 'bg-red-400'
-                          }`} />
-                          <span className={`text-[9px] font-bold uppercase tracking-wider ${
-                            message.confidence >= 85 ? 'text-blue-400' :
-                            message.confidence >= 65 ? 'text-amber-400' : 'text-red-400'
-                          }`}>{message.confidence}% integrity</span>
-                        </div>
-                      )}
-                      {/* Model badge */}
-                      {message.modelUsed && !message.isWelcome && (
-                        <span className="text-[9px] font-bold text-gray-600 uppercase tracking-wider">{message.modelUsed}</span>
-                      )}
                     </div>
                   )}
                   

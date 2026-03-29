@@ -1130,6 +1130,13 @@ export async function POST(request: NextRequest) {
         cardFetchPromise = generateContextualCards('dfs', context.sport ?? undefined, 7).catch(() => []);
 
       } else if (!context.isPoliticalMarket && (context.hasFantasyIntent || hasADPIntent) && (!context.hasBettingIntent || context.selectedCategory === 'fantasy' || hasADPIntent)) {
+        // Fantasy + specific player named → show that player's card (not a generic value board)
+        if (context.playerName) {
+          const intent = parseIntent(userMessage, context.sport ?? undefined);
+          const resolvedPlayerName = context.playerName ?? (intent.players.length > 0 ? intent.players[0] : undefined);
+          cardFetchPromise = generateContextualCards('player', context.sport ?? undefined, 1, false, undefined, { playerName: resolvedPlayerName })
+            .catch(() => []);
+        } else {
         // Fantasy: warm projection cache (fire-and-forget) then generate fantasy cards
         const fantSport = context.sport === 'mlb' ? 'mlb'
           : context.sport?.includes('football') ? 'nfl'
@@ -1154,6 +1161,7 @@ export async function POST(request: NextRequest) {
             isStartSit: hasStartSitIntent,
           }))
           .catch(() => generateContextualCards('fantasy', context.sport ?? undefined, 7).catch(() => []));
+        } // end else (no playerName)
 
       } else if (!context.isPoliticalMarket && context.hasPlayerIntent) {
         // Player-specific: Statcast/VPE cards.

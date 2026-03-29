@@ -602,11 +602,14 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
               // Load messages for the most recent thread
               loadMessages(threads[0].id).then(msgs => {
                 if (msgs.length > 0) {
+                  let storedCards: Record<string, any[]> = {};
+                  try { storedCards = JSON.parse(localStorage.getItem(`lev:cards:${threads[0].id}`) ?? '{}'); } catch { /* ignore */ }
                   setMessages(msgs.map((m: any) => ({
+                    id: m.id,
                     role: m.role,
                     content: m.content,
                     timestamp: m.timestamp,
-                    cards: [],
+                    cards: storedCards[m.id ?? ''] ?? [],
                     modelUsed: m.modelUsed,
                     confidence: m.confidence,
                     isWelcome: m.isWelcome,
@@ -1740,6 +1743,19 @@ No preamble. Start directly with section 1.`;
           : m
       ).slice(-30));
 
+      // Persist cards to localStorage so they survive page reloads.
+      if ((newMessage.cards as any[])?.length && assistantMsg.id && activeChat) {
+        try {
+          const lsKey = `lev:cards:${activeChat}`;
+          const stored: Record<string, any[]> = JSON.parse(localStorage.getItem(lsKey) ?? '{}');
+          stored[assistantMsg.id] = newMessage.cards as any[];
+          // Keep at most 50 message entries per chat to avoid storage bloat
+          const keys = Object.keys(stored);
+          if (keys.length > 50) delete stored[keys[0]];
+          localStorage.setItem(lsKey, JSON.stringify(stored));
+        } catch { /* quota / security errors — silently skip */ }
+      }
+
       // Persist both messages to Supabase (fire-and-forget).
       // Guard: only save when we have a real Supabase UUID — not a placeholder like
       // 'chat-1' or 'chat-{timestamp}'. If a thread creation is in-flight (pendingThreadRef),
@@ -2634,12 +2650,14 @@ No preamble. Start directly with section 1.`;
       // Load messages from Supabase for logged-in users
       loadMessages(chatId).then(msgs => {
         if (msgs.length > 0) {
+          let storedCards: Record<string, any[]> = {};
+          try { storedCards = JSON.parse(localStorage.getItem(`lev:cards:${chatId}`) ?? '{}'); } catch { /* ignore */ }
           setMessages(msgs.map(m => ({
             id: m.id || crypto.randomUUID(),
             role: m.role,
             content: m.content,
             timestamp: m.timestamp,
-            cards: [],
+            cards: storedCards[m.id ?? ''] ?? [],
             modelUsed: m.modelUsed,
             confidence: m.confidence,
             isWelcome: m.isWelcome,

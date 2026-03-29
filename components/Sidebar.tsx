@@ -528,7 +528,7 @@ export function Sidebar({
             )}
             {/* Starred section */}
             {starredChats.length > 0 && (
-              <div className="space-y-1">
+              <div className="space-y-1 animate-fade-in">
                 <div className="flex items-center justify-between px-2 py-1">
                   <div className="flex items-center gap-1.5">
                     <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
@@ -557,7 +557,7 @@ export function Sidebar({
 
             {/* Date-grouped sections */}
             {dateGroups.map(group => (
-              <div key={group.label} className="space-y-1">
+              <div key={group.label} className="space-y-1 animate-fade-in">
                 <div className="flex items-center justify-between px-2 py-1">
                   <span className="text-[9px] font-black uppercase tracking-widest text-[oklch(0.35_0.01_280)]">
                     {group.label}

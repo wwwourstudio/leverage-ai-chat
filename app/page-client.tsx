@@ -3337,7 +3337,7 @@ No preamble. Start directly with section 1.`;
       )}
 
       {/* Sidebar wrapper — overlay when open on mobile/tablet, icon rail in flow when closed */}
-      <div className={`flex-shrink-0 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]${sidebarOpen ? ' max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:w-72 max-lg:animate-slide-in-left' : ''}`}>
+      <div className={`flex-shrink-0 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]${sidebarOpen ? ' max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:w-72 max-lg:animate-fade-in' : ''}`}>
         <Sidebar
           open={sidebarOpen}
           onNewChat={handleNewChat}

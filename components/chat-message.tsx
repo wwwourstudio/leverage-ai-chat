@@ -319,32 +319,41 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
     <div
       role="article"
       aria-label={isUser ? 'User message' : 'AI response'}
-      className={cn('flex gap-3 animate-fade-in-up', isUser ? 'justify-end' : 'justify-start')}
+      className={cn('flex gap-2.5 animate-fade-in', isUser ? 'justify-end' : 'justify-start')}
     >
       {/* AI avatar */}
       {!isUser && (
-        <div className="shrink-0 mt-0.5">
-          <div className="relative w-7 h-7">
-            <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 opacity-20 blur-sm" />
-            <div className="relative w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-md shadow-blue-500/25">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-white"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        <div className="shrink-0 mt-1">
+          <div className="relative w-6 h-6">
+            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 opacity-30 blur-[6px]" />
+            <div className="relative w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-sm shadow-blue-500/30">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 text-white"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
             </div>
           </div>
         </div>
       )}
-      <div className={cn('max-w-3xl', isUser ? 'order-2' : 'flex-1')}>
+      <div className={cn('max-w-3xl min-w-0', isUser ? 'order-2' : 'flex-1')}>
         <div className={cn(
-          'rounded-2xl px-5 py-4',
+          'relative rounded-2xl px-4 py-3.5 overflow-hidden',
           isUser
-            ? 'bg-gradient-to-br from-[oklch(0.30_0.07_260)] to-[oklch(0.24_0.05_265)] text-white shadow-lg shadow-[oklch(0.15_0.04_260)/0.3] min-w-[200px] border border-[oklch(0.38_0.06_260)]'
+            ? 'bg-gradient-to-br from-[oklch(0.32_0.09_258)] to-[oklch(0.26_0.07_268)] text-white shadow-lg shadow-blue-900/40 border border-[oklch(0.40_0.08_258)] min-w-[120px]'
             : message.isError
-              ? 'bg-red-950/20 border border-l-[3px] border-red-800/40 border-l-red-500/60 shadow-sm'
+              ? 'bg-[oklch(0.11_0.015_15)] border border-[oklch(0.22_0.03_15)] shadow-sm'
               : message.isPartial
-                ? 'bg-[oklch(0.12_0.015_280)] border border-l-[3px] border-[oklch(0.22_0.02_280)] border-l-amber-500/60 shadow-sm'
-                : 'bg-[oklch(0.12_0.015_280)] border border-l-[3px] border-[oklch(0.22_0.02_280)] border-l-[oklch(0.45_0.06_260)] shadow-sm',
-          // Hold minimum height during pending/early streaming so layout doesn't jump
+                ? 'bg-[oklch(0.11_0.012_280)] border border-[oklch(0.22_0.015_280)] shadow-sm'
+                : 'bg-[oklch(0.11_0.012_280)] border border-[oklch(0.20_0.015_280)] shadow-sm',
           (!isUser && (message.isPending || message.isStreaming)) ? 'min-h-[72px]' : '',
         )}>
+          {/* Error / partial accent strip */}
+          {!isUser && message.isError && (
+            <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl bg-red-500/70" />
+          )}
+          {!isUser && message.isPartial && (
+            <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl bg-amber-500/60" />
+          )}
+          {!isUser && !message.isError && !message.isPartial && !message.isPending && !message.isStreaming && (
+            <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl bg-gradient-to-b from-blue-500/60 to-violet-500/30" />
+          )}
           {/* ── Loading skeleton — shown while pending OR while first tokens arrive ── */}
           {!isUser && (message.isPending || (message.isStreaming && !message.content?.trim())) && (
             <div className="space-y-2.5 py-1" aria-label="Loading response" aria-busy="true">
@@ -380,17 +389,17 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
             </div>
           ) : (
             <>
-              {/* Error / partial banners — shown above message content for assistant turns */}
+              {/* Error / partial inline labels */}
               {!isUser && message.isError && (
-                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-red-800/30">
-                  <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                  <span className="text-xs text-red-400 font-medium">Response failed</span>
+                <div className="flex items-center gap-1.5 mb-2.5">
+                  <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />
+                  <span className="text-[11px] text-red-400 font-semibold">Response failed</span>
                 </div>
               )}
               {!isUser && message.isPartial && (
-                <div className="flex items-center gap-2 mb-2">
-                  <Info className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span className="text-xs text-amber-400">Partial response</span>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Info className="w-3 h-3 text-amber-400 shrink-0" />
+                  <span className="text-[11px] text-amber-400 font-semibold">Partial response</span>
                 </div>
               )}
               {isUser ? (
@@ -431,92 +440,93 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
               )}
 
               {!isUser && (
-                <div className="mt-3 pt-2.5 border-t border-[oklch(0.20_0.015_280)]">
-                  <div className="flex items-center gap-3 flex-wrap text-[11px] text-[oklch(0.42_0.01_280)]">
-                    {/* Model + processing time */}
-                    {(message.modelUsed || message.processingTime) && (
-                      <span className="flex items-center gap-1">
-                        <Brain className="w-3 h-3 text-purple-500/70" />
-                        {message.modelUsed && (
-                          <span className="font-semibold text-[oklch(0.50_0.01_280)]">
-                            {message.modelUsed.replace(/grok-3(-fast)?/gi, 'Grok 3 Fast').replace(/grok-4/gi, 'Grok 3 Fast')}
-                          </span>
-                        )}
-                        {message.processingTime && (
-                          <span className="flex items-center gap-0.5 text-[oklch(0.42_0.01_280)]">
-                            <Zap className="w-2.5 h-2.5 text-yellow-500/60" />
-                            {message.processingTime}ms
-                          </span>
-                        )}
-                      </span>
-                    )}
+                <div className="mt-3 pt-2.5 border-t border-[oklch(0.18_0.012_280)]">
+                  <div className="flex items-center justify-between gap-2">
+                    {/* Left: model + confidence + sources */}
+                    <div className="flex items-center gap-2 flex-wrap text-[11px] text-[oklch(0.40_0.01_280)] min-w-0">
+                      {(message.modelUsed || message.processingTime) && (
+                        <span className="flex items-center gap-1 shrink-0">
+                          <Brain className="w-3 h-3 text-violet-500/60" />
+                          {message.modelUsed && (
+                            <span className="font-medium text-[oklch(0.46_0.01_280)]">
+                              {message.modelUsed.replace(/grok-3(-fast)?/gi, 'Grok 3 Fast').replace(/grok-4/gi, 'Grok 3 Fast')}
+                            </span>
+                          )}
+                          {message.processingTime && (
+                            <span className="flex items-center gap-0.5">
+                              <Zap className="w-2.5 h-2.5 text-yellow-500/50" />
+                              {message.processingTime}ms
+                            </span>
+                          )}
+                        </span>
+                      )}
+                      {message.confidence != null && (
+                        <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${
+                          message.confidence >= 80
+                            ? 'text-blue-400/80 bg-blue-950/40'
+                            : message.confidence >= 60
+                              ? 'text-amber-400/80 bg-amber-950/30'
+                              : 'text-[oklch(0.42_0.01_280)] bg-[oklch(0.15_0.01_280)]'
+                        }`}>
+                          {message.confidence}%
+                        </span>
+                      )}
+                    </div>
 
-                    {/* Confidence */}
-                    {message.confidence != null && (
-                      <span className={`font-bold px-1.5 py-0.5 rounded border text-[10px] ${
-                        message.confidence >= 80
-                          ? 'text-blue-400 bg-blue-950/30 border-blue-800/30'
-                          : message.confidence >= 60
-                            ? 'text-amber-400 bg-amber-950/20 border-amber-800/20'
-                            : 'text-[oklch(0.45_0.01_280)] bg-[oklch(0.14_0.01_280)] border-[oklch(0.20_0.01_280)]'
-                      }`}>
-                        {message.confidence}%
-                      </span>
-                    )}
-                    {/* Sources */}
-                    {message.sources && message.sources.length > 0 && (
-                      <span className="text-[oklch(0.40_0.01_280)]">
-                        {message.sources.length} source{message.sources.length !== 1 ? 's' : ''}
-                      </span>
-                    )}
-
-                    {/* Action buttons */}
-                    {/* Retry button — prominent red/amber when error/partial, subtle otherwise */}
-                    {onRetry && (
+                    {/* Right: action buttons */}
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      {onRetry && (
+                        <button
+                          onClick={onRetry}
+                          title="Retry"
+                          className={cn(
+                            'p-1.5 rounded-lg text-[11px] transition-all',
+                            message.isError
+                              ? 'text-red-400 hover:bg-red-950/40'
+                              : message.isPartial
+                                ? 'text-amber-400 hover:bg-amber-950/30'
+                                : 'text-[oklch(0.38_0.01_280)] hover:text-[oklch(0.60_0.01_280)] hover:bg-[oklch(0.17_0.01_280)]',
+                          )}
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <button
-                        onClick={onRetry}
-                        title="Retry"
-                        className={cn(
-                          'flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] transition-all',
-                          message.isError
-                            ? 'text-red-400 bg-red-950/30 hover:bg-red-900/40 hover:text-red-300'
-                            : message.isPartial
-                              ? 'text-amber-400 bg-amber-950/30 hover:bg-amber-900/40 hover:text-amber-300'
-                              : 'opacity-60 hover:opacity-100 text-[oklch(0.42_0.01_280)] hover:text-blue-400 hover:bg-[oklch(0.18_0.01_280)]',
-                        )}
+                        onClick={() => {
+                          onCopy?.();
+                          setJustCopied(true);
+                          toast.success('Copied to clipboard');
+                          setTimeout(() => setJustCopied(false), 1500);
+                        }}
+                        title="Copy response"
+                        className="p-1.5 rounded-lg text-[oklch(0.38_0.01_280)] hover:text-blue-400 hover:bg-[oklch(0.17_0.01_280)] transition-all"
                       >
-                        <RotateCcw className="w-3 h-3" />
-                        {(message.isError || message.isPartial) && <span>Retry</span>}
+                        {justCopied
+                          ? <CheckCheck className="w-3.5 h-3.5 text-blue-400 animate-scale-in" />
+                          : <Copy className="w-3.5 h-3.5" />}
                       </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        onCopy?.();
-                        setJustCopied(true);
-                        toast.success('Copied to clipboard');
-                        setTimeout(() => setJustCopied(false), 1500);
-                      }}
-                      title="Copy response"
-                      className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 hover:bg-[oklch(0.18_0.01_280)] rounded px-1 py-0.5 transition-all"
-                    >
-                      {justCopied ? <CheckCheck className="w-3 h-3 text-blue-400 animate-scale-in" /> : <Copy className="w-3 h-3" />}
-                    </button>
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      title="Edit"
-                      className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 hover:bg-[oklch(0.18_0.01_280)] rounded px-1 py-0.5 transition-all"
-                    >
-                      <Edit3 className="w-3 h-3" />
-                    </button>
-                    {message.trustMetrics && (
                       <button
-                        onClick={() => setShowTrust((v: any) => !v)}
-                        title="Trust metrics"
-                        className="flex items-center gap-1 opacity-100 md:opacity-60 hover:opacity-100 hover:text-blue-400 hover:bg-[oklch(0.18_0.01_280)] rounded px-1 py-0.5 transition-all"
+                        onClick={() => setIsEditing(true)}
+                        title="Edit"
+                        className="p-1.5 rounded-lg text-[oklch(0.38_0.01_280)] hover:text-blue-400 hover:bg-[oklch(0.17_0.01_280)] transition-all"
                       >
-                        <Shield className="w-3 h-3" />
+                        <Edit3 className="w-3.5 h-3.5" />
                       </button>
-                    )}
+                      {message.trustMetrics && (
+                        <button
+                          onClick={() => setShowTrust((v: any) => !v)}
+                          title="Trust metrics"
+                          className={cn(
+                            'p-1.5 rounded-lg transition-all',
+                            showTrust
+                              ? 'text-blue-400 bg-blue-950/30'
+                              : 'text-[oklch(0.38_0.01_280)] hover:text-blue-400 hover:bg-[oklch(0.17_0.01_280)]',
+                          )}
+                        >
+                          <Shield className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {showTrust && message.trustMetrics && (

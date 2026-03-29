@@ -24,7 +24,6 @@ import { useKalshiStore } from '@/lib/store/kalshi-store';
 const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ default: m.AuthModals })), { ssr: false });
 import { TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, MessageSquare, Clock, Star, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, X, CheckCheck, AlertTriangle, BarChart, Info, FileText, ImageIcon, Loader2 } from 'lucide-react';
 import { CardLayout } from '@/components/data-cards/CardLayout';
-import { CardAnalysisSkeleton } from '@/components/data-cards/CardSkeleton';
 import { DatabaseStatusBanner } from '@/components/database-status-banner';
 import { TrustMetricsDisplay } from '@/components/trust-metrics-display';
 import { AIProgressIndicator } from '@/components/ai-progress-indicator';
@@ -2974,15 +2973,6 @@ No preamble. Start directly with section 1.`;
           )}
         </div>
 
-        <div className="relative mt-4 pt-4 border-t border-gray-700/50">
-          <button 
-            onClick={() => generateDetailedAnalysis(card)}
-            className="w-full flex items-center justify-center gap-2 text-xs font-bold text-gray-400 hover:text-white transition-colors group/btn"
-          >
-            <span>View Full Analysis</span>
-            <ChevronRight className="w-3.5 h-3.5 group-hover/btn:translate-x-1 transition-transform" />
-          </button>
-        </div>
       </div>
     );
   };
@@ -3569,72 +3559,13 @@ No preamble. Start directly with section 1.`;
 
                   {/* Dynamic Cards Section — Hero + Compact Suggestions layout */}
                   {message.role === 'assistant' && message.cards && message.cards.length > 0 && (
-                    <div>
-                      <CardLayout
-                        cards={message.cards}
-                        aiInsight={message.content}
-                        onAnalyze={(card: any) => {
-                          const cardIndex = message.cards!.indexOf(card as InsightCard);
-                          generateCardAnalysis(card as InsightCard, `${index}-${cardIndex}`);
-                        }}
-                        messageIndex={index}
-                        trustScore={message.trustMetrics?.finalConfidence}
-                        trustLevel={message.trustMetrics?.trustLevel}
-                      />
-
-                      {/* Analysis panels — full width below the card grid */}
-                      {message.cards.map((card: any, cardIndex: any) => {
-                        const cardKey = `${index}-${cardIndex}`;
-                        const analysis = cardAnalysisMap[cardKey];
-                        const isOpen = analysis?.loading || !!analysis?.content || !!analysis?.error;
-                        if (!isOpen) return null;
-                        return (
-                          <div key={cardKey} className="mt-2 rounded-xl border border-gray-700/50 bg-gray-900/95 backdrop-blur-xl overflow-hidden w-full">
-                            {analysis.loading ? (
-                              <CardAnalysisSkeleton cardType={card.type} />
-                            ) : analysis.error ? (
-                              <div className="p-4 flex items-center gap-2 text-xs text-red-400">
-                                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                                <span>{analysis.error}</span>
-                              </div>
-                            ) : (
-                              <div className="p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className="flex items-center gap-1.5">
-                                    <BarChart3 className="w-3 h-3 text-gray-500" />
-                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Analysis</span>
-                                  </div>
-                                  <button
-                                    onClick={() => setCardAnalysisMap((prev: any) => { const n = { ...prev }; delete n[cardKey]; return n; })}
-                                    className="text-gray-600 hover:text-gray-300 transition-colors"
-                                    aria-label="Close analysis"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                                <div className="text-xs text-gray-300 leading-relaxed space-y-2.5">
-                                  {(analysis.content ?? '').split('\n\n').map((para: any, pIdx: any) => {
-                                    if (para.includes('**')) {
-                                      const parts = para.split('**');
-                                      return (
-                                        <p key={`ap-${pIdx}-${para.slice(0, 12)}`}>
-                                          {parts.map((part: any, partIdx: any) =>
-                                            partIdx % 2 === 1
-                                              ? <span key={`ab-${partIdx}`} className="font-bold text-white">{part}</span>
-                                              : <span key={`as-${partIdx}`}>{part}</span>
-                                          )}
-                                        </p>
-                                      );
-                                    }
-                                    return <p key={`ap-${pIdx}-${para.slice(0, 12)}`}>{para}</p>;
-                                  })}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <CardLayout
+                      cards={message.cards}
+                      aiInsight={message.content}
+                      messageIndex={index}
+                      trustScore={message.trustMetrics?.finalConfidence}
+                      trustLevel={message.trustMetrics?.trustLevel}
+                    />
                   )}
 
                   {/* Combined Metadata: Source Credibility & AI Trust - Hidden for welcome message */}

@@ -2333,5 +2333,5 @@ export function cardsToPromptContext(cards: InsightCard[]): string {
 
   if (lines.length === 0) return '';
 
-  return `[Cards shown in UI below this response — reference these specifically in your analysis:\n${lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}\nEnsure your response directly addresses and expands on the data shown in these cards.]`;
+  return `[LIVE DATA CARDS visible to user — ${lines.length} card(s) already displayed in the UI:\n${lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}\nCRITICAL: These cards are ALREADY VISIBLE. Do NOT repeat, list, or restate any odds, lines, player names, or numbers from the cards in your text. The user can read the cards directly. Your text should ONLY provide 2–3 sentences of insight, context, or recommendation that goes BEYOND what the cards show. Start your response immediately with the insight — no preamble.]`;
 }

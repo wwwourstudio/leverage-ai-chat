@@ -1123,11 +1123,11 @@ export async function POST(request: NextRequest) {
 
       if (isAmbiguous) {
         // Ambiguous query: show multi-sport real games and tell AI what's displayed
-        cardFetchPromise = generateContextualCards('all', undefined, 6).catch(() => []);
+        cardFetchPromise = generateContextualCards('all', undefined, 7).catch(() => []);
 
       } else if (!context.isPoliticalMarket && context.selectedCategory === 'dfs') {
         // DFS tab: fetch real player prop lines
-        cardFetchPromise = generateContextualCards('dfs', context.sport ?? undefined, 6).catch(() => []);
+        cardFetchPromise = generateContextualCards('dfs', context.sport ?? undefined, 7).catch(() => []);
 
       } else if (!context.isPoliticalMarket && (context.hasFantasyIntent || hasADPIntent) && (!context.hasBettingIntent || context.selectedCategory === 'fantasy' || hasADPIntent)) {
         // Fantasy: warm projection cache (fire-and-forget) then generate fantasy cards
@@ -1153,7 +1153,7 @@ export async function POST(request: NextRequest) {
             scoringFormat: context.leagueScoringFormat ?? undefined,
             isStartSit: hasStartSitIntent,
           }))
-          .catch(() => generateContextualCards('fantasy', context.sport ?? undefined, 6).catch(() => []));
+          .catch(() => generateContextualCards('fantasy', context.sport ?? undefined, 7).catch(() => []));
 
       } else if (!context.isPoliticalMarket && context.hasPlayerIntent) {
         // Player-specific: Statcast/VPE cards.
@@ -1181,8 +1181,8 @@ export async function POST(request: NextRequest) {
         const sportKey = context.sport || undefined;
 
         if (hasPropCardIntent) {
-          cardFetchPromise = generateContextualCards('props', sportKey, 6).catch(() =>
-            generateContextualCards('betting', sportKey, 6).catch(() => [])
+          cardFetchPromise = generateContextualCards('props', sportKey, 7).catch(() =>
+            generateContextualCards('betting', sportKey, 7).catch(() => [])
           );
         } else if (kalshiSportsFallbackMarkets && kalshiSportsFallbackMarkets.length > 0) {
           cardFetchPromise = import('@/lib/kalshi/index')
@@ -1191,9 +1191,9 @@ export async function POST(request: NextRequest) {
               console.log(`[KALSHI] Serving ${kalshiCards.length} prediction market cards (odds API fallback)`);
               return kalshiCards as InsightCard[];
             })
-            .catch(() => generateContextualCards('betting', sportKey, 6).catch(() => []));
+            .catch(() => generateContextualCards('betting', sportKey, 7).catch(() => []));
         } else {
-          cardFetchPromise = generateContextualCards('betting', sportKey, 6).catch(() => []);
+          cardFetchPromise = generateContextualCards('betting', sportKey, 7).catch(() => []);
         }
 
       } else {

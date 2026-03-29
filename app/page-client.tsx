@@ -4049,7 +4049,7 @@ No preamble. Start directly with section 1.`;
             )}
             {/* Suggested Prompts — welcome grid + scrollable pills */}
             <SuggestedPrompts
-              showWelcomeGrid={messages.length === 1 && !!messages[0]?.isWelcome && suggestedPrompts.length === 0 && !(selectedCategory !== 'all' && selectedSport !== '')}
+              showWelcomeGrid={messages.length === 1 && !!messages[0]?.isWelcome && suggestedPrompts.length === 0 && selectedCategory === 'all'}
               onWelcomeAction={(query) => {
                 const userMessage: Message = { id: crypto.randomUUID(), role: 'user', content: query, timestamp: new Date() };
                 setMessages((prev: Message[]) => [...prev, userMessage]);

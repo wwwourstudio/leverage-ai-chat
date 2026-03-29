@@ -159,8 +159,9 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
       // American Football
       'americanfootball_nfl': ['player_pass_tds', 'player_pass_yds', 'player_pass_completions', 'player_pass_attempts', 'player_pass_interceptions', 'player_rush_yds', 'player_rush_attempts', 'player_receptions', 'player_reception_yds', 'player_anytime_td', 'player_first_td', 'player_kicking_points', 'player_field_goals'],
       'americanfootball_ncaaf': ['player_pass_tds', 'player_pass_yds', 'player_rush_yds', 'player_receptions', 'player_reception_yds', 'player_anytime_td'],
-      // Baseball — batter_ and pitcher_ prefixes (NOT player_; sending player_* returns HTTP 422)
-      'baseball_mlb': ['batter_home_runs', 'batter_hits', 'batter_total_bases', 'batter_rbis', 'batter_runs_scored', 'batter_stolen_bases', 'batter_hits_runs_rbis', 'batter_singles', 'batter_doubles', 'batter_walks', 'batter_strikeouts', 'pitcher_strikeouts', 'pitcher_hits_allowed', 'pitcher_walks', 'pitcher_earned_runs', 'pitcher_outs'],
+      // Baseball — top 8 markets (batter_/pitcher_ prefixes; NOT player_* which returns HTTP 422).
+      // Capped at 8 to keep credit cost reasonable across 8 events (8 × 8 = 64 market requests).
+      'baseball_mlb': ['pitcher_strikeouts', 'batter_home_runs', 'batter_hits', 'batter_total_bases', 'batter_rbis', 'batter_strikeouts', 'pitcher_hits_allowed', 'pitcher_earned_runs'],
       // Hockey
       'icehockey_nhl': ['player_points', 'player_goals', 'player_assists', 'player_shots_on_goal', 'player_blocked_shots', 'player_power_play_points', 'goalie_saves'],
       // Soccer
@@ -198,7 +199,11 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
     // Calling the game odds endpoint with player prop markets returns HTTP 422.
     let events: OddsApiEvent[] = [];
     try {
-      const eventsUrl = `${baseUrl}/sports/${sport}/events?apiKey=${apiKey}`;
+      // Limit to games starting within the next 48 hours — props are posted
+      // for today's and next-day games; requesting beyond that wastes API credits.
+      const now = new Date();
+      const cutoff = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+      const eventsUrl = `${baseUrl}/sports/${sport}/events?apiKey=${apiKey}&commenceTimeFrom=${now.toISOString()}&commenceTimeTo=${cutoff.toISOString()}`;
       // Route through the queue so parallel sport fetches don't all hit the
       // events endpoint simultaneously and trigger HTTP 429 rate limits.
       const eventsResp = await playerPropsQueue.enqueue(() => fetch(eventsUrl), 1);
@@ -230,9 +235,10 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
 
     console.log(`[v0] [PLAYER-PROPS] Queue status: ${playerPropsQueue.getQueueLength()} pending, ${playerPropsQueue.getActiveRequests()} active`);
 
-    // Step 2: For each event, fetch all prop markets in one request.
-    // Limit to first 3 events to avoid burning too many API credits.
-    const eventsToFetch = events.slice(0, 3);
+    // Step 2: For each event, fetch prop markets.
+    // Fetch up to 8 events to cover a full day slate (MLB has 14 games/day).
+    // This also captures next-day games within the 48-hour window above.
+    const eventsToFetch = events.slice(0, 8);
     const fetchPromises = eventsToFetch.map((event: OddsApiEvent, i: number) => {
       return playerPropsQueue.enqueue(async () => {
         const url = `${baseUrl}/sports/${sport}/events/${event.id}/odds?apiKey=${apiKey}&regions=us&markets=${marketsParam}&oddsFormat=american`;

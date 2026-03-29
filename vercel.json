@@ -47,7 +47,7 @@
     },
     {
       "path": "/api/cron/odds",
-      "schedule": "0 */6 * * *"
+      "schedule": "*/10 * * * *"
     }
   ]
 }

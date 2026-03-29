@@ -768,7 +768,7 @@ export async function POST(request: NextRequest) {
       } catch {
         enrichedPrompt += `\n\n[Context: This is a Kalshi prediction market query. Answer directly with prediction market analysis, probability edge, and trading recommendations. Do NOT ask the user to choose a sports platform or area — the user is already on the Kalshi tab. Analyze the specific market or topic asked about.]`;
       }
-    } else if (context.hasBettingIntent && context.sport && !context.isPoliticalMarket && !hasADPIntent) {
+    } else if ((context.hasBettingIntent || context.isSportsQuery) && context.sport && !context.isPoliticalMarket && !hasADPIntent) {
       // Client didn't include live odds — try fetching from the Odds API server-side first.
       // This covers cases where the user typed directly in chat without the UI pre-fetching odds.
       const _oddsKey = getOddsApiKey();
@@ -778,7 +778,7 @@ export async function POST(request: NextRequest) {
           const _sportKey = validateSportKey(context.sport).normalizedKey ?? context.sport;
           const _serverEvents = await Promise.race([
             fetchLiveOdds(_sportKey, { apiKey: _oddsKey, markets: ['h2h', 'spreads', 'totals'], regions: ['us'], oddsFormat: 'american' }),
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
           ]).catch(() => null);
           if (Array.isArray(_serverEvents) && _serverEvents.length > 0) {
             const oddsPreview = (_serverEvents as any[])
@@ -810,6 +810,9 @@ export async function POST(request: NextRequest) {
               .join('\n\n');
             enrichedPrompt += `\n\n--- REAL LIVE ODDS DATA (use ONLY these numbers for odds/lines) ---\nSport: ${context.sport}\n\n${oddsPreview}\n--- END ODDS DATA ---`;
             serverFetchedOdds = true;
+            // Bridge server-fetched events to the hallucination detector so it can
+            // cross-reference AI-cited moneylines against real bookmaker lines.
+            context.oddsData = { events: _serverEvents, sport: _sportKey };
             console.log(`[v0] [ANALYZE] Server-fetched ${_serverEvents.length} ${context.sport} games from Odds API`);
 
             // Query Supabase for notable line movements in the last 4 hours for this sport.

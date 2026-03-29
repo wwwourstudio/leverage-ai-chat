@@ -574,6 +574,14 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
     const name: string = p.name ?? p.player_name ?? playerName;
     const { getPlayerHeadshotUrl } = await import('@/lib/constants');
     const headshotUrl = getPlayerHeadshotUrl(name) ?? getPlayerHeadshotUrl(playerName) ?? null;
+
+    // Route pitchers to dedicated card builder with pitcher-specific metrics
+    const isPitcher = (p.playerType ?? '').toLowerCase() === 'pitcher';
+    if (isPitcher) {
+      return buildPitcherCard(name, p, headshotUrl, playerName);
+    }
+
+    // ── BATTER PATH ──────────────────────────────────────────────────────────
     // StatcastPlayer uses camelCase — check those first, then fall back to snake_case
     // variants that may appear in raw CSV-derived objects or legacy data sources.
     const ev       = p.exitVelocity   ?? p.avg_exit_velocity  ?? p.exit_velocity_avg;
@@ -585,12 +593,12 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
     const sweetSpot = p.sweetSpotPct  ?? p.sweet_spot_percent ?? p.sweet_spot_pct;
 
     const metrics = [
-      ev != null ? { label: 'Avg Exit Velocity', value: `${Number(ev).toFixed(1)} mph` } : null,
-      hardHit != null ? { label: 'Hard Hit %', value: `${Number(hardHit).toFixed(1)}%` } : null,
+      ev != null ? { label: 'Exit Velocity', value: `${Number(ev).toFixed(1)} mph` } : null,
       barrel != null ? { label: 'Barrel %', value: `${Number(barrel).toFixed(1)}%` } : null,
+      xwoba != null ? { label: 'xwOBA', value: String(xwoba) } : null,
+      hardHit != null ? { label: 'Hard Hit %', value: `${Number(hardHit).toFixed(1)}%` } : null,
       xba != null ? { label: 'xBA', value: String(xba) } : null,
       xslg != null ? { label: 'xSLG', value: String(xslg) } : null,
-      xwoba != null ? { label: 'xwOBA', value: String(xwoba) } : null,
       sweetSpot != null ? { label: 'Sweet Spot %', value: `${Number(sweetSpot).toFixed(1)}%` } : null,
     ].filter(Boolean) as Array<{ label: string; value: string }>;
 
@@ -604,17 +612,17 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
       title: name,
       icon: '⚾',
       category: 'MLB',
-      subcategory: 'Statcast Player Analysis',
+      subcategory: 'Hitter Analysis',
       gradient: 'from-blue-600/75 via-blue-900/55 to-slate-900/40',
       status,
       summary_metrics: metrics,
       data: { playerName: name, realData: true, headshotUrl },
-      trend_note: `Live Statcast data from Baseball Savant`,
+      trend_note: 'Live Statcast data from Baseball Savant',
       last_updated: new Date().toLocaleDateString(),
-      metadata: { realData: true, source: 'Baseball Savant Statcast' },
+      metadata: { realData: true, source: 'Baseball Savant · Statcast' },
     };
 
-    console.log(`[v0] [PLAYER CARDS] Built live Statcast card for ${name} (${metrics.length} metrics)`);
+    console.log(`[v0] [PLAYER CARDS] Built batter card for ${name} (${metrics.length} metrics)`);
     return [card];
   } catch (err) {
     console.warn('[v0] [PLAYER CARDS] Failed to fetch Statcast data:', err);
@@ -622,6 +630,84 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
     if (playerName) return buildGenericPlayerCard(playerName, normalizedSport ?? 'baseball_mlb');
     return [];
   }
+}
+
+/**
+ * Build a pitcher-specific Statcast card.
+ * Combines two data sources:
+ *  1. Baseball Savant "against" contact quality (opponent EV, barrel %, xwOBA against)
+ *  2. statcast-client pitcher repertoire (FB velocity, K%, whiff rate, BB%)
+ */
+async function buildPitcherCard(
+  name: string,
+  statcastData: any,
+  headshotUrl: string | null,
+  rawPlayerName: string,
+): Promise<InsightCard[]> {
+  // ── Source 1: opponent contact quality from getStatcastData() ────────────
+  const evAgainst      = statcastData.exitVelocity  ?? statcastData.avg_exit_velocity;
+  const hardHitAgainst = statcastData.hardHitPct    ?? statcastData.hard_hit_percent;
+  const barrelAgainst  = statcastData.barrelRate     ?? statcastData.barrel_batted_rate;
+  const xwobaAgainst   = statcastData.xwoba          ?? statcastData.expected_woba;
+
+  // ── Source 2: pitch repertoire + rate stats from statcast-client ─────────
+  let kPct: number | null = null;
+  let bbPct: number | null = null;
+  let fbVelo: number | null = null;
+  let whiffPct: number | null = null;
+  let team: string | null = null;
+  try {
+    const { findPitcherByName } = await import('@/lib/mlb-projections/statcast-client');
+    const ps = await Promise.race([
+      findPitcherByName(rawPlayerName),
+      new Promise<null>((res) => setTimeout(() => res(null), 3_000)),
+    ]);
+    if (ps) {
+      kPct     = ps.kPct;
+      bbPct    = ps.bbPct;
+      fbVelo   = ps.avgVelocity;
+      whiffPct = ps.whiffPct;
+      team     = ps.team || null;
+    }
+  } catch { /* non-fatal — card still renders with contact quality data */ }
+
+  // ── Metrics — velocity / K% / xwOBA go first (hero tiles) ───────────────
+  const metrics: Array<{ label: string; value: string }> = [
+    fbVelo       != null ? { label: 'FB Velocity',         value: `${Number(fbVelo).toFixed(1)} mph`       } : null,
+    kPct         != null ? { label: 'K%',                  value: `${Number(kPct).toFixed(1)}%`            } : null,
+    xwobaAgainst != null ? { label: 'xwOBA Against',       value: String(xwobaAgainst)                    } : null,
+    whiffPct     != null ? { label: 'Whiff%',              value: `${Number(whiffPct).toFixed(1)}%`        } : null,
+    evAgainst    != null ? { label: 'Exit Velo Against',   value: `${Number(evAgainst).toFixed(1)} mph`    } : null,
+    hardHitAgainst != null ? { label: 'Hard Hit% Against', value: `${Number(hardHitAgainst).toFixed(1)}%` } : null,
+    barrelAgainst != null ? { label: 'Barrel% Against',    value: `${Number(barrelAgainst).toFixed(1)}%`  } : null,
+    bbPct        != null ? { label: 'BB%',                 value: `${Number(bbPct).toFixed(1)}%`           } : null,
+  ].filter(Boolean) as Array<{ label: string; value: string }>;
+
+  // ── Status — inverted from batters: low xwOBA against OR high K% = elite ─
+  const xwobaNum = xwobaAgainst != null ? Number(xwobaAgainst) : 0.320;
+  const kPctNum  = kPct ?? 0;
+  const status: 'hot' | 'edge' | 'value' =
+    xwobaNum <= 0.290 || kPctNum >= 28 ? 'hot'
+    : xwobaNum <= 0.310 || kPctNum >= 22 ? 'edge'
+    : 'value';
+
+  const subcategory = team ? `${team} · SP` : 'Pitcher Analysis';
+
+  console.log(`[v0] [PLAYER CARDS] Built pitcher card for ${name} (${metrics.length} metrics, team=${team ?? 'unknown'})`);
+  return [{
+    type: CARD_TYPES.STATCAST_SUMMARY,
+    title: name,
+    icon: '⚾',
+    category: 'MLB',
+    subcategory,
+    gradient: 'from-violet-600/75 via-blue-900/55 to-slate-900/40',
+    status,
+    summary_metrics: metrics,
+    data: { playerName: name, realData: true, headshotUrl },
+    trend_note: 'Against metrics (EV, Hard Hit%, Barrel%) — lower is better for the pitcher',
+    last_updated: new Date().toLocaleDateString(),
+    metadata: { realData: true, source: 'Baseball Savant · Statcast' },
+  }];
 }
 
 async function buildGenericPlayerCard(playerName: string, sport: string): Promise<InsightCard[]> {

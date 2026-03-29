@@ -27,6 +27,7 @@ interface CategoryDef {
 interface SportDef {
   id: string;
   name: string;
+  isInSeason?: boolean;
 }
 
 export interface SidebarProps {
@@ -472,12 +473,17 @@ export function Sidebar({
                             key={sport.id}
                             onClick={() => setSelectedSport(isActive ? '' : sport.id)}
                             className={cn(
-                              'px-2 py-1 rounded-full text-[9px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0',
+                              'flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0',
                               isActive
                                 ? 'bg-blue-600/20 text-blue-300'
-                                : 'text-[oklch(0.38_0.01_280)] hover:text-[oklch(0.58_0.01_280)] hover:bg-[oklch(0.12_0.01_280)]',
+                                : sport.isInSeason
+                                  ? 'text-[oklch(0.48_0.01_280)] hover:text-white hover:bg-[oklch(0.12_0.01_280)]'
+                                  : 'text-[oklch(0.28_0.01_280)] hover:text-[oklch(0.42_0.01_280)] hover:bg-[oklch(0.12_0.01_280)]',
                             )}
                           >
+                            {sport.isInSeason && !isActive && (
+                              <span className="w-1 h-1 rounded-full bg-green-400/60 shrink-0" />
+                            )}
                             {sport.name}
                           </button>
                         );

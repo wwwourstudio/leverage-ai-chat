@@ -15,7 +15,7 @@
 
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { fetchDynamicCards, type DynamicCard } from '@/lib/data-service';
 import { API_ENDPOINTS, PLAYER_HEADSHOT_IDS, sportToApi } from '@/lib/constants';
@@ -841,14 +841,17 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     { id: 'kalshi', name: 'Kalshi Markets', icon: BarChart3, color: 'text-cyan-400', desc: 'Financial Prediction' },
   ];
 
-  const sports = [
-    { id: 'mlb', name: 'MLB' },
-    { id: 'nfl', name: 'NFL' },
-    { id: 'nba', name: 'NBA' },
-    { id: 'nhl', name: 'NHL' },
-    { id: 'ncaa-football', name: 'NCAA Football' },
-    { id: 'ncaa-basketball', name: 'NCAA Basketball' },
-  ];
+  const sports = useMemo(() => {
+    const raw = [
+      { id: 'mlb',             name: 'MLB',             apiKey: 'baseball_mlb' },
+      { id: 'nba',             name: 'NBA',             apiKey: 'basketball_nba' },
+      { id: 'nhl',             name: 'NHL',             apiKey: 'icehockey_nhl' },
+      { id: 'nfl',             name: 'NFL',             apiKey: 'americanfootball_nfl' },
+      { id: 'ncaa-basketball', name: 'NCAA Basketball', apiKey: 'basketball_ncaab' },
+      { id: 'ncaa-football',   name: 'NCAA Football',   apiKey: 'americanfootball_ncaaf' },
+    ].map(s => ({ ...s, isInSeason: getSeasonInfo(s.apiKey).isInSeason }));
+    return [...raw.filter(s => s.isInSeason), ...raw.filter(s => !s.isInSeason)];
+  }, []);
 
   // Demo cards removed - app now fetches ONLY real data from APIs
   // Real data sources: The Odds API, Grok 4 Fast AI, Open-Meteo Weather API, Supabase

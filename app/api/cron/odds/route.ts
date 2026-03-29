@@ -3,22 +3,31 @@
  *
  * Ingest Layer A — Odds refresh.
  * Fetches live odds for all active sport markets from The Odds API and
- * persists them to the `live_odds_cache` Supabase table.
+ * persists them to the `live_odds_cache`, `odds_snapshots`, and
+ * `closing_lines` Supabase tables.
  *
- * Vercel Cron schedule: every minute  (* * * * *)
  * Auth: CRON_SECRET header (set in Vercel environment variables)
  *
- * The odds ingest is intentionally lightweight — it delegates all heavy
- * lifting to the existing unified-odds-fetcher + odds-persistence modules
- * so there's a single source of truth for odds data.
+ * Rate limiting: Bottleneck enforces sequential fetches with a 2 s gap
+ * between sports to stay well within The Odds API free-tier limits.
+ * p-retry retries each sport fetch up to 2 times on 429 / 5xx errors.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import Bottleneck from 'bottleneck';
 import { getSupabaseUrl, getSupabaseServiceKey } from '@/lib/config';
 
 export const runtime = 'nodejs';
-export const maxDuration = 20;
+export const maxDuration = 30;
+
+// Module-level limiter — instantiated once per cold start, shared across
+// invocations within the same Lambda container.
+// One request at a time with ≥2 s between calls; safe for free tier.
+const limiter = new Bottleneck({
+  maxConcurrent: 1,
+  minTime: 2000,
+});
 
 function getServiceClient() {
   const url = getSupabaseUrl();
@@ -51,9 +60,11 @@ export async function GET(req: NextRequest) {
   const startedAt = Date.now();
 
   try {
-    // Fetch live odds for all primary sport markets in parallel.
-    // fetchLiveOdds requires a sportKey; the cron loops through all active sports.
+    // p-retry is ESM-only; dynamic import keeps the module compatible with
+    // Next.js Node.js serverless runtime bundling.
+    const { default: pRetry } = await import('p-retry');
     const { fetchLiveOdds } = await import('@/lib/unified-odds-fetcher');
+
     const apiKey = process.env.ODDS_API_KEY ?? '';
     const activeSports = [
       'basketball_nba',
@@ -61,15 +72,37 @@ export async function GET(req: NextRequest) {
       'baseball_mlb',
       'icehockey_nhl',
     ];
-    const settled = await Promise.allSettled(
-      activeSports.map(sk => fetchLiveOdds(sk, { apiKey })),
-    );
-    const oddsResult = settled.flatMap(r =>
-      r.status === 'fulfilled' ? (Array.isArray(r.value) ? r.value : []) : [],
-    );
+
+    // ── Fetch: sequential + rate-limited + retried ─────────────────────────
+    // Sequential (maxConcurrent:1 + minTime:2000) prevents burst API hits.
+    // pRetry retries on 429 / 5xx; bails on 401/403 (bad key).
+    const oddsResult: any[] = [];
+    for (const sk of activeSports) {
+      try {
+        const events = await pRetry(
+          () => limiter.schedule(() => fetchLiveOdds(sk, { apiKey })),
+          {
+            retries: 2,
+            minTimeout: 3000,
+            maxTimeout: 8000,
+            shouldRetry: (err: any) => {
+              const status = err?.status ?? err?.response?.status;
+              return !status || status === 429 || status >= 500;
+            },
+            onFailedAttempt: (err) => {
+              console.warn(`[v0] [cron/odds] ${sk} attempt ${err.attemptNumber} failed: ${err.message}`);
+            },
+          }
+        );
+        if (Array.isArray(events)) oddsResult.push(...events);
+      } catch (err: any) {
+        // Log and continue — one sport failing shouldn't abort the whole run
+        console.error(`[v0] [cron/odds] ${sk} failed after retries:`, err.message);
+      }
+    }
 
     console.log(
-      `[v0] [cron/odds] Fetched ${oddsResult?.length ?? 0} games in ${Date.now() - startedAt}ms`,
+      `[v0] [cron/odds] Fetched ${oddsResult.length} games in ${Date.now() - startedAt}ms`,
     );
 
     // ── Persist: upsert games → get UUIDs → upsert live_odds_cache ───────────
@@ -258,7 +291,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       meta: {
-        gamesFetched: oddsResult?.length ?? 0,
+        gamesFetched: oddsResult.length,
         gamesCached: cached,
         snapshotsInserted,
         closingLinesWritten,

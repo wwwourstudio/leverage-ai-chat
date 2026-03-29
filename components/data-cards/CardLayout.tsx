@@ -1,6 +1,6 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { DynamicCardRenderer } from './DynamicCardRenderer';
 import { cn } from '@/lib/utils';
@@ -30,17 +30,14 @@ interface CardLayoutProps {
 /** Extract a short 1–2 sentence blurb from a longer AI message */
 function extractInsightBlurb(text?: string): string | null {
   if (!text) return null;
-  // Strip markdown headers and leading asterisks
   const clean = text
     .replace(/^#+\s+/gm, '')
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/^[-•]\s+/gm, '')
     .trim();
-  // Take the first non-empty line that's at least 20 chars
   const lines = clean.split('\n').map(l => l.trim()).filter(l => l.length > 20);
   if (!lines.length) return null;
   const sentence = lines[0];
-  // Truncate at ~120 chars
   return sentence.length > 120 ? sentence.slice(0, 117) + '…' : sentence;
 }
 
@@ -52,19 +49,21 @@ export const CardLayout = memo(function CardLayout({
   trustScore,
   trustLevel,
 }: CardLayoutProps) {
+  const [page, setPage] = useState(0);
+
   if (!cards || cards.length === 0) return null;
 
   const heroCard = cards[0];
-  // All cards after the first, up to 5
-  const suggestedCards = cards.slice(1, 6);
-
+  const suggestedCards = cards.slice(1, 7); // up to 6 additional cards
+  const COLS = 2;
+  const totalPages = Math.ceil(suggestedCards.length / COLS);
+  const pageCards = suggestedCards.slice(page * COLS, page * COLS + COLS);
   const insight = aiInsight ? extractInsightBlurb(aiInsight) : null;
 
   return (
     <div className="mt-4 space-y-2.5 w-full">
       {/* ── Hero Card ────────────────────────────────────────────────── */}
       <div className="w-full">
-        {/* Ambient glow behind hero */}
         <div
           className="absolute -inset-1 rounded-3xl opacity-20 blur-xl pointer-events-none transition-opacity duration-500"
           aria-hidden="true"
@@ -89,26 +88,48 @@ export const CardLayout = memo(function CardLayout({
         )}
       </div>
 
-      {/* ── Additional Cards Grid ────────────────────────────────────── */}
+      {/* ── Smaller Cards Carousel (2-up per page) ───────────────────── */}
       {suggestedCards.length > 0 && (
-        <div className="space-y-2">
-          <div className={cn(
-            'grid gap-3',
-            suggestedCards.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2',
-          )}>
-            {suggestedCards.map((card, i) => {
-              const key = card.id ?? `${card.type}-${i}`;
+        <div className="space-y-2.5">
+          {/* Card row */}
+          <div className="grid grid-cols-2 gap-3">
+            {pageCards.map((card, i) => {
+              const absIdx = page * COLS + i;
+              const key = card.id ?? `${card.type}-${absIdx}`;
               return (
                 <DynamicCardRenderer
                   key={key}
                   card={card}
-                  index={i + 1}
+                  index={absIdx + 1}
                   isHero={false}
                   onAnalyze={onAnalyze ? () => onAnalyze(card) : undefined}
                 />
               );
             })}
+            {/* Placeholder to keep grid even when last page has 1 card */}
+            {pageCards.length === 1 && <div />}
           </div>
+
+          {/* Dot navigation — only shown when there are multiple pages */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-1.5" role="tablist" aria-label="Card pages">
+              {Array.from({ length: totalPages }).map((_, i) => (
+                <button
+                  key={i}
+                  role="tab"
+                  aria-selected={i === page}
+                  aria-label={`Page ${i + 1}`}
+                  onClick={() => setPage(i)}
+                  className={cn(
+                    'rounded-full transition-all duration-200',
+                    i === page
+                      ? 'w-4 h-1.5 bg-blue-400'
+                      : 'w-1.5 h-1.5 bg-[oklch(0.28_0.01_280)] hover:bg-[oklch(0.38_0.01_280)]',
+                  )}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

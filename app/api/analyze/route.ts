@@ -1203,8 +1203,8 @@ export async function POST(request: NextRequest) {
           );
         } else if (kalshiSportsFallbackMarkets && kalshiSportsFallbackMarkets.length > 0) {
           cardFetchPromise = import('@/lib/kalshi/index')
-            .then(({ generateKalshiCards }) => {
-              const kalshiCards = generateKalshiCards(kalshiSportsFallbackMarkets!);
+            .then(({ kalshiMarketToCard }) => {
+              const kalshiCards = kalshiSportsFallbackMarkets!.map((m: any) => kalshiMarketToCard(m));
               console.log(`[KALSHI] Serving ${kalshiCards.length} prediction market cards (odds API fallback)`);
               return kalshiCards as InsightCard[];
             })

@@ -28,6 +28,14 @@ function setRouteCache(key: string, data: unknown): void {
   ROUTE_CACHE.set(key, { data, expires: Date.now() + ROUTE_CACHE_TTL });
 }
 
+function kalshiActivityScore(m: { priceIsReal?: boolean; yesBid?: number; yesAsk?: number; volume24h?: number; volume?: number; openInterest?: number }): number {
+  return (m.priceIsReal ? 1_000_000 : 0)
+    + (((m.yesBid ?? 0) > 0 || (m.yesAsk ?? 0) > 0) ? 200_000 : 0)
+    + (m.volume24h ?? 0) * 10
+    + (m.volume ?? 0)
+    + (m.openInterest ?? 0);
+}
+
 function isRateLimitError(err: unknown): boolean {
   const msg = String(err);
   return msg.includes('429') || msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('too_many_requests');
@@ -126,7 +134,7 @@ export async function GET(request: Request) {
         // fetch also returns [] and just wastes time. Empty result is returned as-is.
       }
 
-      markets = markets.sort((a, b) => (b.volume24h || b.volume) - (a.volume24h || a.volume));
+      markets = markets.sort((a, b) => kalshiActivityScore(b) - kalshiActivityScore(a));
       console.log(`[v0] [API] [KALSHI] subcategory=${subcategory} → ${markets.length} markets`);
 
       return NextResponse.json({
@@ -258,9 +266,9 @@ export async function POST(request: Request) {
       markets = await fetchKalshiMarkets({ category: finalCategory, limit });
     }
 
-    // Sort by volume and take top N
+    // Sort by activity score (real price signal > active order book > recent volume > total volume)
     markets = markets
-      .sort((a, b) => (b.volume24h || b.volume) - (a.volume24h || a.volume))
+      .sort((a, b) => kalshiActivityScore(b) - kalshiActivityScore(a))
       .slice(0, limit);
 
     const orderbookResults = await Promise.allSettled(

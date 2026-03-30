@@ -154,6 +154,26 @@ function Sparkline({
   );
 }
 
+// ── Inactive Price State ───────────────────────────────────────────────────────
+
+function InactivePriceState() {
+  return (
+    <div
+      className="w-full rounded-xl py-5 flex flex-col items-center gap-2 text-center"
+      style={{ backgroundColor: 'oklch(0.08 0.008 280)', border: '1px solid oklch(0.12 0.01 280)' }}
+    >
+      <Activity className="w-5 h-5" style={{ color: 'oklch(0.30 0.01 280)' }} />
+      <span className="text-[11px] font-semibold" style={{ color: 'oklch(0.42 0.01 280)' }}>
+        Awaiting First Trade
+      </span>
+      <span className="text-[10px] leading-relaxed max-w-[200px]"
+            style={{ color: 'oklch(0.28 0.01 280)' }}>
+        No bids or asks placed yet. Price will discover near 50¢ once trading opens.
+      </span>
+    </div>
+  );
+}
+
 // ── Signal Banner ──────────────────────────────────────────────────────────────
 
 function SignalBanner({ recommendation, edgeScore }: { recommendation?: string; edgeScore?: number }) {
@@ -561,9 +581,10 @@ export const KalshiCard = memo(function KalshiCard({
     return () => clearTimeout(t);
   }, []);
 
-  // Fetch trade sparkline (staggered to avoid rate-limit spikes on multi-card grids)
+  // Fetch trade sparkline (staggered to avoid rate-limit spikes on multi-card grids).
+  // Skip fetch when priceIsReal is false — inactive markets have no trades to show.
   const fetchTrades = useCallback(() => {
-    if (!d.ticker) return;
+    if (!d.ticker || !d.priceIsReal) return;
     const delay = Math.random() * 500;
     const tid = setTimeout(() => {
       fetch(`/api/kalshi?ticker=${encodeURIComponent(d.ticker)}&include=trades`)
@@ -675,8 +696,21 @@ export const KalshiCard = memo(function KalshiCard({
             )}
           </div>
 
-          {/* Live / Closed badge — shows WS indicator when real-time data is streaming */}
-          {isActive ? (
+          {/* Live / Pending / Closed badge */}
+          {!isActive ? (
+            <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full shrink-0"
+                  style={{ backgroundColor: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.15 0.01 280)', color: 'oklch(0.28 0.01 280)' }}>
+              Closed
+            </span>
+          ) : !d.priceIsReal ? (
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full shrink-0"
+                 style={{ backgroundColor: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.18 0.01 280)' }}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'oklch(0.35 0.01 280)' }} />
+              <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: 'oklch(0.40 0.01 280)' }}>
+                Pending
+              </span>
+            </div>
+          ) : (
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full shrink-0"
                  style={{ backgroundColor: YES_COLOR + '0d', border: `1px solid ${livePrice ? YES_COLOR + '55' : YES_COLOR + '22'}` }}>
               <span className={cn('w-1.5 h-1.5 rounded-full', livePrice ? 'animate-pulse' : '')}
@@ -685,11 +719,6 @@ export const KalshiCard = memo(function KalshiCard({
                 {livePrice ? 'WS Live' : 'Live'}
               </span>
             </div>
-          ) : (
-            <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full shrink-0"
-                  style={{ backgroundColor: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.15 0.01 280)', color: 'oklch(0.28 0.01 280)' }}>
-              Closed
-            </span>
           )}
         </div>
 
@@ -713,22 +742,28 @@ export const KalshiCard = memo(function KalshiCard({
       {/* ── Body ────────────────────────────────────────────────────────────── */}
       <div className={cn('px-4 pb-4 space-y-3.5', isHero ? 'pt-4' : 'pt-3.5')}>
 
-        {/* Signal banner */}
-        <SignalBanner
-          recommendation={d.recommendation}
-          edgeScore={typeof d.edgeScore === 'number' ? d.edgeScore : undefined}
-        />
+        {/* Signal banner — only shown when real price data exists */}
+        {d.priceIsReal && (
+          <SignalBanner
+            recommendation={d.recommendation}
+            edgeScore={typeof d.edgeScore === 'number' ? d.edgeScore : undefined}
+          />
+        )}
 
-        {/* Probability hero */}
-        <ProbabilityHero
-          yesPct={yesPct}
-          lastPrice={typeof d.lastPrice === 'number' ? d.lastPrice : undefined}
-          priceDir={priceDir}
-          priceChange={safeChange}
-          trades={trades}
-          isHero={isHero}
-          animated={animated}
-        />
+        {/* Probability hero for active markets; inactive state for dormant markets */}
+        {d.priceIsReal ? (
+          <ProbabilityHero
+            yesPct={yesPct}
+            lastPrice={typeof d.lastPrice === 'number' ? d.lastPrice : undefined}
+            priceDir={priceDir}
+            priceChange={safeChange}
+            trades={trades}
+            isHero={isHero}
+            animated={animated}
+          />
+        ) : (
+          <InactivePriceState />
+        )}
 
         <Divider />
 
@@ -827,7 +862,7 @@ export const KalshiCard = memo(function KalshiCard({
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               >
-                Buy YES
+                {d.priceIsReal ? 'Buy YES' : 'Trade YES'}
                 <ExternalLink className="w-3 h-3 opacity-50 transition-opacity duration-150 group-hover/yes:opacity-90" />
               </a>
 
@@ -853,7 +888,7 @@ export const KalshiCard = memo(function KalshiCard({
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               >
-                Buy NO
+                {d.priceIsReal ? 'Buy NO' : 'Trade NO'}
                 <ExternalLink className="w-3 h-3 opacity-50 transition-opacity duration-150 group-hover/no:opacity-90" />
               </a>
             </div>

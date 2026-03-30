@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
     // Default: type=edge — value bets with positive EV
     const { data: edgeData, error: edgeError } = await supabase
       .from('bet_allocations')
-      .select('id, sport, matchup, edge, bookmaker, market_odds, confidence_score, created_at, status')
+      .select('id, sport, matchup, edge, market_id, confidence_score, created_at, status')
       .in('status', ['pending', 'placed'])
       .gt('edge', 0)
       .order('edge', { ascending: false })
@@ -81,8 +81,8 @@ export async function GET(req: NextRequest) {
           away_team: parts[0] ?? '',
           game_time: row.created_at,
           edge: row.edge ?? 0,
-          bookmaker: row.bookmaker ?? '',
-          market_odds: row.market_odds ?? 0,
+          bookmaker: row.market_id ?? '',
+          market_odds: 0,
           confidence_score: row.confidence_score ?? 0.5,
           created_at: row.created_at,
         };

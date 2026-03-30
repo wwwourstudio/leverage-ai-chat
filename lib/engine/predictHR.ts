@@ -186,15 +186,9 @@ export async function predictHR({
       .eq('game_id', gameId)
       .single<GameRow>(),
 
-    supabase
-      .from('live_odds_cache')
-      .select('implied_prob, american_odds')
-      .eq('game_id', gameId)
-      .eq('player_id', playerId)
-      .eq('market_type', 'player_to_hit_hr')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle<OddsRow>(),
+    // live_odds_cache stores game-level bookmaker JSONB, not player-level props.
+    // Resolve immediately to null so Layer 3 edge calculation falls back to 0.
+    Promise.resolve({ data: null as OddsRow | null, error: null }),
   ]);
 
   // Fail fast on required data

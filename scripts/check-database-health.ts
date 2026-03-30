@@ -30,9 +30,9 @@ const REQUIRED_TABLES = [
 ];
 
 const CRITICAL_COLUMNS = {
-  live_odds_cache: ['sport_key', 'game_id', 'home_team', 'away_team', 'cached_at'],
+  live_odds_cache: ['sport_key', 'game_id_uuid', 'home_team', 'away_team', 'cached_at'],
   ai_response_trust: ['consensus_score', 'trust_score'],
-  line_movement: ['game_id', 'old_line', 'new_line', 'line_change'],
+  line_movement: ['game_id_uuid', 'old_line', 'new_line', 'line_change'],
   capital_state: ['total_capital', 'risk_budget', 'kelly_scale', 'active'],
   bet_allocations: ['market_id', 'allocated_capital', 'kelly_fraction', 'status']
 };

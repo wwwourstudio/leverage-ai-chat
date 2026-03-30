@@ -25,9 +25,9 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await supabase
       .from('line_movement')
-      .select('recorded_at, home_odds, away_odds, bookmaker')
-      .eq('game_id', gameId)
-      .order('recorded_at', { ascending: true })
+      .select('timestamp, old_odds, new_odds, bookmaker')
+      .eq('game_id_uuid', gameId)
+      .order('timestamp', { ascending: true })
       .limit(50);
 
     if (error) {
@@ -37,9 +37,9 @@ export async function GET(req: NextRequest) {
     }
 
     const movements = (data ?? []).map((row: any) => ({
-      timestamp: row.recorded_at,
-      homeOdds: row.home_odds ?? 0,
-      awayOdds: row.away_odds ?? 0,
+      timestamp: row.timestamp,
+      homeOdds: row.old_odds ?? 0,
+      awayOdds: row.new_odds ?? 0,
       bookmaker: row.bookmaker ?? 'unknown',
     }));
 

@@ -6,22 +6,19 @@ import { isSupabaseConfigured } from '@/lib/config';
 export const runtime = 'nodejs';
 
 // Allowlist prevents injection via the metric param
+// These map to actual columns in api.hitter_splits
 const ALLOWED_METRICS = [
-  'xwoba',
   'barrel_rate',
-  'hard_hit_pct',
+  'hard_hit_rate',
   'avg_exit_velocity',
-  'woba',
   'xslg',
-  'launch_angle',
-  'sweet_spot_pct',
-  'xba',
+  'hr_rate',
 ] as const;
 
 type Metric = (typeof ALLOWED_METRICS)[number];
 
 // ============================================================================
-// GET /api/statcast?metric=xwoba&limit=25&player=ohtani&order=desc
+// GET /api/statcast?metric=barrel_rate&limit=25&player=ohtani&order=desc
 // ============================================================================
 
 export async function GET(request: NextRequest) {
@@ -34,23 +31,22 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const rawMetric = searchParams.get('metric')?.trim() ?? 'xwoba';
+    const rawMetric = searchParams.get('metric')?.trim() ?? 'barrel_rate';
     const metric: Metric = (ALLOWED_METRICS as readonly string[]).includes(rawMetric)
       ? (rawMetric as Metric)
-      : 'xwoba';
+      : 'barrel_rate';
     const limit  = Math.min(Number(searchParams.get('limit')) || 25, 100);
     const player = searchParams.get('player')?.trim() ?? '';
-    const order  = searchParams.get('order') === 'asc' ? true : false; // ascending?
+    const ascending = searchParams.get('order') === 'asc';
 
     const supabase = await createClient();
 
     let query = supabase
-      .from('statcast_daily')
-      .select(
-        'player_id, player_name, player_type, season, pa, barrel_rate, hard_hit_pct, avg_exit_velocity, launch_angle, sweet_spot_pct, xba, xslg, woba, xwoba',
-      )
+      .from('hitter_splits')
+      .select('player_name, batter, season, pa, barrel_rate, hard_hit_rate, avg_exit_velocity, xslg, hr_rate')
+      .eq('split_type', 'overall')
       .not(metric, 'is', null)
-      .order(metric, { ascending: order })
+      .order(metric, { ascending })
       .limit(limit);
 
     if (player) {
@@ -60,7 +56,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error('[API/statcast] Query error:', error.message);
+      console.error('[API/statcast] hitter_splits query error:', error.message);
       return NextResponse.json(
         { success: false, error: error.message, leaders: [] },
         { status: HTTP_STATUS.INTERNAL_ERROR },

@@ -1,5 +1,12 @@
 'use client';
 
+// Standalone typed card components (used for direct API data, not AI-generated CardData)
+import { OddsCard } from '@/components/cards/OddsCard';
+import { KalshiMarketCard } from '@/components/cards/KalshiMarketCard';
+import { PlayerCard } from '@/components/cards/PlayerCard';
+import { DFSLineupCard } from '@/components/cards/DFSLineupCard';
+import { ArbitrageOpportunityCard } from '@/components/cards/ArbitrageOpportunityCard';
+
 import { BettingCard } from './BettingCard';
 import { DFSCard } from './DFSCard';
 import { FantasyCard } from './FantasyCard';
@@ -582,6 +589,63 @@ export function DynamicCardRenderer({
     );
   }
 
+  // ── Standalone typed cards (direct API data, exact type matches) ──────────
+
+  // Enriched odds event (from /api/odds enriched response)
+  if (cardType === 'odds_event') {
+    return withOverlays(
+      <OddsCard
+        event={safeCard.data as any}
+        onAsk={handleAnalyze ? () => handleAnalyze() : undefined}
+      />
+    );
+  }
+
+  // Kalshi market card (from /api/kalshi response)
+  if (cardType === 'kalshi_market') {
+    return withOverlays(
+      <KalshiMarketCard
+        market={safeCard.data as any}
+        onAsk={handleAnalyze ? () => handleAnalyze() : undefined}
+      />
+    );
+  }
+
+  // Player profile card (from /api/players response)
+  if (cardType === 'player_profile') {
+    return withOverlays(
+      <PlayerCard
+        player={safeCard.data as any}
+        onAsk={handleAnalyze ? () => handleAnalyze() : undefined}
+      />
+    );
+  }
+
+  // DFS lineup card (from /api/dfs response)
+  if (cardType === 'dfs_lineup') {
+    const lineup: any[] = safeCard.data.lineup ?? safeCard.data.players ?? [];
+    const totalProjected: number = safeCard.data.totalProjected ?? safeCard.data.totalProjectedPts ?? 0;
+    return withOverlays(
+      <DFSLineupCard
+        lineup={lineup}
+        totalProjected={totalProjected}
+        site={safeCard.data.site ?? 'DK'}
+        onAsk={handleAnalyze ? () => handleAnalyze() : undefined}
+      />
+    );
+  }
+
+  // Arbitrage opportunity card (standalone typed — exact match first)
+  if (cardType === 'arbitrage_opp') {
+    return withOverlays(
+      <ArbitrageOpportunityCard
+        opportunity={safeCard.data as any}
+        onAsk={handleAnalyze ? () => handleAnalyze() : undefined}
+      />
+    );
+  }
+
+  // ── Legacy arbitrage cards (existing data-cards pipeline) ────────────────
   // Arbitrage cards
   if (cardType.includes('arbitrage')) {
     return withOverlays(

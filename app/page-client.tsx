@@ -1346,6 +1346,13 @@ No preamble. Start directly with section 1.`;
               } catch { /* ignore malformed chunks */ }
             }
           }
+          // Flush any trailing frame left in buf if stream closed without trailing \n\n
+          if (buf.startsWith('data: ')) {
+            try {
+              const ev = JSON.parse(buf.slice(6));
+              if (ev.type === 'done') donePayload = ev as APIResponse;
+            } catch { /* ignore */ }
+          }
         } finally {
           reader.releaseLock();
         }

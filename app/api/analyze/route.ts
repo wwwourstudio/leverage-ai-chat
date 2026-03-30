@@ -2299,18 +2299,25 @@ export async function POST(request: NextRequest) {
           if (aiText && !usedFallback) {
             dedupCache.set(queryHash, {
               text: aiText,
-              cards,
+              cards: finalCards,
               confidence: trustMetrics.finalConfidence,
               ts: Date.now(),
             });
           }
+
+          // When no live game data was found, strip out realData:false placeholder cards
+          // (e.g. "No Games Available" banners). They render with empty odds fields
+          // and look like broken cards. The clarification pills guide the user instead.
+          const finalCards = noLiveGamesDetected
+            ? cards.filter((c: InsightCard) => c.data?.realData !== false && c.metadata?.realData !== false)
+            : cards;
 
           // Send done event with full metadata
           controller.enqueue(sseChunk({
             type: 'done',
             success: true,
             text: aiText,
-            cards,
+            cards: finalCards,
             confidence: trustMetrics.finalConfidence,
             sources,
             modelUsed,

@@ -50,6 +50,7 @@ interface DynamicCardRendererProps {
   card: CardData;
   index?: number;
   onAnalyze?: (card: CardData) => void;
+  onAsk?: (query: string) => void;
   isLoading?: boolean;
   error?: string;
   isHero?: boolean;
@@ -61,6 +62,7 @@ export function DynamicCardRenderer({
   card,
   index = 0,
   onAnalyze,
+  onAsk,
   isLoading,
   error,
   isHero = false,
@@ -596,7 +598,7 @@ export function DynamicCardRenderer({
     return withOverlays(
       <OddsCard
         event={safeCard.data as any}
-        onAsk={handleAnalyze ? () => handleAnalyze() : undefined}
+        onAsk={onAsk}
       />
     );
   }
@@ -606,7 +608,7 @@ export function DynamicCardRenderer({
     return withOverlays(
       <KalshiMarketCard
         market={safeCard.data as any}
-        onAsk={handleAnalyze ? () => handleAnalyze() : undefined}
+        onAsk={onAsk}
       />
     );
   }
@@ -616,21 +618,33 @@ export function DynamicCardRenderer({
     return withOverlays(
       <PlayerCard
         player={safeCard.data as any}
-        onAsk={handleAnalyze ? () => handleAnalyze() : undefined}
+        onAsk={onAsk}
       />
     );
   }
 
   // DFS lineup card (from /api/dfs response)
   if (cardType === 'dfs_lineup') {
-    const lineup: any[] = safeCard.data.lineup ?? safeCard.data.players ?? [];
-    const totalProjected: number = safeCard.data.totalProjected ?? safeCard.data.totalProjectedPts ?? 0;
+    const rawLineup = safeCard.data.lineup;
+    const rosterArray: any[] = rawLineup?.roster
+      ?? (Array.isArray(rawLineup) ? rawLineup : null)
+      ?? safeCard.data.players
+      ?? [];
+    const totalProjected: number =
+      rawLineup?.totalProjected ?? safeCard.data.totalProjected ?? 0;
+    // Normalize field names: nfbc_adp enriched players use primaryPosition/projectedPoints
+    const lineup = rosterArray.map((p: any) => ({
+      ...p,
+      player_name: p.player_name ?? p.display_name ?? p.name ?? '',
+      player_type: p.player_type ?? p.primaryPosition ?? p.position ?? '',
+      dk_pts_mean: p.dk_pts_mean ?? p.projectedPoints ?? 0,
+    }));
     return withOverlays(
       <DFSLineupCard
         lineup={lineup}
         totalProjected={totalProjected}
         site={safeCard.data.site ?? 'DK'}
-        onAsk={handleAnalyze ? () => handleAnalyze() : undefined}
+        onAsk={onAsk}
       />
     );
   }
@@ -640,7 +654,7 @@ export function DynamicCardRenderer({
     return withOverlays(
       <ArbitrageOpportunityCard
         opportunity={safeCard.data as any}
-        onAsk={handleAnalyze ? () => handleAnalyze() : undefined}
+        onAsk={onAsk}
       />
     );
   }

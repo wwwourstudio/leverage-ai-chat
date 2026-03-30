@@ -2006,12 +2006,23 @@ No preamble. Start directly with section 1.`;
     const t = text.toLowerCase();
     // NFBC/NFFC must come first — TSV data can contain "nba" inside player names
     if (t.includes('nfbc') || t.includes('nffc') || t.includes('nfbkc') || t.includes('tgfbi')) return 'mlb';
+    // ── NCAA must be checked BEFORE generic sport terms ─────────────────────
+    // "college basketball" / "ncaab" must not be caught by t.includes('basketball') → 'nba'
+    // "college football"  / "ncaaf" must not be caught by t.includes('football')  → 'nfl'
+    if (t.includes('ncaab') || t.includes('college basketball')) return 'ncaab';
+    if (t.includes('ncaaf') || t.includes('college football'))  return 'ncaaf';
+    // Bare "ncaa" without a qualifier — return null so the sidebar sport selection
+    // takes precedence rather than silently defaulting to football.
+    if (t.includes('ncaa')) {
+      if (t.includes('basketball')) return 'ncaab';
+      if (t.includes('football'))   return 'ncaaf';
+      return null;
+    }
     // Check league acronyms first (fastest, most reliable)
     if (t.includes('nba') || t.includes('basketball')) return 'nba';
     if (t.includes('nfl') || t.includes('football')) return 'nfl';
     if (t.includes('mlb') || t.includes('baseball')) return 'mlb';
     if (t.includes('nhl') || t.includes('hockey')) return 'nhl';
-    if (t.includes('ncaa')) return t.includes('basketball') ? 'ncaab' : 'ncaaf';
     // ── Position-first disambiguation ──────────────────────────────────────
     // Check sport-specific position abbreviations BEFORE team name keywords.
     // This prevents ambiguous team abbreviations (PHI, MIA, HOU, ATL) from

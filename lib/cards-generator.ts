@@ -1639,7 +1639,20 @@ async function _generateContextualCards(
       let markets: any[] = [];
 
       if (sub === 'sports' || sub === 'sport') {
-        markets = await fetchSportsMarkets();
+        // fetchSportsMarkets() makes 12 batched API calls (~4-6s) which often hits the
+        // card-fetch timeout. Race it against a fast keyword search; if the comprehensive
+        // fetch wins, great — otherwise fall back to the keyword results.
+        const fastFetch = fetchKalshiMarketsWithRetry({
+          search: 'NFL NBA MLB NHL Super Bowl March Madness',
+          limit: Math.max(count * 4, 24),
+          maxRetries: 2,
+        });
+        const comprehensiveFetch = fetchSportsMarkets();
+        const raceResult = await Promise.race([
+          comprehensiveFetch,
+          new Promise<any[]>(resolve => setTimeout(() => resolve([]), 3500)),
+        ]).catch(() => [] as any[]);
+        markets = raceResult.length > 0 ? raceResult : await fastFetch.catch(() => [] as any[]);
       } else if (sub === 'politics' || sub === 'elections' || sub === 'election') {
         markets = await fetchElectionMarkets({ limit: count * 5 });
       } else if (sub === 'weather' || sub === 'climate') {

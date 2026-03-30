@@ -1398,7 +1398,9 @@ No preamble. Start directly with section 1.`;
     const handler = (e: Event) => {
       const { query, category } = (e as CustomEvent<{ query: string; category?: string }>).detail;
       // Sync the platform tab so the AI gets the right context and model
-      if (category) setSelectedCategory(category);
+      // Guard: only update if the category actually changed — prevents redundant
+      // state updates (and their cascading re-renders) when already on the tab.
+      if (category && category !== selectedCategory) setSelectedCategory(category);
       const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: query, timestamp: new Date() };
       setMessages((prev: Message[]) => [...prev, userMsg]);
       setInput('');
@@ -1493,13 +1495,26 @@ No preamble. Start directly with section 1.`;
         // Pass Kalshi sub-category pill value when in Kalshi mode.
         // Only forward values that are actual Kalshi sub-categories — never sport
         // slugs like 'nba' or 'nfl', which are sports-odds concepts, not Kalshi ones.
-        kalshiSubcategory: selectedCategory === 'kalshi' && selectedSport &&
-          ['politics', 'elections', 'election', 'sports', 'sport', 'weather', 'climate',
-           'finance', 'financials', 'economics', 'crypto', 'companies',
-           'trending', 'culture', 'entertainment', 'arts', 'pop culture',
-           'awards', 'tv', 'film', 'music', 'movies', 'celebrity',
-           'oscars', 'emmys', 'grammys'].includes(selectedSport.toLowerCase())
-          ? selectedSport : undefined,
+        // Pill selection takes priority; if no pill is selected we detect from message text
+        // so typing "show me sports markets on Kalshi" still routes to sports markets.
+        kalshiSubcategory: (() => {
+          if (selectedCategory !== 'kalshi') return undefined;
+          const validSubs = ['politics', 'elections', 'election', 'sports', 'sport', 'weather', 'climate',
+            'finance', 'financials', 'economics', 'crypto', 'companies', 'trending',
+            'culture', 'entertainment', 'arts', 'pop culture', 'awards', 'tv', 'film',
+            'music', 'movies', 'celebrity', 'oscars', 'emmys', 'grammys'];
+          if (selectedSport && validSubs.includes(selectedSport.toLowerCase())) return selectedSport;
+          // Fallback: detect from message text when no pill is selected
+          const m = lowerMsg;
+          if (m.includes('sports') || m.includes('nfl') || m.includes('nba') || m.includes('mlb')
+            || m.includes('nhl') || m.includes('march madness') || m.includes('super bowl')
+            || m.includes('world series') || m.includes('stanley cup')
+            || m.includes('championship') || m.includes('game ')) return 'sports';
+          if (m.includes('polit') || m.includes('election')) return 'politics';
+          if (m.includes('weather') || m.includes('climate')) return 'weather';
+          if (m.includes('finance') || m.includes('crypto') || m.includes('econom') || m.includes('stock')) return 'finance';
+          return undefined;
+        })(),
         // Pass selected tab so the API can route DFS vs fantasy correctly
         selectedCategory,
         // Pass league settings so server-side card generation uses the correct size/format
@@ -2004,6 +2019,9 @@ No preamble. Start directly with section 1.`;
 
   const detectSportFromText = (text: string): string | null => {
     const t = text.toLowerCase();
+    // Kalshi is a prediction market platform — queries on it never need sports-odds routing.
+    // Also prevents false positives like "sports" → ' sp' (Starting Pitcher) → MLB.
+    if (t.includes('kalshi') || t.includes('prediction market')) return null;
     // NFBC/NFFC must come first — TSV data can contain "nba" inside player names
     if (t.includes('nfbc') || t.includes('nffc') || t.includes('nfbkc') || t.includes('tgfbi')) return 'mlb';
     // ── NCAA must be checked BEFORE generic sport terms ─────────────────────

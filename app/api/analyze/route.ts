@@ -742,12 +742,18 @@ export async function POST(request: NextRequest) {
       try {
         const { fetchElectionMarkets, fetchKalshiMarketsWithRetry } = await import('@/lib/kalshi/index');
         const sub = (context.kalshiSubcategory || '').toLowerCase();
-        const fetchMarkets = sub === 'politics' || sub === 'elections' || sub === 'election'
-          ? fetchElectionMarkets({ limit: 50 })
+        // Route to the appropriate market source based on Kalshi sub-category.
+        // For 'sports': use a targeted keyword search — faster than fetchSportsMarkets()
+        // which makes 12 sequential API calls and would exceed any reasonable timeout.
+        const fetchMarkets =
+          (sub === 'politics' || sub === 'elections' || sub === 'election')
+            ? fetchElectionMarkets({ limit: 50 })
+          : (sub === 'sports' || sub === 'sport')
+            ? fetchKalshiMarketsWithRetry({ search: 'NFL NBA MLB NHL Super Bowl March Madness', limit: 30, maxRetries: 2 })
           : fetchKalshiMarketsWithRetry({ limit: 50, maxRetries: 3 });
         const markets = await Promise.race([
           fetchMarkets,
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000)),
         ]).catch(() => null);
         if (markets && (markets as any[]).length > 0) {
           const topMarkets = (markets as any[]).slice(0, 6);

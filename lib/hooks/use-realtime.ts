@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
@@ -19,6 +19,11 @@ export function useRealtime<T>(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const supabase = createClient();
+
+  // Keep a ref to the latest onEvent so the subscription always calls the
+  // current callback without needing to resubscribe on every parent re-render.
+  const onEventRef = useRef(onEvent);
+  useEffect(() => { onEventRef.current = onEvent; }, [onEvent]);
 
   useEffect(() => {
     let channel: RealtimeChannel;
@@ -52,8 +57,8 @@ export function useRealtime<T>(
     },
     (payload: any) => {
       console.log(`[Realtime] ${payload.eventType} on ${table}`, payload);
-              if (onEvent) {
-                onEvent(payload);
+              if (onEventRef.current) {
+                onEventRef.current(payload);
               }
               if (payload.eventType === 'INSERT') {
                 setData((prev) => [...prev, payload.new as T]);

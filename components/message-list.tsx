@@ -118,7 +118,9 @@ function DateSeparator({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-3 my-2" role="separator" aria-label={label}>
       <div className="flex-1 h-px bg-[oklch(0.20_0.015_280)]" />
-      <span className="text-[9px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)] px-2">
+      {/* suppressHydrationWarning: server UTC vs client local timezone can produce
+          different Today/Yesterday labels; the client value is always correct. */}
+      <span suppressHydrationWarning className="text-[9px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)] px-2">
         {label}
       </span>
       <div className="flex-1 h-px bg-[oklch(0.20_0.015_280)]" />

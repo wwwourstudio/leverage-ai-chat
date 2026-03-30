@@ -107,6 +107,13 @@ export function validateSportKey(sport: string): {
     'mlb': ODDS_API_SPORTS.MLB,
     'hockey': ODDS_API_SPORTS.NHL,
     'nhl': ODDS_API_SPORTS.NHL,
+    // NCAA sports — short forms and hyphenated UI values
+    'ncaab': ODDS_API_SPORTS.NCAAB,
+    'ncaaf': ODDS_API_SPORTS.NCAAF,
+    'ncaa-basketball': ODDS_API_SPORTS.NCAAB,
+    'ncaa-football': ODDS_API_SPORTS.NCAAF,
+    'college basketball': ODDS_API_SPORTS.NCAAB,
+    'college football': ODDS_API_SPORTS.NCAAF,
   };
 
   const normalizedKey = sportAliases[lowerSport];

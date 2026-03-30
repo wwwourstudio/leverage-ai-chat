@@ -334,6 +334,18 @@ export function useChat<T extends ChatMessage = ChatMessage>(options: UseChatOpt
             throw streamErr;
           }
 
+          // Flush any remaining SSE frame left in buf after stream closes.
+          // If the server's final chunk arrives without a trailing \n\n (common
+          // with TCP fragmentation), the done event sits in buf unparsed and
+          // donePayload stays null — causing cards to be silently dropped.
+          if (buf.startsWith('data: ')) {
+            try {
+              const trailingEv = JSON.parse(buf.slice(6)) as SseEvent;
+              if (trailingEv.type === 'done') donePayload = trailingEv;
+              else if (trailingEv.type === 'text') streamContent += trailingEv.delta ?? '';
+            } catch { /* malformed trailing frame — ignore */ }
+          }
+
           // Flush any tokens buffered in the last partial frame
           if (rafHandle !== null) {
             cancelAnimationFrame(rafHandle);

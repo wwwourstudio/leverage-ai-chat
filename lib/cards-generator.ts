@@ -1878,7 +1878,12 @@ async function _generateContextualCards(
         // Show top allocations if any exist
         if (allocations && allocations.length > 0) {
           allocations.slice(0, Math.min(2, count - 1)).forEach((bet: any) => {
-            const kellyPct = (bet.kelly_fraction * 100).toFixed(2);
+            // Null-safe field extraction — DB rows may have null values
+            const kellyFrac = bet.kelly_fraction ?? 0;
+            const edgeVal = bet.edge ?? 0;
+            const confVal = bet.confidence_score ?? 0;
+            const capital = bet.allocated_capital ?? 0;
+            const kellyPct = (kellyFrac * 100).toFixed(2);
             cards.push({
               type: CARD_TYPES.KELLY_BET,
               title: bet.matchup || 'Bet Allocation',
@@ -1889,11 +1894,11 @@ async function _generateContextualCards(
               data: {
                 matchup: bet.matchup,
                 sport: bet.sport?.toUpperCase(),
-                edge: `${(bet.edge * 100).toFixed(2)}%`,
-                confidence: `${(bet.confidence_score * 100).toFixed(0)}%`,
+                edge: `${(edgeVal * 100).toFixed(2)}%`,
+                confidence: `${(confVal * 100).toFixed(0)}%`,
                 kellyFraction: `${kellyPct}%`,
-                recommendedStake: `$${bet.allocated_capital.toFixed(2)}`,
-                expectedValue: `$${(bet.allocated_capital * bet.edge).toFixed(2)}`,
+                recommendedStake: capital > 0 ? `$${capital.toFixed(2)}` : '—',
+                expectedValue: capital > 0 && edgeVal > 0 ? `$${(capital * edgeVal).toFixed(2)}` : '—',
                 status: bet.status?.toUpperCase(),
                 realData: true
               },

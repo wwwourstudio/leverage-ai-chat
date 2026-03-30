@@ -347,6 +347,102 @@ export async function fetchLiveOdds(sport: string, marketType: string = 'h2h') {
 }
 
 /**
+ * Fetch player data (ADP + roster info)
+ * CLIENT-SIDE ONLY
+ */
+export async function fetchPlayers(params: {
+  search?: string;
+  sport?: string;
+  position?: string;
+  limit?: number;
+} = {}) {
+  if (typeof window === 'undefined') {
+    return { success: false, players: [], error: 'Server-side fetch not supported' };
+  }
+
+  const qs = new URLSearchParams();
+  if (params.search) qs.set('search', params.search);
+  if (params.sport) qs.set('sport', params.sport);
+  if (params.position) qs.set('position', params.position);
+  if (params.limit) qs.set('limit', String(params.limit));
+
+  const cacheKey = `players:${qs.toString()}`;
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION.CARDS) {
+    return cached.data;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const url = `${API_ENDPOINTS.PLAYERS}?${qs.toString()}`;
+    const response = await fetch(url, { signal: controller.signal });
+
+    if (!response.ok) throw new Error(`Players API returned ${response.status}`);
+
+    const result = await safeJsonParse(response);
+    evictCache();
+    cache.set(cacheKey, { data: result, timestamp: Date.now() });
+    return result;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Error fetching players:`, msg);
+    return { success: false, players: [], error: msg };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Fetch DFS projections
+ * CLIENT-SIDE ONLY
+ */
+export async function fetchDFS(params: {
+  date?: string;
+  position?: string;
+  sort?: string;
+  limit?: number;
+} = {}) {
+  if (typeof window === 'undefined') {
+    return { success: false, projections: [], error: 'Server-side fetch not supported' };
+  }
+
+  const qs = new URLSearchParams();
+  if (params.date) qs.set('date', params.date);
+  if (params.position) qs.set('position', params.position);
+  if (params.sort) qs.set('sort', params.sort);
+  if (params.limit) qs.set('limit', String(params.limit));
+
+  const cacheKey = `dfs:${qs.toString()}`;
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION.CARDS) {
+    return cached.data;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const url = `${API_ENDPOINTS.DFS}?${qs.toString()}`;
+    const response = await fetch(url, { signal: controller.signal });
+
+    if (!response.ok) throw new Error(`DFS API returned ${response.status}`);
+
+    const result = await safeJsonParse(response);
+    evictCache();
+    cache.set(cacheKey, { data: result, timestamp: Date.now() });
+    return result;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    console.log(`${LOG_PREFIXES.DATA_SERVICE} Error fetching DFS projections:`, msg);
+    return { success: false, projections: [], error: msg };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
  * Clear cache for specific key or all
  */
 export function clearCache(key?: string) {

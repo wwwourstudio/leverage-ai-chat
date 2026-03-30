@@ -9,6 +9,18 @@ import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/lib/constants';
 import { getOddsApiKey } from '@/lib/config';
 
 // ============================================================================
+// Default sport based on current month (season-aware)
+// ============================================================================
+
+function getDefaultSport(): string {
+  const month = new Date().getMonth() + 1; // 1-12
+  // NFL: Sep–Feb, MLB: Mar–Oct, NBA: Oct–Jun
+  if (month >= 3 && month <= 10) return 'baseball_mlb';
+  if (month >= 9 || month <= 2) return 'americanfootball_nfl';
+  return 'basketball_nba';
+}
+
+// ============================================================================
 // Shared helper — used by both GET and POST
 // ============================================================================
 
@@ -56,7 +68,7 @@ async function fetchOddsForSport(sport: string, marketType = 'h2h') {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const sport      = searchParams.get('sport')   ?? 'americanfootball_nfl';
+    const sport      = searchParams.get('sport')   ?? getDefaultSport();
     const marketType = searchParams.get('markets') ?? 'h2h';
     const result = await fetchOddsForSport(sport, marketType);
     const status = result.success ? HTTP_STATUS.OK : (result.error === ERROR_MESSAGES.ODDS_NOT_CONFIGURED ? HTTP_STATUS.SERVICE_UNAVAILABLE : HTTP_STATUS.BAD_REQUEST);

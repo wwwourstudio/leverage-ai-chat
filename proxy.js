@@ -48,7 +48,19 @@ export async function proxy(request) {
   });
 
   // Refresh the session — sole purpose of this proxy.
-  await supabase.auth.getUser();
+  const { error: authError } = await supabase.auth.getUser();
+
+  // If the refresh token is revoked or expired, clear stale sb- cookies so
+  // the user is treated as logged-out rather than looping on 401 errors.
+  if (authError?.code === 'refresh_token_not_found') {
+    const clearResponse = NextResponse.next({ request });
+    request.cookies.getAll().forEach(cookie => {
+      if (cookie.name.startsWith('sb-')) {
+        clearResponse.cookies.delete(cookie.name);
+      }
+    });
+    return clearResponse;
+  }
 
   return response;
 }

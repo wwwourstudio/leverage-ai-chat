@@ -611,7 +611,7 @@ export async function POST(request: NextRequest) {
     const needsBettingSport = !!(context?.hasBettingIntent && !context?.sport
       && !context?.isPoliticalMarket && context?.selectedCategory === 'betting');
 
-    const clarificationOptions: string[] = isAmbiguous
+    let clarificationOptions: string[] = isAmbiguous
       ? [
           'NBA betting odds tonight',
           'NFL betting analysis',
@@ -694,6 +694,8 @@ export async function POST(request: NextRequest) {
     // Track which data sources were actually injected into the AI prompt (for pipeline log)
     let serverFetchedOdds = false;
     let statcastInjected = false;
+    // True when both Odds API and Kalshi return 0 results — triggers clarification pills
+    let noLiveGamesDetected = false;
 
     // Valid American odds are always ≤ -100 or ≥ +100 — filter anything in-between
     const fmtOdds = (p: unknown): string => {
@@ -910,12 +912,15 @@ export async function POST(request: NextRequest) {
           console.log(`[KALSHI] Injected ${top.length} ${sportKw} markets as odds fallback`);
           enrichedPrompt += `\n\n--- KALSHI ${sportKw.toUpperCase()} MARKETS (live market-implied probabilities — sportsbook odds unavailable) ---\n${marketLines}\n[YES % = market-implied probability. Use these as your probability baseline. Identify edge where your model probability diverges from market price.]\n--- END KALSHI DATA ---`;
         } else {
-          enrichedPrompt += `\n\n[Context: Live ${context.sport.toUpperCase()} sportsbook odds are unavailable. Provide expert betting analysis, line expectations, and value picks based on your knowledge. Today: ${dateStr}.]`;
-          console.log(`[KALSHI] No ${sportKw} markets found — falling back to model knowledge`);
+          // No sportsbook odds AND no Kalshi markets — signal to AI not to hallucinate
+          noLiveGamesDetected = true;
+          enrichedPrompt += `\n\n[IMPORTANT: No live ${context.sport.toUpperCase()} odds or prediction market data is available right now. You MUST NOT invent or assume specific game matchups, scores, teams, or betting lines that you are not 100% certain about. Do not fabricate schedules. Instead: (1) clearly state that verified live data is currently unavailable, (2) offer general betting strategy or historical context for this sport, and (3) ask the user what they would like to analyze — futures, trends, season-long analysis, or to wait for confirmed schedules. Today: ${dateStr}.]`;
+          console.log(`[KALSHI] No ${sportKw} markets found — injecting no-hallucination guard`);
         }
       } catch (err) {
         console.warn(`[KALSHI] Sports market fetch failed for ${sportKw}:`, err instanceof Error ? err.message : String(err));
-        enrichedPrompt += `\n\n[Context: Live ${context.sport.toUpperCase()} sportsbook odds are unavailable. Provide expert betting analysis and value picks from your knowledge.]`;
+        noLiveGamesDetected = true;
+        enrichedPrompt += `\n\n[IMPORTANT: Live ${context.sport.toUpperCase()} odds data is unavailable right now. Do NOT invent game matchups, scores, or betting lines. Clearly state data is unavailable and offer general betting strategy instead.]`;
       }
       } // end else (Kalshi fallback when Odds API had no data)
     } else if (hasADPIntent && context.sport) {
@@ -924,6 +929,57 @@ export async function POST(request: NextRequest) {
     } else if (!context.hasBettingIntent && !context.sport && !context.isPoliticalMarket) {
       // General question — answer from knowledge
       enrichedPrompt += `\n\n[Context: General question — answer with your full expert knowledge about sports betting, fantasy, DFS, or prediction markets as appropriate.]`;
+    }
+
+    // ── Clarification pills for no-live-games scenarios ───────────────────────
+    // When both Odds API and Kalshi returned 0 results, surface sport-specific
+    // prompt options so the user can pivot to something the AI can answer.
+    if (noLiveGamesDetected && clarificationOptions.length === 0 && context.sport) {
+      const sportClarifications: Record<string, string[]> = {
+        basketball_ncaab: [
+          'NCAA Tournament futures and Final Four odds',
+          'College basketball conference betting trends and ATS records',
+          'Best March Madness upset patterns and handicapping strategy',
+          'Top college basketball player props and value bets',
+        ],
+        basketball_nba: [
+          'NBA playoff picture, standings, and series odds',
+          'NBA Finals futures and championship contenders',
+          'Best NBA player props and over/under value tonight',
+          'NBA betting trends and best ATS systems this season',
+        ],
+        americanfootball_nfl: [
+          'NFL Super Bowl futures and offseason team outlooks',
+          'NFL draft prospects and team needs for next season',
+          'Best NFL historical ATS trends and betting systems',
+          'NFL player props strategy and target values',
+        ],
+        americanfootball_ncaaf: [
+          'College football futures, conference champions, and bowl odds',
+          'Top college football ATS records and betting trends',
+          'College football recruiting and team strength analysis',
+          'Best CFB player props and value bets',
+        ],
+        baseball_mlb: [
+          'MLB season futures and World Series odds',
+          'MLB daily player props and run line value',
+          'Baseball betting systems and best ATS trends',
+          'Statcast leaders and pitching matchup analysis',
+        ],
+        icehockey_nhl: [
+          'NHL playoff odds and Stanley Cup futures',
+          'NHL puck line value and best betting systems',
+          'Top NHL player props and goal-scorer odds',
+          'NHL standings and playoff picture analysis',
+        ],
+      };
+      const sportKey = context.sport as string;
+      clarificationOptions = sportClarifications[sportKey] ?? [
+        `${sportKey.replace(/^[a-z]+_/, '').toUpperCase()} futures and season-long analysis`,
+        `${sportKey.replace(/^[a-z]+_/, '').toUpperCase()} betting strategy and historical trends`,
+        `Best ${sportKey.replace(/^[a-z]+_/, '').toUpperCase()} player props and value bets`,
+        `${sportKey.replace(/^[a-z]+_/, '').toUpperCase()} upcoming schedule and matchup previews`,
+      ];
     }
 
     // ── Statcast enrichment for MLB queries ───────────────────────────────────
@@ -1750,6 +1806,13 @@ export async function POST(request: NextRequest) {
     ];
     const hasPropsToolIntent = PROPS_KEYWORDS.some(k => rawQueryLower.includes(k));
 
+    // When props are requested but we already know no live game data exists,
+    // pre-warn the AI so it acknowledges data unavailability gracefully instead of
+    // hallucinating prop lines or saying the tool "failed".
+    if (hasPropsToolIntent && noLiveGamesDetected) {
+      enrichedPrompt += `\n\n[Note: Player props data may be unavailable if no live games are currently scheduled. If the get_props_latest tool returns empty results, clearly acknowledge that live prop lines are not available for this sport today and offer alternatives: historical prop hit rates, season-long averages, or ask what the user wants to analyze instead.]`;
+    }
+
     const getPropsLatestTool = tool({
       description: 'Fetch the latest player prop lines (over/under lines and prices). Use when the user asks about best props, prop picks, or player prop betting.',
       inputSchema: z.object({
@@ -2254,7 +2317,7 @@ export async function POST(request: NextRequest) {
             trustMetrics,
             processingTime,
             useFallback: usedFallback,
-            clarificationNeeded: isAmbiguous,
+            clarificationNeeded: isAmbiguous || noLiveGamesDetected,
             clarificationOptions,
             ...(tokenUsage && { tokenUsage }),
           }));

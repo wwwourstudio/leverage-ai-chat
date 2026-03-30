@@ -688,6 +688,9 @@ export async function POST(request: NextRequest) {
     // Holds Kalshi sports markets fetched during prompt enrichment so the card
     // pipeline can reuse them without a second API call.
     let kalshiSportsFallbackMarkets: any[] | null = null;
+    // Holds the exact Kalshi markets injected into the AI prompt so cards always
+    // show the same data the AI is analysing (no second independent fetch).
+    let kalshiPromptMarkets: any[] | null = null;
     // Track which data sources were actually injected into the AI prompt (for pipeline log)
     let serverFetchedOdds = false;
     let statcastInjected = false;
@@ -756,7 +759,20 @@ export async function POST(request: NextRequest) {
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000)),
         ]).catch(() => null);
         if (markets && (markets as any[]).length > 0) {
-          const topMarkets = (markets as any[]).slice(0, 6);
+          // Sort by activity score before slicing so both AI text and cards surface
+          // the most relevant (real-priced, high-volume) markets first.
+          const sorted = (markets as any[]).sort((a: any, b: any) => {
+            const score = (m: any) =>
+              (m.priceIsReal ? 1_000_000 : 0)
+              + ((m.yesBid > 0 || m.yesAsk > 0) ? 200_000 : 0)
+              + (m.volume24h ?? 0) * 10
+              + (m.volume ?? 0);
+            return score(b) - score(a);
+          });
+          const topMarkets = sorted.slice(0, 6);
+          // Bridge: store these markets so the card pipeline renders the exact
+          // same data the AI is about to analyse (instead of a fresh independent fetch).
+          kalshiPromptMarkets = topMarkets;
           const marketSummary = topMarkets.map((m: any, i: number) => {
             // yesPrice is in cents (0–100). Treat directly as implied probability %.
             const yesCents = Math.min(100, Math.max(0, m.yesPrice ?? m.yesBid ?? m.yes_bid ?? 50));
@@ -1203,8 +1219,8 @@ export async function POST(request: NextRequest) {
           );
         } else if (kalshiSportsFallbackMarkets && kalshiSportsFallbackMarkets.length > 0) {
           cardFetchPromise = import('@/lib/kalshi/index')
-            .then(({ generateKalshiCards }) => {
-              const kalshiCards = generateKalshiCards(kalshiSportsFallbackMarkets!);
+            .then(({ kalshiMarketToCard }) => {
+              const kalshiCards = kalshiSportsFallbackMarkets!.map((m: any) => kalshiMarketToCard(m));
               console.log(`[KALSHI] Serving ${kalshiCards.length} prediction market cards (odds API fallback)`);
               return kalshiCards as InsightCard[];
             })
@@ -1213,6 +1229,16 @@ export async function POST(request: NextRequest) {
           cardFetchPromise = generateContextualCards('betting', sportKey, 7).catch(() => []);
         }
 
+      } else if (kalshiPromptMarkets && kalshiPromptMarkets.length > 0) {
+        // Kalshi tab — reuse the exact same markets already injected into the AI prompt
+        // so the cards always match the analysis text (no second independent API call).
+        cardFetchPromise = import('@/lib/kalshi/index')
+          .then(({ kalshiMarketToCard }) => {
+            const cards = kalshiPromptMarkets!.map((m: any) => kalshiMarketToCard(m));
+            console.log(`[KALSHI] Cards from prompt bridge: ${cards.length} markets`);
+            return cards as InsightCard[];
+          })
+          .catch(() => generateContextualCards('kalshi', context.sport ?? undefined, 6, false, context.kalshiSubcategory).catch(() => []));
       } else {
         // General / fallback — avoid triggering ADP/fantasy cards when there's no fantasy intent
         const isFantasyOrDFSCategory = category === 'fantasy' || category === 'dfs';

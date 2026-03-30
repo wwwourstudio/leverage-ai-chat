@@ -36,6 +36,7 @@ export interface KalshiMarket {
   openInterest: number;
   closeTime: string;
   status: string;
+  priceIsReal: boolean;  // true when lastPrice > 0 OR yesBid > 0 OR yesAsk > 0
 }
 
 interface KalshiPage {
@@ -299,6 +300,7 @@ function parseMarket(m: any): KalshiMarket {
     openInterest: parseFp(m.open_interest_fp, m.open_interest ?? 0),
     closeTime: m.close_time || m.expiration_time || m.end_date || '',
     status: m.status || 'active',
+    priceIsReal: lastPrice > 0 || yesBid > 0 || yesAsk > 0,
   };
 }
 
@@ -1227,40 +1229,7 @@ export async function fetchTopMarketsByVolume(
  */
 export function generateKalshiCards(markets: KalshiMarket[]): any[] {
   console.log('[KALSHI] Generating cards for', markets.length, 'markets');
-
-  return markets.slice(0, 6).map((market, index) => {
-    const yesProb = market.yesPrice / 100;
-    const noProb = market.noPrice / 100;
-    const confidence = Math.abs(yesProb - 0.5) * 2;
-    const status = confidence > 0.3 ? 'edge' : confidence > 0.15 ? 'opportunity' : 'neutral';
-
-    return {
-      type: 'kalshi-market',
-      title: market.title,
-      icon: 'TrendingUp',
-      category: 'KALSHI',
-      subcategory: market.category || 'Prediction Market',
-      gradient: 'from-purple-600 to-indigo-700',
-      status,
-      data: {
-        ticker: market.ticker,
-        subtitle: market.subtitle || '',
-        yesPrice: `${(yesProb * 100).toFixed(1)}¢`,
-        noPrice: `${(noProb * 100).toFixed(1)}¢`,
-        yesProbability: `${(yesProb * 100).toFixed(1)}%`,
-        noProbability: `${(noProb * 100).toFixed(1)}%`,
-        volume: `$${(market.volume / 100).toLocaleString()}`,
-        openInterest: `$${(market.openInterest / 100).toLocaleString()}`,
-        closingTime: new Date(market.closeTime).toLocaleDateString(),
-        marketType: 'Binary Outcome',
-      },
-      metadata: {
-        source: 'Kalshi API',
-        fetchedAt: new Date().toISOString(),
-        marketIndex: index + 1,
-      },
-    };
-  });
+  return markets.slice(0, 6).map(m => kalshiMarketToCard(m));
 }
 
 /**
@@ -1411,6 +1380,8 @@ export function kalshiMarketToCard(
       // Level 2 orderbook depth (null when not fetched)
       orderbookBids: orderbook?.yesBids?.slice(0, 5) ?? null,
       orderbookAsks: orderbook?.yesAsks?.slice(0, 5) ?? null,
+      // Whether the market has any real price signal (vs defaulted 50¢)
+      priceIsReal: market.priceIsReal ?? false,
     },
     status: market.status === 'open' ? 'active' : 'closed',
     realData: true,

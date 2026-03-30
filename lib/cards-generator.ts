@@ -1783,10 +1783,15 @@ async function _generateContextualCards(
       console.log(`[v0] [CARDS-GEN] Kalshi fetched ${markets.length} open markets`);
 
       if (markets.length > 0) {
-        // Sort by volume descending (most liquid = most relevant)
-        markets.sort((a: any, b: any) =>
-          ((b.volume24h ?? 0) + (b.volume ?? 0)) - ((a.volume24h ?? 0) + (a.volume ?? 0))
-        );
+        // Activity-scored sort: markets with real price signals always rank above dormant 50/50 markets.
+        // Within each tier, sort by recent trading activity then total volume.
+        const activityScore = (m: any): number =>
+          (m.priceIsReal ? 1_000_000 : 0)
+          + ((m.yesBid > 0 || m.yesAsk > 0) ? 200_000 : 0)
+          + (m.volume24h ?? 0) * 10
+          + (m.volume ?? 0)
+          + (m.openInterest ?? 0);
+        markets.sort((a: any, b: any) => activityScore(b) - activityScore(a));
         const topMarkets = markets.slice(0, count);
         // Fetch orderbooks for top 3 only — avoids hammering Kalshi rate limits
         const orderbookResults = await Promise.allSettled(

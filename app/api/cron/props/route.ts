@@ -57,12 +57,13 @@ export async function GET(req: NextRequest) {
     const resp = await fetch(url, { signal: AbortSignal.timeout(15_000) });
 
     if (!resp.ok) {
-      const msg = `Odds API returned HTTP ${resp.status}`;
-      console.warn(`[v0] [cron/props] ${msg}`);
-      // 422 = no active props yet; treat as empty rather than error
+      // 422 = no active prop markets for this sport/date; not an error
       if (resp.status === 422) {
+        console.log(`[v0] [cron/props] No active ${sport} prop markets (422) — skipping`);
         return NextResponse.json({ ok: true, inserted: 0, note: 'No active prop markets' });
       }
+      const msg = `Odds API returned HTTP ${resp.status}`;
+      console.warn(`[v0] [cron/props] ${msg}`);
       return NextResponse.json({ ok: false, error: msg }, { status: 502 });
     }
 

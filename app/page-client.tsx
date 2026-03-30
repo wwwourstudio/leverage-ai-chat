@@ -186,7 +186,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
     const sportNames: Record<string, string> = {
       nfl: 'NFL', nba: 'NBA', mlb: 'MLB', nhl: 'NHL',
-      'ncaa-football': 'NCAA Football', 'ncaa-basketball': 'NCAA Basketball',
+      'ncaa-football': 'NCAA Football', 'ncaa-basketball': "NCAA Men's Basketball", 'ncaa-basketball-w': "NCAA Women's Basketball",
     };
     const sportLabel = sport ? (sportNames[sport] || sport.toUpperCase()) : null;
 
@@ -846,8 +846,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       { id: 'nba',             name: 'NBA',             apiKey: 'basketball_nba' },
       { id: 'nhl',             name: 'NHL',             apiKey: 'icehockey_nhl' },
       { id: 'nfl',             name: 'NFL',             apiKey: 'americanfootball_nfl' },
-      { id: 'ncaa-basketball', name: 'NCAA Basketball', apiKey: 'basketball_ncaab' },
-      { id: 'ncaa-football',   name: 'NCAA Football',   apiKey: 'americanfootball_ncaaf' },
+      { id: 'ncaa-basketball',   name: "NCAA Men's Basketball",   apiKey: 'basketball_ncaab' },
+      { id: 'ncaa-basketball-w', name: "NCAA Women's Basketball", apiKey: 'basketball_wncaab' },
+      { id: 'ncaa-football',     name: 'NCAA Football',           apiKey: 'americanfootball_ncaaf' },
     ].map(s => ({ ...s, isInSeason: getSeasonInfo(s.apiKey).isInSeason }));
     return [...raw.filter(s => s.isInSeason), ...raw.filter(s => !s.isInSeason)];
   }, []);
@@ -1445,14 +1446,19 @@ No preamble. Start directly with section 1.`;
       );
 
       // Normalize the UI-selected sport to the same format extractSport() returns
-      // (e.g. 'ncaa-football' → 'ncaaf', 'ncaa-basketball' → 'ncaab', others unchanged)
+      // (e.g. 'ncaa-football' → 'ncaaf', 'ncaa-basketball' → 'ncaab', 'ncaa-basketball-w' → 'ncaaw', others unchanged)
       const selectedSportNormalized = selectedSport === 'ncaa-football' ? 'ncaaf'
         : selectedSport === 'ncaa-basketball' ? 'ncaab'
+        : selectedSport === 'ncaa-basketball-w' ? 'ncaaw'
         : selectedSport || null;
 
-      // Fall back to the UI sport filter when the message doesn't name a sport explicitly.
-      // Don't apply the fallback for Kalshi — that platform never fetches sports odds.
-      const effectiveSport = detectedSport || (selectedCategory !== 'kalshi' ? selectedSportNormalized : null);
+      // Priority: direct message detection > explicit tab selection > history inheritance.
+      // This prevents conversation history from a different sport bleeding into the current
+      // query when the user has explicitly selected a sport tab (e.g. NCAAB tab + MLB history).
+      const directMessageSport = detectSportFromText(userMessage);
+      const effectiveSport = directMessageSport
+        || (selectedCategory !== 'kalshi' ? selectedSportNormalized : null)
+        || (!selectedSportNormalized ? detectedSport : null);
 
       // Betting intent keywords — also activates on Betting tab
       const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'arbitrage', 'arb', 'h2h', 'sportsbook', 'draftkings', 'fanduel', 'moneyline', 'prop', 'parlay'];
@@ -2027,11 +2033,13 @@ No preamble. Start directly with section 1.`;
     // ── NCAA must be checked BEFORE generic sport terms ─────────────────────
     // "college basketball" / "ncaab" must not be caught by t.includes('basketball') → 'nba'
     // "college football"  / "ncaaf" must not be caught by t.includes('football')  → 'nfl'
-    if (t.includes('ncaab') || t.includes('college basketball')) return 'ncaab';
+    if (t.includes('ncaaw') || t.includes('wncaab') || t.includes("women's college basketball") || t.includes("womens college basketball")) return 'ncaaw';
+    if (t.includes('ncaab') || t.includes('college basketball') || t.includes("men's college basketball")) return 'ncaab';
     if (t.includes('ncaaf') || t.includes('college football'))  return 'ncaaf';
     // Bare "ncaa" without a qualifier — return null so the sidebar sport selection
     // takes precedence rather than silently defaulting to football.
     if (t.includes('ncaa')) {
+      if (t.includes("women") && t.includes('basketball')) return 'ncaaw';
       if (t.includes('basketball')) return 'ncaab';
       if (t.includes('football'))   return 'ncaaf';
       return null;
@@ -3096,11 +3104,18 @@ No preamble. Start directly with section 1.`;
       { label: 'College football totals with weather edge', icon: Medal, category: 'betting' },
     ],
     'ncaa-basketball': [
-      { label: 'College basketball best lines tonight', icon: TrendingUp, category: 'betting' },
+      { label: "Men's college basketball best lines tonight", icon: TrendingUp, category: 'betting' },
       { label: 'NCAAB player props with edge', icon: Target, category: 'betting' },
       { label: 'College basketball sharp money plays', icon: Activity, category: 'betting' },
       { label: 'NCAAB arbitrage across sportsbooks', icon: Zap, category: 'betting' },
       { label: 'College basketball parlay builder', icon: Medal, category: 'betting' },
+    ],
+    'ncaa-basketball-w': [
+      { label: "Women's college basketball best lines tonight", icon: TrendingUp, category: 'betting' },
+      { label: 'NCAAW player props with edge', icon: Target, category: 'betting' },
+      { label: "Women's basketball sharp money plays", icon: Activity, category: 'betting' },
+      { label: 'NCAAW arbitrage across sportsbooks', icon: Zap, category: 'betting' },
+      { label: "Women's college basketball parlay builder", icon: Medal, category: 'betting' },
     ],
   };
 
@@ -3141,11 +3156,18 @@ No preamble. Start directly with section 1.`;
       { label: 'NCAAF breakout player targets', icon: Award, category: 'fantasy' },
     ],
     'ncaa-basketball': [
-      { label: 'NCAAB fantasy pickups this week', icon: TrendingUp, category: 'fantasy' },
-      { label: 'College basketball streaming targets', icon: Trophy, category: 'fantasy' },
+      { label: "Men's college basketball fantasy pickups this week", icon: TrendingUp, category: 'fantasy' },
+      { label: 'NCAAB streaming targets and streaming options', icon: Trophy, category: 'fantasy' },
       { label: 'NCAAB trade value analysis', icon: ShoppingCart, category: 'fantasy' },
       { label: 'College basketball injury updates', icon: Activity, category: 'fantasy' },
       { label: 'NCAAB matchup-based start/sit', icon: Award, category: 'fantasy' },
+    ],
+    'ncaa-basketball-w': [
+      { label: "Women's college basketball fantasy pickups this week", icon: TrendingUp, category: 'fantasy' },
+      { label: 'NCAAW streaming targets and options', icon: Trophy, category: 'fantasy' },
+      { label: 'NCAAW trade value analysis', icon: ShoppingCart, category: 'fantasy' },
+      { label: "Women's college basketball injury updates", icon: Activity, category: 'fantasy' },
+      { label: 'NCAAW matchup-based start/sit', icon: Award, category: 'fantasy' },
     ],
   };
 
@@ -3187,11 +3209,18 @@ No preamble. Start directly with section 1.`;
       { label: 'NCAAF QB-receiver correlation stacks', icon: Layers, category: 'dfs' },
     ],
     'ncaa-basketball': [
-      { label: 'NCAAB DFS optimal lineups for DraftKings', icon: Award, category: 'dfs' },
-      { label: 'College basketball FanDuel value plays', icon: DollarSign, category: 'dfs' },
+      { label: "Men's college basketball DFS optimal lineups for DraftKings", icon: Award, category: 'dfs' },
+      { label: 'NCAAB FanDuel value plays', icon: DollarSign, category: 'dfs' },
       { label: 'NCAAB showdown captain picks', icon: Medal, category: 'dfs' },
       { label: 'College basketball low-ownership GPP plays', icon: Users, category: 'dfs' },
       { label: 'NCAAB pace-up game stacks', icon: Layers, category: 'dfs' },
+    ],
+    'ncaa-basketball-w': [
+      { label: "Women's college basketball DFS optimal lineups for DraftKings", icon: Award, category: 'dfs' },
+      { label: 'NCAAW FanDuel value plays', icon: DollarSign, category: 'dfs' },
+      { label: 'NCAAW showdown captain picks', icon: Medal, category: 'dfs' },
+      { label: "Women's basketball low-ownership GPP plays", icon: Users, category: 'dfs' },
+      { label: 'NCAAW pace-up game stacks', icon: Layers, category: 'dfs' },
     ],
   };
 
@@ -3298,10 +3327,16 @@ No preamble. Start directly with section 1.`;
       { label: 'NCAAF arbitrage opportunities',         icon: Zap,        category: 'all' },
     ],
     'ncaa-basketball': [
-      { label: 'NCAAB best bets and spreads tonight', icon: TrendingUp, category: 'all' },
-      { label: 'NCAAB sharp money movement analysis', icon: Activity,   category: 'all' },
-      { label: 'NCAAB DFS optimal lineups',           icon: Award,      category: 'all' },
-      { label: 'NCAAB arbitrage opportunities',       icon: Zap,        category: 'all' },
+      { label: "Men's college basketball best bets tonight", icon: TrendingUp, category: 'all' },
+      { label: 'NCAAB sharp money movement analysis',        icon: Activity,   category: 'all' },
+      { label: 'NCAAB DFS optimal lineups',                  icon: Award,      category: 'all' },
+      { label: 'NCAAB arbitrage opportunities',              icon: Zap,        category: 'all' },
+    ],
+    'ncaa-basketball-w': [
+      { label: "Women's college basketball best bets tonight", icon: TrendingUp, category: 'all' },
+      { label: 'NCAAW sharp money movement analysis',          icon: Activity,   category: 'all' },
+      { label: 'NCAAW DFS optimal lineups',                    icon: Award,      category: 'all' },
+      { label: 'NCAAW arbitrage opportunities',                icon: Zap,        category: 'all' },
     ],
   };
 
@@ -3312,7 +3347,8 @@ No preamble. Start directly with section 1.`;
     { label: 'NFL Odds',         icon: Activity,   category: 'betting', query: 'NFL football betting odds and best lines this week' },
     { label: 'MLB Odds',         icon: Target,     category: 'betting', query: 'MLB baseball betting odds and run lines tonight' },
     { label: 'NHL Odds',         icon: Zap,        category: 'betting', query: 'NHL hockey betting odds and puck lines tonight' },
-    { label: 'NCAAB Odds',       icon: Award,      category: 'betting', query: 'NCAAB college basketball betting odds tonight' },
+    { label: "Men's NCAAB Odds",   icon: Award,      category: 'betting', query: "NCAAB men's college basketball betting odds tonight" },
+    { label: "Women's NCAAW Odds", icon: Award,      category: 'betting', query: "NCAAW women's college basketball betting odds tonight" },
     { label: 'UFC/MMA Odds',     icon: Medal,      category: 'betting', query: 'UFC MMA fight odds and best bets this weekend' },
   ];
   const sportSelectionFantasyPrompts = [

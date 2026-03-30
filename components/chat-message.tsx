@@ -136,8 +136,53 @@ function MarkdownContent({ text }: { text: string }) {
   const elements: React.ReactNode[] = [];
   let bulletBuffer: string[] = [];
   let codeBuffer: string[] = [];
+  let tableBuffer: string[][] = [];
   let inCodeBlock = false;
   let codeLang = '';
+
+  /** Parse a markdown table row: "| a | b | c |" → ["a","b","c"] */
+  const parseTableRow = (line: string): string[] =>
+    line.split('|').map(c => c.trim()).filter((_, j, a) => j > 0 && j < a.length - 1);
+
+  const isTableSep = (cells: string[]) => cells.length > 0 && cells.every(c => /^[-: ]+$/.test(c));
+
+  const flushTable = (key: string) => {
+    if (tableBuffer.length === 0) return;
+    const sepIdx = tableBuffer.findIndex(isTableSep);
+    const headRows = sepIdx > 0 ? tableBuffer.slice(0, sepIdx) : [];
+    const bodyRows = sepIdx >= 0 ? tableBuffer.slice(sepIdx + 1) : tableBuffer;
+    elements.push(
+      <div key={`tbl-${key}`} className="my-3 overflow-x-auto rounded-lg border border-[oklch(0.22_0.02_280)]">
+        <table className="w-full text-xs border-collapse">
+          {headRows.length > 0 && (
+            <thead>
+              {headRows.map((row, ri) => (
+                <tr key={ri} className="bg-[oklch(0.14_0.015_280)]">
+                  {row.map((cell, ci) => (
+                    <th key={ci} className="px-3 py-2 text-left font-semibold text-[oklch(0.80_0.01_85)] border-b border-r last:border-r-0 border-[oklch(0.22_0.02_280)]">
+                      {renderInline(cell)}
+                    </th>
+                  ))}
+                </tr>
+              ))}
+            </thead>
+          )}
+          <tbody>
+            {bodyRows.map((row, ri) => (
+              <tr key={ri} className={ri % 2 === 0 ? 'bg-[oklch(0.10_0.01_280)]' : 'bg-[oklch(0.115_0.012_280)]'}>
+                {row.map((cell, ci) => (
+                  <td key={ci} className="px-3 py-2 text-[oklch(0.78_0.005_280)] border-t border-r last:border-r-0 border-[oklch(0.18_0.015_280)]">
+                    {renderInline(cell)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+    tableBuffer = [];
+  };
 
   const flushBullets = (key: string) => {
     if (bulletBuffer.length === 0) return;
@@ -195,6 +240,8 @@ function MarkdownContent({ text }: { text: string }) {
     if (trimmed.startsWith('```')) {
       if (!inCodeBlock) {
         flushBullets(String(i));
+        flushNumbered(String(i));
+        flushTable(String(i));
         inCodeBlock = true;
         codeLang = trimmed.slice(3).trim();
       } else {
@@ -209,10 +256,19 @@ function MarkdownContent({ text }: { text: string }) {
       return;
     }
 
+    // Markdown table row (starts with |)
+    if (trimmed.startsWith('|')) {
+      flushBullets(String(i));
+      flushNumbered(String(i));
+      tableBuffer.push(parseTableRow(trimmed));
+      return;
+    }
+
     // ### Headers (h3)
     if (trimmed.startsWith('### ')) {
       flushBullets(String(i));
       flushNumbered(String(i));
+      flushTable(String(i));
       elements.push(
         <p key={i} className="text-[12px] font-bold text-blue-300/80 mt-2 mb-0.5 uppercase tracking-wide">
           {trimmed.slice(4)}
@@ -225,6 +281,7 @@ function MarkdownContent({ text }: { text: string }) {
     if (trimmed.startsWith('## ')) {
       flushBullets(String(i));
       flushNumbered(String(i));
+      flushTable(String(i));
       elements.push(
         <p key={i} className="text-[13px] font-bold text-blue-400 mt-3 mb-1 uppercase tracking-wide">
           {trimmed.slice(3)}
@@ -236,6 +293,7 @@ function MarkdownContent({ text }: { text: string }) {
     // # Headers (h1)
     if (trimmed.startsWith('# ')) {
       flushBullets(String(i));
+      flushTable(String(i));
       elements.push(
         <p key={i} className="text-sm font-black text-white mt-3 mb-1">
           {trimmed.slice(2)}
@@ -244,8 +302,18 @@ function MarkdownContent({ text }: { text: string }) {
       return;
     }
 
+    // Horizontal rule (--- or ***)
+    if (/^[-*]{3,}$/.test(trimmed)) {
+      flushBullets(String(i));
+      flushNumbered(String(i));
+      flushTable(String(i));
+      elements.push(<hr key={i} className="my-2 border-[oklch(0.22_0.02_280)]" />);
+      return;
+    }
+
     // Bullet points (- or • or *)
     if (/^[-•*]\s/.test(trimmed)) {
+      flushTable(String(i));
       bulletBuffer.push(trimmed.slice(2).trim());
       return;
     }
@@ -253,14 +321,16 @@ function MarkdownContent({ text }: { text: string }) {
     // Numbered list
     if (/^\d+\.\s/.test(trimmed)) {
       flushBullets(String(i));
+      flushTable(String(i));
       numberedBuffer.push(trimmed.replace(/^\d+\.\s/, '').trim());
       return;
     }
 
-    // Empty line — flush bullets and add a gap
+    // Empty line — flush all buffers and add a gap
     if (trimmed === '') {
       flushBullets(String(i));
       flushNumbered(String(i));
+      flushTable(String(i));
       if (elements.length > 0) {
         elements.push(<div key={`gap-${i}`} className="h-1" />);
       }
@@ -270,6 +340,7 @@ function MarkdownContent({ text }: { text: string }) {
     // Regular paragraph
     flushBullets(String(i));
     flushNumbered(String(i));
+    flushTable(String(i));
     elements.push(
       <p key={i} className="text-sm leading-relaxed text-[oklch(0.82_0.005_85)]">
         {renderInline(trimmed)}
@@ -279,6 +350,7 @@ function MarkdownContent({ text }: { text: string }) {
 
   flushBullets('end');
   flushNumbered('end');
+  flushTable('end');
   if (inCodeBlock) flushCode('eof'); // unclosed fence — render what we have
 
   return <div className="space-y-0.5">{elements}</div>;

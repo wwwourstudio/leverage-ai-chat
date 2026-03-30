@@ -108,6 +108,7 @@ export const SPORTS_MAP = {
   mlb: 'baseball_mlb',
   nhl: 'icehockey_nhl',
   ncaab: 'basketball_ncaab',
+  ncaaw: 'basketball_wncaab',
   ncaaf: 'americanfootball_ncaaf',
 } as const;
 
@@ -163,7 +164,13 @@ export const SPORT_KEYS = {
   NCAAB: {
     SHORT: 'ncaab',
     API: 'basketball_ncaab',
-    NAME: 'NCAA Basketball',
+    NAME: "NCAA Men's Basketball",
+    CATEGORY: 'Basketball'
+  },
+  NCAAW: {
+    SHORT: 'ncaaw',
+    API: 'basketball_wncaab',
+    NAME: "NCAA Women's Basketball",
     CATEGORY: 'Basketball'
   },
   EPL: {
@@ -680,6 +687,7 @@ FORMATTING RULES:
 - Bold key player/team names when they're the focus of a recommendation
 - Use bullet points (- ) for all lists of 3+ items
 - Keep paragraphs to 2–3 sentences max before using bullets
+- NEVER use markdown tables (| pipe syntax) — use bullet points or numbered lists instead
 
 ⛔ NEVER DUMP FULL DATA LISTS — ABSOLUTE RULE:
 - Never output a list of more than 15 players, games, lines, or records in a single response

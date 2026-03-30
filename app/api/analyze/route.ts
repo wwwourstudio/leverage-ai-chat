@@ -654,17 +654,38 @@ export async function POST(request: NextRequest) {
     // Sports queries (even without explicit betting keywords like "MLB Offseason")
     // should use 'betting' so generateContextualCards fetches real game/odds cards.
     // Player-specific queries (e.g. "Aaron Judge") take priority before generic sports routing.
+    // Props and Kelly intent are detected early here so the card generator receives the
+    // correct category ('props' / 'kelly') rather than falling through to 'player' / 'betting'.
+    const PROPS_KEYWORDS_EARLY = [
+      'props', 'player prop', 'player props', 'prop bet', 'prop bets',
+      'strikeout prop', 'hr prop', 'anytime td', 'receptions prop',
+      'points prop', 'assists prop', 'hits prop', 'rbi prop', 'k prop',
+      'over/under prop', 'player over', 'player under',
+    ];
+    const hasPropsIntentEarly = PROPS_KEYWORDS_EARLY.some(k => rawQueryLower.includes(k));
+    const hasKellyIntentEarly =
+      rawQueryLower.includes('kelly') ||
+      rawQueryLower.includes('bet sizing') ||
+      rawQueryLower.includes('kelly criterion') ||
+      rawQueryLower.includes('bankroll management') ||
+      rawQueryLower.includes('optimal stake') ||
+      rawQueryLower.includes('fractional kelly');
+
     const category = context.isPoliticalMarket
       ? 'kalshi'
       : context.selectedCategory === 'dfs'
         ? 'dfs'
-        : context.hasPlayerIntent
-          ? 'player'
-          : context.hasFantasyIntent && !context.hasBettingIntent
-            ? 'fantasy'
-            : (context.hasBettingIntent || context.isSportsQuery)
-              ? 'betting'
-              : 'all';
+        : hasKellyIntentEarly
+          ? 'kelly'
+          : hasPropsIntentEarly
+            ? 'props'
+            : context.hasPlayerIntent
+              ? 'player'
+              : context.hasFantasyIntent && !context.hasBettingIntent
+                ? 'fantasy'
+                : (context.hasBettingIntent || context.isSportsQuery)
+                  ? 'betting'
+                  : 'all';
 
     // ── Server-side cross-sport contamination guard ───────────────────────────
     // The client may send stale oddsData from a previous sport fetch (e.g., cached
@@ -2295,6 +2316,13 @@ export async function POST(request: NextRequest) {
             sources.push({ name: adpBoardName, type: 'api' as const, reliability: 97 });
           }
 
+          // When no live game data was found, strip out realData:false placeholder cards
+          // (e.g. "No Games Available" banners). They render with empty odds fields
+          // and look like broken cards. The clarification pills guide the user instead.
+          const finalCards = noLiveGamesDetected
+            ? cards.filter((c: InsightCard) => c.data?.realData !== false && c.metadata?.realData !== false)
+            : cards;
+
           // ── Guardrail 4: store successful response in dedup cache ────────────
           if (aiText && !usedFallback) {
             dedupCache.set(queryHash, {
@@ -2304,13 +2332,6 @@ export async function POST(request: NextRequest) {
               ts: Date.now(),
             });
           }
-
-          // When no live game data was found, strip out realData:false placeholder cards
-          // (e.g. "No Games Available" banners). They render with empty odds fields
-          // and look like broken cards. The clarification pills guide the user instead.
-          const finalCards = noLiveGamesDetected
-            ? cards.filter((c: InsightCard) => c.data?.realData !== false && c.metadata?.realData !== false)
-            : cards;
 
           // Send done event with full metadata
           controller.enqueue(sseChunk({

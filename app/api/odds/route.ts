@@ -21,6 +21,88 @@ function getDefaultSport(): string {
 }
 
 // ============================================================================
+// Odds enrichment — compute derived fields from raw bookmaker data
+// ============================================================================
+
+function americanToImplied(price: number): number {
+  return price >= 0 ? 100 / (price + 100) : (-price) / (-price + 100);
+}
+
+function enrichEvents(events: any[]): any[] {
+  return events.map(event => {
+    const bookmakers: any[] = event.bookmakers ?? [];
+
+    // ── h2h: best odds per team ──────────────────────────────────────────────
+    const bestH2H: Record<string, { price: number; book: string }> = {};
+    for (const bk of bookmakers) {
+      for (const market of bk.markets ?? []) {
+        if (market.key !== 'h2h') continue;
+        for (const outcome of market.outcomes ?? []) {
+          const name: string = outcome.name;
+          if (!bestH2H[name] || outcome.price > bestH2H[name].price) {
+            bestH2H[name] = { price: outcome.price, book: bk.title };
+          }
+        }
+      }
+    }
+
+    const homeEntry = bestH2H[event.home_team] ?? null;
+    const awayEntry = bestH2H[event.away_team] ?? null;
+
+    // ── implied win % (normalised) ───────────────────────────────────────────
+    let impliedWinPct = { home: 50, away: 50 };
+    if (homeEntry && awayEntry) {
+      const rawHome = americanToImplied(homeEntry.price);
+      const rawAway = americanToImplied(awayEntry.price);
+      const total = rawHome + rawAway;
+      impliedWinPct = {
+        home: Math.round((rawHome / total) * 100),
+        away: Math.round((rawAway / total) * 100),
+      };
+    }
+
+    // ── spread: best line for home team ─────────────────────────────────────
+    let spread: { home: number; away: number; book: string } | null = null;
+    for (const bk of bookmakers) {
+      for (const market of bk.markets ?? []) {
+        if (market.key !== 'spreads') continue;
+        const homeOutcome = market.outcomes?.find((o: any) => o.name === event.home_team);
+        const awayOutcome = market.outcomes?.find((o: any) => o.name === event.away_team);
+        if (homeOutcome?.point !== undefined && awayOutcome?.point !== undefined) {
+          // Prefer the tightest spread (closest to 0 for the underdog)
+          if (!spread || Math.abs(homeOutcome.point) < Math.abs(spread.home)) {
+            spread = { home: homeOutcome.point, away: awayOutcome.point, book: bk.title };
+          }
+        }
+      }
+    }
+
+    // ── total: best O/U line ─────────────────────────────────────────────────
+    let total: { line: number; book: string } | null = null;
+    for (const bk of bookmakers) {
+      for (const market of bk.markets ?? []) {
+        if (market.key !== 'totals') continue;
+        const overOutcome = market.outcomes?.find((o: any) => o.name === 'Over');
+        if (overOutcome?.point !== undefined) {
+          // Use first available
+          if (!total) total = { line: overOutcome.point, book: bk.title };
+        }
+      }
+    }
+
+    return {
+      ...event,
+      bestHomeOdds: homeEntry,
+      bestAwayOdds: awayEntry,
+      spread,
+      total,
+      impliedWinPct,
+      bookmakerCount: bookmakers.length,
+    };
+  });
+}
+
+// ============================================================================
 // Shared helper — used by both GET and POST
 // ============================================================================
 
@@ -52,9 +134,10 @@ async function fetchOddsForSport(sport: string, marketType = 'h2h') {
     regions: [BETTING_REGIONS.US],
     oddsFormat: 'american',
   });
+  const rawEvents = Array.isArray(events) ? events : [];
   return {
     success: true as const,
-    events: Array.isArray(events) ? events : [],
+    events: enrichEvents(rawEvents),
     sport: validation.normalizedKey,
     timestamp: new Date().toISOString(),
     message: SUCCESS_MESSAGES.ODDS_FETCHED,

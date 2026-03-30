@@ -1,5 +1,12 @@
 'use client';
 
+// Standalone typed card components (used for direct API data, not AI-generated CardData)
+import { OddsCard } from '@/components/cards/OddsCard';
+import { KalshiMarketCard } from '@/components/cards/KalshiMarketCard';
+import { PlayerCard } from '@/components/cards/PlayerCard';
+import { DFSLineupCard } from '@/components/cards/DFSLineupCard';
+import { ArbitrageOpportunityCard } from '@/components/cards/ArbitrageOpportunityCard';
+
 import { BettingCard } from './BettingCard';
 import { DFSCard } from './DFSCard';
 import { FantasyCard } from './FantasyCard';
@@ -43,6 +50,7 @@ interface DynamicCardRendererProps {
   card: CardData;
   index?: number;
   onAnalyze?: (card: CardData) => void;
+  onAsk?: (query: string) => void;
   isLoading?: boolean;
   error?: string;
   isHero?: boolean;
@@ -54,6 +62,7 @@ export function DynamicCardRenderer({
   card,
   index = 0,
   onAnalyze,
+  onAsk,
   isLoading,
   error,
   isHero = false,
@@ -582,6 +591,75 @@ export function DynamicCardRenderer({
     );
   }
 
+  // ── Standalone typed cards (direct API data, exact type matches) ──────────
+
+  // Enriched odds event (from /api/odds enriched response)
+  if (cardType === 'odds_event') {
+    return withOverlays(
+      <OddsCard
+        event={safeCard.data as any}
+        onAsk={onAsk}
+      />
+    );
+  }
+
+  // Kalshi market card (from /api/kalshi response)
+  if (cardType === 'kalshi_market') {
+    return withOverlays(
+      <KalshiMarketCard
+        market={safeCard.data as any}
+        onAsk={onAsk}
+      />
+    );
+  }
+
+  // Player profile card (from /api/players response)
+  if (cardType === 'player_profile') {
+    return withOverlays(
+      <PlayerCard
+        player={safeCard.data as any}
+        onAsk={onAsk}
+      />
+    );
+  }
+
+  // DFS lineup card (from /api/dfs response)
+  if (cardType === 'dfs_lineup') {
+    const rawLineup = safeCard.data.lineup;
+    const rosterArray: any[] = rawLineup?.roster
+      ?? (Array.isArray(rawLineup) ? rawLineup : null)
+      ?? safeCard.data.players
+      ?? [];
+    const totalProjected: number =
+      rawLineup?.totalProjected ?? safeCard.data.totalProjected ?? 0;
+    // Normalize field names: nfbc_adp enriched players use primaryPosition/projectedPoints
+    const lineup = rosterArray.map((p: any) => ({
+      ...p,
+      player_name: p.player_name ?? p.display_name ?? p.name ?? '',
+      player_type: p.player_type ?? p.primaryPosition ?? p.position ?? '',
+      dk_pts_mean: p.dk_pts_mean ?? p.projectedPoints ?? 0,
+    }));
+    return withOverlays(
+      <DFSLineupCard
+        lineup={lineup}
+        totalProjected={totalProjected}
+        site={safeCard.data.site ?? 'DK'}
+        onAsk={onAsk}
+      />
+    );
+  }
+
+  // Arbitrage opportunity card (standalone typed — exact match first)
+  if (cardType === 'arbitrage_opp') {
+    return withOverlays(
+      <ArbitrageOpportunityCard
+        opportunity={safeCard.data as any}
+        onAsk={onAsk}
+      />
+    );
+  }
+
+  // ── Legacy arbitrage cards (existing data-cards pipeline) ────────────────
   // Arbitrage cards
   if (cardType.includes('arbitrage')) {
     return withOverlays(

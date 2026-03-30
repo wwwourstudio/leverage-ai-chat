@@ -21,6 +21,7 @@ interface CardLayoutProps {
   cards: CardData[];
   aiInsight?: string;
   onAnalyze?: (card: CardData) => void;
+  onAsk?: (query: string) => void;
   messageIndex?: number;
   trustScore?: number;
   trustLevel?: 'high' | 'medium' | 'low';
@@ -43,6 +44,7 @@ export const CardLayout = memo(function CardLayout({
   cards,
   aiInsight,
   onAnalyze,
+  onAsk,
   messageIndex = 0,
   trustScore,
   trustLevel,
@@ -92,6 +94,7 @@ export const CardLayout = memo(function CardLayout({
           index={0}
           isHero
           onAnalyze={onAnalyze ? () => onAnalyze(heroCard) : undefined}
+          onAsk={onAsk}
           trustScore={trustScore}
           trustLevel={trustLevel}
         />
@@ -133,6 +136,7 @@ export const CardLayout = memo(function CardLayout({
                           index={absIdx + 1}
                           isHero={false}
                           onAnalyze={onAnalyze ? () => onAnalyze(card) : undefined}
+                          onAsk={onAsk}
                         />
                       );
                     })}

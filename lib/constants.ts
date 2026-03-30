@@ -66,6 +66,9 @@ export const API_ENDPOINTS = {
   MARKET_INTELLIGENCE_ANOMALIES: '/api/market-intelligence/anomalies',
   MARKET_INTELLIGENCE_SIGNALS: '/api/market-intelligence/signals',
   MARKET_INTELLIGENCE_RETRAIN: '/api/market-intelligence/retrain',
+  PLAYERS: '/api/players',
+  DFS: '/api/dfs',
+  STATCAST: '/api/statcast',
 } as const;
 
 // AI Prompt for settings-based personalization suggestions

@@ -3637,6 +3637,7 @@ No preamble. Start directly with section 1.`;
                       messageIndex={index}
                       trustScore={message.trustMetrics?.finalConfidence}
                       trustLevel={message.trustMetrics?.trustLevel}
+                      onAsk={(q: string) => generateRealResponse(q)}
                     />
                   )}
 

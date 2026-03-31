@@ -101,7 +101,16 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
     { label: 'Park Factor',    value: data.components.parkFactor,    range: [0.85, 1.35],    fmt: v => v.toFixed(2) },
     { label: 'Weather',        value: data.components.weatherFactor, range: [0.85, 1.25],    fmt: v => v.toFixed(2) },
     { label: 'Matchup',        value: data.components.matchupFactor, range: [0.70, 1.80],    fmt: v => v.toFixed(2) },
+    ...(data.components.mlAdjusted !== undefined
+      ? [{ label: 'ML Adjusted', value: data.components.mlAdjusted, range: [0.80, 1.20] as [number, number], fmt: (v: number) => v.toFixed(2) }]
+      : []),
   ];
+
+  // Confidence interval
+  const ciHalf = data.confidence === 'high' ? 0.03 : data.confidence === 'medium' ? 0.07 : 0.12;
+  const ciLo   = Math.max(0, data.probability - ciHalf);
+  const ciHi   = Math.min(1, data.probability + ciHalf);
+  const CI_MAX = 0.30; // track represents 0–30% probability range
 
   return (
     <div className="rounded-2xl border border-rose-500/25 bg-gradient-to-br from-rose-600/20 via-red-900/15 to-slate-900/40 overflow-hidden shadow-lg">
@@ -120,10 +129,11 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
       </div>
 
       {/* Venue / pitcher strip */}
-      {(data.pitcherName || data.venue) && (
-        <div className="px-4 pb-2 text-xs text-slate-400 flex items-center gap-3">
+      {(data.pitcherName || data.venue || data.gameTime) && (
+        <div className="px-4 pb-2 text-xs text-slate-400 flex items-center gap-3 flex-wrap">
           {data.pitcherName && <span>vs {data.pitcherName}</span>}
           {data.venue && <span>· {data.venue}</span>}
+          {data.gameTime && <span>· {data.gameTime}</span>}
           {data.dataSource === 'mlb_api_fallback' && (
             <span className="text-amber-500/70">· estimated</span>
           )}
@@ -182,6 +192,32 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
             <p className="text-lg font-bold tabular-nums">{fmtOdds(data.impliedOdds ?? null)}</p>
           </div>
         )}
+      </div>
+
+      {/* Confidence interval range */}
+      <div className="px-4 py-2.5 border-t border-rose-500/10">
+        <div className="flex justify-between items-center mb-1 text-[9px]">
+          <span className="text-slate-500 uppercase tracking-wider">Probability Range ({data.confidence} confidence)</span>
+          <span className="text-slate-400 font-bold">{(ciLo * 100).toFixed(1)}% – {(ciHi * 100).toFixed(1)}%</span>
+        </div>
+        <div className="relative h-1.5 rounded-full bg-slate-700/50 overflow-hidden">
+          <div
+            className="absolute top-0 bottom-0 rounded-full bg-rose-500/50"
+            style={{
+              left: `${Math.min(100, (ciLo / CI_MAX) * 100)}%`,
+              right: `${Math.max(0, 100 - (ciHi / CI_MAX) * 100)}%`,
+            }}
+          />
+          <div
+            className="absolute top-0 bottom-0 w-0.5 bg-white/70"
+            style={{ left: `${Math.min(100, (data.probability / CI_MAX) * 100)}%` }}
+          />
+        </div>
+        <div className="flex justify-between text-[8px] text-slate-600 mt-0.5">
+          <span>0%</span>
+          <span>15%</span>
+          <span>30%</span>
+        </div>
       </div>
 
       {/* Component breakdown */}

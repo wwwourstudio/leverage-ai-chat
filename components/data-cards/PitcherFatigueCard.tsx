@@ -167,6 +167,11 @@ export function PitcherFatigueCard({
           <p className="text-[11px] text-[oklch(0.60_0.01_280)] leading-relaxed">{data.bettingImpact}</p>
         )}
 
+        {/* Description context */}
+        {data.description && (
+          <p className="text-[10px] text-[oklch(0.50_0.01_280)] italic leading-relaxed mt-1">{data.description}</p>
+        )}
+
         {onAnalyze && (
           <button
             onClick={onAnalyze}

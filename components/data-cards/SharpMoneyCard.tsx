@@ -90,10 +90,17 @@ export function SharpMoneyCard({
           </span>
         </div>
 
-        <h3 className="text-sm font-black text-[oklch(0.92_0.005_85)] mb-4 truncate">{title}</h3>
+        <h3 className="text-sm font-black text-[oklch(0.92_0.005_85)] mb-0.5 truncate">{title}</h3>
+        {data.outcome && (
+          <p className="text-[10px] font-semibold text-[oklch(0.60_0.01_280)] mb-0.5">Side: {data.outcome}</p>
+        )}
+        {data.matchup && (
+          <p className="text-[10px] text-[oklch(0.48_0.01_280)] mb-3 truncate">{data.matchup}</p>
+        )}
+        {!data.outcome && !data.matchup && <div className="mb-3" />}
 
         {/* Line movement visualization */}
-        {(data.openPrice !== undefined && data.currentPrice !== undefined) ? (
+        {(data.openPrice !== undefined && data.currentPrice !== undefined) && (
           <div className="flex items-center justify-between bg-[oklch(0.09_0.01_280)] rounded-xl border border-[oklch(0.18_0.015_280)] p-4 mb-3">
             <div className="text-center flex-1">
               <p className="text-[8px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-1.5">Opening</p>
@@ -120,10 +127,13 @@ export function SharpMoneyCard({
               </p>
             </div>
           </div>
-        ) : (
-          data.description && (
-            <p className="text-sm text-[oklch(0.65_0.01_280)] mb-3">{data.description}</p>
-          )
+        )}
+
+        {/* Description / insight panel */}
+        {data.description && (
+          <div className="rounded-lg bg-blue-500/5 border border-blue-500/15 px-3 py-2 text-[10px] text-[oklch(0.60_0.01_280)] mb-3 leading-relaxed">
+            {data.description}
+          </div>
         )}
 
         {/* Details */}

@@ -71,6 +71,9 @@ export function BullpenFatigueCard({
               <span className="text-[oklch(0.3_0.01_280)] mx-1.5">/</span>
               <span className="text-[10px] font-medium text-[oklch(0.45_0.01_280)]">{subcategory}</span>
               <h3 className="text-sm font-black text-[oklch(0.92_0.005_85)] mt-1 leading-snug">{title}</h3>
+              {data.teamName && (
+                <p className="text-[10px] text-[oklch(0.50_0.01_280)] mt-0.5">{data.teamName} Bullpen</p>
+              )}
             </div>
           </div>
 
@@ -98,11 +101,17 @@ export function BullpenFatigueCard({
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-2 mb-3">
+        <div className="grid grid-cols-2 gap-2 mb-3">
           {data.inningsLast3Days !== undefined && (
             <div className="bg-[oklch(0.09_0.01_280)] rounded-lg border border-[oklch(0.18_0.015_280)] p-2.5 text-center">
               <p className="text-[8px] uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-1">Inn / 3d</p>
               <p className="text-sm font-black tabular-nums text-[oklch(0.85_0.005_85)]">{data.inningsLast3Days}</p>
+            </div>
+          )}
+          {data.pitchCountLast3Days !== undefined && (
+            <div className="bg-[oklch(0.09_0.01_280)] rounded-lg border border-[oklch(0.18_0.015_280)] p-2.5 text-center">
+              <p className="text-[8px] uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-1">Pitches / 3d</p>
+              <p className="text-sm font-black tabular-nums text-[oklch(0.85_0.005_85)]">{data.pitchCountLast3Days}</p>
             </div>
           )}
           {data.eraLast14Days !== undefined && (

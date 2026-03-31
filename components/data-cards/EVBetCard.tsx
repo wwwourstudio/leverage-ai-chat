@@ -55,6 +55,7 @@ export function EVBetCard({
 
   const modelPct   = data.modelProbability   !== undefined ? Number(data.modelProbability)   * 100 : null;
   const impliedPct = data.impliedProbability !== undefined ? Number(data.impliedProbability) * 100 : null;
+  const kellyDollar = data.quarterKelly !== undefined ? (Number(data.quarterKelly) * 1000).toFixed(0) : null;
 
   return (
     <article
@@ -82,6 +83,9 @@ export function EVBetCard({
             <span className="text-[oklch(0.3_0.01_280)] mx-1.5" aria-hidden="true">/</span>
             <span className="text-[10px] font-medium text-[oklch(0.45_0.01_280)]">{subcategory}</span>
             <h3 className="text-sm font-black text-[oklch(0.92_0.005_85)] mt-1 leading-snug">{title}</h3>
+            {data.matchup && (
+              <p className="text-[10px] text-[oklch(0.50_0.01_280)] mt-0.5 truncate">{data.matchup}</p>
+            )}
           </div>
 
           {/* Confidence badge */}
@@ -111,6 +115,13 @@ export function EVBetCard({
             </p>
           </div>
         </div>
+
+        {/* Bankroll context */}
+        {kellyDollar !== null && (
+          <p className="text-[10px] text-[oklch(0.48_0.01_280)] mb-3">
+            ¼ Kelly on $1,000 bankroll ≈ <span className="font-bold text-[oklch(0.75_0.01_280)]">${kellyDollar}</span>
+          </p>
+        )}
 
         {/* Model vs Market probability comparison */}
         {modelPct !== null && impliedPct !== null && (
@@ -154,6 +165,12 @@ export function EVBetCard({
             </div>
           )}
         </div>
+
+        {data.description && (
+          <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/15 px-3 py-2 mt-3 text-[10px] text-[oklch(0.60_0.01_280)] leading-relaxed">
+            {data.description}
+          </div>
+        )}
 
         {data.note && (
           <p className="mt-3 text-[11px] text-[oklch(0.50_0.01_280)] italic">{data.note}</p>

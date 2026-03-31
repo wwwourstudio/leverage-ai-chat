@@ -93,6 +93,10 @@ export function CatcherFramingCard({
           </span>
         </div>
 
+        {data.catcherName && (
+          <p className="text-[10px] font-semibold text-[oklch(0.65_0.01_280)] mb-2">Catcher: {data.catcherName}</p>
+        )}
+
         {/* fRAA bar */}
         <div className="mb-4">
           <div className="flex justify-between items-center mb-1.5 text-[10px]">

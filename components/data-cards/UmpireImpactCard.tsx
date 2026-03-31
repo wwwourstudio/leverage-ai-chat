@@ -82,6 +82,10 @@ export function UmpireImpactCard({
           </span>
         </div>
 
+        {data.umpireName && (
+          <p className="text-[10px] font-semibold text-[oklch(0.65_0.01_280)] mb-3">Ump: {data.umpireName}</p>
+        )}
+
         {/* Impact grid */}
         <div className="grid grid-cols-3 gap-2 mb-3">
           <div className="bg-[oklch(0.09_0.01_280)] rounded-lg border border-[oklch(0.18_0.015_280)] p-2.5 text-center">

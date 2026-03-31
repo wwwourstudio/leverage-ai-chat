@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, memo } from 'react';
+import { useState, memo, useId } from 'react';
 import { TrendingUp, ChevronRight, Zap, Target, Activity, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AnalysisLightbox } from './AnalysisLightbox';
@@ -135,6 +135,44 @@ function BreakoutRing({ score }: { score: number }) {
   );
 }
 
+// ─── DK Sparkline (recent form) ──────────────────────────────────────────────
+
+function DKSparkline({ data, width = 140, height = 28 }: { data: Array<{ price: number }>; width?: number; height?: number }) {
+  const uid = useId();
+  if (data.length < 2) return null;
+  const prices = data.map(d => d.price);
+  const min = Math.min(...prices), max = Math.max(...prices);
+  const range = max - min || 1;
+  const pad = 2, innerH = height - pad * 2;
+  const pts = prices.map((p, i) => [
+    (i / (prices.length - 1)) * width,
+    pad + innerH - ((p - min) / range) * innerH,
+  ] as [number, number]);
+  let d = `M ${pts[0][0]},${pts[0][1]}`;
+  for (let i = 1; i < pts.length; i++) {
+    const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
+    const cpx = (x0 + x1) / 2;
+    d += ` C ${cpx},${y0} ${cpx},${y1} ${x1},${y1}`;
+  }
+  const area = `${d} L ${width},${height} L 0,${height} Z`;
+  const isUp  = prices[prices.length - 1] >= prices[0];
+  const color = isUp ? '#10b981' : '#94a3b8';
+  const gid   = `dksp-${uid.replace(/:/g, '')}`;
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="overflow-visible" aria-hidden="true">
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${gid})`} />
+      <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="2.5" fill={color} />
+    </svg>
+  );
+}
+
 function metricValueColor(label: string, value: string): string {
   const num = parseFloat(value);
   if (isNaN(num)) return 'text-white';
@@ -170,6 +208,19 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
   const lightboxSections = data.lightbox?.sections ?? [];
   const matchupScore = data.matchup_score ?? 0;
   const trendNote    = data.trend_note ?? '';
+
+  // Recent form sparkline from flat data
+  const recentDkPts  = data.data?.recentDKPts as string | undefined;
+  const sparkData    = recentDkPts
+    ? String(recentDkPts).split(',').map(v => ({ price: parseFloat(v.trim()) })).filter(d => !isNaN(d.price))
+    : [];
+  const recentAvgLabel = data.data?.recentGamesAvg as string | undefined;
+
+  // Home / road splits
+  const homeDkAvg   = data.data?.homeDKAvg   as string | undefined;
+  const roadDkAvg   = data.data?.roadDKAvg   as string | undefined;
+  const homeGames   = data.data?.homeSplitGames as string | undefined;
+  const roadGames   = data.data?.roadSplitGames as string | undefined;
 
   const statusKey    = (data.status ?? 'neutral').toLowerCase();
   const cfg          = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.neutral;
@@ -253,6 +304,39 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
             </div>
           )}
 
+          {/* ── Recent form sparkline ─────────────────────────────────── */}
+          {sparkData.length >= 3 && (
+            <div className="px-3 py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)]">
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-gray-500">Recent Form</span>
+                {recentAvgLabel && (
+                  <span className="text-[9px] text-gray-500">{recentAvgLabel}</span>
+                )}
+              </div>
+              <DKSparkline data={sparkData} width={200} height={28} />
+            </div>
+          )}
+
+          {/* ── Home / road splits ─────────────────────────────────────── */}
+          {(homeDkAvg || roadDkAvg) && (
+            <div className="grid grid-cols-2 gap-1.5">
+              {homeDkAvg && (
+                <div className="flex flex-col items-center gap-0.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] px-2 py-2">
+                  <span className="text-[7px] font-bold uppercase tracking-wider text-gray-500">Home</span>
+                  <span className="text-sm font-black text-white tabular-nums">{homeDkAvg}</span>
+                  {homeGames && <span className="text-[8px] text-gray-600">{homeGames}</span>}
+                </div>
+              )}
+              {roadDkAvg && (
+                <div className="flex flex-col items-center gap-0.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] px-2 py-2">
+                  <span className="text-[7px] font-bold uppercase tracking-wider text-gray-500">Road</span>
+                  <span className="text-sm font-black text-white tabular-nums">{roadDkAvg}</span>
+                  {roadGames && <span className="text-[8px] text-gray-600">{roadGames}</span>}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Summary metrics ────────────────────────────────────────── */}
           {metrics.length > 0 && (
             <div className="space-y-1">
@@ -316,7 +400,12 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
               <Target className="w-2.5 h-2.5 text-gray-700" />
               <span className="text-[8px] font-bold text-gray-700 uppercase tracking-wider">LeverageMetrics Engine</span>
             </div>
-            <span className="text-[8px] text-gray-700">Monte Carlo N=1,000</span>
+            <div className="flex items-center gap-2">
+              {data.last_updated && (
+                <span className="text-[8px] text-gray-700">{data.last_updated}</span>
+              )}
+              <span className="text-[8px] text-gray-700">Monte Carlo N=1,000</span>
+            </div>
           </div>
         </div>
       </article>

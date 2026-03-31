@@ -100,6 +100,21 @@ export function PitchMatchupCard({
           </span>
         </div>
 
+        {/* Batter vs pitcher strip */}
+        {(data.batterName || data.pitcherName) && (
+          <div className="flex items-center justify-between rounded-lg bg-[oklch(0.09_0.01_280)] border border-[oklch(0.18_0.015_280)] px-3 py-1.5 mb-3 text-xs">
+            <div className="text-center min-w-0 flex-1">
+              <p className="text-[8px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-0.5">Batter</p>
+              <p className="font-semibold text-[oklch(0.85_0.005_85)] truncate">{data.batterName ?? '—'}</p>
+            </div>
+            <span className="text-[10px] font-black text-[oklch(0.38_0.01_280)] px-3 shrink-0">vs</span>
+            <div className="text-center min-w-0 flex-1">
+              <p className="text-[8px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-0.5">Pitcher</p>
+              <p className="font-semibold text-[oklch(0.85_0.005_85)] truncate">{data.pitcherName ?? '—'}</p>
+            </div>
+          </div>
+        )}
+
         {/* Edge + velocity */}
         <div className="grid grid-cols-3 gap-2 mb-3">
           <div className="bg-[oklch(0.09_0.01_280)] rounded-lg border border-[oklch(0.18_0.015_280)] p-2.5 text-center">

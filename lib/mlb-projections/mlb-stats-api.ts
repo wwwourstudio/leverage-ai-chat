@@ -331,6 +331,103 @@ export async function fetchPlayerGameLog(playerId: number, group: 'hitting' | 'p
   }
 }
 
+// ─── DraftKings scoring weights (mirrors monte-carlo.ts) ─────────────────────
+const DK_HIT_SCORING = { single: 3, double: 5, triple: 8, hr: 10, rbi: 2, run: 2, bb: 2, sb: 5, k: -0.5 };
+const DK_PITCH_SCORING = { out: 0.75, k: 2, win: 4, er: -2 };
+
+function seasonStatsToDKPts(stats: any, group: 'hitting' | 'pitching', games: number): number {
+  if (games === 0) return 0;
+  if (group === 'hitting') {
+    const singles = (stats.hits ?? 0) - (stats.doubles ?? 0) - (stats.triples ?? 0) - (stats.homeRuns ?? 0);
+    const total = singles * DK_HIT_SCORING.single
+      + (stats.doubles ?? 0) * DK_HIT_SCORING.double
+      + (stats.triples ?? 0) * DK_HIT_SCORING.triple
+      + (stats.homeRuns ?? 0) * DK_HIT_SCORING.hr
+      + (stats.rbi ?? 0) * DK_HIT_SCORING.rbi
+      + (stats.runs ?? 0) * DK_HIT_SCORING.run
+      + (stats.baseOnBalls ?? 0) * DK_HIT_SCORING.bb
+      + (stats.stolenBases ?? 0) * DK_HIT_SCORING.sb
+      + (stats.strikeOuts ?? 0) * DK_HIT_SCORING.k;
+    return total / games;
+  } else {
+    const outs = Math.round(parseFloat(String(stats.inningsPitched ?? '0')) * 3);
+    const total = outs * DK_PITCH_SCORING.out
+      + (stats.strikeOuts ?? 0) * DK_PITCH_SCORING.k
+      + (stats.wins ?? 0) * DK_PITCH_SCORING.win
+      + (stats.earnedRuns ?? 0) * DK_PITCH_SCORING.er;
+    return total / games;
+  }
+}
+
+export interface PlayerSplits {
+  homeAvgDKPts: number;
+  roadAvgDKPts: number;
+  homeGames:    number;
+  roadGames:    number;
+}
+
+/** Fetch home/road DK point averages for a player this season. */
+export async function fetchPlayerHomeSplits(
+  playerId: number,
+  playerType: 'hitting' | 'pitching'
+): Promise<PlayerSplits> {
+  const season = new Date().getFullYear();
+  const cacheKey = `splits:${playerId}:${playerType}:${season}`;
+  const cached = getCached<PlayerSplits>(cacheKey);
+  if (cached) return cached;
+
+  const zero: PlayerSplits = { homeAvgDKPts: 0, roadAvgDKPts: 0, homeGames: 0, roadGames: 0 };
+
+  try {
+    const [homeRes, roadRes] = await Promise.all([
+      fetch(`${MLB_API}/people/${playerId}/stats?stats=season&group=${playerType}&sitCodes=h&season=${season}`, { signal: AbortSignal.timeout(5000) }),
+      fetch(`${MLB_API}/people/${playerId}/stats?stats=season&group=${playerType}&sitCodes=a&season=${season}`, { signal: AbortSignal.timeout(5000) }),
+    ]);
+
+    if (!homeRes.ok || !roadRes.ok) return zero;
+
+    const [homeJson, roadJson] = await Promise.all([homeRes.json(), roadRes.json()]);
+
+    const homeSplit = homeJson.stats?.[0]?.splits?.[0];
+    const roadSplit = roadJson.stats?.[0]?.splits?.[0];
+
+    const homeGames = homeSplit?.stat?.gamesPlayed ?? 0;
+    const roadGames = roadSplit?.stat?.gamesPlayed ?? 0;
+
+    const result: PlayerSplits = {
+      homeAvgDKPts: homeSplit ? seasonStatsToDKPts(homeSplit.stat, playerType, homeGames) : 0,
+      roadAvgDKPts: roadSplit ? seasonStatsToDKPts(roadSplit.stat, playerType, roadGames) : 0,
+      homeGames,
+      roadGames,
+    };
+
+    setCached(cacheKey, result);
+    return result;
+  } catch {
+    return zero;
+  }
+}
+
+/** Convert a PlayerGameLog entry to DraftKings fantasy points. */
+export function gameLogToDKPts(log: PlayerGameLog): number {
+  if ('ab' in log) {
+    // hitter
+    const h = log.h ?? 0;
+    const hr = log.hr ?? 0;
+    const rbi = log.rbi ?? 0;
+    // approximate: singles = hits - HR (no doubles/triples in game log)
+    const singles = Math.max(0, h - hr);
+    return singles * DK_HIT_SCORING.single + hr * DK_HIT_SCORING.hr + rbi * DK_HIT_SCORING.rbi;
+  } else {
+    // pitcher
+    const ip = parseFloat(String(log.ip ?? '0'));
+    const outs = Math.round(ip * 3);
+    const k = log.k ?? 0;
+    const er = log.er ?? 0;
+    return outs * DK_PITCH_SCORING.out + k * DK_PITCH_SCORING.k + er * DK_PITCH_SCORING.er;
+  }
+}
+
 /**
  * Get remaining games in the current MLB season (for ROS projections).
  * Season window: Opening Day (≈ last week of March) → last Sunday of September.

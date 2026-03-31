@@ -2076,22 +2076,107 @@ async function _generateContextualCards(
   if (normalizedSport === 'baseball_mlb' && cards.length < count) {
     try {
       if (category === 'dfs') {
-        // Full DK MLB slate with Monte Carlo projections
-        const { buildDFSSlate } = await import('@/lib/mlb-projections/slate-builder');
-        const dfsRaw = await Promise.race([
-          buildDFSSlate({ limit: count }),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000)),
+        // Full DK MLB slate with Monte Carlo projections — multi-lineup
+        const { buildDFSSlateMulti } = await import('@/lib/mlb-projections/slate-builder');
+        const multi = await Promise.race([
+          buildDFSSlateMulti({ limit: 9 }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 18000)),
         ]);
-        for (const c of dfsRaw) {
+
+        const today = multi.metadata.date;
+        const totalPts = multi.metadata.totalProjPts.toFixed(1);
+        const totalSal = multi.metadata.totalSalary > 0
+          ? `$${(multi.metadata.totalSalary / 1000).toFixed(0)}k`
+          : '';
+
+        // 1× DFS Slate card (full optimal lineup roster)
+        if (multi.slateForCard.length > 0) {
+          cards.push({
+            type: 'dfs-slate',
+            title: `DK Optimal Lineup · MLB · ${today}`,
+            icon: 'Trophy',
+            category: 'MLB',
+            subcategory: `DraftKings · ${totalSal} used · ${totalPts} proj pts`,
+            gradient: 'from-orange-600 to-red-700',
+            status: 'optimal',
+            data: {
+              slate: multi.slateForCard.map(c => ({
+                position:    c.data.position,
+                player:      c.data.player,
+                team:        c.data.team,
+                salary:      c.data.salary,
+                projection:  c.data.projection,
+                ownership:   c.data.ownership,
+                dkValue:     c.data.dkValue,
+                matchupScore: c.data.matchupScore,
+                cardCategory: c.data.cardCategory ?? 'optimal',
+                stackTeam:   c.data.stackTeam,
+              })),
+              topStack: multi.topStack ? `${multi.topStack.type === 'full' ? 'FULL STACK' : 'MINI-STACK'}: ${multi.topStack.team}` : undefined,
+              totalProjPts: totalPts,
+              totalSalary:  totalSal,
+              gamesCount:   String(multi.metadata.gamesCount),
+            },
+            metadata: { realData: true, source: 'LeverageMetrics' },
+          });
+        }
+
+        // 2× DFS Value cards
+        for (const c of multi.valueLineup.slice(0, 2)) {
+          cards.push({
+            type: 'dfs-value',
+            title: c.title,
+            icon: 'TrendingUp',
+            category: c.category,
+            subcategory: c.subcategory,
+            gradient: 'from-emerald-600 to-teal-700',
+            status: 'value',
+            data: { ...c.data, cardCategory: 'value' },
+            metadata: { realData: true, source: 'LeverageMetrics' },
+          });
+        }
+
+        // 2× DFS Matchup cards
+        for (const c of multi.matchupLineup.slice(0, 2)) {
+          cards.push({
+            type: 'dfs-matchup',
+            title: c.title,
+            icon: 'Crosshair',
+            category: c.category,
+            subcategory: c.subcategory,
+            gradient: 'from-blue-600 to-indigo-700',
+            status: 'optimal',
+            data: { ...c.data, cardCategory: 'matchup' },
+            metadata: { realData: true, source: 'LeverageMetrics' },
+          });
+        }
+
+        // 2× DFS Contrarian cards
+        for (const c of multi.contrarianLineup.slice(0, 2)) {
+          cards.push({
+            type: 'dfs-lineup',
+            title: c.title,
+            icon: 'Shuffle',
+            category: c.category,
+            subcategory: c.subcategory,
+            gradient: 'from-violet-600 to-purple-700',
+            status: 'value',
+            data: { ...c.data, cardCategory: 'contrarian' },
+            metadata: { realData: true, source: 'LeverageMetrics' },
+          });
+        }
+
+        // 2× DFS Chalk cards
+        for (const c of multi.chalkLineup.slice(0, 2)) {
           cards.push({
             type: 'dfs-lineup',
             title: c.title,
             icon: 'Users',
             category: c.category,
             subcategory: c.subcategory,
-            gradient: c.gradient,
-            status: c.status,
-            data: c.data,
+            gradient: 'from-amber-600 to-orange-700',
+            status: 'hot',
+            data: { ...c.data, cardCategory: 'chalk' },
             metadata: { realData: true, source: 'LeverageMetrics' },
           });
         }
@@ -2239,24 +2324,24 @@ async function _generateContextualCards(
             }
             const unique = Array.from(byPlayer.values()).sort((a, b) => b.line - a.line);
 
-            // Top play (highest line = most valuable DFS asset)
+            // ── Card 1: Optimal play (highest projected line) ────────────
             const top = unique[0];
             const salaryBase = Math.round((top.line * 190 + 3800) / 100) * 100;
             const proj = top.line;
+            const valueScore1 = proj / (salaryBase / 1000);
+
             // Value plays: top 3 by pts-per-$K excluding the top pick
             const valuePlayers = unique
               .slice(1, 6)
               .map(p => ({ ...p, ppk: p.line / ((Math.round((p.line * 190 + 3800) / 100) * 100) / 1000) }))
-              .sort((a, b) => b.ppk - a.ppk)
-              .slice(0, 3)
-              .map(p => p.player);
+              .sort((a, b) => b.ppk - a.ppk);
 
             cards.push({
               type: CARD_TYPES.DFS_LINEUP,
-              title: `${displaySport || 'DFS'} Optimal Lineup`,
-              icon: 'Users',
+              title: `${displaySport || 'DFS'} Optimal Play`,
+              icon: 'Trophy',
               category: 'DFS',
-              subcategory: `${displaySport || 'Daily Fantasy'} • GPP Stack`,
+              subcategory: `${displaySport || 'Daily Fantasy'} · GPP Stack`,
               gradient: 'from-orange-600 to-red-700',
               data: {
                 player: top.player,
@@ -2268,14 +2353,77 @@ async function _generateContextualCards(
                 boomCeiling: (proj * 1.52).toFixed(1),
                 bustFloor: (proj * 0.52).toFixed(1),
                 targetGame: top.game,
-                targetPlayers: valuePlayers.length > 0 ? valuePlayers : undefined,
+                targetPlayers: valuePlayers.slice(0, 3).map(p => p.player),
                 platforms: ['DraftKings', 'FanDuel'],
-                value: (proj / (salaryBase / 1000)).toFixed(1),
+                dkValue: valueScore1.toFixed(2),
                 tips: `${top.player} leads the ${dfsStatLabel[normalizedSport] ?? 'production'} market with a ${proj} projected line — highest ceiling on today's slate.`,
+                cardCategory: 'optimal',
                 realData: true,
               },
               realData: true,
             });
+
+            // ── Card 2: Value play (best pts/$K among top 5) ────────────
+            if (valuePlayers.length > 0) {
+              const vp = valuePlayers[0];
+              const vpSalary = Math.round((vp.line * 190 + 3800) / 100) * 100;
+              cards.push({
+                type: CARD_TYPES.DFS_VALUE,
+                title: `${displaySport || 'DFS'} Value Play`,
+                icon: 'TrendingUp',
+                category: 'DFS',
+                subcategory: `${displaySport || 'Daily Fantasy'} · Best Value`,
+                gradient: 'from-emerald-600 to-teal-700',
+                data: {
+                  player: vp.player,
+                  team: '—',
+                  position: dfsPositionMap[normalizedSport] ?? 'FLEX',
+                  salary: `$${vpSalary.toLocaleString()}`,
+                  projection: vp.line.toFixed(1),
+                  ownership: `${Math.min(25, Math.round(6 + vp.line / 5))}%`,
+                  boomCeiling: (vp.line * 1.6).toFixed(1),
+                  bustFloor: (vp.line * 0.45).toFixed(1),
+                  targetGame: vp.game,
+                  platforms: ['DraftKings', 'FanDuel'],
+                  dkValue: vp.ppk.toFixed(2),
+                  tips: `${vp.player} is the top value on the slate at ${vp.ppk.toFixed(2)}x pts/$K — great GPP differentiation.`,
+                  cardCategory: 'value',
+                  realData: true,
+                },
+                realData: true,
+              });
+            }
+
+            // ── Card 3: Matchup play (2nd-highest line player as matchup proxy) ──
+            if (unique.length > 1) {
+              const mp = unique[1];
+              const mpSalary = Math.round((mp.line * 190 + 3800) / 100) * 100;
+              cards.push({
+                type: CARD_TYPES.DFS_MATCHUP,
+                title: `${displaySport || 'DFS'} Matchup Play`,
+                icon: 'Crosshair',
+                category: 'DFS',
+                subcategory: `${displaySport || 'Daily Fantasy'} · Matchup Edge`,
+                gradient: 'from-blue-600 to-indigo-700',
+                data: {
+                  player: mp.player,
+                  team: '—',
+                  position: dfsPositionMap[normalizedSport] ?? 'FLEX',
+                  salary: `$${mpSalary.toLocaleString()}`,
+                  projection: mp.line.toFixed(1),
+                  ownership: `${Math.min(30, Math.round(7 + mp.line / 4))}%`,
+                  boomCeiling: (mp.line * 1.5).toFixed(1),
+                  bustFloor: (mp.line * 0.50).toFixed(1),
+                  targetGame: mp.game,
+                  platforms: ['DraftKings', 'FanDuel'],
+                  dkValue: (mp.line / (mpSalary / 1000)).toFixed(2),
+                  tips: `${mp.player} has a favorable matchup with a ${mp.line} projected ${dfsStatLabel[normalizedSport] ?? 'stat'} line — strong floor play.`,
+                  cardCategory: 'matchup',
+                  realData: true,
+                },
+                realData: true,
+              });
+            }
           }
           // If lines.length === 0: no props available yet — skip card so AI handles it
         }

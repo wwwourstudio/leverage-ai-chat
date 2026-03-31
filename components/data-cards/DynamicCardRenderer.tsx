@@ -31,6 +31,7 @@ import { PitchMatchupCard } from './PitchMatchupCard';
 import { UmpireImpactCard } from './UmpireImpactCard';
 import { CatcherFramingCard } from './CatcherFramingCard';
 import { ClosingLineCard } from './ClosingLineCard';
+import { DFSSlateCard } from './DFSSlateCard';
 
 interface CardData {
   id?: string;
@@ -177,6 +178,18 @@ export function DynamicCardRenderer({
         status={safeCard.status}
         onAnalyze={handleAnalyze}
         error={error}
+        isHero={isHero}
+      />
+    );
+  }
+
+  // Full DFS slate card (9-player optimal lineup roster)
+  if (cardType === 'dfs-slate') {
+    return withOverlays(
+      <DFSSlateCard
+        title={safeCard.title}
+        data={safeCard.data}
+        onAnalyze={handleAnalyze}
         isHero={isHero}
       />
     );

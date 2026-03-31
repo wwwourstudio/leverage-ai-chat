@@ -53,6 +53,9 @@ export function EVBetCard({
     : evRaw >= 5  ? 'text-amber-300'
     : 'text-slate-400';
 
+  const modelPct   = data.modelProbability   !== undefined ? Number(data.modelProbability)   * 100 : null;
+  const impliedPct = data.impliedProbability !== undefined ? Number(data.impliedProbability) * 100 : null;
+
   return (
     <article
       className={cn(
@@ -109,6 +112,27 @@ export function EVBetCard({
           </div>
         </div>
 
+        {/* Model vs Market probability comparison */}
+        {modelPct !== null && impliedPct !== null && (
+          <div className="rounded-xl bg-[oklch(0.09_0.01_280)] border border-[oklch(0.18_0.015_280)] px-3 py-2.5 mb-3 space-y-2">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)]">Probability Edge</p>
+            <div className="flex items-center gap-2 text-[10px]">
+              <span className="text-[oklch(0.45_0.01_280)] w-14 shrink-0">Model</span>
+              <div className="flex-1 h-1.5 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+                <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${Math.min(100, modelPct)}%` }} />
+              </div>
+              <span className="text-emerald-400 font-black w-9 text-right tabular-nums">{modelPct.toFixed(1)}%</span>
+            </div>
+            <div className="flex items-center gap-2 text-[10px]">
+              <span className="text-[oklch(0.45_0.01_280)] w-14 shrink-0">Market</span>
+              <div className="flex-1 h-1.5 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+                <div className="h-full rounded-full bg-slate-500 transition-all duration-500" style={{ width: `${Math.min(100, impliedPct)}%` }} />
+              </div>
+              <span className="text-[oklch(0.55_0.01_280)] font-black w-9 text-right tabular-nums">{impliedPct.toFixed(1)}%</span>
+            </div>
+          </div>
+        )}
+
         {/* Details */}
         <div className="space-y-1.5 text-xs">
           {data.market && (
@@ -127,22 +151,6 @@ export function EVBetCard({
             <div className="flex justify-between">
               <span className="text-[oklch(0.45_0.01_280)]">Best Book</span>
               <span className="font-semibold text-[oklch(0.80_0.005_85)]">{data.bookmaker}</span>
-            </div>
-          )}
-          {data.modelProbability !== undefined && (
-            <div className="flex justify-between">
-              <span className="text-[oklch(0.45_0.01_280)]">Model Prob</span>
-              <span className="font-semibold text-emerald-400">
-                {(Number(data.modelProbability) * 100).toFixed(1)}%
-              </span>
-            </div>
-          )}
-          {data.impliedProbability !== undefined && (
-            <div className="flex justify-between">
-              <span className="text-[oklch(0.45_0.01_280)]">Market Implied</span>
-              <span className="font-semibold text-[oklch(0.65_0.01_280)]">
-                {(Number(data.impliedProbability) * 100).toFixed(1)}%
-              </span>
             </div>
           )}
         </div>

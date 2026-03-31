@@ -53,6 +53,9 @@ export function SharpMoneyCard({
 
   const movColor = isShorting ? 'text-red-400' : 'text-emerald-400';
 
+  const magnitudeLabel = movementNum < 5 ? 'MINOR' : movementNum < 15 ? 'MODERATE' : 'MAJOR';
+  const magnitudeColor = movementNum >= 15 ? 'text-red-400' : movementNum >= 5 ? 'text-amber-400' : 'text-slate-400';
+
   return (
     <article
       className={cn(
@@ -149,6 +152,23 @@ export function SharpMoneyCard({
               <span className="text-[oklch(0.50_0.01_280)]">{data.timestamp}</span>
             </div>
           )}
+        </div>
+
+        {/* Magnitude + action recommendation */}
+        <div className={cn(
+          'rounded-lg px-3 py-2 text-[10px] font-semibold mt-3 flex items-start justify-between gap-3',
+          isSteam
+            ? 'bg-red-500/10 border border-red-500/20 text-red-300'
+            : 'bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] text-[oklch(0.55_0.01_280)]',
+        )}>
+          <span>
+            {isSteam
+              ? `⚡ Sharp steam — ${isShorting ? 'follow the shortening price' : 'price drifting with sharp backing'}`
+              : `${magnitudeLabel} move — confirm with volume before acting`}
+          </span>
+          <span className={cn('text-[9px] font-black uppercase tracking-wider shrink-0', magnitudeColor)}>
+            {magnitudeLabel}
+          </span>
         </div>
 
         {data.note && (

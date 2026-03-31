@@ -104,33 +104,64 @@ export function UmpireImpactCard({
           </div>
         </div>
 
-        {/* CSR stats */}
-        <div className="space-y-1.5 text-xs mb-3">
-          {data.calledStrikeRate !== undefined && (
-            <div className="flex justify-between">
-              <span className="text-[oklch(0.45_0.01_280)]">Called Strike Rate</span>
-              <span className="font-semibold text-[oklch(0.80_0.005_85)]">
+        {/* CSR comparison bars */}
+        {data.calledStrikeRate !== undefined && data.leagueAvgCSR !== undefined ? (
+          <div className="rounded-xl bg-[oklch(0.09_0.01_280)] border border-[oklch(0.18_0.015_280)] px-3 py-2.5 mb-3 space-y-2">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)]">Called Strike Rate</p>
+            <div className="flex items-center gap-2 text-[10px]">
+              <span className="text-[oklch(0.45_0.01_280)] w-14 shrink-0">Umpire</span>
+              <div className="flex-1 h-1.5 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+                <div
+                  className={cn('h-full rounded-full transition-all duration-500',
+                    bias === 'wide' ? 'bg-blue-500' : bias === 'tight' ? 'bg-amber-500' : 'bg-slate-500')}
+                  style={{ width: `${Math.min(100, Number(data.calledStrikeRate) * 200)}%` }}
+                />
+              </div>
+              <span className="font-black w-10 text-right tabular-nums text-[oklch(0.80_0.005_85)]">
                 {(Number(data.calledStrikeRate) * 100).toFixed(1)}%
               </span>
             </div>
-          )}
-          {data.leagueAvgCSR !== undefined && (
-            <div className="flex justify-between">
-              <span className="text-[oklch(0.45_0.01_280)]">League Average</span>
-              <span className="font-semibold text-[oklch(0.55_0.01_280)]">
+            <div className="flex items-center gap-2 text-[10px]">
+              <span className="text-[oklch(0.45_0.01_280)] w-14 shrink-0">League</span>
+              <div className="flex-1 h-1.5 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-slate-600 transition-all duration-500"
+                  style={{ width: `${Math.min(100, Number(data.leagueAvgCSR) * 200)}%` }}
+                />
+              </div>
+              <span className="font-black w-10 text-right tabular-nums text-[oklch(0.55_0.01_280)]">
                 {(Number(data.leagueAvgCSR) * 100).toFixed(1)}%
               </span>
             </div>
-          )}
-          {data.strikeZoneSizeRelative !== undefined && (
-            <div className="flex justify-between">
-              <span className="text-[oklch(0.45_0.01_280)]">Zone Size</span>
-              <span className="font-semibold text-[oklch(0.80_0.005_85)]">
-                {(Number(data.strikeZoneSizeRelative) * 100 - 100).toFixed(0)}% vs avg
-              </span>
-            </div>
-          )}
-        </div>
+            {data.strikeZoneSizeRelative !== undefined && (
+              <div className="flex justify-between text-[10px] pt-0.5 border-t border-[oklch(0.16_0.015_280)]">
+                <span className="text-[oklch(0.45_0.01_280)]">Zone Size vs Avg</span>
+                <span className="font-semibold text-[oklch(0.80_0.005_85)]">
+                  {(Number(data.strikeZoneSizeRelative) * 100 - 100).toFixed(0)}%
+                </span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-1.5 text-xs mb-3">
+            {data.calledStrikeRate !== undefined && (
+              <div className="flex justify-between">
+                <span className="text-[oklch(0.45_0.01_280)]">Called Strike Rate</span>
+                <span className="font-semibold text-[oklch(0.80_0.005_85)]">
+                  {(Number(data.calledStrikeRate) * 100).toFixed(1)}%
+                </span>
+              </div>
+            )}
+            {data.strikeZoneSizeRelative !== undefined && (
+              <div className="flex justify-between">
+                <span className="text-[oklch(0.45_0.01_280)]">Zone Size</span>
+                <span className="font-semibold text-[oklch(0.80_0.005_85)]">
+                  {(Number(data.strikeZoneSizeRelative) * 100 - 100).toFixed(0)}% vs avg
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         {data.signal && (
           <p className="text-[11px] text-[oklch(0.60_0.01_280)] leading-relaxed">{data.signal}</p>

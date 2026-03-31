@@ -50,6 +50,11 @@ export function ClosingLineCard({
   const clv = Number(data.clv ?? 0);
   const probDelta = Number(data.clvProbDelta ?? 0);
 
+  // CLV strength bar: map -30..+30 → 0..100%
+  const clvBarPct = Math.min(100, Math.max(0, ((clv + 30) / 60) * 100));
+  const clvBarColor = clv >= 10 ? 'bg-emerald-500' : clv >= 0 ? 'bg-blue-500' : 'bg-red-500';
+  const clvStrength = Math.abs(clv) >= 15 ? 'STRONG' : Math.abs(clv) >= 5 ? 'MODERATE' : 'WEAK';
+
   const verdictConfig = {
     'beat close':   { icon: CheckCircle2, color: 'text-emerald-400', badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', label: 'Beat Close' },
     'at close':     { icon: MinusCircle,  color: 'text-slate-400',   badge: 'bg-slate-500/10   border-slate-500/30   text-slate-400',   label: 'At Close'   },
@@ -108,6 +113,22 @@ export function ClosingLineCard({
             <p className={cn('text-xl font-black tabular-nums', verdictConfig.color)}>
               {formatAmerican(data.closingPrice)}
             </p>
+          </div>
+        </div>
+
+        {/* CLV strength bar */}
+        <div className="rounded-xl bg-[oklch(0.09_0.01_280)] border border-[oklch(0.18_0.015_280)] px-3 py-2.5 mb-3 space-y-1.5">
+          <div className="flex justify-between text-[9px] font-bold uppercase tracking-wide">
+            <span className="text-[oklch(0.40_0.01_280)]">CLV Strength</span>
+            <span className={verdictConfig.color}>{clvStrength}</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+            <div className={cn('h-full rounded-full transition-all duration-500', clvBarColor)} style={{ width: `${clvBarPct}%` }} />
+          </div>
+          <div className="flex justify-between text-[8px] text-[oklch(0.38_0.01_280)]">
+            <span>Missed</span>
+            <span>Neutral</span>
+            <span>Beat</span>
           </div>
         </div>
 

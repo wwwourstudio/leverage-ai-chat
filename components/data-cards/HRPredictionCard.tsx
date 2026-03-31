@@ -78,6 +78,23 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
   const hasEdge      = data.impliedOdds != null && Math.abs(data.edge) > 0.005;
   const edgePositive = data.edge > 0;
 
+  // Circular gauge
+  const CIRC = 2 * Math.PI * 40; // r=40
+  const gaugeStroke = edgePositive ? '#10b981' : data.edge < -0.02 ? '#f43f5e' : '#94a3b8';
+  const gaugeDashOffset = CIRC * (1 - data.probability);
+
+  // Quarter-Kelly stake recommendation
+  const kellyRec = (() => {
+    if (data.impliedOdds == null || data.edge <= 0) return null;
+    const american = data.impliedOdds;
+    const decimal  = american >= 0 ? american / 100 + 1 : 100 / Math.abs(american) + 1;
+    const b = decimal - 1;
+    const p = data.probability;
+    const q = 1 - p;
+    const full = (p * b - q) / b;
+    return Math.max(0, full * 0.25);
+  })();
+
   // Component breakdown bars (relative to each factor's typical range)
   const factors: Array<{ label: string; value: number; range: [number, number]; fmt?: (v: number) => string }> = [
     { label: 'Base Rate',      value: data.components.baseRate,      range: [0, 0.20],       fmt: fmtPct  },
@@ -114,15 +131,36 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
       )}
 
       {/* Primary probability */}
-      <div className="px-4 py-3 flex items-end gap-6 border-t border-rose-500/10">
-        <div>
-          <p className="text-xs text-slate-400 mb-0.5">HR Probability</p>
-          <p className="text-4xl font-black text-white tabular-nums">
-            {fmtPct(data.probability)}
-          </p>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Fair odds: {fmtOdds(modelOdds)}
-          </p>
+      <div className="px-4 py-3 flex items-center gap-4 border-t border-rose-500/10">
+        {/* Circular gauge */}
+        <svg viewBox="0 0 100 100" className="w-20 h-20 shrink-0" aria-hidden="true">
+          <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="8" />
+          <circle
+            cx="50" cy="50" r="40" fill="none"
+            stroke={gaugeStroke}
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeDasharray={CIRC}
+            strokeDashoffset={gaugeDashOffset}
+            transform="rotate(-90 50 50)"
+            style={{ transition: 'stroke-dashoffset 1s ease' }}
+          />
+          <text x="50" y="47" textAnchor="middle" style={{ fontSize: '18px', fill: 'white', fontWeight: 900 }}>
+            {(data.probability * 100).toFixed(0)}%
+          </text>
+          <text x="50" y="62" textAnchor="middle" style={{ fontSize: '8px', fill: 'rgba(148,163,184,0.7)' }}>
+            HR PROB
+          </text>
+        </svg>
+
+        <div className="flex-1">
+          <p className="text-xs text-slate-400 mb-0.5">Fair odds</p>
+          <p className="text-2xl font-black text-white tabular-nums">{fmtOdds(modelOdds)}</p>
+          {kellyRec !== null && (
+            <p className="text-[10px] text-emerald-400/80 mt-1">
+              ¼ Kelly: {(kellyRec * 100).toFixed(1)}% stake
+            </p>
+          )}
         </div>
 
         {/* Edge vs market */}

@@ -3480,7 +3480,7 @@ No preamble. Start directly with section 1.`;
             {/* Database Status Banner */}
             <DatabaseStatusBanner />
             {messages.length === 0 ? (
-              <WelcomeScreen onPromptSelect={setInput} />
+              <WelcomeScreen onPromptSelect={(q) => generateRealResponse(q)} />
             ) : (
               messages.map((message: any, index: any) => {
                 // Group messages: Check if this message is from same sender as previous

@@ -136,7 +136,7 @@ export function DynamicCardRenderer({
   const hasTrustOverlay = trustScore !== undefined;
 
   // Per-card bookmark state (persisted to localStorage)
-  const bookmarkKey = `bookmark:${safeCard.id ?? safeCard.type}:${safeCard.title}`;
+  const bookmarkKey = `bookmark:${safeCard.type}:${safeCard.title}`;
   const [isBookmarked, setIsBookmarked] = useState(() => {
     try { return !!localStorage.getItem(bookmarkKey); } catch { return false; }
   });

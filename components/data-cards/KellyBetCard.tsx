@@ -45,6 +45,13 @@ export function KellyBetCard({
 }: KellyBetCardProps) {
   const edgeNum = parseNumeric(data.edge);
   const confidenceNum = parseNumeric(data.confidence);
+  const stakeNum = parseNumeric(data.recommendedStake);
+  const evNum = parseNumeric(data.expectedValue);
+  const halfKelly = stakeNum !== null ? (stakeNum / 2).toFixed(0) : null;
+  const quarterKelly = stakeNum !== null ? (stakeNum / 4).toFixed(0) : null;
+  const bankrollPct = stakeNum !== null ? (stakeNum / 1000 * 100).toFixed(1) : null;
+  const roiPct = stakeNum !== null && evNum !== null && stakeNum > 0 ? (evNum / stakeNum * 100).toFixed(1) : null;
+  const isLowEdge = edgeNum !== null && edgeNum < 3;
 
   const edgeColor =
     edgeNum !== null && edgeNum >= 5 ? 'text-emerald-400' :
@@ -79,15 +86,45 @@ export function KellyBetCard({
 
         <h3 className="text-sm font-black text-[oklch(0.92_0.005_85)] mb-4 truncate">{title}</h3>
 
+        {/* Low-edge warning banner */}
+        {isLowEdge && (
+          <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-xl bg-amber-500/8 border border-amber-500/20 text-[10px] font-semibold text-amber-300">
+            <Target className="w-3 h-3 shrink-0" />
+            Low-edge play — consider half kelly sizing
+          </div>
+        )}
+
         {/* Recommended stake — hero metric */}
         {data.recommendedStake && (
-          <div className="mb-4">
+          <div className="mb-1">
             <p className="text-[9px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-0.5">
               Recommended Stake
             </p>
-            <p className="text-3xl font-black text-[oklch(0.92_0.005_85)] tabular-nums leading-none">
+            <p className={cn('text-3xl font-black tabular-nums leading-none', isLowEdge ? 'text-amber-400' : 'text-[oklch(0.92_0.005_85)]')}>
               {data.recommendedStake}
             </p>
+            {bankrollPct !== null && (
+              <p className="text-[9px] text-[oklch(0.40_0.01_280)] mt-0.5">{bankrollPct}% of $1,000 bankroll</p>
+            )}
+          </div>
+        )}
+
+        {/* Kelly variants comparison */}
+        {stakeNum !== null && (
+          <div className="rounded-xl bg-[oklch(0.09_0.01_280)] border border-[oklch(0.18_0.015_280)] px-3 py-2.5 mb-3">
+            <p className="text-[8px] font-black uppercase tracking-widest text-[oklch(0.38_0.01_280)] mb-2">Kelly Variants</p>
+            <div className="space-y-1">
+              {[
+                { label: 'Full Kelly', val: data.recommendedStake, active: true },
+                { label: 'Half Kelly', val: `$${halfKelly}` },
+                { label: '¼ Kelly', val: `$${quarterKelly}` },
+              ].map(({ label, val, active }) => (
+                <div key={label} className={cn('flex justify-between text-xs rounded-lg px-2.5 py-1.5', active ? 'bg-indigo-500/10 border border-indigo-500/20' : 'bg-transparent')}>
+                  <span className={active ? 'text-indigo-300 font-bold' : 'text-[oklch(0.45_0.01_280)]'}>{label}</span>
+                  <span className={cn('font-black tabular-nums', active ? 'text-indigo-300' : 'text-[oklch(0.65_0.01_280)]')}>{val}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -95,7 +132,7 @@ export function KellyBetCard({
         <div className="grid grid-cols-3 gap-2 mb-4">
           <MetricCell label="Edge" value={data.edge ?? '—'} valueClass={edgeColor} />
           <MetricCell label="Kelly %" value={data.kellyFraction ?? '—'} />
-          <MetricCell label="Exp. Value" value={data.expectedValue ?? '—'} valueClass="text-blue-400" />
+          <MetricCell label="ROI" value={roiPct !== null ? `+${roiPct}%` : (data.expectedValue ?? '—')} valueClass="text-blue-400" />
         </div>
 
         {/* Confidence bar */}

@@ -143,8 +143,16 @@ export const DFSCard = memo(function DFSCard({
     player, team, position,
     targetGame, targetPlayers, description,
     platforms, tips, salary, projection, ownership,
-    boomCeiling, bustFloor, realData, ...rest
+    boomCeiling, bustFloor, realData,
+    cardCategory, recentDKPts, recentGamesAvg,
+    homeDKAvg, roadDKAvg, homeSplitGames, roadSplitGames,
+    stackTeam, stackType, stackPartners, playerId, // structural — exclude from overflow
+    matchupScore, parkFactor,
+    ...rest
   } = data;
+
+  const matchupScoreNum = matchupScore ? parseFloat(String(matchupScore)) : null;
+  const parkFactorNum = parkFactor ? parseFloat(String(parkFactor)) : null;
 
   const projNum      = parseFloat(String(projection  || '').replace(/[^0-9.]/g, ''));
   const salaryNum    = parseFloat(String(salary      || '').replace(/[^0-9.]/g, ''));
@@ -155,7 +163,7 @@ export const DFSCard = memo(function DFSCard({
   const stackPlayers = Array.isArray(targetPlayers) ? targetPlayers : targetPlayers ? [targetPlayers] : [];
 
   const extraKeys = Object.keys(rest).filter(k =>
-    !['status', 'sport', 'insight', 'source', 'focus', 'value'].includes(k) && rest[k] != null
+    !['status', 'sport', 'insight', 'source', 'focus', 'value', 'dkValue', 'matchupScore', 'parkFactor', 'hrProb'].includes(k) && rest[k] != null
   );
 
   return (
@@ -173,6 +181,20 @@ export const DFSCard = memo(function DFSCard({
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[8px] font-bold text-emerald-400/80">
               <span className="w-1 h-1 rounded-full bg-emerald-400" />
               LIVE
+            </span>
+          )}
+          {cardCategory && (
+            <span className={cn('text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border',
+              cardCategory === 'value'      ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400' :
+              cardCategory === 'matchup'    ? 'bg-blue-500/10 border-blue-500/25 text-blue-400' :
+              cardCategory === 'contrarian' ? 'bg-violet-500/10 border-violet-500/25 text-violet-400' :
+              cardCategory === 'chalk'      ? 'bg-amber-500/10 border-amber-500/25 text-amber-400' :
+              'bg-white/5 border-white/10 text-white/50'
+            )}>
+              {cardCategory === 'value'      ? 'VALUE' :
+               cardCategory === 'matchup'    ? 'MATCHUP' :
+               cardCategory === 'contrarian' ? 'CONTRARIAN' :
+               cardCategory === 'chalk'      ? 'CHALK' : 'OPTIMAL'}
             </span>
           )}
           <span className={cn('w-1.5 h-1.5 rounded-full animate-pulse', cfg.dotCls)} />
@@ -264,6 +286,76 @@ export const DFSCard = memo(function DFSCard({
           </div>
         )}
 
+        {/* ── Recent Form sparkline ─────────────────────────────────── */}
+        {recentDKPts && (() => {
+          const pts = String(recentDKPts).split(',').map(Number).filter(n => !isNaN(n));
+          if (pts.length === 0) return null;
+          const max = Math.max(...pts, 1);
+          return (
+            <div className="rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] px-3 py-2.5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[8px] font-black uppercase tracking-wider text-[oklch(0.38_0.01_280)]">Recent Form</span>
+                {recentGamesAvg && (
+                  <span className="text-[9px] text-white/50 tabular-nums">{recentGamesAvg}</span>
+                )}
+              </div>
+              <div className="flex items-end gap-1 h-8">
+                {pts.map((p, i) => (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                    <div
+                      className={cn('w-full rounded-sm',
+                        p >= max * 0.7 ? 'bg-emerald-500' : p >= max * 0.4 ? 'bg-blue-500' : 'bg-red-500/60'
+                      )}
+                      style={{ height: `${Math.round((p / max) * 24) + 4}px` }}
+                    />
+                    <span className="text-[7px] text-white/30 tabular-nums">{p.toFixed(0)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── Home / Road splits ────────────────────────────────────── */}
+        {(homeDKAvg || roadDKAvg) && (
+          <div className="grid grid-cols-2 gap-1.5">
+            <div className="rounded-lg bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] px-2 py-2 text-center">
+              <span className="text-[7px] font-bold uppercase tracking-wider text-[oklch(0.38_0.01_280)] block mb-0.5">
+                Home {homeSplitGames ? `· ${homeSplitGames}` : ''}
+              </span>
+              <span className="text-sm font-black text-white tabular-nums">{homeDKAvg ?? '—'}</span>
+              <span className="text-[8px] text-white/40 ml-0.5">DK avg</span>
+            </div>
+            <div className="rounded-lg bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] px-2 py-2 text-center">
+              <span className="text-[7px] font-bold uppercase tracking-wider text-[oklch(0.38_0.01_280)] block mb-0.5">
+                Road {roadSplitGames ? `· ${roadSplitGames}` : ''}
+              </span>
+              <span className="text-sm font-black text-white tabular-nums">{roadDKAvg ?? '—'}</span>
+              <span className="text-[8px] text-white/40 ml-0.5">DK avg</span>
+            </div>
+          </div>
+        )}
+
+        {/* ── Matchup score bar ─────────────────────────────────────── */}
+        {matchupScoreNum !== null && !isNaN(matchupScoreNum) && (
+          <div className="rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] px-3 py-2.5 space-y-1">
+            <div className="flex justify-between text-[9px] font-bold uppercase tracking-wide">
+              <span className="text-[oklch(0.40_0.01_280)]">Matchup Score</span>
+              <span className={cn(
+                matchupScoreNum >= 70 ? 'text-emerald-400' : matchupScoreNum >= 50 ? 'text-amber-400' : 'text-red-400'
+              )}>{Math.round(matchupScoreNum)}/100</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+              <div
+                className={cn('h-full rounded-full transition-all duration-700',
+                  matchupScoreNum >= 70 ? 'bg-emerald-500' : matchupScoreNum >= 50 ? 'bg-amber-500' : 'bg-red-500'
+                )}
+                style={{ width: `${Math.min(100, matchupScoreNum)}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* ── Stack section ─────────────────────────────────────────── */}
         {stackPlayers.length > 0 && (
           <div className="rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] px-3 py-2.5">
@@ -287,7 +379,7 @@ export const DFSCard = memo(function DFSCard({
         )}
 
         {/* ── Context chips (game / platforms when no stack) ─────────── */}
-        {!stackPlayers.length && (targetGame || platforms) && (
+        {!stackPlayers.length && (targetGame || platforms || parkFactorNum) && (
           <div className="flex flex-wrap gap-1.5">
             {targetGame && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[oklch(0.13_0.015_280)] border border-[oklch(0.19_0.015_280)] text-[10px] font-medium text-[oklch(0.58_0.01_280)]">
@@ -297,6 +389,16 @@ export const DFSCard = memo(function DFSCard({
             {platforms && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[oklch(0.13_0.015_280)] border border-[oklch(0.19_0.015_280)] text-[10px] font-medium text-[oklch(0.58_0.01_280)]">
                 {Array.isArray(platforms) ? platforms.join(' · ') : String(platforms)}
+              </span>
+            )}
+            {parkFactorNum !== null && !isNaN(parkFactorNum) && (
+              <span className={cn(
+                'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border',
+                parkFactorNum >= 1.05 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                  : parkFactorNum <= 0.96 ? 'bg-red-500/10 border-red-500/20 text-red-400'
+                  : 'bg-[oklch(0.13_0.015_280)] border-[oklch(0.19_0.015_280)] text-[oklch(0.55_0.01_280)]',
+              )}>
+                Park {parkFactorNum.toFixed(2)}x {parkFactorNum >= 1.05 ? '· Hitter-friendly' : parkFactorNum <= 0.96 ? '· Pitcher-friendly' : ''}
               </span>
             )}
           </div>
@@ -323,7 +425,10 @@ export const DFSCard = memo(function DFSCard({
 
         {/* ── Description fallback ──────────────────────────────────── */}
         {!hasCorePlay && description && (
-          <p className="text-xs text-[oklch(0.52_0.01_280)] leading-relaxed mt-3">{description}</p>
+          <div className="rounded-xl border border-[oklch(0.20_0.015_280)] bg-[oklch(0.08_0.01_280)] px-3 py-2.5 mt-3">
+            <span className="text-[8px] font-black uppercase tracking-widest text-[oklch(0.38_0.01_280)] mb-1 block">Overview</span>
+            <p className="text-[11px] text-[oklch(0.52_0.01_280)] leading-relaxed">{description}</p>
+          </div>
         )}
 
         {/* ── Overflow key-value data ───────────────────────────────── */}
@@ -334,7 +439,9 @@ export const DFSCard = memo(function DFSCard({
                 <span className="text-[10px] font-semibold text-[oklch(0.42_0.01_280)] uppercase tracking-wide">
                   {k.replace(/([A-Z])/g, ' $1').trim()}
                 </span>
-                <span className="text-xs font-bold text-white tabular-nums">{String(rest[k])}</span>
+                <span className={cn('text-xs font-black tabular-nums',
+                  String(rest[k]).endsWith('%') ? 'text-amber-400' : 'text-white'
+                )}>{String(rest[k])}</span>
               </div>
             ))}
           </div>

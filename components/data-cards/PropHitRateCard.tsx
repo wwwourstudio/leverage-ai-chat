@@ -25,6 +25,20 @@ interface PropHitRateCardProps {
   onAnalyze?: () => void;
 }
 
+function HitRateGrade({ pct }: { pct: number }) {
+  const grade = pct >= 80 ? 'A' : pct >= 65 ? 'B' : pct >= 50 ? 'C' : pct >= 35 ? 'D' : 'F';
+  const cls = pct >= 80 ? 'bg-emerald-500/15 text-emerald-400 ring-emerald-500/30'
+    : pct >= 65 ? 'bg-blue-500/15 text-blue-400 ring-blue-500/30'
+    : pct >= 50 ? 'bg-amber-500/15 text-amber-400 ring-amber-500/30'
+    : pct >= 35 ? 'bg-orange-500/15 text-orange-400 ring-orange-500/30'
+    : 'bg-red-500/15 text-red-400 ring-red-500/30';
+  return (
+    <div className={cn('w-8 h-8 rounded-full ring-1 flex items-center justify-center shrink-0', cls)}>
+      <span className="text-xs font-black">{grade}</span>
+    </div>
+  );
+}
+
 /** Convert recentForm string like "W,W,L,W,L" into hit/miss booleans */
 function parseRecentForm(recentForm?: string): boolean[] {
   if (!recentForm) return [];
@@ -97,11 +111,14 @@ export const PropHitRateCard = memo(function PropHitRateCard({
               )}
             </div>
           </div>
-          <div className="text-right shrink-0">
-            <p className={cn('font-black tabular-nums', hitColor, isHero ? 'text-2xl' : 'text-xl')}>
-              {hitRatePercentage.toFixed(1)}%
-            </p>
-            <p className="text-[10px] text-gray-600">{hits}/{totalGames} games</p>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="text-right">
+              <p className={cn('font-black tabular-nums', hitColor, isHero ? 'text-2xl' : 'text-xl')}>
+                {hitRatePercentage.toFixed(1)}%
+              </p>
+              <p className="text-[10px] text-gray-600">{hits}/{totalGames} games</p>
+            </div>
+            <HitRateGrade pct={hitRatePercentage} />
           </div>
         </div>
 
@@ -161,16 +178,19 @@ export const PropHitRateCard = memo(function PropHitRateCard({
             )} />
             <span className="text-[11px] text-gray-500 capitalize">{trend.replace('_', ' ')}</span>
           </div>
-          <div className="flex items-center gap-1.5 ml-auto">
-            <div className={cn('rounded-full w-2 h-2',
-              confidence === 'high' ? 'bg-emerald-400' : confidence === 'medium' ? 'bg-amber-400' : 'bg-red-400',
-            )} />
-            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-600">{confidence}</span>
-          </div>
+          <span className={cn(
+            'text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ml-auto',
+            confidence === 'high' ? 'bg-emerald-500/15 text-emerald-400'
+            : confidence === 'medium' ? 'bg-amber-500/15 text-amber-400'
+            : 'bg-red-500/15 text-red-400',
+          )}>
+            {confidence} conf
+          </span>
         </div>
 
         {/* Recommendation */}
         <div className="rounded-xl border border-[oklch(0.22_0.02_280)] bg-[oklch(0.10_0.01_280)] px-3 py-2.5">
+          <span className="text-[8px] font-black uppercase tracking-widest text-gray-600 mb-1 block">Recommendation</span>
           <p className="text-[11px] text-gray-400 leading-relaxed">{recommendation}</p>
         </div>
 

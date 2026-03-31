@@ -48,6 +48,8 @@ export function BullpenFatigueCard({
   const styles = RISK_STYLES[risk] ?? RISK_STYLES.low;
   const fatigueScore = Number(data.fatigueScore ?? 0);
   const impact = Number(data.scoringEnvImpact ?? 0);
+  const eraNum  = Number(data.eraLast14Days ?? 0);
+  const eraColor = eraNum > 5.0 ? 'text-red-400' : eraNum > 4.0 ? 'text-amber-400' : eraNum > 0 ? 'text-emerald-400' : 'text-[oklch(0.85_0.005_85)]';
 
   return (
     <article
@@ -69,6 +71,9 @@ export function BullpenFatigueCard({
               <span className="text-[oklch(0.3_0.01_280)] mx-1.5">/</span>
               <span className="text-[10px] font-medium text-[oklch(0.45_0.01_280)]">{subcategory}</span>
               <h3 className="text-sm font-black text-[oklch(0.92_0.005_85)] mt-1 leading-snug">{title}</h3>
+              {data.teamName && (
+                <p className="text-[10px] text-[oklch(0.50_0.01_280)] mt-0.5">{data.teamName} Bullpen</p>
+              )}
             </div>
           </div>
 
@@ -96,17 +101,23 @@ export function BullpenFatigueCard({
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-2 mb-3">
+        <div className="grid grid-cols-2 gap-2 mb-3">
           {data.inningsLast3Days !== undefined && (
             <div className="bg-[oklch(0.09_0.01_280)] rounded-lg border border-[oklch(0.18_0.015_280)] p-2.5 text-center">
               <p className="text-[8px] uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-1">Inn / 3d</p>
               <p className="text-sm font-black tabular-nums text-[oklch(0.85_0.005_85)]">{data.inningsLast3Days}</p>
             </div>
           )}
+          {data.pitchCountLast3Days !== undefined && (
+            <div className="bg-[oklch(0.09_0.01_280)] rounded-lg border border-[oklch(0.18_0.015_280)] p-2.5 text-center">
+              <p className="text-[8px] uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-1">Pitches / 3d</p>
+              <p className="text-sm font-black tabular-nums text-[oklch(0.85_0.005_85)]">{data.pitchCountLast3Days}</p>
+            </div>
+          )}
           {data.eraLast14Days !== undefined && (
             <div className="bg-[oklch(0.09_0.01_280)] rounded-lg border border-[oklch(0.18_0.015_280)] p-2.5 text-center">
               <p className="text-[8px] uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-1">ERA L14</p>
-              <p className="text-sm font-black tabular-nums text-[oklch(0.85_0.005_85)]">{Number(data.eraLast14Days).toFixed(2)}</p>
+              <p className={cn('text-sm font-black tabular-nums', eraColor)}>{Number(data.eraLast14Days).toFixed(2)}</p>
             </div>
           )}
           {data.scoringEnvImpact !== undefined && (
@@ -121,6 +132,20 @@ export function BullpenFatigueCard({
 
         {data.signal && (
           <p className="text-[11px] text-[oklch(0.60_0.01_280)] leading-relaxed">{data.signal}</p>
+        )}
+
+        {/* Run environment impact banner */}
+        {impact !== 0 && (
+          <div className={cn(
+            'rounded-lg px-3 py-2 text-[10px] font-semibold mt-2 border',
+            impact > 0.5
+              ? 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+              : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300',
+          )}>
+            {impact > 0
+              ? `+${impact.toFixed(1)} runs added — lean over on totals`
+              : `${impact.toFixed(1)} runs suppressed — lean under on totals`}
+          </div>
         )}
 
         {onAnalyze && (

@@ -526,6 +526,34 @@ export const BettingCard = memo(function BettingCard({
           </div>
         )}
 
+        {/* ── Player prop data strip ────────────────────────────────── */}
+        {isPlayerProp && data.player && (data.line != null || data.hitRate != null || confPct !== null) && (
+          <div className={cn('grid gap-1.5', [data.line != null, data.hitRate != null, confPct !== null].filter(Boolean).length === 3 ? 'grid-cols-3' : [data.line != null, data.hitRate != null, confPct !== null].filter(Boolean).length === 2 ? 'grid-cols-2' : 'grid-cols-1')}>
+            {data.line != null && (
+              <div className="flex flex-col items-center rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)] px-2 py-2">
+                <span className="text-[8px] font-bold uppercase tracking-wider text-[oklch(0.38_0.01_280)]">Line</span>
+                <span className="text-base font-black text-white tabular-nums">{data.line}</span>
+              </div>
+            )}
+            {data.hitRate != null && (
+              <div className="flex flex-col items-center rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)] px-2 py-2">
+                <span className="text-[8px] font-bold uppercase tracking-wider text-[oklch(0.38_0.01_280)]">Hit Rate</span>
+                <span className={cn('text-base font-black tabular-nums',
+                  Number(data.hitRate) >= 65 ? 'text-emerald-400' : Number(data.hitRate) <= 35 ? 'text-red-400' : 'text-white'
+                )}>{data.hitRate}%</span>
+              </div>
+            )}
+            {confPct !== null && (
+              <div className="flex flex-col items-center rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)] px-2 py-2">
+                <span className="text-[8px] font-bold uppercase tracking-wider text-[oklch(0.38_0.01_280)]">Confidence</span>
+                <span className={cn('text-base font-black tabular-nums',
+                  confPct >= 70 ? 'text-emerald-400' : confPct >= 50 ? 'text-amber-400' : 'text-red-400'
+                )}>{confPct}%</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Team matchup block ─────────────────────────────────────── */}
         {!isPlayerProp && teams ? (
           <div className="mt-3 rounded-xl border border-[oklch(0.17_0.015_280)] overflow-hidden bg-[oklch(0.08_0.01_280)]">
@@ -735,6 +763,15 @@ export const BettingCard = memo(function BettingCard({
                   {moveDir === 'up' ? <TrendingUp className="w-2.5 h-2.5" /> : moveDir === 'down' ? <TrendingDown className="w-2.5 h-2.5" /> : <Minus className="w-2.5 h-2.5" />}
                   {!isNaN(moveNum) && moveNum !== 0 ? (moveNum > 0 ? `+${moveNum}` : String(moveNum)) : String(rawMove)}
                 </span>
+              </div>
+            )}
+
+            {/* Reverse Line Movement indicator */}
+            {sharpPct !== null && sharpPct >= 60 && hasLineMove && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/8 border border-amber-500/20">
+                <Zap className="w-3 h-3 text-amber-400 shrink-0" />
+                <span className="text-[10px] font-bold text-amber-300">Reverse Line Movement</span>
+                <span className="text-[9px] text-amber-400/70 ml-0.5">— sharp action against public</span>
               </div>
             )}
 

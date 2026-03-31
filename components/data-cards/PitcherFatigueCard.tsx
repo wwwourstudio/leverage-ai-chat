@@ -51,6 +51,20 @@ export function PitcherFatigueCard({
   // Map 0.80–1.50 multiplier range to 0–100% bar
   const barPct = Math.min(100, Math.max(0, ((multiplier - 0.80) / 0.70) * 100));
 
+  const pitchCount = Number(data.pitchCountLastStart ?? 0);
+  const daysRest   = Number(data.daysRest ?? 4);
+  const isHighCount  = pitchCount > 105;
+  const isShortRest  = daysRest > 0 && daysRest <= 3;
+  const recText =
+    label === 'at-risk' ? 'Avoid in DFS — high fatigue, decline likely'
+    : label === 'tired'  ? 'Fade K/IP overs — reduced velocity expected'
+    : label === 'normal' ? 'Standard projection applies'
+    : 'Favorable start — target in DFS & parlays';
+  const recColors =
+    label === 'at-risk' ? 'bg-red-500/10 border-red-500/20 text-red-300'
+    : label === 'tired'  ? 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+    : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300';
+
   return (
     <article
       className={cn(
@@ -131,9 +145,31 @@ export function PitcherFatigueCard({
           )}
         </div>
 
+        {/* Warning flags */}
+        {(isHighCount || isShortRest) && (
+          <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 mb-2 space-y-0.5">
+            {isHighCount && (
+              <p className="text-[10px] text-amber-300 font-semibold">⚠ High pitch count ({pitchCount}) — velocity/command risk</p>
+            )}
+            {isShortRest && (
+              <p className="text-[10px] text-amber-300 font-semibold">⚠ Short rest ({daysRest}d) — monitor lineup/scratch</p>
+            )}
+          </div>
+        )}
+
+        {/* Action recommendation */}
+        <div className={cn('rounded-lg px-3 py-2 text-[10px] font-semibold mb-2 border', recColors)}>
+          {recText}
+        </div>
+
         {/* Betting impact */}
         {data.bettingImpact && (
           <p className="text-[11px] text-[oklch(0.60_0.01_280)] leading-relaxed">{data.bettingImpact}</p>
+        )}
+
+        {/* Description context */}
+        {data.description && (
+          <p className="text-[10px] text-[oklch(0.50_0.01_280)] italic leading-relaxed mt-1">{data.description}</p>
         )}
 
         {onAnalyze && (

@@ -55,6 +55,13 @@ export function CatcherFramingCard({
   // Map fRAA -25..+25 to bar 0..100%
   const barPct = Math.min(100, Math.max(0, (fRAA + 25) / 50 * 100));
 
+  // Called strike conversion delta (typical range: -0.05 to +0.05)
+  const cscd = Number(data.calledStrikeConversionDelta ?? 0);
+  const hasCscd = data.calledStrikeConversionDelta !== undefined && Math.abs(cscd) > 0.001;
+  const cscdBarPct = Math.min(100, Math.max(0, ((cscd + 0.05) / 0.10) * 100));
+  const cscdBarColor = cscd > 0 ? 'bg-emerald-500' : cscd < 0 ? 'bg-red-500' : 'bg-slate-500';
+  const cscdColor = cscd > 0 ? 'text-emerald-400' : cscd < 0 ? 'text-red-400' : 'text-[oklch(0.80_0.005_85)]';
+
   function fmtPct(v: number): string {
     return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(0)}%`;
   }
@@ -86,6 +93,10 @@ export function CatcherFramingCard({
           </span>
         </div>
 
+        {data.catcherName && (
+          <p className="text-[10px] font-semibold text-[oklch(0.65_0.01_280)] mb-2">Catcher: {data.catcherName}</p>
+        )}
+
         {/* fRAA bar */}
         <div className="mb-4">
           <div className="flex justify-between items-center mb-1.5 text-[10px]">
@@ -110,6 +121,29 @@ export function CatcherFramingCard({
             <span>+25 (best)</span>
           </div>
         </div>
+
+        {/* Called strike conversion delta */}
+        {hasCscd && (
+          <div className="mb-4">
+            <div className="flex justify-between items-center mb-1.5 text-[10px]">
+              <span className="text-[oklch(0.45_0.01_280)]">Called Strike Conversion Δ</span>
+              <span className={cn('font-black tabular-nums', cscdColor)}>
+                {cscd > 0 ? '+' : ''}{(cscd * 100).toFixed(1)}pp
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-[oklch(0.18_0.015_280)] overflow-hidden">
+              <div
+                className={cn('h-full rounded-full transition-all duration-500', cscdBarColor)}
+                style={{ width: `${cscdBarPct}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[8px] text-[oklch(0.38_0.01_280)] mt-1">
+              <span>-5pp</span>
+              <span>avg</span>
+              <span>+5pp</span>
+            </div>
+          </div>
+        )}
 
         {/* Prop impact grid */}
         <div className="grid grid-cols-3 gap-2 mb-3">

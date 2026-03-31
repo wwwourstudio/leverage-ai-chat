@@ -436,7 +436,6 @@ export function Sidebar({
                         key={cat.id}
                         onClick={() => {
                           setSelectedCategory(cat.id);
-                          setSelectedSport('');
                           setSuggestedPrompts([]);
                           setLastUserQuery('');
                         }}

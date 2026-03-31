@@ -122,14 +122,54 @@ export function LineMovementCard({
               </div>
             </div>
 
-            {/* Details row */}
-            <div className="space-y-1.5 text-xs">
-              {data.sharpMoney && (
-                <div className="flex items-center justify-between">
+            {/* Sharp / public split bar */}
+            {data.sharpMoney && (() => {
+              const sharpMatch = String(data.sharpMoney).match(/(\d+)/);
+              const sharpNum = sharpMatch ? parseInt(sharpMatch[1]) : null;
+              const publicNum = sharpNum !== null ? 100 - sharpNum : null;
+              return sharpNum !== null ? (
+                <div className="rounded-xl bg-[oklch(0.09_0.01_280)] border border-[oklch(0.18_0.015_280)] px-3 py-2.5 space-y-1.5">
+                  <div className="flex justify-between text-[9px] font-bold uppercase tracking-wide">
+                    <span className="text-[oklch(0.42_0.01_280)]">Public {publicNum}%</span>
+                    <span className={sharpNum >= 60 ? 'text-amber-400' : 'text-[oklch(0.55_0.01_280)]'}>Sharp {sharpNum}%</span>
+                  </div>
+                  <div className="h-2 rounded-full overflow-hidden flex">
+                    <div className="h-full bg-[oklch(0.30_0.01_280)]" style={{ width: `${publicNum}%` }} />
+                    <div className={cn('h-full', sharpNum >= 60 ? 'bg-amber-500' : 'bg-blue-500/70')} style={{ width: `${sharpNum}%` }} />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between text-xs">
                   <span className="text-[oklch(0.45_0.01_280)]">Sharp Action</span>
                   <span className="font-semibold text-[oklch(0.80_0.005_85)]">{data.sharpMoney}</span>
                 </div>
-              )}
+              );
+            })()}
+
+            {/* Follow / Fade recommendation */}
+            {(isSteam || data.sharpMoney) && (() => {
+              const sharpMatch = String(data.sharpMoney ?? '').match(/(\d+)/);
+              const sharpNum = sharpMatch ? parseInt(sharpMatch[1]) : null;
+              const followSharp = isSteam || (sharpNum !== null && sharpNum >= 65);
+              return (
+                <div className={cn(
+                  'flex items-center gap-2 px-3 py-2 rounded-xl border text-[10px] font-semibold',
+                  followSharp
+                    ? 'bg-amber-500/8 border-amber-500/20 text-amber-300'
+                    : 'bg-[oklch(0.10_0.01_280)] border-[oklch(0.19_0.015_280)] text-[oklch(0.55_0.01_280)]',
+                )}>
+                  {followSharp
+                    ? (isUp ? <TrendingUp className="w-3 h-3 shrink-0" /> : <TrendingDown className="w-3 h-3 shrink-0" />)
+                    : <Activity className="w-3 h-3 shrink-0" />}
+                  {followSharp
+                    ? `Follow sharp money — line trending ${isUp ? 'up' : 'down'}`
+                    : 'Monitor — insufficient sharp signal'}
+                </div>
+              );
+            })()}
+
+            {/* Details row */}
+            <div className="space-y-1.5 text-xs">
               {data.bookmaker && (
                 <div className="flex items-center justify-between">
                   <span className="text-[oklch(0.45_0.01_280)]">Source</span>

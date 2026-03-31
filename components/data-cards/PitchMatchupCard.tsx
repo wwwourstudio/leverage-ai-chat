@@ -50,6 +50,20 @@ export function PitchMatchupCard({
     neutral: { border: 'border-[oklch(0.22_0.02_280)]', badge: 'bg-slate-500/10 border-slate-500/30 text-slate-400', label: 'Neutral' },
   }[advantage];
 
+  // Pitch type colors
+  const PITCH_COLORS: Record<string, string> = {
+    FF: 'bg-red-500/70', FT: 'bg-orange-500/70', SI: 'bg-orange-400/70',
+    FC: 'bg-amber-500/70', SL: 'bg-blue-500/70', ST: 'bg-sky-400/70',
+    CH: 'bg-emerald-500/70', FS: 'bg-teal-500/70', CB: 'bg-yellow-500/70',
+    CU: 'bg-yellow-500/70', KC: 'bg-yellow-400/70',
+  };
+  const getPitchColor = (pt: string) => PITCH_COLORS[pt.toUpperCase()] ?? 'bg-purple-500/60';
+
+  // Spin rate context
+  const spinNum = Number(data.pitcherSpinRate ?? 0);
+  const spinLabel = spinNum > 2500 ? 'elite' : spinNum > 2200 ? 'avg' : 'low';
+  const spinColor = spinNum > 2500 ? 'text-emerald-400' : spinNum > 2200 ? 'text-[oklch(0.80_0.005_85)]' : 'text-amber-400';
+
   // Parse pitch mix if JSON string
   let mixEntries: [string, string][] = [];
   try {
@@ -86,6 +100,21 @@ export function PitchMatchupCard({
           </span>
         </div>
 
+        {/* Batter vs pitcher strip */}
+        {(data.batterName || data.pitcherName) && (
+          <div className="flex items-center justify-between rounded-lg bg-[oklch(0.09_0.01_280)] border border-[oklch(0.18_0.015_280)] px-3 py-1.5 mb-3 text-xs">
+            <div className="text-center min-w-0 flex-1">
+              <p className="text-[8px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-0.5">Batter</p>
+              <p className="font-semibold text-[oklch(0.85_0.005_85)] truncate">{data.batterName ?? '—'}</p>
+            </div>
+            <span className="text-[10px] font-black text-[oklch(0.38_0.01_280)] px-3 shrink-0">vs</span>
+            <div className="text-center min-w-0 flex-1">
+              <p className="text-[8px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-0.5">Pitcher</p>
+              <p className="font-semibold text-[oklch(0.85_0.005_85)] truncate">{data.pitcherName ?? '—'}</p>
+            </div>
+          </div>
+        )}
+
         {/* Edge + velocity */}
         <div className="grid grid-cols-3 gap-2 mb-3">
           <div className="bg-[oklch(0.09_0.01_280)] rounded-lg border border-[oklch(0.18_0.015_280)] p-2.5 text-center">
@@ -108,6 +137,17 @@ export function PitchMatchupCard({
           )}
         </div>
 
+        {/* Spin rate context */}
+        {spinNum > 0 && (
+          <div className="flex items-center justify-between text-xs mb-2">
+            <span className="text-[oklch(0.45_0.01_280)]">Spin Rate</span>
+            <span className={cn('font-semibold tabular-nums', spinColor)}>
+              {spinNum.toLocaleString()} rpm
+              <span className="text-[oklch(0.45_0.01_280)] font-normal ml-1">({spinLabel})</span>
+            </span>
+          </div>
+        )}
+
         {/* Pitch mix breakdown */}
         {mixEntries.length > 0 && (
           <div className="space-y-1 mb-3">
@@ -116,7 +156,7 @@ export function PitchMatchupCard({
                 <span className="w-6 text-[oklch(0.50_0.01_280)] font-mono text-[10px]">{pitch}</span>
                 <div className="flex-1 h-1.5 rounded-full bg-[oklch(0.18_0.015_280)] overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-purple-500/60"
+                    className={cn('h-full rounded-full', getPitchColor(pitch))}
                     style={{ width: pct.toString().replace('%', '') + '%' }}
                   />
                 </div>

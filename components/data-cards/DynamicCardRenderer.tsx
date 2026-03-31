@@ -1,5 +1,8 @@
 'use client';
 
+import { useState, useCallback } from 'react';
+import { Star } from 'lucide-react';
+
 // Standalone typed card components (used for direct API data, not AI-generated CardData)
 import { OddsCard } from '@/components/cards/OddsCard';
 import { KalshiMarketCard } from '@/components/cards/KalshiMarketCard';
@@ -31,6 +34,9 @@ import { PitchMatchupCard } from './PitchMatchupCard';
 import { UmpireImpactCard } from './UmpireImpactCard';
 import { CatcherFramingCard } from './CatcherFramingCard';
 import { ClosingLineCard } from './ClosingLineCard';
+import { DFSSlateCard } from './DFSSlateCard';
+import { PropHitRateCard } from './PropHitRateCard';
+import { PlayerPropCard } from './PlayerPropCard';
 
 interface CardData {
   id?: string;
@@ -129,13 +135,32 @@ export function DynamicCardRenderer({
   const isEstimated = safeCard.realData === false;
   const hasTrustOverlay = trustScore !== undefined;
 
-  // Wraps any card element with ESTIMATED badge (when realData===false)
-  // and a per-card trust score chip (when trustScore is provided).
+  // Per-card bookmark state (persisted to localStorage)
+  const bookmarkKey = `bookmark:${safeCard.type}:${safeCard.title}`;
+  const [isBookmarked, setIsBookmarked] = useState(() => {
+    try { return !!localStorage.getItem(bookmarkKey); } catch { return false; }
+  });
+  const toggleBookmark = useCallback(() => {
+    setIsBookmarked(prev => {
+      const next = !prev;
+      try { next ? localStorage.setItem(bookmarkKey, '1') : localStorage.removeItem(bookmarkKey); } catch {}
+      return next;
+    });
+  }, [bookmarkKey]);
+
+  // Wraps any card element with ESTIMATED badge, trust score chip, and bookmark button.
   function withOverlays(el: React.ReactElement): React.ReactElement {
-    if (!isEstimated && !hasTrustOverlay) return el;
     return (
-      <div className="relative">
+      <div className="relative group/card">
         {el}
+        {/* Bookmark button — top-right corner, visible on hover */}
+        <button
+          onClick={toggleBookmark}
+          className="absolute top-2 right-2 z-10 p-1 rounded-md opacity-0 group-hover/card:opacity-100 transition-opacity duration-150 hover:bg-white/10"
+          aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark card'}
+        >
+          <Star className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-amber-400 text-amber-400' : 'text-white/30'}`} />
+        </button>
         {isEstimated && (
           <span className="absolute top-2 right-10 z-10 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-gray-900/80 text-gray-400 border border-gray-700/50 backdrop-blur-sm pointer-events-none">
             ESTIMATED
@@ -177,6 +202,18 @@ export function DynamicCardRenderer({
         status={safeCard.status}
         onAnalyze={handleAnalyze}
         error={error}
+        isHero={isHero}
+      />
+    );
+  }
+
+  // Full DFS slate card (9-player optimal lineup roster)
+  if (cardType === 'dfs-slate') {
+    return withOverlays(
+      <DFSSlateCard
+        title={safeCard.title}
+        data={safeCard.data}
+        onAnalyze={handleAnalyze}
         isHero={isHero}
       />
     );
@@ -359,46 +396,38 @@ export function DynamicCardRenderer({
 
   // Player prop odds cards (from The Odds API via playerPropToCard())
   if (cardType.includes('player_prop') || cardType === 'player-prop') {
-    const d = safeCard.data;
-    const overRaw  = String(d.over  ?? '');
-    const underRaw = String(d.under ?? '');
-    const overNum  = parseFloat(overRaw);
-    const underNum = parseFloat(underRaw);
-    const overStr  = !isNaN(overNum)  ? (overNum  > 0 ? `+${overNum}`  : String(overNum))  : overRaw;
-    const underStr = !isNaN(underNum) ? (underNum > 0 ? `+${underNum}` : String(underNum)) : underRaw;
     return withOverlays(
-      <div className={`group relative bg-gradient-to-br ${safeCard.gradient} rounded-2xl p-5 border border-gray-700/40 hover:border-gray-600/60 transition-all duration-300 shadow-lg hover:shadow-xl`}>
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400/70">{safeCard.category} · Player Props</span>
-            <h3 className="text-sm font-black text-white mt-0.5">{d.player}</h3>
-            <p className="text-xs text-gray-400 mt-0.5">{d.stat} — Line: <span className="text-white font-semibold">{d.line}</span></p>
-          </div>
-          <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-blue-500/15 text-blue-400 border border-blue-500/20 uppercase tracking-wider flex-shrink-0">LIVE</span>
-        </div>
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <div className="bg-black/20 rounded-lg p-2.5 text-center">
-            <p className="text-[9px] uppercase tracking-widest text-gray-500 mb-1">Over {d.line}</p>
-            <p className={`text-lg font-black ${!isNaN(overNum) && overNum > 0 ? 'text-green-400' : 'text-red-400'}`}>{overStr}</p>
-          </div>
-          <div className="bg-black/20 rounded-lg p-2.5 text-center">
-            <p className="text-[9px] uppercase tracking-widest text-gray-500 mb-1">Under {d.line}</p>
-            <p className={`text-lg font-black ${!isNaN(underNum) && underNum > 0 ? 'text-green-400' : 'text-red-400'}`}>{underStr}</p>
-          </div>
-        </div>
-        <div className="border-t border-gray-700/30 pt-2.5 space-y-1">
-          <p className="text-[11px] text-gray-400 truncate">{d.game}</p>
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] text-gray-500">{d.gameTime}</p>
-            <span className="text-[9px] text-gray-600 uppercase tracking-wider">{d.bookmaker}</span>
-          </div>
-        </div>
-        {handleAnalyze && (
-          <button onClick={handleAnalyze} className="mt-3 w-full text-[10px] font-bold uppercase tracking-widest text-blue-400/70 hover:text-blue-300 transition-colors">
-            Analyze →
-          </button>
-        )}
-      </div>
+      <PlayerPropCard
+        data={safeCard.data}
+        category={safeCard.category}
+        gradient={safeCard.gradient}
+        onAnalyze={handleAnalyze}
+        isHero={isHero}
+      />
+    );
+  }
+
+  // Prop hit-rate cards (detailed historical analysis with grade rings + recent form)
+  if (cardType === 'prop-hit-rate' || cardType === 'prop_hit_rate') {
+    const d = safeCard.data;
+    return withOverlays(
+      <PropHitRateCard
+        playerName={String(d.playerName ?? d.player ?? safeCard.title ?? '')}
+        statType={String(d.statType ?? d.stat ?? '')}
+        hitRatePercentage={parseFloat(String(d.hitRatePercentage ?? d.hitRate ?? 0))}
+        totalGames={parseInt(String(d.totalGames ?? 0))}
+        hits={parseInt(String(d.hits ?? 0))}
+        misses={parseInt(String(d.misses ?? 0))}
+        avgLine={parseFloat(String(d.avgLine ?? d.line ?? 0))}
+        avgActual={parseFloat(String(d.avgActual ?? 0))}
+        trend={d.trend ?? 'stable'}
+        confidence={d.confidence ?? 'medium'}
+        recommendation={String(d.recommendation ?? '')}
+        recentForm={d.recentForm}
+        sport={safeCard.category}
+        isHero={isHero}
+        onAnalyze={handleAnalyze}
+      />
     );
   }
 

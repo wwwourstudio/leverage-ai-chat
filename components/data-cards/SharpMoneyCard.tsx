@@ -53,6 +53,9 @@ export function SharpMoneyCard({
 
   const movColor = isShorting ? 'text-red-400' : 'text-emerald-400';
 
+  const magnitudeLabel = movementNum < 5 ? 'MINOR' : movementNum < 15 ? 'MODERATE' : 'MAJOR';
+  const magnitudeColor = movementNum >= 15 ? 'text-red-400' : movementNum >= 5 ? 'text-amber-400' : 'text-slate-400';
+
   return (
     <article
       className={cn(
@@ -87,10 +90,17 @@ export function SharpMoneyCard({
           </span>
         </div>
 
-        <h3 className="text-sm font-black text-[oklch(0.92_0.005_85)] mb-4 truncate">{title}</h3>
+        <h3 className="text-sm font-black text-[oklch(0.92_0.005_85)] mb-0.5 truncate">{title}</h3>
+        {data.outcome && (
+          <p className="text-[10px] font-semibold text-[oklch(0.60_0.01_280)] mb-0.5">Side: {data.outcome}</p>
+        )}
+        {data.matchup && (
+          <p className="text-[10px] text-[oklch(0.48_0.01_280)] mb-3 truncate">{data.matchup}</p>
+        )}
+        {!data.outcome && !data.matchup && <div className="mb-3" />}
 
         {/* Line movement visualization */}
-        {(data.openPrice !== undefined && data.currentPrice !== undefined) ? (
+        {(data.openPrice !== undefined && data.currentPrice !== undefined) && (
           <div className="flex items-center justify-between bg-[oklch(0.09_0.01_280)] rounded-xl border border-[oklch(0.18_0.015_280)] p-4 mb-3">
             <div className="text-center flex-1">
               <p className="text-[8px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-1.5">Opening</p>
@@ -117,10 +127,13 @@ export function SharpMoneyCard({
               </p>
             </div>
           </div>
-        ) : (
-          data.description && (
-            <p className="text-sm text-[oklch(0.65_0.01_280)] mb-3">{data.description}</p>
-          )
+        )}
+
+        {/* Description / insight panel */}
+        {data.description && (
+          <div className="rounded-lg bg-blue-500/5 border border-blue-500/15 px-3 py-2 text-[10px] text-[oklch(0.60_0.01_280)] mb-3 leading-relaxed">
+            {data.description}
+          </div>
         )}
 
         {/* Details */}
@@ -149,6 +162,23 @@ export function SharpMoneyCard({
               <span className="text-[oklch(0.50_0.01_280)]">{data.timestamp}</span>
             </div>
           )}
+        </div>
+
+        {/* Magnitude + action recommendation */}
+        <div className={cn(
+          'rounded-lg px-3 py-2 text-[10px] font-semibold mt-3 flex items-start justify-between gap-3',
+          isSteam
+            ? 'bg-red-500/10 border border-red-500/20 text-red-300'
+            : 'bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] text-[oklch(0.55_0.01_280)]',
+        )}>
+          <span>
+            {isSteam
+              ? `⚡ Sharp steam — ${isShorting ? 'follow the shortening price' : 'price drifting with sharp backing'}`
+              : `${magnitudeLabel} move — confirm with volume before acting`}
+          </span>
+          <span className={cn('text-[9px] font-black uppercase tracking-wider shrink-0', magnitudeColor)}>
+            {magnitudeLabel}
+          </span>
         </div>
 
         {data.note && (

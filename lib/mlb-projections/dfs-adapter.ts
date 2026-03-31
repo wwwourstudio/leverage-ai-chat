@@ -8,6 +8,8 @@
  */
 
 import { runProjectionPipeline, type MLBProjectionCardData } from './projection-pipeline';
+import { fetchPlayerGameLog, fetchPlayerHomeSplits, gameLogToDKPts } from './mlb-stats-api';
+import { fetchTodaysGames } from './mlb-stats-api';
 
 export interface DFSCardData {
   type: string;
@@ -33,21 +35,37 @@ export interface DFSCardData {
     hrProb: string;
     dkValue: string;          // Pts per $1000 (value score)
     source: string;
+    // Enriched fields (optional — non-fatal if missing)
+    recentDKPts?:    string;  // CSV of last 5 game DK pts, most-recent last
+    recentGamesAvg?: string;  // e.g. "10.8 avg · L5"
+    homeDKAvg?:      string;  // avg DK pts in home games
+    roadDKAvg?:      string;  // avg DK pts in road games
+    homeSplitGames?: string;  // e.g. "8 G"
+    roadSplitGames?: string;  // e.g. "6 G"
+    cardCategory?:   string;  // 'optimal'|'value'|'matchup'|'contrarian'|'chalk'
+    stackTeam?:      string;
+    stackType?:      string;  // 'full'|'mini'
+    stackPartners?:  string[];
+    playerId?:       string;  // numeric player ID for lookups
   };
 }
 
 /**
  * Build DFS-ready cards from the projection pipeline.
  * Returns DFSCard-compatible objects sorted by projected DK pts.
+ * Each card is enriched with recent game log data and home/road splits.
  */
 export async function buildDFSCards(opts: { limit?: number; date?: string } = {}): Promise<DFSCardData[]> {
   const { limit = 9 } = opts;
 
-  const projections = await runProjectionPipeline({
-    playerType: 'all',
-    limit: limit * 2, // Over-fetch to filter and rank
-    date: opts.date,
-  });
+  const [projections, todaysGames] = await Promise.all([
+    runProjectionPipeline({
+      playerType: 'all',
+      limit: limit * 2, // Over-fetch to filter and rank
+      date: opts.date,
+    }),
+    fetchTodaysGames(opts.date).catch(() => []),
+  ]);
 
   if (projections.length === 0) return [];
 
@@ -58,10 +76,63 @@ export async function buildDFSCards(opts: { limit?: number; date?: string } = {}
     return parseFloat(bDK?.value ?? '0') - parseFloat(aDK?.value ?? '0');
   });
 
-  return sorted.slice(0, limit).map(proj => projectionToDFSCard(proj));
+  const topN = sorted.slice(0, limit);
+
+  // Enrich each player with game log + splits in parallel (non-blocking)
+  const enriched = await Promise.allSettled(
+    topN.map(async (proj) => {
+      const card = projectionToDFSCard(proj, todaysGames);
+      const isHitter = proj.position !== 'SP' && proj.position !== 'RP';
+      const group = isHitter ? 'hitting' : 'pitching';
+
+      // Attempt to find player ID from summary metrics
+      const playerIdStr = proj.summary_metrics.find(m => m.label === 'Player ID')?.value;
+      const playerId = playerIdStr ? parseInt(playerIdStr, 10) : null;
+
+      if (playerId && !isNaN(playerId)) {
+        card.data.playerId = String(playerId);
+
+        // Parallel enrichment — failures are silently ignored
+        const [gameLogs, splits] = await Promise.allSettled([
+          fetchPlayerGameLog(playerId, group, 5),
+          fetchPlayerHomeSplits(playerId, group),
+        ]);
+
+        // Recent form
+        if (gameLogs.status === 'fulfilled' && gameLogs.value.length > 0) {
+          const logs = gameLogs.value;
+          const dkPtsArr = logs.map(log => gameLogToDKPts(log));
+          card.data.recentDKPts = dkPtsArr.map(p => p.toFixed(1)).join(',');
+          const avg = dkPtsArr.reduce((s, p) => s + p, 0) / dkPtsArr.length;
+          card.data.recentGamesAvg = `${avg.toFixed(1)} avg · L${dkPtsArr.length}`;
+        }
+
+        // Home/road splits
+        if (splits.status === 'fulfilled') {
+          const s = splits.value;
+          if (s.homeGames > 0 || s.roadGames > 0) {
+            if (s.homeGames > 0) {
+              card.data.homeDKAvg = s.homeAvgDKPts.toFixed(1);
+              card.data.homeSplitGames = `${s.homeGames} G`;
+            }
+            if (s.roadGames > 0) {
+              card.data.roadDKAvg = s.roadAvgDKPts.toFixed(1);
+              card.data.roadSplitGames = `${s.roadGames} G`;
+            }
+          }
+        }
+      }
+
+      return card;
+    })
+  );
+
+  return enriched
+    .filter((r): r is PromiseFulfilledResult<DFSCardData> => r.status === 'fulfilled')
+    .map(r => r.value);
 }
 
-function projectionToDFSCard(proj: MLBProjectionCardData): DFSCardData {
+function projectionToDFSCard(proj: MLBProjectionCardData, todaysGames: Awaited<ReturnType<typeof fetchTodaysGames>> = []): DFSCardData {
   const dkPts    = proj.summary_metrics.find(m => m.label === 'DK Proj Pts')?.value ?? '0';
   const dkPtsNum = parseFloat(dkPts) || 0;
   const isHitter = proj.position !== 'SP' && proj.position !== 'RP';
@@ -94,6 +165,18 @@ function projectionToDFSCard(proj: MLBProjectionCardData): DFSCardData {
     ? buildHitterTip(proj, parkFactor, valueScore)
     : buildPitcherTip(proj);
 
+  // Match player's team to today's games for targetGame
+  const teamUpper = proj.team.toUpperCase();
+  const matchingGame = todaysGames.find(g =>
+    g.homeTeamAbbr.toUpperCase() === teamUpper ||
+    g.awayTeamAbbr.toUpperCase() === teamUpper ||
+    g.homeTeam.toUpperCase().includes(teamUpper) ||
+    g.awayTeam.toUpperCase().includes(teamUpper)
+  );
+  const targetGame = matchingGame
+    ? `${matchingGame.awayTeamAbbr} @ ${matchingGame.homeTeamAbbr}`
+    : '';
+
   return {
     type: 'dfs-lineup',
     title: `${proj.player_name} — DFS Play`,
@@ -111,7 +194,7 @@ function projectionToDFSCard(proj: MLBProjectionCardData): DFSCardData {
       ownership:    `${estimatedOwnership.toFixed(0)}%`,
       boomCeiling:  p90DK,
       bustFloor:    p10DK,
-      targetGame:   '',
+      targetGame,
       tips:         tip,
       matchupScore: `${(proj.matchup_score * 100).toFixed(0)}/100`,
       parkFactor:   parkFactor.toFixed(2),

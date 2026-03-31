@@ -585,7 +585,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           setIsLoggedIn(true);
           setUser({
             name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-            email: user.email || ''
+            email: user.email || '',
+            avatar: user.user_metadata?.avatar_url || user.user_metadata?.picture || undefined,
           });
           // Load profile ID for credit sync (credits/instructions come via the page-load /api/init)
           loadProfileId(user.id);
@@ -598,6 +599,14 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             if (threads.length > 0) {
               setChats(threads);
               setActiveChat(threads[0].id);
+              // Restore category and sport filters from the most recent thread
+              const firstThread = threads[0];
+              if (firstThread.category && firstThread.category !== 'all') {
+                setSelectedCategory(firstThread.category);
+              }
+              const SPORT_KEYS_LIST = ['basketball_nba', 'americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb', 'soccer_epl', 'soccer_mls'];
+              const sportTag = firstThread.tags?.find((t: string) => SPORT_KEYS_LIST.includes(t));
+              if (sportTag) setSelectedSport(sportTag);
               // Load messages for the most recent thread
               loadMessages(threads[0].id).then(msgs => {
                 if (msgs.length > 0) {
@@ -628,7 +637,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             setIsLoggedIn(true);
             setUser({
               name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
-              email: session.user.email || ''
+              email: session.user.email || '',
+              avatar: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || undefined,
             });
             setShowLoginModal(false);
             setShowSignupModal(false);
@@ -760,18 +770,24 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     return cleanup;
   }, []);
 
-  // Auto-refresh cards every 5 minutes when the conversation has AI cards
+  // One-time card fallback: if the AI response didn't include cards (rare failure),
+  // fetch them independently so the user sees something.
+  // We do NOT refresh cards that were already returned by the AI — those are aligned
+  // with the AI text and replacing them would cause text/card drift.
   useEffect(() => {
-    const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+    if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current);
 
-    const refreshCards = async () => {
-      // Only refresh if there are messages with cards showing
-      const hasCards = messages.some((m: any) => m.role === 'assistant' && m.cards && m.cards.length > 0);
-      if (!hasCards || !lastUserQuery) return;
+    const fillMissingCards = async () => {
+      if (!lastUserQuery) return;
 
-      // Guard: skip if we already fetched for this exact query+category combination
+      // Guard: only run once per query+category combination
       const fetchKey = `${lastUserQuery}::${selectedCategory}`;
       if (fetchedForQueryRef.current === fetchKey) return;
+
+      // Skip if the last AI message already has cards (AI-aligned, do not replace)
+      const lastAIMessage = [...messages].reverse().find((m: any) => m.role === 'assistant');
+      if (lastAIMessage?.cards?.length) return;
+
       fetchedForQueryRef.current = fetchKey;
 
       try {
@@ -788,19 +804,19 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           msgLow.includes('contract pricing') ||
           msgLow.includes('winner contract')
         ) ? 'kalshi'
-          : (selectedCategory === 'fantasy' || selectedCategory === 'dfs') && !hasFantasyOrDFSQuery
-          ? 'betting'  // don't load ADP/fantasy cards for non-fantasy queries even if fantasy tab is active
+          : selectedCategory === 'fantasy' && !hasFantasyOrDFSQuery
+          ? 'betting'
           : selectedCategory;
-        const refreshSport = extractSportFromText(lastUserQuery) || undefined;
+        const refreshSport = extractSportFromText(lastUserQuery) || selectedSport || undefined;
         const freshCards = await fetchDynamicCards({ sport: refreshSport, userContext: lastUserQuery, category: detectedCategory, limit: 4 });
         if (freshCards.length === 0) return;
 
         const converted = freshCards.map(convertToInsightCard);
         setMessages((prev: any) => {
           const updated = [...prev];
-          // Update the last assistant message that has cards
+          // Only fill messages that still have no cards
           for (let i = updated.length - 1; i >= 0; i--) {
-            if (updated[i].role === 'assistant' && updated[i].cards?.length) {
+            if (updated[i].role === 'assistant' && !updated[i].cards?.length) {
               updated[i] = { ...updated[i], cards: converted };
               break;
             }
@@ -813,8 +829,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       }
     };
 
-    if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current);
-    cardsRefreshIntervalRef.current = setInterval(refreshCards, REFRESH_INTERVAL);
+    // Short delay to let the AI done-event cards arrive first
+    cardsRefreshIntervalRef.current = setTimeout(fillMissingCards, 3000) as unknown as ReturnType<typeof setInterval>;
     return () => { if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current); };
   }, [lastUserQuery]);
 
@@ -2730,6 +2746,10 @@ No preamble. Start directly with section 1.`;
     if (selectedChat?.category && selectedChat.category !== 'all') {
       setSelectedCategory(selectedChat.category);
     }
+    // Restore sport filter from thread tags
+    const SPORT_KEYS_LIST = ['basketball_nba', 'americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb', 'soccer_epl', 'soccer_mls'];
+    const sportTag = selectedChat?.tags?.find((t: string) => SPORT_KEYS_LIST.includes(t));
+    setSelectedSport(sportTag ?? '');
 
     if (isLoggedIn) {
       // Load messages from Supabase for logged-in users

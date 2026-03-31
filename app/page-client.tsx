@@ -770,18 +770,24 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     return cleanup;
   }, []);
 
-  // Auto-refresh cards every 5 minutes when the conversation has AI cards
+  // One-time card fallback: if the AI response didn't include cards (rare failure),
+  // fetch them independently so the user sees something.
+  // We do NOT refresh cards that were already returned by the AI — those are aligned
+  // with the AI text and replacing them would cause text/card drift.
   useEffect(() => {
-    const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+    if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current);
 
-    const refreshCards = async () => {
-      // Only refresh if there are messages with cards showing
-      const hasCards = messages.some((m: any) => m.role === 'assistant' && m.cards && m.cards.length > 0);
-      if (!hasCards || !lastUserQuery) return;
+    const fillMissingCards = async () => {
+      if (!lastUserQuery) return;
 
-      // Guard: skip if we already fetched for this exact query+category combination
+      // Guard: only run once per query+category combination
       const fetchKey = `${lastUserQuery}::${selectedCategory}`;
       if (fetchedForQueryRef.current === fetchKey) return;
+
+      // Skip if the last AI message already has cards (AI-aligned, do not replace)
+      const lastAIMessage = [...messages].reverse().find((m: any) => m.role === 'assistant');
+      if (lastAIMessage?.cards?.length) return;
+
       fetchedForQueryRef.current = fetchKey;
 
       try {
@@ -799,9 +805,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           msgLow.includes('winner contract')
         ) ? 'kalshi'
           : selectedCategory === 'fantasy' && !hasFantasyOrDFSQuery
-          ? 'betting'  // don't load ADP/fantasy cards for non-fantasy queries even if fantasy tab is active
+          ? 'betting'
           : selectedCategory;
-        // Prefer sport extracted from query text; fall back to the user's active sport selection
         const refreshSport = extractSportFromText(lastUserQuery) || selectedSport || undefined;
         const freshCards = await fetchDynamicCards({ sport: refreshSport, userContext: lastUserQuery, category: detectedCategory, limit: 4 });
         if (freshCards.length === 0) return;
@@ -809,9 +814,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         const converted = freshCards.map(convertToInsightCard);
         setMessages((prev: any) => {
           const updated = [...prev];
-          // Update the last assistant message that has cards
+          // Only fill messages that still have no cards
           for (let i = updated.length - 1; i >= 0; i--) {
-            if (updated[i].role === 'assistant' && updated[i].cards?.length) {
+            if (updated[i].role === 'assistant' && !updated[i].cards?.length) {
               updated[i] = { ...updated[i], cards: converted };
               break;
             }
@@ -824,8 +829,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       }
     };
 
-    if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current);
-    cardsRefreshIntervalRef.current = setInterval(refreshCards, REFRESH_INTERVAL);
+    // Short delay to let the AI done-event cards arrive first
+    cardsRefreshIntervalRef.current = setTimeout(fillMissingCards, 3000) as unknown as ReturnType<typeof setInterval>;
     return () => { if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current); };
   }, [lastUserQuery]);
 

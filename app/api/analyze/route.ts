@@ -1240,22 +1240,20 @@ export async function POST(request: NextRequest) {
             .catch(() => []);
         } else {
         // Fantasy: warm projection cache (fire-and-forget) then generate fantasy cards
-        const fantSport = context.sport === 'mlb' ? 'mlb'
-          : context.sport?.includes('football') ? 'nfl'
+        // Default to NFL when no sport specified — covers "start or sit", "waiver wire", etc.
+        const fantSport: 'mlb' | 'nfl' | 'nba' = context.sport === 'mlb' ? 'mlb'
           : context.sport === 'nba' ? 'nba'
-          : null;
-        if (fantSport) {
-          import('@/lib/fantasy/projections-cache')
-            .then(({ currentSeasonFor }) => {
-              const season = currentSeasonFor(fantSport as 'nfl' | 'mlb' | 'nba');
-              return import('@/lib/fantasy/projections-seeder').then(({ seedProjectionsFromSupabase }) =>
-                seedProjectionsFromSupabase(fantSport as 'nfl' | 'mlb' | 'nba', season)
-              );
-            })
-            .catch((err: unknown) => {
-              console.warn('[API/analyze] Projection seeding failed:', err instanceof Error ? err.message : String(err));
-            });
-        }
+          : 'nfl'; // covers americanfootball_nfl, undefined, and unknown
+        import('@/lib/fantasy/projections-cache')
+          .then(({ currentSeasonFor }) => {
+            const season = currentSeasonFor(fantSport);
+            return import('@/lib/fantasy/projections-seeder').then(({ seedProjectionsFromSupabase }) =>
+              seedProjectionsFromSupabase(fantSport, season)
+            );
+          })
+          .catch((err: unknown) => {
+            console.warn('[API/analyze] Projection seeding failed:', err instanceof Error ? err.message : String(err));
+          });
         cardFetchPromise = import('@/lib/fantasy/cards/fantasy-card-generator')
           .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 6, context.sport || undefined, {
             teamCount: context.leagueSize ?? undefined,

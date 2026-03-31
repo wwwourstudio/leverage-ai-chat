@@ -1356,12 +1356,11 @@ export async function generateFantasyCards(
   sport?: string,
   leagueOptions?: LeagueOptions
 ): Promise<InsightCard[]> {
-  // Non-NFL sport → don't show NFL player data; return sport-branded cards instead
-  // Only treat as NFL when sport is explicitly nfl/football; null/undefined/'' → not NFL
-  const isNFL = !!sport && (sport === 'nfl' || sport.includes('football') || sport.startsWith('americanfootball'));
+  // Default to NFL when no sport is provided — "start or sit", "waiver wire", etc.
+  // are overwhelmingly NFL queries; NFL also has full offline fallback data (NFL_PROJECTIONS_2025).
+  const effectiveSport = sport || 'nfl';
+  const isNFL = effectiveSport === 'nfl' || effectiveSport.includes('football') || effectiveSport.startsWith('americanfootball');
   if (!isNFL) {
-    // No sport context at all — skip card generation to avoid generating wrong-sport cards
-    if (!sport) return [];
     // Detect start/sit intent from the message if caller didn't set isStartSit explicitly
     const msgL = userMessage.toLowerCase();
     const isStartSit = leagueOptions?.isStartSit ??
@@ -1370,7 +1369,7 @@ export async function generateFantasyCards(
        'matchup based', 'streaming', 'must start', 'must sit',
        'favorable matchup', 'tough matchup',
       ].some(k => msgL.includes(k));
-    return generateNonNFLFantasyCards(sport, count, { ...leagueOptions, isStartSit });
+    return generateNonNFLFantasyCards(effectiveSport, count, { ...leagueOptions, isStartSit });
   }
 
   const msg = userMessage.toLowerCase();

@@ -1234,17 +1234,22 @@ Provide exactly these 5 sections:
 
 No preamble. Start directly with section 1.`;
     } else if (['betting', 'odds', 'moneyline', 'spread', 'totals'].includes(cardType)) {
+      // Parse teams from matchup string if homeTeam/awayTeam not directly set
+      const matchupStr = d.matchup ?? card.title ?? '';
+      const matchupParts = matchupStr.includes('@') ? matchupStr.split('@').map((s: string) => s.trim()) : ['', ''];
+      const awayTeamName = d.awayTeam ?? matchupParts[0] ?? '';
+      const homeTeamName = d.homeTeam ?? matchupParts[1] ?? '';
       prompt = `Analyze this sports betting opportunity as a sharp bettor. Be concise.
 
 Market: "${card.title}"
-Category: ${card.subcategory || card.category}${d.homeTeam ? `\nHome: ${d.homeTeam}` : ''}${d.awayTeam ? `\nAway: ${d.awayTeam}` : ''}${d.homeOdds || d.odds ? `\nOdds: ${d.homeOdds ?? d.odds}` : ''}${d.spread ? `\nSpread: ${d.spread}` : ''}${d.total ? `\nTotal: ${d.total}` : ''}
+Sport: ${card.category}${awayTeamName ? `\nAway: ${awayTeamName}${d.awayOdds ? ` (ML: ${d.awayOdds})` : ''}` : ''}${homeTeamName ? `\nHome: ${homeTeamName}${d.homeOdds ? ` (ML: ${d.homeOdds})` : ''}` : ''}${(d.awaySpread || d.homeSpread) ? `\nSpread: ${awayTeamName} ${d.awaySpread ?? '—'} / ${homeTeamName} ${d.homeSpread ?? '—'}` : d.spread ? `\nSpread: ${d.spread}` : ''}${d.overUnder ? `\nTotal: ${d.overUnder}` : d.total ? `\nTotal: ${d.total}` : ''}${d.bookmakerCount ? `\nBooks covering: ${d.bookmakerCount}` : ''}${d.bestHomeOdds && d.bestHomeOdds !== d.homeOdds ? `\nBest home ML: ${d.bestHomeOdds}` : ''}${d.bestAwayOdds && d.bestAwayOdds !== d.awayOdds ? `\nBest away ML: ${d.bestAwayOdds}` : ''}${d.edge ? `\nDetected edge: ${d.edge}` : ''}${d.sharpMoney ? `\nSharp money signal: ${d.sharpMoney}` : ''}${d.sharpPct ? `\nSharp %: ${d.sharpPct}%` : ''}${d.confidence ? `\nModel confidence: ${d.confidence}` : ''}${d.lineMove ?? d.movement ?? d.lineChange ? `\nLine movement: ${d.lineMove ?? d.movement ?? d.lineChange}` : ''}${d.injuryAlert ? `\nInjury alert: ${d.injuryAlert}` : ''}${d.weatherNote ? `\nWeather: ${d.weatherNote}` : ''}${d.marketEfficiency ? `\nMarket efficiency: ${d.marketEfficiency}` : ''}
 
 Provide exactly these 5 sections:
-**1. Line Analysis** – Is this line sharp or public? Any steam or reverse line movement?
-**2. Key Angles** – 3 bullet points of the strongest betting factors
-**3. Kelly Sizing** – Suggested bet size as % of bankroll and why
-**4. Sharp Signal** – Where is sharp money leaning?
-**5. Pick** – Clear recommendation with one-line reasoning
+**1. Line Analysis** – Is this line sharp or public? Any steam, key numbers, or reverse line movement?
+**2. Key Angles** – 3 bullet points of the strongest betting factors for this specific matchup
+**3. Kelly Sizing** – Suggested bet size as % of bankroll based on edge and confidence
+**4. Sharp Signal** – Where is sharp money leaning and why?
+**5. Pick** – Clear recommendation (side/total) with one-line reasoning and confidence level
 
 No preamble. Start directly with section 1.`;
     } else if (cardType === 'arbitrage') {
@@ -1272,6 +1277,31 @@ Provide exactly these 5 sections:
 **3. Correlation Stacks** – Best teammates to pair for maximum upside
 **4. Ownership Leverage** – GPP leverage potential (low/medium/high ownership)
 **5. Recommendation** – Use in Cash / GPP / Both / Fade
+
+No preamble. Start directly with section 1.`;
+    } else if (cardType === 'prop-hit-rate' || cardType === 'player-prop' || cardType === 'prop') {
+      const pct = d.hitRatePercentage ?? d.hitRate ?? '—';
+      const propTrend = d.trend ?? '—';
+      const diff = (typeof d.avgActual === 'number' && typeof d.avgLine === 'number')
+        ? `${(d.avgActual - d.avgLine) >= 0 ? '+' : ''}${(d.avgActual - d.avgLine).toFixed(1)}`
+        : d.edge ?? '—';
+      prompt = `Analyze this player prop bet. Be concise and actionable.
+
+Player: "${card.title}"
+Stat/Line: ${d.statType ?? card.subcategory ?? '—'}
+Hit rate: ${pct}% (${d.hits ?? '—'}/${d.totalGames ?? '—'} games)
+Trend: ${propTrend}
+Avg line: ${d.avgLine ?? '—'} | Avg actual: ${d.avgActual ?? '—'} | Edge: ${diff}
+Recent form (last 7): ${d.recentForm ?? '—'}
+Confidence: ${d.confidence ?? '—'}
+Recommendation: ${d.recommendation ?? '—'}
+
+Provide exactly these 5 sections:
+**1. Hit Rate Assessment** – Is ${pct}% a significant edge or noise? Evaluate the sample size.
+**2. Trend Analysis** – What does the ${propTrend} trend indicate going forward?
+**3. Line Value** – Is the current line set correctly given recent performance?
+**4. Risk Factors** – What could cause the trend to reverse or the prop to miss?
+**5. Pick** – Over / Under / Pass with confidence level (Low/Medium/High)
 
 No preamble. Start directly with section 1.`;
     } else if (cardType === 'fantasy' || cardType === 'draft') {

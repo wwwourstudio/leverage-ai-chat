@@ -542,7 +542,12 @@ export const BettingCard = memo(function BettingCard({
                   </span>
                 )}
                 {awayProb !== null && (
-                  <span className="text-[9px] text-[oklch(0.42_0.01_280)]">{awayProb}% win</span>
+                  <span className={cn(
+                    'text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums',
+                    awayProb > 55 ? 'text-emerald-400 bg-emerald-500/12' :
+                    awayProb > 45 ? 'text-white/60 bg-white/5' :
+                    'text-[oklch(0.38_0.01_280)] bg-white/5',
+                  )}>{awayProb}%</span>
                 )}
               </div>
 
@@ -574,7 +579,12 @@ export const BettingCard = memo(function BettingCard({
                   </span>
                 )}
                 {homeProb !== null && (
-                  <span className="text-[9px] text-[oklch(0.42_0.01_280)]">{homeProb}% win</span>
+                  <span className={cn(
+                    'text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums',
+                    homeProb > 55 ? 'text-emerald-400 bg-emerald-500/12' :
+                    homeProb > 45 ? 'text-white/60 bg-white/5' :
+                    'text-[oklch(0.38_0.01_280)] bg-white/5',
+                  )}>{homeProb}%</span>
                 )}
               </div>
             </div>
@@ -607,6 +617,23 @@ export const BettingCard = memo(function BettingCard({
           />
         )}
 
+        {/* ── Value edge indicator ──────────────────────────────────── */}
+        {data.edge && (() => {
+          const edgeNum = parseFloat(String(data.edge).replace(/[^0-9.-]/g, ''));
+          if (isNaN(edgeNum) || edgeNum < 2) return null;
+          return (
+            <div className={cn(
+              'flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-bold',
+              edgeNum >= 5
+                ? 'bg-emerald-500/10 border border-emerald-500/25 text-emerald-300'
+                : 'bg-amber-500/10 border border-amber-500/25 text-amber-300',
+            )}>
+              <Zap className="w-3.5 h-3.5 shrink-0" />
+              <span className="flex-1">{edgeNum >= 5 ? 'Strong edge detected' : 'Potential value'} — {data.edge} edge vs market</span>
+            </div>
+          );
+        })()}
+
         {/* ── Odds grid ─────────────────────────────────────────────── */}
         {hasOdds && !isFinal && (
           <div className={cn(
@@ -619,23 +646,23 @@ export const BettingCard = memo(function BettingCard({
           )}>
             {spreadAway && (
               <OddsCell
-                label={teams ? `${abbr(teams.away)} ATS` : 'Away Spread'}
+                label={teams ? `${abbr(teams.away)} SPREAD` : 'Away Spread'}
                 value={spreadAway.pts}
-                sub={spreadAway.juice ? `(${spreadAway.juice})` : undefined}
+                sub={spreadAway.juice ? `juice ${spreadAway.juice}` : undefined}
               />
             )}
             {spreadHome && (
               <OddsCell
-                label={teams ? `${abbr(teams.home)} ATS` : 'Home Spread'}
+                label={teams ? `${abbr(teams.home)} SPREAD` : 'Home Spread'}
                 value={spreadHome.pts}
-                sub={spreadHome.juice ? `(${spreadHome.juice})` : undefined}
+                sub={spreadHome.juice ? `juice ${spreadHome.juice}` : undefined}
               />
             )}
             {ou && (
               <OddsCell
-                label="O/U Total"
+                label="TOTAL O/U"
                 value={ou.total}
-                sub={ou.overJ ? `O ${ou.overJ} / U ${ou.underJ ?? '—'}` : undefined}
+                sub={ou.overJ ? `O ${ou.overJ} · U ${ou.underJ ?? '—'}` : undefined}
                 highlight
               />
             )}

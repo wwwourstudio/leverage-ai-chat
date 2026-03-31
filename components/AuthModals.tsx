@@ -191,6 +191,7 @@ export function AuthModals({
                 </div>
 
                 <button
+                  type="button"
                   onClick={handleGoogleAuth}
                   className="w-full py-3 border border-gray-800 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all"
                 >
@@ -292,6 +293,7 @@ export function AuthModals({
                 </div>
 
                 <button
+                  type="button"
                   onClick={handleGoogleAuth}
                   className="w-full py-3 border border-gray-800 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all"
                 >

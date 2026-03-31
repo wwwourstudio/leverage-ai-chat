@@ -50,6 +50,22 @@ function getCategoryAccent(label?: string): string {
   return CATEGORY_ACCENT[(label || '').toLowerCase()] ?? '#6366f1';
 }
 
+const CATEGORY_HEADER_GRAD: Record<string, string> = {
+  election:      'from-blue-500/25 via-blue-500/10 to-transparent',
+  politics:      'from-blue-500/25 via-blue-500/10 to-transparent',
+  sports:        'from-emerald-500/25 via-emerald-500/10 to-transparent',
+  weather:       'from-cyan-400/25 via-cyan-400/10 to-transparent',
+  finance:       'from-amber-500/25 via-amber-500/10 to-transparent',
+  crypto:        'from-violet-500/25 via-violet-500/10 to-transparent',
+  tech:          'from-violet-600/25 via-violet-600/10 to-transparent',
+  entertainment: 'from-pink-500/25 via-pink-500/10 to-transparent',
+  market:        'from-indigo-500/25 via-indigo-500/10 to-transparent',
+};
+
+function getCategoryHeaderGrad(label?: string): string {
+  return CATEGORY_HEADER_GRAD[(label || '').toLowerCase()] ?? 'from-indigo-500/25 via-indigo-500/10 to-transparent';
+}
+
 function CategoryIcon({ label, size = 14, style }: { label?: string; size?: number; style?: React.CSSProperties }) {
   const cls = `shrink-0`;
   const s = { width: size, height: size, ...style };
@@ -348,10 +364,10 @@ function OrderBookMini({
   const maxQty   = Math.max(...[...top3Bids, ...top3Asks].map(r => r.quantity), 1);
 
   return (
-    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: 'oklch(0.09 0.01 280)', border: '1px solid oklch(0.14 0.01 280)' }}>
-      <div className="grid grid-cols-2 divide-x" style={{ borderColor: 'oklch(0.12 0.01 280)' }}>
+    <div className="rounded-xl overflow-hidden bg-[oklch(0.09_0.01_280)] border border-[oklch(0.14_0.01_280)]">
+      <div className="grid grid-cols-2">
         {/* Bids (YES) */}
-        <div className="p-2.5 space-y-1">
+        <div className="p-2.5 space-y-1 border-r border-r-[oklch(0.12_0.01_280)]">
           <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: YES_COLOR + '88' }}>Bids</span>
           {top3Bids.map((row, i) => (
             <div key={i} className="relative flex items-center justify-between text-[10px] tabular-nums rounded overflow-hidden px-1.5 py-0.5">
@@ -618,6 +634,7 @@ export const KalshiCard = memo(function KalshiCard({
   const isActive    = status === 'active' || status === 'open' || status === 'live';
   const marketCat   = (d.subcategory || subcategory || category || 'Prediction').toUpperCase();
   const accentColor = getCategoryAccent(d.iconLabel);
+  const headerGrad  = getCategoryHeaderGrad(d.iconLabel);
 
   // Use live WebSocket prices when available; fall back to REST data from props
   const yesBid: number | null = (livePrice && livePrice.yesBid > 0) ? livePrice.yesBid
@@ -656,62 +673,32 @@ export const KalshiCard = memo(function KalshiCard({
   return (
     <article
       className={cn(
-        'group relative w-full rounded-2xl overflow-hidden',
-        'transition-all duration-300',
+        'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.09_0.012_280)] border transition-all duration-300',
         isHero
-          ? 'shadow-[0_0_56px_#00d15d08]'
-          : 'hover:shadow-[0_8px_40px_#00000060] hover:-translate-y-px',
+          ? 'border-[oklch(0.28_0.025_260)] shadow-[0_0_32px_oklch(0.3_0.06_260/0.12)]'
+          : 'border-[oklch(0.18_0.016_280)] hover:border-[oklch(0.28_0.02_280)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.08)]',
       )}
-      style={{
-        backgroundColor: '#070a10',
-        border: `1px solid ${isHero ? '#1a2236' : '#0f1624'}`,
-        borderTopColor: accentColor,
-        borderTopWidth: '2px',
-      }}
+      style={{ borderTopColor: accentColor, borderTopWidth: '2px' }}
     >
 
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="px-4 pt-3.5 pb-3" style={{ borderBottom: '1px solid #0b0f1a' }}>
+      {/* ── Gradient header ─────────────────────────────────────────────────── */}
+      <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', headerGrad)}>
 
-        {/* Breadcrumb + badges */}
-        <div className="flex items-center justify-between mb-2.5 gap-2">
-          <div className="flex items-center gap-1.5 min-w-0">
-            {/* Category icon pill */}
-            <div
-              className="flex items-center justify-center w-5 h-5 rounded-md shrink-0"
-              style={{ backgroundColor: accentColor + '16', border: `1px solid ${accentColor}2e` }}
-            >
-              <CategoryIcon label={d.iconLabel} size={11} style={{ color: accentColor }} />
-            </div>
-            <span className="text-[9px] font-black uppercase tracking-[0.14em] shrink-0"
-                  style={{ color: 'oklch(0.28 0.025 260)' }}>Kalshi</span>
-            <span className="text-[oklch(0.16_0.01_280)] text-[9px] shrink-0">/</span>
-            <span className="text-[9px] font-bold truncate" style={{ color: accentColor + 'cc' }}>
-              {marketCat}
-            </span>
-            {d.isHot && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0 text-orange-400 bg-orange-500/10 border border-orange-500/20">
-                <Flame className="w-2.5 h-2.5" /> Hot
-              </span>
-            )}
-          </div>
-
-          {/* Live / Pending / Closed badge */}
+        {/* Status badge — top right */}
+        <div className="absolute top-3 right-3 flex items-center gap-1.5">
           {!isActive ? (
-            <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full shrink-0"
-                  style={{ backgroundColor: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.15 0.01 280)', color: 'oklch(0.28 0.01 280)' }}>
+            <span className="text-[9px] font-black uppercase tracking-widest text-white/40">
               Closed
             </span>
           ) : !d.priceIsReal ? (
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full shrink-0"
-                 style={{ backgroundColor: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.18 0.01 280)' }}>
-              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'oklch(0.35 0.01 280)' }} />
-              <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: 'oklch(0.40 0.01 280)' }}>
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+              <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
+              <span className="text-[8px] font-black uppercase tracking-widest text-white/50">
                 Pending
               </span>
             </div>
           ) : (
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full shrink-0"
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full"
                  style={{ backgroundColor: YES_COLOR + '0d', border: `1px solid ${livePrice ? YES_COLOR + '55' : YES_COLOR + '22'}` }}>
               <span className={cn('w-1.5 h-1.5 rounded-full', livePrice ? 'animate-pulse' : '')}
                     style={{ backgroundColor: YES_COLOR }} />
@@ -722,9 +709,27 @@ export const KalshiCard = memo(function KalshiCard({
           )}
         </div>
 
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <div
+            className="flex items-center justify-center w-4 h-4 rounded shrink-0"
+            style={{ backgroundColor: accentColor + '28' }}
+          >
+            <CategoryIcon label={d.iconLabel} size={10} style={{ color: accentColor }} />
+          </div>
+          <span className="text-[9px] font-black uppercase tracking-widest text-white/70">Kalshi</span>
+          <span className="text-white/30">·</span>
+          <span className="text-[9px] text-white/50 truncate">{marketCat}</span>
+          {d.isHot && (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0 text-orange-400 bg-orange-500/10 border border-orange-500/20">
+              <Flame className="w-2.5 h-2.5" /> Hot
+            </span>
+          )}
+        </div>
+
         {/* Title */}
         <h3
-          className={cn('font-bold text-white leading-snug', isHero ? 'text-[15px]' : 'text-[13px]')}
+          className={cn('font-black text-white leading-snug text-balance pr-20', isHero ? 'text-[15px]' : 'text-sm')}
           title={title}
         >
           {shortenTitle(title)}
@@ -732,8 +737,7 @@ export const KalshiCard = memo(function KalshiCard({
 
         {/* Subtitle */}
         {d.subtitle && d.subtitle !== title && d.subtitle.length > 0 && (
-          <p className="text-[11px] mt-1 line-clamp-2 leading-relaxed"
-             style={{ color: 'oklch(0.36 0.01 280)' }}>
+          <p className="text-[11px] mt-1 line-clamp-2 leading-relaxed text-white/50">
             {d.subtitle}
           </p>
         )}
@@ -811,29 +815,12 @@ export const KalshiCard = memo(function KalshiCard({
           {onAnalyze && (
             <button
               onClick={onAnalyze}
-              className="group/btn flex items-center justify-center gap-2 w-full py-2 rounded-xl text-[11px] font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2"
-              style={{
-                backgroundColor: 'oklch(0.11 0.018 260)',
-                border: '1px solid oklch(0.17 0.022 260)',
-                color: 'oklch(0.48 0.015 260)',
-              }}
-              onFocus={e => { e.currentTarget.style.borderColor = `${YES_COLOR}40`; }}
-              onBlur={e => { e.currentTarget.style.borderColor = 'oklch(0.17 0.022 260)'; }}
-              onMouseEnter={e => {
-                e.currentTarget.style.backgroundColor = 'oklch(0.15 0.022 260)';
-                e.currentTarget.style.color = '#ffffff';
-                e.currentTarget.style.borderColor = 'oklch(0.22 0.028 260)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.backgroundColor = 'oklch(0.11 0.018 260)';
-                e.currentTarget.style.color = 'oklch(0.48 0.015 260)';
-                e.currentTarget.style.borderColor = 'oklch(0.17 0.022 260)';
-              }}
+              className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)] text-xs font-semibold text-[oklch(0.46_0.01_280)] hover:text-white hover:bg-[oklch(0.14_0.015_280)] hover:border-[oklch(0.26_0.02_280)] transition-all duration-150"
               aria-label={`AI analysis for ${title}`}
             >
-              <BarChart3 className="w-3.5 h-3.5 shrink-0" />
+              <BarChart3 className="w-3.5 h-3.5" />
               AI Analysis
-              <ChevronRight className="w-3.5 h-3.5 opacity-60 transition-transform duration-150 group-hover/btn:translate-x-0.5" />
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           )}
 

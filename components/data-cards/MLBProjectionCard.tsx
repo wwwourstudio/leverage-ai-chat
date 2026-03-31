@@ -135,6 +135,22 @@ function BreakoutRing({ score }: { score: number }) {
   );
 }
 
+function metricValueColor(label: string, value: string): string {
+  const num = parseFloat(value);
+  if (isNaN(num)) return 'text-white';
+  const lo = label.toLowerCase();
+  if (lo.includes('barrel') || lo.includes(' ev') || lo.includes('hard') || lo.includes('k/9') || lo.includes('strikeout') || lo.includes('csw') || lo.includes('swstr') || lo.includes('stuff')) {
+    return num >= 12 ? 'text-emerald-400' : num >= 7 ? 'text-amber-400' : 'text-red-400';
+  }
+  if (lo.includes('era') || lo.includes('whip') || lo.includes('walk') || lo.includes('bb%') || lo.includes('chase')) {
+    return num <= 3 ? 'text-emerald-400' : num <= 4.5 ? 'text-amber-400' : 'text-red-400';
+  }
+  if (value.endsWith('%')) {
+    return num >= 60 ? 'text-emerald-400' : num >= 40 ? 'text-amber-400' : 'text-red-400';
+  }
+  return 'text-white';
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnalyze, isHero = false }: MLBProjectionCardProps) {
@@ -240,12 +256,26 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
           {/* ── Summary metrics ────────────────────────────────────────── */}
           {metrics.length > 0 && (
             <div className="space-y-1">
-              {metrics.slice(0, isHero ? 6 : 4).map((m, i) => (
-                <div key={i} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-[oklch(0.08_0.01_280)]">
-                  <span className="text-[10px] text-gray-500 uppercase tracking-wide">{m.label}</span>
-                  <span className="text-[10px] font-black text-white tabular-nums">{m.value}</span>
-                </div>
-              ))}
+              {metrics.slice(0, isHero ? 6 : 4).map((m, i) => {
+                const isPercent = String(m.value).endsWith('%');
+                const numVal = parseFloat(String(m.value));
+                return (
+                  <div key={i} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-[oklch(0.08_0.01_280)]">
+                    <span className="text-[10px] text-gray-500 uppercase tracking-wide">{m.label}</span>
+                    <div className="flex flex-col items-end gap-0.5 min-w-[3rem]">
+                      <span className={cn('text-[10px] font-black tabular-nums', metricValueColor(m.label, String(m.value)))}>{m.value}</span>
+                      {isPercent && !isNaN(numVal) && (
+                        <div className="h-0.5 w-10 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+                          <div
+                            className={cn('h-full rounded-full', numVal >= 60 ? 'bg-emerald-500' : numVal >= 40 ? 'bg-amber-500' : 'bg-red-500')}
+                            style={{ width: `${Math.min(100, numVal)}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
 

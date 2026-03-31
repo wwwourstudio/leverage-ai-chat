@@ -1062,20 +1062,29 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       );
     }
 
-    // PRIORITY 3: Category fallbacks if still not enough
-    if (isDFS && suggestions.length < 5) {
+    // PRIORITY 3: Category fallbacks — selectedCategory wins over message-derived signals
+    // so that e.g. "Fantasy + MLB" selected + message mentioning DFS still shows fantasy prompts.
+    const p3Category =
+      selectedCategory !== 'all'
+        ? selectedCategory
+        : isDFS      ? 'dfs'
+        : isFantasyQ ? 'fantasy'
+        : isKalshi   ? 'kalshi'
+        : 'betting';
+
+    if (p3Category === 'dfs' && suggestions.length < 5) {
       suggestions.push(
         { label: 'Build a low-ownership tournament stack', icon: Users, category: 'dfs' },
         { label: 'Find value plays under $5K salary', icon: DollarSign, category: 'dfs' },
         { label: 'Showdown slate captain picks with leverage', icon: Medal, category: 'dfs' }
       );
-    } else if (isFantasyQ && suggestions.length < 5) {
+    } else if (p3Category === 'fantasy' && suggestions.length < 5) {
       suggestions.push(
         { label: 'Show me ADP risers this week', icon: TrendingUp, category: 'fantasy' },
         { label: 'Best ball stacking strategy', icon: Medal, category: 'fantasy' },
         { label: 'Auction value targets this week', icon: ShoppingCart, category: 'fantasy' }
       );
-    } else if (isKalshi && suggestions.length < 5) {
+    } else if (p3Category === 'kalshi' && suggestions.length < 5) {
       suggestions.push(
         { label: 'Show trending Kalshi markets', icon: TrendingUp, category: 'kalshi' },
         { label: 'Political markets with market inefficiency', icon: Activity, category: 'kalshi' },

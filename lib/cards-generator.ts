@@ -607,6 +607,23 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
     const barrelNum = barrel ? Number(barrel) : 0;
     const status = evNum >= 92 || barrelNum >= 12 ? 'hot' : evNum >= 88 || barrelNum >= 8 ? 'edge' : 'value';
 
+    // ── Enrich with MLB Stats API season stats + game log (parallel, capped at 5s) ──
+    let seasonStats = null;
+    let gameLog: Array<{ date: string; opp: string; result: string; ab?: number; h?: number; hr?: number; rbi?: number }> = [];
+    try {
+      const { findPlayerIdByName, fetchPlayerSeasonStats, fetchPlayerGameLog } = await import('@/lib/mlb-projections/mlb-stats-api');
+      const playerId = await Promise.race([
+        findPlayerIdByName(name),
+        new Promise<null>(r => setTimeout(() => r(null), 3_000)),
+      ]);
+      if (playerId) {
+        [seasonStats, gameLog] = await Promise.all([
+          Promise.race([fetchPlayerSeasonStats(playerId, 'hitting'), new Promise<null>(r => setTimeout(() => r(null), 4_000))]),
+          Promise.race([fetchPlayerGameLog(playerId, 'hitting', 5), new Promise<never[]>(r => setTimeout(() => r([]), 4_000))]),
+        ]);
+      }
+    } catch { /* non-fatal — render without enrichment */ }
+
     const card: InsightCard = {
       type: CARD_TYPES.STATCAST_SUMMARY,
       title: name,
@@ -616,13 +633,19 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
       gradient: 'from-blue-600/75 via-blue-900/55 to-slate-900/40',
       status,
       summary_metrics: metrics,
-      data: { playerName: name, realData: true, headshotUrl },
+      data: {
+        playerName: name,
+        realData: true,
+        headshotUrl,
+        seasonStats: seasonStats ?? undefined,
+        gameLog: gameLog.length > 0 ? gameLog : undefined,
+      },
       trend_note: 'Live Statcast data from Baseball Savant',
       last_updated: new Date().toLocaleDateString(),
       metadata: { realData: true, source: 'Baseball Savant · Statcast' },
     };
 
-    console.log(`[v0] [PLAYER CARDS] Built batter card for ${name} (${metrics.length} metrics)`);
+    console.log(`[v0] [PLAYER CARDS] Built batter card for ${name} (${metrics.length} metrics, season stats: ${!!seasonStats}, game log: ${gameLog.length} games)`);
     return [card];
   } catch (err) {
     console.warn('[v0] [PLAYER CARDS] Failed to fetch Statcast data:', err);

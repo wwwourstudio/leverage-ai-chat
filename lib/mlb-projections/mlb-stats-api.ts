@@ -172,6 +172,165 @@ function extractLineup(players: any[], teamName: string, teamAbbr: string): MLBB
     .sort((a, b) => a.battingOrder - b.battingOrder);
 }
 
+// ── Player lookup + stats helpers ─────────────────────────────────────────────
+
+export interface PlayerSeasonStats {
+  avg: string;        // e.g. ".311"
+  hr: number;
+  rbi: number;
+  ops: string;        // e.g. ".952"
+  slg: string;
+  obp: string;
+  hits: number;
+  atBats: number;
+  gamesPlayed: number;
+  sb?: number;
+  era?: string;       // pitchers
+  k?: number;
+  bb?: number;
+}
+
+export interface PlayerGameLog {
+  date: string;       // "Mar 28"
+  opp: string;        // "@BOS"
+  result: string;     // "W 5-2" | "L 3-8"
+  ab?: number;
+  h?: number;
+  hr?: number;
+  rbi?: number;
+  k?: number;         // pitchers
+  er?: number;
+  ip?: string;
+}
+
+/** Search for an MLB player ID by name. Returns null on failure. */
+export async function findPlayerIdByName(name: string): Promise<number | null> {
+  const cacheKey = `pid:${name.toLowerCase()}`;
+  const cached = getCached<number | null>(cacheKey);
+  if (cached !== null) return cached;
+
+  try {
+    const url = `${MLB_API}/people/search?names=${encodeURIComponent(name)}&sportIds=1`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const people: any[] = json.people ?? [];
+    if (!people.length) return null;
+    const id = people[0].id as number;
+    setCached(cacheKey, id);
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+/** Fetch season stats for a player. Returns null on failure. */
+export async function fetchPlayerSeasonStats(playerId: number, group: 'hitting' | 'pitching' = 'hitting'): Promise<PlayerSeasonStats | null> {
+  const season = new Date().getFullYear();
+  const cacheKey = `stats:${playerId}:${group}:${season}`;
+  const cached = getCached<PlayerSeasonStats | null>(cacheKey);
+  if (cached !== null) return cached;
+
+  try {
+    const url = `${MLB_API}/people/${playerId}/stats?stats=season&season=${season}&group=${group}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const splits: any[] = json.stats?.[0]?.splits ?? [];
+    if (!splits.length) return null;
+    const s = splits[0].stat;
+
+    let result: PlayerSeasonStats;
+    if (group === 'hitting') {
+      result = {
+        avg: s.avg ?? '.---',
+        hr: s.homeRuns ?? 0,
+        rbi: s.rbi ?? 0,
+        ops: s.ops ?? '.---',
+        slg: s.slg ?? '.---',
+        obp: s.obp ?? '.---',
+        hits: s.hits ?? 0,
+        atBats: s.atBats ?? 0,
+        gamesPlayed: s.gamesPlayed ?? 0,
+        sb: s.stolenBases ?? 0,
+      };
+    } else {
+      result = {
+        avg: s.avg ?? '.---',
+        era: s.era ?? '--',
+        hr: 0,
+        rbi: 0,
+        ops: '.---',
+        slg: '.---',
+        obp: '.---',
+        hits: s.hits ?? 0,
+        atBats: 0,
+        gamesPlayed: s.gamesPlayed ?? s.gamesPitched ?? 0,
+        k: s.strikeOuts ?? 0,
+        bb: s.baseOnBalls ?? 0,
+      };
+    }
+    setCached(cacheKey, result);
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+/** Fetch last N games from a player's game log. */
+export async function fetchPlayerGameLog(playerId: number, group: 'hitting' | 'pitching' = 'hitting', limit = 5): Promise<PlayerGameLog[]> {
+  const season = new Date().getFullYear();
+  const cacheKey = `gamelog:${playerId}:${group}:${season}`;
+  const cached = getCached<PlayerGameLog[]>(cacheKey);
+  if (cached) return cached.slice(0, limit);
+
+  try {
+    const url = `${MLB_API}/people/${playerId}/stats?stats=gameLog&season=${season}&group=${group}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const splits: any[] = json.stats?.[0]?.splits ?? [];
+
+    const logs: PlayerGameLog[] = splits
+      .slice(-15)
+      .reverse()
+      .slice(0, limit)
+      .map((sp: any) => {
+        const s = sp.stat;
+        const dateStr = sp.date ?? '';
+        const dateLabel = dateStr
+          ? new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          : '';
+        const opponent = sp.opponent?.abbreviation ?? sp.opponent?.name ?? '???';
+        const isHome = sp.isHome ?? true;
+        return group === 'hitting'
+          ? {
+              date: dateLabel,
+              opp: `${isHome ? 'vs' : '@'}${opponent}`,
+              result: sp.team?.wins != null ? '' : '',
+              ab: s.atBats ?? 0,
+              h: s.hits ?? 0,
+              hr: s.homeRuns ?? 0,
+              rbi: s.rbi ?? 0,
+            }
+          : {
+              date: dateLabel,
+              opp: `${isHome ? 'vs' : '@'}${opponent}`,
+              result: '',
+              ip: s.inningsPitched ?? '0',
+              k: s.strikeOuts ?? 0,
+              er: s.earnedRuns ?? 0,
+              bb: s.baseOnBalls ?? 0,
+            };
+      });
+
+    setCached(cacheKey, logs);
+    return logs.slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Get remaining games in the current MLB season (for ROS projections).
  * Season window: Opening Day (≈ last week of March) → last Sunday of September.

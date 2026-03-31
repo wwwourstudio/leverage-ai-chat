@@ -434,6 +434,11 @@ export async function POST(request: NextRequest) {
       context.sport = 'mlb';
       console.log('[API/analyze] ADP intent with no sport — defaulting to MLB');
     }
+    // DFS with no explicit sport defaults to NBA — highest DFS volume market
+    if (context.selectedCategory === 'dfs' && !context.sport) {
+      context.sport = 'basketball_nba';
+      console.log('[API/analyze] DFS with no sport — defaulting to NBA');
+    }
 
     // Start/sit intent: user wants daily matchup-based start or sit advice.
     const START_SIT_KEYWORDS = [

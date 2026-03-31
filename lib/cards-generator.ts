@@ -624,6 +624,59 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
       }
     } catch { /* non-fatal — render without enrichment */ }
 
+    // ── Enrich with live prop lines from Odds API (capped at 3s, non-fatal) ──
+    type PropLine = {
+      label: string; statType: string; line: number;
+      overOdds: number; impliedPct: number; hitRate: string; trend: 'hot' | 'cold' | 'neutral';
+    };
+    let propLines: PropLine[] = [];
+    try {
+      const { fetchPlayerProps } = await import('@/lib/player-props-service');
+      const allProps = await Promise.race([
+        fetchPlayerProps({ sport: 'baseball_mlb' }),
+        new Promise<never[]>(r => setTimeout(() => r([]), 3_000)),
+      ]);
+
+      const lowerName2 = name.toLowerCase();
+      const playerProps = allProps.filter(prop => {
+        const pn = prop.playerName.toLowerCase();
+        return pn.includes(lowerName2) || lowerName2.includes(pn) ||
+          pn.split(' ').slice(-1)[0] === lowerName2.split(' ').slice(-1)[0];
+      });
+
+      const STAT_LABELS: Record<string, string> = {
+        hits: 'Hits', home_runs: 'Home Runs', rbi: 'RBI',
+        total_bases: 'Total Bases', strikeouts: 'Strikeouts',
+      };
+      const impliedProb = (odds: number): number =>
+        odds > 0 ? (100 / (odds + 100)) * 100 : ((-odds) / (-odds + 100)) * 100;
+
+      for (const prop of playerProps) {
+        const label = STAT_LABELS[prop.statType] ?? prop.statType.replace(/_/g, ' ');
+        const ip = impliedProb(prop.overOdds);
+        const threshold = Math.ceil(prop.line);
+        let hits = 0;
+        for (const g of gameLog) {
+          const val = prop.statType === 'home_runs' ? (g.hr ?? 0)
+            : prop.statType === 'rbi' ? (g.rbi ?? 0)
+            : (g.h ?? 0);
+          if (val >= threshold) hits++;
+        }
+        const total = gameLog.length;
+        const hitRate = total > 0 ? `${hits}/${total} last` : '—';
+        const trend: 'hot' | 'cold' | 'neutral' =
+          total > 0 ? (hits / total >= 0.6 ? 'hot' : hits / total <= 0.3 ? 'cold' : 'neutral') : 'neutral';
+        propLines.push({ label, statType: prop.statType, line: prop.line, overOdds: prop.overOdds, impliedPct: Math.round(ip), hitRate, trend });
+      }
+
+      // Prioritise primary MLB batting props, cap at 4
+      const PRIORITY = ['hits', 'home_runs', 'rbi', 'total_bases'];
+      propLines = [
+        ...PRIORITY.map(st => propLines.find(p => p.statType === st)).filter(Boolean) as PropLine[],
+        ...propLines.filter(p => !PRIORITY.includes(p.statType)),
+      ].slice(0, 4);
+    } catch { /* non-fatal */ }
+
     const card: InsightCard = {
       type: CARD_TYPES.STATCAST_SUMMARY,
       title: name,
@@ -639,6 +692,7 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
         headshotUrl,
         seasonStats: seasonStats ?? undefined,
         gameLog: gameLog.length > 0 ? gameLog : undefined,
+        propLines: propLines.length > 0 ? propLines : undefined,
       },
       trend_note: 'Live Statcast data from Baseball Savant',
       last_updated: new Date().toLocaleDateString(),

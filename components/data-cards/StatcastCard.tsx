@@ -22,6 +22,11 @@ interface GameLogEntry {
   ip?: string; k?: number; er?: number; bb?: number;
 }
 
+interface PropLine {
+  label: string; statType: string; line: number;
+  overOdds: number; impliedPct: number; hitRate: string; trend: 'hot' | 'cold' | 'neutral';
+}
+
 interface StatcastCardData {
   type: string; title: string; category: string; subcategory: string;
   gradient: string; status: string; summary_metrics: Metric[];
@@ -145,7 +150,7 @@ function MetricRow({ label, value }: Metric) {
 }
 
 function FlatDataMetrics({ data }: { data: Record<string, any> }) {
-  const SKIP = new Set(['playerName', 'realData', 'headshotUrl', 'seasonStats', 'gameLog']);
+  const SKIP = new Set(['playerName', 'realData', 'headshotUrl', 'seasonStats', 'gameLog', 'propLines']);
   const entries = Object.entries(data).filter(([k]) => !SKIP.has(k));
   if (!entries.length) return null;
   return (
@@ -333,6 +338,79 @@ function RecentFormSubCard({ log }: { log: GameLogEntry[] }) {
   );
 }
 
+// ── Sub-card: Prop Lines ──────────────────────────────────────────────────────
+
+function PropLinesSubCard({ lines }: { lines: PropLine[] }) {
+  if (!lines.length) return null;
+
+  const fmtOdds = (o: number) => (o > 0 ? `+${o}` : String(o));
+  const barWidth = (pct: number) => Math.min(100, Math.max(4, pct));
+
+  return (
+    <div className="rounded-2xl bg-gradient-to-br from-amber-600/40 via-orange-900/30 to-slate-900/60 border border-amber-500/25 p-4 h-full">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+          <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
+        </div>
+        <div>
+          <p className="text-[9px] font-extrabold uppercase tracking-widest text-amber-400">Prop Lines</p>
+          <p className="text-[11px] font-bold text-white leading-tight">Today&apos;s Markets</p>
+        </div>
+        <span className="ml-auto text-[9px] font-bold text-gray-500 border border-gray-700/40 rounded px-1.5 py-0.5">ODDS API</span>
+      </div>
+
+      {/* Prop rows */}
+      <div className="space-y-3">
+        {lines.map((prop, i) => (
+          <div key={i}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] font-bold text-white">
+                {prop.label} O{prop.line}
+              </span>
+              <span className={cn(
+                'text-[11px] font-black tabular-nums',
+                prop.overOdds > 0 ? 'text-emerald-400' : 'text-amber-300',
+              )}>
+                {fmtOdds(prop.overOdds)}
+              </span>
+            </div>
+            {/* Progress bar + implied pct */}
+            <div className="flex items-center gap-2 mb-1">
+              <div className="flex-1 h-1.5 rounded-full bg-white/8 overflow-hidden">
+                <div
+                  className={cn(
+                    'h-full rounded-full transition-all duration-500',
+                    prop.impliedPct >= 60 ? 'bg-emerald-500/70'
+                    : prop.impliedPct >= 45 ? 'bg-amber-500/70'
+                    : 'bg-rose-500/60',
+                  )}
+                  style={{ width: `${barWidth(prop.impliedPct)}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-gray-400 tabular-nums w-9 text-right">
+                {prop.impliedPct}% imp
+              </span>
+            </div>
+            {/* Hit rate streak */}
+            <div className="flex items-center gap-1">
+              <span className={cn(
+                'text-[10px]',
+                prop.trend === 'hot' ? 'text-orange-400' : prop.trend === 'cold' ? 'text-sky-400' : 'text-gray-500',
+              )}>
+                {prop.trend === 'hot' ? '🔥' : prop.trend === 'cold' ? '❄' : '→'}
+              </span>
+              <span className="text-[10px] text-gray-500">
+                {prop.hitRate !== '—' ? `Hit in ${prop.hitRate} games` : 'No recent game data'}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Sub-card slider ───────────────────────────────────────────────────────────
 
 function SubCardSlider({
@@ -447,11 +525,13 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
   const headshotUrl = (data.data?.headshotUrl as string | null | undefined) ?? getPlayerHeadshotUrl(playerName);
   const seasonStats = data.data?.seasonStats as SeasonStats | undefined;
   const gameLog     = (data.data?.gameLog as GameLogEntry[] | undefined) ?? [];
+  const propLines   = (data.data?.propLines as PropLine[] | undefined) ?? [];
 
   // Build sub-cards (only include if data is available)
   const subCards: React.ReactNode[] = [];
   if (seasonStats) subCards.push(<SeasonSubCard key="season" stats={seasonStats} conf={conf} />);
   if (gameLog.length > 0) subCards.push(<RecentFormSubCard key="recent" log={gameLog} />);
+  if (propLines.length > 0) subCards.push(<PropLinesSubCard key="props" lines={propLines} />);
 
   return (
     <>

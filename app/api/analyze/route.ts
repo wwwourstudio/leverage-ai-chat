@@ -724,7 +724,7 @@ export async function POST(request: NextRequest) {
       return `${p > 0 ? '+' : ''}${p}`;
     };
 
-    if (context.oddsData?.events?.length > 0) {
+    if (context.oddsData?.events?.length > 0 && !context.isPoliticalMarket) {
       const oddsPreview = context.oddsData.events
         .slice(0, 8)
         .map((e: any) => {
@@ -1304,9 +1304,10 @@ export async function POST(request: NextRequest) {
           cardFetchPromise = generateContextualCards('betting', sportKey, 7).catch(() => []);
         }
 
-      } else if (kalshiPromptMarkets && kalshiPromptMarkets.length > 0) {
-        // Kalshi tab — reuse the exact same markets already injected into the AI prompt
-        // so the cards always match the analysis text (no second independent API call).
+      } else if (context.isPoliticalMarket || (kalshiPromptMarkets && kalshiPromptMarkets.length > 0)) {
+        // Kalshi query — reuse prompt-bridge markets when available; otherwise fall back
+        // to generateContextualCards('kalshi'). Condition includes isPoliticalMarket so
+        // card generation fires even when the Kalshi fetch returned 0 markets.
         cardFetchPromise = import('@/lib/kalshi/index')
           .then(({ kalshiMarketToCard }) => {
             const cards = kalshiPromptMarkets!.map((m: any) => kalshiMarketToCard(m));

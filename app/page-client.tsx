@@ -798,10 +798,11 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           msgLow.includes('contract pricing') ||
           msgLow.includes('winner contract')
         ) ? 'kalshi'
-          : (selectedCategory === 'fantasy' || selectedCategory === 'dfs') && !hasFantasyOrDFSQuery
+          : selectedCategory === 'fantasy' && !hasFantasyOrDFSQuery
           ? 'betting'  // don't load ADP/fantasy cards for non-fantasy queries even if fantasy tab is active
           : selectedCategory;
-        const refreshSport = extractSportFromText(lastUserQuery) || undefined;
+        // Prefer sport extracted from query text; fall back to the user's active sport selection
+        const refreshSport = extractSportFromText(lastUserQuery) || selectedSport || undefined;
         const freshCards = await fetchDynamicCards({ sport: refreshSport, userContext: lastUserQuery, category: detectedCategory, limit: 4 });
         if (freshCards.length === 0) return;
 

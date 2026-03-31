@@ -159,19 +159,21 @@ export async function loadMessages(threadId: string): Promise<PersistedMessage[]
 
 /**
  * Append a single message to a thread.
- * Fire-and-forget — never blocks the UI.
+ * Returns the server-assigned message UUID on success, or null on failure.
  */
 export async function saveMessage(
   threadId: string,
   msg: { role: 'user' | 'assistant'; content: string; model_used?: string; confidence?: number; is_welcome?: boolean }
-): Promise<void> {
-  if (!isUUID(threadId)) return;
+): Promise<string | null> {
+  if (!isUUID(threadId)) return null;
   try {
-    await apiCall(`/api/chats/${threadId}/messages`, {
+    const json = await apiCall(`/api/chats/${threadId}/messages`, {
       method: 'POST',
       body: JSON.stringify(msg),
     });
+    return (json.message?.id as string) ?? null;
   } catch (err) {
     console.warn('[v0] [Chat] saveMessage failed:', err);
+    return null;
   }
 }

@@ -1874,15 +1874,37 @@ No preamble. Start directly with section 1.`;
           selectedCategory === 'all' ? 'multi-platform' : selectedCategory,
           ...(selectedSport ? [selectedSport] : []),
         ];
-        resolveThreadId().then(threadId => {
+        resolveThreadId().then(async (threadId) => {
           if (!threadId) return;
           saveMessage(threadId, { role: 'user', content: userMessage });
-          saveMessage(threadId, {
+          const savedMsgId = await saveMessage(threadId, {
             role: 'assistant',
             content: capturedMsg.content,
             model_used: capturedMsg.modelUsed,
             confidence: capturedMsg.confidence,
           });
+          // Re-key cards in localStorage to use real DB IDs so they survive page reloads.
+          // The early save above used client-side UUIDs (temp thread ID + streaming message ID).
+          // Now we have the real Supabase-assigned IDs for both the thread and the message.
+          const clientMsgId = capturedMsg.id;
+          if (savedMsgId && (capturedMsg.cards as any[])?.length) {
+            try {
+              const oldKey = `lev:cards:${capturedChat}`;
+              const newKey = `lev:cards:${threadId}`;
+              let stored: Record<string, any[]> = JSON.parse(localStorage.getItem(oldKey) ?? '{}');
+              if (oldKey !== newKey) {
+                localStorage.removeItem(oldKey);
+              }
+              // Re-key message entry: client streaming UUID → server UUID
+              if (stored[clientMsgId]?.length && clientMsgId !== savedMsgId) {
+                stored[savedMsgId] = stored[clientMsgId];
+                delete stored[clientMsgId];
+              }
+              const keys = Object.keys(stored);
+              if (keys.length > 50) delete stored[keys[0]];
+              localStorage.setItem(newKey, JSON.stringify(stored));
+            } catch { /* quota / security errors — silently skip */ }
+          }
           // Sync category + sport tags so sidebar always shows correct context
           updateThread(threadId, { category: finalCategory, tags: finalTags });
           setChats((prev: any) => prev.map((c: any) =>

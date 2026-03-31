@@ -32,6 +32,7 @@ import { UmpireImpactCard } from './UmpireImpactCard';
 import { CatcherFramingCard } from './CatcherFramingCard';
 import { ClosingLineCard } from './ClosingLineCard';
 import { DFSSlateCard } from './DFSSlateCard';
+import { PropHitRateCard } from './PropHitRateCard';
 
 interface CardData {
   id?: string;
@@ -412,6 +413,30 @@ export function DynamicCardRenderer({
           </button>
         )}
       </div>
+    );
+  }
+
+  // Prop hit-rate cards (detailed historical analysis with grade rings + recent form)
+  if (cardType === 'prop-hit-rate' || cardType === 'prop_hit_rate') {
+    const d = safeCard.data;
+    return withOverlays(
+      <PropHitRateCard
+        playerName={String(d.playerName ?? d.player ?? safeCard.title ?? '')}
+        statType={String(d.statType ?? d.stat ?? '')}
+        hitRatePercentage={parseFloat(String(d.hitRatePercentage ?? d.hitRate ?? 0))}
+        totalGames={parseInt(String(d.totalGames ?? 0))}
+        hits={parseInt(String(d.hits ?? 0))}
+        misses={parseInt(String(d.misses ?? 0))}
+        avgLine={parseFloat(String(d.avgLine ?? d.line ?? 0))}
+        avgActual={parseFloat(String(d.avgActual ?? 0))}
+        trend={d.trend ?? 'stable'}
+        confidence={d.confidence ?? 'medium'}
+        recommendation={String(d.recommendation ?? '')}
+        recentForm={d.recentForm}
+        sport={safeCard.category}
+        isHero={isHero}
+        onAnalyze={handleAnalyze}
+      />
     );
   }
 

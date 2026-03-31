@@ -1315,6 +1315,21 @@ export function kalshiMarketToCard(
     market.priceChange > 0 ? 'up' :
     market.priceChange < 0 ? 'down' : 'flat';
 
+  // Build synthetic price history for sparkline — Kalshi API has no tick history endpoint.
+  // Uses lastPrice + priceChange to construct a minimal directional trend line.
+  const syntheticTrades: Array<{ price: number }> | null = (() => {
+    if (!market.priceIsReal || yesPct <= 0) return null;
+    const prev = market.lastPrice > 0
+      ? market.lastPrice
+      : Math.max(1, yesPct - (market.priceChange ?? 0));
+    if (prev === yesPct) return null; // flat — no meaningful line to show
+    return [
+      { price: Math.max(1, Math.min(99, prev)) },
+      { price: Math.max(1, Math.min(99, (prev + yesPct) / 2)) },
+      { price: Math.max(1, Math.min(99, yesPct)) },
+    ];
+  })();
+
   return {
     type: 'kalshi-market',
     title: market.title,
@@ -1382,6 +1397,8 @@ export function kalshiMarketToCard(
       orderbookAsks: orderbook?.yesAsks?.slice(0, 5) ?? null,
       // Whether the market has any real price signal (vs defaulted 50¢)
       priceIsReal: market.priceIsReal ?? false,
+      // Synthetic price history for sparkline (3-point trend from lastPrice → yesPct)
+      trades: syntheticTrades,
     },
     status: market.status === 'open' ? 'active' : 'closed',
     realData: true,

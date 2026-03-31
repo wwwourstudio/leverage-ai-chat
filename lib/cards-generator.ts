@@ -2620,12 +2620,19 @@ export function cardsToPromptContext(cards: InsightCard[]): string {
     }
 
     // ── Kalshi / prediction market cards ─────────────────────────────────────
-    if (card.type === CARD_TYPES.KALSHI_INSIGHT || card.type === CARD_TYPES.KALSHI_MARKET || card.type === 'kalshi') {
+    if (
+      card.type === CARD_TYPES.KALSHI_INSIGHT || card.type === CARD_TYPES.KALSHI_MARKET ||
+      card.type === 'kalshi' || card.type === 'kalshi-market'
+    ) {
       const title = String(d.market ?? d.title ?? card.title ?? '');
       const parts: string[] = [`Kalshi: ${title}`];
-      if (d.yesPrice !== undefined) parts.push(`YES: ${d.yesPrice}¢`);
-      if (d.noPrice !== undefined) parts.push(`NO: ${d.noPrice}¢`);
+      const yesCents = d.yesPct !== undefined ? d.yesPct : (d.yesPrice ? parseFloat(String(d.yesPrice)) : undefined);
+      const noCents  = d.noPct  !== undefined ? d.noPct  : (d.noPrice  ? parseFloat(String(d.noPrice))  : undefined);
+      if (yesCents !== undefined) parts.push(`YES: ${yesCents}¢`);
+      if (noCents  !== undefined) parts.push(`NO: ${noCents}¢`);
       if (d.volume) parts.push(`Vol: ${d.volume}`);
+      if (d.recommendation) parts.push(String(d.recommendation));
+      if (d.expiresLabel) parts.push(`Expires: ${d.expiresLabel}`);
       lines.push(parts.join(' | '));
       continue;
     }
@@ -2669,11 +2676,81 @@ export function cardsToPromptContext(cards: InsightCard[]): string {
       continue;
     }
 
+    // ── DFS Slate card (full optimal lineup) ─────────────────────────────────
+    if (card.type === 'dfs-slate' || card.type === CARD_TYPES.DFS_SLATE) {
+      const slateArr = Array.isArray(d.slate) ? d.slate as any[] : [];
+      const parts: string[] = [`DFS MLB Optimal Slate`];
+      if (d.totalSalary) parts.push(`Salary: ${d.totalSalary}`);
+      if (d.totalProjPts) parts.push(`Proj: ${d.totalProjPts} pts`);
+      if (d.topStack) parts.push(`Stack: ${d.topStack}`);
+      if (slateArr.length > 0) {
+        const roster = slateArr
+          .map((p: any) => `${p.position} ${p.player} (${p.team}) ${p.salary} ${p.projection}pts ${p.ownership}own`)
+          .join(' | ');
+        parts.push(`Lineup: ${roster}`);
+      }
+      lines.push(parts.join(' | '));
+      continue;
+    }
+
+    // ── DFS Value / Matchup / Contrarian / Chalk cards ────────────────────────
+    if (
+      card.type === 'dfs-value' || card.type === 'dfs-matchup' ||
+      card.type === 'dfs-contrarian' || card.type === 'dfs-chalk' ||
+      card.type === CARD_TYPES.DFS_VALUE || card.type === CARD_TYPES.DFS_MATCHUP ||
+      card.type === CARD_TYPES.DFS_CONTRARIAN
+    ) {
+      const catLabel = String(d.cardCategory ?? card.type.replace('dfs-', '')).toUpperCase();
+      const parts: string[] = [`DFS ${catLabel}`];
+      if (d.player) parts.push(`Player: ${d.player}${d.position ? ` (${d.position})` : ''}`);
+      if (d.team && d.team !== '—') parts.push(`Team: ${d.team}`);
+      if (d.salary) parts.push(`Salary: ${d.salary}`);
+      if (d.projection) parts.push(`Proj: ${d.projection} DK pts`);
+      if (d.ownership) parts.push(`Own: ${d.ownership}`);
+      if (d.dkValue) parts.push(`Value: ${d.dkValue}x pts/$k`);
+      if (d.matchupScore) parts.push(`Matchup: ${d.matchupScore}`);
+      if (d.targetGame) parts.push(`Game: ${d.targetGame}`);
+      if (d.recentGamesAvg) parts.push(`L5 avg: ${d.recentGamesAvg}`);
+      if (d.homeDKAvg && d.roadDKAvg) parts.push(`Home/Road: ${d.homeDKAvg}/${d.roadDKAvg} DK avg`);
+      lines.push(parts.join(' | '));
+      continue;
+    }
+
+    // ── Weather cards ──────────────────────────────────────────────────────────
+    if (
+      card.type === 'weather_impact' || card.type === 'weather_game' ||
+      card.type === CARD_TYPES.WEATHER_IMPACT || card.type === CARD_TYPES.WEATHER_GAME
+    ) {
+      const parts: string[] = [`Weather: ${card.title}`];
+      if (d.location) parts.push(String(d.location));
+      if (d.temperature) parts.push(`Temp: ${d.temperature}`);
+      if (d.wind) parts.push(`Wind: ${d.wind}`);
+      if (d.precipitation) parts.push(`Precip: ${d.precipitation}`);
+      if (d.gameImpact) parts.push(`Impact: ${d.gameImpact}`);
+      lines.push(parts.join(' | '));
+      continue;
+    }
+
+    // ── MLB Projection cards ───────────────────────────────────────────────────
+    if (card.type === 'mlb_projection_card') {
+      const name = String(d.player_name ?? d.playerName ?? card.title ?? '');
+      const parts: string[] = [`MLB Proj: ${name}`];
+      if (d.team) parts.push(`Team: ${d.team}`);
+      if (d.position) parts.push(`Pos: ${d.position}`);
+      const metrics = Array.isArray(d.summary_metrics) ? d.summary_metrics as any[] : [];
+      const dkPts = metrics.find((m: any) => m.label === 'DK Proj Pts')?.value;
+      if (dkPts) parts.push(`DK Proj: ${dkPts}`);
+      if (d.matchup_score) parts.push(`Matchup: ${(parseFloat(String(d.matchup_score)) * 100).toFixed(0)}/100`);
+      if (d.trend_note) parts.push(String(d.trend_note));
+      lines.push(parts.join(' | '));
+      continue;
+    }
+
     // ── Generic fallback: include title only ─────────────────────────────────
     if (card.title) lines.push(card.title);
   }
 
   if (lines.length === 0) return '';
 
-  return `[LIVE DATA CARDS visible to user — ${lines.length} card(s) already displayed in the UI:\n${lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}\nCRITICAL: These cards are ALREADY VISIBLE. Do NOT repeat, list, or restate any odds, lines, player names, or numbers from the cards in your text. The user can read the cards directly. Your text should ONLY provide 2–3 sentences of insight, context, or recommendation that goes BEYOND what the cards show. Start your response immediately with the insight — no preamble.]`;
+  return `[LIVE DATA CARDS visible to user — ${lines.length} card(s) already displayed in the UI:\n${lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}\nYour response MUST reference specific values shown in these cards — e.g. "With the -7.5 spread..." or "Given Gerrit Cole's 22.4 DK pts projection..." or "At 65¢ YES...". Ground your analysis in the exact numbers the user sees. Do not merely list all data; integrate the key values into 2-4 sentences of insight that goes beyond the raw numbers. Start your response immediately with the insight — no preamble.]`;
 }

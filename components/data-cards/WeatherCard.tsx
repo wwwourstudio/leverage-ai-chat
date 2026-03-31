@@ -100,18 +100,27 @@ function computeImpactScore(data: WeatherCardProps['data']): number | null {
 
 function ImpactMeter({ score }: { score: number }) {
   const pct = (score / 10) * 100;
-  const color = score >= 7 ? 'from-red-500 to-rose-400'
-    : score >= 4 ? 'from-amber-500 to-yellow-400'
-    : 'from-emerald-500 to-green-400';
-  const label = score >= 7 ? 'HIGH IMPACT' : score >= 4 ? 'MODERATE' : 'LOW IMPACT';
-  const textCls = score >= 7 ? 'text-red-400' : score >= 4 ? 'text-amber-400' : 'text-emerald-400';
+  const isHigh = score >= 7;
+  const isMid = score >= 4;
+  const color = isHigh ? 'from-red-500 to-rose-400' : isMid ? 'from-amber-500 to-yellow-400' : 'from-emerald-500 to-green-400';
+  const label = isHigh ? 'HIGH IMPACT' : isMid ? 'MODERATE' : 'LOW IMPACT';
+  const textCls = isHigh ? 'text-red-400' : isMid ? 'text-amber-400' : 'text-emerald-400';
+  const ringCls = isHigh ? 'ring-red-500/40 bg-red-500/10' : isMid ? 'ring-amber-500/40 bg-amber-500/10' : 'ring-emerald-500/40 bg-emerald-500/10';
+
   return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-[9px] font-semibold text-[oklch(0.40_0.01_280)]">
-        <span>Game Impact</span>
-        <span className={cn('font-black', textCls)}>{label} · {score}/10</span>
+    <div className="space-y-2.5">
+      {/* Hero score row */}
+      <div className="flex items-center gap-3">
+        <div className={cn('w-11 h-11 rounded-full ring-2 flex items-center justify-center shrink-0', ringCls)}>
+          <span className={cn('text-base font-black tabular-nums leading-none', textCls)}>{score}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className={cn('text-xs font-black uppercase tracking-widest', textCls)}>{label}</div>
+          <div className="text-[9px] text-[oklch(0.40_0.01_280)] font-semibold mt-0.5">Game Impact · {score}/10</div>
+        </div>
       </div>
-      <div className="h-2.5 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+      {/* Impact bar */}
+      <div className="h-2 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
         <div
           className={cn('h-full rounded-full bg-gradient-to-r transition-all duration-700', color)}
           style={{ width: `${pct}%` }}

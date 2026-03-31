@@ -148,27 +148,40 @@ export function ArbitrageCard({ data, gradient = 'from-emerald-500 to-green-600'
 }
 
 function BetLeg({ bet, leg }: { bet: { team: string; book: string; odds: string; stake: string; toWin: string }; leg: number }) {
+  const accent = leg === 1 ? 'emerald' : 'sky';
+  const borderCls = leg === 1 ? 'border-emerald-500/30' : 'border-sky-500/30';
+  const oddsPositive = bet.odds && (bet.odds.startsWith('+') || parseFloat(bet.odds) > 0);
+  const oddsCls = oddsPositive ? 'text-emerald-400' : 'text-white/90';
+
   return (
-    <div className="rounded-xl bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.015_280)] px-4 py-3">
-      <div className="flex items-center justify-between mb-2">
+    <div className={cn('rounded-xl bg-[oklch(0.10_0.01_280)] border overflow-hidden', borderCls)}>
+      {/* Leg header */}
+      <div className={cn(
+        'flex items-center justify-between px-3 py-2 border-b',
+        leg === 1 ? 'bg-emerald-500/8 border-emerald-500/20' : 'bg-sky-500/8 border-sky-500/20',
+      )}>
         <div className="flex items-center gap-2">
-          <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" aria-hidden="true" />
-          <span className="text-sm font-bold text-[oklch(0.90_0.005_85)]">{bet.team}</span>
+          <CheckCircle className={cn('w-3.5 h-3.5 shrink-0', leg === 1 ? 'text-emerald-400' : 'text-sky-400')} aria-hidden="true" />
+          <span className={cn('text-[9px] font-black uppercase tracking-widest', leg === 1 ? 'text-emerald-500' : 'text-sky-500')}>
+            LEG {leg}
+          </span>
+          <span className="text-sm font-black text-white/90">{bet.team}</span>
         </div>
-        <span className="text-sm font-mono font-bold tabular-nums text-[oklch(0.90_0.005_85)]">{bet.odds}</span>
+        <span className={cn('text-base font-black tabular-nums', oddsCls)}>{bet.odds}</span>
       </div>
-      <div className="grid grid-cols-3 gap-2 text-xs">
+      {/* Leg details */}
+      <div className="grid grid-cols-3 gap-2 px-3 py-2.5 text-xs">
         <div>
-          <span className="text-[oklch(0.45_0.01_280)]">Book</span>
-          <div className="font-semibold text-[oklch(0.75_0.005_85)]">{bet.book}</div>
+          <span className="text-[oklch(0.42_0.01_280)] text-[9px] uppercase tracking-wide font-bold">Book</span>
+          <div className="font-bold text-[oklch(0.78_0.005_85)] mt-0.5">{bet.book}</div>
         </div>
         <div>
-          <span className="text-[oklch(0.45_0.01_280)]">Stake</span>
-          <div className="font-semibold text-[oklch(0.75_0.005_85)]">{bet.stake}</div>
+          <span className="text-[oklch(0.42_0.01_280)] text-[9px] uppercase tracking-wide font-bold">Stake</span>
+          <div className="font-bold text-[oklch(0.78_0.005_85)] mt-0.5">{bet.stake}</div>
         </div>
         <div>
-          <span className="text-[oklch(0.45_0.01_280)]">To Win</span>
-          <div className="font-semibold text-emerald-400">{bet.toWin}</div>
+          <span className="text-[oklch(0.42_0.01_280)] text-[9px] uppercase tracking-wide font-bold">To Win</span>
+          <div className="font-black text-emerald-400 mt-0.5">{bet.toWin}</div>
         </div>
       </div>
     </div>

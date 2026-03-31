@@ -1076,9 +1076,12 @@ async function _generateContextualCards(
   
   logger.debug(LogCategory.CACHE, 'cards_cache_miss', { metadata: { multiSport, sport, category } });
 
-  // Fantasy with no sport: default to MLB — MLB draft season runs Jan–Apr (NFBC / TGFBI)
-  const effectiveSport = (category === 'fantasy' || category === 'draft' || category === 'waiver') && !sport
-    ? 'baseball_mlb'
+  // Fantasy/DFS with no sport: apply per-category defaults
+  // Fantasy/draft/waiver → MLB (draft season Jan–Apr); DFS → NBA (high-volume DFS market)
+  const effectiveSport = !sport
+    ? (category === 'fantasy' || category === 'draft' || category === 'waiver' ? 'baseball_mlb'
+      : category === 'dfs' ? 'basketball_nba'
+      : sport)
     : sport;
 
   // Normalize sport to API format, then get display name
@@ -2186,18 +2189,13 @@ async function _generateContextualCards(
       americanfootball_nfl: 'passing yards',
       icehockey_nhl: 'shots on goal',
     };
-    // When no sport specified, fall back to in-season sports in priority order
-    const dfsSportFallbacks = ['basketball_nba', 'icehockey_nhl', 'americanfootball_nfl'];
-    const effectiveDfsSport = (normalizedSport && dfsMarketMap[normalizedSport])
-      ? normalizedSport
-      : dfsSportFallbacks.find(s => s in dfsMarketMap) ?? '';
-    const dfsMarket = dfsMarketMap[effectiveDfsSport];
+    const dfsMarket = dfsMarketMap[normalizedSport || ''];
 
-    if (dfsMarket && effectiveDfsSport) {
+    if (dfsMarket && normalizedSport) {
       try {
         const { getOddsApiKey } = await import('@/lib/config');
         const apiKey = getOddsApiKey();
-        const url = `https://api.the-odds-api.com/v4/sports/${effectiveDfsSport}/odds?apiKey=${apiKey}&regions=us&markets=${dfsMarket}&oddsFormat=american`;
+        const url = `https://api.the-odds-api.com/v4/sports/${normalizedSport}/odds?apiKey=${apiKey}&regions=us&markets=${dfsMarket}&oddsFormat=american`;
 
         type OddsEvent = {
           home_team: string;
@@ -2263,7 +2261,7 @@ async function _generateContextualCards(
               data: {
                 player: top.player,
                 team: '—',
-                position: dfsPositionMap[effectiveDfsSport] ?? 'FLEX',
+                position: dfsPositionMap[normalizedSport] ?? 'FLEX',
                 salary: `$${salaryBase.toLocaleString()}`,
                 projection: proj.toFixed(1),
                 ownership: `${Math.min(35, Math.round(8 + proj / 4))}%`,
@@ -2273,7 +2271,7 @@ async function _generateContextualCards(
                 targetPlayers: valuePlayers.length > 0 ? valuePlayers : undefined,
                 platforms: ['DraftKings', 'FanDuel'],
                 value: (proj / (salaryBase / 1000)).toFixed(1),
-                tips: `${top.player} leads the ${dfsStatLabel[effectiveDfsSport] ?? 'production'} market with a ${proj} projected line — highest ceiling on today's slate.`,
+                tips: `${top.player} leads the ${dfsStatLabel[normalizedSport] ?? 'production'} market with a ${proj} projected line — highest ceiling on today's slate.`,
                 realData: true,
               },
               realData: true,

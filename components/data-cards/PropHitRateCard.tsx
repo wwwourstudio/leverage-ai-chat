@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { TrendingUp, TrendingDown, Minus, Activity, BarChart2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Activity, BarChart2, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PlayerAvatar } from './PlayerAvatar';
 import { getPlayerHeadshotUrl } from '@/lib/constants';
@@ -22,6 +22,7 @@ interface PropHitRateCardProps {
   sport?: string;
   photoUrl?: string;
   isHero?: boolean;
+  onAnalyze?: () => void;
 }
 
 /** Convert recentForm string like "W,W,L,W,L" into hit/miss booleans */
@@ -49,6 +50,7 @@ export const PropHitRateCard = memo(function PropHitRateCard({
   sport,
   photoUrl,
   isHero = false,
+  onAnalyze,
 }: PropHitRateCardProps) {
   const isStrong = hitRatePercentage >= 65;
   const isWeak = hitRatePercentage <= 35;
@@ -171,6 +173,18 @@ export const PropHitRateCard = memo(function PropHitRateCard({
         <div className="rounded-xl border border-[oklch(0.22_0.02_280)] bg-[oklch(0.10_0.01_280)] px-3 py-2.5">
           <p className="text-[11px] text-gray-400 leading-relaxed">{recommendation}</p>
         </div>
+
+        {/* AI Analysis CTA */}
+        {onAnalyze && (
+          <button
+            onClick={onAnalyze}
+            className="flex items-center justify-center gap-1.5 w-full mt-1 py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)] text-xs font-semibold text-[oklch(0.46_0.01_280)] hover:text-white hover:bg-[oklch(0.14_0.015_280)] hover:border-[oklch(0.26_0.02_280)] transition-all duration-150"
+          >
+            <BarChart2 className="w-3.5 h-3.5" />
+            AI Analysis
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </article>
   );

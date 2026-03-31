@@ -323,7 +323,10 @@ export const DFSCard = memo(function DFSCard({
 
         {/* ── Description fallback ──────────────────────────────────── */}
         {!hasCorePlay && description && (
-          <p className="text-xs text-[oklch(0.52_0.01_280)] leading-relaxed mt-3">{description}</p>
+          <div className="rounded-xl border border-[oklch(0.20_0.015_280)] bg-[oklch(0.08_0.01_280)] px-3 py-2.5 mt-3">
+            <span className="text-[8px] font-black uppercase tracking-widest text-[oklch(0.38_0.01_280)] mb-1 block">Overview</span>
+            <p className="text-[11px] text-[oklch(0.52_0.01_280)] leading-relaxed">{description}</p>
+          </div>
         )}
 
         {/* ── Overflow key-value data ───────────────────────────────── */}
@@ -334,7 +337,9 @@ export const DFSCard = memo(function DFSCard({
                 <span className="text-[10px] font-semibold text-[oklch(0.42_0.01_280)] uppercase tracking-wide">
                   {k.replace(/([A-Z])/g, ' $1').trim()}
                 </span>
-                <span className="text-xs font-bold text-white tabular-nums">{String(rest[k])}</span>
+                <span className={cn('text-xs font-black tabular-nums',
+                  String(rest[k]).endsWith('%') ? 'text-amber-400' : 'text-white'
+                )}>{String(rest[k])}</span>
               </div>
             ))}
           </div>

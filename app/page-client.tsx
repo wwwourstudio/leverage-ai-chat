@@ -585,7 +585,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           setIsLoggedIn(true);
           setUser({
             name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-            email: user.email || ''
+            email: user.email || '',
+            avatar: user.user_metadata?.avatar_url || user.user_metadata?.picture || undefined,
           });
           // Load profile ID for credit sync (credits/instructions come via the page-load /api/init)
           loadProfileId(user.id);
@@ -628,7 +629,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             setIsLoggedIn(true);
             setUser({
               name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
-              email: session.user.email || ''
+              email: session.user.email || '',
+              avatar: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || undefined,
             });
             setShowLoginModal(false);
             setShowSignupModal(false);

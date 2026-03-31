@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState, useCallback } from 'react';
-import { Menu, TrendingUp, Bell, Settings, LogIn, UserPlus, Download, Share2, Check, Copy } from 'lucide-react';
+import { Menu, X, TrendingUp, Bell, Settings, LogIn, UserPlus, Download, Share2, Check, Copy } from 'lucide-react';
 import { exportChatAsMarkdown, exportChatAsJSON, downloadFile, chatFilename, type ExportMessage, type ExportChat } from '@/lib/chat-export';
 import { useToast } from '@/components/toast-provider';
 
@@ -90,7 +90,10 @@ export const ChatHeader = memo(function ChatHeader({
             onClick={onToggleSidebar}
             className="group p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 active:scale-95 bg-transparent"
           >
-            <Menu className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
+            {sidebarOpen
+              ? <X className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
+              : <Menu className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
+            }
           </button>
           <div className="flex items-center gap-2 md:gap-3">
             {/* Logo mark */}

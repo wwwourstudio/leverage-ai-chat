@@ -147,8 +147,12 @@ export const DFSCard = memo(function DFSCard({
     cardCategory, recentDKPts, recentGamesAvg,
     homeDKAvg, roadDKAvg, homeSplitGames, roadSplitGames,
     stackTeam, stackType, stackPartners, playerId, // structural — exclude from overflow
+    matchupScore, parkFactor,
     ...rest
   } = data;
+
+  const matchupScoreNum = matchupScore ? parseFloat(String(matchupScore)) : null;
+  const parkFactorNum = parkFactor ? parseFloat(String(parkFactor)) : null;
 
   const projNum      = parseFloat(String(projection  || '').replace(/[^0-9.]/g, ''));
   const salaryNum    = parseFloat(String(salary      || '').replace(/[^0-9.]/g, ''));
@@ -332,6 +336,26 @@ export const DFSCard = memo(function DFSCard({
           </div>
         )}
 
+        {/* ── Matchup score bar ─────────────────────────────────────── */}
+        {matchupScoreNum !== null && !isNaN(matchupScoreNum) && (
+          <div className="rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] px-3 py-2.5 space-y-1">
+            <div className="flex justify-between text-[9px] font-bold uppercase tracking-wide">
+              <span className="text-[oklch(0.40_0.01_280)]">Matchup Score</span>
+              <span className={cn(
+                matchupScoreNum >= 70 ? 'text-emerald-400' : matchupScoreNum >= 50 ? 'text-amber-400' : 'text-red-400'
+              )}>{Math.round(matchupScoreNum)}/100</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+              <div
+                className={cn('h-full rounded-full transition-all duration-700',
+                  matchupScoreNum >= 70 ? 'bg-emerald-500' : matchupScoreNum >= 50 ? 'bg-amber-500' : 'bg-red-500'
+                )}
+                style={{ width: `${Math.min(100, matchupScoreNum)}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* ── Stack section ─────────────────────────────────────────── */}
         {stackPlayers.length > 0 && (
           <div className="rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] px-3 py-2.5">
@@ -355,7 +379,7 @@ export const DFSCard = memo(function DFSCard({
         )}
 
         {/* ── Context chips (game / platforms when no stack) ─────────── */}
-        {!stackPlayers.length && (targetGame || platforms) && (
+        {!stackPlayers.length && (targetGame || platforms || parkFactorNum) && (
           <div className="flex flex-wrap gap-1.5">
             {targetGame && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[oklch(0.13_0.015_280)] border border-[oklch(0.19_0.015_280)] text-[10px] font-medium text-[oklch(0.58_0.01_280)]">
@@ -365,6 +389,16 @@ export const DFSCard = memo(function DFSCard({
             {platforms && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[oklch(0.13_0.015_280)] border border-[oklch(0.19_0.015_280)] text-[10px] font-medium text-[oklch(0.58_0.01_280)]">
                 {Array.isArray(platforms) ? platforms.join(' · ') : String(platforms)}
+              </span>
+            )}
+            {parkFactorNum !== null && !isNaN(parkFactorNum) && (
+              <span className={cn(
+                'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border',
+                parkFactorNum >= 1.05 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                  : parkFactorNum <= 0.96 ? 'bg-red-500/10 border-red-500/20 text-red-400'
+                  : 'bg-[oklch(0.13_0.015_280)] border-[oklch(0.19_0.015_280)] text-[oklch(0.55_0.01_280)]',
+              )}>
+                Park {parkFactorNum.toFixed(2)}x {parkFactorNum >= 1.05 ? '· Hitter-friendly' : parkFactorNum <= 0.96 ? '· Pitcher-friendly' : ''}
               </span>
             )}
           </div>

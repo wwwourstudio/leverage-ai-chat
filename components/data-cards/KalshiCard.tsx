@@ -565,7 +565,12 @@ export const KalshiCard = memo(function KalshiCard({
   title, category, subcategory, data: d, status, onAnalyze, isHero,
 }: KalshiCardProps) {
   const [animated, setAnimated] = useState(false);
-  const [trades, setTrades]     = useState<Array<{ price: number }> | null>(null);
+  // Seed from synthetic trades bundled in card data; real API trades override when fetched
+  const [trades, setTrades] = useState<Array<{ price: number }> | null>(
+    Array.isArray(d.trades) && (d.trades as Array<{ price: number }>).length >= 2
+      ? (d.trades as Array<{ price: number }>)
+      : null
+  );
 
   // ── Real-time WebSocket price overlay ──────────────────────────────────────
   const livePrice  = useKalshiStore(s => d.ticker ? s.getPrice(d.ticker as string) : undefined);

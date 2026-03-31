@@ -1,6 +1,6 @@
 'use client';
 
-import { Wallet, ChevronRight, PieChart } from 'lucide-react';
+import { Wallet, ChevronRight, PieChart, TrendingUp, TrendingDown, Minus, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface PortfolioData {
@@ -49,6 +49,7 @@ export function PortfolioCard({
 }: PortfolioCardProps) {
   const utilNum = parseUtilization(data.utilizationRate);
   const hasLiveData = !!(data.totalBankroll);
+  const roiNum = data.roi ? parseFloat(String(data.roi).replace('%', '')) : null;
 
   const utilColor =
     utilNum !== null && utilNum > 80 ? 'bg-red-500' :
@@ -129,6 +130,17 @@ export function PortfolioCard({
                     aria-valuemax={100}
                   />
                 </div>
+                {utilNum > 75 && (
+                  <div className={cn(
+                    'flex items-center gap-1.5 mt-2 px-2.5 py-1.5 rounded-lg border text-[10px] font-semibold',
+                    utilNum > 90
+                      ? 'bg-red-500/8 border-red-500/20 text-red-300'
+                      : 'bg-amber-500/8 border-amber-500/20 text-amber-300',
+                  )}>
+                    <AlertTriangle className="w-3 h-3 shrink-0" />
+                    {utilNum > 90 ? 'Critical utilization — reduce positions immediately' : 'High utilization — consider reducing position size'}
+                  </div>
+                )}
               </div>
             )}
 
@@ -149,7 +161,18 @@ export function PortfolioCard({
               {data.roi && (
                 <div className="flex items-center justify-between">
                   <span className="text-[oklch(0.45_0.01_280)]">ROI</span>
-                  <span className="font-semibold text-emerald-400">{data.roi}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn('font-semibold', roiNum === null ? 'text-emerald-400' : roiNum > 0 ? 'text-emerald-400' : roiNum < 0 ? 'text-red-400' : 'text-[oklch(0.55_0.01_280)]')}>
+                      {data.roi}
+                    </span>
+                    {roiNum !== null && (
+                      roiNum > 0
+                        ? <span className="flex items-center gap-0.5 text-[9px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded"><TrendingUp className="w-2.5 h-2.5" />Profitable</span>
+                        : roiNum < 0
+                          ? <span className="flex items-center gap-0.5 text-[9px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded"><TrendingDown className="w-2.5 h-2.5" />Drawdown</span>
+                          : <span className="flex items-center gap-0.5 text-[9px] font-bold text-[oklch(0.45_0.01_280)] bg-[oklch(0.14_0.01_280)] border border-[oklch(0.20_0.015_280)] px-1.5 py-0.5 rounded"><Minus className="w-2.5 h-2.5" />Break-even</span>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

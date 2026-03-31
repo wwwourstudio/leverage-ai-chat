@@ -766,6 +766,15 @@ export const BettingCard = memo(function BettingCard({
               </div>
             )}
 
+            {/* Reverse Line Movement indicator */}
+            {sharpPct !== null && sharpPct >= 60 && hasLineMove && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/8 border border-amber-500/20">
+                <Zap className="w-3 h-3 text-amber-400 shrink-0" />
+                <span className="text-[10px] font-bold text-amber-300">Reverse Line Movement</span>
+                <span className="text-[9px] text-amber-400/70 ml-0.5">— sharp action against public</span>
+              </div>
+            )}
+
             {/* Book vig (overround) */}
             {vigPct !== null && vigPct > 0 && (
               <div className="flex items-center justify-between">

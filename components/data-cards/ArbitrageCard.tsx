@@ -34,13 +34,39 @@ export function ArbitrageCard({ data, gradient = 'from-emerald-500 to-green-600'
     const created = new Date(data.generatedAt).getTime();
     const tick = () => setAgeMs(Date.now() - created);
     tick();
-    const id = setInterval(tick, 30_000); // Update every 30s
+    // Use 1s interval when near expiry for accurate countdown, 15s otherwise
+    const interval = ageMs >= ARB_WARN_MS ? 1_000 : 15_000;
+    const id = setInterval(tick, interval);
     return () => clearInterval(id);
-  }, [data.generatedAt]);
+  }, [data.generatedAt, ageMs >= ARB_WARN_MS]);
 
   const ageMin = Math.floor(ageMs / 60_000);
   const isExpired = ageMs >= ARB_EXPIRE_MS;
   const isWarning = ageMs >= ARB_WARN_MS && !isExpired;
+
+  // Remaining time for countdown
+  const remainingMs = Math.max(0, ARB_EXPIRE_MS - ageMs);
+  const remainMins = Math.floor(remainingMs / 60_000);
+  const remainSecs = Math.floor((remainingMs % 60_000) / 1_000);
+  const countdownStr = isWarning
+    ? remainMins > 0 ? `${remainMins}m ${remainSecs}s` : `${remainSecs}s`
+    : `${10 - ageMin}m`;
+
+  // ROI and implied probabilities
+  const profitAmtNum = parseFloat(String(data.profitAmount ?? '').replace(/[$,]/g, ''));
+  const totalStakeNum = parseFloat(String(data.totalStake ?? '').replace(/[$,]/g, ''));
+  const roiPct = !isNaN(profitAmtNum) && !isNaN(totalStakeNum) && totalStakeNum > 0
+    ? (profitAmtNum / totalStakeNum * 100).toFixed(2)
+    : null;
+
+  function impliedProb(odds: string): string | null {
+    const n = parseFloat(odds);
+    if (isNaN(n)) return null;
+    const decimal = n >= 0 ? (n / 100) + 1 : 1 - (100 / n);
+    return (1 / decimal * 100).toFixed(1);
+  }
+  const impl1 = data.bet1?.odds ? impliedProb(data.bet1.odds) : null;
+  const impl2 = data.bet2?.odds ? impliedProb(data.bet2.odds) : null;
 
   const confColor =
     data.confidence === 'HIGH' ? 'text-emerald-400' :
@@ -73,7 +99,7 @@ export function ArbitrageCard({ data, gradient = 'from-emerald-500 to-green-600'
           <AlertTriangle className="w-3 h-3 shrink-0" />
           {isExpired
             ? `Opportunity expired ${ageMin} min ago — odds likely changed`
-            : `${10 - ageMin} min remaining — execute quickly`}
+            : `${countdownStr} remaining — execute quickly`}
         </div>
       )}
 
@@ -97,8 +123,13 @@ export function ArbitrageCard({ data, gradient = 'from-emerald-500 to-green-600'
 
         {/* Profit display */}
         <div className="mb-3">
-          <div className="text-2xl sm:text-3xl font-black tabular-nums text-emerald-400 leading-none">
-            {data.profit}
+          <div className="flex items-end gap-3">
+            <div className="text-2xl sm:text-3xl font-black tabular-nums text-emerald-400 leading-none">
+              {data.profit}
+            </div>
+            {roiPct !== null && (
+              <span className="text-sm font-black text-emerald-300 mb-0.5">+{roiPct}% ROI</span>
+            )}
           </div>
           <p className="text-sm text-[oklch(0.60_0.01_280)] mt-1">
             Guaranteed: <span className="font-semibold text-[oklch(0.85_0.005_85)]">{data.profitAmount}</span>
@@ -106,6 +137,22 @@ export function ArbitrageCard({ data, gradient = 'from-emerald-500 to-green-600'
             Stake: <span className="font-semibold text-[oklch(0.85_0.005_85)]">{data.totalStake}</span>
           </p>
         </div>
+
+        {/* Implied probabilities */}
+        {(impl1 || impl2) && (
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            {[
+              { label: data.bet1?.book ?? 'Leg 1', prob: impl1, accent: 'text-emerald-400' },
+              { label: data.bet2?.book ?? 'Leg 2', prob: impl2, accent: 'text-sky-400' },
+            ].map(({ label, prob, accent }) => prob ? (
+              <div key={label} className="bg-[oklch(0.10_0.01_280)] rounded-xl border border-[oklch(0.19_0.015_280)] px-2.5 py-2 text-center">
+                <p className="text-[8px] uppercase tracking-widest text-[oklch(0.38_0.01_280)] mb-0.5 truncate">{label}</p>
+                <p className={cn('text-sm font-black tabular-nums', accent)}>{prob}%</p>
+                <p className="text-[8px] text-[oklch(0.35_0.01_280)]">impl. prob</p>
+              </div>
+            ) : null)}
+          </div>
+        )}
 
         {/* Event info */}
         <div className="flex items-center gap-2 mb-3 text-xs text-[oklch(0.50_0.01_280)]">

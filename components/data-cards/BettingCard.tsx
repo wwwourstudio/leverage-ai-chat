@@ -230,14 +230,18 @@ function OddsCell({ label, value, sub, positive, highlight, isBest }: {
   return (
     <div className={cn(
       'flex flex-col items-center gap-0.5 px-2 py-2.5 rounded-xl border',
-      isBest
+      positive === true
+        ? 'bg-emerald-500/8 border-emerald-500/25'
+        : positive === false
+        ? 'bg-red-500/8 border-red-500/20'
+        : isBest
         ? 'bg-emerald-500/8 border-emerald-500/25'
         : highlight
         ? 'bg-blue-500/10 border-blue-500/20'
         : 'bg-[oklch(0.08_0.01_280)] border-[oklch(0.17_0.015_280)]',
     )}>
       <span className="text-[8px] font-bold uppercase tracking-wider text-[oklch(0.38_0.01_280)]">{label}</span>
-      <span className={cn('text-sm font-black tabular-nums',
+      <span className={cn('text-lg font-black tabular-nums',
         positive === true ? 'text-emerald-400' :
         positive === false ? 'text-red-400' :
         'text-white'
@@ -529,7 +533,7 @@ export const BettingCard = memo(function BettingCard({
               {/* Away team */}
               <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
                 <TeamLogo name={teams.away} sport={data.sport} avatarCls={theme.avatarCls} isLarge={isHero} />
-                <span className={cn('font-bold text-white/90 text-center leading-tight truncate w-full', isHero ? 'text-sm' : 'text-xs')}>{teams.away}</span>
+                <span className={cn('font-black text-white/90 text-center leading-tight truncate w-full', isHero ? 'text-sm' : 'text-xs')}>{teams.away}</span>
                 {awayML && (
                   <span className={cn(
                     'font-black tabular-nums',
@@ -556,7 +560,7 @@ export const BettingCard = memo(function BettingCard({
                 {isFinal && data.finalScore ? (
                   <span className="text-sm font-black text-white tabular-nums">{data.finalScore}</span>
                 ) : (
-                  <span className="text-sm font-black text-[oklch(0.26_0.01_280)]">@</span>
+                  <span className={cn('text-xs font-black uppercase tracking-wider opacity-60', theme.accentColor)}>VS</span>
                 )}
                 {!isFinal && data.gameTime && (
                   <span className="text-[9px] text-[oklch(0.28_0.01_280)]">{data.gameTime}</span>
@@ -566,7 +570,7 @@ export const BettingCard = memo(function BettingCard({
               {/* Home team */}
               <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
                 <TeamLogo name={teams.home} sport={data.sport} avatarCls={theme.avatarCls} isLarge={isHero} />
-                <span className={cn('font-bold text-white/90 text-center leading-tight truncate w-full', isHero ? 'text-sm' : 'text-xs')}>{teams.home}</span>
+                <span className={cn('font-black text-white/90 text-center leading-tight truncate w-full', isHero ? 'text-sm' : 'text-xs')}>{teams.home}</span>
                 {homeML && (
                   <span className={cn(
                     'font-black tabular-nums',
@@ -649,6 +653,7 @@ export const BettingCard = memo(function BettingCard({
                 label={teams ? `${abbr(teams.away)} SPREAD` : 'Away Spread'}
                 value={spreadAway.pts}
                 sub={spreadAway.juice ? `juice ${spreadAway.juice}` : undefined}
+                positive={spreadAway.pts?.startsWith('+') ? true : spreadAway.pts?.startsWith('-') ? false : undefined}
               />
             )}
             {spreadHome && (
@@ -656,6 +661,7 @@ export const BettingCard = memo(function BettingCard({
                 label={teams ? `${abbr(teams.home)} SPREAD` : 'Home Spread'}
                 value={spreadHome.pts}
                 sub={spreadHome.juice ? `juice ${spreadHome.juice}` : undefined}
+                positive={spreadHome.pts?.startsWith('+') ? true : spreadHome.pts?.startsWith('-') ? false : undefined}
               />
             )}
             {ou && (

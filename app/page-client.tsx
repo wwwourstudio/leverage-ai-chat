@@ -599,6 +599,14 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             if (threads.length > 0) {
               setChats(threads);
               setActiveChat(threads[0].id);
+              // Restore category and sport filters from the most recent thread
+              const firstThread = threads[0];
+              if (firstThread.category && firstThread.category !== 'all') {
+                setSelectedCategory(firstThread.category);
+              }
+              const SPORT_KEYS_LIST = ['basketball_nba', 'americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb', 'soccer_epl', 'soccer_mls'];
+              const sportTag = firstThread.tags?.find((t: string) => SPORT_KEYS_LIST.includes(t));
+              if (sportTag) setSelectedSport(sportTag);
               // Load messages for the most recent thread
               loadMessages(threads[0].id).then(msgs => {
                 if (msgs.length > 0) {
@@ -2732,6 +2740,10 @@ No preamble. Start directly with section 1.`;
     if (selectedChat?.category && selectedChat.category !== 'all') {
       setSelectedCategory(selectedChat.category);
     }
+    // Restore sport filter from thread tags
+    const SPORT_KEYS_LIST = ['basketball_nba', 'americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb', 'soccer_epl', 'soccer_mls'];
+    const sportTag = selectedChat?.tags?.find((t: string) => SPORT_KEYS_LIST.includes(t));
+    setSelectedSport(sportTag ?? '');
 
     if (isLoggedIn) {
       // Load messages from Supabase for logged-in users

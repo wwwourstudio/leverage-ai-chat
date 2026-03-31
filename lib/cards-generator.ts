@@ -2186,13 +2186,18 @@ async function _generateContextualCards(
       americanfootball_nfl: 'passing yards',
       icehockey_nhl: 'shots on goal',
     };
-    const dfsMarket = dfsMarketMap[normalizedSport || ''];
+    // When no sport specified, fall back to in-season sports in priority order
+    const dfsSportFallbacks = ['basketball_nba', 'icehockey_nhl', 'americanfootball_nfl'];
+    const effectiveDfsSport = (normalizedSport && dfsMarketMap[normalizedSport])
+      ? normalizedSport
+      : dfsSportFallbacks.find(s => s in dfsMarketMap) ?? '';
+    const dfsMarket = dfsMarketMap[effectiveDfsSport];
 
-    if (dfsMarket && normalizedSport) {
+    if (dfsMarket && effectiveDfsSport) {
       try {
         const { getOddsApiKey } = await import('@/lib/config');
         const apiKey = getOddsApiKey();
-        const url = `https://api.the-odds-api.com/v4/sports/${normalizedSport}/odds?apiKey=${apiKey}&regions=us&markets=${dfsMarket}&oddsFormat=american`;
+        const url = `https://api.the-odds-api.com/v4/sports/${effectiveDfsSport}/odds?apiKey=${apiKey}&regions=us&markets=${dfsMarket}&oddsFormat=american`;
 
         type OddsEvent = {
           home_team: string;
@@ -2258,7 +2263,7 @@ async function _generateContextualCards(
               data: {
                 player: top.player,
                 team: '—',
-                position: dfsPositionMap[normalizedSport] ?? 'FLEX',
+                position: dfsPositionMap[effectiveDfsSport] ?? 'FLEX',
                 salary: `$${salaryBase.toLocaleString()}`,
                 projection: proj.toFixed(1),
                 ownership: `${Math.min(35, Math.round(8 + proj / 4))}%`,
@@ -2268,7 +2273,7 @@ async function _generateContextualCards(
                 targetPlayers: valuePlayers.length > 0 ? valuePlayers : undefined,
                 platforms: ['DraftKings', 'FanDuel'],
                 value: (proj / (salaryBase / 1000)).toFixed(1),
-                tips: `${top.player} leads the ${dfsStatLabel[normalizedSport] ?? 'production'} market with a ${proj} projected line — highest ceiling on today's slate.`,
+                tips: `${top.player} leads the ${dfsStatLabel[effectiveDfsSport] ?? 'production'} market with a ${proj} projected line — highest ceiling on today's slate.`,
                 realData: true,
               },
               realData: true,

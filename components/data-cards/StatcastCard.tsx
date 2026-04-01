@@ -111,6 +111,8 @@ function useWatchlist(playerName: string) {
           ? [...list, { name: playerName, position: 'SP', addedAt: new Date().toISOString() }]
           : list.filter(e => e.name !== playerName);
         localStorage.setItem(WATCHLIST_KEY, JSON.stringify(updated));
+        // Notify app-level badge counter
+        window.dispatchEvent(new CustomEvent('watchlist-update', { detail: { count: updated.length } }));
       } catch {}
       return next;
     });

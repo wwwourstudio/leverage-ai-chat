@@ -31,6 +31,7 @@ const SettingsLightbox = dynamic(() => import('@/components/SettingsLightbox').t
 const AlertsLightbox = dynamic(() => import('@/components/AlertsLightbox').then(m => ({ default: m.AlertsLightbox })), { ssr: false });
 const StripeLightbox = dynamic(() => import('@/components/StripeLightbox').then(m => ({ default: m.StripeLightbox })), { ssr: false });
 const UserLightbox = dynamic(() => import('@/components/UserLightbox').then(m => ({ default: m.UserLightbox })), { ssr: false });
+const WatchlistLightbox = dynamic(() => import('@/components/WatchlistLightbox').then(m => ({ default: m.WatchlistLightbox })), { ssr: false });
 import { useToast } from '@/components/toast-provider';
 import { Sidebar } from '@/components/Sidebar';
 import { ChatHeader, ChatInput } from '@/components/chat';
@@ -284,6 +285,21 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [showSettingsLightbox, setShowSettingsLightbox] = useState(false);
   const [showAlertsLightbox, setShowAlertsLightbox] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
+  const [showWatchlistLightbox, setShowWatchlistLightbox] = useState(false);
+  const [watchlistCount, setWatchlistCount] = useState(0);
+  // Sync watchlist badge count from localStorage on mount + on updates from card toggles
+  useEffect(() => {
+    try {
+      const list = JSON.parse(localStorage.getItem('leverage_watchlist') ?? '[]');
+      setWatchlistCount(Array.isArray(list) ? list.length : 0);
+    } catch { /* ignore */ }
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ count: number }>).detail;
+      setWatchlistCount(detail.count);
+    };
+    window.addEventListener('watchlist-update', handler);
+    return () => window.removeEventListener('watchlist-update', handler);
+  }, []);
   const [showStripeLightbox, setShowStripeLightbox] = useState(false);
   const [showUserLightbox, setShowUserLightbox] = useState(false);
   const [customInstructions, setCustomInstructions] = useState('');
@@ -3571,6 +3587,8 @@ No preamble. Start directly with section 1.`;
           onOpenAlerts={() => setShowAlertsLightbox(true)}
           alertCount={alertCount}
           onOpenSettings={() => setShowSettingsLightbox(true)}
+          onOpenWatchlist={() => setShowWatchlistLightbox(true)}
+          watchlistCount={watchlistCount}
           onOpenLogin={() => setShowLoginModal(true)}
           onOpenSignup={() => setShowSignupModal(true)}
           currentSport={selectedSport || selectedCategory}
@@ -4340,6 +4358,19 @@ No preamble. Start directly with section 1.`;
         isOpen={showAlertsLightbox}
         onClose={() => setShowAlertsLightbox(false)}
         onAlertsCountChange={setAlertCount}
+      />
+
+      {/* Watchlist Lightbox */}
+      <WatchlistLightbox
+        isOpen={showWatchlistLightbox}
+        onClose={() => {
+          setShowWatchlistLightbox(false);
+          // Sync count after user may have removed players
+          try {
+            const list = JSON.parse(localStorage.getItem('leverage_watchlist') ?? '[]');
+            setWatchlistCount(Array.isArray(list) ? list.length : 0);
+          } catch { /* ignore */ }
+        }}
       />
 
       {/* Stripe Purchase Lightbox */}

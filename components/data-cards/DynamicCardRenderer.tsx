@@ -149,18 +149,21 @@ export function DynamicCardRenderer({
   }, [bookmarkKey]);
 
   // Wraps any card element with ESTIMATED badge, trust score chip, and bookmark button.
-  function withOverlays(el: React.ReactElement): React.ReactElement {
+  // Pass skipBookmark=true for card types that have their own save/watch mechanism.
+  function withOverlays(el: React.ReactElement, skipBookmark = false): React.ReactElement {
     return (
       <div className="relative group/card">
         {el}
-        {/* Bookmark button — top-right corner, visible on hover */}
-        <button
-          onClick={toggleBookmark}
-          className="absolute top-2 right-2 z-10 p-1 rounded-md opacity-0 group-hover/card:opacity-100 transition-opacity duration-150 hover:bg-white/10"
-          aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark card'}
-        >
-          <Star className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-amber-400 text-amber-400' : 'text-white/30'}`} />
-        </button>
+        {/* Bookmark button — top-right corner, visible on hover. Skipped for cards with built-in watchlist. */}
+        {!skipBookmark && (
+          <button
+            onClick={toggleBookmark}
+            className="absolute top-2 right-2 z-10 p-1 rounded-md opacity-0 group-hover/card:opacity-100 transition-opacity duration-150 hover:bg-white/10"
+            aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark card'}
+          >
+            <Star className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-amber-400 text-amber-400' : 'text-white/30'}`} />
+          </button>
+        )}
         {isEstimated && (
           <span className="absolute top-2 right-10 z-10 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-gray-900/80 text-gray-400 border border-gray-700/50 backdrop-blur-sm pointer-events-none">
             ESTIMATED
@@ -332,12 +335,15 @@ export function DynamicCardRenderer({
     cardType === 'leaderboard_card' ||
     cardType === 'pitch_analysis_card'
   ) {
+    // StatcastCard has its own heart/watchlist button — skip the generic bookmark star
+    const isStatcastPitcher = cardType.includes('statcast');
     return withOverlays(
       <StatcastCard
         data={{ ...safeCard, ...(card as any) } as any}
         onAnalyze={handleAnalyze}
         isHero={isHero}
-      />
+      />,
+      isStatcastPitcher, // skipBookmark
     );
   }
 

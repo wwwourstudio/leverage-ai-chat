@@ -647,6 +647,32 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             loadInitData();
             // Restore fantasy league from DB on sign-in
             loadFantasyLeagueFromDB();
+            // Load chat threads + most recent messages so history appears immediately
+            // after email/password login (Google OAuth handles this via page redirect).
+            setIsLoadingChats(true);
+            loadThreads().then(threads => {
+              setIsLoadingChats(false);
+              if (threads.length > 0) {
+                setChats(threads);
+                setActiveChat(threads[0].id);
+                loadMessages(threads[0].id).then(msgs => {
+                  if (msgs.length > 0) {
+                    let storedCards: Record<string, any[]> = {};
+                    try { storedCards = JSON.parse(localStorage.getItem(`lev:cards:${threads[0].id}`) ?? '{}'); } catch { /* ignore */ }
+                    setMessages(msgs.map((m: any) => ({
+                      id: m.id,
+                      role: m.role,
+                      content: m.content,
+                      timestamp: m.timestamp,
+                      cards: m.cards?.length ? m.cards : (storedCards[m.id ?? ''] ?? []),
+                      modelUsed: m.modelUsed,
+                      confidence: m.confidence,
+                      isWelcome: m.isWelcome,
+                    })) as any);
+                  }
+                });
+              }
+            });
           } else {
             setIsLoggedIn(false);
             setUser(null);

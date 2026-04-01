@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useCallback, memo } from 'react';
-import { ChevronLeft, ChevronRight, TrendingUp, Calendar, Activity, BarChart3 } from 'lucide-react';
+import { useState, useCallback, memo } from 'react';
+import { TrendingUp, Activity, BarChart3, Heart, Zap, Wind } from 'lucide-react';
 import { AnalysisLightbox, type LightboxSection } from './AnalysisLightbox';
 import { getPlayerHeadshotUrl } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -89,6 +89,36 @@ const STATUS_CONFIG: Record<string, { label: string; dotCls: string; textCls: st
   optimal: { label: 'OPTIMAL', dotCls: 'bg-sky-400',     textCls: 'text-sky-400' },
 };
 
+// ── Watchlist hook ─────────────────────────────────────────────────────────────
+
+const WATCHLIST_KEY = 'leverage_watchlist';
+interface WatchlistEntry { name: string; team?: string; position: string; addedAt: string; }
+
+function useWatchlist(playerName: string) {
+  const [watched, setWatched] = useState<boolean>(() => {
+    try {
+      const list: WatchlistEntry[] = JSON.parse(localStorage.getItem(WATCHLIST_KEY) ?? '[]');
+      return list.some(e => e.name === playerName);
+    } catch { return false; }
+  });
+
+  const toggle = useCallback(() => {
+    setWatched(prev => {
+      const next = !prev;
+      try {
+        const list: WatchlistEntry[] = JSON.parse(localStorage.getItem(WATCHLIST_KEY) ?? '[]');
+        const updated = next
+          ? [...list, { name: playerName, position: 'SP', addedAt: new Date().toISOString() }]
+          : list.filter(e => e.name !== playerName);
+        localStorage.setItem(WATCHLIST_KEY, JSON.stringify(updated));
+      } catch {}
+      return next;
+    });
+  }, [playerName]);
+
+  return { watched, toggle };
+}
+
 // ── Value formatting ──────────────────────────────────────────────────────────
 
 function getValueStyle(value: string): { textCls: string; barWidth?: number } {
@@ -112,7 +142,7 @@ function getValueStyle(value: string): { textCls: string; barWidth?: number } {
   return { textCls: 'text-white' };
 }
 
-// ── Main card internals ───────────────────────────────────────────────────────
+// ── Shared sub-components ─────────────────────────────────────────────────────
 
 function HeroMetrics({ metrics, conf }: { metrics: Metric[]; conf: TypeConf }) {
   const top = metrics.slice(0, 3);
@@ -149,257 +179,224 @@ function MetricRow({ label, value }: Metric) {
   );
 }
 
-function FlatDataMetrics({ data }: { data: Record<string, any> }) {
-  const SKIP = new Set(['playerName', 'realData', 'headshotUrl', 'seasonStats', 'gameLog', 'propLines']);
-  const entries = Object.entries(data).filter(([k]) => !SKIP.has(k));
-  if (!entries.length) return null;
+// ── Tab bar ───────────────────────────────────────────────────────────────────
+
+const PITCHER_TABS = ['Stats', 'Advanced', 'Props'] as const;
+
+function PitcherTabBar({ active, onSelect, accentBg, accentBorder, accentText }: {
+  active: number; onSelect: (i: number) => void;
+  accentBg: string; accentBorder: string; accentText: string;
+}) {
   return (
-    <div className="space-y-0">
-      {entries.map(([k, v], i) => (
-        <MetricRow key={i} label={k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} value={String(v)} />
+    <div
+      className="flex gap-1 mb-3 overflow-x-auto"
+      style={{ scrollbarWidth: 'none' }}
+    >
+      {PITCHER_TABS.map((label, i) => (
+        <button
+          key={i}
+          onClick={() => onSelect(i)}
+          className={cn(
+            'flex-shrink-0 px-3 py-1 rounded-full text-[10px] font-bold border transition-all duration-150',
+            active === i
+              ? `${accentBg} ${accentBorder} ${accentText}`
+              : 'bg-white/5 border-white/10 text-gray-500 hover:text-gray-300 hover:bg-white/8',
+          )}
+        >
+          {label}
+        </button>
       ))}
     </div>
   );
 }
 
-// ── Sub-card: Season Stats ────────────────────────────────────────────────────
+// ── Tab 0: Stats ──────────────────────────────────────────────────────────────
 
-function SeasonSubCard({ stats, conf }: { stats: SeasonStats; conf: TypeConf }) {
-  const isPitcher = !!stats.era;
-  const year = new Date().getFullYear();
-
+function TabStats({ metrics, trendNote, conf }: {
+  metrics: Metric[]; trendNote?: string; conf: TypeConf;
+}) {
   return (
-    <div className={`rounded-2xl bg-gradient-to-br from-violet-600/40 via-purple-900/30 to-slate-900/60 border border-violet-500/25 p-4 h-full`}>
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-7 h-7 rounded-lg bg-violet-500/20 border border-violet-500/30 flex items-center justify-center flex-shrink-0">
-          <BarChart3 className="w-3.5 h-3.5 text-violet-400" />
-        </div>
-        <div>
-          <p className="text-[9px] font-extrabold uppercase tracking-widest text-violet-400">{year} Season</p>
-          <p className="text-[11px] font-bold text-white leading-tight">
-            {isPitcher ? 'Pitching Stats' : 'Batting Stats'}
-          </p>
-        </div>
-        <span className="ml-auto text-[9px] font-bold text-gray-500 border border-gray-700/40 rounded px-1.5 py-0.5">MLB</span>
+    <div>
+      <HeroMetrics metrics={metrics} conf={conf} />
+      <div className="space-y-0">
+        {metrics.slice(3).map((m, i) => <MetricRow key={i} label={m.label} value={m.value} />)}
       </div>
-
-      {isPitcher ? (
-        <>
-          <div className="grid grid-cols-2 gap-1.5 mb-3">
-            {[
-              { label: 'ERA', val: stats.era ?? '--', hi: true },
-              { label: 'K', val: String(stats.k ?? 0), hi: true },
-              { label: 'BB', val: String(stats.bb ?? 0), hi: false },
-              { label: 'G', val: String(stats.gamesPlayed), hi: false },
-            ].map((s, i) => (
-              <div key={i} className="bg-white/5 rounded-xl p-2 text-center">
-                <p className={`text-sm font-black tabular-nums ${s.hi ? 'text-violet-300' : 'text-white/70'}`}>{s.val}</p>
-                <p className="text-[9px] font-bold uppercase tracking-wide text-violet-400/70 mt-0.5">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        </>
-      ) : (
-        <>
-          {/* Big 4 tiles */}
-          <div className="grid grid-cols-4 gap-1 mb-3">
-            {[
-              { label: 'HR', val: String(stats.hr) },
-              { label: 'RBI', val: String(stats.rbi) },
-              { label: 'H', val: String(stats.hits) },
-              { label: 'SB', val: String(stats.sb ?? 0) },
-            ].map((s, i) => (
-              <div key={i} className="bg-white/5 rounded-xl p-2 text-center">
-                <p className="text-sm font-black text-white tabular-nums">{s.val}</p>
-                <p className="text-[9px] font-bold uppercase tracking-wide text-violet-400/70 mt-0.5">{s.label}</p>
-              </div>
-            ))}
-          </div>
-          {/* Rate stats */}
-          <div className="space-y-0">
-            {[
-              { label: 'AVG', value: stats.avg },
-              { label: 'OPS', value: stats.ops },
-              { label: 'SLG', value: stats.slg },
-              { label: 'OBP', value: stats.obp },
-              { label: 'G / AB', value: `${stats.gamesPlayed} / ${stats.atBats}` },
-            ].map((m, i) => (
-              <div key={i} className="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0">
-                <span className="text-[11px] text-gray-400">{m.label}</span>
-                <span className="text-[11px] font-bold text-white tabular-nums">{m.value}</span>
-              </div>
-            ))}
-          </div>
-        </>
+      {trendNote && (
+        <div className={`mt-3 px-3 py-2 rounded-xl ${conf.accentBg} border ${conf.accentBorder}`}>
+          <p className="text-[11px] text-gray-300 leading-relaxed italic">{trendNote}</p>
+        </div>
       )}
     </div>
   );
 }
 
-// ── Sub-card: Recent Form (game log) ─────────────────────────────────────────
+// ── Tab 1: Advanced ───────────────────────────────────────────────────────────
 
-function RecentFormSubCard({ log }: { log: GameLogEntry[] }) {
-  if (!log.length) return null;
-  const isPitcher = log[0].ip !== undefined;
+function TabAdvanced({ data, seasonStats, gameLog, conf }: {
+  data: Record<string, any>;
+  seasonStats?: SeasonStats;
+  gameLog: GameLogEntry[];
+  conf: TypeConf;
+}) {
+  const hasPitchMix = data.pitchMixFB || data.pitchMixBrk || data.pitchMixOff;
+  const hasRelease  = data.spinRate || data.extension || data.hBreak || data.vBreak;
+  const hasSeason   = !!seasonStats;
+  const hasLog      = gameLog.length > 0;
 
-  // Compute batter hit streak / on-fire indicator
-  const consecutiveHits = !isPitcher
-    ? log.reduce((streak, g) => (g.h ?? 0) > 0 ? streak + 1 : 0, 0)
-    : 0;
+  if (!hasPitchMix && !hasRelease && !hasSeason && !hasLog) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 gap-2">
+        <Wind className="w-6 h-6 text-gray-600" />
+        <p className="text-[11px] text-gray-500 text-center">Advanced Statcast data loads with live pitcher queries</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-emerald-600/40 via-teal-900/30 to-slate-900/60 border border-emerald-500/25 p-4 h-full">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
-          <Activity className="w-3.5 h-3.5 text-emerald-400" />
-        </div>
+    <div className="space-y-3">
+      {/* Pitch Arsenal */}
+      {hasPitchMix && (
         <div>
-          <p className="text-[9px] font-extrabold uppercase tracking-widest text-emerald-400">Recent Form</p>
-          <p className="text-[11px] font-bold text-white leading-tight">Last {log.length} Games</p>
+          <p className="text-[9px] font-extrabold uppercase tracking-widest text-gray-500 mb-2">Pitch Arsenal</p>
+          <div className="flex gap-1.5">
+            {data.pitchMixFB && (
+              <div className="flex-1 flex flex-col items-center rounded-xl bg-blue-500/15 border border-blue-500/30 py-2 px-1">
+                <span className="text-sm font-black text-blue-300 tabular-nums">{data.pitchMixFB}</span>
+                <span className="text-[9px] font-bold uppercase text-blue-400/70 mt-0.5">Fastball</span>
+              </div>
+            )}
+            {data.pitchMixBrk && (
+              <div className="flex-1 flex flex-col items-center rounded-xl bg-violet-500/15 border border-violet-500/30 py-2 px-1">
+                <span className="text-sm font-black text-violet-300 tabular-nums">{data.pitchMixBrk}</span>
+                <span className="text-[9px] font-bold uppercase text-violet-400/70 mt-0.5">Breaking</span>
+              </div>
+            )}
+            {data.pitchMixOff && (
+              <div className="flex-1 flex flex-col items-center rounded-xl bg-amber-500/15 border border-amber-500/30 py-2 px-1">
+                <span className="text-sm font-black text-amber-300 tabular-nums">{data.pitchMixOff}</span>
+                <span className="text-[9px] font-bold uppercase text-amber-400/70 mt-0.5">Offspeed</span>
+              </div>
+            )}
+          </div>
         </div>
-        {consecutiveHits >= 3 && (
-          <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
-            🔥 {consecutiveHits}-game hit streak
-          </span>
-        )}
-      </div>
+      )}
 
-      {/* Game log table */}
-      <div className="overflow-x-auto -mx-1 px-1">
-        <table className="w-full text-[11px] border-collapse">
-          <thead>
-            <tr className="border-b border-white/10">
-              <th className="text-left text-gray-500 font-semibold pb-1.5 pr-2 whitespace-nowrap">Date</th>
-              <th className="text-left text-gray-500 font-semibold pb-1.5 pr-2">Opp</th>
-              {isPitcher ? (
-                <>
+      {/* Spin & Release */}
+      {hasRelease && (
+        <div>
+          <p className="text-[9px] font-extrabold uppercase tracking-widest text-gray-500 mb-2">Spin & Release</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {[
+              { label: 'Spin Rate', val: data.spinRate },
+              { label: 'Extension', val: data.extension },
+              { label: 'H-Break',   val: data.hBreak },
+              { label: 'V-Break',   val: data.vBreak },
+            ].filter(r => r.val).map((r, i) => (
+              <div key={i} className="bg-white/5 rounded-xl p-2.5 text-center">
+                <p className={`text-sm font-black tabular-nums ${conf.accentText}`}>{r.val}</p>
+                <p className="text-[9px] font-bold uppercase tracking-wide text-gray-500 mt-0.5">{r.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Season Stats */}
+      {hasSeason && seasonStats && (
+        <div>
+          <p className="text-[9px] font-extrabold uppercase tracking-widest text-gray-500 mb-2">Season Stats</p>
+          <div className="grid grid-cols-4 gap-1">
+            {[
+              { label: 'ERA', val: seasonStats.era ?? '--' },
+              { label: 'K',   val: String(seasonStats.k ?? 0) },
+              { label: 'BB',  val: String(seasonStats.bb ?? 0) },
+              { label: 'G',   val: String(seasonStats.gamesPlayed) },
+            ].map((s, i) => (
+              <div key={i} className="bg-white/5 rounded-xl p-2 text-center">
+                <p className={`text-sm font-black tabular-nums ${i < 2 ? conf.accentText : 'text-white/70'}`}>{s.val}</p>
+                <p className="text-[9px] font-bold uppercase tracking-wide text-gray-500 mt-0.5">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent Form */}
+      {hasLog && (
+        <div>
+          <p className="text-[9px] font-extrabold uppercase tracking-widest text-gray-500 mb-2">Recent Form</p>
+          <div className="overflow-x-auto -mx-1 px-1">
+            <table className="w-full text-[11px] border-collapse">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="text-left text-gray-500 font-semibold pb-1.5 pr-2">Date</th>
+                  <th className="text-left text-gray-500 font-semibold pb-1.5 pr-2">Opp</th>
                   <th className="text-right text-gray-500 font-semibold pb-1.5 pr-2">IP</th>
                   <th className="text-right text-gray-500 font-semibold pb-1.5 pr-2">K</th>
                   <th className="text-right text-gray-500 font-semibold pb-1.5 pr-2">ER</th>
                   <th className="text-right text-gray-500 font-semibold pb-1.5">BB</th>
-                </>
-              ) : (
-                <>
-                  <th className="text-right text-gray-500 font-semibold pb-1.5 pr-2">AB</th>
-                  <th className="text-right text-gray-500 font-semibold pb-1.5 pr-2">H</th>
-                  <th className="text-right text-gray-500 font-semibold pb-1.5 pr-2">HR</th>
-                  <th className="text-right text-gray-500 font-semibold pb-1.5">RBI</th>
-                </>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {log.map((g, i) => (
-              <tr key={i} className="border-b border-white/5 last:border-0">
-                <td className="py-1.5 pr-2 text-gray-400 whitespace-nowrap">{g.date}</td>
-                <td className="py-1.5 pr-2 text-gray-300 whitespace-nowrap font-medium">{g.opp}</td>
-                {isPitcher ? (
-                  <>
-                    <td className="py-1.5 pr-2 text-right text-white font-medium">{g.ip}</td>
-                    <td className="py-1.5 pr-2 text-right font-bold text-emerald-400">{g.k}</td>
-                    <td className={cn('py-1.5 pr-2 text-right font-bold', (g.er ?? 0) === 0 ? 'text-emerald-400' : (g.er ?? 0) <= 2 ? 'text-amber-400' : 'text-rose-400')}>{g.er}</td>
-                    <td className="py-1.5 text-right text-gray-400">{g.bb}</td>
-                  </>
-                ) : (
-                  <>
-                    <td className="py-1.5 pr-2 text-right text-gray-400">{g.ab ?? '—'}</td>
-                    <td className={cn('py-1.5 pr-2 text-right font-bold tabular-nums',
-                      (g.h ?? 0) >= 3 ? 'text-emerald-400' : (g.h ?? 0) >= 1 ? 'text-amber-300' : 'text-gray-500'
-                    )}>{g.h ?? '—'}</td>
-                    <td className={cn('py-1.5 pr-2 text-right font-bold tabular-nums',
-                      (g.hr ?? 0) > 0 ? 'text-rose-400' : 'text-gray-600'
-                    )}>{g.hr ?? 0}</td>
-                    <td className="py-1.5 text-right text-gray-400 tabular-nums">{g.rbi ?? 0}</td>
-                  </>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Footer summary */}
-      {!isPitcher && (
-        <div className="mt-2 pt-2 border-t border-white/5 flex gap-3 text-[10px] text-gray-500">
-          <span>
-            Total H: <span className="text-white font-semibold">{log.reduce((s, g) => s + (g.h ?? 0), 0)}</span>
-          </span>
-          <span>
-            HR: <span className="text-rose-400 font-semibold">{log.reduce((s, g) => s + (g.hr ?? 0), 0)}</span>
-          </span>
-          <span>
-            RBI: <span className="text-white font-semibold">{log.reduce((s, g) => s + (g.rbi ?? 0), 0)}</span>
-          </span>
+                </tr>
+              </thead>
+              <tbody>
+                {gameLog.map((g, i) => (
+                  <tr key={i} className="border-b border-white/5 last:border-0">
+                    <td className="py-1.5 pr-2 text-gray-400 whitespace-nowrap">{g.date}</td>
+                    <td className="py-1.5 pr-2 text-gray-300 font-medium whitespace-nowrap">{g.opp}</td>
+                    <td className="py-1.5 pr-2 text-right text-white font-medium">{g.ip ?? '—'}</td>
+                    <td className="py-1.5 pr-2 text-right font-bold text-emerald-400">{g.k ?? '—'}</td>
+                    <td className={cn('py-1.5 pr-2 text-right font-bold',
+                      (g.er ?? 0) === 0 ? 'text-emerald-400' : (g.er ?? 0) <= 2 ? 'text-amber-400' : 'text-rose-400'
+                    )}>{g.er ?? '—'}</td>
+                    <td className="py-1.5 text-right text-gray-400">{g.bb ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-// ── Sub-card: Prop Lines ──────────────────────────────────────────────────────
+// ── Tab 2: Props ──────────────────────────────────────────────────────────────
 
-function PropLinesSubCard({ lines }: { lines: PropLine[] }) {
-  if (!lines.length) return null;
-
+function TabProps({ data, propLines, onAnalyze }: {
+  data: Record<string, any>;
+  propLines: PropLine[];
+  onAnalyze?: () => void;
+}) {
   const fmtOdds = (o: number) => (o > 0 ? `+${o}` : String(o));
   const barWidth = (pct: number) => Math.min(100, Math.max(4, pct));
 
-  return (
-    <div className="rounded-2xl bg-gradient-to-br from-amber-600/40 via-orange-900/30 to-slate-900/60 border border-amber-500/25 p-4 h-full">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
-          <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
-        </div>
-        <div>
-          <p className="text-[9px] font-extrabold uppercase tracking-widest text-amber-400">Prop Lines</p>
-          <p className="text-[11px] font-bold text-white leading-tight">Today&apos;s Markets</p>
-        </div>
-        <span className="ml-auto text-[9px] font-bold text-gray-500 border border-gray-700/40 rounded px-1.5 py-0.5">ODDS API</span>
-      </div>
-
-      {/* Prop rows */}
-      <div className="space-y-3">
-        {lines.map((prop, i) => (
+  if (propLines.length > 0) {
+    return (
+      <div className="space-y-4">
+        {propLines.map((prop, i) => (
           <div key={i}>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] font-bold text-white">
-                {prop.label} O{prop.line}
-              </span>
-              <span className={cn(
-                'text-[11px] font-black tabular-nums',
-                prop.overOdds > 0 ? 'text-emerald-400' : 'text-amber-300',
-              )}>
-                {fmtOdds(prop.overOdds)}
-              </span>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-bold text-white">{prop.label} O{prop.line}</span>
+              <span className={cn('text-[11px] font-black tabular-nums',
+                prop.overOdds > 0 ? 'text-emerald-400' : 'text-amber-300'
+              )}>{fmtOdds(prop.overOdds)}</span>
             </div>
-            {/* Progress bar + implied pct */}
             <div className="flex items-center gap-2 mb-1">
               <div className="flex-1 h-1.5 rounded-full bg-white/8 overflow-hidden">
                 <div
-                  className={cn(
-                    'h-full rounded-full transition-all duration-500',
+                  className={cn('h-full rounded-full transition-all duration-500',
                     prop.impliedPct >= 60 ? 'bg-emerald-500/70'
                     : prop.impliedPct >= 45 ? 'bg-amber-500/70'
-                    : 'bg-rose-500/60',
+                    : 'bg-rose-500/60'
                   )}
                   style={{ width: `${barWidth(prop.impliedPct)}%` }}
                 />
               </div>
-              <span className="text-[10px] text-gray-400 tabular-nums w-9 text-right">
-                {prop.impliedPct}% imp
-              </span>
+              <span className="text-[10px] text-gray-400 tabular-nums w-9 text-right">{prop.impliedPct}% imp</span>
             </div>
-            {/* Hit rate streak */}
             <div className="flex items-center gap-1">
-              <span className={cn(
-                'text-[10px]',
-                prop.trend === 'hot' ? 'text-orange-400' : prop.trend === 'cold' ? 'text-sky-400' : 'text-gray-500',
-              )}>
-                {prop.trend === 'hot' ? '🔥' : prop.trend === 'cold' ? '❄' : '→'}
-              </span>
+              <span className={cn('text-[10px]',
+                prop.trend === 'hot' ? 'text-orange-400' : prop.trend === 'cold' ? 'text-sky-400' : 'text-gray-500'
+              )}>{prop.trend === 'hot' ? '🔥' : prop.trend === 'cold' ? '❄' : '→'}</span>
               <span className="text-[10px] text-gray-500">
                 {prop.hitRate !== '—' ? `Hit in ${prop.hitRate} games` : 'No recent game data'}
               </span>
@@ -407,101 +404,47 @@ function PropLinesSubCard({ lines }: { lines: PropLine[] }) {
           </div>
         ))}
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-// ── Sub-card slider ───────────────────────────────────────────────────────────
-
-function SubCardSlider({
-  children,
-}: {
-  children: React.ReactNode[];
-}) {
-  const [page, setPage] = useState(0);
-  const touchStartX = useRef<number | null>(null);
-  const touchStartY = useRef<number | null>(null);
-  const total = children.length;
-
-  const goTo = useCallback((n: number) => setPage(Math.max(0, Math.min(n, total - 1))), [total]);
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-  };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX.current === null || touchStartY.current === null) return;
-    const dx = touchStartX.current - e.changedTouches[0].clientX;
-    const dy = Math.abs(touchStartY.current - e.changedTouches[0].clientY);
-    if (Math.abs(dx) > 44 && Math.abs(dx) > dy * 1.5) dx > 0 ? goTo(page + 1) : goTo(page - 1);
-    touchStartX.current = null;
-    touchStartY.current = null;
-  };
-
-  if (total === 0) return null;
+  // No prop lines — show K projection from raw data
+  const kPctRaw   = data.kPctRaw   as number | undefined;
+  const fbVeloRaw = data.fbVeloRaw as number | undefined;
 
   return (
-    <div className="space-y-2 mt-3">
-      {/* Sliding track */}
-      <div className="overflow-hidden rounded-2xl" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        <div
-          className="flex transition-transform duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]"
-          style={{ transform: `translateX(-${page * 100}%)` }}
-        >
-          {children.map((child, i) => (
-            <div key={i} className="w-full flex-shrink-0">
-              {child}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Nav: dots + arrows */}
-      {total > 1 && (
-        <div className="flex items-center justify-between px-0.5">
-          <button
-            onClick={() => goTo(page - 1)}
-            disabled={page === 0}
-            className={cn(
-              'flex items-center justify-center w-6 h-6 rounded-lg transition-all duration-150',
-              page === 0 ? 'opacity-0 pointer-events-none' : 'text-[oklch(0.45_0.01_280)] hover:text-white hover:bg-[oklch(0.18_0.015_280)]',
+    <div className="space-y-3">
+      {(kPctRaw != null || fbVeloRaw != null) && (
+        <div>
+          <p className="text-[9px] font-extrabold uppercase tracking-widest text-gray-500 mb-2">K Projection Estimate</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {kPctRaw != null && (
+              <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-2.5 text-center">
+                <p className="text-sm font-black text-emerald-300 tabular-nums">{kPctRaw.toFixed(1)}%</p>
+                <p className="text-[9px] font-bold uppercase text-emerald-400/70 mt-0.5">Season K%</p>
+              </div>
             )}
-          >
-            <ChevronLeft className="w-3.5 h-3.5" />
-          </button>
-
-          <div className="flex items-center gap-2.5">
-            <div className="flex items-center gap-1.5" role="tablist">
-              {Array.from({ length: total }).map((_, i) => (
-                <button
-                  key={i}
-                  role="tab"
-                  aria-selected={i === page}
-                  onClick={() => goTo(i)}
-                  className={cn(
-                    'rounded-full transition-all duration-250',
-                    i === page ? 'w-5 h-1.5 bg-blue-400' : 'w-1.5 h-1.5 bg-[oklch(0.24_0.01_280)] hover:bg-[oklch(0.36_0.01_280)]',
-                  )}
-                />
-              ))}
-            </div>
-            <span className="text-[9px] font-semibold tabular-nums text-[oklch(0.32_0.01_280)]">
-              {page + 1}/{total}
-            </span>
+            {fbVeloRaw != null && (
+              <div className="bg-blue-500/10 border border-blue-500/25 rounded-xl p-2.5 text-center">
+                <p className="text-sm font-black text-blue-300 tabular-nums">{fbVeloRaw.toFixed(1)} mph</p>
+                <p className="text-[9px] font-bold uppercase text-blue-400/70 mt-0.5">FB Velocity</p>
+              </div>
+            )}
           </div>
-
-          <button
-            onClick={() => goTo(page + 1)}
-            disabled={page === total - 1}
-            className={cn(
-              'flex items-center justify-center w-6 h-6 rounded-lg transition-all duration-150',
-              page === total - 1 ? 'opacity-0 pointer-events-none' : 'text-[oklch(0.45_0.01_280)] hover:text-white hover:bg-[oklch(0.18_0.015_280)]',
-            )}
-          >
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
         </div>
       )}
+
+      <div className="flex flex-col items-center gap-2 py-4">
+        <Zap className="w-5 h-5 text-gray-600" />
+        <p className="text-[11px] text-gray-500 text-center">Live prop lines load when game is scheduled</p>
+        {onAnalyze && (
+          <button
+            onClick={onAnalyze}
+            className="mt-1 px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[10px] font-bold hover:bg-blue-500/25 transition-colors"
+          >
+            Ask AI for K Prop Analysis
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -511,6 +454,7 @@ function SubCardSlider({
 export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero = false }: StatcastCardProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
 
   const cardType   = (data.type ?? '').toLowerCase();
   const conf       = TYPE_CONFIG[cardType] ?? DEFAULT_CONF;
@@ -527,11 +471,10 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
   const gameLog     = (data.data?.gameLog as GameLogEntry[] | undefined) ?? [];
   const propLines   = (data.data?.propLines as PropLine[] | undefined) ?? [];
 
-  // Build sub-cards (only include if data is available)
-  const subCards: React.ReactNode[] = [];
-  if (seasonStats) subCards.push(<SeasonSubCard key="season" stats={seasonStats} conf={conf} />);
-  if (gameLog.length > 0) subCards.push(<RecentFormSubCard key="recent" log={gameLog} />);
-  if (propLines.length > 0) subCards.push(<PropLinesSubCard key="props" lines={propLines} />);
+  const { watched, toggle: toggleWatch } = useWatchlist(playerName);
+
+  // Only show tabs for pitcher analysis cards; other statcast types keep the original flat layout
+  const isPitcherCard = cardType === 'statcast_summary_card';
 
   return (
     <>
@@ -561,26 +504,79 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/30 border border-white/10 flex-shrink-0">
-            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusConf.dotCls}`} />
-            <span className={`text-[9px] font-extrabold tracking-widest ${statusConf.textCls}`}>{statusConf.label}</span>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Watchlist heart */}
+            {isPitcherCard && (
+              <button
+                onClick={toggleWatch}
+                title={watched ? 'Remove from watchlist' : 'Add to watchlist'}
+                className={cn(
+                  'w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150',
+                  watched
+                    ? 'text-rose-400 bg-rose-500/20 border border-rose-500/30'
+                    : 'text-gray-600 bg-white/5 border border-white/10 hover:text-rose-400 hover:bg-rose-500/10',
+                )}
+              >
+                <Heart className="w-3.5 h-3.5" fill={watched ? 'currentColor' : 'none'} />
+              </button>
+            )}
+            {/* Status badge */}
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/30 border border-white/10">
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusConf.dotCls}`} />
+              <span className={`text-[9px] font-extrabold tracking-widest ${statusConf.textCls}`}>{statusConf.label}</span>
+            </div>
           </div>
         </div>
 
-        {/* Statcast metrics */}
-        {hasSummaryMetrics && <HeroMetrics metrics={data.summary_metrics} conf={conf} />}
-        <div className="space-y-0">
-          {hasSummaryMetrics
-            ? data.summary_metrics.slice(3).map((m, i) => <MetricRow key={i} label={m.label} value={m.value} />)
-            : data.data ? <FlatDataMetrics data={data.data} /> : null
-          }
-        </div>
+        {/* Tab bar (pitcher cards only) */}
+        {isPitcherCard && (
+          <PitcherTabBar
+            active={activeTab}
+            onSelect={setActiveTab}
+            accentBg={conf.accentBg}
+            accentBorder={conf.accentBorder}
+            accentText={conf.accentText}
+          />
+        )}
 
-        {/* Trend note */}
-        {data.trend_note && (
-          <div className={`mt-3 px-3 py-2 rounded-xl ${conf.accentBg} border ${conf.accentBorder}`}>
-            <p className="text-[11px] text-gray-300 leading-relaxed italic">{data.trend_note}</p>
-          </div>
+        {/* Content */}
+        {isPitcherCard ? (
+          <>
+            {activeTab === 0 && hasSummaryMetrics && (
+              <TabStats metrics={data.summary_metrics} trendNote={data.trend_note} conf={conf} />
+            )}
+            {activeTab === 1 && (
+              <TabAdvanced data={data.data ?? {}} seasonStats={seasonStats} gameLog={gameLog} conf={conf} />
+            )}
+            {activeTab === 2 && (
+              <TabProps data={data.data ?? {}} propLines={propLines} onAnalyze={onAnalyze} />
+            )}
+          </>
+        ) : (
+          /* Non-pitcher statcast cards: original flat layout */
+          <>
+            {hasSummaryMetrics && <HeroMetrics metrics={data.summary_metrics} conf={conf} />}
+            <div className="space-y-0">
+              {hasSummaryMetrics
+                ? data.summary_metrics.slice(3).map((m: Metric, i: number) => <MetricRow key={i} label={m.label} value={m.value} />)
+                : data.data ? (
+                    <div className="space-y-0">
+                      {Object.entries(data.data)
+                        .filter(([k]) => !['playerName','realData','headshotUrl','seasonStats','gameLog','propLines'].includes(k))
+                        .map(([k, v], i) => (
+                          <MetricRow key={i} label={k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} value={String(v)} />
+                        ))
+                      }
+                    </div>
+                  ) : null
+              }
+            </div>
+            {data.trend_note && (
+              <div className={`mt-3 px-3 py-2 rounded-xl ${conf.accentBg} border ${conf.accentBorder}`}>
+                <p className="text-[11px] text-gray-300 leading-relaxed italic">{data.trend_note}</p>
+              </div>
+            )}
+          </>
         )}
 
         {/* Footer */}
@@ -610,11 +606,6 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
           </div>
         </div>
       </div>
-
-      {/* ── Sub-card slider (Season + Recent Form) ── */}
-      {subCards.length > 0 && (
-        <SubCardSlider>{subCards}</SubCardSlider>
-      )}
 
       {/* Lightbox */}
       <AnalysisLightbox

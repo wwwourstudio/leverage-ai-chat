@@ -69,7 +69,7 @@ export async function POST(
 
     // Reject oversized payloads before parsing
     const contentLength = Number(request.headers.get('content-length') ?? 0);
-    if (contentLength > 200_000) { // 200KB — generous for large messages
+    if (contentLength > 500_000) { // 500KB — cards JSONB can add ~50KB per message
       return NextResponse.json({ success: false, error: 'Request too large' }, { status: 413 });
     }
 
@@ -79,7 +79,7 @@ export async function POST(
     } catch {
       return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: HTTP_STATUS.BAD_REQUEST });
     }
-    const { role, content, model_used, confidence, is_welcome = false } = body as any;
+    const { role, content, model_used, confidence, is_welcome = false, cards } = body as any;
 
     if (!role || !content) {
       return NextResponse.json(
@@ -126,6 +126,7 @@ export async function POST(
         thread_id: id,
         role,
         content: String(content).slice(0, 50000),
+        cards: Array.isArray(cards) ? cards : null,
         model_used: model_used ?? null,
         confidence: confidence ?? null,
         is_welcome,

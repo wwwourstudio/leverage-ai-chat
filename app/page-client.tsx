@@ -617,7 +617,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
                     role: m.role,
                     content: m.content,
                     timestamp: m.timestamp,
-                    cards: storedCards[m.id ?? ''] ?? [],
+                    cards: m.cards?.length ? m.cards : (storedCards[m.id ?? ''] ?? []),
                     modelUsed: m.modelUsed,
                     confidence: m.confidence,
                     isWelcome: m.isWelcome,
@@ -647,6 +647,32 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             loadInitData();
             // Restore fantasy league from DB on sign-in
             loadFantasyLeagueFromDB();
+            // Load chat threads + most recent messages so history appears immediately
+            // after email/password login (Google OAuth handles this via page redirect).
+            setIsLoadingChats(true);
+            loadThreads().then(threads => {
+              setIsLoadingChats(false);
+              if (threads.length > 0) {
+                setChats(threads);
+                setActiveChat(threads[0].id);
+                loadMessages(threads[0].id).then(msgs => {
+                  if (msgs.length > 0) {
+                    let storedCards: Record<string, any[]> = {};
+                    try { storedCards = JSON.parse(localStorage.getItem(`lev:cards:${threads[0].id}`) ?? '{}'); } catch { /* ignore */ }
+                    setMessages(msgs.map((m: any) => ({
+                      id: m.id,
+                      role: m.role,
+                      content: m.content,
+                      timestamp: m.timestamp,
+                      cards: m.cards?.length ? m.cards : (storedCards[m.id ?? ''] ?? []),
+                      modelUsed: m.modelUsed,
+                      confidence: m.confidence,
+                      isWelcome: m.isWelcome,
+                    })) as any);
+                  }
+                });
+              }
+            });
           } else {
             setIsLoggedIn(false);
             setUser(null);
@@ -1874,15 +1900,38 @@ No preamble. Start directly with section 1.`;
           selectedCategory === 'all' ? 'multi-platform' : selectedCategory,
           ...(selectedSport ? [selectedSport] : []),
         ];
-        resolveThreadId().then(threadId => {
+        resolveThreadId().then(async (threadId) => {
           if (!threadId) return;
           saveMessage(threadId, { role: 'user', content: userMessage });
-          saveMessage(threadId, {
+          const savedMsgId = await saveMessage(threadId, {
             role: 'assistant',
             content: capturedMsg.content,
             model_used: capturedMsg.modelUsed,
             confidence: capturedMsg.confidence,
+            cards: (capturedMsg.cards as unknown[])?.length ? capturedMsg.cards as unknown[] : undefined,
           });
+          // Re-key cards in localStorage to use real DB IDs so they survive page reloads.
+          // The early save above used client-side UUIDs (temp thread ID + streaming message ID).
+          // Now we have the real Supabase-assigned IDs for both the thread and the message.
+          const clientMsgId = capturedMsg.id;
+          if (savedMsgId && (capturedMsg.cards as any[])?.length) {
+            try {
+              const oldKey = `lev:cards:${capturedChat}`;
+              const newKey = `lev:cards:${threadId}`;
+              let stored: Record<string, any[]> = JSON.parse(localStorage.getItem(oldKey) ?? '{}');
+              if (oldKey !== newKey) {
+                localStorage.removeItem(oldKey);
+              }
+              // Re-key message entry: client streaming UUID → server UUID
+              if (stored[clientMsgId]?.length && clientMsgId !== savedMsgId) {
+                stored[savedMsgId] = stored[clientMsgId];
+                delete stored[clientMsgId];
+              }
+              const keys = Object.keys(stored);
+              if (keys.length > 50) delete stored[keys[0]];
+              localStorage.setItem(newKey, JSON.stringify(stored));
+            } catch { /* quota / security errors — silently skip */ }
+          }
           // Sync category + sport tags so sidebar always shows correct context
           updateThread(threadId, { category: finalCategory, tags: finalTags });
           setChats((prev: any) => prev.map((c: any) =>
@@ -2762,7 +2811,7 @@ No preamble. Start directly with section 1.`;
             role: m.role,
             content: m.content,
             timestamp: m.timestamp,
-            cards: storedCards[m.id ?? ''] ?? [],
+            cards: m.cards?.length ? m.cards : (storedCards[m.id ?? ''] ?? []),
             modelUsed: m.modelUsed,
             confidence: m.confidence,
             isWelcome: m.isWelcome,

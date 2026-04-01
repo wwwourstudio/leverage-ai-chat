@@ -842,6 +842,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   thread_id UUID NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
   role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
   content TEXT NOT NULL,
+  cards JSONB,
   model_used TEXT,
   confidence FLOAT8,
   is_welcome BOOLEAN NOT NULL DEFAULT false,

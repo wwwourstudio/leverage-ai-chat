@@ -40,6 +40,7 @@ export function AuthModals({
   const [signupPassword, setSignupPassword] = useState('');
   const [signupError, setSignupError] = useState('');
   const [signupLoading, setSignupLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleLogin = async () => {
     setLoginError('');
@@ -113,14 +114,22 @@ export function AuthModals({
   };
 
   const handleGoogleAuth = async () => {
+    setGoogleLoading(true);
+    setLoginError('');
+    setSignupError('');
     try {
       const supabase = createClient();
       await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: `${window.location.origin}/auth/callback` },
       });
+      // signInWithOAuth redirects away — no further cleanup needed on success
     } catch (err: any) {
-      setLoginError(err?.message || 'Google auth failed');
+      const msg = err?.message || 'Google auth failed. Please try again.';
+      if (showLoginModal) setLoginError(msg);
+      else setSignupError(msg);
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -193,9 +202,10 @@ export function AuthModals({
                 <button
                   type="button"
                   onClick={handleGoogleAuth}
-                  className="w-full py-3 border border-gray-800 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all"
+                  disabled={googleLoading}
+                  className="w-full py-3 border border-gray-800 hover:bg-gray-800 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all"
                 >
-                  Continue with Google
+                  {googleLoading ? 'Redirecting to Google\u2026' : 'Continue with Google'}
                 </button>
 
                 <p className="text-center text-sm text-gray-500">

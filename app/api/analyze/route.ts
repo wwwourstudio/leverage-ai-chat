@@ -1208,7 +1208,7 @@ export async function POST(request: NextRequest) {
     let cardPromise: Promise<InsightCard[]>;
 
     // ── Case 1: Client sent live odds → cards built synchronously, AI already has data ──
-    if (!context.isPoliticalMarket && !isAmbiguous && !context.hasPlayerIntent && !context.hasFantasyIntent && (context.isSportsQuery || context.hasBettingIntent) && context.oddsData?.events?.length > 0) {
+    if (!context.isPoliticalMarket && context.selectedCategory !== 'kalshi' && !isAmbiguous && !context.hasPlayerIntent && !context.hasFantasyIntent && (context.isSportsQuery || context.hasBettingIntent) && context.oddsData?.events?.length > 0) {
       const sportKey = context.sport || context.oddsData.sport || 'sports';
       const builtCards = oddsEventsToBettingCards(
         context.oddsData.events,
@@ -1236,7 +1236,7 @@ export async function POST(request: NextRequest) {
         // DFS tab: fetch real player prop lines
         cardFetchPromise = generateContextualCards('dfs', context.sport ?? undefined, 7).catch(() => []);
 
-      } else if (!context.isPoliticalMarket && (context.hasFantasyIntent || hasADPIntent) && (!context.hasBettingIntent || context.selectedCategory === 'fantasy' || hasADPIntent)) {
+      } else if (!context.isPoliticalMarket && context.selectedCategory !== 'kalshi' && ((context.hasFantasyIntent || hasADPIntent) || context.selectedCategory === 'fantasy') && (!context.hasBettingIntent || context.selectedCategory === 'fantasy' || hasADPIntent)) {
         // Fantasy + specific player named → show that player's card (not a generic value board)
         if (context.playerName) {
           const intent = parseIntent(userMessage, context.sport ?? undefined);
@@ -1281,7 +1281,7 @@ export async function POST(request: NextRequest) {
         // Single player — show only their card, no supplementary betting cards.
         cardFetchPromise = generateContextualCards('player', context.sport ?? undefined, 1, false, undefined, { playerName: resolvedPlayerName }).catch(() => []);
 
-      } else if (!context.isPoliticalMarket && (context.isSportsQuery || context.hasBettingIntent)) {
+      } else if (!context.isPoliticalMarket && context.selectedCategory !== 'kalshi' && (context.isSportsQuery || context.hasBettingIntent)) {
         // Prop-specific queries: route to props category so real prop cards are generated
         const PROP_CARD_KEYWORDS = [
           'pitcher prop', 'pitcher props', 'batter prop', 'batter props',
@@ -1309,7 +1309,7 @@ export async function POST(request: NextRequest) {
           cardFetchPromise = generateContextualCards('betting', sportKey, 7).catch(() => []);
         }
 
-      } else if (context.isPoliticalMarket || (kalshiPromptMarkets && kalshiPromptMarkets.length > 0)) {
+      } else if (context.isPoliticalMarket || context.selectedCategory === 'kalshi' || (kalshiPromptMarkets && kalshiPromptMarkets.length > 0)) {
         // Kalshi query — reuse prompt-bridge markets when available; otherwise fall back
         // to generateContextualCards('kalshi'). Condition includes isPoliticalMarket so
         // card generation fires even when the Kalshi fetch returned 0 markets.
@@ -1324,7 +1324,8 @@ export async function POST(request: NextRequest) {
         // General / fallback — avoid triggering ADP/fantasy cards when there's no fantasy intent
         const isFantasyOrDFSCategory = category === 'fantasy' || category === 'dfs';
         const hasFantasyOrADPIntent = context.hasFantasyIntent || hasADPIntent;
-        const effectiveCategory = isFantasyOrDFSCategory && !hasFantasyOrADPIntent ? 'betting' : category;
+        const validSelectedCategory = context.selectedCategory && ['betting', 'dfs', 'fantasy', 'kalshi', 'props'].includes(context.selectedCategory) ? context.selectedCategory : undefined;
+        const effectiveCategory = isFantasyOrDFSCategory && !hasFantasyOrADPIntent ? 'betting' : (validSelectedCategory ?? category);
         cardFetchPromise = generateContextualCards(effectiveCategory, context.sport ?? undefined, 6, false, context.kalshiSubcategory).catch(() => []);
       }
 

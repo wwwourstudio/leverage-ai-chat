@@ -98,35 +98,35 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm animate-backdrop-in" onClick={handleClose}>
       <div
-        className="relative w-full md:max-w-lg max-h-[90vh] md:max-h-[85vh] md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slide-up md:animate-scale-in"
+        className="relative w-full md:max-w-lg max-h-[90vh] md:max-h-[85vh] md:mx-4 bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slide-up md:animate-scale-in"
         onClick={(e: any) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-800 flex-shrink-0">
+        <div className="flex items-center justify-between p-6 border-b border-[var(--border-subtle)] flex-shrink-0">
           <div className="flex items-center gap-3">
             {view === 'checkout' && (
               <button
                 onClick={() => { setView('select'); setFetchClientSecret(null); setCheckoutError(null); }}
-                className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300 mr-1"
+                className="p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-faint)] hover:text-[var(--text-muted)] mr-1"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
             )}
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-purple-600 flex items-center justify-center flex-shrink-0">
-              <CreditCard className="w-5 h-5 text-white" />
+              <CreditCard className="w-5 h-5 text-foreground" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">
+              <h2 className="text-xl font-bold text-foreground">
                 {view === 'checkout' ? 'Secure Checkout' : 'Get Credits'}
               </h2>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-[var(--text-faint)]">
                 {view === 'checkout'
                   ? 'Complete your purchase below'
                   : `You have ${creditsRemaining} credits remaining`}
               </p>
             </div>
           </div>
-          <button onClick={handleClose} className="p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300">
+          <button onClick={handleClose} className="p-2 rounded-lg hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-faint)] hover:text-[var(--text-muted)]">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -155,13 +155,13 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
         ) : (
           <>
             {/* Tab Nav */}
-            <div className="flex border-b border-gray-800 flex-shrink-0">
+            <div className="flex border-b border-[var(--border-subtle)] flex-shrink-0">
               <button
                 onClick={() => setActiveTab('credits')}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition-all border-b-2 ${
                   activeTab === 'credits'
                     ? 'text-blue-400 border-blue-400 bg-blue-500/5'
-                    : 'text-gray-500 border-transparent hover:text-gray-300'
+                    : 'text-[var(--text-faint)] border-transparent hover:text-[var(--text-muted)]'
                 }`}
               >
                 <Zap className="w-4 h-4" />
@@ -172,7 +172,7 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition-all border-b-2 ${
                   activeTab === 'subscription'
                     ? 'text-purple-400 border-purple-400 bg-purple-500/5'
-                    : 'text-gray-500 border-transparent hover:text-gray-300'
+                    : 'text-[var(--text-faint)] border-transparent hover:text-[var(--text-muted)]'
                 }`}
               >
                 <Crown className="w-4 h-4" />
@@ -184,7 +184,7 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
             <div className="flex-1 overflow-y-auto p-6">
               {activeTab === 'credits' ? (
                 <div className="space-y-4">
-                  <p className="text-sm text-gray-400">1 credit = 1 AI analysis. Choose a package or enter a custom amount.</p>
+                  <p className="text-sm text-[var(--text-muted)]">1 credit = 1 AI analysis. Choose a package or enter a custom amount.</p>
 
                   {/* Credit packages */}
                   <div className="grid grid-cols-3 gap-2">
@@ -195,7 +195,7 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
                         className={`relative p-3 rounded-xl text-center transition-all ${
                           selectedPackage === pkg.amount
                             ? 'bg-blue-600/20 border-blue-500/50 text-blue-400 border-2'
-                            : 'bg-gray-800 border border-gray-700 text-gray-300 hover:border-gray-600'
+                            : 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-[var(--border-hover)]'
                         }`}
                       >
                         {pkg.popular && (
@@ -204,23 +204,23 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
                           </span>
                         )}
                         <p className="text-lg font-black">{pkg.label}</p>
-                        <p className="text-xs text-gray-500">{pkg.credits} credits</p>
+                        <p className="text-xs text-[var(--text-faint)]">{pkg.credits} credits</p>
                       </button>
                     ))}
                   </div>
 
                   {/* Custom amount */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-400 mb-1">Custom Amount (min $5)</label>
+                    <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1">Custom Amount (min $5)</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)] font-bold">$</span>
                       <input
                         type="number"
                         min="5"
                         value={customAmount}
                         onChange={(e: any) => { setCustomAmount(e.target.value); setSelectedPackage(null); }}
                         placeholder="Custom"
-                        className="w-full pl-7 pr-4 py-2.5 bg-gray-950 border border-gray-800 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500/50 transition-all"
+                        className="w-full pl-7 pr-4 py-2.5 bg-background border border-[var(--border-subtle)] rounded-xl text-foreground text-sm placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50 transition-all"
                       />
                     </div>
                   </div>
@@ -228,7 +228,7 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
                   <button
                     onClick={handlePurchaseCredits}
                     disabled={processing || (!selectedPackage && (!customAmount || parseInt(customAmount) < 5))}
-                    className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-[var(--bg-surface)] disabled:text-[var(--text-faint)] disabled:cursor-not-allowed text-foreground font-bold rounded-xl transition-all flex items-center justify-center gap-2"
                   >
                     {processing ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -238,14 +238,14 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
                     {processing ? 'Opening checkout...' : `Purchase ${selectedPackage || customAmount || 0} Credits`}
                   </button>
 
-                  <div className="flex items-center gap-2 justify-center text-xs text-gray-600">
+                  <div className="flex items-center gap-2 justify-center text-xs text-[var(--text-faint)]">
                     <Shield className="w-3.5 h-3.5" />
                     <span>Secured by Stripe. We never store your card details.</span>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <p className="text-sm text-gray-400">Get monthly credits with a subscription and save.</p>
+                  <p className="text-sm text-[var(--text-muted)]">Get monthly credits with a subscription and save.</p>
 
                   {SUBSCRIPTION_PLANS.map(plan => (
                     <button
@@ -254,7 +254,7 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
                       className={`relative w-full p-5 rounded-xl text-left transition-all ${
                         selectedPlan === plan.id
                           ? 'bg-purple-600/15 border-2 border-purple-500/50'
-                          : 'bg-gray-800/50 border border-gray-700 hover:border-gray-600'
+                          : 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)]'
                       }`}
                     >
                       {plan.popular && (
@@ -264,17 +264,17 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
                       )}
                       <div className="flex items-baseline justify-between mb-3">
                         <div>
-                          <p className="text-lg font-bold text-white">{plan.name}</p>
-                          {plan.billed && <p className="text-xs text-gray-500">Billed ${plan.billed}/year</p>}
+                          <p className="text-lg font-bold text-foreground">{plan.name}</p>
+                          {plan.billed && <p className="text-xs text-[var(--text-faint)]">Billed ${plan.billed}/year</p>}
                         </div>
                         <div className="text-right">
-                          <span className="text-2xl font-black text-white">${plan.price}</span>
-                          <span className="text-gray-400 text-sm">/{plan.interval}</span>
+                          <span className="text-2xl font-black text-foreground">${plan.price}</span>
+                          <span className="text-[var(--text-muted)] text-sm">/{plan.interval}</span>
                         </div>
                       </div>
                       <div className="space-y-1.5">
                         {plan.features.map(f => (
-                          <div key={f} className="flex items-center gap-2 text-xs text-gray-300">
+                          <div key={f} className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
                             <CheckCircle className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
                             <span>{f}</span>
                           </div>
@@ -286,7 +286,7 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
                   <button
                     onClick={handleSubscribe}
                     disabled={processing}
-                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-800 disabled:text-gray-600 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 disabled:bg-[var(--bg-surface)] disabled:text-[var(--text-faint)] text-foreground font-bold rounded-xl transition-all flex items-center justify-center gap-2"
                   >
                     {processing ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -296,7 +296,7 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
                     {processing ? 'Opening checkout...' : 'Subscribe Now'}
                   </button>
 
-                  <div className="flex items-center gap-2 justify-center text-xs text-gray-600">
+                  <div className="flex items-center gap-2 justify-center text-xs text-[var(--text-faint)]">
                     <Shield className="w-3.5 h-3.5" />
                     <span>Cancel anytime. Secured by Stripe.</span>
                   </div>

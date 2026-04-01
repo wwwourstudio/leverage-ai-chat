@@ -134,25 +134,25 @@ export const ChatInput = memo(function ChatInput({
           {uploadedFiles.map((file) => (
             <div
               key={file.id}
-              className="flex items-center gap-2 px-2.5 py-1.5 bg-[oklch(0.14_0.015_280)] border border-[oklch(0.22_0.02_280)] rounded-xl text-xs"
+              className="flex items-center gap-2 px-2.5 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl text-xs"
             >
               {file.type === 'image'
                 ? <ImageIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                 : <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
-              <span className="font-medium text-white/80 max-w-[100px] truncate">{file.name}</span>
-              <span className="text-white/30">{(file.size / 1024).toFixed(0)}KB</span>
+              <span className="font-medium text-foreground/80 max-w-[100px] truncate">{file.name}</span>
+              <span className="text-[var(--text-faint)]">{(file.size / 1024).toFixed(0)}KB</span>
               <button
                 onClick={() => { onSaveFile(file); toast.success('Saved'); }}
                 className="p-0.5 rounded hover:bg-blue-500/20 transition-colors"
                 title="Save to profile"
               >
-                <Bookmark className="w-3 h-3 text-white/30 hover:text-blue-400" />
+                <Bookmark className="w-3 h-3 text-[var(--text-faint)] hover:text-blue-400" />
               </button>
               <button
                 onClick={() => onRemoveFile(file.id)}
                 className="p-0.5 rounded hover:bg-white/10 transition-colors"
               >
-                <X className="w-3 h-3 text-white/30 hover:text-red-400" />
+                <X className="w-3 h-3 text-[var(--text-faint)] hover:text-red-400" />
               </button>
             </div>
           ))}
@@ -169,7 +169,7 @@ export const ChatInput = memo(function ChatInput({
         className={`relative rounded-2xl border transition-all duration-200 ${
           isDragOver
             ? 'border-blue-500/60 bg-blue-500/5 ring-1 ring-blue-500/30'
-            : 'bg-[oklch(0.11_0.012_280)] border-[oklch(0.20_0.016_280)] hover:border-[oklch(0.26_0.02_280)] focus-within:border-[oklch(0.36_0.07_260)] focus-within:ring-1 focus-within:ring-[oklch(0.36_0.07_260)/0.2]'
+            : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)] hover:border-[var(--border-hover)] focus-within:border-blue-500/60 focus-within:ring-1 focus-within:ring-blue-500/20'
         }`}
       >
         {/* Drag overlay */}
@@ -192,7 +192,7 @@ export const ChatInput = memo(function ChatInput({
             onKeyDown={handleKeyDown}
             placeholder={defaultPlaceholder}
             disabled={isTyping}
-            className="flex-1 bg-transparent resize-none pl-4 pr-2 pt-3.5 pb-2 text-sm font-medium text-white placeholder-[oklch(0.38_0.01_280)] focus:outline-none leading-relaxed disabled:opacity-50"
+            className="flex-1 bg-transparent resize-none pl-4 pr-2 pt-3.5 pb-2 text-sm font-medium text-foreground placeholder-[var(--text-faint)] focus:outline-none leading-relaxed disabled:opacity-50"
             style={{ minHeight: '52px', maxHeight: '180px' }}
           />
           {/* Attach — floats right of textarea, vertically centered */}
@@ -202,7 +202,7 @@ export const ChatInput = memo(function ChatInput({
               onClick={() => fileInputRef.current?.click()}
               disabled={isTyping}
               title="Attach file"
-              className="flex items-center justify-center w-8 h-8 rounded-xl text-[oklch(0.38_0.01_280)] hover:text-white hover:bg-[oklch(0.18_0.015_280)] border border-transparent hover:border-[oklch(0.25_0.02_280)] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center justify-center w-8 h-8 rounded-xl text-[var(--text-faint)] hover:text-foreground hover:bg-[var(--bg-elevated)] border border-transparent hover:border-[var(--border-subtle)] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Paperclip className="w-4 h-4" />
             </button>
@@ -223,7 +223,7 @@ export const ChatInput = memo(function ChatInput({
                 className={`flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-medium border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                   deepThink
                     ? 'bg-indigo-600/15 border-indigo-500/40 text-indigo-300'
-                    : 'text-[oklch(0.45_0.01_280)] border-transparent hover:text-white hover:bg-[oklch(0.18_0.015_280)] hover:border-[oklch(0.25_0.02_280)]'
+                    : 'text-[var(--text-faint)] border-transparent hover:text-foreground hover:bg-[var(--bg-elevated)] hover:border-[var(--border-subtle)]'
                 }`}
               >
                 <Brain className={`w-3.5 h-3.5 shrink-0 ${deepThink ? 'text-indigo-300' : ''}`} />
@@ -241,7 +241,7 @@ export const ChatInput = memo(function ChatInput({
               className={`hidden sm:flex items-center gap-1 h-8 px-2.5 rounded-xl text-[10px] font-semibold border transition-all hover:opacity-80 ${
                 creditsRemaining <= 3
                   ? 'text-orange-400 bg-orange-500/10 border-orange-500/25'
-                  : 'text-[oklch(0.40_0.01_280)] bg-transparent border-[oklch(0.22_0.016_280)] hover:border-[oklch(0.28_0.02_280)]'
+                  : 'text-[var(--text-muted)] bg-transparent border-[var(--border-subtle)] hover:border-[var(--border-subtle)]'
               }`}
             >
               <Sparkles className="w-3 h-3" />
@@ -252,7 +252,7 @@ export const ChatInput = memo(function ChatInput({
             {input.length > MAX_CHARS * 0.65 && (
               <div className="relative flex items-center justify-center w-8 h-8 shrink-0">
                 <svg className="-rotate-90 absolute inset-0 w-8 h-8" viewBox="0 0 32 32" aria-hidden="true">
-                  <circle cx="16" cy="16" r="12" fill="none" stroke="oklch(0.22 0.02 280)" strokeWidth="2.5" />
+                  <circle cx="16" cy="16" r="12" fill="none" stroke="var(--border-subtle)" strokeWidth="2.5" />
                   <circle
                     cx="16" cy="16" r="12"
                     fill="none" stroke={ringColor} strokeWidth="2.5"
@@ -262,7 +262,7 @@ export const ChatInput = memo(function ChatInput({
                     style={{ transition: 'stroke-dashoffset 0.2s, stroke 0.2s' }}
                   />
                 </svg>
-                <span className={`relative z-10 text-[9px] font-bold tabular-nums leading-none ${overLimit ? 'text-red-400' : nearLimit ? 'text-orange-400' : 'text-white/50'}`}>
+                <span className={`relative z-10 text-[9px] font-bold tabular-nums leading-none ${overLimit ? 'text-red-400' : nearLimit ? 'text-orange-400' : 'text-[var(--text-faint)]'}`}>
                   {overLimit ? `-${Math.abs(charsLeft)}` : charsLeft}
                 </span>
               </div>
@@ -273,7 +273,7 @@ export const ChatInput = memo(function ChatInput({
               <button
                 type="button"
                 onClick={onStopGeneration}
-                className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl bg-[oklch(0.18_0.012_280)] hover:bg-[oklch(0.23_0.018_280)] border border-[oklch(0.28_0.02_280)] hover:border-[oklch(0.34_0.025_280)] text-[oklch(0.50_0.01_280)] hover:text-white/90 text-xs font-semibold transition-all duration-150 active:scale-95"
+                className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl bg-[var(--bg-elevated)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] text-[var(--text-muted)] hover:text-foreground text-xs font-semibold transition-all duration-150 active:scale-95"
               >
                 <Square className="w-2.5 h-2.5 fill-current shrink-0" />
                 <span>Stop</span>

@@ -168,13 +168,13 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
       onClick={onClose}
     >
       <div
-        className="relative w-full md:max-w-lg max-h-[90vh] md:max-h-[85vh] md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slide-up md:animate-scale-in"
+        className="relative w-full md:max-w-lg max-h-[90vh] md:max-h-[85vh] md:mx-4 bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slide-up md:animate-scale-in"
         onClick={(e: any) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-800 flex-shrink-0">
+        <div className="flex items-center justify-between p-6 border-b border-[var(--border-subtle)] flex-shrink-0">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl font-bold shrink-0">
+            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-foreground text-xl font-bold shrink-0">
               {user?.avatar ? (
                 <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full object-cover" />
               ) : (
@@ -182,13 +182,13 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
               )}
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">{user?.name || 'Guest'}</h2>
-              <p className="text-sm text-gray-500">{user?.email || 'Not signed in'}</p>
+              <h2 className="text-lg font-bold text-foreground">{user?.name || 'Guest'}</h2>
+              <p className="text-sm text-[var(--text-faint)]">{user?.email || 'Not signed in'}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+            className="p-2 rounded-lg hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-faint)] hover:text-[var(--text-muted)]"
           >
             <X className="w-5 h-5" />
           </button>
@@ -198,9 +198,9 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
         <div className="p-6 flex-1 overflow-y-auto">
           <div className="flex items-center gap-2 mb-1">
             <Bot className="w-4 h-4 text-blue-400" />
-            <label className="text-sm font-semibold text-white">Custom AI Instructions</label>
+            <label className="text-sm font-semibold text-foreground">Custom AI Instructions</label>
           </div>
-          <p className="text-xs text-gray-500 mb-3">
+          <p className="text-xs text-[var(--text-faint)] mb-3">
             Tell Grok 4 how to respond — betting style, preferred sports, stake sizes, or anything it should always know about you. These are injected as system-level directives so the AI treats them as top-priority context.
           </p>
 
@@ -210,7 +210,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
               <button
                 key={t.label}
                 onClick={() => appendText(t.text)}
-                className="px-2.5 py-1 rounded-full bg-gray-800 hover:bg-blue-900/60 border border-gray-700 hover:border-blue-600/60 text-xs text-gray-300 hover:text-blue-300 transition-all"
+                className="px-2.5 py-1 rounded-full bg-[var(--bg-surface)] hover:bg-blue-900/60 border border-[var(--border-subtle)] hover:border-blue-600/60 text-xs text-[var(--text-muted)] hover:text-blue-300 transition-all"
               >
                 + {t.label}
               </button>
@@ -220,7 +220,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
-              <span className="ml-2 text-sm text-gray-400">Loading your instructions…</span>
+              <span className="ml-2 text-sm text-[var(--text-muted)]">Loading your instructions…</span>
             </div>
           ) : (
             <textarea
@@ -229,25 +229,25 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
               maxLength={MAX_CHARS}
               placeholder={`Examples:\n• Sharp bettor, 2–4% Kelly stakes, prioritize ATS value\n• Always give me closing line value analysis\n• I play DraftKings GPPs, prefer high-upside plays\n• Focus on NBA player props, especially over/unders`}
               rows={6}
-              className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all resize-none"
+              className="w-full px-4 py-3 bg-background border border-[var(--border-subtle)] rounded-xl text-foreground placeholder-[var(--text-faint)] text-sm focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all resize-none"
             />
           )}
-          <p className="text-xs text-gray-600 mt-1.5">{instructions.length} / {MAX_CHARS} characters</p>
+          <p className="text-xs text-[var(--text-faint)] mt-1.5">{instructions.length} / {MAX_CHARS} characters</p>
 
           {/* Betting Profile quick-set */}
           <details className="mt-4 group">
-            <summary className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-400 hover:text-gray-200 transition-colors select-none list-none">
+            <summary className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[var(--text-muted)] hover:text-foreground transition-colors select-none list-none">
               <ChevronDown className="w-3.5 h-3.5 transition-transform group-open:rotate-180" />
               Betting Profile (quick-set)
             </summary>
-            <div className="mt-3 p-4 bg-gray-950/60 border border-gray-800 rounded-xl space-y-3">
+            <div className="mt-3 p-4 bg-[var(--bg-overlay)]/60 border border-[var(--border-subtle)] rounded-xl space-y-3">
               {/* Primary Sport */}
               <div className="flex items-center gap-3">
-                <label className="text-xs text-gray-400 w-28 shrink-0">Primary sport</label>
+                <label className="text-xs text-[var(--text-muted)] w-28 shrink-0">Primary sport</label>
                 <select
                   value={primarySport}
                   onChange={(e: any) => setPrimarySport(e.target.value)}
-                  className="flex-1 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500/50"
+                  className="flex-1 px-3 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg text-sm text-foreground focus:outline-none focus:border-blue-500/50"
                 >
                   {SPORT_NAMES.map(n => (
                     <option key={n} value={n}>{n}</option>
@@ -257,7 +257,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
 
               {/* Risk Tolerance */}
               <div className="flex items-center gap-3">
-                <label className="text-xs text-gray-400 w-28 shrink-0">Risk tolerance</label>
+                <label className="text-xs text-[var(--text-muted)] w-28 shrink-0">Risk tolerance</label>
                 <div className="flex gap-2">
                   {(['Conservative', 'Medium', 'Aggressive'] as const).map(r => (
                     <label key={r} className="flex items-center gap-1 cursor-pointer">
@@ -269,7 +269,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
                         onChange={() => setRiskTolerance(r)}
                         className="accent-blue-500"
                       />
-                      <span className="text-xs text-gray-300">{r}</span>
+                      <span className="text-xs text-[var(--text-muted)]">{r}</span>
                     </label>
                   ))}
                 </div>
@@ -277,11 +277,11 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
 
               {/* Stake Style */}
               <div className="flex items-center gap-3">
-                <label className="text-xs text-gray-400 w-28 shrink-0">Stake style</label>
+                <label className="text-xs text-[var(--text-muted)] w-28 shrink-0">Stake style</label>
                 <select
                   value={stakeStyle}
                   onChange={(e: any) => setStakeStyle(e.target.value)}
-                  className="flex-1 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500/50"
+                  className="flex-1 px-3 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg text-sm text-foreground focus:outline-none focus:border-blue-500/50"
                 >
                   <option>Flat</option>
                   <option>Kelly</option>
@@ -300,23 +300,23 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
 
           {/* Saved Files */}
           <details className="mt-4 group">
-            <summary className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-400 hover:text-gray-200 transition-colors select-none list-none">
+            <summary className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[var(--text-muted)] hover:text-foreground transition-colors select-none list-none">
               <ChevronDown className="w-3.5 h-3.5 transition-transform group-open:rotate-180" />
               Saved Files
               {savedFiles.length > 0 && (
                 <span className="ml-1 px-1.5 py-0.5 rounded-full bg-blue-900/50 text-blue-300 text-[10px] font-black">{savedFiles.length}</span>
               )}
             </summary>
-            <div className="mt-3 p-4 bg-gray-950/60 border border-gray-800 rounded-xl space-y-2">
+            <div className="mt-3 p-4 bg-[var(--bg-overlay)]/60 border border-[var(--border-subtle)] rounded-xl space-y-2">
               {savedFiles.length === 0 ? (
-                <p className="text-xs text-gray-600 text-center py-2">
+                <p className="text-xs text-[var(--text-faint)] text-center py-2">
                   No saved files. Attach a file to a message and click the bookmark icon to save it here.
                 </p>
               ) : (
                 savedFiles.map((file: any) => (
                   <div
                     key={file.id}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-gray-900/60 border border-gray-800 hover:border-gray-700 transition-all"
+                    className="flex items-center gap-2 p-2 rounded-lg bg-[var(--bg-overlay)]/60 border border-[var(--border-subtle)] hover:border-[var(--border-hover)] transition-all"
                   >
                     {file.type === 'image' ? (
                       <ImageIcon className="w-4 h-4 text-blue-400 shrink-0" />
@@ -324,8 +324,8 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
                       <FileText className="w-4 h-4 text-blue-400 shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-gray-200 truncate">{file.name}</p>
-                      <p className="text-[10px] text-gray-600">
+                      <p className="text-xs font-semibold text-foreground truncate">{file.name}</p>
+                      <p className="text-[10px] text-[var(--text-faint)]">
                         {(file.size / 1024).toFixed(1)} KB · {new Date(file.savedAt).toLocaleDateString()}
                       </p>
                     </div>
@@ -339,7 +339,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
                       </button>
                       <button
                         onClick={() => handleDeleteSavedFile(file.id)}
-                        className="p-1 rounded-md hover:bg-red-900/30 text-gray-600 hover:text-red-400 transition-all"
+                        className="p-1 rounded-md hover:bg-red-900/30 text-[var(--text-faint)] hover:text-red-400 transition-all"
                         title="Delete saved file"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -353,7 +353,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-800">
+        <div className="flex items-center justify-between p-6 border-t border-[var(--border-subtle)]">
           <button
             onClick={handleLogout}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-900/50 text-red-400 hover:bg-red-900/20 hover:border-red-700/50 text-sm font-semibold transition-all"
@@ -365,7 +365,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
           <button
             onClick={handleSave}
             disabled={saving || loading}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-800 disabled:text-gray-600 text-white text-sm font-bold transition-all"
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-[var(--bg-surface)] disabled:text-[var(--text-faint)] text-foreground text-sm font-bold transition-all"
           >
             {saving ? (
               <Loader2 className="w-4 h-4 animate-spin" />

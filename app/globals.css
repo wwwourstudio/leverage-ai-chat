@@ -322,7 +322,7 @@
   display: inline-block;
   width: 2px;
   height: 0.85em;
-  background-color: rgba(255, 255, 255, 0.75);
+  background-color: var(--foreground);
   margin-left: 2px;
   vertical-align: text-bottom;
   border-radius: 1px;

@@ -400,30 +400,29 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
       onClick={onClose}
     >
       <div
-        className="relative w-full md:max-w-2xl max-h-[92vh] md:max-h-[88vh] md:mx-4 rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slide-up md:animate-scale-in"
-        style={{ background: 'oklch(0.12 0.015 280)', border: '1px solid oklch(0.22 0.02 280)' }}
+        className="relative w-full md:max-w-2xl max-h-[92vh] md:max-h-[88vh] md:mx-4 rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slide-up md:animate-scale-in bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
         onClick={e => e.stopPropagation()}
       >
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-4" style={{ borderBottom: '1px solid oklch(0.20 0.02 280)' }}>
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg">
               <Bell className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white leading-tight">Alerts</h2>
+              <h2 className="text-lg font-bold text-foreground leading-tight">Alerts</h2>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[11px] text-gray-500">{alerts.length} total</span>
+                <span className="text-[11px] text-[var(--text-faint)]">{alerts.length} total</span>
                 {activeCount > 0 && (
                   <>
-                    <span className="text-gray-700">·</span>
+                    <span className="text-[var(--border-subtle)]">·</span>
                     <span className="text-[11px] text-green-400">{activeCount} active</span>
                   </>
                 )}
                 {triggeredCount > 0 && (
                   <>
-                    <span className="text-gray-700">·</span>
+                    <span className="text-[var(--border-subtle)]">·</span>
                     <span className="text-[11px] text-yellow-400">{triggeredCount} triggered</span>
                   </>
                 )}
@@ -433,13 +432,13 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
 
           <div className="flex items-center gap-2">
             {/* Tab toggle */}
-            <div className="flex items-center rounded-lg p-0.5" style={{ background: 'oklch(0.18 0.015 280)' }}>
+            <div className="flex items-center rounded-lg p-0.5 bg-[var(--bg-elevated)]">
               <button
                 onClick={() => setActiveTab('list')}
                 className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                   activeTab === 'list'
-                    ? 'bg-white/10 text-white'
-                    : 'text-gray-500 hover:text-gray-300'
+                    ? 'bg-[var(--bg-surface)] text-foreground'
+                    : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'
                 }`}
               >
                 My Alerts
@@ -448,8 +447,8 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                 onClick={() => setActiveTab('create')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                   activeTab === 'create'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-500 hover:text-gray-300'
+                    ? 'bg-blue-600 text-foreground'
+                    : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'
                 }`}
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -458,8 +457,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
             </div>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg text-gray-500 hover:text-gray-300 transition-colors"
-              style={{ background: 'oklch(0.18 0.015 280)' }}
+              className="p-2 rounded-lg text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors bg-[var(--bg-elevated)]"
             >
               <X className="w-4 h-4" />
             </button>
@@ -476,7 +474,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
               {/* Filter bar */}
               {alerts.length > 0 && (
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Filter className="w-3.5 h-3.5 text-gray-600 shrink-0" />
+                  <Filter className="w-3.5 h-3.5 text-[var(--text-faint)] shrink-0" />
                   {/* Type filters */}
                   {ALERT_TYPES.map(type => {
                     const TypeIcon = type.icon;
@@ -486,9 +484,8 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                         key={type.value}
                         onClick={() => setFilterType(active ? null : type.value)}
                         className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
-                          active ? `${type.bg} ${type.color} border ${type.border}` : 'text-gray-500 hover:text-gray-300'
+                          active ? `${type.bg} ${type.color} border ${type.border}` : 'text-[var(--text-faint)] hover:text-[var(--text-muted)] bg-[var(--bg-elevated)]'
                         }`}
-                        style={active ? {} : { background: 'oklch(0.17 0.015 280)' }}
                       >
                         <TypeIcon className="w-3 h-3" />
                         {type.label}
@@ -496,7 +493,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                     );
                   })}
                   {/* Divider */}
-                  <span className="w-px h-4 bg-gray-800" />
+                  <span className="w-px h-4 bg-[var(--border-subtle)]" />
                   {/* Status filter */}
                   {(['all', 'active', 'paused'] as const).map(s => (
                     <button
@@ -505,11 +502,10 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                       className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold capitalize transition-all ${
                         filterStatus === s
                           ? s === 'active' ? 'bg-green-500/15 text-green-400 border border-green-500/30'
-                            : s === 'paused' ? 'bg-gray-500/15 text-gray-400 border border-gray-500/30'
+                            : s === 'paused' ? 'bg-gray-500/15 text-[var(--text-muted)] border border-gray-500/30'
                             : 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                          : 'text-gray-500 hover:text-gray-300'
+                          : 'text-[var(--text-faint)] hover:text-[var(--text-muted)] bg-[var(--bg-elevated)]'
                       }`}
-                      style={filterStatus !== s ? { background: 'oklch(0.17 0.015 280)' } : {}}
                     >
                       {s}
                     </button>
@@ -521,30 +517,30 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
               {(!authChecked || loading) ? (
                 <div className="flex flex-col items-center justify-center h-52 gap-3">
                   <Loader2 className="w-7 h-7 text-blue-400 animate-spin" />
-                  <p className="text-sm text-gray-500">{!authChecked ? 'Initializing...' : 'Loading alerts...'}</p>
+                  <p className="text-sm text-[var(--text-faint)]">{!authChecked ? 'Initializing...' : 'Loading alerts...'}</p>
                 </div>
 
               ) : !isAuthenticated ? (
                 <div className="flex flex-col items-center justify-center h-52 text-center gap-3">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'oklch(0.17 0.015 280)' }}>
-                    <Bell className="w-7 h-7 text-gray-600" />
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[var(--bg-elevated)]">
+                    <Bell className="w-7 h-7 text-[var(--text-faint)]" />
                   </div>
                   <div>
-                    <p className="text-gray-300 font-semibold">Sign in to use alerts</p>
-                    <p className="text-xs text-gray-600 mt-1">Get notified about odds changes, line movement, and more</p>
+                    <p className="text-[var(--text-muted)] font-semibold">Sign in to use alerts</p>
+                    <p className="text-xs text-[var(--text-faint)] mt-1">Get notified about odds changes, line movement, and more</p>
                   </div>
                 </div>
 
               ) : filteredAlerts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-52 text-center gap-3">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'oklch(0.17 0.015 280)' }}>
-                    <Bell className="w-7 h-7 text-gray-600" />
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[var(--bg-elevated)]">
+                    <Bell className="w-7 h-7 text-[var(--text-faint)]" />
                   </div>
                   <div>
-                    <p className="text-gray-300 font-semibold">
+                    <p className="text-[var(--text-muted)] font-semibold">
                       {alerts.length > 0 ? 'No alerts match your filters' : 'No alerts yet'}
                     </p>
-                    <p className="text-xs text-gray-600 mt-1">
+                    <p className="text-xs text-[var(--text-faint)] mt-1">
                       {alerts.length > 0
                         ? 'Try clearing the filters above'
                         : 'Create your first alert to stay ahead of the market'}
@@ -574,10 +570,9 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                     return (
                       <div
                         key={alert.id}
-                        className={`rounded-xl p-4 transition-all ${
-                          alert.is_active ? 'opacity-100' : 'opacity-55'
+                        className={`rounded-xl p-4 transition-all bg-[var(--bg-elevated)] ${
+                          alert.is_active ? 'border border-[var(--border-hover)] opacity-100' : 'border border-[var(--border-subtle)] opacity-55'
                         }`}
-                        style={{ background: 'oklch(0.16 0.015 280)', border: `1px solid oklch(${alert.is_active ? '0.24' : '0.19'} 0.02 280)` }}
                       >
                         <div className="flex items-start gap-3">
                           {/* Icon */}
@@ -588,12 +583,12 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                           {/* Content */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-sm font-bold text-white">{alert.title}</p>
+                              <p className="text-sm font-bold text-foreground">{alert.title}</p>
                               {/* Status badge */}
                               {alert.is_active ? (
                                 <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-500/15 text-green-400">Active</span>
                               ) : (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-500/20 text-gray-500">Paused</span>
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[var(--bg-surface)] text-[var(--text-faint)]">Paused</span>
                               )}
                               {alert.trigger_count > 0 && (
                                 <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-yellow-500/15 text-yellow-400">
@@ -603,7 +598,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                             </div>
 
                             {/* Meta row */}
-                            <p className="text-xs text-gray-500 mt-0.5 truncate">
+                            <p className="text-xs text-[var(--text-faint)] mt-0.5 truncate">
                               {typeInfo.label}
                               {alert.sport && ` · ${alert.sport}`}
                               {alert.team && ` · ${alert.team}`}
@@ -614,28 +609,28 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                             {/* Trigger progress */}
                             {triggerProgress !== null && (
                               <div className="mt-2 flex items-center gap-2">
-                                <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: 'oklch(0.22 0.02 280)' }}>
+                                <div className="flex-1 h-1 rounded-full overflow-hidden bg-[var(--border-subtle)]">
                                   <div
                                     className={`h-full rounded-full transition-all ${triggerProgress >= 1 ? 'bg-yellow-500' : 'bg-blue-500'}`}
                                     style={{ width: `${Math.min(triggerProgress * 100, 100)}%` }}
                                   />
                                 </div>
-                                <span className="text-[10px] text-gray-600 shrink-0">
+                                <span className="text-[10px] text-[var(--text-faint)] shrink-0">
                                   {alert.trigger_count}/{alert.max_triggers}
                                 </span>
                               </div>
                             )}
                             {!hasMaxTriggers && alert.trigger_count > 0 && (
-                              <p className="text-[10px] text-gray-600 mt-1">∞ unlimited triggers</p>
+                              <p className="text-[10px] text-[var(--text-faint)] mt-1">∞ unlimited triggers</p>
                             )}
 
                             {/* Timestamps */}
                             <div className="flex items-center gap-3 mt-1.5">
-                              <p className="text-[10px] text-gray-700">
+                              <p className="text-[10px] text-[var(--border-subtle)]">
                                 Created {new Date(alert.created_at).toLocaleDateString()}
                               </p>
                               {alert.last_triggered_at && (
-                                <p className="flex items-center gap-1 text-[10px] text-gray-600">
+                                <p className="flex items-center gap-1 text-[10px] text-[var(--text-faint)]">
                                   <Clock className="w-2.5 h-2.5" />
                                   Last fired {formatRelativeTime(alert.last_triggered_at)}
                                 </p>
@@ -650,8 +645,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                               <button
                                 onClick={() => resetTriggerCount(alert.id)}
                                 disabled={isResetting}
-                                className="p-1.5 rounded-lg text-gray-600 hover:text-blue-400 transition-colors"
-                                style={{ background: 'oklch(0.19 0.015 280)' }}
+                                className="p-1.5 rounded-lg text-[var(--text-faint)] hover:text-blue-400 transition-colors bg-[var(--bg-surface)]"
                                 title="Reset trigger count"
                               >
                                 {isResetting
@@ -663,21 +657,19 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                             {/* Toggle */}
                             <button
                               onClick={() => toggleAlert(alert.id, alert.is_active)}
-                              className="p-1.5 rounded-lg transition-colors"
-                              style={{ background: 'oklch(0.19 0.015 280)' }}
+                              className="p-1.5 rounded-lg transition-colors bg-[var(--bg-surface)]"
                               title={alert.is_active ? 'Pause alert' : 'Activate alert'}
                             >
                               {alert.is_active
                                 ? <ToggleRight className="w-5 h-5 text-blue-400" />
-                                : <ToggleLeft className="w-5 h-5 text-gray-600" />
+                                : <ToggleLeft className="w-5 h-5 text-[var(--text-faint)]" />
                               }
                             </button>
                             {/* Delete */}
                             <button
                               onClick={() => deleteAlert(alert.id)}
                               disabled={isDeleting}
-                              className="p-1.5 rounded-lg text-gray-600 hover:text-red-400 transition-colors"
-                              style={{ background: 'oklch(0.19 0.015 280)' }}
+                              className="p-1.5 rounded-lg text-[var(--text-faint)] hover:text-red-400 transition-colors bg-[var(--bg-surface)]"
                               title="Delete alert"
                             >
                               {isDeleting
@@ -701,14 +693,14 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
 
               {!isAuthenticated ? (
                 <div className="flex flex-col items-center justify-center h-52 text-center gap-3">
-                  <AlertCircle className="w-10 h-10 text-gray-600" />
-                  <p className="text-gray-400 font-semibold">Sign in to create alerts</p>
+                  <AlertCircle className="w-10 h-10 text-[var(--text-faint)]" />
+                  <p className="text-[var(--text-muted)] font-semibold">Sign in to create alerts</p>
                 </div>
               ) : (
                 <>
                   {/* Alert type */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-400 mb-2.5 uppercase tracking-wider">Alert Type</label>
+                    <label className="block text-xs font-bold text-[var(--text-muted)] mb-2.5 uppercase tracking-wider">Alert Type</label>
                     <div className="grid grid-cols-3 gap-2">
                       {ALERT_TYPES.map(type => {
                         const TypeIcon = type.icon;
@@ -720,9 +712,8 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                             className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                               selected
                                 ? `${type.bg} ${type.color} border ${type.border}`
-                                : 'text-gray-500 hover:text-gray-300 border border-transparent'
+                                : 'text-[var(--text-faint)] hover:text-[var(--text-muted)] border border-transparent bg-[var(--bg-elevated)]'
                             }`}
-                            style={selected ? {} : { background: 'oklch(0.17 0.015 280)' }}
                           >
                             <TypeIcon className="w-3.5 h-3.5 shrink-0" />
                             <span className="truncate">{type.label}</span>
@@ -734,23 +725,19 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
 
                   {/* Title + AI Suggest */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-400 mb-1.5 uppercase tracking-wider">Title</label>
+                    <label className="block text-xs font-bold text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">Title</label>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         value={newAlert.title}
                         onChange={(e: any) => setNewAlert((prev: any) => ({ ...prev, title: e.target.value }))}
                         placeholder="e.g., Lakers spread moves 2+ points"
-                        className="flex-1 px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
-                        style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
-                        onFocus={(e: any) => (e.currentTarget.style.borderColor = 'oklch(0.45 0.18 260)')}
-                        onBlur={(e: any) => (e.currentTarget.style.borderColor = 'oklch(0.22 0.02 280)')}
+                        className="flex-1 px-3 py-2.5 rounded-xl text-foreground text-sm placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50 transition-all bg-background border border-[var(--border-subtle)]"
                       />
                       <button
                         onClick={fetchAiSuggestion}
                         disabled={aiLoading || newAlert.title.trim().length < 3}
-                        className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-40"
-                        style={{ background: 'oklch(0.17 0.015 280)', border: '1px solid oklch(0.30 0.08 280)' }}
+                        className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-40 bg-[var(--bg-elevated)] border border-[var(--border-subtle)]"
                         title="Get AI suggestion"
                       >
                         {aiLoading ? <Loader2 className="w-3.5 h-3.5 text-purple-400 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-purple-400" />}
@@ -760,20 +747,20 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
 
                     {/* AI Suggestion card */}
                     {aiSuggestion && (
-                      <div className="mt-2.5 p-3 rounded-xl" style={{ background: 'oklch(0.14 0.02 290)', border: '1px solid oklch(0.30 0.08 290)' }}>
+                      <div className="mt-2.5 p-3 rounded-xl bg-[var(--bg-overlay)] border border-purple-500/30">
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="flex items-center gap-1.5">
                             <Sparkles className="w-3.5 h-3.5 text-purple-400" />
                             <span className="text-xs font-bold text-purple-300">AI Suggestion</span>
                           </div>
-                          <button onClick={() => setAiSuggestion(null)} className="text-gray-600 hover:text-gray-400">
+                          <button onClick={() => setAiSuggestion(null)} className="text-[var(--text-faint)] hover:text-[var(--text-muted)]">
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
                         <div className="space-y-1 mb-3">
-                          <p className="text-sm font-semibold text-white">{aiSuggestion.title}</p>
+                          <p className="text-sm font-semibold text-foreground">{aiSuggestion.title}</p>
                           {aiSuggestion.description && (
-                            <p className="text-xs text-gray-400">{aiSuggestion.description}</p>
+                            <p className="text-xs text-[var(--text-muted)]">{aiSuggestion.description}</p>
                           )}
                           <div className="flex flex-wrap gap-1.5 mt-1.5">
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/15 text-purple-400">
@@ -785,7 +772,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                               </span>
                             )}
                             {aiSuggestion.sport && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-700 text-gray-400">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[var(--bg-elevated)] text-[var(--text-muted)]">
                                 {aiSuggestion.sport}
                               </span>
                             )}
@@ -805,37 +792,34 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                   {/* Sport + Team + Player */}
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 mb-1.5 uppercase tracking-wider">Sport</label>
+                      <label className="block text-xs font-bold text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">Sport</label>
                       <select
                         value={newAlert.sport}
                         onChange={(e: any) => setNewAlert((prev: any) => ({ ...prev, sport: e.target.value }))}
-                        className="w-full px-3 py-2.5 rounded-xl text-white text-sm focus:outline-none transition-all"
-                        style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
+                        className="w-full px-3 py-2.5 rounded-xl text-foreground text-sm focus:outline-none focus:border-blue-500/50 transition-all bg-background border border-[var(--border-subtle)]"
                       >
                         <option value="">Any</option>
                         {SPORTS.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 mb-1.5 uppercase tracking-wider">Team</label>
+                      <label className="block text-xs font-bold text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">Team</label>
                       <input
                         type="text"
                         value={newAlert.team}
                         onChange={(e: any) => setNewAlert((prev: any) => ({ ...prev, team: e.target.value }))}
                         placeholder="e.g., Lakers"
-                        className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
-                        style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
+                        className="w-full px-3 py-2.5 rounded-xl text-foreground text-sm placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50 transition-all bg-background border border-[var(--border-subtle)]"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 mb-1.5 uppercase tracking-wider">Player</label>
+                      <label className="block text-xs font-bold text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">Player</label>
                       <input
                         type="text"
                         value={newAlert.player}
                         onChange={(e: any) => setNewAlert((prev: any) => ({ ...prev, player: e.target.value }))}
                         placeholder="e.g., LeBron"
-                        className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
-                        style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
+                        className="w-full px-3 py-2.5 rounded-xl text-foreground text-sm placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50 transition-all bg-background border border-[var(--border-subtle)]"
                       />
                     </div>
                   </div>
@@ -843,7 +827,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                   {/* Threshold (conditional) */}
                   {thresholdLabel && (
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 mb-1.5 uppercase tracking-wider">
+                      <label className="block text-xs font-bold text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">
                         {thresholdLabel}
                       </label>
                       <input
@@ -853,28 +837,26 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                         value={newAlert.threshold}
                         onChange={(e: any) => setNewAlert((prev: any) => ({ ...prev, threshold: e.target.value }))}
                         placeholder="Leave blank to trigger on any change"
-                        className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
-                        style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
+                        className="w-full px-3 py-2.5 rounded-xl text-foreground text-sm placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50 transition-all bg-background border border-[var(--border-subtle)]"
                       />
                     </div>
                   )}
 
                   {/* Description */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-400 mb-1.5 uppercase tracking-wider">Notes (optional)</label>
+                    <label className="block text-xs font-bold text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">Notes (optional)</label>
                     <input
                       type="text"
                       value={newAlert.description}
                       onChange={(e: any) => setNewAlert((prev: any) => ({ ...prev, description: e.target.value }))}
                       placeholder="Any additional context"
-                      className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
-                      style={{ background: 'oklch(0.10 0.01 280)', border: '1px solid oklch(0.22 0.02 280)' }}
+                      className="w-full px-3 py-2.5 rounded-xl text-foreground text-sm placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50 transition-all bg-background border border-[var(--border-subtle)]"
                     />
                   </div>
 
                   {/* Max triggers */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Max Triggers</label>
+                    <label className="block text-xs font-bold text-[var(--text-muted)] mb-2 uppercase tracking-wider">Max Triggers</label>
                     <div className="flex gap-2 flex-wrap">
                       {MAX_TRIGGERS_OPTIONS.map(opt => (
                         <button
@@ -883,9 +865,8 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                             newAlert.max_triggers === opt.value
                               ? 'bg-blue-600/20 text-blue-400 border border-blue-500/40'
-                              : 'text-gray-500 hover:text-gray-300 border border-transparent'
+                              : 'text-[var(--text-faint)] hover:text-[var(--text-muted)] border border-transparent bg-[var(--bg-elevated)]'
                           }`}
-                          style={newAlert.max_triggers !== opt.value ? { background: 'oklch(0.17 0.015 280)' } : {}}
                         >
                           {opt.label}
                         </button>
@@ -895,7 +876,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
 
                   {/* Delivery Channels */}
                   <div>
-                    <p className="text-xs font-semibold text-gray-400 mb-2">Delivery Channels</p>
+                    <p className="text-xs font-semibold text-[var(--text-muted)] mb-2">Delivery Channels</p>
                     <div className="flex flex-wrap gap-2">
                       {DELIVERY_CHANNELS.map(ch => {
                         const selected = newAlert.notify_channels.includes(ch.value);
@@ -913,9 +894,8 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all ${
                               selected
                                 ? 'border-blue-400/60 bg-blue-500/15 text-blue-300'
-                                : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600'
+                                : 'border-transparent text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:border-[var(--border-hover)] bg-[var(--bg-elevated)]'
                             }`}
-                            style={!selected ? { background: 'oklch(0.17 0.015 280)' } : {}}
                           >
                             <Icon className="w-3 h-3" />
                             {ch.label}
@@ -923,14 +903,14 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                         );
                       })}
                     </div>
-                    <p className="text-[10px] text-gray-600 mt-1.5">Email, SMS, and Push require account configuration. Webhook posts to your URL.</p>
+                    <p className="text-[10px] text-[var(--text-faint)] mt-1.5">Email, SMS, and Push require account configuration. Webhook posts to your URL.</p>
                   </div>
 
                   {/* Preview */}
                   {newAlert.title && (
-                    <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: 'oklch(0.15 0.015 280)', border: '1px solid oklch(0.21 0.02 280)' }}>
-                      <AlertCircle className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                      <p className="text-xs text-gray-400">{getAlertPreview(newAlert)}</p>
+                    <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+                      <AlertCircle className="w-3.5 h-3.5 text-[var(--text-faint)] shrink-0" />
+                      <p className="text-xs text-[var(--text-muted)]">{getAlertPreview(newAlert)}</p>
                     </div>
                   )}
 
@@ -946,8 +926,7 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
                     </button>
                     <button
                       onClick={() => setActiveTab('list')}
-                      className="px-5 py-2.5 rounded-xl text-gray-400 hover:text-gray-300 text-sm font-semibold transition-all"
-                      style={{ background: 'oklch(0.17 0.015 280)' }}
+                      className="px-5 py-2.5 rounded-xl text-[var(--text-muted)] hover:text-foreground text-sm font-semibold transition-all bg-[var(--bg-elevated)]"
                     >
                       Cancel
                     </button>

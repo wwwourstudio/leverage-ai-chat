@@ -21,7 +21,7 @@ function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onCha
       onClick={() => onChange(!checked)}
       className={cn(
         'relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40',
-        checked ? 'bg-blue-600' : 'bg-gray-700',
+        checked ? 'bg-blue-600' : 'bg-[var(--bg-elevated)]',
         disabled && 'opacity-50 cursor-not-allowed',
       )}
     >
@@ -38,10 +38,10 @@ function Avatar({ name, avatar, size = 'md' }: { name: string; avatar?: string |
   const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?';
   const sizeClass = size === 'lg' ? 'w-16 h-16 text-xl' : size === 'sm' ? 'w-8 h-8 text-xs' : 'w-12 h-12 text-sm';
   if (avatar) {
-    return <img src={avatar} alt={name} className={cn(sizeClass, 'rounded-full object-cover ring-2 ring-gray-700')} />;
+    return <img src={avatar} alt={name} className={cn(sizeClass, 'rounded-full object-cover ring-2 ring-[var(--border-subtle)]')} />;
   }
   return (
-    <div className={cn(sizeClass, 'rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-black text-white ring-2 ring-gray-700')}>
+    <div className={cn(sizeClass, 'rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-black text-white ring-2 ring-[var(--border-subtle)]')}>
       {initials}
     </div>
   );
@@ -50,9 +50,9 @@ function Avatar({ name, avatar, size = 'md' }: { name: string; avatar?: string |
 // ── Stat Card ──────────────────────────────────────────────────────────────
 function StatCard({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
   return (
-    <div className="flex-1 min-w-0 p-3 bg-[oklch(0.12_0.01_280)] rounded-xl border border-[oklch(0.20_0.01_280)] text-center">
-      <div className={cn('text-lg font-black tabular-nums', accent ?? 'text-white')}>{value}</div>
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mt-0.5 truncate">{label}</div>
+    <div className="flex-1 min-w-0 p-3 bg-[var(--bg-surface)] rounded-xl border border-[var(--border-subtle)] text-center">
+      <div className={cn('text-lg font-black tabular-nums', accent ?? 'text-foreground')}>{value}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mt-0.5 truncate">{label}</div>
     </div>
   );
 }
@@ -106,7 +106,7 @@ const SPORTSBOOKS = ['DraftKings', 'FanDuel', 'BetMGM', 'Caesars', 'PointsBet', 
 const SPORTS = ['NBA', 'NFL', 'MLB', 'NHL', 'NCAAB', 'NCAAF', 'EPL', 'MLS', 'UFC', 'Tennis'];
 
 const TIER_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  free:        { label: 'Free',        color: 'text-gray-400',   bg: 'bg-gray-500/20 border-gray-500/30' },
+  free:        { label: 'Free',        color: 'text-[var(--text-muted)]',   bg: 'bg-[var(--bg-elevated)] border-[var(--border-subtle)]' },
   core:        { label: 'Core',        color: 'text-blue-400',   bg: 'bg-blue-500/20 border-blue-500/30' },
   pro:         { label: 'Pro',         color: 'text-purple-400', bg: 'bg-purple-500/20 border-purple-500/30' },
   high_stakes: { label: 'High Stakes', color: 'text-yellow-400', bg: 'bg-yellow-500/20 border-yellow-500/30' },
@@ -303,7 +303,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
   };
 
   const roiDisplay = stats.roi > 0 ? `+${stats.roi.toFixed(1)}%` : `${stats.roi.toFixed(1)}%`;
-  const roiColor   = stats.roi > 0 ? 'text-blue-400' : stats.roi < 0 ? 'text-red-400' : 'text-gray-400';
+  const roiColor   = stats.roi > 0 ? 'text-blue-500' : stats.roi < 0 ? 'text-red-500' : 'text-[var(--text-muted)]';
 
   const kellyTip = () => {
     if (!prefs.bankroll) return null;
@@ -326,11 +326,11 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
       onClick={onClose}
     >
       <div
-        className="relative w-full md:max-w-2xl max-h-[92vh] md:max-h-[88vh] md:mx-4 bg-[oklch(0.10_0.015_280)] border border-[oklch(0.20_0.02_280)] rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slide-up md:animate-scale-in"
+        className="relative w-full md:max-w-2xl max-h-[92vh] md:max-h-[88vh] md:mx-4 bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slide-up md:animate-scale-in"
         onClick={(e: any) => e.stopPropagation()}
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-[oklch(0.18_0.015_280)]">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-3">
             {loading ? (
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
@@ -340,24 +340,24 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
               <Avatar name={name || user?.name || 'User'} avatar={profileData?.avatar ?? user?.avatar} />
             )}
             <div>
-              <h2 className="text-base font-black text-white leading-tight">
+              <h2 className="text-base font-black text-foreground leading-tight">
                 {name || user?.name || 'Settings'}
               </h2>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', tierInfo.bg, tierInfo.color)}>
                   {tierInfo.label}
                 </span>
-                {isGuest && <span className="text-[10px] text-gray-500 font-semibold">Guest</span>}
+                {isGuest && <span className="text-[10px] text-[var(--text-faint)] font-semibold">Guest</span>}
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300">
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-faint)] hover:text-[var(--text-muted)]">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* ── Tab Nav ────────────────────────────────────────────────────── */}
-        <div className="flex border-b border-[oklch(0.18_0.015_280)]">
+        <div className="flex border-b border-[var(--border-subtle)]">
           {tabs.map(tab => (
             <button
               key={tab.id}
@@ -365,8 +365,8 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
               className={cn(
                 'relative flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-colors',
                 activeTab === tab.id
-                  ? 'text-white bg-blue-500/5'
-                  : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/40',
+                  ? 'text-foreground bg-blue-500/5'
+                  : 'text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]/40',
               )}
             >
               <tab.icon className="w-3.5 h-3.5" />
@@ -394,28 +394,28 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                     <div className="flex items-center gap-4">
                       <Avatar name={name || 'User'} avatar={profileData?.avatar ?? user?.avatar} size="lg" />
                       <div className="flex-1 min-w-0">
-                        <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">Display Name</label>
+                        <label className="block text-[10px] font-bold text-[var(--text-faint)] mb-1.5 uppercase tracking-wider">Display Name</label>
                         <input
                           type="text"
                           value={name}
                           onChange={(e: any) => setName(e.target.value)}
                           placeholder="Your name"
-                          className="w-full px-3 py-2 bg-[oklch(0.13_0.01_280)] border border-[oklch(0.22_0.01_280)] rounded-lg text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                          className="w-full px-3 py-2 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg text-foreground placeholder-[var(--text-faint)] text-sm focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20 transition-all"
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">Email</label>
+                      <label className="block text-[10px] font-bold text-[var(--text-faint)] mb-1.5 uppercase tracking-wider">Email</label>
                       <input
                         type="email"
                         value={user?.email ?? ''}
                         disabled
-                        className="w-full px-3 py-2 bg-[oklch(0.11_0.01_280)]/60 border border-[oklch(0.18_0.01_280)] rounded-lg text-gray-500 text-sm cursor-not-allowed"
+                        className="w-full px-3 py-2 bg-[var(--bg-overlay)]/60 border border-[var(--border-subtle)] rounded-lg text-[var(--text-faint)] text-sm cursor-not-allowed"
                       />
                     </div>
                     {formatMemberSince(profileData?.member_since ?? null) && (
-                      <p className="text-xs text-gray-600">
-                        Member since <span className="text-gray-400 font-semibold">{formatMemberSince(profileData?.member_since ?? null)}</span>
+                      <p className="text-xs text-[var(--text-faint)]">
+                        Member since <span className="text-[var(--text-muted)] font-semibold">{formatMemberSince(profileData?.member_since ?? null)}</span>
                       </p>
                     )}
                   </div>
@@ -423,7 +423,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                   {/* Stats */}
                   {stats.total_analyses > 0 && (
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">Your Stats</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)] mb-2">Your Stats</p>
                       <div className="flex gap-2">
                         <StatCard label="Analyses" value={stats.total_analyses} />
                         <StatCard label="Record"   value={`${stats.wins}W–${stats.losses}L`} />
@@ -434,14 +434,14 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                   )}
 
                   {/* Credits */}
-                  <div className="flex items-center justify-between p-4 bg-[oklch(0.13_0.01_280)] rounded-xl border border-[oklch(0.22_0.01_280)]">
+                  <div className="flex items-center justify-between p-4 bg-[var(--bg-surface)] rounded-xl border border-[var(--border-subtle)]">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-lg bg-blue-500/15 flex items-center justify-center">
                         <CreditCard className="w-4 h-4 text-blue-400" />
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-white">Credits Balance</p>
-                        <p className="text-xs text-gray-500">Used for AI analyses</p>
+                        <p className="text-sm font-bold text-foreground">Credits Balance</p>
+                        <p className="text-xs text-[var(--text-faint)]">Used for AI analyses</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -458,14 +458,14 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                   </div>
 
                   {/* Subscription */}
-                  <div className="flex items-center justify-between p-4 bg-[oklch(0.13_0.01_280)] rounded-xl border border-[oklch(0.22_0.01_280)]">
+                  <div className="flex items-center justify-between p-4 bg-[var(--bg-surface)] rounded-xl border border-[var(--border-subtle)]">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-lg bg-purple-500/15 flex items-center justify-center">
                         <Trophy className="w-4 h-4 text-purple-400" />
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-white">Subscription</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-sm font-bold text-foreground">Subscription</p>
+                        <p className="text-xs text-[var(--text-faint)]">
                           {isPaid ? 'Active premium plan' : 'Upgrade for unlimited access'}
                         </p>
                       </div>
@@ -492,8 +492,8 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                   {/* Sports */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Preferred Sports</label>
-                      <span className="text-[10px] text-gray-600">{prefs.tracked_sports.length} selected</span>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Preferred Sports</label>
+                      <span className="text-[10px] text-[var(--text-faint)]">{prefs.tracked_sports.length} selected</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {SPORTS.map(sport => {
@@ -506,7 +506,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                               'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all',
                               active
                                 ? 'bg-blue-600/15 text-blue-400 border-blue-500/40'
-                                : 'bg-[oklch(0.13_0.01_280)] text-gray-400 border-[oklch(0.22_0.01_280)] hover:border-gray-500',
+                                : 'bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:border-[var(--border-hover)]',
                             )}
                           >
                             {active && '✓ '}{sport}
@@ -519,8 +519,8 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                   {/* Sportsbooks */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Preferred Sportsbooks</label>
-                      <span className="text-[10px] text-gray-600">{prefs.preferred_books.length} selected</span>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Preferred Sportsbooks</label>
+                      <span className="text-[10px] text-[var(--text-faint)]">{prefs.preferred_books.length} selected</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {SPORTSBOOKS.map(book => {
@@ -533,7 +533,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                               'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all',
                               active
                                 ? 'bg-blue-600/15 text-blue-400 border-blue-500/40'
-                                : 'bg-[oklch(0.13_0.01_280)] text-gray-400 border-[oklch(0.22_0.01_280)] hover:border-gray-500',
+                                : 'bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:border-[var(--border-hover)]',
                             )}
                           >
                             {book}
@@ -545,9 +545,9 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
 
                   {/* Bankroll */}
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">Bankroll</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)] mb-2">Bankroll</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-bold pointer-events-none">$</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)] text-sm font-bold pointer-events-none">$</span>
                       <input
                         type="number"
                         min="0"
@@ -555,11 +555,11 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                         value={prefs.bankroll || ''}
                         onChange={(e: any) => setPrefs((p: any) => ({ ...p, bankroll: parseFloat(e.target.value) || 0 }))}
                         placeholder="0"
-                        className="w-full pl-7 pr-4 py-2.5 bg-[oklch(0.13_0.01_280)] border border-[oklch(0.22_0.01_280)] rounded-lg text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                        className="w-full pl-7 pr-4 py-2.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg text-foreground placeholder-[var(--text-faint)] text-sm focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20 transition-all"
                       />
                     </div>
                     {kellyTip() && (
-                      <p className="text-[10px] text-gray-500 mt-1.5 flex items-center gap-1">
+                      <p className="text-[10px] text-[var(--text-faint)] mt-1.5 flex items-center gap-1">
                         <Target className="w-3 h-3" /> {kellyTip()}
                       </p>
                     )}
@@ -567,7 +567,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
 
                   {/* Risk Tolerance */}
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">Risk Tolerance</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)] mb-2">Risk Tolerance</label>
                     <div className="flex gap-2">
                       {RISK_CONFIG.map(r => {
                         const active = prefs.risk_tolerance === r.value;
@@ -577,12 +577,12 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                             onClick={() => setPrefs((p: any) => ({ ...p, risk_tolerance: r.value }))}
                             className={cn(
                               'flex-1 flex flex-col items-center gap-1 py-3 rounded-xl border text-xs font-semibold transition-all',
-                              active ? cn(r.bg, r.border, r.color) : 'bg-[oklch(0.13_0.01_280)] text-gray-400 border-[oklch(0.22_0.01_280)] hover:border-gray-500',
+                              active ? cn(r.bg, r.border, r.color) : 'bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:border-[var(--border-hover)]',
                             )}
                           >
                             <span className="text-lg">{r.emoji}</span>
                             <span>{r.label}</span>
-                            <span className={cn('text-[9px] font-normal', active ? 'opacity-80' : 'text-gray-600')}>{r.desc}</span>
+                            <span className={cn('text-[9px] font-normal', active ? 'opacity-80' : 'text-[var(--text-faint)]')}>{r.desc}</span>
                           </button>
                         );
                       })}
@@ -591,7 +591,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
 
                   {/* Theme */}
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">Theme</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)] mb-2">Theme</label>
                     <div className="flex gap-2">
                       {THEME_CONFIG.map(t => {
                         const active = prefs.theme === t.value;
@@ -603,7 +603,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                               'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-xs font-semibold transition-all',
                               active
                                 ? 'bg-blue-600/15 text-blue-400 border-blue-500/40'
-                                : 'bg-[oklch(0.13_0.01_280)] text-gray-400 border-[oklch(0.22_0.01_280)] hover:border-gray-500',
+                                : 'bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:border-[var(--border-hover)]',
                             )}
                           >
                             <span>{t.emoji}</span>{t.label}
@@ -619,8 +619,8 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
               {activeTab === 'notifications' && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between px-1">
-                    <p className="text-xs text-gray-500">
-                      <span className="text-white font-bold">
+                    <p className="text-xs text-[var(--text-faint)]">
+                      <span className="text-foreground font-bold">
                         {NOTIFICATION_CONFIG.filter(n => prefs[n.key]).length}
                       </span>{' '}of {NOTIFICATION_CONFIG.length} active
                     </p>
@@ -632,7 +632,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                           ...Object.fromEntries(NOTIFICATION_CONFIG.map(n => [n.key, !allOn])),
                         }));
                       }}
-                      className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+                      className="text-[10px] text-blue-500 hover:text-blue-600 font-semibold transition-colors"
                     >
                       {NOTIFICATION_CONFIG.every(n => prefs[n.key]) ? 'Disable all' : 'Enable all'}
                     </button>
@@ -643,14 +643,14 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                     return (
                       <div
                         key={item.key}
-                        className="flex items-center gap-4 p-4 bg-[oklch(0.13_0.01_280)] rounded-xl border border-[oklch(0.22_0.01_280)] hover:border-[oklch(0.28_0.01_280)] transition-colors"
+                        className="flex items-center gap-4 p-4 bg-[var(--bg-surface)] rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-hover)] transition-colors"
                       >
                         <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0', item.iconBg)}>
                           <Icon className={cn('w-4 h-4', item.color)} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-white">{item.label}</p>
-                          <p className="text-xs text-gray-500 truncate">{item.desc}</p>
+                          <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                          <p className="text-xs text-[var(--text-faint)] truncate">{item.desc}</p>
                         </div>
                         <ToggleSwitch
                           checked={prefs[item.key]}
@@ -667,39 +667,39 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                 <div className="space-y-5">
                   {/* Stats grid */}
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">Your Betting Profile</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)] mb-2">Your Betting Profile</p>
                     <div className="grid grid-cols-2 gap-2">
-                      <div className="p-3 bg-[oklch(0.13_0.01_280)] rounded-xl border border-[oklch(0.22_0.01_280)]">
+                      <div className="p-3 bg-[var(--bg-surface)] rounded-xl border border-[var(--border-subtle)]">
                         <div className="flex items-center gap-1.5 mb-1">
                           <BarChart3 className="w-3 h-3 text-blue-400" />
-                          <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">Analyses</span>
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Analyses</span>
                         </div>
-                        <p className="text-2xl font-black text-white tabular-nums">{stats.total_analyses}</p>
+                        <p className="text-2xl font-black text-foreground tabular-nums">{stats.total_analyses}</p>
                       </div>
-                      <div className="p-3 bg-[oklch(0.13_0.01_280)] rounded-xl border border-[oklch(0.22_0.01_280)]">
+                      <div className="p-3 bg-[var(--bg-surface)] rounded-xl border border-[var(--border-subtle)]">
                         <div className="flex items-center gap-1.5 mb-1">
                           <TrendingUp className="w-3 h-3 text-blue-400" />
-                          <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">ROI</span>
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-faint)]">ROI</span>
                         </div>
                         <p className={cn('text-2xl font-black tabular-nums', roiColor)}>{roiDisplay}</p>
                       </div>
-                      <div className="p-3 bg-[oklch(0.13_0.01_280)] rounded-xl border border-[oklch(0.22_0.01_280)]">
+                      <div className="p-3 bg-[var(--bg-surface)] rounded-xl border border-[var(--border-subtle)]">
                         <div className="flex items-center gap-1.5 mb-1">
                           <Target className="w-3 h-3 text-yellow-400" />
-                          <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">Record</span>
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Record</span>
                         </div>
-                        <p className="text-xl font-black text-white">
-                          <span className="text-blue-400">{stats.wins}W</span>
-                          <span className="text-gray-600 mx-1">–</span>
-                          <span className="text-red-400">{stats.losses}L</span>
+                        <p className="text-xl font-black text-foreground">
+                          <span className="text-blue-500">{stats.wins}W</span>
+                          <span className="text-[var(--text-faint)] mx-1">–</span>
+                          <span className="text-red-500">{stats.losses}L</span>
                         </p>
                       </div>
-                      <div className="p-3 bg-[oklch(0.13_0.01_280)] rounded-xl border border-[oklch(0.22_0.01_280)]">
+                      <div className="p-3 bg-[var(--bg-surface)] rounded-xl border border-[var(--border-subtle)]">
                         <div className="flex items-center gap-1.5 mb-1">
                           <Trophy className="w-3 h-3 text-purple-400" />
-                          <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">Top Sport</span>
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Top Sport</span>
                         </div>
-                        <p className="text-xl font-black text-white">{stats.favorite_sport ?? '—'}</p>
+                        <p className="text-xl font-black text-foreground">{stats.favorite_sport ?? '—'}</p>
                       </div>
                     </div>
                   </div>
@@ -707,11 +707,11 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                   {/* AI Suggestions */}
                   <div>
                     <div className="flex items-center justify-between mb-3">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">AI Recommendations</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">AI Recommendations</p>
                       {suggestions.length > 0 && !suggestLoading && (
                         <button
                           onClick={handleGetSuggestions}
-                          className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
+                          className="flex items-center gap-1 text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors"
                         >
                           <RotateCcw className="w-3 h-3" /> Refresh
                         </button>
@@ -723,15 +723,15 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                         <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mx-auto mb-3">
                           <Sparkles className="w-6 h-6 text-purple-400" />
                         </div>
-                        <p className="text-sm font-semibold text-gray-400 mb-1">Get personalized tips</p>
-                        <p className="text-xs text-gray-600 mb-4 max-w-xs mx-auto leading-relaxed">
+                        <p className="text-sm font-semibold text-[var(--text-muted)] mb-1">Get personalized tips</p>
+                        <p className="text-xs text-[var(--text-faint)] mb-4 max-w-xs mx-auto leading-relaxed">
                           AI analyzes your profile and stats to suggest setting optimizations.
                         </p>
                         {suggestError && <p className="text-xs text-red-400 mb-3">{suggestError}</p>}
                         <button
                           onClick={handleGetSuggestions}
                           disabled={suggestLoading || isGuest}
-                          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-800 disabled:to-gray-800 disabled:text-gray-500 text-white text-sm font-bold transition-all"
+                          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:bg-[var(--bg-elevated)] disabled:bg-none disabled:text-[var(--text-faint)] text-white text-sm font-bold transition-all"
                         >
                           <Sparkles className="w-4 h-4" />
                           {isGuest ? 'Sign in to use AI Coach' : 'Get AI Suggestions'}
@@ -742,7 +742,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                     {suggestLoading && (
                       <div className="flex items-center justify-center py-10 gap-3">
                         <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
-                        <span className="text-sm text-gray-500">Analyzing your profile…</span>
+                        <span className="text-sm text-[var(--text-faint)]">Analyzing your profile…</span>
                       </div>
                     )}
 
@@ -751,13 +751,13 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                         {suggestions.map((s: any) => (
                           <div
                             key={s.id}
-                            className="p-4 bg-[oklch(0.13_0.01_280)] rounded-xl border border-[oklch(0.22_0.01_280)] hover:border-purple-500/30 transition-colors"
+                            className="p-4 bg-[var(--bg-surface)] rounded-xl border border-[var(--border-subtle)] hover:border-purple-500/30 transition-colors"
                           >
                             <div className="flex items-start gap-3">
                               <span className="text-xl flex-shrink-0 mt-0.5">{s.icon}</span>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold text-white">{s.title}</p>
-                                <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{s.description}</p>
+                                <p className="text-sm font-bold text-foreground">{s.title}</p>
+                                <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">{s.description}</p>
                               </div>
                               {s.action && (
                                 <button
@@ -780,11 +780,11 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
         </div>
 
         {/* ── Footer ─────────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-5 py-4 border-t border-[oklch(0.18_0.015_280)]">
+        <div className="flex items-center justify-between px-5 py-4 border-t border-[var(--border-subtle)]">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={onClose}
-              className="px-5 py-2 rounded-xl border border-[oklch(0.25_0.01_280)] text-gray-400 hover:text-gray-300 hover:border-gray-600 text-sm font-semibold transition-all flex-shrink-0"
+              className="px-5 py-2 rounded-xl border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-muted)] hover:border-[var(--border-hover)] text-sm font-semibold transition-all flex-shrink-0"
             >
               Cancel
             </button>
@@ -795,7 +795,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-800 disabled:text-gray-600 text-white text-sm font-bold transition-all"
+            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-[var(--bg-elevated)] disabled:text-[var(--text-faint)] text-white text-sm font-bold transition-all"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
             {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Changes'}

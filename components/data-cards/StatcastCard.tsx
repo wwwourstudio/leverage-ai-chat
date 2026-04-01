@@ -141,7 +141,7 @@ function getValueStyle(value: string): { textCls: string; barWidth?: number } {
   }
   if (/^[+-]\d{2,4}$/.test(v)) return { textCls: v.startsWith('+') ? 'text-emerald-400' : 'text-rose-400' };
   if (/^[+-][\d.]+%$/.test(v)) return { textCls: v.startsWith('+') ? 'text-emerald-400' : 'text-rose-400' };
-  return { textCls: 'text-white' };
+  return { textCls: 'text-foreground' };
 }
 
 // ── Shared sub-components ─────────────────────────────────────────────────────
@@ -167,13 +167,13 @@ function HeroMetrics({ metrics, conf }: { metrics: Metric[]; conf: TypeConf }) {
 function MetricRow({ label, value }: Metric) {
   const { textCls, barWidth } = getValueStyle(value);
   return (
-    <div className="py-1.5 border-b border-white/5 last:border-0">
+    <div className="py-1.5 border-b border-[var(--border-subtle)] last:border-0">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-400">{label}</span>
+        <span className="text-xs text-[var(--text-muted)]">{label}</span>
         <span className={`text-xs font-bold tabular-nums ${textCls}`}>{value}</span>
       </div>
       {barWidth !== undefined && (
-        <div className="mt-1 h-0.5 w-full rounded-full bg-white/5 overflow-hidden">
+        <div className="mt-1 h-0.5 w-full rounded-full bg-[var(--bg-elevated)] overflow-hidden">
           <div className={`h-full rounded-full transition-all duration-500 ${barWidth >= 60 ? 'bg-emerald-500/60' : barWidth >= 35 ? 'bg-amber-500/60' : 'bg-rose-500/60'}`} style={{ width: `${barWidth}%` }} />
         </div>
       )}
@@ -202,7 +202,7 @@ function PitcherTabBar({ active, onSelect, accentBg, accentBorder, accentText }:
             'flex-shrink-0 px-3 py-1 rounded-full text-[10px] font-bold border transition-all duration-150',
             active === i
               ? `${accentBg} ${accentBorder} ${accentText}`
-              : 'bg-white/5 border-white/10 text-gray-500 hover:text-gray-300 hover:bg-white/8',
+              : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]',
           )}
         >
           {label}
@@ -223,7 +223,7 @@ function TabStats({ metrics, trendNote, conf }: {
       <HeroMetrics metrics={metrics} conf={conf} />
       {trendNote && (
         <div className={`mt-3 px-3 py-2 rounded-xl ${conf.accentBg} border ${conf.accentBorder}`}>
-          <p className="text-[11px] text-gray-300 leading-relaxed italic">{trendNote}</p>
+          <p className="text-[11px] text-[var(--text-muted)] leading-relaxed italic">{trendNote}</p>
         </div>
       )}
     </div>
@@ -252,7 +252,7 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
       {/* Core rate stats — always present (Whiff%, K%, FB Velo, Barrel%, BB%, …) */}
       {extraMetrics.length > 0 && (
         <div>
-          <p className="text-[9px] font-extrabold uppercase tracking-widest text-gray-500 mb-1.5">Rate Stats</p>
+          <p className="text-[9px] font-extrabold uppercase tracking-widest text-[var(--text-faint)] mb-1.5">Rate Stats</p>
           <div className="space-y-0">
             {extraMetrics.map((m, i) => <MetricRow key={i} label={m.label} value={m.value} />)}
           </div>
@@ -262,7 +262,7 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
       {/* Pitch Arsenal */}
       {hasPitchMix && (
         <div>
-          <p className="text-[9px] font-extrabold uppercase tracking-widest text-gray-500 mb-2">Pitch Arsenal</p>
+          <p className="text-[9px] font-extrabold uppercase tracking-widest text-[var(--text-faint)] mb-2">Pitch Arsenal</p>
           <div className="flex gap-1.5">
             {data.pitchMixFB && (
               <div className="flex-1 flex flex-col items-center rounded-xl bg-blue-500/15 border border-blue-500/30 py-2 px-1">
@@ -289,7 +289,7 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
       {/* Spin & Release */}
       {hasRelease && (
         <div>
-          <p className="text-[9px] font-extrabold uppercase tracking-widest text-gray-500 mb-2">Spin & Release</p>
+          <p className="text-[9px] font-extrabold uppercase tracking-widest text-[var(--text-faint)] mb-2">Spin & Release</p>
           <div className="grid grid-cols-2 gap-1.5">
             {[
               { label: 'Spin Rate', val: data.spinRate },
@@ -297,9 +297,9 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
               { label: 'H-Break',   val: data.hBreak },
               { label: 'V-Break',   val: data.vBreak },
             ].filter(r => r.val).map((r, i) => (
-              <div key={i} className="bg-white/5 rounded-xl p-2.5 text-center">
+              <div key={i} className="bg-[var(--bg-elevated)] rounded-xl p-2.5 text-center">
                 <p className={`text-sm font-black tabular-nums ${conf.accentText}`}>{r.val}</p>
-                <p className="text-[9px] font-bold uppercase tracking-wide text-gray-500 mt-0.5">{r.label}</p>
+                <p className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-faint)] mt-0.5">{r.label}</p>
               </div>
             ))}
           </div>
@@ -309,7 +309,7 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
       {/* Season Stats */}
       {hasSeason && seasonStats && (
         <div>
-          <p className="text-[9px] font-extrabold uppercase tracking-widest text-gray-500 mb-2">Season Stats</p>
+          <p className="text-[9px] font-extrabold uppercase tracking-widest text-[var(--text-faint)] mb-2">Season Stats</p>
           <div className="grid grid-cols-4 gap-1">
             {[
               { label: 'ERA', val: seasonStats.era ?? '--' },
@@ -317,9 +317,9 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
               { label: 'BB',  val: String(seasonStats.bb ?? 0) },
               { label: 'G',   val: String(seasonStats.gamesPlayed) },
             ].map((s, i) => (
-              <div key={i} className="bg-white/5 rounded-xl p-2 text-center">
-                <p className={`text-sm font-black tabular-nums ${i < 2 ? conf.accentText : 'text-white/70'}`}>{s.val}</p>
-                <p className="text-[9px] font-bold uppercase tracking-wide text-gray-500 mt-0.5">{s.label}</p>
+              <div key={i} className="bg-[var(--bg-elevated)] rounded-xl p-2 text-center">
+                <p className={`text-sm font-black tabular-nums ${i < 2 ? conf.accentText : 'text-foreground/70'}`}>{s.val}</p>
+                <p className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-faint)] mt-0.5">{s.label}</p>
               </div>
             ))}
           </div>
@@ -329,30 +329,30 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
       {/* Recent Form */}
       {hasLog && (
         <div>
-          <p className="text-[9px] font-extrabold uppercase tracking-widest text-gray-500 mb-2">Recent Form</p>
+          <p className="text-[9px] font-extrabold uppercase tracking-widest text-[var(--text-faint)] mb-2">Recent Form</p>
           <div className="overflow-x-auto -mx-1 px-1">
             <table className="w-full text-[11px] border-collapse">
               <thead>
-                <tr className="border-b border-white/10">
-                  <th className="text-left text-gray-500 font-semibold pb-1.5 pr-2">Date</th>
-                  <th className="text-left text-gray-500 font-semibold pb-1.5 pr-2">Opp</th>
-                  <th className="text-right text-gray-500 font-semibold pb-1.5 pr-2">IP</th>
-                  <th className="text-right text-gray-500 font-semibold pb-1.5 pr-2">K</th>
-                  <th className="text-right text-gray-500 font-semibold pb-1.5 pr-2">ER</th>
-                  <th className="text-right text-gray-500 font-semibold pb-1.5">BB</th>
+                <tr className="border-b border-[var(--border-subtle)]">
+                  <th className="text-left text-[var(--text-faint)] font-semibold pb-1.5 pr-2">Date</th>
+                  <th className="text-left text-[var(--text-faint)] font-semibold pb-1.5 pr-2">Opp</th>
+                  <th className="text-right text-[var(--text-faint)] font-semibold pb-1.5 pr-2">IP</th>
+                  <th className="text-right text-[var(--text-faint)] font-semibold pb-1.5 pr-2">K</th>
+                  <th className="text-right text-[var(--text-faint)] font-semibold pb-1.5 pr-2">ER</th>
+                  <th className="text-right text-[var(--text-faint)] font-semibold pb-1.5">BB</th>
                 </tr>
               </thead>
               <tbody>
                 {gameLog.map((g, i) => (
-                  <tr key={i} className="border-b border-white/5 last:border-0">
-                    <td className="py-1.5 pr-2 text-gray-400 whitespace-nowrap">{g.date}</td>
-                    <td className="py-1.5 pr-2 text-gray-300 font-medium whitespace-nowrap">{g.opp}</td>
-                    <td className="py-1.5 pr-2 text-right text-white font-medium">{g.ip ?? '—'}</td>
+                  <tr key={i} className="border-b border-[var(--border-subtle)] last:border-0">
+                    <td className="py-1.5 pr-2 text-[var(--text-muted)] whitespace-nowrap">{g.date}</td>
+                    <td className="py-1.5 pr-2 text-[var(--text-muted)] font-medium whitespace-nowrap">{g.opp}</td>
+                    <td className="py-1.5 pr-2 text-right text-foreground font-medium">{g.ip ?? '—'}</td>
                     <td className="py-1.5 pr-2 text-right font-bold text-emerald-400">{g.k ?? '—'}</td>
                     <td className={cn('py-1.5 pr-2 text-right font-bold',
                       (g.er ?? 0) === 0 ? 'text-emerald-400' : (g.er ?? 0) <= 2 ? 'text-amber-400' : 'text-rose-400'
                     )}>{g.er ?? '—'}</td>
-                    <td className="py-1.5 text-right text-gray-400">{g.bb ?? '—'}</td>
+                    <td className="py-1.5 text-right text-[var(--text-muted)]">{g.bb ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -380,13 +380,13 @@ function TabProps({ data, propLines, onAnalyze }: {
         {propLines.map((prop, i) => (
           <div key={i}>
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] font-bold text-white">{prop.label} O{prop.line}</span>
+              <span className="text-[11px] font-bold text-foreground">{prop.label} O{prop.line}</span>
               <span className={cn('text-[11px] font-black tabular-nums',
                 prop.overOdds > 0 ? 'text-emerald-400' : 'text-amber-300'
               )}>{fmtOdds(prop.overOdds)}</span>
             </div>
             <div className="flex items-center gap-2 mb-1">
-              <div className="flex-1 h-1.5 rounded-full bg-white/8 overflow-hidden">
+              <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                 <div
                   className={cn('h-full rounded-full transition-all duration-500',
                     prop.impliedPct >= 60 ? 'bg-emerald-500/70'
@@ -396,13 +396,13 @@ function TabProps({ data, propLines, onAnalyze }: {
                   style={{ width: `${barWidth(prop.impliedPct)}%` }}
                 />
               </div>
-              <span className="text-[10px] text-gray-400 tabular-nums w-9 text-right">{prop.impliedPct}% imp</span>
+              <span className="text-[10px] text-[var(--text-muted)] tabular-nums w-9 text-right">{prop.impliedPct}% imp</span>
             </div>
             <div className="flex items-center gap-1">
               <span className={cn('text-[10px]',
-                prop.trend === 'hot' ? 'text-orange-400' : prop.trend === 'cold' ? 'text-sky-400' : 'text-gray-500'
+                prop.trend === 'hot' ? 'text-orange-400' : prop.trend === 'cold' ? 'text-sky-400' : 'text-[var(--text-faint)]'
               )}>{prop.trend === 'hot' ? '🔥' : prop.trend === 'cold' ? '❄' : '→'}</span>
-              <span className="text-[10px] text-gray-500">
+              <span className="text-[10px] text-[var(--text-faint)]">
                 {prop.hitRate !== '—' ? `Hit in ${prop.hitRate} games` : 'No recent game data'}
               </span>
             </div>
@@ -420,7 +420,7 @@ function TabProps({ data, propLines, onAnalyze }: {
     <div className="space-y-3">
       {(kPctRaw != null || fbVeloRaw != null) && (
         <div>
-          <p className="text-[9px] font-extrabold uppercase tracking-widest text-gray-500 mb-2">K Projection Estimate</p>
+          <p className="text-[9px] font-extrabold uppercase tracking-widest text-[var(--text-faint)] mb-2">K Projection Estimate</p>
           <div className="grid grid-cols-2 gap-1.5">
             {kPctRaw != null && (
               <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-2.5 text-center">
@@ -439,8 +439,8 @@ function TabProps({ data, propLines, onAnalyze }: {
       )}
 
       <div className="flex flex-col items-center gap-2 py-4">
-        <Zap className="w-5 h-5 text-gray-600" />
-        <p className="text-[11px] text-gray-500 text-center">Live prop lines load when game is scheduled</p>
+        <Zap className="w-5 h-5 text-[var(--text-faint)]" />
+        <p className="text-[11px] text-[var(--text-faint)] text-center">Live prop lines load when game is scheduled</p>
         {onAnalyze && (
           <button
             onClick={onAnalyze}
@@ -497,11 +497,11 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 mb-0.5">
                 <span className={`text-[9px] font-extrabold uppercase tracking-widest ${conf.accentText}`}>{data.category ?? 'MLB'}</span>
-                <span className="text-[9px] text-gray-600">·</span>
-                <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">{data.subcategory ?? conf.label}</span>
+                <span className="text-[9px] text-[var(--border-subtle)]">·</span>
+                <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-faint)]">{data.subcategory ?? conf.label}</span>
               </div>
               <h3
-                className={`font-black text-white leading-tight truncate ${isHero ? 'text-base' : 'text-sm'}${onAnalyze ? ' cursor-pointer hover:text-blue-300 transition-colors' : ''}`}
+                className={`font-black text-foreground leading-tight truncate ${isHero ? 'text-base' : 'text-sm'}${onAnalyze ? ' cursor-pointer hover:text-blue-300 transition-colors' : ''}`}
                 onClick={onAnalyze}
               >
                 {data.title}
@@ -519,14 +519,14 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
                   'w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150',
                   watched
                     ? 'text-rose-400 bg-rose-500/20 border border-rose-500/30'
-                    : 'text-gray-600 bg-white/5 border border-white/10 hover:text-rose-400 hover:bg-rose-500/10',
+                    : 'text-[var(--text-faint)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:text-rose-400 hover:bg-rose-500/10',
                 )}
               >
                 <Heart className="w-3.5 h-3.5" fill={watched ? 'currentColor' : 'none'} />
               </button>
             )}
             {/* Status badge */}
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/30 border border-white/10">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[var(--bg-overlay)]/20 border border-[var(--border-subtle)]">
               <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusConf.dotCls}`} />
               <span className={`text-[9px] font-extrabold tracking-widest ${statusConf.textCls}`}>{statusConf.label}</span>
             </div>
@@ -578,28 +578,28 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
             </div>
             {data.trend_note && (
               <div className={`mt-3 px-3 py-2 rounded-xl ${conf.accentBg} border ${conf.accentBorder}`}>
-                <p className="text-[11px] text-gray-300 leading-relaxed italic">{data.trend_note}</p>
+                <p className="text-[11px] text-[var(--text-muted)] leading-relaxed italic">{data.trend_note}</p>
               </div>
             )}
           </>
         )}
 
         {/* Footer */}
-        <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between gap-2">
+        <div className="mt-4 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-bold uppercase tracking-widest text-gray-500 border border-gray-700/40 rounded px-1.5 py-0.5">
+            <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-faint)] border border-[var(--border-subtle)] rounded px-1.5 py-0.5">
               {data.data?.sport === 'NFL' ? 'NFL Stats'
                : data.data?.sport === 'NBA' ? 'NBA Stats'
                : data.data?.sport === 'NHL' ? 'NHL Stats'
                : 'Baseball Savant'}
             </span>
             {data.last_updated && (
-              <span className="text-[9px] text-gray-600">· {data.last_updated}</span>
+              <span className="text-[9px] text-[var(--text-faint)]">· {data.last_updated}</span>
             )}
           </div>
           <div className="flex items-center gap-2">
             {onAnalyze && (
-              <button onClick={onAnalyze} className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white text-[10px] font-bold transition-colors border border-white/10">
+              <button onClick={onAnalyze} className="px-2.5 py-1 rounded-lg bg-[var(--bg-elevated)] hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-foreground text-[10px] font-bold transition-colors border border-[var(--border-subtle)]">
                 AI Analysis
               </button>
             )}

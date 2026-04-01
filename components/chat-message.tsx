@@ -82,7 +82,7 @@ function renderInline(text: string): React.ReactNode {
         break;
       }
       parts.push(
-        <strong key={key++} className="font-bold text-white">
+        <strong key={key++} className="font-bold text-foreground">
           {remaining.slice(2, close)}
         </strong>
       );
@@ -98,7 +98,7 @@ function renderInline(text: string): React.ReactNode {
         break;
       }
       parts.push(
-        <code key={key++} className="px-1.5 py-0.5 rounded bg-[oklch(0.18_0.015_280)] text-blue-300 font-mono text-[0.85em]">
+        <code key={key++} className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-blue-600 dark:text-blue-300 font-mono text-[0.85em]">
           {remaining.slice(1, close)}
         </code>
       );
@@ -114,7 +114,7 @@ function renderInline(text: string): React.ReactNode {
         break;
       }
       parts.push(
-        <em key={key++} className="italic text-[oklch(0.75_0.005_85)]">
+        <em key={key++} className="italic text-[var(--text-muted)]">
           {remaining.slice(1, close)}
         </em>
       );
@@ -152,14 +152,14 @@ function MarkdownContent({ text }: { text: string }) {
     const headRows = sepIdx > 0 ? tableBuffer.slice(0, sepIdx) : [];
     const bodyRows = sepIdx >= 0 ? tableBuffer.slice(sepIdx + 1) : tableBuffer;
     elements.push(
-      <div key={`tbl-${key}`} className="my-3 overflow-x-auto rounded-lg border border-[oklch(0.22_0.02_280)]">
+      <div key={`tbl-${key}`} className="my-3 overflow-x-auto rounded-lg border border-[var(--border-subtle)]">
         <table className="w-full text-xs border-collapse">
           {headRows.length > 0 && (
             <thead>
               {headRows.map((row, ri) => (
-                <tr key={ri} className="bg-[oklch(0.14_0.015_280)]">
+                <tr key={ri} className="bg-[var(--bg-elevated)]">
                   {row.map((cell, ci) => (
-                    <th key={ci} className="px-3 py-2 text-left font-semibold text-[oklch(0.80_0.01_85)] border-b border-r last:border-r-0 border-[oklch(0.22_0.02_280)]">
+                    <th key={ci} className="px-3 py-2 text-left font-semibold text-foreground border-b border-r last:border-r-0 border-[var(--border-subtle)]">
                       {renderInline(cell)}
                     </th>
                   ))}
@@ -169,9 +169,9 @@ function MarkdownContent({ text }: { text: string }) {
           )}
           <tbody>
             {bodyRows.map((row, ri) => (
-              <tr key={ri} className={ri % 2 === 0 ? 'bg-[oklch(0.10_0.01_280)]' : 'bg-[oklch(0.115_0.012_280)]'}>
+              <tr key={ri} className={ri % 2 === 0 ? 'bg-[var(--bg-surface)]' : 'bg-[var(--bg-overlay)]'}>
                 {row.map((cell, ci) => (
-                  <td key={ci} className="px-3 py-2 text-[oklch(0.78_0.005_280)] border-t border-r last:border-r-0 border-[oklch(0.18_0.015_280)]">
+                  <td key={ci} className="px-3 py-2 text-[var(--text-muted)] border-t border-r last:border-r-0 border-[var(--border-subtle)]">
                     {renderInline(cell)}
                   </td>
                 ))}
@@ -218,13 +218,13 @@ function MarkdownContent({ text }: { text: string }) {
   const flushCode = (key: string) => {
     if (codeBuffer.length === 0) return;
     elements.push(
-      <div key={`code-${key}`} className="my-2 rounded-lg overflow-hidden border border-[oklch(0.22_0.02_280)]">
+      <div key={`code-${key}`} className="my-2 rounded-lg overflow-hidden border border-[var(--border-subtle)]">
         {codeLang && (
-          <div className="px-3 py-1 bg-[oklch(0.16_0.015_280)] text-[10px] font-mono text-[oklch(0.45_0.01_280)] uppercase tracking-wide border-b border-[oklch(0.22_0.02_280)]">
+          <div className="px-3 py-1 bg-[var(--bg-elevated)] text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wide border-b border-[var(--border-subtle)]">
             {codeLang}
           </div>
         )}
-        <pre className="px-4 py-3 bg-[oklch(0.10_0.01_280)] text-sm font-mono text-[oklch(0.78_0.005_280)] overflow-x-auto leading-relaxed">
+        <pre className="px-4 py-3 bg-[var(--bg-surface)] text-sm font-mono text-[var(--text-muted)] overflow-x-auto leading-relaxed">
           <code>{codeBuffer.join('\n')}</code>
         </pre>
       </div>
@@ -270,7 +270,7 @@ function MarkdownContent({ text }: { text: string }) {
       flushNumbered(String(i));
       flushTable(String(i));
       elements.push(
-        <p key={i} className="text-[12px] font-bold text-blue-300/80 mt-2 mb-0.5 uppercase tracking-wide">
+        <p key={i} className="text-[12px] font-bold text-blue-600 dark:text-blue-300/80 mt-2 mb-0.5 uppercase tracking-wide">
           {trimmed.slice(4)}
         </p>
       );
@@ -283,7 +283,7 @@ function MarkdownContent({ text }: { text: string }) {
       flushNumbered(String(i));
       flushTable(String(i));
       elements.push(
-        <p key={i} className="text-[13px] font-bold text-blue-400 mt-3 mb-1 uppercase tracking-wide">
+        <p key={i} className="text-[13px] font-bold text-blue-600 dark:text-blue-400 mt-3 mb-1 uppercase tracking-wide">
           {trimmed.slice(3)}
         </p>
       );
@@ -295,7 +295,7 @@ function MarkdownContent({ text }: { text: string }) {
       flushBullets(String(i));
       flushTable(String(i));
       elements.push(
-        <p key={i} className="text-sm font-black text-white mt-3 mb-1">
+        <p key={i} className="text-sm font-black text-foreground mt-3 mb-1">
           {trimmed.slice(2)}
         </p>
       );
@@ -307,7 +307,7 @@ function MarkdownContent({ text }: { text: string }) {
       flushBullets(String(i));
       flushNumbered(String(i));
       flushTable(String(i));
-      elements.push(<hr key={i} className="my-2 border-[oklch(0.22_0.02_280)]" />);
+      elements.push(<hr key={i} className="my-2 border-[var(--border-subtle)]" />);
       return;
     }
 
@@ -342,7 +342,7 @@ function MarkdownContent({ text }: { text: string }) {
     flushNumbered(String(i));
     flushTable(String(i));
     elements.push(
-      <p key={i} className="text-sm leading-relaxed text-[oklch(0.82_0.005_85)]">
+      <p key={i} className="text-sm leading-relaxed text-foreground">
         {renderInline(trimmed)}
       </p>
     );
@@ -410,10 +410,10 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
           isUser
             ? 'bg-gradient-to-br from-[oklch(0.32_0.09_258)] to-[oklch(0.26_0.07_268)] text-white shadow-lg shadow-blue-900/40 border border-[oklch(0.40_0.08_258)] min-w-[120px]'
             : message.isError
-              ? 'bg-[oklch(0.11_0.015_15)] border border-[oklch(0.22_0.03_15)] shadow-sm'
+              ? 'bg-[var(--bg-surface)] border border-red-500/20 shadow-sm'
               : message.isPartial
-                ? 'bg-[oklch(0.11_0.012_280)] border border-[oklch(0.22_0.015_280)] shadow-sm'
-                : 'bg-[oklch(0.11_0.012_280)] border border-[oklch(0.20_0.015_280)] shadow-sm',
+                ? 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm'
+                : 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm',
           (!isUser && (message.isPending || message.isStreaming)) ? 'min-h-[72px]' : '',
         )}>
           {/* Error / partial accent strip */}
@@ -429,9 +429,9 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
           {/* ── Loading skeleton — shown while pending OR while first tokens arrive ── */}
           {!isUser && (message.isPending || (message.isStreaming && !message.content?.trim())) && (
             <div className="space-y-2.5 py-1" aria-label="Loading response" aria-busy="true">
-              <div className="h-2.5 w-48 rounded-full bg-white/10 animate-pulse" />
-              <div className="h-2.5 w-64 rounded-full bg-white/10 animate-pulse [animation-delay:150ms]" />
-              <div className="h-2.5 w-36 rounded-full bg-white/10 animate-pulse [animation-delay:300ms]" />
+              <div className="h-2.5 w-48 rounded-full bg-[var(--bg-elevated)] animate-pulse" />
+              <div className="h-2.5 w-64 rounded-full bg-[var(--bg-elevated)] animate-pulse [animation-delay:150ms]" />
+              <div className="h-2.5 w-36 rounded-full bg-[var(--bg-elevated)] animate-pulse [animation-delay:300ms]" />
             </div>
           )}
 
@@ -440,7 +440,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
               <textarea
                 value={editContent}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditContent(e.target.value)}
-                className="w-full bg-[oklch(0.10_0.01_280)] text-white rounded-lg p-3 min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full bg-[var(--bg-overlay)] text-foreground rounded-lg p-3 min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
               <div className="flex gap-2">
                 <button
@@ -452,7 +452,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                 </button>
                 <button
                   onClick={() => setIsEditing(false)}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center gap-2 text-sm text-white"
+                  className="px-4 py-2 bg-[var(--bg-elevated)] hover:bg-[var(--bg-surface)] rounded-lg flex items-center gap-2 text-sm text-foreground"
                 >
                   <X className="w-4 h-4" />
                   Cancel
@@ -538,7 +538,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                             ? 'text-blue-400/80 bg-blue-950/40'
                             : message.confidence >= 60
                               ? 'text-amber-400/80 bg-amber-950/30'
-                              : 'text-[oklch(0.42_0.01_280)] bg-[oklch(0.15_0.01_280)]'
+                              : 'text-[var(--text-faint)] bg-[var(--bg-elevated)]'
                         }`}>
                           {message.confidence}%
                         </span>
@@ -557,7 +557,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                               ? 'text-red-400 hover:bg-red-950/40'
                               : message.isPartial
                                 ? 'text-amber-400 hover:bg-amber-950/30'
-                                : 'text-[oklch(0.38_0.01_280)] hover:text-[oklch(0.60_0.01_280)] hover:bg-[oklch(0.17_0.01_280)]',
+                                : 'text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]',
                           )}
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
@@ -571,7 +571,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                           setTimeout(() => setJustCopied(false), 1500);
                         }}
                         title="Copy response"
-                        className="p-1.5 rounded-lg text-[oklch(0.38_0.01_280)] hover:text-blue-400 hover:bg-[oklch(0.17_0.01_280)] transition-all"
+                        className="p-1.5 rounded-lg text-[var(--text-faint)] hover:text-blue-400 hover:bg-[var(--bg-elevated)] transition-all"
                       >
                         {justCopied
                           ? <CheckCheck className="w-3.5 h-3.5 text-blue-400 animate-scale-in" />
@@ -580,7 +580,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                       <button
                         onClick={() => setIsEditing(true)}
                         title="Edit"
-                        className="p-1.5 rounded-lg text-[oklch(0.38_0.01_280)] hover:text-blue-400 hover:bg-[oklch(0.17_0.01_280)] transition-all"
+                        className="p-1.5 rounded-lg text-[var(--text-faint)] hover:text-blue-400 hover:bg-[var(--bg-elevated)] transition-all"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
@@ -592,7 +592,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                             'p-1.5 rounded-lg transition-all',
                             showTrust
                               ? 'text-blue-400 bg-blue-950/30'
-                              : 'text-[oklch(0.38_0.01_280)] hover:text-blue-400 hover:bg-[oklch(0.17_0.01_280)]',
+                              : 'text-[var(--text-faint)] hover:text-blue-400 hover:bg-[var(--bg-elevated)]',
                           )}
                         >
                           <Shield className="w-3.5 h-3.5" />

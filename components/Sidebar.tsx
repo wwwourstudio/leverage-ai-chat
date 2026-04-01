@@ -72,7 +72,7 @@ function tagAccentClass(tags: string[]): string {
   if (first === 'nfl')      return 'border-l-2 border-l-amber-500/60';
   if (first === 'nba')      return 'border-l-2 border-l-orange-500/60';
   if (first === 'nhl')      return 'border-l-2 border-l-sky-500/60';
-  return 'border-l-2 border-l-[oklch(0.22_0.01_280)]';
+  return 'border-l-2 border-l-[var(--border-subtle)]';
 }
 
 /** Groups non-starred chats by recency */
@@ -149,7 +149,7 @@ const ChatCard = memo(function ChatCard({
         tagAccentClass(chat.tags),
         isActive
           ? 'bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10 border border-blue-500/30 shadow-lg shadow-blue-500/10'
-          : 'bg-[oklch(0.10_0.01_280)] border border-[oklch(0.14_0.01_280)] hover:bg-[oklch(0.13_0.01_280)] hover:border-[oklch(0.22_0.01_280)]',
+          : 'bg-[var(--bg-overlay)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] hover:border-[var(--border-subtle)]',
       )}
     >
       {isActive && (
@@ -161,7 +161,7 @@ const ChatCard = memo(function ChatCard({
           <div className="flex items-center gap-1.5 mb-1 group/title">
             <MessageSquare className={cn(
               'w-3 h-3 flex-shrink-0 transition-colors',
-              isActive ? 'text-blue-400' : 'text-[oklch(0.35_0.01_280)]',
+              isActive ? 'text-blue-400' : 'text-[var(--text-faint)]',
             )} />
             {isEditing ? (
               <div className="flex-1 flex items-center gap-1">
@@ -171,33 +171,33 @@ const ChatCard = memo(function ChatCard({
                   onChange={(e: any) => setEditingChatTitle(e.target.value)}
                   onKeyDown={(e: any) => onKeyDownChatTitle(e, chat.id)}
                   onBlur={() => onSaveChatTitle(chat.id)}
-                  className="flex-1 bg-[oklch(0.14_0.015_280)] border border-blue-500/50 rounded-md px-2 py-0.5 text-xs font-bold text-white focus:outline-none focus:ring-1 focus:ring-blue-500/40"
+                  className="flex-1 bg-[var(--bg-elevated)] border border-blue-500/50 rounded-md px-2 py-0.5 text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-blue-500/40"
                   autoFocus
                   onClick={(e: any) => e.stopPropagation()}
                 />
                 <button
                   onClick={(e: any) => { e.stopPropagation(); onSaveChatTitle(chat.id); }}
-                  className="p-0.5 hover:bg-[oklch(0.18_0.01_280)] rounded transition-all"
+                  className="p-0.5 hover:bg-[var(--bg-elevated)] rounded transition-all"
                 >
                   <CheckCircle className="w-3 h-3 text-emerald-400" />
                 </button>
               </div>
             ) : (
               <div className="flex-1 flex items-center gap-1 min-w-0">
-                <h3 className="text-xs font-bold text-white truncate flex-1">{chat.title}</h3>
+                <h3 className="text-xs font-bold text-foreground truncate flex-1">{chat.title}</h3>
                 <button
                   onClick={(e: any) => onEditChatTitle(chat.id, chat.title, e)}
-                  className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-[oklch(0.18_0.01_280)] rounded transition-all flex-shrink-0"
+                  className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-[var(--bg-elevated)] rounded transition-all flex-shrink-0"
                   title="Edit title"
                 >
-                  <Edit3 className="w-2.5 h-2.5 text-[oklch(0.40_0.01_280)] hover:text-blue-400" />
+                  <Edit3 className="w-2.5 h-2.5 text-[var(--text-faint)] hover:text-blue-400" />
                 </button>
               </div>
             )}
           </div>
 
           {/* Preview */}
-          <p className="text-[11px] text-[oklch(0.42_0.01_280)] truncate mb-1.5 leading-tight pl-[18px]">
+          <p className="text-[11px] text-[var(--text-faint)] truncate mb-1.5 leading-tight pl-[18px]">
             {chat.preview}
           </p>
 
@@ -207,13 +207,13 @@ const ChatCard = memo(function ChatCard({
               {chat.tags.slice(0, 2).map((tag, i) => (
                 <span
                   key={i}
-                  className="px-1.5 py-0.5 bg-[oklch(0.13_0.01_280)] border border-[oklch(0.18_0.01_280)] rounded text-[9px] font-semibold text-[oklch(0.40_0.01_280)] uppercase tracking-wide"
+                  className="px-1.5 py-0.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded text-[9px] font-semibold text-[var(--text-faint)] uppercase tracking-wide"
                 >
                   {tag}
                 </span>
               ))}
             </div>
-            <span suppressHydrationWarning className="text-[9px] text-[oklch(0.32_0.01_280)] whitespace-nowrap">
+            <span suppressHydrationWarning className="text-[9px] text-[var(--text-faint)] whitespace-nowrap">
               {formatRelativeTime(chat.timestamp)}
             </span>
           </div>
@@ -224,22 +224,22 @@ const ChatCard = memo(function ChatCard({
           <button
             onClick={(e: any) => onStarChat(chat.id, e)}
             className={cn(
-              'p-1 rounded-md hover:bg-[oklch(0.16_0.01_280)] transition-all',
+              'p-1 rounded-md hover:bg-[var(--bg-elevated)] transition-all',
               chat.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
             )}
             title={chat.starred ? 'Unstar' : 'Star'}
           >
             <Star className={cn(
               'w-3 h-3',
-              chat.starred ? 'text-yellow-400 fill-yellow-400' : 'text-[oklch(0.40_0.01_280)]',
+              chat.starred ? 'text-yellow-400 fill-yellow-400' : 'text-[var(--text-faint)]',
             )} />
           </button>
           <button
             onClick={(e: any) => onDeleteChat(chat.id, e)}
-            className="p-1 rounded-md hover:bg-[oklch(0.16_0.01_280)] opacity-0 group-hover:opacity-100 transition-all"
+            className="p-1 rounded-md hover:bg-[var(--bg-elevated)] opacity-0 group-hover:opacity-100 transition-all"
             title="Delete"
           >
-            <Trash2 className="w-3 h-3 text-[oklch(0.38_0.01_280)] hover:text-red-400 transition-colors" />
+            <Trash2 className="w-3 h-3 text-[var(--text-faint)] hover:text-red-400 transition-colors" />
           </button>
         </div>
       </div>
@@ -299,13 +299,13 @@ function IconRail({
               className={cn(
                 'w-full h-9 rounded-xl flex items-center justify-center transition-all duration-200',
                 isActive
-                  ? 'bg-[oklch(0.16_0.02_280)]'
-                  : 'hover:bg-[oklch(0.13_0.01_280)]',
+                  ? 'bg-[var(--bg-elevated)]'
+                  : 'hover:bg-[var(--bg-surface)]',
               )}
             >
               <Icon className={cn(
                 'w-4 h-4 transition-colors',
-                isActive ? cat.color : 'text-[oklch(0.36_0.01_280)]',
+                isActive ? cat.color : 'text-[var(--text-faint)]',
               )} />
             </button>
           );
@@ -380,7 +380,7 @@ export function Sidebar({
   return (
     <div
       className={cn(
-        'flex flex-col h-full bg-[oklch(0.08_0.012_280)] border-r border-[oklch(0.16_0.016_280)] transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0',
+        'flex flex-col h-full bg-[var(--bg-overlay)] border-r border-[var(--border-subtle)] transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0',
         open ? 'w-72' : 'w-14',
       )}
     >
@@ -400,7 +400,7 @@ export function Sidebar({
       {open && (
         <>
           {/* ── Header ─────────────────────────────────────────────────────── */}
-          <div className="px-3 pt-3 pb-3 border-b border-[oklch(0.16_0.016_280)] bg-[oklch(0.10_0.012_280)] space-y-3 flex-shrink-0">
+          <div className="px-3 pt-3 pb-3 border-b border-[var(--border-subtle)] bg-[var(--bg-overlay)] space-y-3 flex-shrink-0">
             {/* New Analysis button */}
             <button
               onClick={onNewChat}
@@ -413,20 +413,20 @@ export function Sidebar({
 
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[oklch(0.35_0.01_280)] pointer-events-none" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-faint)] pointer-events-none" />
               <input
                 value={chatSearch}
                 onChange={(e: any) => setChatSearch(e.target.value)}
                 placeholder="Search chats…"
-                className="w-full bg-[oklch(0.11_0.015_280)] border border-[oklch(0.20_0.02_280)] rounded-lg py-2 pl-8 pr-3 text-sm text-[oklch(0.75_0.01_280)] placeholder-[oklch(0.32_0.01_280)] focus:outline-none focus:border-blue-500/50 transition-colors"
+                className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg py-2 pl-8 pr-3 text-sm text-[var(--text-muted)] placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50 transition-colors"
               />
             </div>
 
             {/* Platform category pills */}
             <div>
-              <div className="text-[9px] font-black uppercase tracking-widest text-[oklch(0.32_0.01_280)] mb-1.5 px-0.5">Platform</div>
+              <div className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-1.5 px-0.5">Platform</div>
               <div className="relative">
-                <div className="absolute right-0 inset-y-0 w-6 bg-gradient-to-l from-[oklch(0.10_0.012_280)] to-transparent z-10 pointer-events-none" />
+                <div className="absolute right-0 inset-y-0 w-6 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
                 <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide pr-4">
                   {categories.map(cat => {
                     const Icon = cat.icon;
@@ -443,13 +443,13 @@ export function Sidebar({
                         className={cn(
                           'group/pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0',
                           isActive
-                            ? 'bg-[oklch(0.16_0.02_280)] text-white'
-                            : 'text-[oklch(0.42_0.01_280)] hover:text-[oklch(0.70_0.01_280)] hover:bg-[oklch(0.13_0.01_280)]',
+                            ? 'bg-[var(--bg-elevated)] text-foreground'
+                            : 'text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
                         )}
                       >
                         <Icon className={cn(
                           'w-3 h-3 transition-colors',
-                          isActive ? cat.color : 'text-[oklch(0.36_0.01_280)] group-hover/pill:text-[oklch(0.52_0.01_280)]',
+                          isActive ? cat.color : 'text-[var(--text-faint)] group-hover/pill:text-[var(--text-muted)]',
                         )} />
                         <span>{cat.id === 'all' ? 'ALL' : cat.name.toUpperCase()}</span>
                       </button>
@@ -461,7 +461,7 @@ export function Sidebar({
               {/* Sport / Kalshi sub-filter */}
               {selectedCategory !== 'kalshi' && (
                 <div className="relative mt-1.5">
-                  <div className="absolute right-0 inset-y-0 w-6 bg-gradient-to-l from-[oklch(0.10_0.012_280)] to-transparent z-10 pointer-events-none" />
+                  <div className="absolute right-0 inset-y-0 w-6 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
                   <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide pr-4">
                     {sports
                       .filter(s => !(['fantasy', 'dfs'].includes(selectedCategory) && s.id.startsWith('ncaa')))
@@ -476,8 +476,8 @@ export function Sidebar({
                               isActive
                                 ? 'bg-blue-600/20 text-blue-300'
                                 : sport.isInSeason
-                                  ? 'text-[oklch(0.48_0.01_280)] hover:text-white hover:bg-[oklch(0.12_0.01_280)]'
-                                  : 'text-[oklch(0.28_0.01_280)] hover:text-[oklch(0.42_0.01_280)] hover:bg-[oklch(0.12_0.01_280)]',
+                                  ? 'text-[var(--text-muted)] hover:text-foreground hover:bg-[var(--bg-surface)]'
+                                  : 'text-[var(--text-faint)] hover:text-[var(--text-faint)] hover:bg-[var(--bg-surface)]',
                             )}
                           >
                             {sport.isInSeason && !isActive && (
@@ -493,7 +493,7 @@ export function Sidebar({
 
               {selectedCategory === 'kalshi' && (
                 <div className="relative mt-1.5">
-                  <div className="absolute right-0 inset-y-0 w-6 bg-gradient-to-l from-[oklch(0.10_0.012_280)] to-transparent z-10 pointer-events-none" />
+                  <div className="absolute right-0 inset-y-0 w-6 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
                   <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide pr-4">
                     {KALSHI_TOPICS.map(topic => (
                       <button
@@ -503,7 +503,7 @@ export function Sidebar({
                           'px-2 py-1 rounded-full text-[9px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0',
                           selectedSport === topic
                             ? 'bg-cyan-600/20 text-cyan-300'
-                            : 'text-[oklch(0.38_0.01_280)] hover:text-[oklch(0.58_0.01_280)] hover:bg-[oklch(0.12_0.01_280)]',
+                            : 'text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
                         )}
                       >
                         {topic}
@@ -521,11 +521,11 @@ export function Sidebar({
             {isLoadingChats && (
               <div className="space-y-1.5 px-1 pt-1" aria-busy="true" aria-label="Loading chats">
                 {[1, 0.8, 0.9, 0.75, 0.85].map((w, i) => (
-                  <div key={i} className="relative flex items-center gap-2 rounded-xl bg-[oklch(0.11_0.01_280)] border border-[oklch(0.16_0.01_280)] h-[52px] px-3 overflow-hidden">
-                    <div className="w-0.5 h-full absolute left-0 top-0 bg-[oklch(0.22_0.02_260)] rounded-l-xl" />
+                  <div key={i} className="relative flex items-center gap-2 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] h-[52px] px-3 overflow-hidden">
+                    <div className="w-0.5 h-full absolute left-0 top-0 bg-[var(--border-subtle)] rounded-l-xl" />
                     <div className="flex-1 space-y-1.5 pl-1">
-                      <div className="h-2.5 rounded-full bg-[oklch(0.16_0.01_280)] animate-pulse" style={{ width: `${w * 100}%` }} />
-                      <div className="h-2 rounded-full bg-[oklch(0.13_0.01_280)] animate-pulse" style={{ width: `${w * 60}%` }} />
+                      <div className="h-2.5 rounded-full bg-[var(--bg-elevated)] animate-pulse" style={{ width: `${w * 100}%` }} />
+                      <div className="h-2 rounded-full bg-[var(--bg-surface)] animate-pulse" style={{ width: `${w * 60}%` }} />
                     </div>
                   </div>
                 ))}
@@ -537,9 +537,9 @@ export function Sidebar({
                 <div className="flex items-center justify-between px-2 py-1">
                   <div className="flex items-center gap-1.5">
                     <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                    <span className="text-[9px] font-black uppercase tracking-widest text-[oklch(0.40_0.01_280)]">Starred</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">Starred</span>
                   </div>
-                  <span className="text-[9px] font-bold text-[oklch(0.30_0.01_280)]">{starredChats.length}</span>
+                  <span className="text-[9px] font-bold text-[var(--text-faint)]">{starredChats.length}</span>
                 </div>
                 {starredChats.map((chat, i) => (
                   <div
@@ -569,10 +569,10 @@ export function Sidebar({
             {dateGroups.map(group => (
               <div key={group.label} className="space-y-1">
                 <div className="flex items-center justify-between px-2 py-1">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-[oklch(0.35_0.01_280)]">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">
                     {group.label}
                   </span>
-                  <span className="text-[9px] font-bold text-[oklch(0.28_0.01_280)]">{group.chats.length}</span>
+                  <span className="text-[9px] font-bold text-[var(--text-faint)]">{group.chats.length}</span>
                 </div>
                 {group.chats.map((chat, i) => (
                   <div
@@ -601,11 +601,11 @@ export function Sidebar({
             {/* Empty state */}
             {filteredChats.length === 0 && (
               <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-                <div className="w-10 h-10 rounded-2xl bg-[oklch(0.12_0.01_280)] border border-[oklch(0.18_0.01_280)] flex items-center justify-center mb-3">
-                  <MessageSquare className="w-5 h-5 text-[oklch(0.32_0.01_280)]" />
+                <div className="w-10 h-10 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center mb-3">
+                  <MessageSquare className="w-5 h-5 text-[var(--text-faint)]" />
                 </div>
-                <p className="text-xs font-bold text-[oklch(0.42_0.01_280)] mb-1">No chats found</p>
-                <p className="text-[10px] text-[oklch(0.30_0.01_280)]">
+                <p className="text-xs font-bold text-[var(--text-faint)] mb-1">No chats found</p>
+                <p className="text-[10px] text-[var(--text-faint)]">
                   {chatSearch ? 'Try a different search term' : 'Start a new analysis above'}
                 </p>
               </div>

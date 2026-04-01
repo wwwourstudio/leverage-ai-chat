@@ -64,9 +64,9 @@ const STATUS_CONFIG: Record<string, { label: string; dot: string; text: string; 
   },
   neutral: {
     label: 'PROJ',
-    dot: 'bg-gray-400',
-    text: 'text-gray-400',
-    bg: 'bg-gray-500/15 border-gray-500/30',
+    dot: 'bg-[var(--text-faint)]',
+    text: 'text-[var(--text-muted)]',
+    bg: 'bg-[var(--bg-surface)] border-[var(--border-subtle)]',
     header: 'from-slate-600/75 via-gray-900/55 to-slate-900/40',
   },
 };
@@ -81,9 +81,9 @@ function PercentileBar({ p10, p50, p90, label }: { p10: number; p50: number; p90
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[9px] font-bold uppercase tracking-widest text-gray-500">{label} Range</span>
+        <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-faint)]">{label} Range</span>
       </div>
-      <div className="relative h-4 bg-[oklch(0.10_0.01_280)] rounded-full overflow-hidden">
+      <div className="relative h-4 bg-[var(--bg-surface)] rounded-full overflow-hidden">
         {/* P10–P90 range bar */}
         <div
           className="absolute top-0 bottom-0 bg-gradient-to-r from-slate-500/40 to-emerald-500/40 rounded-full"
@@ -95,7 +95,7 @@ function PercentileBar({ p10, p50, p90, label }: { p10: number; p50: number; p90
           style={{ left: `${p50Pct}%` }}
         />
       </div>
-      <div className="flex justify-between text-[9px] font-bold text-gray-500">
+      <div className="flex justify-between text-[9px] font-bold text-[var(--text-faint)]">
         <span>P10: {p10}</span>
         <span className="text-emerald-400">P50: {p50}</span>
         <span>P90: {p90}</span>
@@ -107,7 +107,7 @@ function PercentileBar({ p10, p50, p90, label }: { p10: number; p50: number; p90
 // ─── Breakout score ring ──────────────────────────────────────────────────────
 
 function BreakoutRing({ score }: { score: number }) {
-  const color = score >= 70 ? 'text-amber-400' : score >= 50 ? 'text-blue-400' : 'text-gray-500';
+  const color = score >= 70 ? 'text-amber-400' : score >= 50 ? 'text-blue-400' : 'text-[var(--text-faint)]';
   const label = score >= 70 ? 'BREAKOUT' : score >= 50 ? 'UPSIDE' : 'STABLE';
   const circumference = 2 * Math.PI * 20;
   const dashOffset = circumference * (1 - score / 100);
@@ -116,7 +116,7 @@ function BreakoutRing({ score }: { score: number }) {
     <div className="flex flex-col items-center gap-0.5">
       <div className="relative w-12 h-12">
         <svg className="w-full h-full -rotate-90" viewBox="0 0 48 48">
-          <circle cx="24" cy="24" r="20" stroke="oklch(0.18 0.01 280)" strokeWidth="4" fill="none" />
+          <circle cx="24" cy="24" r="20" stroke="var(--border-subtle)" strokeWidth="4" fill="none" />
           <circle
             cx="24" cy="24" r="20"
             stroke={score >= 70 ? '#fbbf24' : score >= 50 ? '#60a5fa' : '#6b7280'}
@@ -175,7 +175,7 @@ function DKSparkline({ data, width = 140, height = 28 }: { data: Array<{ price: 
 
 function metricValueColor(label: string, value: string): string {
   const num = parseFloat(value);
-  if (isNaN(num)) return 'text-white';
+  if (isNaN(num)) return 'text-foreground';
   const lo = label.toLowerCase();
   if (lo.includes('barrel') || lo.includes(' ev') || lo.includes('hard') || lo.includes('k/9') || lo.includes('strikeout') || lo.includes('csw') || lo.includes('swstr') || lo.includes('stuff')) {
     return num >= 12 ? 'text-emerald-400' : num >= 7 ? 'text-amber-400' : 'text-red-400';
@@ -186,7 +186,7 @@ function metricValueColor(label: string, value: string): string {
   if (value.endsWith('%')) {
     return num >= 60 ? 'text-emerald-400' : num >= 40 ? 'text-amber-400' : 'text-red-400';
   }
-  return 'text-white';
+  return 'text-foreground';
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -242,10 +242,10 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
   return (
     <>
       <article className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.09_0.012_280)] border transition-all duration-300',
+        'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-300',
         isHero
-          ? 'border-[oklch(0.30_0.03_260)] shadow-[0_0_32px_oklch(0.3_0.06_260/0.18)]'
-          : 'border-[oklch(0.18_0.016_280)] hover:border-[oklch(0.28_0.02_280)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.10)]',
+          ? 'border-[var(--border-subtle)] shadow-[0_0_32px_oklch(0.3_0.06_260/0.18)]'
+          : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.10)]',
       )}>
         {/* ── Header ──────────────────────────────────────────────────── */}
         <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', data.gradient || cfg.header)}>
@@ -256,14 +256,14 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
           <div className="flex items-center gap-1.5 mb-1.5">
             <Activity className="w-3 h-3 text-white/60" />
             <span className="text-[9px] font-black uppercase tracking-widest text-white/70">MLB · LeverageMetrics</span>
-            <span className="text-white/30">·</span>
+            <span className="text-white/40">·</span>
             <span className="text-[9px] text-white/50 truncate">{data.subcategory}</span>
           </div>
           <div className="flex items-start justify-between gap-2 pr-16">
             <div>
               <h3
                 className={cn(
-                  'font-black text-white leading-tight',
+                  'font-black text-foreground leading-tight',
                   isHero ? 'text-lg' : 'text-sm',
                   onAnalyze && 'cursor-pointer hover:text-blue-300 transition-colors',
                 )}
@@ -273,7 +273,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
                 {playerName}
               </h3>
               {(team || position) && (
-                <p className="text-[9px] font-bold text-white/50 mt-0.5">
+                <p className="text-[9px] font-bold text-[var(--text-muted)] mt-0.5">
                   {team}{team && position ? ' · ' : ''}{position}
                 </p>
               )}
@@ -294,7 +294,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
 
           {/* ── Percentile bar ──────────────────────────────────────────── */}
           {(percentiles.p10 !== undefined || percentiles.p90 > 0) && (
-            <div className="px-3 py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)]">
+            <div className="px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
               <PercentileBar
                 p10={percentiles.p10}
                 p50={percentiles.p50}
@@ -306,11 +306,11 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
 
           {/* ── Recent form sparkline ─────────────────────────────────── */}
           {sparkData.length >= 3 && (
-            <div className="px-3 py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)]">
+            <div className="px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
               <div className="flex justify-between items-center mb-1.5">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-gray-500">Recent Form</span>
+                <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Recent Form</span>
                 {recentAvgLabel && (
-                  <span className="text-[9px] text-gray-500">{recentAvgLabel}</span>
+                  <span className="text-[9px] text-[var(--text-faint)]">{recentAvgLabel}</span>
                 )}
               </div>
               <DKSparkline data={sparkData} width={200} height={28} />
@@ -321,17 +321,17 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
           {(homeDkAvg || roadDkAvg) && (
             <div className="grid grid-cols-2 gap-1.5">
               {homeDkAvg && (
-                <div className="flex flex-col items-center gap-0.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] px-2 py-2">
-                  <span className="text-[7px] font-bold uppercase tracking-wider text-gray-500">Home</span>
-                  <span className="text-sm font-black text-white tabular-nums">{homeDkAvg}</span>
-                  {homeGames && <span className="text-[8px] text-gray-600">{homeGames}</span>}
+                <div className="flex flex-col items-center gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2">
+                  <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Home</span>
+                  <span className="text-sm font-black text-foreground tabular-nums">{homeDkAvg}</span>
+                  {homeGames && <span className="text-[8px] text-[var(--text-faint)]">{homeGames}</span>}
                 </div>
               )}
               {roadDkAvg && (
-                <div className="flex flex-col items-center gap-0.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] px-2 py-2">
-                  <span className="text-[7px] font-bold uppercase tracking-wider text-gray-500">Road</span>
-                  <span className="text-sm font-black text-white tabular-nums">{roadDkAvg}</span>
-                  {roadGames && <span className="text-[8px] text-gray-600">{roadGames}</span>}
+                <div className="flex flex-col items-center gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2">
+                  <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Road</span>
+                  <span className="text-sm font-black text-foreground tabular-nums">{roadDkAvg}</span>
+                  {roadGames && <span className="text-[8px] text-[var(--text-faint)]">{roadGames}</span>}
                 </div>
               )}
             </div>
@@ -344,12 +344,12 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
                 const isPercent = String(m.value).endsWith('%');
                 const numVal = parseFloat(String(m.value));
                 return (
-                  <div key={i} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-[oklch(0.08_0.01_280)]">
-                    <span className="text-[10px] text-gray-500 uppercase tracking-wide">{m.label}</span>
+                  <div key={i} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-[var(--bg-overlay)]">
+                    <span className="text-[10px] text-[var(--text-faint)] uppercase tracking-wide">{m.label}</span>
                     <div className="flex flex-col items-end gap-0.5 min-w-[3rem]">
                       <span className={cn('text-[10px] font-black tabular-nums', metricValueColor(m.label, String(m.value)))}>{m.value}</span>
                       {isPercent && !isNaN(numVal) && (
-                        <div className="h-0.5 w-10 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+                        <div className="h-0.5 w-10 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                           <div
                             className={cn('h-full rounded-full', numVal >= 60 ? 'bg-emerald-500' : numVal >= 40 ? 'bg-amber-500' : 'bg-red-500')}
                             style={{ width: `${Math.min(100, numVal)}%` }}
@@ -367,7 +367,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
           {trendNote && (
             <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-500/5 border border-amber-500/20">
               <Zap className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
-              <p className="text-[10px] text-gray-400 leading-relaxed line-clamp-2">{trendNote}</p>
+              <p className="text-[10px] text-[var(--text-muted)] leading-relaxed line-clamp-2">{trendNote}</p>
             </div>
           )}
 
@@ -376,7 +376,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
             {lightboxSections.length > 0 && (
               <button
                 onClick={() => setShowLightbox(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)] text-xs font-semibold text-gray-500 hover:text-white hover:bg-[oklch(0.14_0.015_280)] hover:border-[oklch(0.26_0.02_280)] transition-all duration-150"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-faint)] hover:text-foreground hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] transition-all duration-150"
               >
                 <BarChart3 className="w-3.5 h-3.5" />
                 Full Breakdown
@@ -385,7 +385,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
             {onAnalyze && (
               <button
                 onClick={onAnalyze}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)] text-xs font-semibold text-gray-500 hover:text-white hover:bg-[oklch(0.14_0.015_280)] hover:border-[oklch(0.26_0.02_280)] transition-all duration-150"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-faint)] hover:text-foreground hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] transition-all duration-150"
               >
                 <TrendingUp className="w-3.5 h-3.5" />
                 Analyze
@@ -395,16 +395,16 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
           </div>
 
           {/* ── Data source badge ─────────────────────────────────────── */}
-          <div className="flex items-center justify-between pt-1 border-t border-gray-800/50">
+          <div className="flex items-center justify-between pt-1 border-t border-[var(--border-subtle)]">
             <div className="flex items-center gap-1">
-              <Target className="w-2.5 h-2.5 text-gray-700" />
-              <span className="text-[8px] font-bold text-gray-700 uppercase tracking-wider">LeverageMetrics Engine</span>
+              <Target className="w-2.5 h-2.5 text-[var(--border-subtle)]" />
+              <span className="text-[8px] font-bold text-[var(--text-faint)] uppercase tracking-wider">LeverageMetrics Engine</span>
             </div>
             <div className="flex items-center gap-2">
               {data.last_updated && (
-                <span className="text-[8px] text-gray-700">{data.last_updated}</span>
+                <span className="text-[8px] text-[var(--text-faint)]">{data.last_updated}</span>
               )}
-              <span className="text-[8px] text-gray-700">Monte Carlo N=1,000</span>
+              <span className="text-[8px] text-[var(--text-faint)]">Monte Carlo N=1,000</span>
             </div>
           </div>
         </div>
@@ -428,9 +428,9 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
 
 function MetricBox({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className="flex flex-col items-center gap-0.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] px-2 py-2.5">
-      <span className="text-[7px] font-bold uppercase tracking-wider text-gray-500">{label}</span>
-      <span className={cn('text-sm font-black tabular-nums', highlight ? 'text-emerald-400' : 'text-white')}>
+    <div className="flex flex-col items-center gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2.5">
+      <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-faint)]">{label}</span>
+      <span className={cn('text-sm font-black tabular-nums', highlight ? 'text-emerald-400' : 'text-foreground')}>
         {value}
       </span>
     </div>

@@ -141,61 +141,61 @@ export function AuthModals({
           onClick={() => setShowLoginModal(false)}
         >
           <div
-            className="relative w-full md:max-w-md md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto animate-slide-up md:animate-scale-in"
+            className="relative w-full md:max-w-md md:mx-4 bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto animate-slide-up md:animate-scale-in"
             onClick={(e: any) => e.stopPropagation()}
           >
             <button
               onClick={() => setShowLoginModal(false)}
-              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-faint)] hover:text-[var(--text-muted)]"
             >
               <X className="w-5 h-5" />
             </button>
 
             <div className="p-8">
               <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold text-white mb-2">Welcome Back</h2>
-                <p className="text-sm text-gray-400">Sign in to access your account</p>
+                <h2 className="text-2xl font-bold text-foreground mb-2">Welcome Back</h2>
+                <p className="text-sm text-[var(--text-muted)]">Sign in to access your account</p>
               </div>
 
               <form className="space-y-4" onSubmit={(e: any) => { e.preventDefault(); handleLogin(); }}>
                 {loginError && <ErrorBanner message={loginError} />}
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-400 mb-2">Email</label>
+                  <label className="block text-sm font-semibold text-[var(--text-muted)] mb-2">Email</label>
                   <input
                     type="email"
                     value={loginEmail}
                     onChange={(e: any) => setLoginEmail(e.target.value)}
                     placeholder="your@email.com"
-                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    className="w-full px-4 py-3 bg-background border border-[var(--border-subtle)] rounded-xl text-foreground placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-400 mb-2">Password</label>
+                  <label className="block text-sm font-semibold text-[var(--text-muted)] mb-2">Password</label>
                   <input
                     type="password"
                     value={loginPassword}
                     onChange={(e: any) => setLoginPassword(e.target.value)}
                     placeholder="Enter password"
-                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    className="w-full px-4 py-3 bg-background border border-[var(--border-subtle)] rounded-xl text-foreground placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={loginLoading}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all"
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-foreground font-bold rounded-xl transition-all"
                 >
                   {loginLoading ? 'Signing in\u2026' : 'Sign In'}
                 </button>
 
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-800"></div>
+                    <div className="w-full border-t border-[var(--border-subtle)]"></div>
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-gray-900 text-gray-500">or</span>
+                    <span className="px-2 bg-[var(--bg-overlay)] text-[var(--text-faint)]">or</span>
                   </div>
                 </div>
 
@@ -203,12 +203,12 @@ export function AuthModals({
                   type="button"
                   onClick={handleGoogleAuth}
                   disabled={googleLoading}
-                  className="w-full py-3 border border-gray-800 hover:bg-gray-800 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all"
+                  className="w-full py-3 border border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] disabled:opacity-60 disabled:cursor-not-allowed text-foreground font-semibold rounded-xl transition-all"
                 >
                   {googleLoading ? 'Redirecting to Google\u2026' : 'Continue with Google'}
                 </button>
 
-                <p className="text-center text-sm text-gray-500">
+                <p className="text-center text-sm text-[var(--text-faint)]">
                   {"Don't have an account? "}
                   <button
                     type="button"
@@ -233,84 +233,84 @@ export function AuthModals({
           onClick={() => setShowSignupModal(false)}
         >
           <div
-            className="relative w-full md:max-w-md md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto animate-slide-up md:animate-scale-in"
+            className="relative w-full md:max-w-md md:mx-4 bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto animate-slide-up md:animate-scale-in"
             onClick={(e: any) => e.stopPropagation()}
           >
             <button
               onClick={() => setShowSignupModal(false)}
-              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-faint)] hover:text-[var(--text-muted)]"
             >
               <X className="w-5 h-5" />
             </button>
 
             <div className="p-8">
               <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold text-white mb-2">Create Account</h2>
-                <p className="text-sm text-gray-400">Sign up to get started with Leverage AI</p>
+                <h2 className="text-2xl font-bold text-foreground mb-2">Create Account</h2>
+                <p className="text-sm text-[var(--text-muted)]">Sign up to get started with Leverage AI</p>
               </div>
 
               <form className="space-y-4" onSubmit={(e: any) => { e.preventDefault(); handleSignup(); }}>
                 {signupError && <ErrorBanner message={signupError} />}
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-400 mb-2">Full Name</label>
+                  <label className="block text-sm font-semibold text-[var(--text-muted)] mb-2">Full Name</label>
                   <input
                     type="text"
                     value={signupName}
                     onChange={(e: any) => setSignupName(e.target.value)}
                     placeholder="John Doe"
-                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    className="w-full px-4 py-3 bg-background border border-[var(--border-subtle)] rounded-xl text-foreground placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-400 mb-2">Email</label>
+                  <label className="block text-sm font-semibold text-[var(--text-muted)] mb-2">Email</label>
                   <input
                     type="email"
                     value={signupEmail}
                     onChange={(e: any) => setSignupEmail(e.target.value)}
                     placeholder="your@email.com"
-                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    className="w-full px-4 py-3 bg-background border border-[var(--border-subtle)] rounded-xl text-foreground placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-400 mb-2">Password</label>
+                  <label className="block text-sm font-semibold text-[var(--text-muted)] mb-2">Password</label>
                   <input
                     type="password"
                     value={signupPassword}
                     onChange={(e: any) => setSignupPassword(e.target.value)}
                     placeholder="Create a password"
-                    className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    className="w-full px-4 py-3 bg-background border border-[var(--border-subtle)] rounded-xl text-foreground placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={signupLoading}
-                  className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all shadow-lg"
+                  className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 disabled:opacity-60 disabled:cursor-not-allowed text-foreground font-bold rounded-xl transition-all shadow-lg"
                 >
                   {signupLoading ? 'Creating account\u2026' : 'Create Account'}
                 </button>
 
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-800"></div>
+                    <div className="w-full border-t border-[var(--border-subtle)]"></div>
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-gray-900 text-gray-500">or</span>
+                    <span className="px-2 bg-[var(--bg-overlay)] text-[var(--text-faint)]">or</span>
                   </div>
                 </div>
 
                 <button
                   type="button"
                   onClick={handleGoogleAuth}
-                  className="w-full py-3 border border-gray-800 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all"
+                  className="w-full py-3 border border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] text-foreground font-semibold rounded-xl transition-all"
                 >
                   Sign up with Google
                 </button>
 
-                <p className="text-center text-sm text-gray-500">
+                <p className="text-center text-sm text-[var(--text-faint)]">
                   {"Already have an account? "}
                   <button
                     type="button"

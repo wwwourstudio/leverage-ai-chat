@@ -190,7 +190,7 @@ function TeamLogo({
 
   if (logoUrl && !imgFailed) {
     return (
-      <div className={cn('rounded-xl overflow-hidden flex items-center justify-center shrink-0 bg-white/5', sz)}>
+      <div className={cn('rounded-xl overflow-hidden flex items-center justify-center shrink-0 bg-[var(--bg-elevated)]', sz)}>
         <img src={logoUrl} alt={name} className="w-full h-full object-contain p-1 drop-shadow" onError={() => setImgFailed(true)} />
       </div>
     );
@@ -210,11 +210,11 @@ function SplitBar({ leftPct, leftLabel, rightLabel, leftColor, rightColor }: {
 }) {
   return (
     <div className="space-y-1">
-      <div className="relative h-2.5 rounded-full overflow-hidden bg-[oklch(0.14_0.01_280)] flex">
+      <div className="relative h-2.5 rounded-full overflow-hidden bg-[var(--bg-elevated)] flex">
         <div className={cn('h-full transition-all duration-700', leftColor)} style={{ width: `${leftPct}%` }} />
         <div className={cn('h-full flex-1', rightColor)} />
       </div>
-      <div className="flex justify-between text-[9px] font-semibold text-[oklch(0.40_0.01_280)]">
+      <div className="flex justify-between text-[9px] font-semibold text-[var(--text-faint)]">
         <span>{leftLabel} {leftPct}%</span>
         <span>{100 - leftPct}% {rightLabel}</span>
       </div>
@@ -239,15 +239,15 @@ function OddsCell({ label, value, sub, positive, highlight, isBest }: {
         ? 'bg-emerald-500/8 border-emerald-500/25'
         : highlight
         ? 'bg-blue-500/10 border-blue-500/20'
-        : 'bg-[oklch(0.08_0.01_280)] border-[oklch(0.17_0.015_280)]',
+        : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)]',
     )}>
-      <span className="text-[8px] font-bold uppercase tracking-wider text-[oklch(0.38_0.01_280)]">{label}</span>
+      <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{label}</span>
       <span className={cn('text-lg font-black tabular-nums',
         positive === true ? 'text-emerald-400' :
         positive === false ? 'text-red-400' :
-        'text-white'
+        'text-foreground'
       )}>{value}</span>
-      {sub && <span className="text-[9px] text-[oklch(0.38_0.01_280)]">{sub}</span>}
+      {sub && <span className="text-[9px] text-[var(--text-muted)]">{sub}</span>}
       {isBest && <span className="text-[7px] font-black text-emerald-500 uppercase tracking-wider">BEST</span>}
     </div>
   );
@@ -288,12 +288,12 @@ function BookComparisonRow({
   const cols = books.length;
 
   return (
-    <div className="rounded-xl bg-[oklch(0.07_0.008_280)] border border-[oklch(0.15_0.012_280)] overflow-hidden">
+    <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-1.5 px-3 pt-2 pb-1.5">
-        <BookOpen className="w-3 h-3 text-[oklch(0.40_0.01_280)]" />
-        <span className="text-[9px] font-black uppercase tracking-widest text-[oklch(0.40_0.01_280)]">Odds Comparison</span>
-        <span className="ml-auto text-[8px] text-[oklch(0.32_0.01_280)]">ML</span>
+        <BookOpen className="w-3 h-3 text-[var(--text-muted)]" />
+        <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)]">Odds Comparison</span>
+        <span className="ml-auto text-[8px] text-[var(--text-faint)]">ML</span>
       </div>
 
       {/* Column headers */}
@@ -305,7 +305,7 @@ function BookComparisonRow({
         {books.map((b) => (
           <span
             key={b.name}
-            className="text-[9px] font-bold text-[oklch(0.38_0.01_280)] text-center truncate"
+            className="text-[9px] font-bold text-[var(--text-muted)] text-center truncate"
           >
             {shortName(b.name)}
           </span>
@@ -315,10 +315,10 @@ function BookComparisonRow({
       {/* Away team row */}
       {awayTeam && (
         <div
-          className="grid px-3 py-1.5 border-t border-[oklch(0.12_0.01_280)]"
+          className="grid px-3 py-1.5 border-t border-[var(--border-subtle)]"
           style={{ gridTemplateColumns: `1fr repeat(${cols}, minmax(0, 1fr))` }}
         >
-          <span className="text-[10px] font-semibold text-white/70 truncate self-center">
+          <span className="text-[10px] font-semibold text-[var(--text-muted)] truncate self-center">
             {awayTeam.split(' ').slice(-1)[0]}
           </span>
           {books.map((b) => {
@@ -329,9 +329,9 @@ function BookComparisonRow({
                 key={b.name}
                 className={cn(
                   'text-[11px] font-black tabular-nums text-center self-center',
-                  !b.awayOdds ? 'text-[oklch(0.28_0.01_280)]'
+                  !b.awayOdds ? 'text-[var(--text-faint)]'
                     : n > 0 ? 'text-emerald-400'
-                    : 'text-white/80',
+                    : 'text-foreground',
                   isBest && 'text-emerald-300',
                 )}
               >
@@ -346,10 +346,10 @@ function BookComparisonRow({
       {/* Home team row */}
       {homeTeam && (
         <div
-          className="grid px-3 py-1.5 border-t border-[oklch(0.12_0.01_280)]"
+          className="grid px-3 py-1.5 border-t border-[var(--border-subtle)]"
           style={{ gridTemplateColumns: `1fr repeat(${cols}, minmax(0, 1fr))` }}
         >
-          <span className="text-[10px] font-semibold text-white/70 truncate self-center">
+          <span className="text-[10px] font-semibold text-[var(--text-muted)] truncate self-center">
             {homeTeam.split(' ').slice(-1)[0]}
           </span>
           {books.map((b) => {
@@ -360,9 +360,9 @@ function BookComparisonRow({
                 key={b.name}
                 className={cn(
                   'text-[11px] font-black tabular-nums text-center self-center',
-                  !b.homeOdds ? 'text-[oklch(0.28_0.01_280)]'
+                  !b.homeOdds ? 'text-[var(--text-faint)]'
                     : n > 0 ? 'text-emerald-400'
-                    : 'text-white/80',
+                    : 'text-foreground',
                   isBest && 'text-emerald-300',
                 )}
               >
@@ -394,7 +394,7 @@ function TabBar({ activeTab, onSelect, accentCls }: {
             'px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 border transition-all duration-150',
             activeTab === i
               ? accentCls
-              : 'text-[oklch(0.38_0.01_280)] border-transparent hover:text-white/70',
+              : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-muted)]',
           )}
         >
           {tab}
@@ -509,21 +509,21 @@ function TabOdds({
 
       {/* Market Intelligence panel */}
       {(confPct !== null || sharpPct !== null || hasLineMove || vigPct !== null) && (
-        <div className="rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] p-3 space-y-2.5">
+        <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] p-3 space-y-2.5">
           <div className="flex items-center gap-1.5">
             <Zap className="w-3 h-3 text-amber-400" />
-            <span className="text-[9px] font-black uppercase tracking-widest text-[oklch(0.42_0.01_280)]">Market Intelligence</span>
+            <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)]">Market Intelligence</span>
           </div>
 
           {confPct !== null && (
             <div className="space-y-1">
-              <div className="flex justify-between text-[9px] font-semibold text-[oklch(0.42_0.01_280)]">
+              <div className="flex justify-between text-[9px] font-semibold text-[var(--text-muted)]">
                 <span>Model Confidence</span>
                 <span className={cn(
                   confPct >= 70 ? 'text-emerald-400' : confPct >= 50 ? 'text-blue-400' : 'text-amber-400'
                 )}>{Math.round(confPct)}%</span>
               </div>
-              <div className="h-2 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+              <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                 <div
                   className={cn('h-full rounded-full transition-all duration-700',
                     confPct >= 70 ? 'bg-emerald-400' : confPct >= 50 ? 'bg-blue-400' : 'bg-amber-400'
@@ -536,11 +536,11 @@ function TabOdds({
 
           {sharpPct !== null && (
             <div className="space-y-1">
-              <div className="flex justify-between text-[9px] font-semibold text-[oklch(0.42_0.01_280)]">
+              <div className="flex justify-between text-[9px] font-semibold text-[var(--text-muted)]">
                 <span>Sharp Money</span>
-                <span className={cn(sharpPct >= 60 ? 'text-purple-400' : 'text-[oklch(0.55_0.01_280)]')}>{Math.round(sharpPct)}%</span>
+                <span className={cn(sharpPct >= 60 ? 'text-purple-400' : 'text-[var(--text-faint)]')}>{Math.round(sharpPct)}%</span>
               </div>
-              <div className="h-2 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+              <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-purple-500 to-violet-400 transition-all duration-700"
                   style={{ width: `${Math.min(100, sharpPct)}%` }}
@@ -551,12 +551,12 @@ function TabOdds({
 
           {hasLineMove && (
             <div className="flex items-center justify-between">
-              <span className="text-[9px] font-semibold text-[oklch(0.42_0.01_280)] uppercase tracking-wider">Line Movement</span>
+              <span className="text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Line Movement</span>
               <span className={cn(
                 'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border',
                 moveDir === 'up' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                 : moveDir === 'down' ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                : 'bg-[oklch(0.14_0.01_280)] text-[oklch(0.48_0.01_280)] border-[oklch(0.20_0.015_280)]',
+                : 'bg-[var(--bg-elevated)] text-[var(--text-faint)] border-[var(--border-subtle)]',
               )}>
                 {moveDir === 'up' ? <TrendingUp className="w-2.5 h-2.5" /> : moveDir === 'down' ? <TrendingDown className="w-2.5 h-2.5" /> : <Minus className="w-2.5 h-2.5" />}
                 {!isNaN(moveNum) && moveNum !== 0 ? (moveNum > 0 ? `+${moveNum}` : String(moveNum)) : String(rawMove)}
@@ -574,7 +574,7 @@ function TabOdds({
 
           {vigPct !== null && vigPct > 0 && (
             <div className="flex items-center justify-between">
-              <span className="text-[9px] font-semibold text-[oklch(0.42_0.01_280)] uppercase tracking-wider">Book Vig</span>
+              <span className="text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Book Vig</span>
               <span className={cn(
                 'text-[10px] font-bold',
                 vigPct > 5 ? 'text-red-400' : vigPct > 3 ? 'text-amber-400' : 'text-emerald-400',
@@ -596,15 +596,15 @@ function TabOdds({
 
       {/* Recommendation */}
       {data.recommendation && (
-        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)]">
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
           <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
-          <p className="text-xs text-[oklch(0.62_0.005_85)] leading-relaxed">{data.recommendation}</p>
+          <p className="text-xs text-[var(--text-muted)] leading-relaxed">{data.recommendation}</p>
         </div>
       )}
 
       {/* Description / AI analysis */}
       {data.description && (
-        <p className="text-[11px] text-[oklch(0.48_0.01_280)] leading-relaxed px-1">{data.description}</p>
+        <p className="text-[11px] text-[var(--text-faint)] leading-relaxed px-1">{data.description}</p>
       )}
     </div>
   );
@@ -618,12 +618,12 @@ function TabProps({ data, onAnalyze }: { data: BettingCardData; onAnalyze?: () =
   if (props.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 py-6 text-center">
-        <Users className="w-8 h-8 text-[oklch(0.28_0.01_280)]" />
-        <p className="text-[11px] text-[oklch(0.38_0.01_280)]">No prop data available</p>
+        <Users className="w-8 h-8 text-[var(--text-faint)]" />
+        <p className="text-[11px] text-[var(--text-muted)]">No prop data available</p>
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[oklch(0.13_0.012_280)] border border-[oklch(0.22_0.018_280)] text-[10px] font-semibold text-[oklch(0.52_0.01_280)] hover:text-white hover:border-[oklch(0.32_0.02_280)] transition-all"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)] hover:text-foreground hover:border-[var(--border-hover)] transition-all"
           >
             Ask AI about player props for this game →
           </button>
@@ -637,12 +637,12 @@ function TabProps({ data, onAnalyze }: { data: BettingCardData; onAnalyze?: () =
         const oddsNum = parseFloat(p.odds);
         const hitRate = parseFloat(p.hitRate);
         return (
-          <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)]">
+          <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
             <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-black text-white truncate">{p.player}</p>
-              <p className="text-[9px] text-[oklch(0.40_0.01_280)] truncate">{p.team} · {p.stat}</p>
+              <p className="text-[11px] font-black text-foreground truncate">{p.player}</p>
+              <p className="text-[9px] text-[var(--text-muted)] truncate">{p.team} · {p.stat}</p>
             </div>
-            <span className="text-[11px] font-bold text-[oklch(0.48_0.01_280)] tabular-nums shrink-0">{p.line}</span>
+            <span className="text-[11px] font-bold text-[var(--text-faint)] tabular-nums shrink-0">{p.line}</span>
             {p.odds && (
               <span className={cn(
                 'px-2 py-0.5 rounded-full text-[9px] font-black border shrink-0',
@@ -698,28 +698,28 @@ function TabTeams({ data, teams, theme }: {
   if (rows.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 py-6 text-center">
-        <Users className="w-8 h-8 text-[oklch(0.28_0.01_280)]" />
-        <p className="text-[11px] text-[oklch(0.38_0.01_280)]">No team comparison data available</p>
+        <Users className="w-8 h-8 text-[var(--text-faint)]" />
+        <p className="text-[11px] text-[var(--text-muted)]">No team comparison data available</p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] overflow-hidden">
-      <div className="grid grid-cols-3 px-3 py-2 border-b border-[oklch(0.14_0.01_280)]">
-        <span className="text-[9px] font-black uppercase tracking-wider text-[oklch(0.38_0.01_280)]">Stat</span>
+    <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] overflow-hidden">
+      <div className="grid grid-cols-3 px-3 py-2 border-b border-[var(--border-subtle)]">
+        <span className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Stat</span>
         <span className={cn('text-[10px] font-black uppercase text-center', theme.accentColor)}>{awayAbbr}</span>
         <span className={cn('text-[10px] font-black uppercase text-center', theme.accentColor)}>{homeAbbr}</span>
       </div>
       {rows.map(({ label, away, home }) => (
-        <div key={label} className="grid grid-cols-3 px-3 py-2 border-b border-[oklch(0.12_0.01_280)] last:border-0">
-          <span className="text-[9px] text-[oklch(0.42_0.01_280)] self-center">{label}</span>
-          <span className="text-[10px] font-bold text-white text-center self-center">{away ?? '—'}</span>
-          <span className="text-[10px] font-bold text-white text-center self-center">{home ?? '—'}</span>
+        <div key={label} className="grid grid-cols-3 px-3 py-2 border-b border-[var(--border-subtle)] last:border-0">
+          <span className="text-[9px] text-[var(--text-muted)] self-center">{label}</span>
+          <span className="text-[10px] font-bold text-foreground text-center self-center">{away ?? '—'}</span>
+          <span className="text-[10px] font-bold text-foreground text-center self-center">{home ?? '—'}</span>
         </div>
       ))}
       {!tc && (
-        <p className="text-[9px] text-[oklch(0.32_0.01_280)] px-3 py-2">Full statistical comparison not available</p>
+        <p className="text-[9px] text-[var(--text-faint)] px-3 py-2">Full statistical comparison not available</p>
       )}
     </div>
   );
@@ -735,13 +735,13 @@ function TabHistory({ data }: { data: BettingCardData }) {
       {(data.atsRecord || data.h2hRecord) && (
         <div className="flex gap-2 flex-wrap">
           {data.atsRecord && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[oklch(0.13_0.012_280)] border border-[oklch(0.22_0.018_280)] text-[9px] font-black text-white/70">
-              ATS <span className="text-white">{data.atsRecord}</span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[9px] font-black text-[var(--text-muted)]">
+              ATS <span className="text-foreground">{data.atsRecord}</span>
             </span>
           )}
           {data.h2hRecord && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[oklch(0.13_0.012_280)] border border-[oklch(0.22_0.018_280)] text-[9px] font-black text-white/70">
-              H2H <span className="text-white">{data.h2hRecord}</span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[9px] font-black text-[var(--text-muted)]">
+              H2H <span className="text-foreground">{data.h2hRecord}</span>
             </span>
           )}
         </div>
@@ -749,9 +749,9 @@ function TabHistory({ data }: { data: BettingCardData }) {
       {history.length > 0 ? (
         <div className="space-y-1.5">
           {history.map((h: any, i: number) => (
-            <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)]">
-              <span className="text-[9px] text-[oklch(0.40_0.01_280)]">{h.date}</span>
-              <span className="text-[10px] font-bold text-white tabular-nums">{h.score ?? h.result}</span>
+            <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
+              <span className="text-[9px] text-[var(--text-muted)]">{h.date}</span>
+              <span className="text-[10px] font-bold text-foreground tabular-nums">{h.score ?? h.result}</span>
               <span className={cn(
                 'px-2 py-0.5 rounded-full text-[8px] font-black border',
                 h.betResult === 'hit'
@@ -764,7 +764,7 @@ function TabHistory({ data }: { data: BettingCardData }) {
           ))}
         </div>
       ) : (
-        <p className="text-[11px] text-[oklch(0.38_0.01_280)] text-center py-4">No detailed history available</p>
+        <p className="text-[11px] text-[var(--text-muted)] text-center py-4">No detailed history available</p>
       )}
     </div>
   );
@@ -788,18 +788,18 @@ function TabInjuries({ data }: { data: BettingCardData }) {
     return (
       <div className="space-y-1.5">
         {injuries.map((inj: any, i: number) => (
-          <div key={i} className="px-3 py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)]">
+          <div key={i} className="px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-[11px] font-black text-white truncate">{inj.player}</p>
-                <p className="text-[9px] text-[oklch(0.40_0.01_280)]">{inj.team}</p>
+                <p className="text-[11px] font-black text-foreground truncate">{inj.player}</p>
+                <p className="text-[9px] text-[var(--text-muted)]">{inj.team}</p>
               </div>
               <span className={cn('px-2 py-0.5 rounded-full text-[8px] font-black border shrink-0', statusCls(inj.status))}>
                 {inj.status?.toUpperCase()}
               </span>
             </div>
             {inj.impact && (
-              <p className="text-[9px] text-[oklch(0.42_0.01_280)] mt-1.5 leading-relaxed">{inj.impact}</p>
+              <p className="text-[9px] text-[var(--text-muted)] mt-1.5 leading-relaxed">{inj.impact}</p>
             )}
           </div>
         ))}
@@ -818,8 +818,8 @@ function TabInjuries({ data }: { data: BettingCardData }) {
 
   return (
     <div className="flex flex-col items-center gap-2 py-6 text-center">
-      <Shield className="w-8 h-8 text-[oklch(0.28_0.01_280)]" />
-      <p className="text-[11px] text-[oklch(0.38_0.01_280)]">No injury reports for this game</p>
+      <Shield className="w-8 h-8 text-[var(--text-faint)]" />
+      <p className="text-[11px] text-[var(--text-muted)]">No injury reports for this game</p>
     </div>
   );
 }
@@ -833,12 +833,12 @@ function TabWatch({ data, onAnalyze }: { data: BettingCardData; onAnalyze?: () =
   if (players.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 py-6 text-center">
-        <Eye className="w-8 h-8 text-[oklch(0.28_0.01_280)]" />
-        <p className="text-[11px] text-[oklch(0.38_0.01_280)]">No watch list available</p>
+        <Eye className="w-8 h-8 text-[var(--text-faint)]" />
+        <p className="text-[11px] text-[var(--text-muted)]">No watch list available</p>
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[oklch(0.13_0.012_280)] border border-[oklch(0.22_0.018_280)] text-[10px] font-semibold text-[oklch(0.52_0.01_280)] hover:text-white hover:border-[oklch(0.32_0.02_280)] transition-all"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)] hover:text-foreground hover:border-[var(--border-hover)] transition-all"
           >
             Ask AI who to watch in this game →
           </button>
@@ -850,12 +850,12 @@ function TabWatch({ data, onAnalyze }: { data: BettingCardData; onAnalyze?: () =
   return (
     <div className="space-y-2">
       {players.map((p: any, i: number) => (
-        <div key={i} className="flex items-start gap-3 px-3 py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)]">
+        <div key={i} className="flex items-start gap-3 px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
           <PlayerAvatar playerName={p.player} photoUrl={p.photoUrl} sport={data.sport} size="md" />
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-black text-white truncate">{p.player}</p>
-            <p className="text-[9px] text-[oklch(0.40_0.01_280)] mb-1">{p.team}</p>
-            <p className="text-[10px] text-[oklch(0.50_0.01_280)] leading-relaxed">{p.reason}</p>
+            <p className="text-[11px] font-black text-foreground truncate">{p.player}</p>
+            <p className="text-[9px] text-[var(--text-muted)] mb-1">{p.team}</p>
+            <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">{p.reason}</p>
           </div>
         </div>
       ))}
@@ -923,10 +923,10 @@ export const BettingCard = memo(function BettingCard({
 
   return (
     <article className={cn(
-      'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.09_0.012_280)] border transition-all duration-300',
+      'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-300',
       isHero
-        ? 'border-[oklch(0.28_0.025_260)] shadow-[0_0_32px_oklch(0.3_0.06_260/0.12)]'
-        : 'border-[oklch(0.18_0.016_280)] hover:border-[oklch(0.28_0.02_280)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.08)]',
+        ? 'border-[var(--border-subtle)] shadow-[0_0_32px_oklch(0.3_0.06_260/0.12)]'
+        : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.08)]',
     )}>
 
       {/* ── Full-bleed gradient header ───────────────────────────────── */}
@@ -988,7 +988,7 @@ export const BettingCard = memo(function BettingCard({
               'inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full border text-[9px] font-bold',
               moveDir === 'up'   ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
               : moveDir === 'down' ? 'bg-red-500/15 border-red-500/30 text-red-300'
-              : 'bg-white/10 border-white/20 text-white/60',
+              : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-muted)]',
             )}>
               {moveDir === 'up' ? <TrendingUp className="w-2.5 h-2.5" /> : moveDir === 'down' ? <TrendingDown className="w-2.5 h-2.5" /> : <Minus className="w-2.5 h-2.5" />}
               {!isNaN(moveNum) && moveNum !== 0 ? (moveNum > 0 ? `+${moveNum}` : String(moveNum)) : String(rawMove)}
@@ -1001,11 +1001,11 @@ export const BettingCard = memo(function BettingCard({
 
         {/* ── Player prop header ──────────────────────────────────────── */}
         {isPlayerProp && data.player && (
-          <div className="flex items-center gap-3 mt-3 px-3 py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)]">
+          <div className="flex items-center gap-3 mt-3 px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
             <PlayerAvatar playerName={data.player} photoUrl={playerPhotoUrl} sport={data.sport} size={isHero ? 'lg' : 'md'} />
             <div className="min-w-0 flex-1">
-              <p className={cn('font-black text-white truncate', isHero ? 'text-base' : 'text-sm')}>{data.player}</p>
-              {data.stat && <p className="text-[11px] text-[oklch(0.45_0.01_280)] truncate">{data.stat}</p>}
+              <p className={cn('font-black text-foreground truncate', isHero ? 'text-base' : 'text-sm')}>{data.player}</p>
+              {data.stat && <p className="text-[11px] text-[var(--text-faint)] truncate">{data.stat}</p>}
             </div>
             {data.odds && (
               <span className={cn('font-black tabular-nums shrink-0 text-xl', Number(data.odds) > 0 ? 'text-emerald-400' : 'text-red-400')}>
@@ -1019,22 +1019,22 @@ export const BettingCard = memo(function BettingCard({
         {isPlayerProp && data.player && (data.line != null || data.hitRate != null || confPct !== null) && (
           <div className={cn('grid gap-1.5', [data.line != null, data.hitRate != null, confPct !== null].filter(Boolean).length === 3 ? 'grid-cols-3' : [data.line != null, data.hitRate != null, confPct !== null].filter(Boolean).length === 2 ? 'grid-cols-2' : 'grid-cols-1')}>
             {data.line != null && (
-              <div className="flex flex-col items-center rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)] px-2 py-2">
-                <span className="text-[8px] font-bold uppercase tracking-wider text-[oklch(0.38_0.01_280)]">Line</span>
-                <span className="text-base font-black text-white tabular-nums">{data.line}</span>
+              <div className="flex flex-col items-center rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2">
+                <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Line</span>
+                <span className="text-base font-black text-foreground tabular-nums">{data.line}</span>
               </div>
             )}
             {data.hitRate != null && (
-              <div className="flex flex-col items-center rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)] px-2 py-2">
-                <span className="text-[8px] font-bold uppercase tracking-wider text-[oklch(0.38_0.01_280)]">Hit Rate</span>
+              <div className="flex flex-col items-center rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2">
+                <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Hit Rate</span>
                 <span className={cn('text-base font-black tabular-nums',
-                  Number(data.hitRate) >= 65 ? 'text-emerald-400' : Number(data.hitRate) <= 35 ? 'text-red-400' : 'text-white'
+                  Number(data.hitRate) >= 65 ? 'text-emerald-400' : Number(data.hitRate) <= 35 ? 'text-red-400' : 'text-foreground'
                 )}>{data.hitRate}%</span>
               </div>
             )}
             {confPct !== null && (
-              <div className="flex flex-col items-center rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)] px-2 py-2">
-                <span className="text-[8px] font-bold uppercase tracking-wider text-[oklch(0.38_0.01_280)]">Confidence</span>
+              <div className="flex flex-col items-center rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2">
+                <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Confidence</span>
                 <span className={cn('text-base font-black tabular-nums',
                   confPct >= 70 ? 'text-emerald-400' : confPct >= 50 ? 'text-amber-400' : 'text-red-400'
                 )}>{confPct}%</span>
@@ -1045,17 +1045,17 @@ export const BettingCard = memo(function BettingCard({
 
         {/* ── Team matchup block ─────────────────────────────────────── */}
         {!isPlayerProp && teams ? (
-          <div className="mt-3 rounded-xl border border-[oklch(0.17_0.015_280)] overflow-hidden bg-[oklch(0.08_0.01_280)]">
+          <div className="mt-3 rounded-xl border border-[var(--border-subtle)] overflow-hidden bg-[var(--bg-overlay)]">
             <div className="flex items-center gap-2 px-4 py-3">
               {/* Away team */}
               <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
                 <TeamLogo name={teams.away} sport={data.sport} avatarCls={theme.avatarCls} isLarge={isHero} />
-                <span className={cn('font-black text-white/90 text-center leading-tight truncate w-full', isHero ? 'text-sm' : 'text-xs')}>{teams.away}</span>
+                <span className={cn('font-black text-foreground text-center leading-tight truncate w-full', isHero ? 'text-sm' : 'text-xs')}>{teams.away}</span>
                 {awayML && (
                   <span className={cn(
                     'font-black tabular-nums',
                     isHero ? 'text-xl' : 'text-lg',
-                    awayML.positive ? 'text-emerald-400' : 'text-white/80',
+                    awayML.positive ? 'text-emerald-400' : 'text-foreground',
                     isBestAway && 'ring-1 ring-emerald-400/40 rounded-md px-1 bg-emerald-500/8',
                   )}>
                     {awayML.display}
@@ -1066,8 +1066,8 @@ export const BettingCard = memo(function BettingCard({
                   <span className={cn(
                     'text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums',
                     awayProb > 55 ? 'text-emerald-400 bg-emerald-500/12' :
-                    awayProb > 45 ? 'text-white/60 bg-white/5' :
-                    'text-[oklch(0.38_0.01_280)] bg-white/5',
+                    awayProb > 45 ? 'text-[var(--text-muted)] bg-[var(--bg-elevated)]' :
+                    'text-[var(--text-muted)] bg-[var(--bg-elevated)]',
                   )}>{awayProb}%</span>
                 )}
               </div>
@@ -1075,24 +1075,24 @@ export const BettingCard = memo(function BettingCard({
               {/* Centre divider */}
               <div className="flex flex-col items-center gap-1 shrink-0 px-1">
                 {isFinal && data.finalScore ? (
-                  <span className="text-sm font-black text-white tabular-nums">{data.finalScore}</span>
+                  <span className="text-sm font-black text-foreground tabular-nums">{data.finalScore}</span>
                 ) : (
                   <span className={cn('text-xs font-black uppercase tracking-wider opacity-60', theme.accentColor)}>VS</span>
                 )}
                 {!isFinal && data.gameTime && (
-                  <span className="text-[9px] text-[oklch(0.28_0.01_280)]">{data.gameTime}</span>
+                  <span className="text-[9px] text-[var(--text-faint)]">{data.gameTime}</span>
                 )}
               </div>
 
               {/* Home team */}
               <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
                 <TeamLogo name={teams.home} sport={data.sport} avatarCls={theme.avatarCls} isLarge={isHero} />
-                <span className={cn('font-black text-white/90 text-center leading-tight truncate w-full', isHero ? 'text-sm' : 'text-xs')}>{teams.home}</span>
+                <span className={cn('font-black text-foreground text-center leading-tight truncate w-full', isHero ? 'text-sm' : 'text-xs')}>{teams.home}</span>
                 {homeML && (
                   <span className={cn(
                     'font-black tabular-nums',
                     isHero ? 'text-xl' : 'text-lg',
-                    homeML.positive ? 'text-emerald-400' : 'text-white/80',
+                    homeML.positive ? 'text-emerald-400' : 'text-foreground',
                     isBestHome && 'ring-1 ring-emerald-400/40 rounded-md px-1 bg-emerald-500/8',
                   )}>
                     {homeML.display}
@@ -1103,8 +1103,8 @@ export const BettingCard = memo(function BettingCard({
                   <span className={cn(
                     'text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums',
                     homeProb > 55 ? 'text-emerald-400 bg-emerald-500/12' :
-                    homeProb > 45 ? 'text-white/60 bg-white/5' :
-                    'text-[oklch(0.38_0.01_280)] bg-white/5',
+                    homeProb > 45 ? 'text-[var(--text-muted)] bg-[var(--bg-elevated)]' :
+                    'text-[var(--text-muted)] bg-[var(--bg-elevated)]',
                   )}>{homeProb}%</span>
                 )}
               </div>
@@ -1118,13 +1118,13 @@ export const BettingCard = memo(function BettingCard({
                   leftLabel={abbr(teams.away)}
                   rightLabel={abbr(teams.home)}
                   leftColor={cn('bg-gradient-to-r', theme.probBarColor, 'opacity-80')}
-                  rightColor="bg-[oklch(0.22_0.015_280)]"
+                  rightColor="bg-[var(--bg-elevated)]"
                 />
               </div>
             )}
           </div>
         ) : !isPlayerProp && (
-          <p className="text-sm font-semibold text-white/80 mt-3 truncate">{title}</p>
+          <p className="text-sm font-semibold text-foreground mt-3 truncate">{title}</p>
         )}
 
         {/* ── Tab bar ───────────────────────────────────────────────── */}
@@ -1162,15 +1162,15 @@ export const BettingCard = memo(function BettingCard({
         {activeTab === 5 && <TabWatch data={data} onAnalyze={onAnalyze} />}
 
         {/* ── Footer ────────────────────────────────────────────────── */}
-        <div className="pt-2 border-t border-[oklch(0.15_0.015_280)] space-y-2">
+        <div className="pt-2 border-t border-[var(--border-subtle)] space-y-2">
           <div className="flex items-center gap-2">
             {data.bookmaker && (
-              <span className="text-[10px] font-semibold text-[oklch(0.43_0.01_280)] bg-[oklch(0.13_0.012_280)] px-2 py-0.5 rounded-md border border-[oklch(0.19_0.015_280)]">
+              <span className="text-[10px] font-semibold text-[var(--text-muted)] bg-[var(--bg-surface)] px-2 py-0.5 rounded-md border border-[var(--border-subtle)]">
                 {data.bookmaker}
               </span>
             )}
             {data.bookmakerCount && Number(data.bookmakerCount) > 1 && (
-              <span className="flex items-center gap-1 text-[10px] text-[oklch(0.35_0.01_280)]">
+              <span className="flex items-center gap-1 text-[10px] text-[var(--text-faint)]">
                 <BookOpen className="w-3 h-3" />
                 {Number(data.bookmakerCount)} books
               </span>
@@ -1179,7 +1179,7 @@ export const BettingCard = memo(function BettingCard({
           {onAnalyze && (
             <button
               onClick={onAnalyze}
-              className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)] text-xs font-semibold text-[oklch(0.46_0.01_280)] hover:text-white hover:bg-[oklch(0.14_0.015_280)] hover:border-[oklch(0.26_0.02_280)] transition-all duration-150"
+              className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-faint)] hover:text-foreground hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] transition-all duration-150"
             >
               <TrendingUp className="w-3.5 h-3.5" />
               Full Analysis

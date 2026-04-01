@@ -111,6 +111,8 @@ function useWatchlist(playerName: string) {
           ? [...list, { name: playerName, position: 'SP', addedAt: new Date().toISOString() }]
           : list.filter(e => e.name !== playerName);
         localStorage.setItem(WATCHLIST_KEY, JSON.stringify(updated));
+        // Notify app-level badge counter
+        window.dispatchEvent(new CustomEvent('watchlist-update', { detail: { count: updated.length } }));
       } catch {}
       return next;
     });
@@ -211,6 +213,7 @@ function PitcherTabBar({ active, onSelect, accentBg, accentBorder, accentText }:
 }
 
 // ── Tab 0: Stats ──────────────────────────────────────────────────────────────
+// Shows the top 3 hero metrics only + trend note (clean summary view)
 
 function TabStats({ metrics, trendNote, conf }: {
   metrics: Metric[]; trendNote?: string; conf: TypeConf;
@@ -218,9 +221,6 @@ function TabStats({ metrics, trendNote, conf }: {
   return (
     <div>
       <HeroMetrics metrics={metrics} conf={conf} />
-      <div className="space-y-0">
-        {metrics.slice(3).map((m, i) => <MetricRow key={i} label={m.label} value={m.value} />)}
-      </div>
       {trendNote && (
         <div className={`mt-3 px-3 py-2 rounded-xl ${conf.accentBg} border ${conf.accentBorder}`}>
           <p className="text-[11px] text-gray-300 leading-relaxed italic">{trendNote}</p>
@@ -231,29 +231,34 @@ function TabStats({ metrics, trendNote, conf }: {
 }
 
 // ── Tab 1: Advanced ───────────────────────────────────────────────────────────
+// Always shows the remaining summary_metrics (index 3+) so it's never empty,
+// plus pitch arsenal / spin-rate / season stats / game log when available.
 
-function TabAdvanced({ data, seasonStats, gameLog, conf }: {
+function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
+  metrics: Metric[];
   data: Record<string, any>;
   seasonStats?: SeasonStats;
   gameLog: GameLogEntry[];
   conf: TypeConf;
 }) {
-  const hasPitchMix = data.pitchMixFB || data.pitchMixBrk || data.pitchMixOff;
-  const hasRelease  = data.spinRate || data.extension || data.hBreak || data.vBreak;
-  const hasSeason   = !!seasonStats;
-  const hasLog      = gameLog.length > 0;
-
-  if (!hasPitchMix && !hasRelease && !hasSeason && !hasLog) {
-    return (
-      <div className="flex flex-col items-center justify-center py-8 gap-2">
-        <Wind className="w-6 h-6 text-gray-600" />
-        <p className="text-[11px] text-gray-500 text-center">Advanced Statcast data loads with live pitcher queries</p>
-      </div>
-    );
-  }
+  const extraMetrics = metrics.slice(3);           // Whiff%, K%, FB Velo, Barrel%, BB%…
+  const hasPitchMix  = data.pitchMixFB || data.pitchMixBrk || data.pitchMixOff;
+  const hasRelease   = data.spinRate || data.extension || data.hBreak || data.vBreak;
+  const hasSeason    = !!seasonStats;
+  const hasLog       = gameLog.length > 0;
 
   return (
     <div className="space-y-3">
+      {/* Core rate stats — always present (Whiff%, K%, FB Velo, Barrel%, BB%, …) */}
+      {extraMetrics.length > 0 && (
+        <div>
+          <p className="text-[9px] font-extrabold uppercase tracking-widest text-gray-500 mb-1.5">Rate Stats</p>
+          <div className="space-y-0">
+            {extraMetrics.map((m, i) => <MetricRow key={i} label={m.label} value={m.value} />)}
+          </div>
+        </div>
+      )}
+
       {/* Pitch Arsenal */}
       {hasPitchMix && (
         <div>
@@ -546,7 +551,7 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
               <TabStats metrics={data.summary_metrics} trendNote={data.trend_note} conf={conf} />
             )}
             {activeTab === 1 && (
-              <TabAdvanced data={data.data ?? {}} seasonStats={seasonStats} gameLog={gameLog} conf={conf} />
+              <TabAdvanced metrics={data.summary_metrics ?? []} data={data.data ?? {}} seasonStats={seasonStats} gameLog={gameLog} conf={conf} />
             )}
             {activeTab === 2 && (
               <TabProps data={data.data ?? {}} propLines={propLines} onAnalyze={onAnalyze} />

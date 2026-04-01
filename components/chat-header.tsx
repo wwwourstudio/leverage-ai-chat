@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState, useCallback } from 'react';
-import { Menu, X, TrendingUp, Bell, Settings, LogIn, UserPlus, Download, Share2, Check, Copy } from 'lucide-react';
+import { Menu, X, TrendingUp, Bell, Settings, LogIn, UserPlus, Download, Share2, Check, Copy, Heart } from 'lucide-react';
 import { exportChatAsMarkdown, exportChatAsJSON, downloadFile, chatFilename, type ExportMessage, type ExportChat } from '@/lib/chat-export';
 import { useToast } from '@/components/toast-provider';
 
@@ -14,6 +14,8 @@ interface ChatHeaderProps {
   onOpenAlerts: () => void;
   alertCount: number;
   onOpenSettings: () => void;
+  onOpenWatchlist?: () => void;
+  watchlistCount?: number;
   onOpenLogin: () => void;
   onOpenSignup: () => void;
   // Export / share props (optional — hidden when not provided)
@@ -32,6 +34,8 @@ export const ChatHeader = memo(function ChatHeader({
   onOpenAlerts,
   alertCount,
   onOpenSettings,
+  onOpenWatchlist,
+  watchlistCount = 0,
   onOpenLogin,
   onOpenSignup,
   activeChat,
@@ -194,6 +198,21 @@ export const ChatHeader = memo(function ChatHeader({
                 </div>
               </div>
 
+              {/* Watchlist button */}
+              {onOpenWatchlist && (
+                <button
+                  onClick={onOpenWatchlist}
+                  className="relative p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
+                  title="Player Watchlist"
+                >
+                  <Heart className={`w-5 h-5 transition-colors ${watchlistCount > 0 ? 'text-rose-400 fill-rose-400' : 'text-[var(--text-muted)] group-hover:text-rose-400'}`} fill={watchlistCount > 0 ? 'currentColor' : 'none'} />
+                  {watchlistCount > 0 && (
+                    <div className="absolute top-1.5 right-1.5 min-w-[14px] h-[14px] px-0.5 bg-rose-500 rounded-full border border-[var(--bg-overlay)] flex items-center justify-center">
+                      <span className="text-[8px] font-black text-white tabular-nums">{watchlistCount}</span>
+                    </div>
+                  )}
+                </button>
+              )}
               <button
                 onClick={onOpenAlerts}
                 className="relative p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"

@@ -18,7 +18,7 @@ export interface ChatThread {
   tags: string[];
 }
 
-// Minimal message shape for persistence (cards/attachments are not persisted)
+// Minimal message shape for persistence
 export interface PersistedMessage {
   id?: string;
   role: 'user' | 'assistant';
@@ -27,6 +27,7 @@ export interface PersistedMessage {
   modelUsed?: string;
   confidence?: number;
   isWelcome?: boolean;
+  cards?: unknown[];
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -149,6 +150,7 @@ export async function loadMessages(threadId: string): Promise<PersistedMessage[]
         modelUsed: m.model_used ?? undefined,
         confidence: m.confidence ?? undefined,
         isWelcome: m.is_welcome ?? false,
+        cards: Array.isArray(m.cards) ? m.cards : undefined,
       };
     });
   } catch (err) {
@@ -163,7 +165,7 @@ export async function loadMessages(threadId: string): Promise<PersistedMessage[]
  */
 export async function saveMessage(
   threadId: string,
-  msg: { role: 'user' | 'assistant'; content: string; model_used?: string; confidence?: number; is_welcome?: boolean }
+  msg: { role: 'user' | 'assistant'; content: string; model_used?: string; confidence?: number; is_welcome?: boolean; cards?: unknown[] }
 ): Promise<string | null> {
   if (!isUUID(threadId)) return null;
   try {

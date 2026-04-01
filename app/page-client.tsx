@@ -617,7 +617,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
                     role: m.role,
                     content: m.content,
                     timestamp: m.timestamp,
-                    cards: storedCards[m.id ?? ''] ?? [],
+                    cards: m.cards?.length ? m.cards : (storedCards[m.id ?? ''] ?? []),
                     modelUsed: m.modelUsed,
                     confidence: m.confidence,
                     isWelcome: m.isWelcome,
@@ -1882,6 +1882,7 @@ No preamble. Start directly with section 1.`;
             content: capturedMsg.content,
             model_used: capturedMsg.modelUsed,
             confidence: capturedMsg.confidence,
+            cards: (capturedMsg.cards as unknown[])?.length ? capturedMsg.cards as unknown[] : undefined,
           });
           // Re-key cards in localStorage to use real DB IDs so they survive page reloads.
           // The early save above used client-side UUIDs (temp thread ID + streaming message ID).
@@ -2784,7 +2785,7 @@ No preamble. Start directly with section 1.`;
             role: m.role,
             content: m.content,
             timestamp: m.timestamp,
-            cards: storedCards[m.id ?? ''] ?? [],
+            cards: m.cards?.length ? m.cards : (storedCards[m.id ?? ''] ?? []),
             modelUsed: m.modelUsed,
             confidence: m.confidence,
             isWelcome: m.isWelcome,

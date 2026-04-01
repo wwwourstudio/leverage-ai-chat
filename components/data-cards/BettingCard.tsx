@@ -4,6 +4,7 @@ import { memo, useState } from 'react';
 import {
   Clock, TrendingUp, TrendingDown, Minus,
   ChevronRight, Zap, Shield, AlertTriangle, Wind, BookOpen,
+  Users, Eye,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PlayerAvatar } from './PlayerAvatar';
@@ -377,6 +378,492 @@ function BookComparisonRow({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// TabBar
+// ─────────────────────────────────────────────────────────────────────────────
+function TabBar({ activeTab, onSelect, accentCls }: {
+  activeTab: number; onSelect: (i: number) => void; accentCls: string;
+}) {
+  const tabs = ['Odds', 'Props', 'Teams', 'History', 'Injuries', 'Watch'];
+  return (
+    <div className="flex overflow-x-auto gap-1 py-1" style={{ scrollbarWidth: 'none' }}>
+      {tabs.map((tab, i) => (
+        <button
+          key={tab}
+          onClick={() => onSelect(i)}
+          className={cn(
+            'px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 border transition-all duration-150',
+            activeTab === i
+              ? accentCls
+              : 'text-[oklch(0.38_0.01_280)] border-transparent hover:text-white/70',
+          )}
+        >
+          {tab}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TabOdds — existing market data (Tab 1)
+// ─────────────────────────────────────────────────────────────────────────────
+function TabOdds({
+  data, teams, isFinal, hasBookComparison, books,
+  spreadHome, spreadAway, ou, hasOdds,
+  isBestHome, isBestAway, awayML, homeML,
+  confPct, sharpPct, hasLineMove, moveDir, moveNum, rawMove, vigPct,
+}: {
+  data: BettingCardData;
+  teams: { away: string; home: string } | null;
+  isFinal: boolean;
+  hasBookComparison: boolean;
+  books: BookEntry[];
+  spreadHome: { pts: string; juice?: string } | null;
+  spreadAway: { pts: string; juice?: string } | null;
+  ou: { total: string; overJ?: string; underJ?: string } | null;
+  hasOdds: boolean;
+  isBestHome: boolean;
+  isBestAway: boolean;
+  awayML: { display: string; positive: boolean } | null;
+  homeML: { display: string; positive: boolean } | null;
+  confPct: number | null;
+  sharpPct: number | null;
+  hasLineMove: boolean;
+  moveDir: 'up' | 'down' | 'flat';
+  moveNum: number;
+  rawMove: string;
+  vigPct: number | null;
+}) {
+  return (
+    <div className="space-y-3">
+      {/* Book comparison */}
+      {!isFinal && hasBookComparison && teams && (
+        <BookComparisonRow
+          books={books}
+          homeTeam={teams.home}
+          awayTeam={teams.away}
+          bestHomeOdds={data.bestHomeOdds}
+          bestAwayOdds={data.bestAwayOdds}
+        />
+      )}
+
+      {/* Value edge indicator */}
+      {data.edge && (() => {
+        const edgeNum = parseFloat(String(data.edge).replace(/[^0-9.-]/g, ''));
+        if (isNaN(edgeNum) || edgeNum < 2) return null;
+        return (
+          <div className={cn(
+            'flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-bold',
+            edgeNum >= 5
+              ? 'bg-emerald-500/10 border border-emerald-500/25 text-emerald-300'
+              : 'bg-amber-500/10 border border-amber-500/25 text-amber-300',
+          )}>
+            <Zap className="w-3.5 h-3.5 shrink-0" />
+            <span className="flex-1">{edgeNum >= 5 ? 'Strong edge detected' : 'Potential value'} — {data.edge} edge vs market</span>
+          </div>
+        );
+      })()}
+
+      {/* Odds grid */}
+      {hasOdds && !isFinal && (
+        <div className={cn(
+          'grid gap-1.5',
+          spreadHome && spreadAway && ou
+            ? 'grid-cols-3'
+            : spreadHome && spreadAway
+            ? 'grid-cols-2'
+            : 'grid-cols-2 sm:grid-cols-3',
+        )}>
+          {spreadAway && (
+            <OddsCell
+              label={teams ? `${abbr(teams.away)} SPREAD` : 'Away Spread'}
+              value={spreadAway.pts}
+              sub={spreadAway.juice ? `juice ${spreadAway.juice}` : undefined}
+              positive={spreadAway.pts?.startsWith('+') ? true : spreadAway.pts?.startsWith('-') ? false : undefined}
+            />
+          )}
+          {spreadHome && (
+            <OddsCell
+              label={teams ? `${abbr(teams.home)} SPREAD` : 'Home Spread'}
+              value={spreadHome.pts}
+              sub={spreadHome.juice ? `juice ${spreadHome.juice}` : undefined}
+              positive={spreadHome.pts?.startsWith('+') ? true : spreadHome.pts?.startsWith('-') ? false : undefined}
+            />
+          )}
+          {ou && (
+            <OddsCell
+              label="TOTAL O/U"
+              value={ou.total}
+              sub={ou.overJ ? `O ${ou.overJ} · U ${ou.underJ ?? '—'}` : undefined}
+              highlight
+            />
+          )}
+          {!spreadAway && !spreadHome && !ou && awayML && (
+            <OddsCell label={teams ? abbr(teams.away) : 'Away'} value={awayML.display} positive={awayML.positive} isBest={isBestAway} />
+          )}
+          {!spreadAway && !spreadHome && !ou && homeML && (
+            <OddsCell label={teams ? abbr(teams.home) : 'Home'} value={homeML.display} positive={homeML.positive} isBest={isBestHome} />
+          )}
+        </div>
+      )}
+
+      {/* Market Intelligence panel */}
+      {(confPct !== null || sharpPct !== null || hasLineMove || vigPct !== null) && (
+        <div className="rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] p-3 space-y-2.5">
+          <div className="flex items-center gap-1.5">
+            <Zap className="w-3 h-3 text-amber-400" />
+            <span className="text-[9px] font-black uppercase tracking-widest text-[oklch(0.42_0.01_280)]">Market Intelligence</span>
+          </div>
+
+          {confPct !== null && (
+            <div className="space-y-1">
+              <div className="flex justify-between text-[9px] font-semibold text-[oklch(0.42_0.01_280)]">
+                <span>Model Confidence</span>
+                <span className={cn(
+                  confPct >= 70 ? 'text-emerald-400' : confPct >= 50 ? 'text-blue-400' : 'text-amber-400'
+                )}>{Math.round(confPct)}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+                <div
+                  className={cn('h-full rounded-full transition-all duration-700',
+                    confPct >= 70 ? 'bg-emerald-400' : confPct >= 50 ? 'bg-blue-400' : 'bg-amber-400'
+                  )}
+                  style={{ width: `${Math.min(100, confPct)}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {sharpPct !== null && (
+            <div className="space-y-1">
+              <div className="flex justify-between text-[9px] font-semibold text-[oklch(0.42_0.01_280)]">
+                <span>Sharp Money</span>
+                <span className={cn(sharpPct >= 60 ? 'text-purple-400' : 'text-[oklch(0.55_0.01_280)]')}>{Math.round(sharpPct)}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-purple-500 to-violet-400 transition-all duration-700"
+                  style={{ width: `${Math.min(100, sharpPct)}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {hasLineMove && (
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-semibold text-[oklch(0.42_0.01_280)] uppercase tracking-wider">Line Movement</span>
+              <span className={cn(
+                'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border',
+                moveDir === 'up' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                : moveDir === 'down' ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                : 'bg-[oklch(0.14_0.01_280)] text-[oklch(0.48_0.01_280)] border-[oklch(0.20_0.015_280)]',
+              )}>
+                {moveDir === 'up' ? <TrendingUp className="w-2.5 h-2.5" /> : moveDir === 'down' ? <TrendingDown className="w-2.5 h-2.5" /> : <Minus className="w-2.5 h-2.5" />}
+                {!isNaN(moveNum) && moveNum !== 0 ? (moveNum > 0 ? `+${moveNum}` : String(moveNum)) : String(rawMove)}
+              </span>
+            </div>
+          )}
+
+          {sharpPct !== null && sharpPct >= 60 && hasLineMove && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/8 border border-amber-500/20">
+              <Zap className="w-3 h-3 text-amber-400 shrink-0" />
+              <span className="text-[10px] font-bold text-amber-300">Reverse Line Movement</span>
+              <span className="text-[9px] text-amber-400/70 ml-0.5">— sharp action against public</span>
+            </div>
+          )}
+
+          {vigPct !== null && vigPct > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-semibold text-[oklch(0.42_0.01_280)] uppercase tracking-wider">Book Vig</span>
+              <span className={cn(
+                'text-[10px] font-bold',
+                vigPct > 5 ? 'text-red-400' : vigPct > 3 ? 'text-amber-400' : 'text-emerald-400',
+              )}>
+                {vigPct}%
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Weather note */}
+      {data.weatherNote && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-sky-500/6 border border-sky-500/20">
+          <Wind className="w-3 h-3 text-sky-400 shrink-0" />
+          <span className="text-[10px] text-sky-300 leading-relaxed">{data.weatherNote}</span>
+        </div>
+      )}
+
+      {/* Recommendation */}
+      {data.recommendation && (
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)]">
+          <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-[oklch(0.62_0.005_85)] leading-relaxed">{data.recommendation}</p>
+        </div>
+      )}
+
+      {/* Description / AI analysis */}
+      {data.description && (
+        <p className="text-[11px] text-[oklch(0.48_0.01_280)] leading-relaxed px-1">{data.description}</p>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TabProps — player props (Tab 2)
+// ─────────────────────────────────────────────────────────────────────────────
+function TabProps({ data, onAnalyze }: { data: BettingCardData; onAnalyze?: () => void }) {
+  const props = Array.isArray(data.playerProps) ? data.playerProps : [];
+  if (props.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-6 text-center">
+        <Users className="w-8 h-8 text-[oklch(0.28_0.01_280)]" />
+        <p className="text-[11px] text-[oklch(0.38_0.01_280)]">No prop data available</p>
+        {onAnalyze && (
+          <button
+            onClick={onAnalyze}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[oklch(0.13_0.012_280)] border border-[oklch(0.22_0.018_280)] text-[10px] font-semibold text-[oklch(0.52_0.01_280)] hover:text-white hover:border-[oklch(0.32_0.02_280)] transition-all"
+          >
+            Ask AI about player props for this game →
+          </button>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-1.5">
+      {props.map((p: any, i: number) => {
+        const oddsNum = parseFloat(p.odds);
+        const hitRate = parseFloat(p.hitRate);
+        return (
+          <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)]">
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-black text-white truncate">{p.player}</p>
+              <p className="text-[9px] text-[oklch(0.40_0.01_280)] truncate">{p.team} · {p.stat}</p>
+            </div>
+            <span className="text-[11px] font-bold text-[oklch(0.48_0.01_280)] tabular-nums shrink-0">{p.line}</span>
+            {p.odds && (
+              <span className={cn(
+                'px-2 py-0.5 rounded-full text-[9px] font-black border shrink-0',
+                !isNaN(oddsNum) && oddsNum > 0
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25'
+                  : 'bg-red-500/10 text-red-300 border-red-500/25',
+              )}>
+                {!isNaN(oddsNum) && oddsNum > 0 ? `+${p.odds}` : p.odds}
+              </span>
+            )}
+            {p.hitRate != null && (
+              <span className={cn(
+                'text-[10px] font-black tabular-nums shrink-0',
+                !isNaN(hitRate) && hitRate >= 65 ? 'text-emerald-400'
+                : !isNaN(hitRate) && hitRate <= 35 ? 'text-red-400'
+                : 'text-white/70',
+              )}>
+                {p.hitRate}%
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TabTeams — team comparison (Tab 3)
+// ─────────────────────────────────────────────────────────────────────────────
+function TabTeams({ data, teams, theme }: {
+  data: BettingCardData;
+  teams: { away: string; home: string } | null;
+  theme: { accentColor: string };
+}) {
+  const tc = data.teamComparison as any;
+  const awayAbbr = teams ? abbr(teams.away) : 'AWY';
+  const homeAbbr = teams ? abbr(teams.home) : 'HME';
+
+  const rows = [
+    { label: 'Home Record', away: null as string | null, home: data.homeRecord ?? null },
+    { label: 'Away Record', away: data.awayRecord ?? null, home: null as string | null },
+    { label: 'ATS', away: data.atsRecord ?? null, home: data.atsRecord ?? null },
+    { label: 'H2H', away: data.h2hRecord ?? null, home: data.h2hRecord ?? null },
+    ...(tc ? [
+      { label: 'Off. Rank', away: tc.away?.offenseRank != null ? `#${tc.away.offenseRank}` : null, home: tc.home?.offenseRank != null ? `#${tc.home.offenseRank}` : null },
+      { label: 'Def. Rank', away: tc.away?.defenseRank != null ? `#${tc.away.defenseRank}` : null, home: tc.home?.defenseRank != null ? `#${tc.home.defenseRank}` : null },
+      { label: 'Pts/G', away: tc.away?.pointsPerGame ?? null, home: tc.home?.pointsPerGame ?? null },
+      { label: 'Last 10', away: tc.away?.last10 ?? null, home: tc.home?.last10 ?? null },
+    ] : []),
+  ].filter(r => r.away != null || r.home != null);
+
+  if (rows.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-2 py-6 text-center">
+        <Users className="w-8 h-8 text-[oklch(0.28_0.01_280)]" />
+        <p className="text-[11px] text-[oklch(0.38_0.01_280)]">No team comparison data available</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] overflow-hidden">
+      <div className="grid grid-cols-3 px-3 py-2 border-b border-[oklch(0.14_0.01_280)]">
+        <span className="text-[9px] font-black uppercase tracking-wider text-[oklch(0.38_0.01_280)]">Stat</span>
+        <span className={cn('text-[10px] font-black uppercase text-center', theme.accentColor)}>{awayAbbr}</span>
+        <span className={cn('text-[10px] font-black uppercase text-center', theme.accentColor)}>{homeAbbr}</span>
+      </div>
+      {rows.map(({ label, away, home }) => (
+        <div key={label} className="grid grid-cols-3 px-3 py-2 border-b border-[oklch(0.12_0.01_280)] last:border-0">
+          <span className="text-[9px] text-[oklch(0.42_0.01_280)] self-center">{label}</span>
+          <span className="text-[10px] font-bold text-white text-center self-center">{away ?? '—'}</span>
+          <span className="text-[10px] font-bold text-white text-center self-center">{home ?? '—'}</span>
+        </div>
+      ))}
+      {!tc && (
+        <p className="text-[9px] text-[oklch(0.32_0.01_280)] px-3 py-2">Full statistical comparison not available</p>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TabHistory — head-to-head history (Tab 4)
+// ─────────────────────────────────────────────────────────────────────────────
+function TabHistory({ data }: { data: BettingCardData }) {
+  const history = Array.isArray(data.h2hHistory) ? data.h2hHistory : [];
+  return (
+    <div className="space-y-3">
+      {(data.atsRecord || data.h2hRecord) && (
+        <div className="flex gap-2 flex-wrap">
+          {data.atsRecord && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[oklch(0.13_0.012_280)] border border-[oklch(0.22_0.018_280)] text-[9px] font-black text-white/70">
+              ATS <span className="text-white">{data.atsRecord}</span>
+            </span>
+          )}
+          {data.h2hRecord && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[oklch(0.13_0.012_280)] border border-[oklch(0.22_0.018_280)] text-[9px] font-black text-white/70">
+              H2H <span className="text-white">{data.h2hRecord}</span>
+            </span>
+          )}
+        </div>
+      )}
+      {history.length > 0 ? (
+        <div className="space-y-1.5">
+          {history.map((h: any, i: number) => (
+            <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)]">
+              <span className="text-[9px] text-[oklch(0.40_0.01_280)]">{h.date}</span>
+              <span className="text-[10px] font-bold text-white tabular-nums">{h.score ?? h.result}</span>
+              <span className={cn(
+                'px-2 py-0.5 rounded-full text-[8px] font-black border',
+                h.betResult === 'hit'
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                  : 'bg-red-500/15 text-red-300 border-red-500/30',
+              )}>
+                {h.betResult === 'hit' ? 'HIT' : 'MISS'}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-[11px] text-[oklch(0.38_0.01_280)] text-center py-4">No detailed history available</p>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TabInjuries — injury reports (Tab 5)
+// ─────────────────────────────────────────────────────────────────────────────
+function TabInjuries({ data }: { data: BettingCardData }) {
+  const injuries = Array.isArray(data.injuries) ? data.injuries : [];
+
+  if (injuries.length > 0) {
+    const statusCls = (status: string) => {
+      const s = status?.toUpperCase();
+      if (s === 'OUT') return 'bg-red-500/15 text-red-300 border-red-500/30';
+      if (s === 'DOUBTFUL') return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+      if (s === 'QUESTIONABLE') return 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30';
+      if (s === 'GTD') return 'bg-blue-500/15 text-blue-300 border-blue-500/30';
+      return 'bg-white/10 text-white/60 border-white/20';
+    };
+    return (
+      <div className="space-y-1.5">
+        {injuries.map((inj: any, i: number) => (
+          <div key={i} className="px-3 py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)]">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[11px] font-black text-white truncate">{inj.player}</p>
+                <p className="text-[9px] text-[oklch(0.40_0.01_280)]">{inj.team}</p>
+              </div>
+              <span className={cn('px-2 py-0.5 rounded-full text-[8px] font-black border shrink-0', statusCls(inj.status))}>
+                {inj.status?.toUpperCase()}
+              </span>
+            </div>
+            {inj.impact && (
+              <p className="text-[9px] text-[oklch(0.42_0.01_280)] mt-1.5 leading-relaxed">{inj.impact}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (data.injuryAlert) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/6 border border-red-500/20">
+        <Shield className="w-3 h-3 text-red-400 shrink-0" />
+        <span className="text-[10px] text-red-300 leading-relaxed">{data.injuryAlert}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-2 py-6 text-center">
+      <Shield className="w-8 h-8 text-[oklch(0.28_0.01_280)]" />
+      <p className="text-[11px] text-[oklch(0.38_0.01_280)]">No injury reports for this game</p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TabWatch — players to watch (Tab 6)
+// ─────────────────────────────────────────────────────────────────────────────
+function TabWatch({ data, onAnalyze }: { data: BettingCardData; onAnalyze?: () => void }) {
+  const players = Array.isArray(data.playersToWatch) ? data.playersToWatch : [];
+
+  if (players.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-6 text-center">
+        <Eye className="w-8 h-8 text-[oklch(0.28_0.01_280)]" />
+        <p className="text-[11px] text-[oklch(0.38_0.01_280)]">No watch list available</p>
+        {onAnalyze && (
+          <button
+            onClick={onAnalyze}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[oklch(0.13_0.012_280)] border border-[oklch(0.22_0.018_280)] text-[10px] font-semibold text-[oklch(0.52_0.01_280)] hover:text-white hover:border-[oklch(0.32_0.02_280)] transition-all"
+          >
+            Ask AI who to watch in this game →
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {players.map((p: any, i: number) => (
+        <div key={i} className="flex items-start gap-3 px-3 py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)]">
+          <PlayerAvatar playerName={p.player} photoUrl={p.photoUrl} sport={data.sport} size="md" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-black text-white truncate">{p.player}</p>
+            <p className="text-[9px] text-[oklch(0.40_0.01_280)] mb-1">{p.team}</p>
+            <p className="text-[10px] text-[oklch(0.50_0.01_280)] leading-relaxed">{p.reason}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main BettingCard
 // ─────────────────────────────────────────────────────────────────────────────
 export const BettingCard = memo(function BettingCard({
@@ -431,6 +918,8 @@ export const BettingCard = memo(function BettingCard({
 
   const books: BookEntry[] = Array.isArray(data.books) ? data.books : [];
   const hasBookComparison = books.length >= 2;
+
+  const [activeTab, setActiveTab] = useState(0);
 
   return (
     <article className={cn(
@@ -638,196 +1127,39 @@ export const BettingCard = memo(function BettingCard({
           <p className="text-sm font-semibold text-white/80 mt-3 truncate">{title}</p>
         )}
 
-        {/* ── Multi-book odds comparison ─────────────────────────────── */}
-        {!isFinal && hasBookComparison && teams && (
-          <BookComparisonRow
+        {/* ── Tab bar ───────────────────────────────────────────────── */}
+        <TabBar activeTab={activeTab} onSelect={setActiveTab} accentCls={theme.avatarCls} />
+
+        {/* ── Tab content ───────────────────────────────────────────── */}
+        {activeTab === 0 && (
+          <TabOdds
+            data={data}
+            teams={teams}
+            isFinal={isFinal}
+            hasBookComparison={hasBookComparison}
             books={books}
-            homeTeam={teams.home}
-            awayTeam={teams.away}
-            bestHomeOdds={data.bestHomeOdds}
-            bestAwayOdds={data.bestAwayOdds}
+            spreadHome={spreadHome}
+            spreadAway={spreadAway}
+            ou={ou}
+            hasOdds={hasOdds}
+            isBestHome={isBestHome}
+            isBestAway={isBestAway}
+            awayML={awayML}
+            homeML={homeML}
+            confPct={confPct}
+            sharpPct={sharpPct}
+            hasLineMove={hasLineMove}
+            moveDir={moveDir}
+            moveNum={moveNum}
+            rawMove={String(rawMove)}
+            vigPct={vigPct}
           />
         )}
-
-        {/* ── Value edge indicator ──────────────────────────────────── */}
-        {data.edge && (() => {
-          const edgeNum = parseFloat(String(data.edge).replace(/[^0-9.-]/g, ''));
-          if (isNaN(edgeNum) || edgeNum < 2) return null;
-          return (
-            <div className={cn(
-              'flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-bold',
-              edgeNum >= 5
-                ? 'bg-emerald-500/10 border border-emerald-500/25 text-emerald-300'
-                : 'bg-amber-500/10 border border-amber-500/25 text-amber-300',
-            )}>
-              <Zap className="w-3.5 h-3.5 shrink-0" />
-              <span className="flex-1">{edgeNum >= 5 ? 'Strong edge detected' : 'Potential value'} — {data.edge} edge vs market</span>
-            </div>
-          );
-        })()}
-
-        {/* ── Odds grid ─────────────────────────────────────────────── */}
-        {hasOdds && !isFinal && (
-          <div className={cn(
-            'grid gap-1.5',
-            spreadHome && spreadAway && ou
-              ? 'grid-cols-3'
-              : spreadHome && spreadAway
-              ? 'grid-cols-2'
-              : 'grid-cols-2 sm:grid-cols-3',
-          )}>
-            {spreadAway && (
-              <OddsCell
-                label={teams ? `${abbr(teams.away)} SPREAD` : 'Away Spread'}
-                value={spreadAway.pts}
-                sub={spreadAway.juice ? `juice ${spreadAway.juice}` : undefined}
-                positive={spreadAway.pts?.startsWith('+') ? true : spreadAway.pts?.startsWith('-') ? false : undefined}
-              />
-            )}
-            {spreadHome && (
-              <OddsCell
-                label={teams ? `${abbr(teams.home)} SPREAD` : 'Home Spread'}
-                value={spreadHome.pts}
-                sub={spreadHome.juice ? `juice ${spreadHome.juice}` : undefined}
-                positive={spreadHome.pts?.startsWith('+') ? true : spreadHome.pts?.startsWith('-') ? false : undefined}
-              />
-            )}
-            {ou && (
-              <OddsCell
-                label="TOTAL O/U"
-                value={ou.total}
-                sub={ou.overJ ? `O ${ou.overJ} · U ${ou.underJ ?? '—'}` : undefined}
-                highlight
-              />
-            )}
-            {!spreadAway && !spreadHome && !ou && awayML && (
-              <OddsCell label={teams ? abbr(teams.away) : 'Away'} value={awayML.display} positive={awayML.positive} isBest={isBestAway} />
-            )}
-            {!spreadAway && !spreadHome && !ou && homeML && (
-              <OddsCell label={teams ? abbr(teams.home) : 'Home'} value={homeML.display} positive={homeML.positive} isBest={isBestHome} />
-            )}
-          </div>
-        )}
-
-        {/* ── Analytics panel ───────────────────────────────────────── */}
-        {(confPct !== null || sharpPct !== null || hasLineMove || vigPct !== null) && (
-          <div className="rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] p-3 space-y-2.5">
-            <div className="flex items-center gap-1.5">
-              <Zap className="w-3 h-3 text-amber-400" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-[oklch(0.42_0.01_280)]">Market Intelligence</span>
-            </div>
-
-            {confPct !== null && (
-              <div className="space-y-1">
-                <div className="flex justify-between text-[9px] font-semibold text-[oklch(0.42_0.01_280)]">
-                  <span>Model Confidence</span>
-                  <span className={cn(
-                    confPct >= 70 ? 'text-emerald-400' : confPct >= 50 ? 'text-blue-400' : 'text-amber-400'
-                  )}>{Math.round(confPct)}%</span>
-                </div>
-                <div className="h-2 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
-                  <div
-                    className={cn('h-full rounded-full transition-all duration-700',
-                      confPct >= 70 ? 'bg-emerald-400' : confPct >= 50 ? 'bg-blue-400' : 'bg-amber-400'
-                    )}
-                    style={{ width: `${Math.min(100, confPct)}%` }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {sharpPct !== null && (
-              <div className="space-y-1">
-                <div className="flex justify-between text-[9px] font-semibold text-[oklch(0.42_0.01_280)]">
-                  <span>Sharp Money</span>
-                  <span className={cn(sharpPct >= 60 ? 'text-purple-400' : 'text-[oklch(0.55_0.01_280)]')}>{Math.round(sharpPct)}%</span>
-                </div>
-                <div className="h-2 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-purple-500 to-violet-400 transition-all duration-700"
-                    style={{ width: `${Math.min(100, sharpPct)}%` }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {hasLineMove && (
-              <div className="flex items-center justify-between">
-                <span className="text-[9px] font-semibold text-[oklch(0.42_0.01_280)] uppercase tracking-wider">Line Movement</span>
-                <span className={cn(
-                  'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border',
-                  moveDir === 'up' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                  : moveDir === 'down' ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                  : 'bg-[oklch(0.14_0.01_280)] text-[oklch(0.48_0.01_280)] border-[oklch(0.20_0.015_280)]',
-                )}>
-                  {moveDir === 'up' ? <TrendingUp className="w-2.5 h-2.5" /> : moveDir === 'down' ? <TrendingDown className="w-2.5 h-2.5" /> : <Minus className="w-2.5 h-2.5" />}
-                  {!isNaN(moveNum) && moveNum !== 0 ? (moveNum > 0 ? `+${moveNum}` : String(moveNum)) : String(rawMove)}
-                </span>
-              </div>
-            )}
-
-            {/* Reverse Line Movement indicator */}
-            {sharpPct !== null && sharpPct >= 60 && hasLineMove && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/8 border border-amber-500/20">
-                <Zap className="w-3 h-3 text-amber-400 shrink-0" />
-                <span className="text-[10px] font-bold text-amber-300">Reverse Line Movement</span>
-                <span className="text-[9px] text-amber-400/70 ml-0.5">— sharp action against public</span>
-              </div>
-            )}
-
-            {/* Book vig (overround) */}
-            {vigPct !== null && vigPct > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-[9px] font-semibold text-[oklch(0.42_0.01_280)] uppercase tracking-wider">Book Vig</span>
-                <span className={cn(
-                  'text-[10px] font-bold',
-                  vigPct > 5 ? 'text-red-400' : vigPct > 3 ? 'text-amber-400' : 'text-emerald-400',
-                )}>
-                  {vigPct}%
-                </span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Records ───────────────────────────────────────────────── */}
-        {(data.atsRecord || data.h2hRecord || data.homeRecord || data.awayRecord) && (
-          <div className="grid grid-cols-2 gap-1.5">
-            {[
-              { label: 'ATS', val: data.atsRecord },
-              { label: 'H2H', val: data.h2hRecord },
-              { label: 'Home', val: data.homeRecord },
-              { label: 'Away', val: data.awayRecord },
-            ].filter(r => !!r.val).map(({ label, val }) => (
-              <div key={label} className="rounded-lg bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] px-2.5 py-1.5">
-                <div className="text-[9px] font-bold uppercase tracking-wider text-[oklch(0.38_0.01_280)]">{label}</div>
-                <div className="text-xs font-black text-white mt-0.5">{val}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ── Alerts ────────────────────────────────────────────────── */}
-        {data.injuryAlert && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/6 border border-red-500/20">
-            <Shield className="w-3 h-3 text-red-400 shrink-0" />
-            <span className="text-[10px] text-red-300 leading-relaxed">{data.injuryAlert}</span>
-          </div>
-        )}
-        {data.weatherNote && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-sky-500/6 border border-sky-500/20">
-            <Wind className="w-3 h-3 text-sky-400 shrink-0" />
-            <span className="text-[10px] text-sky-300 leading-relaxed">{data.weatherNote}</span>
-          </div>
-        )}
-
-        {/* ── Recommendation ────────────────────────────────────────── */}
-        {data.recommendation && (
-          <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)]">
-            <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
-            <p className="text-xs text-[oklch(0.62_0.005_85)] leading-relaxed">{data.recommendation}</p>
-          </div>
-        )}
+        {activeTab === 1 && <TabProps data={data} onAnalyze={onAnalyze} />}
+        {activeTab === 2 && <TabTeams data={data} teams={teams} theme={theme} />}
+        {activeTab === 3 && <TabHistory data={data} />}
+        {activeTab === 4 && <TabInjuries data={data} />}
+        {activeTab === 5 && <TabWatch data={data} onAnalyze={onAnalyze} />}
 
         {/* ── Footer ────────────────────────────────────────────────── */}
         <div className="pt-2 border-t border-[oklch(0.15_0.015_280)] space-y-2">

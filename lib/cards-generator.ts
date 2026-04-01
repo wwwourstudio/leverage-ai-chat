@@ -733,6 +733,13 @@ async function buildPitcherCard(
   let fbVelo: number | null = null;
   let whiffPct: number | null = null;
   let team: string | null = null;
+  let spinRate: number | null = null;
+  let extension: number | null = null;
+  let hBreak: number | null = null;
+  let vBreak: number | null = null;
+  let fbPct: number | null = null;
+  let breakingPct: number | null = null;
+  let offspeedPct: number | null = null;
   try {
     const { findPitcherByName } = await import('@/lib/mlb-projections/statcast-client');
     const ps = await Promise.race([
@@ -740,11 +747,18 @@ async function buildPitcherCard(
       new Promise<null>((res) => setTimeout(() => res(null), 3_000)),
     ]);
     if (ps) {
-      kPct     = ps.kPct;
-      bbPct    = ps.bbPct;
-      fbVelo   = ps.avgVelocity;
-      whiffPct = ps.whiffPct;
-      team     = ps.team || null;
+      kPct        = ps.kPct;
+      bbPct       = ps.bbPct;
+      fbVelo      = ps.avgVelocity;
+      whiffPct    = ps.whiffPct;
+      team        = ps.team || null;
+      spinRate    = ps.spinRate    ?? null;
+      extension   = ps.extension   ?? null;
+      hBreak      = ps.horizontalBreak ?? null;
+      vBreak      = ps.verticalBreak   ?? null;
+      fbPct       = ps.fastballPct ?? null;
+      breakingPct = ps.breakingPct ?? null;
+      offspeedPct = ps.offspeedPct ?? null;
     }
   } catch { /* non-fatal — card still renders with contact quality data */ }
 
@@ -780,7 +794,23 @@ async function buildPitcherCard(
     gradient: 'from-violet-600/75 via-blue-900/55 to-slate-900/40',
     status,
     summary_metrics: metrics,
-    data: { playerName: name, realData: true, headshotUrl },
+    data: {
+      playerName: name,
+      realData: true,
+      headshotUrl,
+      team: team ?? undefined,
+      // Advanced tab data
+      spinRate:    spinRate    != null ? `${Math.round(spinRate)} rpm`            : undefined,
+      extension:   extension   != null ? `${Number(extension).toFixed(1)} ft`     : undefined,
+      hBreak:      hBreak      != null ? `${Number(hBreak).toFixed(1)} in`        : undefined,
+      vBreak:      vBreak      != null ? `${Number(vBreak).toFixed(1)} in`        : undefined,
+      pitchMixFB:  fbPct       != null ? `${Number(fbPct).toFixed(0)}%`           : undefined,
+      pitchMixBrk: breakingPct != null ? `${Number(breakingPct).toFixed(0)}%`     : undefined,
+      pitchMixOff: offspeedPct != null ? `${Number(offspeedPct).toFixed(0)}%`     : undefined,
+      // Raw numbers for the Props tab edge calc
+      kPctRaw:  kPct  != null ? kPct  : undefined,
+      fbVeloRaw: fbVelo != null ? fbVelo : undefined,
+    },
     trend_note: 'Against metrics (EV, Hard Hit%, Barrel%) — lower is better for the pitcher',
     last_updated: new Date().toLocaleDateString(),
     metadata: { realData: true, source: 'Baseball Savant · Statcast' },

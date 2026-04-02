@@ -1062,7 +1062,7 @@ function buildKalshiUnavailableCards(_count: number): any[] {
     icon: 'AlertTriangle',
     category: 'KALSHI',
     subcategory: 'Service Status',
-    gradient: 'from-gray-700 to-gray-800',
+    gradient: 'from-[var(--bg-surface)] to-[var(--bg-elevated)]',
     realData: false,
     status: 'neutral',
     data: {

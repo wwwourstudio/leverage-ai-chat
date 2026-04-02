@@ -6,7 +6,7 @@ import {
   Cpu, Film, Globe, Clock,
   Bitcoin, ArrowUp, ArrowDown, ExternalLink,
   Flame, BarChart3, ChevronRight, Layers,
-  Activity, Zap, TrendingDown,
+  Activity, Zap, TrendingDown, Bookmark,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useKalshiStore } from '@/lib/store/kalshi-store';
@@ -206,21 +206,33 @@ function InactivePriceState() {
 
 // ── Signal Banner ──────────────────────────────────────────────────────────────
 
+type RecClass = 'strong_yes' | 'lean_yes' | 'strong_no' | 'lean_no' | 'efficient' | 'unknown';
+
+function classifyRecommendation(rec?: string): RecClass {
+  if (!rec) return 'unknown';
+  const s = rec.toLowerCase();
+  if (s.includes('strong yes') || s.includes('strong buy yes')) return 'strong_yes';
+  if (s.includes('lean yes')   || s.includes('slight yes'))     return 'lean_yes';
+  if (s.includes('strong no')  || s.includes('strong buy no'))  return 'strong_no';
+  if (s.includes('lean no')    || s.includes('slight no'))      return 'lean_no';
+  if (s.includes('efficient')  || s.includes('50/50'))          return 'efficient';
+  return 'unknown';
+}
+
+const REC_CONFIG: Record<RecClass, { icon: React.ReactNode; color: string; bg: string; border: string }> = {
+  strong_yes: { icon: <Zap className="w-3 h-3 shrink-0" />,         color: YES_COLOR,       bg: YES_COLOR + '14', border: YES_COLOR + '35' },
+  lean_yes:   { icon: <TrendingUp className="w-3 h-3 shrink-0" />,  color: YES_COLOR + 'cc', bg: YES_COLOR + '0a', border: YES_COLOR + '25' },
+  strong_no:  { icon: <Zap className="w-3 h-3 shrink-0" />,         color: NO_COLOR,        bg: NO_COLOR  + '14', border: NO_COLOR  + '35' },
+  lean_no:    { icon: <TrendingDown className="w-3 h-3 shrink-0" />, color: NO_COLOR + 'cc', bg: NO_COLOR  + '0a', border: NO_COLOR  + '25' },
+  efficient:  { icon: <Activity className="w-3 h-3 shrink-0" />,    color: '#6366f1cc',     bg: '#6366f10e',      border: '#6366f130'       },
+  unknown:    { icon: <Activity className="w-3 h-3 shrink-0" />,    color: '#6366f1cc',     bg: '#6366f10e',      border: '#6366f130'       },
+};
+
 function SignalBanner({ recommendation, edgeScore }: { recommendation?: string; edgeScore?: number }) {
   if (!recommendation) return null;
-
-  const isStrongYes = recommendation.toLowerCase().includes('strong yes');
-  const isLeanYes   = recommendation.toLowerCase().includes('lean yes');
-  const isStrongNo  = recommendation.toLowerCase().includes('strong no');
-  const isLeanNo    = recommendation.toLowerCase().includes('lean no');
-  const isEfficient = recommendation.toLowerCase().includes('efficient');
-
-  const config =
-    isStrongYes ? { icon: <Zap className="w-3 h-3 shrink-0" />,        color: YES_COLOR, bg: YES_COLOR + '14', border: YES_COLOR + '35' } :
-    isLeanYes   ? { icon: <TrendingUp className="w-3 h-3 shrink-0" />, color: YES_COLOR + 'cc', bg: YES_COLOR + '0a', border: YES_COLOR + '25' } :
-    isStrongNo  ? { icon: <Zap className="w-3 h-3 shrink-0" />,        color: NO_COLOR,  bg: NO_COLOR  + '14', border: NO_COLOR  + '35' } :
-    isLeanNo    ? { icon: <TrendingDown className="w-3 h-3 shrink-0" />, color: NO_COLOR + 'cc', bg: NO_COLOR + '0a', border: NO_COLOR + '25' } :
-    { icon: <Activity className="w-3 h-3 shrink-0" />, color: '#6366f1cc', bg: '#6366f10e', border: '#6366f130' };
+  const cls    = classifyRecommendation(recommendation);
+  const config = REC_CONFIG[cls];
+  const showEdge = typeof edgeScore === 'number' && edgeScore > 0 && cls !== 'efficient';
 
   return (
     <div
@@ -229,7 +241,7 @@ function SignalBanner({ recommendation, edgeScore }: { recommendation?: string; 
     >
       {config.icon}
       <span className="flex-1 leading-snug">{recommendation}</span>
-      {typeof edgeScore === 'number' && edgeScore > 0 && !isEfficient && (
+      {showEdge && (
         <span className="tabular-nums font-black text-[10px] shrink-0 opacity-80">
           {edgeScore}% edge
         </span>
@@ -305,16 +317,7 @@ function ProbabilityHero({
         </div>
       </div>
 
-      {/* Full-width sparkline row */}
-      {trades && trades.length >= 2 ? (
-        <div className="w-full rounded-xl overflow-hidden bg-[var(--bg-overlay)] px-2 pt-2 pb-1">
-          <Sparkline trades={trades} fullWidth height={48} />
-          <div className="flex items-center justify-between mt-1 px-1">
-            <span className="text-[8px] font-semibold text-[var(--text-faint)]">Price history</span>
-            <span className="text-[8px] font-semibold text-[var(--text-faint)]">24h</span>
-          </div>
-        </div>
-      ) : null}
+      {/* Sparkline moved to Trade tab */}
 
       {/* Probability bar */}
       <div className="space-y-1">
@@ -655,6 +658,319 @@ function Divider() {
   return <div className="h-px bg-[var(--border-subtle)]" />;
 }
 
+// ── Watchlist hook ─────────────────────────────────────────────────────────────
+
+const WATCHLIST_KEY = 'leverage_watchlist';
+interface WatchlistEntry { name: string; team?: string; position: string; addedAt: string; }
+
+function useKalshiWatchlist(title: string, ticker?: string) {
+  const name = title.slice(0, 60);
+  const [watched, setWatched] = useState<boolean>(() => {
+    try {
+      const list: WatchlistEntry[] = JSON.parse(localStorage.getItem(WATCHLIST_KEY) ?? '[]');
+      return list.some(e => e.name === name);
+    } catch { return false; }
+  });
+
+  const toggle = useCallback(() => {
+    setWatched(prev => {
+      const next = !prev;
+      try {
+        const list: WatchlistEntry[] = JSON.parse(localStorage.getItem(WATCHLIST_KEY) ?? '[]');
+        const updated = next
+          ? [...list, { name, position: 'KALSHI', team: ticker, addedAt: new Date().toISOString() }]
+          : list.filter(e => e.name !== name);
+        localStorage.setItem(WATCHLIST_KEY, JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('watchlist-update', { detail: { count: updated.length } }));
+      } catch {}
+      return next;
+    });
+  }, [name, ticker]);
+
+  return { watched, toggle };
+}
+
+// ── Tab Bar ────────────────────────────────────────────────────────────────────
+
+const KALSHI_TABS = ['Market', 'Depth', 'Trade', 'Watch'] as const;
+
+function KalshiTabBar({ activeTab, onSelect, accentColor }: {
+  activeTab: number; onSelect: (i: number) => void; accentColor: string;
+}) {
+  return (
+    <div className="flex overflow-x-auto gap-1 px-4 pt-3 pb-0" style={{ scrollbarWidth: 'none' }}>
+      {KALSHI_TABS.map((tab, i) => (
+        <button
+          key={tab}
+          onClick={() => onSelect(i)}
+          className={cn(
+            'px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 border transition-all duration-150',
+            activeTab !== i && 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-muted)]',
+          )}
+          style={activeTab === i ? {
+            color: accentColor,
+            backgroundColor: accentColor + '18',
+            border: `1px solid ${accentColor}35`,
+          } : undefined}
+        >
+          {tab}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Tab 0 — Market ─────────────────────────────────────────────────────────────
+
+function TabMarket({
+  yesPct, lastPrice, priceDir, priceChange, isHero, animated,
+  closeTimeIso, recommendation, edgeScore, priceIsReal, safeChange,
+}: {
+  yesPct: number; lastPrice?: number; priceDir?: string; priceChange?: number;
+  isHero?: boolean; animated: boolean; closeTimeIso?: string; recommendation?: string;
+  edgeScore?: number; priceIsReal?: boolean; safeChange: number;
+}) {
+  return (
+    <div className="space-y-3.5 pt-3">
+      {priceIsReal && safeChange !== 0 && (
+        <PriceMovementChip priceChange={safeChange} priceDir={priceDir ?? 'flat'} />
+      )}
+      {priceIsReal && (
+        <SignalBanner recommendation={recommendation} edgeScore={edgeScore} />
+      )}
+      {priceIsReal ? (
+        <ProbabilityHero
+          yesPct={yesPct} lastPrice={lastPrice} priceDir={priceDir}
+          priceChange={priceChange} trades={null}
+          isHero={isHero} animated={animated}
+        />
+      ) : (
+        <InactivePriceState />
+      )}
+      <Divider />
+      <TimeBar closeTimeIso={closeTimeIso} />
+    </div>
+  );
+}
+
+// ── Tab 1 — Depth ──────────────────────────────────────────────────────────────
+
+function TabDepth({
+  bids, asks, yesBid, yesAsk, noBid, noAsk, spread, spreadLabel,
+  hasPrices, hasOrderBook, priceFlash,
+  volume24hRaw, volumeRaw, openInterestRaw, volumeTier, isActive,
+}: {
+  bids: Array<{ price: number; quantity: number }>;
+  asks: Array<{ price: number; quantity: number }>;
+  yesBid: number | null; yesAsk: number | null;
+  noBid: number | null;  noAsk: number | null;
+  spread?: number; spreadLabel?: string;
+  hasPrices: boolean; hasOrderBook: boolean; priceFlash: boolean;
+  volume24hRaw?: number; volumeRaw?: number; openInterestRaw?: number;
+  volumeTier?: string; isActive: boolean;
+}) {
+  const spreadConf =
+    typeof spread !== 'number' ? null :
+    spread <= 1 ? { color: YES_COLOR } :
+    spread <= 4 ? { color: '#f59e0b' } :
+    { color: NO_COLOR };
+  const spreadBarPct = typeof spread === 'number' ? Math.min(100, (spread / 10) * 100) : 0;
+
+  return (
+    <div className="space-y-3 pt-3">
+      {hasOrderBook && (
+        <OrderBookMini bids={bids} asks={asks} />
+      )}
+
+      {isActive && hasPrices && (
+        <div className={cn(
+          'rounded-xl transition-colors duration-700',
+          priceFlash ? 'bg-emerald-500/8' : 'bg-transparent',
+        )}>
+          <PriceChips
+            yesBid={yesBid} yesAsk={yesAsk}
+            noBid={noBid}   noAsk={noAsk}
+            spread={spread}
+          />
+        </div>
+      )}
+
+      {typeof spread === 'number' && (
+        <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">Spread Quality</span>
+            {spreadLabel && spreadConf && (
+              <span
+                className="text-[9px] font-bold px-2 py-0.5 rounded-full"
+                style={{ color: spreadConf.color, backgroundColor: spreadConf.color + '15', border: `1px solid ${spreadConf.color}28` }}
+              >
+                {spreadLabel}
+              </span>
+            )}
+          </div>
+          <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{ width: `${spreadBarPct}%`, backgroundColor: spreadConf?.color ?? '#6366f1' }}
+            />
+          </div>
+          <div className="flex justify-between text-[8px] text-[var(--text-faint)]">
+            <span>Tight (1¢)</span>
+            <span>Wide (10¢+)</span>
+          </div>
+        </div>
+      )}
+
+      <StatsRow
+        volume24hRaw={volume24hRaw}
+        volumeRaw={volumeRaw}
+        openInterestRaw={openInterestRaw}
+        volumeTier={volumeTier}
+      />
+    </div>
+  );
+}
+
+// ── Tab 2 — Trade ──────────────────────────────────────────────────────────────
+
+function TabTrade({
+  trades, priceChange, priceDir, lastPrice, volume24h, volumeTier, isHero,
+}: {
+  trades: Array<{ price: number }> | null;
+  priceChange: number; priceDir: string; lastPrice?: number;
+  volume24h?: string; volumeTier?: string; isHero?: boolean;
+}) {
+  const tierColor =
+    volumeTier === 'Deep'     ? YES_COLOR  :
+    volumeTier === 'Active'   ? '#f59e0b'  :
+    volumeTier === 'Moderate' ? '#6366f1'  : 'var(--text-faint)';
+
+  return (
+    <div className="space-y-3 pt-3">
+      {trades && trades.length >= 2 ? (
+        <div className="w-full rounded-xl overflow-hidden bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 pt-2 pb-1.5">
+          <Sparkline trades={trades} fullWidth height={isHero ? 96 : 80} />
+          <div className="flex items-center justify-between mt-1 px-1">
+            <span className="text-[8px] font-semibold text-[var(--text-faint)]">Entry price history</span>
+            <span className="text-[8px] font-semibold text-[var(--text-faint)]">24h</span>
+          </div>
+        </div>
+      ) : (
+        <div className="w-full rounded-xl py-5 flex flex-col items-center gap-2 text-center bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
+          <Activity className="w-5 h-5 text-[var(--text-faint)]" />
+          <span className="text-[11px] font-semibold text-[var(--text-muted)]">No price history</span>
+          <span className="text-[10px] text-[var(--text-faint)]">Market has not traded yet</span>
+        </div>
+      )}
+
+      {priceChange !== 0 && (
+        <PriceMovementChip priceChange={priceChange} priceDir={priceDir} />
+      )}
+
+      {lastPrice != null && lastPrice > 0 && (
+        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
+          <span className="text-[10px] font-semibold text-[var(--text-faint)]">Last trade</span>
+          <div className="flex items-center gap-1.5">
+            {priceDir === 'up'
+              ? <ArrowUp className="w-3 h-3" style={{ color: YES_COLOR }} />
+              : priceDir === 'down'
+              ? <ArrowDown className="w-3 h-3" style={{ color: NO_COLOR }} />
+              : null}
+            <span className="text-[12px] font-black tabular-nums text-foreground">{lastPrice}¢</span>
+          </div>
+        </div>
+      )}
+
+      {(volume24h || volumeTier) && (
+        <div className="grid grid-cols-2 gap-2">
+          {volume24h && (
+            <div className="flex flex-col gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5">
+              <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)]">24h Volume</span>
+              <span className="text-[13px] font-black tabular-nums text-foreground/80">{volume24h}</span>
+            </div>
+          )}
+          {volumeTier && (
+            <div className="flex flex-col gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5">
+              <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Tier</span>
+              <span className="text-[13px] font-black" style={{ color: tierColor }}>{volumeTier}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Tab 3 — Watch ──────────────────────────────────────────────────────────────
+
+function TabWatch({
+  title, ticker, seriesTicker, eventTicker, closeTimeIso, tradeBase,
+  accentColor, watched, toggleWatch,
+}: {
+  title: string; ticker?: string; seriesTicker?: string; eventTicker?: string;
+  closeTimeIso?: string; tradeBase: string; accentColor: string;
+  watched: boolean; toggleWatch: () => void;
+}) {
+  return (
+    <div className="space-y-3 pt-3">
+      {/* Bookmark toggle */}
+      <button
+        onClick={toggleWatch}
+        className={cn(
+          'flex items-center justify-center gap-2 w-full py-3 rounded-xl text-[12px] font-black tracking-wide transition-all duration-150',
+          !watched && 'bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-foreground',
+        )}
+        style={watched ? {
+          color: accentColor,
+          backgroundColor: accentColor + '18',
+          border: `1px solid ${accentColor}35`,
+        } : undefined}
+      >
+        <Bookmark className={cn('w-4 h-4', watched && 'fill-current')} />
+        {watched ? 'Watching this market' : 'Watch this market'}
+      </button>
+
+      {/* Ticker deep link */}
+      {ticker && (
+        <a
+          href={tradeBase}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] transition-colors duration-150 group/ticker"
+        >
+          <span className="font-mono text-[11px] text-[var(--text-muted)] group-hover/ticker:text-foreground transition-colors">{ticker}</span>
+          <ExternalLink className="w-3.5 h-3.5 text-[var(--text-faint)] group-hover/ticker:text-[var(--text-muted)]" />
+        </a>
+      )}
+
+      {/* Expiry */}
+      <div className="px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] space-y-2">
+        <TimeBar closeTimeIso={closeTimeIso} />
+        {closeTimeIso && (
+          <p className="text-[10px] text-[var(--text-faint)]">
+            {new Date(closeTimeIso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+          </p>
+        )}
+      </div>
+
+      <Divider />
+      <RelatedMarketsLink seriesTicker={seriesTicker} eventTicker={eventTicker} />
+
+      {/* Quick trade link */}
+      <a
+        href={tradeBase}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground hover:border-[var(--border-hover)] transition-all duration-150"
+      >
+        <Globe className="w-3.5 h-3.5" />
+        Open on Kalshi
+        <ExternalLink className="w-3 h-3 opacity-60" />
+      </a>
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export const KalshiCard = memo(function KalshiCard({
@@ -732,10 +1048,14 @@ export const KalshiCard = memo(function KalshiCard({
     return 50;
   })();
 
+  const [activeTab, setActiveTab] = useState(0);
+
   const isActive    = status === 'active' || status === 'open' || status === 'live';
   const marketCat   = (d.subcategory || subcategory || category || 'Prediction').toUpperCase();
   const accentColor = getCategoryAccent(d.iconLabel);
   const headerGrad  = getCategoryHeaderGrad(d.iconLabel);
+
+  const { watched, toggle: toggleWatch } = useKalshiWatchlist(title, d.ticker as string | undefined);
 
   // Use live WebSocket prices when available; fall back to REST data from props
   const yesBid: number | null = (livePrice && livePrice.yesBid > 0) ? livePrice.yesBid
@@ -851,79 +1171,74 @@ export const KalshiCard = memo(function KalshiCard({
         )}
       </div>
 
+      {/* ── Tab bar ─────────────────────────────────────────────────────────── */}
+      <KalshiTabBar activeTab={activeTab} onSelect={setActiveTab} accentColor={accentColor} />
+
       {/* ── Body ────────────────────────────────────────────────────────────── */}
-      <div className={cn('px-4 pb-4 space-y-3.5', isHero ? 'pt-4' : 'pt-3.5')}>
+      <div className={cn('px-4 pb-4', isHero ? 'pt-3' : 'pt-2.5')}>
 
-        {/* Price movement chip — prominent Δ indicator */}
-        {d.priceIsReal && safeChange !== 0 && (
-          <PriceMovementChip priceChange={safeChange} priceDir={priceDir} />
-        )}
-
-        {/* Signal banner — only shown when real price data exists */}
-        {d.priceIsReal && (
-          <SignalBanner
-            recommendation={d.recommendation}
-            edgeScore={typeof d.edgeScore === 'number' ? d.edgeScore : undefined}
-          />
-        )}
-
-        {/* Probability hero for active markets; inactive state for dormant markets */}
-        {d.priceIsReal ? (
-          <ProbabilityHero
+        {/* Tab content */}
+        {activeTab === 0 && (
+          <TabMarket
             yesPct={yesPct}
             lastPrice={typeof d.lastPrice === 'number' ? d.lastPrice : undefined}
             priceDir={priceDir}
             priceChange={safeChange}
-            trades={trades}
             isHero={isHero}
             animated={animated}
+            closeTimeIso={d.closeTimeIso as string | undefined}
+            recommendation={d.recommendation as string | undefined}
+            edgeScore={typeof d.edgeScore === 'number' ? d.edgeScore : undefined}
+            priceIsReal={!!d.priceIsReal}
+            safeChange={safeChange}
           />
-        ) : (
-          <InactivePriceState />
+        )}
+        {activeTab === 1 && (
+          <TabDepth
+            bids={Array.isArray(d.orderbookBids) ? d.orderbookBids as Array<{ price: number; quantity: number }> : []}
+            asks={Array.isArray(d.orderbookAsks) ? d.orderbookAsks as Array<{ price: number; quantity: number }> : []}
+            yesBid={yesBid} yesAsk={yesAsk}
+            noBid={noBid}   noAsk={noAsk}
+            spread={typeof d.spread === 'number' ? d.spread : undefined}
+            spreadLabel={typeof d.spreadLabel === 'string' ? d.spreadLabel : undefined}
+            hasPrices={hasPrices}
+            hasOrderBook={hasOrderBook}
+            priceFlash={priceFlash}
+            volume24hRaw={typeof d.volume24hRaw === 'number' ? d.volume24hRaw : undefined}
+            volumeRaw={typeof d.volumeRaw === 'number' ? d.volumeRaw : undefined}
+            openInterestRaw={typeof d.openInterestRaw === 'number' ? d.openInterestRaw : undefined}
+            volumeTier={typeof d.volumeTier === 'string' ? d.volumeTier : undefined}
+            isActive={isActive}
+          />
+        )}
+        {activeTab === 2 && (
+          <TabTrade
+            trades={trades}
+            priceChange={safeChange}
+            priceDir={priceDir}
+            lastPrice={typeof d.lastPrice === 'number' ? d.lastPrice : undefined}
+            volume24h={typeof d.volume24h === 'string' ? d.volume24h : undefined}
+            volumeTier={typeof d.volumeTier === 'string' ? d.volumeTier : undefined}
+            isHero={isHero}
+          />
+        )}
+        {activeTab === 3 && (
+          <TabWatch
+            title={title}
+            ticker={typeof d.ticker === 'string' ? d.ticker : undefined}
+            seriesTicker={typeof d.seriesTicker === 'string' ? d.seriesTicker : undefined}
+            eventTicker={typeof d.eventTicker === 'string' ? d.eventTicker : undefined}
+            closeTimeIso={typeof d.closeTimeIso === 'string' ? d.closeTimeIso : undefined}
+            tradeBase={tradeBase}
+            accentColor={accentColor}
+            watched={watched}
+            toggleWatch={toggleWatch}
+          />
         )}
 
         <Divider />
 
-        {/* Order book depth — hero/full-size only */}
-        {isHero && isActive && hasOrderBook && (
-          <OrderBookMini bids={d.orderbookBids} asks={d.orderbookAsks} />
-        )}
-
-        {/* Buy price chips — hero/full-size only */}
-        {isHero && isActive && hasPrices && !hasOrderBook && (
-          <div className={cn(
-            'rounded-xl transition-colors duration-700',
-            priceFlash ? 'bg-emerald-500/8' : 'bg-transparent',
-          )}>
-            <PriceChips
-              yesBid={yesBid} yesAsk={yesAsk}
-              noBid={noBid}   noAsk={noAsk}
-              spread={typeof d.spread === 'number' ? d.spread : undefined}
-            />
-          </div>
-        )}
-
-        {/* Market stats — hero/full-size only */}
-        {isHero && (
-          <StatsRow
-            volume24hRaw={d.volume24hRaw}
-            volumeRaw={d.volumeRaw}
-            openInterestRaw={d.openInterestRaw}
-            volumeTier={d.volumeTier}
-          />
-        )}
-
-        {/* Time remaining — always shown */}
-        <TimeBar closeTimeIso={d.closeTimeIso} />
-
-        {/* Related markets link — hero/full-size only */}
-        {isHero && (d.seriesTicker || d.eventTicker) && d.seriesTicker !== d.ticker && (
-          <RelatedMarketsLink seriesTicker={d.seriesTicker} eventTicker={d.eventTicker} />
-        )}
-
-        <Divider />
-
-        {/* ── CTAs ──────────────────────────────────────────────────────────── */}
+        {/* ── CTAs — always visible ──────────────────────────────────────────── */}
         <div className="space-y-2">
 
           {/* Primary: Place Bet on Kalshi */}

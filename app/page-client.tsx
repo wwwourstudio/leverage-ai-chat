@@ -286,19 +286,26 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [showAlertsLightbox, setShowAlertsLightbox] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
   const [showWatchlistLightbox, setShowWatchlistLightbox] = useState(false);
-  const [watchlistCount, setWatchlistCount] = useState(0);
-  // Sync watchlist badge count from localStorage on mount + on updates from card toggles
+  const [savedPlayersCount, setSavedPlayersCount] = useState(0);
+  const [savedCardsCount, setSavedCardsCount] = useState(0);
+  // Sync bookmark badge counts from localStorage on mount + on updates from card toggles
   useEffect(() => {
     try {
-      const list = JSON.parse(localStorage.getItem('leverage_watchlist') ?? '[]');
-      setWatchlistCount(Array.isArray(list) ? list.length : 0);
+      const players = JSON.parse(localStorage.getItem('leverage_watchlist') ?? '[]');
+      setSavedPlayersCount(Array.isArray(players) ? players.length : 0);
     } catch { /* ignore */ }
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ count: number }>).detail;
-      setWatchlistCount(detail.count);
+    try {
+      const cards = JSON.parse(localStorage.getItem('leverage_saved_cards') ?? '[]');
+      setSavedCardsCount(Array.isArray(cards) ? cards.length : 0);
+    } catch { /* ignore */ }
+    const playersHandler = (e: Event) => setSavedPlayersCount((e as CustomEvent<{ count: number }>).detail.count);
+    const cardsHandler = (e: Event) => setSavedCardsCount((e as CustomEvent<{ count: number }>).detail.count);
+    window.addEventListener('watchlist-update', playersHandler);
+    window.addEventListener('saved-cards-update', cardsHandler);
+    return () => {
+      window.removeEventListener('watchlist-update', playersHandler);
+      window.removeEventListener('saved-cards-update', cardsHandler);
     };
-    window.addEventListener('watchlist-update', handler);
-    return () => window.removeEventListener('watchlist-update', handler);
   }, []);
   const [showStripeLightbox, setShowStripeLightbox] = useState(false);
   const [showUserLightbox, setShowUserLightbox] = useState(false);
@@ -328,6 +335,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // Tracks an in-flight createThread() call so saveMessage can await it instead of
   // firing against a placeholder ID ('chat-1' or 'chat-{timestamp}').
   const pendingThreadRef = useRef<Promise<import('@/lib/chat-service').ChatThread | null> | null>(null);
+  const pendingQueryRef = useRef<string | null>(null);
 
   // Fantasy league setup state — must NOT read localStorage here (causes SSR hydration mismatch #418)
   const [fantasyLeague, setFantasyLeague] = useState<FantasyLeague | null>(null);
@@ -2803,6 +2811,64 @@ No preamble. Start directly with section 1.`;
     console.log('[v0] New', selectedCategory, 'analysis chat created. Chats remaining:', CHAT_LIMIT - updated.count);
   };
 
+  // ── Auto-query: fire pending query once the welcome message appears ───────────
+  // When openChatWithQuery sets pendingQueryRef and calls handleNewChat, messages
+  // resets to [welcomeMsg]. This effect detects that and submits the pending query.
+  useEffect(() => {
+    const q = pendingQueryRef.current;
+    if (q !== null && messages.length === 1 && (messages[0] as any)?.isWelcome) {
+      pendingQueryRef.current = null;
+      const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: q, timestamp: new Date() };
+      setMessages((prev: Message[]) => [...prev, userMsg]);
+      setInput('');
+      generateRealResponseRef.current?.(q);
+    }
+  }, [messages]);
+
+  // ── Sport/category inference helpers ─────────────────────────────────────────
+
+  function inferSportFromPosition(position: string): string {
+    const p = position.toUpperCase();
+    if (['SP','RP','CL','C','1B','2B','3B','SS','LF','CF','RF','DH','OF','P'].includes(p)) return 'baseball_mlb';
+    if (['QB','RB','WR','TE','K','DEF','PK','FB'].includes(p)) return 'americanfootball_nfl';
+    if (['PG','SG','SF','PF','F','G','F-C','G-F'].includes(p)) return 'basketball_nba';
+    return '';
+  }
+
+  const CARD_SPORT_MAP: Record<string, string> = {
+    MLB: 'baseball_mlb', NBA: 'basketball_nba', NFL: 'americanfootball_nfl',
+    NHL: 'icehockey_nhl', NCAAB: 'basketball_ncaab', NCAAF: 'americanfootball_ncaaf',
+    EPL: 'soccer_epl', MLS: 'soccer_usa_mls',
+  };
+  const CARD_PLATFORM_MAP: Record<string, string> = {
+    DFS: 'dfs', Kalshi: 'kalshi', Fantasy: 'fantasy',
+  };
+
+  // ── Open a new chat and immediately submit a query ────────────────────────────
+  const openChatWithQuery = (query: string, category?: string, sport?: string) => {
+    if (category) setSelectedCategory(category);
+    if (sport !== undefined) setSelectedSport(sport);
+    pendingQueryRef.current = query;
+    handleNewChat();
+  };
+
+  // ── Bookmark click handlers passed to WatchlistLightbox ──────────────────────
+
+  const handleSavedPlayerClick = (name: string, position: string, team?: string) => {
+    setShowWatchlistLightbox(false);
+    const sport = inferSportFromPosition(position);
+    const query = `Analyze ${name} — show me recent stats, props, and betting lines`;
+    openChatWithQuery(query, 'betting', sport || undefined);
+  };
+
+  const handleSavedCardClick = (entry: import('@/components/data-cards/DynamicCardRenderer').SavedCardEntry) => {
+    setShowWatchlistLightbox(false);
+    const sport = CARD_SPORT_MAP[entry.card.category] ?? '';
+    const platform = CARD_PLATFORM_MAP[entry.card.category] ?? 'betting';
+    const query = `Show me ${entry.card.subcategory || entry.card.type.replace(/_/g, ' ')} for ${entry.card.title}`;
+    openChatWithQuery(query, platform, sport || undefined);
+  };
+
   const handleSelectChat = (chatId: string) => {
     setActiveChat(chatId);
 
@@ -3588,7 +3654,7 @@ No preamble. Start directly with section 1.`;
           alertCount={alertCount}
           onOpenSettings={() => setShowSettingsLightbox(true)}
           onOpenWatchlist={() => setShowWatchlistLightbox(true)}
-          watchlistCount={watchlistCount}
+          watchlistCount={savedPlayersCount + savedCardsCount}
           onOpenLogin={() => setShowLoginModal(true)}
           onOpenSignup={() => setShowSignupModal(true)}
           currentSport={selectedSport || selectedCategory}
@@ -4363,14 +4429,9 @@ No preamble. Start directly with section 1.`;
       {/* Watchlist Lightbox */}
       <WatchlistLightbox
         isOpen={showWatchlistLightbox}
-        onClose={() => {
-          setShowWatchlistLightbox(false);
-          // Sync count after user may have removed players
-          try {
-            const list = JSON.parse(localStorage.getItem('leverage_watchlist') ?? '[]');
-            setWatchlistCount(Array.isArray(list) ? list.length : 0);
-          } catch { /* ignore */ }
-        }}
+        onClose={() => setShowWatchlistLightbox(false)}
+        onPlayerClick={handleSavedPlayerClick}
+        onCardClick={handleSavedCardClick}
       />
 
       {/* Stripe Purchase Lightbox */}

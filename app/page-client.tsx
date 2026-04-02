@@ -18,7 +18,8 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { fetchDynamicCards, type DynamicCard } from '@/lib/data-service';
-import { API_ENDPOINTS, PLAYER_HEADSHOT_IDS, sportToApi } from '@/lib/constants';
+import { API_ENDPOINTS, PLAYER_HEADSHOT_IDS, sportToApi, FREE_TIER } from '@/lib/constants';
+import { isDev as getIsDev } from '@/lib/config';
 import { createClient } from '@/lib/supabase/client';
 import { useKalshiStore } from '@/lib/store/kalshi-store';
 const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ default: m.AuthModals })), { ssr: false });
@@ -266,7 +267,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editingChatTitle, setEditingChatTitle] = useState('');
   const [showLimitNotification, setShowLimitNotification] = useState(false);
-  const [_chatsRemaining, setChatsRemaining] = useState(5);
+
   const [creditsRemaining, setCreditsRemaining] = useState(15);
   const [systemStatus, setSystemStatus] = useState<'ok' | 'degraded' | 'down'>('ok');
 
@@ -407,8 +408,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   
   // Credit system utilities — syncs with Supabase user_profiles when logged in,
   // falls back to localStorage for anonymous users.
-  const MESSAGE_LIMIT = parseInt(process.env.NEXT_PUBLIC_FREE_MESSAGE_LIMIT ?? '15', 10);
-  const CHAT_LIMIT = parseInt(process.env.NEXT_PUBLIC_FREE_CHAT_LIMIT ?? '10', 10);
+  const MESSAGE_LIMIT = FREE_TIER.MESSAGE_LIMIT;
+  const CHAT_LIMIT = FREE_TIER.CHAT_LIMIT;
   const LIMIT_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
   const [supabaseProfileId, setSupabaseProfileId] = useState<string | null>(null);
 
@@ -1538,7 +1539,7 @@ No preamble. Start directly with section 1.`;
     setIsTyping(true);
     setLastUserQuery(userMessage);
     const startTime = Date.now();
-    const isDev = process.env.NODE_ENV !== 'production';
+    const isDev = getIsDev();
 
     try {
       console.log('[v0] Starting real AI analysis for:', userMessage);
@@ -2230,7 +2231,7 @@ No preamble. Start directly with section 1.`;
     return null;
   };
   // Regression guard: MLB player names must override ambiguous team code matches.
-  if (process.env.NODE_ENV !== 'production') {
+  if (getIsDev()) {
     console.assert(
       detectSportFromText('Kyle Schwarber HR prop') === 'mlb',
       '[v0] detectSportFromText regression: "Kyle Schwarber HR prop" should return "mlb"',
@@ -2807,7 +2808,6 @@ No preamble. Start directly with section 1.`;
 
     // Update rate limit count
     const updated = updateRateLimitCount();
-    setChatsRemaining(CHAT_LIMIT - updated.count);
     console.log('[v0] New', selectedCategory, 'analysis chat created. Chats remaining:', CHAT_LIMIT - updated.count);
   };
 

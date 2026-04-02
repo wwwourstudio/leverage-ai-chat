@@ -7,6 +7,7 @@ import {
 } from '@/lib/odds/index';
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/lib/constants';
 import { getOddsApiKey } from '@/lib/config';
+import { americanToImpliedProb } from '@/lib/utils/odds-math';
 
 // ============================================================================
 // Default sport based on current month (season-aware)
@@ -24,9 +25,7 @@ function getDefaultSport(): string {
 // Odds enrichment — compute derived fields from raw bookmaker data
 // ============================================================================
 
-function americanToImplied(price: number): number {
-  return price >= 0 ? 100 / (price + 100) : (-price) / (-price + 100);
-}
+const americanToImplied = americanToImpliedProb;
 
 function enrichEvents(events: any[]): any[] {
   return events.map(event => {

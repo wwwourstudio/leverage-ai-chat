@@ -60,17 +60,12 @@ export interface ModelPredictionInput {
 // Core conversion utilities
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Convert American odds to decimal (e.g. -110 → 1.909, +150 → 2.500) */
-export function americanToDecimal(american: number): number {
-  if (american > 0) return 1 + american / 100;
-  return 1 + 100 / Math.abs(american);
-}
-
-/** Convert American odds to implied probability (includes bookmaker vig) */
-export function americanToImplied(american: number): number {
-  if (american > 0) return 100 / (american + 100);
-  return Math.abs(american) / (Math.abs(american) + 100);
-}
+// Re-exported from canonical odds-math module for backward compat (clv-tracker imports from here)
+export {
+  americanToDecimal,
+  americanToImpliedProb as americanToImplied,
+} from '@/lib/utils/odds-math';
+import { americanToDecimal, americanToImpliedProb as americanToImplied } from '@/lib/utils/odds-math';
 
 /**
  * Strip vig from a two-outcome market (e.g. moneyline, Over/Under).

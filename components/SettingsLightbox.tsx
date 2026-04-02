@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/toast-provider';
-import { API_ENDPOINTS } from '@/lib/constants';
+import { API_ENDPOINTS, SETTINGS_SPORTSBOOKS, SETTINGS_SPORTS, TIER_LABELS, RISK_CONFIG, THEME_CONFIG } from '@/lib/constants';
 
 // ── Toggle Switch ──────────────────────────────────────────────────────────
 function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
@@ -101,28 +101,6 @@ interface AiSuggestion {
 
 type SettingsTab = 'account' | 'preferences' | 'notifications' | 'aicoach';
 
-// ── Constants ──────────────────────────────────────────────────────────────
-const SPORTSBOOKS = ['DraftKings', 'FanDuel', 'BetMGM', 'Caesars', 'PointsBet', 'BetRivers', 'Barstool', 'WynnBET'];
-const SPORTS = ['NBA', 'NFL', 'MLB', 'NHL', 'NCAAB', 'NCAAF', 'EPL', 'MLS', 'UFC', 'Tennis'];
-
-const TIER_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  free:        { label: 'Free',        color: 'text-[var(--text-muted)]',   bg: 'bg-[var(--bg-elevated)] border-[var(--border-subtle)]' },
-  core:        { label: 'Core',        color: 'text-blue-400',   bg: 'bg-blue-500/20 border-blue-500/30' },
-  pro:         { label: 'Pro',         color: 'text-purple-400', bg: 'bg-purple-500/20 border-purple-500/30' },
-  high_stakes: { label: 'High Stakes', color: 'text-yellow-400', bg: 'bg-yellow-500/20 border-yellow-500/30' },
-};
-
-const RISK_CONFIG = [
-  { value: 'conservative', label: 'Conservative', emoji: '🛡️', desc: '~1–2% per bet', color: 'text-blue-400',  border: 'border-blue-500/40',  bg: 'bg-blue-500/10' },
-  { value: 'medium',       label: 'Medium',       emoji: '⚖️', desc: '~2–5% per bet', color: 'text-yellow-400', border: 'border-yellow-500/40', bg: 'bg-yellow-500/10' },
-  { value: 'aggressive',   label: 'Aggressive',   emoji: '🔥', desc: '~5–10% per bet', color: 'text-red-400',   border: 'border-red-500/40',    bg: 'bg-red-500/10' },
-];
-
-const THEME_CONFIG = [
-  { value: 'dark',   label: 'Dark',   emoji: '🌙' },
-  { value: 'light',  label: 'Light',  emoji: '☀️' },
-  { value: 'system', label: 'System', emoji: '💻' },
-];
 
 const NOTIFICATION_CONFIG = [
   { key: 'email_notifications'  as const, label: 'Email Notifications',  desc: 'Alerts and reports via email',          icon: Mail,       color: 'text-blue-400',   iconBg: 'bg-blue-500/15' },
@@ -496,7 +474,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                       <span className="text-[10px] text-[var(--text-faint)]">{prefs.tracked_sports.length} selected</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {SPORTS.map(sport => {
+                      {SETTINGS_SPORTS.map(sport => {
                         const active = prefs.tracked_sports.includes(sport);
                         return (
                           <button
@@ -523,7 +501,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
                       <span className="text-[10px] text-[var(--text-faint)]">{prefs.preferred_books.length} selected</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {SPORTSBOOKS.map(book => {
+                      {SETTINGS_SPORTSBOOKS.map(book => {
                         const active = prefs.preferred_books.includes(book);
                         return (
                           <button

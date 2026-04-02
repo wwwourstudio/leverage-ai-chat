@@ -28,16 +28,7 @@ export interface KellyInput {
   confidence?: number; // Confidence score 0-1 (default 1)
 }
 
-/**
- * Convert American odds to decimal odds
- */
-function americanToDecimal(odds: number): number {
-  if (odds > 0) {
-    return 1 + odds / 100;
-  } else {
-    return 1 + 100 / Math.abs(odds);
-  }
-}
+import { americanToDecimal } from '@/lib/utils/odds-math';
 
 /**
  * Calculate Kelly Criterion fraction for a given probability and odds

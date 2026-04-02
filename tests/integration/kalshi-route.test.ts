@@ -1,7 +1,7 @@
 /**
  * Integration tests for GET /api/kalshi and POST /api/kalshi
  *
- * Strategy: mock @/lib/kalshi-client so no real network calls are made.
+ * Strategy: mock @/lib/kalshi/index so no real network calls are made.
  * Each test configures the mock functions and verifies the handler's
  * routing logic, status codes, and response shapes.
  */
@@ -19,7 +19,7 @@ vi.mock('next/server', () => ({
 }));
 
 // ── kalshi-client mock ─────────────────────────────────────────────────────
-vi.mock('@/lib/kalshi-client', () => ({
+vi.mock('@/lib/kalshi/index', () => ({
   fetchKalshiMarkets: vi.fn(),
   fetchAllKalshiMarkets: vi.fn(),
   fetchSportsMarkets: vi.fn(),
@@ -36,7 +36,7 @@ import {
   fetchElectionMarkets,
   getMarketByTicker,
   kalshiMarketToCard,
-} from '@/lib/kalshi-client';
+} from '@/lib/kalshi/index';
 
 const { GET, POST } = await import('@/app/api/kalshi/route');
 

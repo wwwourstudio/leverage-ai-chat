@@ -5,6 +5,7 @@ import { TrustMetricsDisplay } from '@/components/trust-metrics-display';
 import { Shield, Copy, Edit3, CheckCheck, X, Zap, Brain, AlertCircle, Info, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/toast-provider';
+import { formatRelativeTime } from '@/lib/utils';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -356,15 +357,6 @@ function MarkdownContent({ text }: { text: string }) {
   return <div className="space-y-0.5">{elements}</div>;
 }
 
-function formatRelativeTime(date: Date): string {
-  const now = Date.now();
-  const diff = Math.floor((now - date.getTime()) / 1000);
-  if (diff < 5) return 'just now';
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
 
 /** Chars before we collapse an assistant message. ~2 full screens of text. */
 const COLLAPSE_THRESHOLD = 3000;

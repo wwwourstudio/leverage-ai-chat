@@ -8,12 +8,14 @@ import { createClient } from '@/lib/supabase/server';
 import { CACHE_CONFIG, API_ENDPOINTS, LOG_PREFIXES, DATA_SOURCES } from '@/lib/constants';
 import type { Result } from '@/lib/types';
 import { Ok, Err } from '@/lib/types';
+import { americanToImpliedProb, americanToDecimal } from '@/lib/utils/odds-math';
 
 // ============================================
 // Types
 // ============================================
 
 export interface DynamicCard {
+  id?: string;
   type: string;
   title: string;
   icon: string;
@@ -23,6 +25,7 @@ export interface DynamicCard {
   data: Record<string, any>;
   status: string;
   realData: boolean;
+  metadata?: Record<string, any>;
 }
 
 export interface UserInsights {
@@ -278,18 +281,11 @@ export function extractBestOdds(bookmakers: any[]): {
   };
 }
 
-export function oddsToImpliedProbability(americanOdds: number): number {
-  if (americanOdds > 0) {
-    return 100 / (americanOdds + 100);
-  } else {
-    return Math.abs(americanOdds) / (Math.abs(americanOdds) + 100);
-  }
-}
+export const oddsToImpliedProbability = americanToImpliedProb;
 
 export function calculateExpectedValue(
   americanOdds: number,
   trueProbability: number
 ): number {
-  const decimalOdds = americanOdds > 0 ? (americanOdds / 100) + 1 : (100 / Math.abs(americanOdds)) + 1;
-  return (trueProbability * decimalOdds) - 1;
+  return (trueProbability * americanToDecimal(americanOdds)) - 1;
 }

@@ -9,6 +9,8 @@
  *   Negative (-110): bet $110 to win $100 → return = stake + stake * (100 / 110)
  */
 
+import { americanOddsWin, americanOddsPayout } from '@/lib/utils/odds-math';
+
 export interface PickResultRow {
   predicted_prob: number;
   actual_result: boolean | null;
@@ -167,21 +169,3 @@ export function computeExpectedValue(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Total payout (stake + profit) for a winning bet.
- * americanOdds: +145 or -110
- * stake: amount wagered
- */
-function americanOddsPayout(americanOdds: number, stake: number): number {
-  return stake + americanOddsWin(americanOdds, stake);
-}
-
-/**
- * Net profit for a winning bet (payout minus stake).
- */
-function americanOddsWin(americanOdds: number, stake: number): number {
-  if (americanOdds >= 0) {
-    return stake * (americanOdds / 100);
-  }
-  return stake * (100 / Math.abs(americanOdds));
-}

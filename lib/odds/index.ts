@@ -5,6 +5,8 @@
  */
 
 import { ENV_KEYS, LOG_PREFIXES, EXTERNAL_APIS } from '@/lib/constants';
+import { getOddsApiKey } from '@/lib/config';
+import { americanToImpliedProb } from '@/lib/utils/odds-math';
 import { supabaseOddsService } from '@/lib/supabase-odds-service';
 import { oddsApiQueue } from '@/lib/api-request-manager';
 
@@ -313,7 +315,7 @@ export async function getOddsWithCache(
     }
   }
 
-  const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+  const apiKey = getOddsApiKey();
   if (!apiKey) {
     throw new Error('ODDS_API_KEY not configured');
   }
@@ -399,12 +401,8 @@ export async function findArbitrageOpportunities(
       }
     }
     
-    const homeImplied = bestHomeOdds > 0 
-      ? 100 / (bestHomeOdds + 100)
-      : -bestHomeOdds / (-bestHomeOdds + 100);
-    const awayImplied = bestAwayOdds > 0
-      ? 100 / (bestAwayOdds + 100)
-      : -bestAwayOdds / (-bestAwayOdds + 100);
+    const homeImplied = americanToImpliedProb(bestHomeOdds);
+    const awayImplied = americanToImpliedProb(bestAwayOdds);
     
     const totalImplied = homeImplied + awayImplied;
     

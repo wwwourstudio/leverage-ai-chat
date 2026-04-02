@@ -237,7 +237,7 @@ async function generateSportSpecificCards(
   // Fetch real live odds for this sport using unified service
   if (category === 'betting' || category === 'all' || !category) {
     try {
-      const { getOddsWithCache } = await import('@/lib/unified-odds-fetcher');
+      const { getOddsWithCache } = await import('@/lib/odds/index');
       
       const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
       if (!apiKey) {
@@ -1744,7 +1744,7 @@ async function _generateContextualCards(
         fetchAllKalshiMarkets,
         fetchMarketOrderbook,
         kalshiMarketToCard,
-      } = await import('@/lib/kalshi-client');
+      } = await import('@/lib/kalshi/index');
 
       let markets: any[] = [];
 

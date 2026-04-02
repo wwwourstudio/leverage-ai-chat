@@ -17,6 +17,7 @@ import { AI_CONFIG } from '@/lib/constants';
 import { getGrokApiKey, getOddsApiKey } from '@/lib/config';
 import { logger, LogCategory } from '@/lib/logger';
 import type { InsightCard } from '@/lib/cards-generator';
+import { americanToImpliedProb } from '@/lib/utils/odds-math';
 
 // ============================================================================
 // 1. INTENT PARSER — deterministic, no AI
@@ -777,10 +778,7 @@ export interface HREdgeContext {
   isSharp?: boolean;
 }
 
-/** American odds → implied probability (removes vig naively) */
-function americanToProb(odds: number): number {
-  return odds > 0 ? 100 / (odds + 100) : (-odds) / (-odds + 100);
-}
+const americanToProb = americanToImpliedProb;
 
 /**
  * Fetch all book HR prop lines for a player from The Odds API.

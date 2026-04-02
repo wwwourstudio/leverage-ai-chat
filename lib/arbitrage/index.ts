@@ -1,9 +1,17 @@
 /**
  * Unified Arbitrage Detection Engine
  * Consolidated from multiple arbitrage modules for better maintainability
- * 
+ *
  * Identifies risk-free betting opportunities across bookmakers
  */
+
+import {
+  americanToImpliedProb,
+  americanToDecimal,
+} from '@/lib/utils/odds-math';
+
+// Re-export for backward compatibility (tests and price-normalizer import from here)
+export { americanToImpliedProb as americanOddsToImpliedProbability, americanToDecimal } from '@/lib/utils/odds-math';
 
 export interface ArbitrageOpportunity {
   sport: string;
@@ -44,27 +52,6 @@ export interface ArbitrageOpportunity {
   allBooks: string[];
 }
 
-/**
- * Convert American odds to implied probability
- */
-export function americanOddsToImpliedProbability(odds: number): number {
-  if (odds > 0) {
-    return 100 / (odds + 100);
-  } else {
-    return Math.abs(odds) / (Math.abs(odds) + 100);
-  }
-}
-
-/**
- * Convert American odds to decimal odds
- */
-export function americanToDecimal(odds: number): number {
-  if (odds > 0) {
-    return (odds / 100) + 1;
-  } else {
-    return (100 / Math.abs(odds)) + 1;
-  }
-}
 
 /**
  * Detect arbitrage in two-sided markets
@@ -228,8 +215,8 @@ export function detectArbitrageOpportunities(
     }
     
     // Calculate implied probabilities
-    const homeProb = americanOddsToImpliedProbability(bestHomeOdds);
-    const awayProb = americanOddsToImpliedProbability(bestAwayOdds);
+    const homeProb = americanToImpliedProb(bestHomeOdds);
+    const awayProb = americanToImpliedProb(bestAwayOdds);
     const totalProb = homeProb + awayProb;
     
     // Arbitrage exists when total probability < 1

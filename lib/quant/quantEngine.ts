@@ -91,20 +91,14 @@ export interface QuantAnalysis {
 }
 
 // ─── Odds Conversion ─────────────────────────────────────────────────────────
+// Re-exported from canonical odds-math module for backward compat
 
-export function americanToDecimal(odds: number): number {
-  return odds > 0 ? (odds / 100) + 1 : (100 / Math.abs(odds)) + 1;
-}
-
-export function decimalToAmerican(decimal: number): number {
-  if (decimal >= 2) return Math.round((decimal - 1) * 100);
-  return Math.round(-100 / (decimal - 1));
-}
-
-export function americanToImplied(odds: number): number {
-  if (odds > 0) return 100 / (odds + 100);
-  return Math.abs(odds) / (Math.abs(odds) + 100);
-}
+export {
+  americanToDecimal,
+  decimalToAmerican,
+  americanToImpliedProb as americanToImplied,
+} from '@/lib/utils/odds-math';
+import { americanToDecimal, americanToImpliedProb as americanToImplied } from '@/lib/utils/odds-math';
 
 // ─── Kelly Criterion ─────────────────────────────────────────────────────────
 

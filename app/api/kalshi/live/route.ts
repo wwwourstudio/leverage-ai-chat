@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMarketByTicker, kalshiMarketToCard } from '@/lib/kalshi-client';
+import { getMarketByTicker, kalshiMarketToCard } from '@/lib/kalshi/index';
 
 /**
  * GET /api/kalshi/live?ticker=<TICKER>

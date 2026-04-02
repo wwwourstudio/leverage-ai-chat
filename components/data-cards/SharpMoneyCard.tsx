@@ -54,15 +54,15 @@ export function SharpMoneyCard({
   const movColor = isShorting ? 'text-red-400' : 'text-emerald-400';
 
   const magnitudeLabel = movementNum < 5 ? 'MINOR' : movementNum < 15 ? 'MODERATE' : 'MAJOR';
-  const magnitudeColor = movementNum >= 15 ? 'text-red-400' : movementNum >= 5 ? 'text-amber-400' : 'text-slate-400';
+  const magnitudeColor = movementNum >= 15 ? 'text-red-400' : movementNum >= 5 ? 'text-amber-400' : 'text-[var(--text-muted)]';
 
   return (
     <article
       className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border transition-all duration-200 animate-fade-in-up',
+        'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-200 animate-fade-in-up',
         isSteam
           ? 'border-red-600/50 hover:border-red-500/70 hover:shadow-[0_0_35px_oklch(0.4_0.18_25/0.15)]'
-          : 'border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)]',
+          : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)]',
         isHero && 'sm:rounded-3xl',
       )}
     >
@@ -81,30 +81,30 @@ export function SharpMoneyCard({
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-2 min-w-0">
             <Activity className="w-4 h-4 text-blue-400 shrink-0" aria-hidden="true" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.55_0.01_280)]">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
               {category}
             </span>
           </div>
-          <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[oklch(0.10_0.01_280)] text-[oklch(0.45_0.01_280)] border border-[oklch(0.20_0.015_280)] shrink-0">
+          <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[var(--bg-overlay)] text-[var(--text-muted)] border border-[var(--border-subtle)] shrink-0">
             {subcategory}
           </span>
         </div>
 
-        <h3 className="text-sm font-black text-[oklch(0.92_0.005_85)] mb-0.5 truncate">{title}</h3>
+        <h3 className="text-sm font-black text-foreground mb-0.5 truncate">{title}</h3>
         {data.outcome && (
-          <p className="text-[10px] font-semibold text-[oklch(0.60_0.01_280)] mb-0.5">Side: {data.outcome}</p>
+          <p className="text-[10px] font-semibold text-[var(--text-muted)] mb-0.5">Side: {data.outcome}</p>
         )}
         {data.matchup && (
-          <p className="text-[10px] text-[oklch(0.48_0.01_280)] mb-3 truncate">{data.matchup}</p>
+          <p className="text-[10px] text-[var(--text-muted)] mb-3 truncate">{data.matchup}</p>
         )}
         {!data.outcome && !data.matchup && <div className="mb-3" />}
 
         {/* Line movement visualization */}
         {(data.openPrice !== undefined && data.currentPrice !== undefined) && (
-          <div className="flex items-center justify-between bg-[oklch(0.09_0.01_280)] rounded-xl border border-[oklch(0.18_0.015_280)] p-4 mb-3">
+          <div className="flex items-center justify-between bg-[var(--bg-overlay)] rounded-xl border border-[var(--border-subtle)] p-4 mb-3">
             <div className="text-center flex-1">
-              <p className="text-[8px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-1.5">Opening</p>
-              <p className="text-xl font-black text-[oklch(0.55_0.01_280)] tabular-nums">
+              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1.5">Opening</p>
+              <p className="text-xl font-black text-[var(--text-muted)] tabular-nums">
                 {formatAmericanOdds(data.openPrice)}
               </p>
             </div>
@@ -121,7 +121,7 @@ export function SharpMoneyCard({
             </div>
 
             <div className="text-center flex-1">
-              <p className="text-[8px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-1.5">Current</p>
+              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1.5">Current</p>
               <p className={cn('text-xl font-black tabular-nums', movColor)}>
                 {formatAmericanOdds(data.currentPrice)}
               </p>
@@ -131,7 +131,7 @@ export function SharpMoneyCard({
 
         {/* Description / insight panel */}
         {data.description && (
-          <div className="rounded-lg bg-blue-500/5 border border-blue-500/15 px-3 py-2 text-[10px] text-[oklch(0.60_0.01_280)] mb-3 leading-relaxed">
+          <div className="rounded-lg bg-blue-500/5 border border-blue-500/15 px-3 py-2 text-[10px] text-[var(--text-muted)] mb-3 leading-relaxed">
             {data.description}
           </div>
         )}
@@ -140,26 +140,26 @@ export function SharpMoneyCard({
         <div className="space-y-1.5 text-xs">
           {data.market && (
             <div className="flex justify-between">
-              <span className="text-[oklch(0.45_0.01_280)]">Market</span>
-              <span className="font-semibold text-[oklch(0.80_0.005_85)]">{data.market}</span>
+              <span className="text-[var(--text-muted)]">Market</span>
+              <span className="font-semibold text-foreground">{data.market}</span>
             </div>
           )}
           {data.bookmaker && (
             <div className="flex justify-between">
-              <span className="text-[oklch(0.45_0.01_280)]">Source</span>
-              <span className="font-semibold text-[oklch(0.80_0.005_85)]">{data.bookmaker}</span>
+              <span className="text-[var(--text-muted)]">Source</span>
+              <span className="font-semibold text-foreground">{data.bookmaker}</span>
             </div>
           )}
           {data.sampleCount !== undefined && (
             <div className="flex justify-between">
-              <span className="text-[oklch(0.45_0.01_280)]">Snapshots</span>
-              <span className="font-semibold text-[oklch(0.80_0.005_85)]">{data.sampleCount}</span>
+              <span className="text-[var(--text-muted)]">Snapshots</span>
+              <span className="font-semibold text-foreground">{data.sampleCount}</span>
             </div>
           )}
           {data.timestamp && (
             <div className="flex justify-between">
-              <span className="text-[oklch(0.45_0.01_280)]">Last Updated</span>
-              <span className="text-[oklch(0.50_0.01_280)]">{data.timestamp}</span>
+              <span className="text-[var(--text-muted)]">Last Updated</span>
+              <span className="text-[var(--text-muted)]">{data.timestamp}</span>
             </div>
           )}
         </div>
@@ -169,7 +169,7 @@ export function SharpMoneyCard({
           'rounded-lg px-3 py-2 text-[10px] font-semibold mt-3 flex items-start justify-between gap-3',
           isSteam
             ? 'bg-red-500/10 border border-red-500/20 text-red-300'
-            : 'bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] text-[oklch(0.55_0.01_280)]',
+            : 'bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-[var(--text-muted)]',
         )}>
           <span>
             {isSteam
@@ -182,13 +182,13 @@ export function SharpMoneyCard({
         </div>
 
         {data.note && (
-          <p className="mt-3 text-[11px] text-[oklch(0.50_0.01_280)] italic">{data.note}</p>
+          <p className="mt-3 text-[11px] text-[var(--text-muted)] italic">{data.note}</p>
         )}
 
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[oklch(0.20_0.015_280)] text-xs font-semibold text-[oklch(0.50_0.01_280)] hover:text-red-400 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-red-400 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
           >
             Full Analysis
             <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />

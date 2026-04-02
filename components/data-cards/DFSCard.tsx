@@ -201,10 +201,10 @@ export const DFSCard = memo(function DFSCard({
           <span className={cn('text-[9px] font-black uppercase tracking-widest', cfg.textCls)}>{cfg.label}</span>
         </div>
         <div className="flex items-center gap-1.5 mb-1.5">
-          <Gamepad2 className="w-3 h-3 text-white/60" />
-          <span className="text-[9px] font-black uppercase tracking-widest text-white/70">{category}</span>
-          <span className="text-white/40">·</span>
-          <span className="text-[9px] text-white/50 truncate">{subcategory}</span>
+          <Gamepad2 className="w-3 h-3 text-foreground/60" />
+          <span className="text-[9px] font-black uppercase tracking-widest text-foreground/70">{category}</span>
+          <span className="text-foreground/40">·</span>
+          <span className="text-[9px] text-foreground/50 truncate">{subcategory}</span>
         </div>
         <h3 className={cn('font-black text-foreground leading-snug text-balance pr-20', isHero ? 'text-lg' : 'text-sm')}>
           {title}

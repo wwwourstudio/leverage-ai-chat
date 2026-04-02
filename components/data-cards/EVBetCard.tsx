@@ -51,7 +51,7 @@ export function EVBetCard({
   const evColor =
     evRaw >= 10 ? 'text-emerald-300'
     : evRaw >= 5  ? 'text-amber-300'
-    : 'text-slate-400';
+    : 'text-[var(--text-muted)]';
 
   const modelPct   = data.modelProbability   !== undefined ? Number(data.modelProbability)   * 100 : null;
   const impliedPct = data.impliedProbability !== undefined ? Number(data.impliedProbability) * 100 : null;
@@ -60,7 +60,7 @@ export function EVBetCard({
   return (
     <article
       className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border transition-all duration-200 animate-fade-in-up',
+        'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-200 animate-fade-in-up',
         'border-emerald-600/30 hover:border-emerald-500/50 hover:shadow-[0_0_30px_oklch(0.4_0.12_145/0.10)]',
         isHero && 'sm:rounded-3xl',
       )}
@@ -77,14 +77,14 @@ export function EVBetCard({
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="min-w-0">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.55_0.01_280)]">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
               {category}
             </span>
-            <span className="text-[oklch(0.3_0.01_280)] mx-1.5" aria-hidden="true">/</span>
-            <span className="text-[10px] font-medium text-[oklch(0.45_0.01_280)]">{subcategory}</span>
-            <h3 className="text-sm font-black text-[oklch(0.92_0.005_85)] mt-1 leading-snug">{title}</h3>
+            <span className="text-[var(--text-faint)] mx-1.5" aria-hidden="true">/</span>
+            <span className="text-[10px] font-medium text-[var(--text-muted)]">{subcategory}</span>
+            <h3 className="text-sm font-black text-foreground mt-1 leading-snug">{title}</h3>
             {data.matchup && (
-              <p className="text-[10px] text-[oklch(0.50_0.01_280)] mt-0.5 truncate">{data.matchup}</p>
+              <p className="text-[10px] text-[var(--text-muted)] mt-0.5 truncate">{data.matchup}</p>
             )}
           </div>
 
@@ -96,21 +96,21 @@ export function EVBetCard({
 
         {/* EV + Odds row */}
         <div className="grid grid-cols-3 gap-2 mb-3">
-          <div className="bg-[oklch(0.09_0.01_280)] rounded-xl border border-[oklch(0.18_0.015_280)] p-3 text-center">
-            <p className="text-[8px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-1">EV Edge</p>
+          <div className="bg-[var(--bg-overlay)] rounded-xl border border-[var(--border-subtle)] p-3 text-center">
+            <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">EV Edge</p>
             <p className={cn('text-lg font-black tabular-nums', evColor)}>{data.evPercent ?? '—'}</p>
           </div>
-          <div className="bg-[oklch(0.09_0.01_280)] rounded-xl border border-[oklch(0.18_0.015_280)] p-3 text-center">
-            <p className="text-[8px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-1">Odds</p>
-            <p className="text-lg font-black tabular-nums text-[oklch(0.92_0.005_85)]">
+          <div className="bg-[var(--bg-overlay)] rounded-xl border border-[var(--border-subtle)] p-3 text-center">
+            <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Odds</p>
+            <p className="text-lg font-black tabular-nums text-foreground">
               {data.americanOdds !== undefined
                 ? (Number(data.americanOdds) > 0 ? `+${data.americanOdds}` : String(data.americanOdds))
                 : '—'}
             </p>
           </div>
-          <div className="bg-[oklch(0.09_0.01_280)] rounded-xl border border-[oklch(0.18_0.015_280)] p-3 text-center">
-            <p className="text-[8px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-1">¼ Kelly</p>
-            <p className="text-lg font-black tabular-nums text-[oklch(0.80_0.005_85)]">
+          <div className="bg-[var(--bg-overlay)] rounded-xl border border-[var(--border-subtle)] p-3 text-center">
+            <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">¼ Kelly</p>
+            <p className="text-lg font-black tabular-nums text-foreground">
               {data.quarterKelly !== undefined ? `${(Number(data.quarterKelly) * 100).toFixed(1)}%` : '—'}
             </p>
           </div>
@@ -118,28 +118,28 @@ export function EVBetCard({
 
         {/* Bankroll context */}
         {kellyDollar !== null && (
-          <p className="text-[10px] text-[oklch(0.48_0.01_280)] mb-3">
-            ¼ Kelly on $1,000 bankroll ≈ <span className="font-bold text-[oklch(0.75_0.01_280)]">${kellyDollar}</span>
+          <p className="text-[10px] text-[var(--text-muted)] mb-3">
+            ¼ Kelly on $1,000 bankroll ≈ <span className="font-bold text-foreground">${kellyDollar}</span>
           </p>
         )}
 
         {/* Model vs Market probability comparison */}
         {modelPct !== null && impliedPct !== null && (
-          <div className="rounded-xl bg-[oklch(0.09_0.01_280)] border border-[oklch(0.18_0.015_280)] px-3 py-2.5 mb-3 space-y-2">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)]">Probability Edge</p>
+          <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5 mb-3 space-y-2">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Probability Edge</p>
             <div className="flex items-center gap-2 text-[10px]">
-              <span className="text-[oklch(0.45_0.01_280)] w-14 shrink-0">Model</span>
-              <div className="flex-1 h-1.5 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+              <span className="text-[var(--text-muted)] w-14 shrink-0">Model</span>
+              <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                 <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${Math.min(100, modelPct)}%` }} />
               </div>
               <span className="text-emerald-400 font-black w-9 text-right tabular-nums">{modelPct.toFixed(1)}%</span>
             </div>
             <div className="flex items-center gap-2 text-[10px]">
-              <span className="text-[oklch(0.45_0.01_280)] w-14 shrink-0">Market</span>
-              <div className="flex-1 h-1.5 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+              <span className="text-[var(--text-muted)] w-14 shrink-0">Market</span>
+              <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                 <div className="h-full rounded-full bg-slate-500 transition-all duration-500" style={{ width: `${Math.min(100, impliedPct)}%` }} />
               </div>
-              <span className="text-[oklch(0.55_0.01_280)] font-black w-9 text-right tabular-nums">{impliedPct.toFixed(1)}%</span>
+              <span className="text-[var(--text-muted)] font-black w-9 text-right tabular-nums">{impliedPct.toFixed(1)}%</span>
             </div>
           </div>
         )}
@@ -148,38 +148,38 @@ export function EVBetCard({
         <div className="space-y-1.5 text-xs">
           {data.market && (
             <div className="flex justify-between">
-              <span className="text-[oklch(0.45_0.01_280)]">Market</span>
-              <span className="font-semibold text-[oklch(0.80_0.005_85)]">{data.market}</span>
+              <span className="text-[var(--text-muted)]">Market</span>
+              <span className="font-semibold text-foreground">{data.market}</span>
             </div>
           )}
           {data.outcome && (
             <div className="flex justify-between">
-              <span className="text-[oklch(0.45_0.01_280)]">Outcome</span>
-              <span className="font-semibold text-[oklch(0.80_0.005_85)]">{data.outcome}</span>
+              <span className="text-[var(--text-muted)]">Outcome</span>
+              <span className="font-semibold text-foreground">{data.outcome}</span>
             </div>
           )}
           {data.bookmaker && (
             <div className="flex justify-between">
-              <span className="text-[oklch(0.45_0.01_280)]">Best Book</span>
-              <span className="font-semibold text-[oklch(0.80_0.005_85)]">{data.bookmaker}</span>
+              <span className="text-[var(--text-muted)]">Best Book</span>
+              <span className="font-semibold text-foreground">{data.bookmaker}</span>
             </div>
           )}
         </div>
 
         {data.description && (
-          <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/15 px-3 py-2 mt-3 text-[10px] text-[oklch(0.60_0.01_280)] leading-relaxed">
+          <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/15 px-3 py-2 mt-3 text-[10px] text-[var(--text-muted)] leading-relaxed">
             {data.description}
           </div>
         )}
 
         {data.note && (
-          <p className="mt-3 text-[11px] text-[oklch(0.50_0.01_280)] italic">{data.note}</p>
+          <p className="mt-3 text-[11px] text-[var(--text-muted)] italic">{data.note}</p>
         )}
 
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[oklch(0.20_0.015_280)] text-xs font-semibold text-[oklch(0.50_0.01_280)] hover:text-emerald-400 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-emerald-400 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
           >
             <Zap className="w-3 h-3" aria-hidden="true" />
             Full EV Analysis

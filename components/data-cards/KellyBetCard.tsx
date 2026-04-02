@@ -56,12 +56,12 @@ export function KellyBetCard({
   const edgeColor =
     edgeNum !== null && edgeNum >= 5 ? 'text-emerald-400' :
     edgeNum !== null && edgeNum >= 2 ? 'text-sky-400' :
-    'text-[oklch(0.60_0.01_280)]';
+    'text-[var(--text-muted)]';
 
   return (
     <article
       className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200 animate-fade-in-up',
+        'group relative w-full rounded-2xl overflow-hidden bg-background border border-[var(--border-subtle)] hover:border-[var(--border-hover)] transition-all duration-200 animate-fade-in-up',
         isHero && 'sm:rounded-3xl',
       )}
     >
@@ -75,7 +75,7 @@ export function KellyBetCard({
         <div className="flex items-center justify-between gap-3 mb-2.5">
           <div className="flex items-center gap-2 min-w-0">
             <Target className="w-4 h-4 text-indigo-400 shrink-0" aria-hidden="true" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.55_0.01_280)]">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
               {category}
             </span>
           </div>
@@ -84,7 +84,7 @@ export function KellyBetCard({
           </span>
         </div>
 
-        <h3 className="text-sm font-black text-[oklch(0.92_0.005_85)] mb-4 truncate">{title}</h3>
+        <h3 className="text-sm font-black text-foreground mb-4 truncate">{title}</h3>
 
         {/* Low-edge warning banner */}
         {isLowEdge && (
@@ -97,22 +97,22 @@ export function KellyBetCard({
         {/* Recommended stake — hero metric */}
         {data.recommendedStake && (
           <div className="mb-1">
-            <p className="text-[9px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-0.5">
+            <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-0.5">
               Recommended Stake
             </p>
-            <p className={cn('text-3xl font-black tabular-nums leading-none', isLowEdge ? 'text-amber-400' : 'text-[oklch(0.92_0.005_85)]')}>
+            <p className={cn('text-3xl font-black tabular-nums leading-none', isLowEdge ? 'text-amber-400' : 'text-foreground')}>
               {data.recommendedStake}
             </p>
             {bankrollPct !== null && (
-              <p className="text-[9px] text-[oklch(0.40_0.01_280)] mt-0.5">{bankrollPct}% of $1,000 bankroll</p>
+              <p className="text-[9px] text-[var(--text-faint)] mt-0.5">{bankrollPct}% of $1,000 bankroll</p>
             )}
           </div>
         )}
 
         {/* Kelly variants comparison */}
         {stakeNum !== null && (
-          <div className="rounded-xl bg-[oklch(0.09_0.01_280)] border border-[oklch(0.18_0.015_280)] px-3 py-2.5 mb-3">
-            <p className="text-[8px] font-black uppercase tracking-widest text-[oklch(0.38_0.01_280)] mb-2">Kelly Variants</p>
+          <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5 mb-3">
+            <p className="text-[8px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-2">Kelly Variants</p>
             <div className="space-y-1">
               {[
                 { label: 'Full Kelly', val: data.recommendedStake, active: true },
@@ -120,8 +120,8 @@ export function KellyBetCard({
                 { label: '¼ Kelly', val: `$${quarterKelly}` },
               ].map(({ label, val, active }) => (
                 <div key={label} className={cn('flex justify-between text-xs rounded-lg px-2.5 py-1.5', active ? 'bg-indigo-500/10 border border-indigo-500/20' : 'bg-transparent')}>
-                  <span className={active ? 'text-indigo-300 font-bold' : 'text-[oklch(0.45_0.01_280)]'}>{label}</span>
-                  <span className={cn('font-black tabular-nums', active ? 'text-indigo-300' : 'text-[oklch(0.65_0.01_280)]')}>{val}</span>
+                  <span className={active ? 'text-indigo-300 font-bold' : 'text-[var(--text-muted)]'}>{label}</span>
+                  <span className={cn('font-black tabular-nums', active ? 'text-indigo-300' : 'text-[var(--text-muted)]')}>{val}</span>
                 </div>
               ))}
             </div>
@@ -139,10 +139,10 @@ export function KellyBetCard({
         {confidenceNum !== null && (
           <div className="mb-3">
             <div className="flex justify-between text-[10px] mb-1">
-              <span className="text-[oklch(0.45_0.01_280)] uppercase tracking-wider">Model Confidence</span>
-              <span className="font-bold text-[oklch(0.80_0.005_85)]">{data.confidence}</span>
+              <span className="text-[var(--text-muted)] uppercase tracking-wider">Model Confidence</span>
+              <span className="font-bold text-foreground">{data.confidence}</span>
             </div>
-            <div className="w-full h-1.5 bg-[oklch(0.09_0.01_280)] rounded-full overflow-hidden">
+            <div className="w-full h-1.5 bg-[var(--bg-overlay)] rounded-full overflow-hidden">
               <div
                 className={cn(
                   'h-full rounded-full transition-all',
@@ -161,7 +161,7 @@ export function KellyBetCard({
         )}
 
         {data.sport && (
-          <div className="flex items-center gap-1.5 text-[10px] text-[oklch(0.45_0.01_280)]">
+          <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
             <TrendingUp className="w-3 h-3" aria-hidden="true" />
             <span>{data.sport}</span>
           </div>
@@ -170,7 +170,7 @@ export function KellyBetCard({
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[oklch(0.20_0.015_280)] text-xs font-semibold text-[oklch(0.50_0.01_280)] hover:text-[oklch(0.85_0.005_85)] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
             aria-label="Full Kelly bet analysis"
           >
             Full Analysis
@@ -185,15 +185,15 @@ export function KellyBetCard({
 function MetricCell({
   label,
   value,
-  valueClass = 'text-[oklch(0.80_0.005_85)]',
+  valueClass = 'text-foreground',
 }: {
   label: string;
   value: string;
   valueClass?: string;
 }) {
   return (
-    <div className="bg-[oklch(0.09_0.01_280)] rounded-xl border border-[oklch(0.18_0.015_280)] p-2.5 text-center">
-      <p className="text-[9px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-1">{label}</p>
+    <div className="bg-[var(--bg-overlay)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
+      <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">{label}</p>
       <p className={cn('text-sm font-black tabular-nums', valueClass)}>{value}</p>
     </div>
   );

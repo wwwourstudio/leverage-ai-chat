@@ -49,10 +49,10 @@ export function LineMovementCard({
   return (
     <article
       className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border transition-all duration-200 animate-fade-in-up',
+        'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-200 animate-fade-in-up',
         isSteam
           ? 'border-red-600/40 hover:border-red-500/60'
-          : 'border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)]',
+          : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)]',
         isHero && 'sm:rounded-3xl',
       )}
     >
@@ -73,24 +73,24 @@ export function LineMovementCard({
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-2 min-w-0">
             <Activity className="w-4 h-4 text-blue-400 shrink-0" aria-hidden="true" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.55_0.01_280)]">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
               {category}
             </span>
           </div>
-          <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[oklch(0.10_0.01_280)] text-[oklch(0.45_0.01_280)] border border-[oklch(0.20_0.015_280)] shrink-0">
+          <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[var(--bg-overlay)] text-[var(--text-muted)] border border-[var(--border-subtle)] shrink-0">
             {subcategory}
           </span>
         </div>
 
-        <h3 className="text-sm font-black text-[oklch(0.92_0.005_85)] mb-4 truncate">{title}</h3>
+        <h3 className="text-sm font-black text-foreground mb-4 truncate">{title}</h3>
 
         {hasMovement ? (
           <>
             {/* Line movement visualization */}
-            <div className="flex items-center justify-between bg-[oklch(0.09_0.01_280)] rounded-xl border border-[oklch(0.18_0.015_280)] p-4 mb-3">
+            <div className="flex items-center justify-between bg-[var(--bg-overlay)] rounded-xl border border-[var(--border-subtle)] p-4 mb-3">
               <div className="text-center flex-1">
-                <p className="text-[9px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-1.5">Opening</p>
-                <p className="text-xl font-black text-[oklch(0.60_0.01_280)] tabular-nums">{data.oldLine}</p>
+                <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1.5">Opening</p>
+                <p className="text-xl font-black text-[var(--text-muted)] tabular-nums">{data.oldLine}</p>
               </div>
 
               <div className="flex flex-col items-center gap-1 px-4">
@@ -110,7 +110,7 @@ export function LineMovementCard({
               </div>
 
               <div className="text-center flex-1">
-                <p className="text-[9px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-1.5">Current</p>
+                <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1.5">Current</p>
                 <p
                   className={cn(
                     'text-xl font-black tabular-nums',
@@ -128,20 +128,20 @@ export function LineMovementCard({
               const sharpNum = sharpMatch ? parseInt(sharpMatch[1]) : null;
               const publicNum = sharpNum !== null ? 100 - sharpNum : null;
               return sharpNum !== null ? (
-                <div className="rounded-xl bg-[oklch(0.09_0.01_280)] border border-[oklch(0.18_0.015_280)] px-3 py-2.5 space-y-1.5">
+                <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5 space-y-1.5">
                   <div className="flex justify-between text-[9px] font-bold uppercase tracking-wide">
-                    <span className="text-[oklch(0.42_0.01_280)]">Public {publicNum}%</span>
-                    <span className={sharpNum >= 60 ? 'text-amber-400' : 'text-[oklch(0.55_0.01_280)]'}>Sharp {sharpNum}%</span>
+                    <span className="text-[var(--text-faint)]">Public {publicNum}%</span>
+                    <span className={sharpNum >= 60 ? 'text-amber-400' : 'text-[var(--text-muted)]'}>Sharp {sharpNum}%</span>
                   </div>
                   <div className="h-2 rounded-full overflow-hidden flex">
-                    <div className="h-full bg-[oklch(0.30_0.01_280)]" style={{ width: `${publicNum}%` }} />
+                    <div className="h-full bg-[var(--bg-elevated)]" style={{ width: `${publicNum}%` }} />
                     <div className={cn('h-full', sharpNum >= 60 ? 'bg-amber-500' : 'bg-blue-500/70')} style={{ width: `${sharpNum}%` }} />
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-[oklch(0.45_0.01_280)]">Sharp Action</span>
-                  <span className="font-semibold text-[oklch(0.80_0.005_85)]">{data.sharpMoney}</span>
+                  <span className="text-[var(--text-muted)]">Sharp Action</span>
+                  <span className="font-semibold text-foreground">{data.sharpMoney}</span>
                 </div>
               );
             })()}
@@ -156,7 +156,7 @@ export function LineMovementCard({
                   'flex items-center gap-2 px-3 py-2 rounded-xl border text-[10px] font-semibold',
                   followSharp
                     ? 'bg-amber-500/8 border-amber-500/20 text-amber-300'
-                    : 'bg-[oklch(0.10_0.01_280)] border-[oklch(0.19_0.015_280)] text-[oklch(0.55_0.01_280)]',
+                    : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)] text-[var(--text-muted)]',
                 )}>
                   {followSharp
                     ? (isUp ? <TrendingUp className="w-3 h-3 shrink-0" /> : <TrendingDown className="w-3 h-3 shrink-0" />)
@@ -172,14 +172,14 @@ export function LineMovementCard({
             <div className="space-y-1.5 text-xs">
               {data.bookmaker && (
                 <div className="flex items-center justify-between">
-                  <span className="text-[oklch(0.45_0.01_280)]">Source</span>
-                  <span className="font-semibold text-[oklch(0.80_0.005_85)]">{data.bookmaker}</span>
+                  <span className="text-[var(--text-muted)]">Source</span>
+                  <span className="font-semibold text-foreground">{data.bookmaker}</span>
                 </div>
               )}
               {data.timestamp && (
                 <div className="flex items-center justify-between">
-                  <span className="text-[oklch(0.45_0.01_280)]">Updated</span>
-                  <span className="text-[oklch(0.50_0.01_280)]">{data.timestamp}</span>
+                  <span className="text-[var(--text-muted)]">Updated</span>
+                  <span className="text-[var(--text-muted)]">{data.timestamp}</span>
                 </div>
               )}
             </div>
@@ -188,13 +188,13 @@ export function LineMovementCard({
           /* Fallback / monitoring state */
           <div className="py-2 space-y-2">
             {data.description && (
-              <p className="text-sm text-[oklch(0.65_0.01_280)]">{data.description}</p>
+              <p className="text-sm text-[var(--text-muted)]">{data.description}</p>
             )}
             {data.note && (
-              <p className="text-xs text-[oklch(0.45_0.01_280)]">{data.note}</p>
+              <p className="text-xs text-[var(--text-faint)]">{data.note}</p>
             )}
             {data.tracking && (
-              <p className="text-xs text-[oklch(0.45_0.01_280)]">Tracking: {data.tracking}</p>
+              <p className="text-xs text-[var(--text-faint)]">Tracking: {data.tracking}</p>
             )}
           </div>
         )}
@@ -202,7 +202,7 @@ export function LineMovementCard({
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[oklch(0.20_0.015_280)] text-xs font-semibold text-[oklch(0.50_0.01_280)] hover:text-[oklch(0.85_0.005_85)] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
             aria-label="Analyze line movement"
           >
             Full Analysis

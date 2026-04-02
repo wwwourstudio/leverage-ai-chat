@@ -46,13 +46,13 @@ export function OddsCard({ event, onAsk }: OddsCardProps) {
   const awayImpl = event.impliedWinPct?.away ?? 50;
 
   return (
-    <div className="bg-[oklch(0.11_0.01_280)] border border-[oklch(0.18_0.02_280)] rounded-xl p-4 flex flex-col gap-3 hover:border-[oklch(0.28_0.05_270)] transition-colors">
+    <div className="bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-xl p-4 flex flex-col gap-3 hover:border-[var(--border-hover)] transition-colors">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold tracking-widest uppercase text-[oklch(0.45_0.01_280)]">
+        <span className="text-[10px] font-semibold tracking-widest uppercase text-[var(--text-muted)]">
           {event.sport_key?.replace(/_/g, ' ').toUpperCase()}
         </span>
-        <span className="text-[10px] text-[oklch(0.40_0.01_280)]">
+        <span className="text-[10px] text-[var(--text-faint)]">
           {formatTime(event.commence_time)}
         </span>
       </div>
@@ -67,7 +67,7 @@ export function OddsCard({ event, onAsk }: OddsCardProps) {
         ).map(({ team, odds, impl }) => (
           <div
             key={team}
-            className="bg-[oklch(0.08_0.01_280)] rounded-lg p-3 flex flex-col gap-1"
+            className="bg-[var(--bg-overlay)] rounded-lg p-3 flex flex-col gap-1"
           >
             <span className="text-[11px] font-medium text-white/70 truncate">{team}</span>
             <span
@@ -81,11 +81,11 @@ export function OddsCard({ event, onAsk }: OddsCardProps) {
               {odds ? formatOdds(odds.price) : '—'}
             </span>
             {odds?.book && (
-              <span className="text-[9px] text-[oklch(0.38_0.01_280)] uppercase tracking-wide">
+              <span className="text-[9px] text-[var(--text-faint)] uppercase tracking-wide">
                 {odds.book}
               </span>
             )}
-            <span className="text-[10px] text-[oklch(0.45_0.01_280)]">
+            <span className="text-[10px] text-[var(--text-muted)]">
               {impl.toFixed(0)}% implied
             </span>
           </div>
@@ -94,10 +94,10 @@ export function OddsCard({ event, onAsk }: OddsCardProps) {
 
       {/* Win probability bar */}
       <div className="flex items-center gap-2">
-        <span className="text-[9px] text-[oklch(0.38_0.01_280)] w-8 text-right">
+        <span className="text-[9px] text-[var(--text-faint)] w-8 text-right">
           {awayImpl.toFixed(0)}%
         </span>
-        <div className="flex-1 h-1.5 rounded-full bg-[oklch(0.16_0.01_280)] overflow-hidden flex">
+        <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden flex">
           <div
             className="h-full bg-blue-500 transition-all"
             style={{ width: `${awayImpl}%` }}
@@ -107,28 +107,28 @@ export function OddsCard({ event, onAsk }: OddsCardProps) {
             style={{ width: `${homeImpl}%` }}
           />
         </div>
-        <span className="text-[9px] text-[oklch(0.38_0.01_280)] w-8">
+        <span className="text-[9px] text-[var(--text-faint)] w-8">
           {homeImpl.toFixed(0)}%
         </span>
       </div>
 
       {/* Spread / Total row */}
       {(event.spread || event.total) && (
-        <div className="flex gap-2 flex-wrap text-[10px] text-[oklch(0.45_0.01_280)]">
+        <div className="flex gap-2 flex-wrap text-[10px] text-[var(--text-muted)]">
           {event.spread && (
-            <span className="bg-[oklch(0.14_0.01_280)] rounded px-2 py-1">
+            <span className="bg-[var(--bg-elevated)] rounded px-2 py-1">
               Spread: {event.spread.home > 0 ? '+' : ''}
               {event.spread.home} / {event.spread.away > 0 ? '+' : ''}
               {event.spread.away}
             </span>
           )}
           {event.total && (
-            <span className="bg-[oklch(0.14_0.01_280)] rounded px-2 py-1">
+            <span className="bg-[var(--bg-elevated)] rounded px-2 py-1">
               O/U {event.total.line}
             </span>
           )}
           {event.bookmakerCount != null && (
-            <span className="bg-[oklch(0.14_0.01_280)] rounded px-2 py-1 ml-auto">
+            <span className="bg-[var(--bg-elevated)] rounded px-2 py-1 ml-auto">
               {event.bookmakerCount} books
             </span>
           )}

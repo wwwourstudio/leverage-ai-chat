@@ -45,17 +45,17 @@ export const DraftCard = memo(function DraftCard({ data, ...p }: FantasyCardProp
                 >
                   {bestPick.name}
                 </button>
-                <span className="text-xs text-[oklch(0.48_0.01_280)]">{bestPick.team}</span>
+                <span className="text-xs text-[var(--text-muted)]">{bestPick.team}</span>
               </div>
               {bestPick.reason && (
-                <p className="text-[11px] text-[oklch(0.48_0.01_280)] mt-1 leading-relaxed">{bestPick.reason}</p>
+                <p className="text-[11px] text-[var(--text-muted)] mt-1 leading-relaxed">{bestPick.reason}</p>
               )}
             </div>
             <div className="flex flex-col items-end shrink-0 gap-0.5">
               <span className="text-base font-black text-teal-400 tabular-nums">+{bestPick.vbd}</span>
-              <span className="text-[8px] text-[oklch(0.35_0.01_280)]">VBD</span>
+              <span className="text-[8px] text-[var(--text-faint)]">VBD</span>
               {bestPick.adp != null && (
-                <span className="text-[9px] font-bold text-[oklch(0.38_0.01_280)] tabular-nums">ADP {bestPick.adp}</span>
+                <span className="text-[9px] font-bold text-[var(--text-faint)] tabular-nums">ADP {bestPick.adp}</span>
               )}
             </div>
           </div>
@@ -67,7 +67,7 @@ export const DraftCard = memo(function DraftCard({ data, ...p }: FantasyCardProp
         <>
           <div className="flex items-center gap-1.5">
             <Zap className="w-2.5 h-2.5 text-amber-400" />
-            <p className="text-[9px] font-black uppercase tracking-widest text-[oklch(0.42_0.01_280)]">Leverage Plays</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">Leverage Plays</p>
           </div>
           <div className="space-y-1.5">
             {leveragePicks.slice(0, 3).map((lp: any, i: number) => (
@@ -77,10 +77,10 @@ export const DraftCard = memo(function DraftCard({ data, ...p }: FantasyCardProp
                   'flex items-center gap-2 px-2.5 py-1.5 rounded-xl border transition-colors',
                   i === 0
                     ? 'bg-amber-500/6 border-amber-500/20'
-                    : 'bg-[oklch(0.08_0.01_280)] border-[oklch(0.15_0.01_280)]',
+                    : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)]',
                 )}
               >
-                <span className="text-[10px] font-black text-[oklch(0.38_0.01_280)] w-3 shrink-0">{i + 1}</span>
+                <span className="text-[10px] font-black text-[var(--text-faint)] w-3 shrink-0">{i + 1}</span>
                 <PlayerAvatar
                   playerName={lp.name}
                   photoUrl={lp.photoUrl ?? getPlayerHeadshotUrl(lp.name)}
@@ -95,13 +95,13 @@ export const DraftCard = memo(function DraftCard({ data, ...p }: FantasyCardProp
                 >
                   {lp.name}
                 </button>
-                <span className="text-[10px] text-[oklch(0.42_0.01_280)] truncate max-w-[110px] hidden sm:block">{lp.reason}</span>
+                <span className="text-[10px] text-[var(--text-faint)] truncate max-w-[110px] hidden sm:block">{lp.reason}</span>
                 <div className="flex flex-col items-end shrink-0">
                   <span className={cn('text-xs font-black tabular-nums', i === 0 ? 'text-amber-400' : 'text-white')}>
                     +{lp.vbd}
                   </span>
                   {lp.adp != null && (
-                    <span className="text-[8px] text-[oklch(0.32_0.01_280)] tabular-nums">{lp.adp}</span>
+                    <span className="text-[8px] text-[var(--text-faint)] tabular-nums">{lp.adp}</span>
                   )}
                 </div>
               </div>

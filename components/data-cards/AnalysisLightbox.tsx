@@ -69,13 +69,13 @@ export function AnalysisLightbox({
       {/* Panel */}
       <div
         className={cn(
-          'relative z-10 w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-[oklch(0.07_0.01_280)] border shadow-2xl',
+          'relative z-10 w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-background border shadow-2xl',
           accentBorder,
         )}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[oklch(0.18_0.015_280)] shrink-0">
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[var(--border-subtle)] shrink-0">
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-black text-white leading-tight truncate">{title}</h3>
             <p className={cn('text-[9px] font-extrabold uppercase tracking-widest mt-0.5', accentText)}>
@@ -86,14 +86,14 @@ export function AnalysisLightbox({
             {!!rawData && (
               <button
                 onClick={handleCopy}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[oklch(0.14_0.015_280)] hover:bg-[oklch(0.18_0.015_280)] text-[oklch(0.55_0.01_280)] hover:text-white text-[10px] font-bold transition-colors border border-[oklch(0.20_0.015_280)]"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--bg-elevated)] hover:bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-white text-[10px] font-bold transition-colors border border-[var(--border-subtle)]"
               >
                 {copied ? '✓ Copied' : 'Copy JSON'}
               </button>
             )}
             <button
               onClick={onClose}
-              className="flex items-center justify-center w-7 h-7 rounded-full bg-[oklch(0.14_0.015_280)] text-[oklch(0.55_0.01_280)] hover:text-white hover:bg-[oklch(0.20_0.015_280)] transition-colors"
+              className="flex items-center justify-center w-7 h-7 rounded-full bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-white hover:bg-[var(--bg-surface)] transition-colors"
               aria-label="Close"
             >
               <X className="w-3.5 h-3.5" />
@@ -108,10 +108,10 @@ export function AnalysisLightbox({
               <h4 className={cn('text-[10px] font-extrabold uppercase tracking-widest mb-2', accentText)}>
                 {section.title}
               </h4>
-              <div className={cn('rounded-xl border grid grid-cols-2 divide-y divide-x divide-[oklch(0.14_0.01_280)] overflow-hidden', accentBg, accentBorder)}>
+              <div className={cn('rounded-xl border grid grid-cols-2 divide-y divide-x divide-[var(--border-subtle)] overflow-hidden', accentBg, accentBorder)}>
                 {section.metrics?.map((m, j) => (
-                  <div key={j} className="flex items-center justify-between px-3 py-2 bg-[oklch(0.09_0.01_280)]">
-                    <span className="text-[10px] text-[oklch(0.52_0.01_280)] truncate pr-2">{m.label}</span>
+                  <div key={j} className="flex items-center justify-between px-3 py-2 bg-[var(--bg-overlay)]">
+                    <span className="text-[10px] text-[var(--text-muted)] truncate pr-2">{m.label}</span>
                     <span className="text-[10px] font-black text-white whitespace-nowrap">{m.value}</span>
                   </div>
                 ))}
@@ -119,12 +119,12 @@ export function AnalysisLightbox({
             </div>
           ))}
           {sections.length === 0 && (
-            <p className="text-sm text-[oklch(0.42_0.01_280)] text-center py-6">No breakdown data available.</p>
+            <p className="text-sm text-[var(--text-faint)] text-center py-6">No breakdown data available.</p>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-5 pb-5 pt-3 border-t border-[oklch(0.18_0.015_280)] shrink-0 flex justify-end">
+        <div className="px-5 pb-5 pt-3 border-t border-[var(--border-subtle)] shrink-0 flex justify-end">
           <button
             onClick={onClose}
             className={cn('px-4 py-2 rounded-xl hover:opacity-90 text-sm font-bold transition-opacity border', accentBg, accentBorder, accentText)}

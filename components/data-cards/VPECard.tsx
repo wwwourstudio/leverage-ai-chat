@@ -64,7 +64,7 @@ function VPEGauge({ score }: { score: number }) {
     <div className="flex flex-col items-center gap-0.5">
       <div className="relative w-12 h-12">
         <svg className="w-full h-full -rotate-90" viewBox="0 0 48 48">
-          <circle cx="24" cy="24" r="20" stroke="oklch(0.18 0.01 280)" strokeWidth="4" fill="none" />
+          <circle cx="24" cy="24" r="20" stroke="var(--border-subtle)" strokeWidth="4" fill="none" />
           <circle
             cx="24" cy="24" r="20"
             stroke={stroke}
@@ -151,17 +151,17 @@ export const VPECard = memo(function VPECard({ card, onAnalyze, isHero }: VPECar
 
         {/* Kalshi prediction markets — YES/NO chips */}
         {kalshiMarkets.length > 0 && (
-          <div className="pt-2 border-t border-[oklch(0.20_0.015_280)]">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.45_0.01_280)] mb-1.5">
+          <div className="pt-2 border-t border-[var(--border-subtle)]">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-1.5">
               Kalshi Markets
             </p>
             <div className="space-y-1.5">
               {kalshiMarkets.slice(0, 3).map((m) => (
                 <div
                   key={m.ticker}
-                  className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-[oklch(0.10_0.01_280)] border border-[oklch(0.16_0.015_280)]"
+                  className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)]"
                 >
-                  <span className="text-[11px] text-[oklch(0.70_0.005_85)] truncate flex-1">{m.title}</span>
+                  <span className="text-[11px] text-foreground/70 truncate flex-1">{m.title}</span>
                   <div className="flex items-center gap-1 shrink-0">
                     <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded-md">
                       YES {m.yesPrice}¢

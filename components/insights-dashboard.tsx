@@ -153,8 +153,8 @@ export function InsightsDashboard({ userId }: InsightsDashboardProps) {
 
       {/* Trust Metrics */}
       {trustMetrics && (
-        <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-5">
-          <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-4">
+        <div className="bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-xl p-5">
+          <h3 className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-4">
             AI Trust & Validation Metrics (30 Days)
           </h3>
           <TrustMetricsDisplay metrics={trustMetrics} showDetails={true} />
@@ -163,8 +163,8 @@ export function InsightsDashboard({ userId }: InsightsDashboardProps) {
 
       {/* User Performance — uses insights + historical data (profile only has auth metadata) */}
       {(insights?.totalInvested > 0 || (historical?.resolvedPredictions ?? 0) > 0) && (
-        <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-5">
-          <h3 className="text-[10px] font-black text-[oklch(0.45_0.01_280)] uppercase tracking-widest mb-4">
+        <div className="bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-xl p-5">
+          <h3 className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-4">
             Your Performance
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -199,22 +199,22 @@ function TrendSparkline({ points, positive }: { points: number[]; positive?: boo
 
 function StatCard({ icon: Icon, label, value, change, subtitle, positive, trend }: any) {
   return (
-    <div className="bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)] rounded-xl p-4">
+    <div className="bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-xl p-4">
       <div className="flex items-start justify-between mb-3">
-        <div className="p-2 bg-[oklch(0.16_0.02_280)] rounded-lg">
-          <Icon className="w-4 h-4 text-[oklch(0.60_0.01_280)]" />
+        <div className="p-2 bg-[var(--bg-surface)] rounded-lg">
+          <Icon className="w-4 h-4 text-[var(--text-muted)]" />
         </div>
         {change && (
           <span className={`text-xs font-medium px-2 py-1 rounded ${
-            positive ? 'bg-[oklch(0.16_0.005_85)] text-[oklch(0.80_0.005_85)]' : 'bg-[oklch(0.14_0.005_85)] text-[oklch(0.55_0.005_85)]'
+            positive ? 'bg-[var(--bg-surface)] text-foreground/80' : 'bg-[var(--bg-elevated)] text-[var(--text-muted)]'
           }`}>
             {change}
           </span>
         )}
       </div>
-      <div className="text-2xl font-bold text-[oklch(0.92_0.005_85)] mb-1">{value}</div>
+      <div className="text-2xl font-bold text-foreground mb-1">{value}</div>
       <div className="flex items-center justify-between">
-        <div className="text-xs text-[oklch(0.45_0.01_280)]">{subtitle || label}</div>
+        <div className="text-xs text-[var(--text-muted)]">{subtitle || label}</div>
         {trend && <TrendSparkline points={trend} positive={positive} />}
       </div>
     </div>
@@ -224,8 +224,8 @@ function StatCard({ icon: Icon, label, value, change, subtitle, positive, trend 
 function ProfileStat({ label, value }: { label: string; value: string | number }) {
   return (
     <div>
-      <div className="text-lg font-bold text-[oklch(0.92_0.005_85)]">{value}</div>
-      <div className="text-xs text-[oklch(0.45_0.01_280)]">{label}</div>
+      <div className="text-lg font-bold text-foreground">{value}</div>
+      <div className="text-xs text-[var(--text-muted)]">{label}</div>
     </div>
   );
 }

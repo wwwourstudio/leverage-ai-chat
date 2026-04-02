@@ -101,10 +101,10 @@ function StatBox({
   valueCls?: string;
 }) {
   return (
-    <div className="rounded-xl bg-[oklch(0.09_0.012_280)] border border-[oklch(0.17_0.015_280)] px-3 py-2.5 flex flex-col gap-0.5">
-      <span className="text-[9px] font-bold uppercase tracking-widest text-[oklch(0.38_0.01_280)]">{label}</span>
+    <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5 flex flex-col gap-0.5">
+      <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-faint)]">{label}</span>
       <span className={cn('text-sm font-black tabular-nums', valueCls)}>{value}</span>
-      {sub && <span className="text-[9px] text-[oklch(0.40_0.01_280)]">{sub}</span>}
+      {sub && <span className="text-[9px] text-[var(--text-faint)]">{sub}</span>}
     </div>
   );
 }
@@ -112,7 +112,7 @@ function StatBox({
 function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
   const pct = Math.min(100, Math.max(0, (value / max) * 100));
   return (
-    <div className="h-1.5 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+    <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
       <div className={cn('h-full rounded-full bg-gradient-to-r transition-all duration-500', color)} style={{ width: `${pct}%` }} />
     </div>
   );
@@ -122,9 +122,9 @@ function SectionHeader({ icon: Icon, title, badge }: { icon: React.ElementType; 
   return (
     <div className="flex items-center gap-2 mb-3">
       <Icon className="w-3.5 h-3.5 text-blue-400" />
-      <span className="text-[10px] font-black uppercase tracking-widest text-[oklch(0.55_0.01_280)]">{title}</span>
+      <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">{title}</span>
       {badge !== undefined && (
-        <span className="ml-auto px-1.5 py-0.5 rounded-full bg-[oklch(0.16_0.02_260)] text-[9px] font-black text-blue-400">
+        <span className="ml-auto px-1.5 py-0.5 rounded-full bg-[var(--bg-surface)] text-[9px] font-black text-blue-400">
           {badge}
         </span>
       )}
@@ -161,7 +161,7 @@ function OddsScanner({
               'px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all',
               selectedSport === s.key
                 ? 'bg-blue-600 text-white'
-                : 'bg-[oklch(0.14_0.012_280)] text-[oklch(0.46_0.01_280)] hover:text-white',
+                : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-white',
             )}
           >
             {s.label}
@@ -171,7 +171,7 @@ function OddsScanner({
 
       <div className="flex-1 overflow-y-auto space-y-1.5 min-h-0 pr-0.5">
         {loading && (
-          <div className="flex items-center justify-center py-8 gap-2 text-[oklch(0.40_0.01_280)]">
+          <div className="flex items-center justify-center py-8 gap-2 text-[var(--text-faint)]">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span className="text-xs">Scanning odds…</span>
           </div>
@@ -179,8 +179,8 @@ function OddsScanner({
 
         {!loading && events.length === 0 && (
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <Activity className="w-6 h-6 text-[oklch(0.28_0.01_280)] mb-2" />
-            <p className="text-xs text-[oklch(0.38_0.01_280)]">No games scheduled</p>
+            <Activity className="w-6 h-6 text-[var(--text-faint)] mb-2" />
+            <p className="text-xs text-[var(--text-faint)]">No games scheduled</p>
           </div>
         )}
 
@@ -203,7 +203,7 @@ function OddsScanner({
           return (
             <div
               key={event.id}
-              className="rounded-xl bg-[oklch(0.09_0.012_280)] border border-[oklch(0.17_0.015_280)] hover:border-blue-500/30 transition-all p-2.5 group"
+              className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] hover:border-blue-500/30 transition-all p-2.5 group"
             >
               {/* Time */}
               <div className="flex items-center gap-1.5 mb-1.5">
@@ -213,11 +213,11 @@ function OddsScanner({
                     Live
                   </span>
                 ) : (
-                  <span className="text-[9px] text-[oklch(0.38_0.01_280)]">
+                  <span className="text-[9px] text-[var(--text-faint)]">
                     {gameTime.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · {gameTime.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
                   </span>
                 )}
-                {book && <span className="ml-auto text-[8px] text-[oklch(0.32_0.01_280)]">{book.title}</span>}
+                {book && <span className="ml-auto text-[8px] text-[var(--text-faint)]">{book.title}</span>}
               </div>
 
               {/* Teams */}
@@ -308,8 +308,8 @@ function KellyCalculator({
       <SectionHeader icon={Target} title="Kelly Optimizer" />
 
       {/* Bankroll input */}
-      <div className="rounded-xl bg-[oklch(0.09_0.012_280)] border border-[oklch(0.17_0.015_280)] px-3 py-2.5">
-        <label className="text-[9px] font-bold uppercase tracking-widest text-[oklch(0.38_0.01_280)] mb-1 block">
+      <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5">
+        <label className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-faint)] mb-1 block">
           Bankroll ($)
         </label>
         <input
@@ -322,26 +322,26 @@ function KellyCalculator({
       </div>
 
       {/* Manual leg entry */}
-      <div className="rounded-xl bg-[oklch(0.09_0.012_280)] border border-[oklch(0.17_0.015_280)] px-3 py-2.5 space-y-2">
-        <span className="text-[9px] font-bold uppercase tracking-widest text-[oklch(0.38_0.01_280)]">Add Bet Leg</span>
+      <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5 space-y-2">
+        <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Add Bet Leg</span>
         <input
           placeholder="Label (e.g. Lakers ML)"
           value={newLabel}
           onChange={(e: any) => setNewLabel(e.target.value)}
-          className="w-full bg-[oklch(0.07_0.01_280)] border border-[oklch(0.16_0.015_280)] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-[oklch(0.35_0.01_280)] focus:outline-none focus:border-blue-500/50"
+          className="w-full bg-background border border-[var(--border-subtle)] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50"
         />
         <div className="flex gap-2">
           <input
             placeholder="Odds (e.g. -180)"
             value={newOdds}
             onChange={(e: any) => setNewOdds(e.target.value)}
-            className="flex-1 bg-[oklch(0.07_0.01_280)] border border-[oklch(0.16_0.015_280)] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-[oklch(0.35_0.01_280)] focus:outline-none focus:border-blue-500/50"
+            className="flex-1 bg-background border border-[var(--border-subtle)] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50"
           />
           <input
             placeholder="Win % (e.g. 58)"
             value={newProb}
             onChange={(e: any) => setNewProb(e.target.value)}
-            className="flex-1 bg-[oklch(0.07_0.01_280)] border border-[oklch(0.16_0.015_280)] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-[oklch(0.35_0.01_280)] focus:outline-none focus:border-blue-500/50"
+            className="flex-1 bg-background border border-[var(--border-subtle)] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50"
           />
         </div>
         <button
@@ -366,23 +366,23 @@ function KellyCalculator({
             return (
               <div
                 key={leg.id}
-                className="rounded-xl bg-[oklch(0.09_0.012_280)] border border-[oklch(0.17_0.015_280)] px-3 py-2 flex items-center gap-2"
+                className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2 flex items-center gap-2"
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-[11px] font-semibold text-white truncate">{leg.label}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[9px] text-[oklch(0.40_0.01_280)]">{formatOdds(leg.americanOdds)}</span>
-                    <span className="text-[9px] text-[oklch(0.40_0.01_280)]">·</span>
+                    <span className="text-[9px] text-[var(--text-faint)]">{formatOdds(leg.americanOdds)}</span>
+                    <span className="text-[9px] text-[var(--text-faint)]">·</span>
                     <span className={cn('text-[9px] font-bold', edgeColor(edge))}>
                       {edge > 0 ? '+' : ''}{(edge * 100).toFixed(1)}% edge
                     </span>
-                    <span className="text-[9px] text-[oklch(0.40_0.01_280)]">·</span>
+                    <span className="text-[9px] text-[var(--text-faint)]">·</span>
                     <span className="text-[9px] text-white font-bold">${stake.toFixed(2)}</span>
                   </div>
                 </div>
                 <button
                   onClick={() => onRemoveLeg(leg.id)}
-                  className="p-1 rounded text-[oklch(0.38_0.01_280)] hover:text-red-400 transition-colors"
+                  className="p-1 rounded text-[var(--text-faint)] hover:text-red-400 transition-colors"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -396,7 +396,7 @@ function KellyCalculator({
       <button
         onClick={onRunAnalysis}
         disabled={legs.length === 0 || loading}
-        className="py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-[oklch(0.14_0.012_280)] disabled:text-[oklch(0.35_0.01_280)] text-white text-xs font-black transition-all flex items-center justify-center gap-2"
+        className="py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-[var(--bg-elevated)] disabled:text-[var(--text-faint)] text-white text-xs font-black transition-all flex items-center justify-center gap-2"
       >
         {loading ? (
           <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Running…</>
@@ -417,17 +417,17 @@ function QuantSummary({ analysis, bankroll }: { analysis: QuantAnalysis; bankrol
   const pos = portfolio.positions.filter(p => p.edge > 0);
 
   return (
-    <div className="space-y-2 rounded-xl bg-[oklch(0.07_0.01_280)] border border-[oklch(0.16_0.015_280)] p-3">
+    <div className="space-y-2 rounded-xl bg-background border border-[var(--border-subtle)] p-3">
       <div className="flex items-center gap-2 mb-2">
         <BarChart2 className="w-3.5 h-3.5 text-blue-400" />
-        <span className="text-[10px] font-black uppercase tracking-widest text-[oklch(0.55_0.01_280)]">Quant Analysis</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Quant Analysis</span>
       </div>
 
       {/* Kelly positions */}
       {pos.length > 0 && (
         <div className="space-y-1">
           {pos.map(p => (
-            <div key={p.legId} className="flex items-center gap-2 py-1.5 border-b border-[oklch(0.14_0.01_280)] last:border-0">
+            <div key={p.legId} className="flex items-center gap-2 py-1.5 border-b border-[var(--border-subtle)] last:border-0">
               <span className="flex-1 text-[10px] text-white truncate">{p.label}</span>
               <span className={cn('text-[10px] font-bold', edgeColor(p.edge))}>
                 {p.edge > 0 ? '+' : ''}{(p.edge * 100).toFixed(1)}%
@@ -467,12 +467,12 @@ function QuantSummary({ analysis, bankroll }: { analysis: QuantAnalysis; bankrol
 
       {/* P5 → P95 bar */}
       <div className="mt-1.5">
-        <div className="flex justify-between text-[8px] text-[oklch(0.38_0.01_280)] mb-1">
+        <div className="flex justify-between text-[8px] text-[var(--text-faint)] mb-1">
           <span>P5: {formatPct(monteCarlo.p5ROI)}</span>
           <span>Median: {formatPct(monteCarlo.medianROI)}</span>
           <span>P95: {formatPct(monteCarlo.p95ROI)}</span>
         </div>
-        <div className="h-2 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden relative">
+        <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden relative">
           {/* Red zone: P5 to 0 */}
           {monteCarlo.p5ROI < 0 && (
             <div
@@ -501,11 +501,11 @@ function QuantSummary({ analysis, bankroll }: { analysis: QuantAnalysis; bankrol
 
       {/* Regime */}
       {regime && (
-        <div className="flex items-start gap-2 p-2 rounded-lg bg-[oklch(0.10_0.012_260)] border border-[oklch(0.18_0.02_260)]">
+        <div className="flex items-start gap-2 p-2 rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
           <Zap className="w-3 h-3 text-purple-400 mt-0.5 shrink-0" />
           <div>
             <span className="text-[9px] font-black text-purple-300 uppercase">{regime.regime} regime</span>
-            <p className="text-[9px] text-[oklch(0.45_0.01_280)] mt-0.5">{regime.description}</p>
+            <p className="text-[9px] text-[var(--text-muted)] mt-0.5">{regime.description}</p>
           </div>
         </div>
       )}
@@ -587,9 +587,9 @@ function RiskPanel({
 
       {/* Exposure bar */}
       <div>
-        <div className="flex justify-between text-[9px] text-[oklch(0.38_0.01_280)] mb-1">
+        <div className="flex justify-between text-[9px] text-[var(--text-faint)] mb-1">
           <span>Portfolio Exposure</span>
-          <span className={exposurePct > 20 ? 'text-red-400' : 'text-[oklch(0.42_0.01_280)]'}>{exposurePct.toFixed(1)}%</span>
+          <span className={exposurePct > 20 ? 'text-red-400' : 'text-[var(--text-faint)]'}>{exposurePct.toFixed(1)}%</span>
         </div>
         <MiniBar
           value={exposurePct}
@@ -626,12 +626,12 @@ function RiskPanel({
 
       {/* Open positions */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        <span className="text-[9px] font-bold uppercase tracking-widest text-[oklch(0.38_0.01_280)] block mb-1.5">Position Tracker</span>
+        <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-faint)] block mb-1.5">Position Tracker</span>
         {positions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6 text-center">
-            <Target className="w-6 h-6 text-[oklch(0.28_0.01_280)] mb-2" />
-            <p className="text-xs text-[oklch(0.38_0.01_280)]">No positions tracked</p>
-            <p className="text-[9px] text-[oklch(0.32_0.01_280)] mt-1">Run quant analysis to auto-add positions</p>
+            <Target className="w-6 h-6 text-[var(--text-faint)] mb-2" />
+            <p className="text-xs text-[var(--text-faint)]">No positions tracked</p>
+            <p className="text-[9px] text-[var(--text-faint)] mt-1">Run quant analysis to auto-add positions</p>
           </div>
         ) : (
           <div className="space-y-1">
@@ -652,13 +652,13 @@ function RiskPanel({
               return (
                 <div
                   key={p.id}
-                  className="rounded-xl bg-[oklch(0.09_0.012_280)] border border-[oklch(0.17_0.015_280)] px-2.5 py-2 flex items-center gap-2"
+                  className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2.5 py-2 flex items-center gap-2"
                 >
                   <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', statusDot)} />
                   <div className="flex-1 min-w-0">
                     <p className="text-[10px] font-semibold text-white truncate">{p.label}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-[8px] text-[oklch(0.40_0.01_280)]">{formatOdds(p.americanOdds)}</span>
+                      <span className="text-[8px] text-[var(--text-faint)]">{formatOdds(p.americanOdds)}</span>
                       <span className={cn('text-[8px] font-bold', edgeColor(edge))}>{edge >= 0 ? '+' : ''}{(edge * 100).toFixed(1)}%</span>
                     </div>
                   </div>
@@ -684,7 +684,7 @@ function ArbitrageAlert({ count, onScan, loading }: { count: number; onScan: () 
         'flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all',
         count > 0
           ? 'bg-emerald-900/30 border-emerald-600/40 text-emerald-300 hover:bg-emerald-800/40'
-          : 'bg-[oklch(0.12_0.012_280)] border-[oklch(0.20_0.015_280)] text-[oklch(0.46_0.01_280)] hover:text-white',
+          : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-white',
       )}
     >
       {loading ? (
@@ -807,13 +807,13 @@ export default function TradingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[oklch(0.07_0.01_280)] text-white">
+    <div className="min-h-screen bg-background text-white">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="border-b border-[oklch(0.16_0.015_280)] bg-[oklch(0.08_0.012_280)]">
+      <header className="border-b border-[var(--border-subtle)] bg-[var(--bg-overlay)]">
         <div className="mx-auto max-w-[1600px] flex items-center gap-4 px-4 py-3">
           <Link
             href="/"
-            className="flex items-center gap-1.5 text-[oklch(0.46_0.01_280)] hover:text-white transition-colors text-xs"
+            className="flex items-center gap-1.5 text-[var(--text-muted)] hover:text-white transition-colors text-xs"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="hidden sm:inline">Back</span>
@@ -829,7 +829,7 @@ export default function TradingPage() {
 
           <div className="ml-auto flex items-center gap-2">
             {lastUpdated && (
-              <div className="hidden md:flex items-center gap-1.5 text-[9px] text-[oklch(0.38_0.01_280)]">
+              <div className="hidden md:flex items-center gap-1.5 text-[9px] text-[var(--text-faint)]">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 <span>Live · {lastUpdated.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span>
               </div>
@@ -840,7 +840,7 @@ export default function TradingPage() {
             <button
               onClick={() => fetchOdds(selectedSport)}
               disabled={oddsLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[oklch(0.20_0.015_280)] bg-[oklch(0.12_0.012_280)] text-[oklch(0.46_0.01_280)] hover:text-white text-xs font-semibold transition-all disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-white text-xs font-semibold transition-all disabled:opacity-50"
             >
               <RefreshCw className={cn('w-3.5 h-3.5', oddsLoading && 'animate-spin')} />
               <span className="hidden sm:inline">Refresh</span>
@@ -861,7 +861,7 @@ export default function TradingPage() {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr_1fr] gap-4 h-[calc(100vh-110px)] min-h-[600px]">
 
           {/* Column 1: Live Odds Scanner */}
-          <div className="rounded-2xl bg-[oklch(0.08_0.012_280)] border border-[oklch(0.16_0.015_280)] p-4 overflow-hidden flex flex-col">
+          <div className="rounded-2xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] p-4 overflow-hidden flex flex-col">
             <OddsScanner
               events={events}
               loading={oddsLoading}
@@ -872,7 +872,7 @@ export default function TradingPage() {
           </div>
 
           {/* Column 2: Kelly Optimizer + Monte Carlo */}
-          <div className="rounded-2xl bg-[oklch(0.08_0.012_280)] border border-[oklch(0.16_0.015_280)] p-4 overflow-hidden flex flex-col">
+          <div className="rounded-2xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] p-4 overflow-hidden flex flex-col">
             <KellyCalculator
               bankroll={bankroll}
               onBankrollChange={setBankroll}
@@ -886,7 +886,7 @@ export default function TradingPage() {
           </div>
 
           {/* Column 3: Risk Monitor + Positions */}
-          <div className="rounded-2xl bg-[oklch(0.08_0.012_280)] border border-[oklch(0.16_0.015_280)] p-4 overflow-hidden flex flex-col">
+          <div className="rounded-2xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] p-4 overflow-hidden flex flex-col">
             <RiskPanel
               positions={positions}
               bankroll={bankroll}
@@ -896,10 +896,10 @@ export default function TradingPage() {
         </div>
 
         {/* Info footer */}
-        <div className="mt-3 flex items-start gap-2 px-3 py-2 rounded-xl bg-[oklch(0.09_0.012_280)] border border-[oklch(0.15_0.012_280)]">
+        <div className="mt-3 flex items-start gap-2 px-3 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
           <Info className="w-3 h-3 text-blue-400 mt-0.5 shrink-0" />
-          <p className="text-[9px] text-[oklch(0.38_0.01_280)] leading-relaxed">
-            <span className="font-bold text-[oklch(0.50_0.01_280)]">Pro Terminal</span> — Kelly sizing uses ¼-Kelly (25%) by default with a 5% max position cap. Monte Carlo runs 5 000 simulations over 50 bets. Edge estimates in the odds scanner use devigged (no-vig) fair probabilities — the vig slice shown reflects what the bookmaker takes per side. Hover and add legs to the Kelly calculator to set your own win probability for precise analysis. This is for informational purposes only; verify all odds before placing wagers.
+          <p className="text-[9px] text-[var(--text-faint)] leading-relaxed">
+            <span className="font-bold text-[var(--text-muted)]">Pro Terminal</span> — Kelly sizing uses ¼-Kelly (25%) by default with a 5% max position cap. Monte Carlo runs 5 000 simulations over 50 bets. Edge estimates in the odds scanner use devigged (no-vig) fair probabilities — the vig slice shown reflects what the bookmaker takes per side. Hover and add legs to the Kelly calculator to set your own win probability for precise analysis. This is for informational purposes only; verify all odds before placing wagers.
           </p>
         </div>
       </main>

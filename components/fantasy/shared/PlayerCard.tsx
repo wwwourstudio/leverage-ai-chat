@@ -81,9 +81,9 @@ export function PlayerCard({
       onKeyDown={e => e.key === 'Enter' && onClick?.()}
       className={cn(
         'group relative flex items-center gap-3 pl-4 pr-3 py-3',
-        'rounded-xl bg-[oklch(0.13_0.015_280)] border border-white/10',
+        'rounded-xl bg-[var(--bg-elevated)] border border-white/10',
         'cursor-pointer select-none transition-all duration-200',
-        'hover:border-white/20 hover:bg-[oklch(0.16_0.015_280)]',
+        'hover:border-white/20 hover:bg-[var(--bg-surface)]',
         isRecommended && 'border-blue-500/40 bg-blue-500/5 hover:border-blue-500/60',
         className,
       )}

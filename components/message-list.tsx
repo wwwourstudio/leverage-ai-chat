@@ -55,7 +55,7 @@ function TypingIndicator() {
       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-900/30">
         <Sparkles className="w-4 h-4 text-white animate-pulse" />
       </div>
-      <div className="bg-[oklch(0.12_0.015_280)] border border-[oklch(0.22_0.02_280)] rounded-2xl px-5 py-3.5 flex items-center gap-3">
+      <div className="bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-2xl px-5 py-3.5 flex items-center gap-3">
         {/* Animated waveform — 5 bars with staggered timing */}
         <div className="flex gap-[3px] items-center" style={{ height: '18px' }}>
           {[0, 1, 2, 3, 4].map((i) => (
@@ -75,7 +75,7 @@ function TypingIndicator() {
         {/* Stage label */}
         <span
           key={stage}
-          className="text-[11px] text-[oklch(0.50_0.01_280)] font-medium animate-fade-in-up"
+          className="text-[11px] text-[var(--text-muted)] font-medium animate-fade-in-up"
         >
           {TYPING_STAGES[stage]}
         </span>
@@ -117,13 +117,13 @@ function isSameDay(a: Date, b: Date): boolean {
 function DateSeparator({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-3 my-2" role="separator" aria-label={label}>
-      <div className="flex-1 h-px bg-[oklch(0.20_0.015_280)]" />
+      <div className="flex-1 h-px bg-[var(--bg-surface)]" />
       {/* suppressHydrationWarning: server UTC vs client local timezone can produce
           different Today/Yesterday labels; the client value is always correct. */}
-      <span suppressHydrationWarning className="text-[9px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)] px-2">
+      <span suppressHydrationWarning className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-faint)] px-2">
         {label}
       </span>
-      <div className="flex-1 h-px bg-[oklch(0.20_0.015_280)]" />
+      <div className="flex-1 h-px bg-[var(--bg-surface)]" />
     </div>
   );
 }

@@ -41,7 +41,7 @@ export function KalshiMarketCard({ market, onAsk }: KalshiMarketCardProps) {
   const yesPct = market.priceIsReal ? market.yesPrice : null;
 
   return (
-    <div className="bg-[oklch(0.11_0.01_280)] border border-[oklch(0.18_0.02_280)] rounded-xl p-4 flex flex-col gap-3 hover:border-[oklch(0.28_0.05_270)] transition-colors">
+    <div className="bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-xl p-4 flex flex-col gap-3 hover:border-[var(--border-hover)] transition-colors">
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <span className="text-[10px] font-semibold tracking-widest uppercase text-violet-400/70">
@@ -49,11 +49,11 @@ export function KalshiMarketCard({ market, onAsk }: KalshiMarketCardProps) {
         </span>
         <div className="flex items-center gap-2">
           {!market.priceIsReal && (
-            <span className="text-[9px] bg-[oklch(0.18_0.02_290)] text-violet-400/60 rounded px-1.5 py-0.5">
+            <span className="text-[9px] bg-[var(--bg-surface)] text-violet-400/60 rounded px-1.5 py-0.5">
               Price TBD
             </span>
           )}
-          <span className="text-[9px] text-[oklch(0.38_0.01_280)]">
+          <span className="text-[9px] text-[var(--text-faint)]">
             Closes {countdown(market.closeTime)}
           </span>
         </div>
@@ -64,7 +64,7 @@ export function KalshiMarketCard({ market, onAsk }: KalshiMarketCardProps) {
         {market.title}
       </p>
       {market.subtitle && (
-        <p className="text-[11px] text-[oklch(0.45_0.01_280)] -mt-1">{market.subtitle}</p>
+        <p className="text-[11px] text-[var(--text-muted)] -mt-1">{market.subtitle}</p>
       )}
 
       {/* YES / NO prices */}
@@ -80,7 +80,7 @@ export function KalshiMarketCard({ market, onAsk }: KalshiMarketCardProps) {
             </div>
           )}
         </div>
-        <div className="bg-[oklch(0.14_0.01_280)] border border-[oklch(0.20_0.01_280)] rounded-lg p-3 text-center">
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-lg p-3 text-center">
           <div className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-0.5">
             NO
           </div>
@@ -97,7 +97,7 @@ export function KalshiMarketCard({ market, onAsk }: KalshiMarketCardProps) {
       {yesPct !== null && (
         <div className="flex items-center gap-2">
           <span className="text-[9px] text-blue-400/60 w-8 text-right">{yesPct}%</span>
-          <div className="flex-1 h-1.5 rounded-full bg-[oklch(0.16_0.01_280)] overflow-hidden">
+          <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-blue-600 to-violet-600 transition-all"
               style={{ width: `${yesPct}%` }}
@@ -108,19 +108,19 @@ export function KalshiMarketCard({ market, onAsk }: KalshiMarketCardProps) {
       )}
 
       {/* Stats row */}
-      <div className="flex gap-2 flex-wrap text-[10px] text-[oklch(0.40_0.01_280)]">
+      <div className="flex gap-2 flex-wrap text-[10px] text-[var(--text-faint)]">
         {market.volume24h > 0 && (
-          <span className="bg-[oklch(0.14_0.01_280)] rounded px-2 py-1">
+          <span className="bg-[var(--bg-elevated)] rounded px-2 py-1">
             Vol 24h: ${market.volume24h.toLocaleString()}
           </span>
         )}
         {market.openInterest > 0 && (
-          <span className="bg-[oklch(0.14_0.01_280)] rounded px-2 py-1">
+          <span className="bg-[var(--bg-elevated)] rounded px-2 py-1">
             OI: ${market.openInterest.toLocaleString()}
           </span>
         )}
         {market.spread > 0 && (
-          <span className="bg-[oklch(0.14_0.01_280)] rounded px-2 py-1">
+          <span className="bg-[var(--bg-elevated)] rounded px-2 py-1">
             Spread: {market.spread}¢
           </span>
         )}

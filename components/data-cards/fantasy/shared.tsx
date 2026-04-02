@@ -85,7 +85,7 @@ export function RankCircle({ rank, tier }: { rank: number; tier: number }) {
     ? 'bg-slate-400/15 border-slate-400/40 text-slate-300'
     : tier === 3
     ? 'bg-amber-700/20 border-amber-700/40 text-amber-500'
-    : 'bg-[oklch(0.10_0.01_280)] border-[oklch(0.18_0.01_280)] text-[oklch(0.38_0.01_280)]';
+    : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)] text-[var(--text-faint)]';
   return (
     <span className={cn('inline-flex items-center justify-center w-5 h-5 rounded-full border text-[9px] font-black shrink-0', c)}>
       {rank}
@@ -120,10 +120,10 @@ export function Shell({ title, category, subcategory, status, Icon, children, on
 
   return (
     <article className={cn(
-      'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.09_0.012_280)] border transition-all duration-300',
+      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-overlay)] border transition-all duration-300',
       isHero
-        ? 'border-[oklch(0.28_0.025_260)] shadow-[0_0_32px_oklch(0.3_0.06_260/0.15)]'
-        : 'border-[oklch(0.18_0.016_280)] hover:border-[oklch(0.28_0.02_280)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.08)]',
+        ? 'border-[var(--border-hover)] shadow-[0_0_32px_oklch(0.3_0.06_260/0.15)]'
+        : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.08)]',
     )}>
       {/* Gradient header */}
       <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', cfg.headerGrad)}>
@@ -149,7 +149,7 @@ export function Shell({ title, category, subcategory, status, Icon, children, on
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)] text-xs font-semibold text-[oklch(0.46_0.01_280)] hover:text-white hover:bg-[oklch(0.14_0.015_280)] hover:border-[oklch(0.26_0.02_280)] transition-all duration-150"
+            className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-white hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] transition-all duration-150"
           >
             <TrendingUp className="w-3.5 h-3.5" />
             Full Analysis

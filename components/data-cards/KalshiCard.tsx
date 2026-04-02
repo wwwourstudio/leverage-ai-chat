@@ -130,16 +130,17 @@ const isPublicTicker = (t?: string) =>
 // ── Sparkline ──────────────────────────────────────────────────────────────────
 
 function Sparkline({
-  trades, width = 80, height = 24,
-}: { trades: Array<{ price: number }>; width?: number; height?: number }) {
+  trades, width = 200, height = 48, fullWidth = false,
+}: { trades: Array<{ price: number }>; width?: number; height?: number; fullWidth?: boolean }) {
   const uid = useId();
   if (trades.length < 2) return null;
   const prices = trades.map(t => t.price);
   const min = Math.min(...prices), max = Math.max(...prices);
-  const range = max - min || 1;
-  const pad = 2, innerH = height - pad * 2;
+  const range = max - min || 2;
+  const pad = 3, innerH = height - pad * 2;
+  const w = width;
   const pts = prices.map((p, i) => [
-    (i / (prices.length - 1)) * width,
+    (i / (prices.length - 1)) * w,
     pad + innerH - ((p - min) / range) * innerH,
   ] as [number, number]);
   let d = `M ${pts[0][0]},${pts[0][1]}`;
@@ -148,24 +149,41 @@ function Sparkline({
     const cpx = (x0 + x1) / 2;
     d += ` C ${cpx},${y0} ${cpx},${y1} ${x1},${y1}`;
   }
-  const area = `${d} L ${width},${height} L 0,${height} Z`;
+  const area = `${d} L ${w},${height} L 0,${height} Z`;
   const isUp  = prices[prices.length - 1] >= prices[0];
   const color = isUp ? YES_COLOR : NO_COLOR;
   const gid   = `spark-${uid.replace(/:/g, '')}`;
+  // 50¢ midline Y position
+  const midY = range > 0 ? pad + innerH - ((50 - min) / range) * innerH : pad + innerH / 2;
+  const showMidLine = midY > pad && midY < height - pad;
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}
-         className="overflow-visible" aria-hidden="true">
+    <svg
+      width={fullWidth ? '100%' : w}
+      height={height}
+      viewBox={`0 0 ${w} ${height}`}
+      preserveAspectRatio="none"
+      className="overflow-visible block"
+      aria-hidden="true"
+    >
       <defs>
         <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor={color} stopOpacity="0.3" />
+          <stop offset="0%"   stopColor={color} stopOpacity="0.35" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
+      {/* 50¢ midpoint reference line */}
+      {showMidLine && (
+        <line
+          x1="0" y1={midY} x2={w} y2={midY}
+          stroke="currentColor" strokeWidth="0.6"
+          strokeDasharray="4,4" opacity="0.18"
+        />
+      )}
       <path d={area} fill={`url(#${gid})`} />
-      <path d={d} fill="none" stroke={color} strokeWidth="1.5"
+      <path d={d} fill="none" stroke={color} strokeWidth="1.75"
             strokeLinecap="round" strokeLinejoin="round" />
       <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]}
-              r="2.5" fill={color} />
+              r="3" fill={color} />
     </svg>
   );
 }
@@ -174,16 +192,12 @@ function Sparkline({
 
 function InactivePriceState() {
   return (
-    <div
-      className="w-full rounded-xl py-5 flex flex-col items-center gap-2 text-center"
-      style={{ backgroundColor: 'oklch(0.08 0.008 280)', border: '1px solid oklch(0.12 0.01 280)' }}
-    >
-      <Activity className="w-5 h-5" style={{ color: 'oklch(0.30 0.01 280)' }} />
-      <span className="text-[11px] font-semibold" style={{ color: 'oklch(0.42 0.01 280)' }}>
+    <div className="w-full rounded-xl py-5 flex flex-col items-center gap-2 text-center bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
+      <Activity className="w-5 h-5 text-[var(--text-faint)]" />
+      <span className="text-[11px] font-semibold text-[var(--text-muted)]">
         Awaiting First Trade
       </span>
-      <span className="text-[10px] leading-relaxed max-w-[200px]"
-            style={{ color: 'oklch(0.28 0.01 280)' }}>
+      <span className="text-[10px] leading-relaxed max-w-[200px] text-[var(--text-faint)]">
         No bids or asks placed yet. Price will discover near 50¢ once trading opens.
       </span>
     </div>
@@ -237,7 +251,7 @@ function ProbabilityHero({
 
   return (
     <div className="w-full space-y-3">
-      {/* YES / NO price row */}
+      {/* YES / NO price row — no sparkline in the middle */}
       <div className="flex items-end justify-between gap-3">
 
         {/* YES block */}
@@ -247,48 +261,32 @@ function ProbabilityHero({
           <div className="flex items-baseline gap-1.5">
             <span
               className={cn('tabular-nums font-black leading-none tracking-tight',
-                isHero ? 'text-[44px]' : 'text-[38px]')}
-              style={{ color: yesLeads ? YES_COLOR : 'oklch(0.42 0.01 280)' }}
+                isHero ? 'text-[44px]' : 'text-[32px]')}
+              style={{ color: yesLeads ? YES_COLOR : 'var(--text-muted)' }}
             >
               {yesPct}
             </span>
             <span className="text-sm font-bold mb-0.5"
-                  style={{ color: yesLeads ? YES_COLOR + 'aa' : 'oklch(0.28 0.01 280)' }}>¢</span>
-            {/* Δ indicator */}
-            {priceDir && priceDir !== 'flat' && !!priceChange && Math.abs(priceChange) > 0 && (
-              <span className={cn('flex items-center gap-0.5 text-[10px] font-bold mb-1',
-                priceDir === 'up' ? 'text-[#00d15d]' : 'text-[#f63d58]')}>
-                {priceDir === 'up'
-                  ? <ArrowUp className="w-2.5 h-2.5" />
-                  : <ArrowDown className="w-2.5 h-2.5" />}
-                {Math.abs(priceChange)}¢
-              </span>
-            )}
+                  style={{ color: yesLeads ? YES_COLOR + 'aa' : 'var(--text-faint)' }}>¢</span>
           </div>
           <span className="text-[9px] font-medium tabular-nums"
-                style={{ color: yesLeads ? YES_COLOR + '70' : 'oklch(0.28 0.01 280)' }}>
+                style={{ color: yesLeads ? YES_COLOR + '70' : 'var(--text-faint)' }}>
             {yesPct}% implied
           </span>
           {lastPrice != null && lastPrice > 0 && lastPrice !== yesPct && (
-            <span className="text-[9px] text-[oklch(0.28_0.01_280)] tabular-nums">
+            <span className="text-[9px] text-[var(--text-faint)] tabular-nums">
               last {lastPrice}¢
             </span>
           )}
         </div>
 
-        {/* Sparkline — center */}
-        <div className="flex flex-col items-center gap-1 flex-1 pb-1">
-          {trades && trades.length >= 2 ? (
-            <>
-              <Sparkline trades={trades} width={80} height={24} />
-              <span className="text-[8px] font-semibold uppercase tracking-wider"
-                    style={{ color: 'oklch(0.28 0.02 260)' }}>24h</span>
-            </>
-          ) : (
-            <div className="w-20 h-6 rounded-lg flex items-center justify-center opacity-15"
-                 style={{ backgroundColor: 'oklch(0.14 0.01 280)' }}>
-              <Activity className="w-3.5 h-3.5" style={{ color: 'oklch(0.35 0.01 280)' }} />
-            </div>
+        {/* Center: efficiency tag */}
+        <div className="flex flex-col items-center gap-1 flex-shrink-0">
+          {Math.abs(yesPct - 50) <= 5 && (
+            <span className="text-[8px] font-semibold px-2 py-0.5 rounded-full"
+                  style={{ color: '#6366f1', backgroundColor: '#6366f112', border: '1px solid #6366f128' }}>
+              near 50/50
+            </span>
           )}
         </div>
 
@@ -299,25 +297,35 @@ function ProbabilityHero({
           <div className="flex items-baseline gap-1.5">
             <span
               className={cn('tabular-nums font-black leading-none tracking-tight',
-                isHero ? 'text-[44px]' : 'text-[38px]')}
-              style={{ color: !yesLeads ? NO_COLOR : 'oklch(0.42 0.01 280)' }}
+                isHero ? 'text-[44px]' : 'text-[32px]')}
+              style={{ color: !yesLeads ? NO_COLOR : 'var(--text-muted)' }}
             >
               {noPct}
             </span>
             <span className="text-sm font-bold mb-0.5"
-                  style={{ color: !yesLeads ? NO_COLOR + 'aa' : 'oklch(0.28 0.01 280)' }}>¢</span>
+                  style={{ color: !yesLeads ? NO_COLOR + 'aa' : 'var(--text-faint)' }}>¢</span>
           </div>
           <span className="text-[9px] font-medium tabular-nums"
-                style={{ color: !yesLeads ? NO_COLOR + '70' : 'oklch(0.28 0.01 280)' }}>
+                style={{ color: !yesLeads ? NO_COLOR + '70' : 'var(--text-faint)' }}>
             {noPct}% implied
           </span>
         </div>
       </div>
 
+      {/* Full-width sparkline row */}
+      {trades && trades.length >= 2 ? (
+        <div className="w-full rounded-xl overflow-hidden bg-[var(--bg-overlay)] px-2 pt-2 pb-1">
+          <Sparkline trades={trades} fullWidth height={48} />
+          <div className="flex items-center justify-between mt-1 px-1">
+            <span className="text-[8px] font-semibold text-[var(--text-faint)]">Price history</span>
+            <span className="text-[8px] font-semibold text-[var(--text-faint)]">24h</span>
+          </div>
+        </div>
+      ) : null}
+
       {/* Probability bar */}
       <div className="space-y-1">
-        <div className="relative h-2.5 rounded-full overflow-hidden"
-             style={{ backgroundColor: 'oklch(0.12 0.01 280)' }}>
+        <div className="relative h-2.5 rounded-full overflow-hidden bg-[var(--bg-surface)]">
           {/* YES fill */}
           <div
             className="absolute left-0 top-0 h-full rounded-full"
@@ -337,12 +345,11 @@ function ProbabilityHero({
             }}
           />
           {/* 50¢ center notch */}
-          <div className="absolute left-1/2 -translate-x-px top-0 h-full w-0.5"
-               style={{ backgroundColor: 'oklch(0.07 0.01 280)' }} />
+          <div className="absolute left-1/2 -translate-x-px top-0 h-full w-0.5 bg-[var(--bg-overlay)]" />
         </div>
         <div className="flex justify-between text-[8px] font-semibold">
           <span style={{ color: YES_COLOR + '66' }}>0¢</span>
-          <span style={{ color: 'oklch(0.22 0.01 280)' }}>50¢</span>
+          <span className="text-[var(--text-faint)]">50¢</span>
           <span style={{ color: NO_COLOR + '66' }}>100¢</span>
         </div>
       </div>
@@ -364,17 +371,17 @@ function OrderBookMini({
   const maxQty   = Math.max(...[...top3Bids, ...top3Asks].map(r => r.quantity), 1);
 
   return (
-    <div className="rounded-xl overflow-hidden bg-[oklch(0.09_0.01_280)] border border-[oklch(0.14_0.01_280)]">
+    <div className="rounded-xl overflow-hidden bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
       <div className="grid grid-cols-2">
         {/* Bids (YES) */}
-        <div className="p-2.5 space-y-1 border-r border-r-[oklch(0.12_0.01_280)]">
+        <div className="p-2.5 space-y-1 border-r border-r-[var(--border-subtle)]">
           <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: YES_COLOR + '88' }}>Bids</span>
           {top3Bids.map((row, i) => (
             <div key={i} className="relative flex items-center justify-between text-[10px] tabular-nums rounded overflow-hidden px-1.5 py-0.5">
               <div className="absolute inset-0 rounded"
                    style={{ backgroundColor: YES_COLOR + '0f', width: `${(row.quantity / maxQty) * 100}%`, transition: 'width 600ms' }} />
               <span className="relative font-bold z-10" style={{ color: YES_COLOR + 'cc' }}>{row.price}¢</span>
-              <span className="relative text-[9px] z-10" style={{ color: 'oklch(0.38 0.01 280)' }}>{row.quantity.toLocaleString()}</span>
+              <span className="relative text-[9px] z-10 text-[var(--text-muted)]">{row.quantity.toLocaleString()}</span>
             </div>
           ))}
         </div>
@@ -386,7 +393,7 @@ function OrderBookMini({
               <div className="absolute right-0 inset-y-0 rounded"
                    style={{ backgroundColor: NO_COLOR + '0f', width: `${(row.quantity / maxQty) * 100}%`, transition: 'width 600ms' }} />
               <span className="relative font-bold z-10" style={{ color: NO_COLOR + 'cc' }}>{row.price}¢</span>
-              <span className="relative text-[9px] z-10" style={{ color: 'oklch(0.38 0.01 280)' }}>{row.quantity.toLocaleString()}</span>
+              <span className="relative text-[9px] z-10 text-[var(--text-muted)]">{row.quantity.toLocaleString()}</span>
             </div>
           ))}
         </div>
@@ -417,8 +424,7 @@ function PriceChips({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-[9px] font-black uppercase tracking-widest"
-              style={{ color: 'oklch(0.28 0.02 260)' }}>Best price to buy</span>
+        <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">Best price to buy</span>
         {spreadConf && (
           <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={spreadConf.style}>
             {spreadConf.text}
@@ -457,17 +463,16 @@ function StatsRow({
   const oi     = fmtVol(openInterestRaw);
   if (!vol24h && !volAll && !oi) return null;
 
+
   const tierColor =
     volumeTier === 'Deep'     ? YES_COLOR    :
     volumeTier === 'Active'   ? '#f59e0b'    :
-    volumeTier === 'Moderate' ? '#6366f1'    : 'oklch(0.35 0.01 280)';
+    volumeTier === 'Moderate' ? '#6366f1'    : 'var(--text-faint)';
 
   return (
-    <div className="rounded-xl px-3 py-2.5 space-y-2"
-         style={{ backgroundColor: 'oklch(0.09 0.01 280)', border: '1px solid oklch(0.14 0.01 280)' }}>
+    <div className="rounded-xl px-3 py-2.5 space-y-2 bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
       <div className="flex items-center justify-between">
-        <span className="text-[8px] font-black uppercase tracking-widest"
-              style={{ color: 'oklch(0.28 0.02 260)' }}>Market Depth</span>
+        <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-faint)]">Market Depth</span>
         {volumeTier && (
           <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full"
                 style={{ color: tierColor, backgroundColor: tierColor + '15', border: `1px solid ${tierColor}28` }}>
@@ -477,21 +482,19 @@ function StatsRow({
       </div>
       <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col gap-0.5">
-          <span className="text-[8px] font-bold uppercase tracking-wider"
-                style={{ color: 'oklch(0.28 0.02 260)' }}>24h Vol</span>
-          <span className="text-[12px] font-black tabular-nums text-white/80">{vol24h ?? '—'}</span>
+          <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)]">24h Vol</span>
+          <span className="text-[12px] font-black tabular-nums text-foreground/80">{vol24h ?? '—'}</span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className="text-[8px] font-bold uppercase tracking-wider"
-                style={{ color: 'oklch(0.28 0.02 260)' }}>Total</span>
-          <span className="text-[12px] font-black tabular-nums text-white/80">{volAll ?? '—'}</span>
+          <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Total</span>
+          <span className="text-[12px] font-black tabular-nums text-foreground/80">{volAll ?? '—'}</span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className="text-[8px] font-bold uppercase tracking-wider"
-                style={{ color: 'oklch(0.28 0.02 260)' }}>Open Int</span>
+          <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Open Int</span>
           <span className="text-[12px] font-black tabular-nums" style={{ color: '#6366f1' }}>{oi ?? '—'}</span>
         </div>
       </div>
+      <VolumeBar volume24hRaw={volume24hRaw} volumeRaw={volumeRaw} />
     </div>
   );
 }
@@ -500,7 +503,18 @@ function StatsRow({
 
 function TimeBar({ closeTimeIso }: { closeTimeIso?: string | null }) {
   const { label, pctElapsed, urgency } = timeRemaining(closeTimeIso);
-  if (urgency === 'closed') return null;
+  const closeDateStr = closeTimeIso
+    ? new Date(closeTimeIso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : null;
+
+  if (urgency === 'closed') {
+    return (
+      <div className="flex items-center justify-between text-[9px]">
+        <span className="font-black uppercase tracking-widest text-[var(--text-faint)]">Settled</span>
+        {closeDateStr && <span className="text-[var(--text-faint)]">{closeDateStr}</span>}
+      </div>
+    );
+  }
 
   const barColor  =
     urgency === 'critical' ? NO_COLOR  :
@@ -510,20 +524,23 @@ function TimeBar({ closeTimeIso }: { closeTimeIso?: string | null }) {
     urgency === 'critical' ? { color: NO_COLOR }   :
     urgency === 'urgent'   ? { color: '#fb923c' }  :
     urgency === 'soon'     ? { color: '#fbbf24' }  :
-    { color: 'oklch(0.40 0.01 280)' };
+    {};
 
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[9px] font-black uppercase tracking-widest"
-              style={{ color: 'oklch(0.28 0.02 260)' }}>Closes in</span>
-        <span className="flex items-center gap-1 text-[10px] font-bold" style={textStyle}>
-          <Clock className={cn('w-3 h-3', urgency === 'critical' && 'animate-pulse')} />
-          {label}
-        </span>
+        <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">Closes in</span>
+        <div className="flex items-center gap-1.5">
+          <span className={cn('flex items-center gap-1 text-[10px] font-bold', !textStyle.color && 'text-[var(--text-muted)]')} style={textStyle}>
+            <Clock className={cn('w-3 h-3', urgency === 'critical' && 'animate-pulse')} />
+            {label}
+          </span>
+          {closeDateStr && (
+            <span className="text-[9px] text-[var(--text-faint)]">· {closeDateStr}</span>
+          )}
+        </div>
       </div>
-      <div className="relative h-1.5 rounded-full overflow-hidden"
-           style={{ backgroundColor: 'oklch(0.12 0.01 280)' }}>
+      <div className="relative h-1.5 rounded-full overflow-hidden bg-[var(--bg-surface)]">
         <div className="absolute left-0 top-0 h-full rounded-full transition-all duration-1000"
              style={{ width: `${pctElapsed}%`, backgroundColor: barColor, opacity: 0.8 }} />
       </div>
@@ -543,8 +560,7 @@ function RelatedMarketsLink({ seriesTicker, eventTicker }: { seriesTicker?: stri
       href={`https://kalshi.com/markets/${linkTarget.toLowerCase()}`}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-1.5 text-[10px] font-medium transition-colors duration-150 group/rel"
-      style={{ color: 'oklch(0.36 0.02 260)' }}
+      className="flex items-center gap-1.5 text-[10px] font-medium transition-colors duration-150 group/rel text-[var(--text-muted)] hover:text-foreground"
     >
       <Layers className="w-3 h-3 shrink-0" />
       <span className="group-hover/rel:underline">More in {linkTarget}</span>
@@ -553,10 +569,54 @@ function RelatedMarketsLink({ seriesTicker, eventTicker }: { seriesTicker?: stri
   );
 }
 
+// ── Price Movement Chip ────────────────────────────────────────────────────────
+
+function PriceMovementChip({ priceChange, priceDir }: { priceChange: number; priceDir: string }) {
+  if (!priceChange || Math.abs(priceChange) < 1 || priceDir === 'flat') return null;
+  const isUp = priceDir === 'up';
+  return (
+    <div
+      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full w-fit text-[11px] font-black"
+      style={{
+        color: isUp ? YES_COLOR : NO_COLOR,
+        backgroundColor: (isUp ? YES_COLOR : NO_COLOR) + '15',
+        border: `1px solid ${isUp ? YES_COLOR : NO_COLOR}30`,
+      }}
+    >
+      {isUp ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+      {isUp ? '+' : ''}{priceChange}¢ today
+    </div>
+  );
+}
+
+// ── Volume Bar ─────────────────────────────────────────────────────────────────
+
+function VolumeBar({ volume24hRaw, volumeRaw }: { volume24hRaw?: number; volumeRaw?: number }) {
+  if (!volume24hRaw || !volumeRaw || volumeRaw <= 0) return null;
+  const pct = Math.min(100, Math.round((volume24hRaw / volumeRaw) * 100));
+  return (
+    <div className="space-y-1 pt-1">
+      <div className="flex justify-between text-[8px] font-semibold text-[var(--text-faint)]">
+        <span>24h Activity</span>
+        <span>{pct}% of total vol</span>
+      </div>
+      <div className="h-1 rounded-full overflow-hidden bg-[var(--bg-surface)]">
+        <div
+          className="h-full rounded-full transition-all duration-700"
+          style={{
+            width: `${pct}%`,
+            backgroundColor: pct > 30 ? YES_COLOR + '99' : '#6366f188',
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ── Divider ────────────────────────────────────────────────────────────────────
 
 function Divider() {
-  return <div className="h-px" style={{ backgroundColor: 'oklch(0.10 0.01 280)' }} />;
+  return <div className="h-px bg-[var(--border-subtle)]" />;
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
@@ -678,10 +738,10 @@ export const KalshiCard = memo(function KalshiCard({
   return (
     <article
       className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.09_0.012_280)] border transition-all duration-300',
+        'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-300',
         isHero
-          ? 'border-[oklch(0.28_0.025_260)] shadow-[0_0_32px_oklch(0.3_0.06_260/0.12)]'
-          : 'border-[oklch(0.18_0.016_280)] hover:border-[oklch(0.28_0.02_280)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.08)]',
+          ? 'border-[var(--border-hover)] shadow-[0_0_32px_oklch(0.3_0.06_260/0.12)]'
+          : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.08)]',
       )}
       style={{ borderTopColor: accentColor, borderTopWidth: '2px' }}
     >
@@ -732,12 +792,12 @@ export const KalshiCard = memo(function KalshiCard({
           )}
         </div>
 
-        {/* Title */}
+        {/* Title — full exact text from Kalshi API */}
         <h3
-          className={cn('font-black text-white leading-snug text-balance pr-20', isHero ? 'text-[15px]' : 'text-sm')}
+          className={cn('font-black text-white leading-snug pr-20', isHero ? 'text-[15px]' : 'text-sm', 'line-clamp-4')}
           title={title}
         >
-          {shortenTitle(title)}
+          {title}
         </h3>
 
         {/* Subtitle */}
@@ -746,10 +806,22 @@ export const KalshiCard = memo(function KalshiCard({
             {d.subtitle}
           </p>
         )}
+
+        {/* Ticker badge — exact Kalshi market ID */}
+        {d.ticker && (
+          <span className="inline-block mt-1.5 font-mono text-[9px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-white/30 select-all tracking-wider">
+            {d.ticker}
+          </span>
+        )}
       </div>
 
       {/* ── Body ────────────────────────────────────────────────────────────── */}
       <div className={cn('px-4 pb-4 space-y-3.5', isHero ? 'pt-4' : 'pt-3.5')}>
+
+        {/* Price movement chip — prominent Δ indicator */}
+        {d.priceIsReal && safeChange !== 0 && (
+          <PriceMovementChip priceChange={safeChange} priceDir={priceDir} />
+        )}
 
         {/* Signal banner — only shown when real price data exists */}
         {d.priceIsReal && (
@@ -776,13 +848,13 @@ export const KalshiCard = memo(function KalshiCard({
 
         <Divider />
 
-        {/* Order book depth (when available — active markets only) */}
-        {isActive && hasOrderBook && (
+        {/* Order book depth — hero/full-size only */}
+        {isHero && isActive && hasOrderBook && (
           <OrderBookMini bids={d.orderbookBids} asks={d.orderbookAsks} />
         )}
 
-        {/* Buy price chips (when no order book — active markets only) */}
-        {isActive && hasPrices && !hasOrderBook && (
+        {/* Buy price chips — hero/full-size only */}
+        {isHero && isActive && hasPrices && !hasOrderBook && (
           <div className={cn(
             'rounded-xl transition-colors duration-700',
             priceFlash ? 'bg-emerald-500/8' : 'bg-transparent',
@@ -795,19 +867,21 @@ export const KalshiCard = memo(function KalshiCard({
           </div>
         )}
 
-        {/* Market stats */}
-        <StatsRow
-          volume24hRaw={d.volume24hRaw}
-          volumeRaw={d.volumeRaw}
-          openInterestRaw={d.openInterestRaw}
-          volumeTier={d.volumeTier}
-        />
+        {/* Market stats — hero/full-size only */}
+        {isHero && (
+          <StatsRow
+            volume24hRaw={d.volume24hRaw}
+            volumeRaw={d.volumeRaw}
+            openInterestRaw={d.openInterestRaw}
+            volumeTier={d.volumeTier}
+          />
+        )}
 
-        {/* Time remaining */}
+        {/* Time remaining — always shown */}
         <TimeBar closeTimeIso={d.closeTimeIso} />
 
-        {/* Related markets link */}
-        {(d.seriesTicker || d.eventTicker) && d.seriesTicker !== d.ticker && (
+        {/* Related markets link — hero/full-size only */}
+        {isHero && (d.seriesTicker || d.eventTicker) && d.seriesTicker !== d.ticker && (
           <RelatedMarketsLink seriesTicker={d.seriesTicker} eventTicker={d.eventTicker} />
         )}
 
@@ -816,28 +890,42 @@ export const KalshiCard = memo(function KalshiCard({
         {/* ── CTAs ──────────────────────────────────────────────────────────── */}
         <div className="space-y-2">
 
-          {/* AI Analysis */}
-          {onAnalyze && (
-            <button
-              onClick={onAnalyze}
-              className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)] text-xs font-semibold text-[oklch(0.46_0.01_280)] hover:text-white hover:bg-[oklch(0.14_0.015_280)] hover:border-[oklch(0.26_0.02_280)] transition-all duration-150"
-              aria-label={`AI analysis for ${title}`}
+          {/* Primary: Place Bet on Kalshi */}
+          {hasSpecificMarket && (
+            <a
+              href={tradeBase}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-black tracking-wide transition-all duration-150"
+              style={{
+                background: `linear-gradient(135deg, ${accentColor}22, ${accentColor}12)`,
+                border: `1px solid ${accentColor}40`,
+                color: accentColor,
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = `linear-gradient(135deg, ${accentColor}35, ${accentColor}22)`;
+                e.currentTarget.style.boxShadow = `0 4px 20px ${accentColor}20`;
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = `linear-gradient(135deg, ${accentColor}22, ${accentColor}12)`;
+                e.currentTarget.style.boxShadow = 'none';
+              }}
             >
-              <BarChart3 className="w-3.5 h-3.5" />
-              AI Analysis
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+              <Globe className="w-4 h-4" />
+              Place Bet on Kalshi
+              <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+            </a>
           )}
 
-          {/* YES / NO trade buttons — only for active (open) markets */}
-          {isActive && hasSpecificMarket && (
+          {/* YES / NO trade buttons — only for active (open) markets with price data */}
+          {isActive && hasSpecificMarket && d.priceIsReal && (
             <div className="grid grid-cols-2 gap-2">
               {/* YES */}
               <a
                 href={tradeBase}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group/yes flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-black tracking-wide transition-all duration-150"
+                className="group/yes flex flex-col items-center justify-center gap-0.5 py-2.5 rounded-xl text-[11px] font-black tracking-wide transition-all duration-150"
                 style={{
                   color: YES_COLOR,
                   backgroundColor: YES_COLOR + '12',
@@ -854,8 +942,8 @@ export const KalshiCard = memo(function KalshiCard({
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               >
-                {d.priceIsReal ? 'Buy YES' : 'Trade YES'}
-                <ExternalLink className="w-3 h-3 opacity-50 transition-opacity duration-150 group-hover/yes:opacity-90" />
+                <span>Buy YES</span>
+                <span className="text-[10px] font-bold opacity-80">{yesPct}¢</span>
               </a>
 
               {/* NO */}
@@ -863,7 +951,7 @@ export const KalshiCard = memo(function KalshiCard({
                 href={tradeBase}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group/no flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-black tracking-wide transition-all duration-150"
+                className="group/no flex flex-col items-center justify-center gap-0.5 py-2.5 rounded-xl text-[11px] font-black tracking-wide transition-all duration-150"
                 style={{
                   color: NO_COLOR,
                   backgroundColor: NO_COLOR + '0e',
@@ -880,10 +968,23 @@ export const KalshiCard = memo(function KalshiCard({
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               >
-                {d.priceIsReal ? 'Buy NO' : 'Trade NO'}
-                <ExternalLink className="w-3 h-3 opacity-50 transition-opacity duration-150 group-hover/no:opacity-90" />
+                <span>Buy NO</span>
+                <span className="text-[10px] font-bold opacity-80">{100 - yesPct}¢</span>
               </a>
             </div>
+          )}
+
+          {/* AI Analysis */}
+          {onAnalyze && (
+            <button
+              onClick={onAnalyze}
+              className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground hover:bg-[var(--bg-surface)] hover:border-[var(--border-hover)] transition-all duration-150"
+              aria-label={`AI analysis for ${title}`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              AI Analysis
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           )}
         </div>
       </div>

@@ -280,15 +280,8 @@ function ProbabilityHero({
           )}
         </div>
 
-        {/* Center: efficiency tag */}
-        <div className="flex flex-col items-center gap-1 flex-shrink-0">
-          {Math.abs(yesPct - 50) <= 5 && (
-            <span className="text-[8px] font-semibold px-2 py-0.5 rounded-full"
-                  style={{ color: '#6366f1', backgroundColor: '#6366f112', border: '1px solid #6366f128' }}>
-              near 50/50
-            </span>
-          )}
-        </div>
+        {/* Center: donut gauge */}
+        <ProbabilityDonut yesPct={yesPct} size={isHero ? 72 : 60} />
 
         {/* NO block */}
         <div className="flex flex-col items-end gap-0.5 min-w-0">
@@ -566,6 +559,49 @@ function RelatedMarketsLink({ seriesTicker, eventTicker }: { seriesTicker?: stri
       <span className="group-hover/rel:underline">More in {linkTarget}</span>
       <ChevronRight className="w-3 h-3 opacity-60" />
     </a>
+  );
+}
+
+// ── Probability Donut Gauge ────────────────────────────────────────────────────
+
+function ProbabilityDonut({ yesPct, size = 72 }: { yesPct: number; size?: number }) {
+  const r = (size / 2) - 7;
+  const circumference = 2 * Math.PI * r;
+  const yesOffset = circumference * (1 - yesPct / 100);
+  const cx = size / 2, cy = size / 2;
+  const yesLeads = yesPct >= 50;
+
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg
+        width={size} height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className="-rotate-90"
+        aria-hidden="true"
+      >
+        {/* NO arc — background ring */}
+        <circle cx={cx} cy={cy} r={r}
+          stroke={NO_COLOR + '30'} strokeWidth="6" fill="none" />
+        {/* YES arc */}
+        <circle cx={cx} cy={cy} r={r}
+          stroke={yesLeads ? YES_COLOR : YES_COLOR + '55'}
+          strokeWidth="6" fill="none"
+          strokeDasharray={circumference}
+          strokeDashoffset={yesOffset}
+          strokeLinecap="round"
+          style={{ transition: 'stroke-dashoffset 900ms cubic-bezier(0.4,0,0.2,1)' }}
+        />
+      </svg>
+      {/* Center label */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-[15px] font-black tabular-nums leading-none"
+              style={{ color: yesLeads ? YES_COLOR : 'var(--text-muted)' }}>
+          {yesPct}
+        </span>
+        <span className="text-[7px] font-black uppercase tracking-wider"
+              style={{ color: YES_COLOR + '70' }}>YES</span>
+      </div>
+    </div>
   );
 }
 

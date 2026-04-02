@@ -19,12 +19,12 @@ function BreakoutBar({ score }: { score: number }) {
     <div className="space-y-1">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1">
-          <TrendingUp className="w-2.5 h-2.5 text-[oklch(0.42_0.01_280)]" />
-          <span className="text-[8px] font-bold uppercase tracking-wider text-[oklch(0.42_0.01_280)]">Breakout Score</span>
+          <TrendingUp className="w-2.5 h-2.5 text-[var(--text-faint)]" />
+          <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Breakout Score</span>
         </div>
         <span className={cn('text-[10px] font-black tabular-nums', textCls)}>{score.toFixed(1)}σ</span>
       </div>
-      <div className="h-1 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+      <div className="h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
         <div className={cn('h-full rounded-full transition-all duration-700', barCls)} style={{ width: `${pct}%` }} />
       </div>
     </div>
@@ -37,7 +37,7 @@ function RankBadge({ rank }: { rank: number }) {
     'text-slate-300 bg-slate-500/15 border-slate-500/25',
     'text-amber-600 bg-amber-700/15 border-amber-700/25',
   ];
-  const cls = colors[rank - 1] ?? 'text-[oklch(0.45_0.01_280)] bg-[oklch(0.12_0.01_280)] border-[oklch(0.18_0.01_280)]';
+  const cls = colors[rank - 1] ?? 'text-[var(--text-muted)] bg-[var(--bg-elevated)] border-[var(--border-subtle)]';
   return (
     <span className={cn('w-5 h-5 rounded-full border flex items-center justify-center text-[9px] font-black shrink-0', cls)}>
       {rank}
@@ -55,21 +55,21 @@ export const WaiverCard = memo(function WaiverCard({ data, isHero, ...p }: Fanta
   return (
     <Shell {...p} isHero={isHero} status="hot" Icon={isStatcastLeaderboard ? Activity : Zap}>
       {description && (
-        <p className="text-xs text-[oklch(0.52_0.01_280)] leading-relaxed mb-2">{description}</p>
+        <p className="text-xs text-[var(--text-muted)] leading-relaxed mb-2">{description}</p>
       )}
 
       {isStatcastLeaderboard ? (
         /* ── Statcast xwOBA leaderboard ── */
         <div className="space-y-1.5">
           {/* Column headers */}
-          <div className="flex items-center gap-2 px-3 pb-1.5 border-b border-[oklch(0.16_0.015_280)]">
+          <div className="flex items-center gap-2 px-3 pb-1.5 border-b border-[var(--border-subtle)]">
             <div className="w-5 shrink-0" />
             <div className="w-7 shrink-0" />
             <div className="flex-1" />
             <div className="flex items-center gap-3 shrink-0">
-              <span className="text-[8px] font-bold uppercase tracking-widest text-[oklch(0.38_0.01_280)] w-10 text-right">xwOBA</span>
-              <span className="text-[8px] font-bold uppercase tracking-widest text-[oklch(0.38_0.01_280)] w-16 text-right">Exit Velo</span>
-              <span className="text-[8px] font-bold uppercase tracking-widest text-[oklch(0.38_0.01_280)] w-12 text-right">Barrel%</span>
+              <span className="text-[8px] font-bold uppercase tracking-widest text-[var(--text-faint)] w-10 text-right">xwOBA</span>
+              <span className="text-[8px] font-bold uppercase tracking-widest text-[var(--text-faint)] w-16 text-right">Exit Velo</span>
+              <span className="text-[8px] font-bold uppercase tracking-widest text-[var(--text-faint)] w-12 text-right">Barrel%</span>
             </div>
           </div>
 
@@ -87,7 +87,7 @@ export const WaiverCard = memo(function WaiverCard({ data, isHero, ...p }: Fanta
                   'flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors',
                   isElite
                     ? 'bg-blue-500/5 border-blue-500/20'
-                    : 'bg-[oklch(0.09_0.01_280)] border-[oklch(0.15_0.012_280)]',
+                    : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)]',
                 )}
               >
                 <RankBadge rank={i + 1} />
@@ -102,13 +102,13 @@ export const WaiverCard = memo(function WaiverCard({ data, isHero, ...p }: Fanta
                   </span>
                   <span className={cn(
                     'text-xs font-semibold tabular-nums w-16 text-right',
-                    exitNum >= 92 ? 'text-amber-400' : 'text-[oklch(0.60_0.01_280)]',
+                    exitNum >= 92 ? 'text-amber-400' : 'text-[var(--text-muted)]',
                   )}>
                     {exitNum ? `${exitNum.toFixed(1)} mph` : '—'}
                   </span>
                   <span className={cn(
                     'text-xs font-semibold tabular-nums w-12 text-right',
-                    barrelNum >= 15 ? 'text-red-400' : barrelNum >= 10 ? 'text-amber-400' : 'text-[oklch(0.60_0.01_280)]',
+                    barrelNum >= 15 ? 'text-red-400' : barrelNum >= 10 ? 'text-amber-400' : 'text-[var(--text-muted)]',
                   )}>
                     {barrelNum ? `${barrelNum.toFixed(1)}%` : '—'}
                   </span>
@@ -117,7 +117,7 @@ export const WaiverCard = memo(function WaiverCard({ data, isHero, ...p }: Fanta
             );
           })}
 
-          <p className="text-[9px] text-[oklch(0.35_0.01_280)] pt-0.5">
+          <p className="text-[9px] text-[var(--text-faint)] pt-0.5">
             Source: Baseball Savant · {new Date().getFullYear()} season
           </p>
         </div>
@@ -132,14 +132,14 @@ export const WaiverCard = memo(function WaiverCard({ data, isHero, ...p }: Fanta
               ? 'border-red-500/30 bg-red-500/5'
               : isMedium
               ? 'border-amber-500/30 bg-amber-500/5'
-              : 'border-[oklch(0.16_0.015_280)] bg-[oklch(0.08_0.01_280)]';
+              : 'border-[var(--border-subtle)] bg-[var(--bg-overlay)]';
             return (
               <div key={i} className={cn('px-3 py-2.5 rounded-xl border', urgencyBorder)}>
                 <div className="flex items-center gap-2 mb-2">
                   <PlayerAvatar playerName={t.name} photoUrl={photoUrl} sport={avatarSport} size="sm" />
                   <PosBadge pos={t.pos} />
                   <span className="text-xs font-black text-white leading-tight">{t.name}</span>
-                  <span className="text-[10px] text-[oklch(0.42_0.01_280)]">{t.team}</span>
+                  <span className="text-[10px] text-[var(--text-faint)]">{t.team}</span>
                   <div className="ml-auto flex items-center gap-1.5 shrink-0">
                     {isHot && (
                       <span className="flex items-center gap-0.5 text-[8px] font-black uppercase text-red-400 bg-red-500/10 border border-red-500/30 px-1.5 py-0.5 rounded-full">
@@ -147,16 +147,16 @@ export const WaiverCard = memo(function WaiverCard({ data, isHero, ...p }: Fanta
                       </span>
                     )}
                     {t.rostered != null && (
-                      <span className="text-[9px] text-[oklch(0.40_0.01_280)]">{t.rostered}% owned</span>
+                      <span className="text-[9px] text-[var(--text-faint)]">{t.rostered}% owned</span>
                     )}
                   </div>
                 </div>
                 {t.faabBid != null && t.faabBid > 0 && (
                   <div className="flex items-center gap-1 mb-1.5">
-                    <span className="text-[9px] font-bold text-[oklch(0.42_0.01_280)]">FAAB</span>
+                    <span className="text-[9px] font-bold text-[var(--text-faint)]">FAAB</span>
                     <span className="text-base font-black text-teal-400 tabular-nums">${t.faabBid}</span>
                     {t.faabPct != null && (
-                      <span className="text-[9px] text-[oklch(0.38_0.01_280)]">({t.faabPct}%)</span>
+                      <span className="text-[9px] text-[var(--text-faint)]">({t.faabPct}%)</span>
                     )}
                   </div>
                 )}
@@ -166,7 +166,7 @@ export const WaiverCard = memo(function WaiverCard({ data, isHero, ...p }: Fanta
                   </div>
                 )}
                 {t.reason && (
-                  <p className="text-[10px] text-[oklch(0.48_0.01_280)] leading-relaxed">{t.reason}</p>
+                  <p className="text-[10px] text-[var(--text-muted)] leading-relaxed">{t.reason}</p>
                 )}
               </div>
             );
@@ -175,7 +175,7 @@ export const WaiverCard = memo(function WaiverCard({ data, isHero, ...p }: Fanta
       )}
 
       {budgetNote && (
-        <p className="text-[9px] text-[oklch(0.35_0.01_280)] pt-0.5">{budgetNote}</p>
+        <p className="text-[9px] text-[var(--text-faint)] pt-0.5">{budgetNote}</p>
       )}
     </Shell>
   );

@@ -233,7 +233,7 @@ export const ChatHeader = memo(function ChatHeader({
             <>
               <button
                 onClick={onOpenLogin}
-                className="p-1.5 md:px-4 md:py-2 rounded-xl md:border md:border-[var(--border-subtle)] md:bg-[var(--bg-overlay)] hover:bg-[var(--bg-elevated)] md:hover:border-[oklch(0.28_0.02_280)] text-[var(--text-muted)] hover:text-white text-xs md:text-sm font-semibold transition-all"
+                className="p-1.5 md:px-4 md:py-2 rounded-xl md:border md:border-[var(--border-subtle)] md:bg-[var(--bg-overlay)] hover:bg-[var(--bg-elevated)] md:hover:border-[var(--border-hover)] text-[var(--text-muted)] hover:text-white text-xs md:text-sm font-semibold transition-all"
               >
                 <LogIn className="w-4 h-4 md:hidden" />
                 <span className="hidden md:inline">Log in</span>

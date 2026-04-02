@@ -11,7 +11,7 @@ import { Shell, PosBadge, TierBadge, RankCircle, type FantasyCardProps } from '.
 function VBDBar({ vbd, maxVbd }: { vbd: number; maxVbd: number }) {
   const pct = maxVbd > 0 ? Math.min(100, (vbd / maxVbd) * 100) : 0;
   return (
-    <div className="h-[2px] mx-2 mb-0.5 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+    <div className="h-[2px] mx-2 mb-0.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
       <div
         className="h-full rounded-full bg-gradient-to-r from-teal-500 to-emerald-400 transition-all duration-700"
         style={{ width: `${pct}%` }}
@@ -35,12 +35,12 @@ export const VBDCard = memo(function VBDCard({ data, isHero, ...p }: FantasyCard
           const isTop = idx === 0;
           const rowBg = isTop
             ? 'bg-teal-500/8 border-teal-500/20 shadow-[inset_0_0_0_1px_oklch(0.5_0.15_170/0.08)]'
-            : 'bg-[oklch(0.08_0.01_280)] border-[oklch(0.15_0.01_280)]';
+            : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)]';
           return (
             <div key={pl.name}>
               <div
                 className={cn(
-                  'flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-colors hover:bg-[oklch(0.12_0.01_280)] cursor-pointer',
+                  'flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-colors hover:bg-[var(--bg-elevated)] cursor-pointer',
                   rowBg,
                 )}
                 onClick={() => {
@@ -55,10 +55,10 @@ export const VBDCard = memo(function VBDCard({ data, isHero, ...p }: FantasyCard
                 <div className="flex-1 min-w-0">
                   <span className="text-xs font-bold text-white truncate block">
                     {pl.name}
-                    <span className="text-[10px] font-normal text-[oklch(0.42_0.01_280)] ml-1">{pl.team}</span>
+                    <span className="text-[10px] font-normal text-[var(--text-faint)] ml-1">{pl.team}</span>
                   </span>
                   {pl.adp && (
-                    <span className="text-[9px] text-[oklch(0.35_0.01_280)]">ADP {pl.adp}</span>
+                    <span className="text-[9px] text-[var(--text-faint)]">ADP {pl.adp}</span>
                   )}
                 </div>
                 <PosBadge pos={pl.pos} />
@@ -82,7 +82,7 @@ export const VBDCard = memo(function VBDCard({ data, isHero, ...p }: FantasyCard
           );
         })}
       </div>
-      <p className="text-[9px] text-[oklch(0.35_0.01_280)] pt-0.5">
+      <p className="text-[9px] text-[var(--text-faint)] pt-0.5">
         VBD = pts above replacement · {scoringFormat ?? 'PPR'} · {leagueSize ?? 12}-team
       </p>
     </Shell>

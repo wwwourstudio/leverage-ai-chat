@@ -15,7 +15,7 @@ function DropBar({ pct }: { pct: number }) {
     : 'bg-gradient-to-r from-blue-500 to-cyan-400';
   return (
     <div className="mt-1.5 space-y-0.5">
-      <div className="h-1 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+      <div className="h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
         <div className={cn('h-full rounded-full transition-all duration-700', barCls)} style={{ width: `${capped}%` }} />
       </div>
     </div>
@@ -28,7 +28,7 @@ export const CliffCard = memo(function CliffCard({ data, ...p }: FantasyCardProp
   return (
     <Shell {...p} status="alert" Icon={AlertTriangle}>
       {description && (
-        <p className="text-xs text-[oklch(0.52_0.01_280)] leading-relaxed">{description}</p>
+        <p className="text-xs text-[var(--text-muted)] leading-relaxed">{description}</p>
       )}
       <div className="space-y-2">
         {cliffs.map((c: any, i: number) => {
@@ -57,7 +57,7 @@ export const CliffCard = memo(function CliffCard({ data, ...p }: FantasyCardProp
           );
         })}
       </div>
-      <p className="text-[9px] text-[oklch(0.35_0.01_280)]">
+      <p className="text-[9px] text-[var(--text-faint)]">
         Miss these positions and you wait 3–4 rounds for equivalent value.
       </p>
     </Shell>

@@ -36,7 +36,7 @@ export const ProjectionCard = memo(function ProjectionCard({ data, ...p }: Fanta
             <div className="flex items-center gap-1 flex-wrap mt-0.5">
               {pos  && <PosBadge pos={pos} />}
               {tier && <TierBadge tier={tier} />}
-              {team && <span className="text-[10px] text-[oklch(0.48_0.01_280)] font-medium">{team}</span>}
+              {team && <span className="text-[10px] text-[var(--text-muted)] font-medium">{team}</span>}
             </div>
           </div>
         </div>
@@ -46,8 +46,8 @@ export const ProjectionCard = memo(function ProjectionCard({ data, ...p }: Fanta
       {stats.length > 0 && (
         <div className={cn('grid gap-1.5', stats.length === 3 ? 'grid-cols-3' : stats.length === 2 ? 'grid-cols-2' : 'grid-cols-1')}>
           {stats.map(s => (
-            <div key={s.label} className="flex flex-col items-center gap-0.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.16_0.015_280)] py-2.5">
-              <span className="text-[8px] font-bold uppercase tracking-wider text-[oklch(0.38_0.01_280)]">{s.label}</span>
+            <div key={s.label} className="flex flex-col items-center gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] py-2.5">
+              <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)]">{s.label}</span>
               <span className={cn('text-lg font-black tabular-nums', s.color)}>{String(s.val)}</span>
             </div>
           ))}
@@ -55,7 +55,7 @@ export const ProjectionCard = memo(function ProjectionCard({ data, ...p }: Fanta
       )}
 
       {analysis && (
-        <p className="text-xs text-[oklch(0.52_0.01_280)] leading-relaxed">{analysis}</p>
+        <p className="text-xs text-[var(--text-muted)] leading-relaxed">{analysis}</p>
       )}
     </Shell>
   );

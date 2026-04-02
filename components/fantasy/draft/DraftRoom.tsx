@@ -135,7 +135,7 @@ export function DraftRoom({
       )}
 
       {/* Mobile tab switcher — visible only on small screens */}
-      <div className="flex lg:hidden border border-[oklch(0.22_0.02_280)] rounded-xl overflow-hidden bg-[oklch(0.09_0.012_280)]">
+      <div className="flex lg:hidden border border-[var(--border-subtle)] rounded-xl overflow-hidden bg-[var(--bg-overlay)]">
         {MOBILE_TABS.map((tab) => (
           <button
             key={tab.id}
@@ -143,8 +143,8 @@ export function DraftRoom({
             className={cn(
               'flex-1 py-2.5 text-xs font-bold transition-colors',
               mobileTab === tab.id
-                ? 'bg-[oklch(0.18_0.025_260)] text-white'
-                : 'text-[oklch(0.50_0.01_280)] hover:text-white hover:bg-[oklch(0.14_0.015_280)]',
+                ? 'bg-[var(--bg-surface)] text-white'
+                : 'text-[var(--text-muted)] hover:text-white hover:bg-[var(--bg-elevated)]',
             )}
           >
             {tab.label}

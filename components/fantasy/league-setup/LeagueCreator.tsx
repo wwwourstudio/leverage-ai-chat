@@ -144,19 +144,19 @@ function StepIndicator({ step, labels }: { step: number; labels: string[] }) {
                 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border transition-all duration-200',
                 done   ? 'bg-emerald-500/20 border-emerald-500/60 text-emerald-400'
                 : active ? 'bg-blue-500/20 border-blue-400/80 text-blue-300'
-                : 'bg-[oklch(0.14_0.01_280)] border-[oklch(0.22_0.02_280)] text-[oklch(0.45_0.01_280)]',
+                : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-muted)]',
               )}>
                 {done ? <Check className="w-3.5 h-3.5" /> : n}
               </div>
               <span className={cn(
                 'text-[9px] font-medium whitespace-nowrap',
-                active ? 'text-blue-300' : done ? 'text-emerald-400' : 'text-[oklch(0.35_0.01_280)]',
+                active ? 'text-blue-300' : done ? 'text-emerald-400' : 'text-[var(--text-faint)]',
               )}>{label}</span>
             </div>
             {i < labels.length - 1 && (
               <div className={cn(
                 'w-6 h-px mb-3 transition-all duration-200',
-                step > n ? 'bg-emerald-500/50' : 'bg-[oklch(0.22_0.02_280)]',
+                step > n ? 'bg-emerald-500/50' : 'bg-[var(--bg-surface)]',
               )} />
             )}
           </div>
@@ -303,7 +303,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
   // ── Step 1: Sport ──────────────────────────────────────────────────────────
   const StepSport = () => (
     <div className="space-y-3">
-      <p className="text-sm text-[oklch(0.55_0.01_280)] mb-4">What sport is your fantasy league?</p>
+      <p className="text-sm text-[var(--text-muted)] mb-4">What sport is your fantasy league?</p>
       <div className="grid grid-cols-2 gap-3">
         {SPORTS.map(s => (
           <button
@@ -324,7 +324,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
             }}
             className={cn(
               'relative rounded-xl border p-4 text-left transition-all duration-200 overflow-hidden group',
-              form.sport === s.value ? s.selected : `${s.border} bg-[oklch(0.11_0.01_280)]`,
+              form.sport === s.value ? s.selected : `${s.border} bg-[var(--bg-overlay)]`,
             )}
           >
             <div className={cn(
@@ -334,7 +334,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
             )} />
             <div className="relative">
               <div className="text-2xl mb-2">{s.icon}</div>
-              <div className="text-sm font-bold text-[oklch(0.90_0.005_85)]">{s.label}</div>
+              <div className="text-sm font-bold text-foreground">{s.label}</div>
               {form.sport === s.value && (
                 <div className="absolute top-0 right-0">
                   <Check className="w-4 h-4 text-emerald-400" />
@@ -355,7 +355,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
     const platforms = PLATFORMS[form.sport] ?? PLATFORMS.nfl;
     return (
       <div className="space-y-3">
-        <p className="text-sm text-[oklch(0.55_0.01_280)] mb-4">
+        <p className="text-sm text-[var(--text-muted)] mb-4">
           Which platform is your {sportMeta.label} league on?
         </p>
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
@@ -380,7 +380,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
                 p.accent,
                 form.platform === p.value
                   ? ''
-                  : 'bg-[oklch(0.11_0.01_280)] text-[oklch(0.70_0.01_280)]',
+                  : 'bg-[var(--bg-overlay)] text-foreground/70',
               )}
             >
               {p.label}
@@ -399,7 +399,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
 
     return (
       <div className="space-y-4">
-        <p className="text-sm text-[oklch(0.55_0.01_280)] mb-4">
+        <p className="text-sm text-[var(--text-muted)] mb-4">
           How many teams are in your league?
         </p>
 
@@ -417,11 +417,11 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
                   'rounded-xl border py-5 text-2xl font-black transition-all duration-200',
                   form.leagueSize === sz
                     ? 'border-emerald-400 bg-emerald-500/15 text-emerald-300'
-                    : 'border-[oklch(0.22_0.02_280)] bg-[oklch(0.11_0.01_280)] text-[oklch(0.70_0.01_280)] hover:border-[oklch(0.32_0.02_280)]',
+                    : 'border-[var(--border-subtle)] bg-[var(--bg-overlay)] text-foreground/70 hover:border-[var(--border-hover)]',
                 )}
               >
                 {sz}
-                <span className="block text-[10px] font-normal text-[oklch(0.45_0.01_280)] mt-0.5">teams</span>
+                <span className="block text-[10px] font-normal text-[var(--text-muted)] mt-0.5">teams</span>
               </button>
             ))}
           </div>
@@ -430,8 +430,8 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
           <div className="space-y-4">
             <div className="flex items-center justify-center">
               <div className="flex flex-col items-center">
-                <span className="text-5xl font-black text-[oklch(0.95_0.005_85)] tabular-nums">{form.leagueSize}</span>
-                <span className="text-xs text-[oklch(0.45_0.01_280)] mt-1">teams</span>
+                <span className="text-5xl font-black text-foreground tabular-nums">{form.leagueSize}</span>
+                <span className="text-xs text-[var(--text-muted)] mt-1">teams</span>
               </div>
             </div>
             <div className="px-2">
@@ -448,7 +448,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
                 }}
                 className="w-full accent-blue-400 h-2 cursor-pointer"
               />
-              <div className="flex justify-between text-[10px] text-[oklch(0.40_0.01_280)] mt-1 px-0.5">
+              <div className="flex justify-between text-[10px] text-[var(--text-faint)] mt-1 px-0.5">
                 <span>8</span>
                 <span>16</span>
                 <span>24</span>
@@ -469,7 +469,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
                     'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-150',
                     form.leagueSize === sz
                       ? 'border-blue-400 bg-blue-500/15 text-blue-300'
-                      : 'border-[oklch(0.22_0.02_280)] bg-[oklch(0.11_0.01_280)] text-[oklch(0.55_0.01_280)] hover:border-[oklch(0.30_0.02_280)]',
+                      : 'border-[var(--border-subtle)] bg-[var(--bg-overlay)] text-[var(--text-muted)] hover:border-[var(--border-hover)]',
                   )}
                 >
                   {sz}
@@ -479,9 +479,9 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
           </div>
         )}
 
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[oklch(0.10_0.01_280)] border border-[oklch(0.18_0.015_280)]">
-          <Users className="w-3.5 h-3.5 text-[oklch(0.45_0.01_280)]" />
-          <span className="text-[11px] text-[oklch(0.50_0.01_280)]">{form.leagueSize}-team league · {form.platform.toUpperCase()} · {sportMeta.icon} {sportMeta.label}</span>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
+          <Users className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+          <span className="text-[11px] text-[var(--text-muted)]">{form.leagueSize}-team league · {form.platform.toUpperCase()} · {sportMeta.icon} {sportMeta.label}</span>
         </div>
 
         <NavButtons onBack={() => setStep(2)} onNext={() => setStep(4)} />
@@ -496,7 +496,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
     const types = form.platform === 'nfbc' ? allTypes.filter(t => t.value === 'roto') : allTypes;
     return (
       <div className="space-y-3">
-        <p className="text-sm text-[oklch(0.55_0.01_280)] mb-4">
+        <p className="text-sm text-[var(--text-muted)] mb-4">
           What scoring format does your league use?
         </p>
         {form.platform === 'nfbc' && (
@@ -520,13 +520,13 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
                 'w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all duration-200',
                 form.leagueType === t.value
                   ? 'border-blue-400 bg-blue-500/10'
-                  : 'border-[oklch(0.22_0.02_280)] bg-[oklch(0.11_0.01_280)] hover:border-[oklch(0.30_0.02_280)]',
+                  : 'border-[var(--border-subtle)] bg-[var(--bg-overlay)] hover:border-[var(--border-hover)]',
               )}
             >
               <span className="text-xl">{t.emoji}</span>
               <div className="flex-1 min-w-0">
-                <div className={cn('text-sm font-bold', form.leagueType === t.value ? 'text-blue-300' : 'text-[oklch(0.88_0.005_85)]')}>{t.label}</div>
-                <div className="text-xs text-[oklch(0.45_0.01_280)]">{t.desc}</div>
+                <div className={cn('text-sm font-bold', form.leagueType === t.value ? 'text-blue-300' : 'text-foreground')}>{t.label}</div>
+                <div className="text-xs text-[var(--text-muted)]">{t.desc}</div>
               </div>
               {form.leagueType === t.value && (
                 <Check className="w-4 h-4 text-blue-400 shrink-0" />
@@ -543,7 +543,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
   const StepNFBCUpload = () => (
     <div className="space-y-4">
       <p className="text-sm font-bold text-emerald-300 mb-1">Set Up Your Fantasy League with AI</p>
-      <p className="text-xs text-[oklch(0.50_0.01_280)] mb-3">
+      <p className="text-xs text-[var(--text-muted)] mb-3">
         Upload your NFBC CSV exports and our AI will generate draft strategy, rankings, and roster recommendations.
       </p>
 
@@ -594,7 +594,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
                     ? 'border-emerald-400 bg-emerald-500/10'
                     : slot.file
                     ? 'border-emerald-500/50 bg-emerald-500/5'
-                    : 'border-[oklch(0.24_0.02_280)] bg-[oklch(0.11_0.01_280)] hover:border-[oklch(0.32_0.02_280)]',
+                    : 'border-[var(--border-subtle)] bg-[var(--bg-overlay)] hover:border-[var(--border-hover)]',
                 )}
                 onClick={() => !slot.file && fileInputRefs.current[slot.key]?.click()}
               >
@@ -602,18 +602,18 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
                   {slot.file ? (
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                   ) : (
-                    <Upload className="w-4 h-4 text-[oklch(0.45_0.01_280)] shrink-0" />
+                    <Upload className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className={cn('text-xs font-semibold truncate', slot.file ? 'text-emerald-300' : 'text-[oklch(0.75_0.005_85)]')}>{slot.label}</p>
-                    <p className="text-[10px] text-[oklch(0.40_0.01_280)] truncate mt-0.5">
+                    <p className={cn('text-xs font-semibold truncate', slot.file ? 'text-emerald-300' : 'text-foreground/80')}>{slot.label}</p>
+                    <p className="text-[10px] text-[var(--text-faint)] truncate mt-0.5">
                       {slot.file ? slot.file.name : slot.hint}
                     </p>
                   </div>
                   {slot.file && (
                     <button
                       onClick={e => { e.stopPropagation(); setNfbcSlots(prev => prev.map(s => s.key === slot.key ? { ...s, file: null, error: null } : s)); }}
-                      className="p-1 rounded-lg hover:bg-red-500/15 text-[oklch(0.45_0.01_280)] hover:text-red-400 transition-colors"
+                      className="p-1 rounded-lg hover:bg-red-500/15 text-[var(--text-muted)] hover:text-red-400 transition-colors"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -621,7 +621,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
                   {!slot.file && (
                     <button
                       onClick={e => { e.stopPropagation(); fileInputRefs.current[slot.key]?.click(); }}
-                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold text-[oklch(0.65_0.01_280)] border border-[oklch(0.24_0.02_280)] hover:border-emerald-500/50 hover:text-emerald-400 transition-all"
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold text-[var(--text-muted)] border border-[var(--border-subtle)] hover:border-emerald-500/50 hover:text-emerald-400 transition-all"
                     >
                       Select
                     </button>
@@ -637,7 +637,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
             </div>
           ))}
 
-          <p className="text-[10px] text-[oklch(0.35_0.01_280)] px-1">
+          <p className="text-[10px] text-[var(--text-faint)] px-1">
             CSV files only · Max 5 MB each · Files are saved to your account
           </p>
         </div>
@@ -651,7 +651,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
             <Bot className="w-4 h-4 text-emerald-400" />
             <span className="text-xs font-bold text-emerald-300">AI Analysis</span>
           </div>
-          <div className="flex-1 p-3 overflow-y-auto max-h-52 text-[11px] text-[oklch(0.65_0.005_85)] leading-relaxed">
+          <div className="flex-1 p-3 overflow-y-auto max-h-52 text-[11px] text-[var(--text-muted)] leading-relaxed">
             {nfbcAiLoading ? (
               <div className="flex items-center gap-2 text-emerald-400">
                 <div className="w-3 h-3 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin" />
@@ -661,8 +661,8 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
               <div className="whitespace-pre-wrap">{nfbcAiAnalysis}</div>
             ) : (
               <div className="flex flex-col items-center justify-center h-28 gap-2 text-center">
-                <FileText className="w-7 h-7 text-[oklch(0.28_0.015_280)]" />
-                <p className="text-[oklch(0.38_0.01_280)]">Upload a CSV to activate AI analysis</p>
+                <FileText className="w-7 h-7 text-[var(--text-faint)]" />
+                <p className="text-[var(--text-faint)]">Upload a CSV to activate AI analysis</p>
               </div>
             )}
           </div>
@@ -687,38 +687,38 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
   const StepRoster = () => (
     <div className="space-y-4">
       <div>
-        <label className="block text-xs font-semibold text-[oklch(0.55_0.01_280)] mb-1.5 uppercase tracking-wider">League Name</label>
+        <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">League Name</label>
         <Input
           value={form.name}
           onChange={e => update({ name: e.target.value })}
           placeholder="My Fantasy League"
-          className="bg-[oklch(0.11_0.01_280)] border-[oklch(0.22_0.02_280)]"
+          className="bg-[var(--bg-overlay)] border-[var(--border-subtle)]"
         />
       </div>
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="block text-xs font-semibold text-[oklch(0.55_0.01_280)] uppercase tracking-wider">Roster Slots</label>
-          <span className="text-[10px] text-[oklch(0.40_0.01_280)]">
+          <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Roster Slots</label>
+          <span className="text-[10px] text-[var(--text-faint)]">
             {Object.values(form.rosterSlots).reduce((a: number, b: number) => a + b, 0)} total spots
           </span>
         </div>
         <div className="grid grid-cols-2 gap-1.5 max-h-[240px] overflow-y-auto pr-1">
           {(Object.entries(form.rosterSlots) as [string, number][]).map(([pos, count]) => (
-            <div key={pos} className="flex items-center justify-between rounded-lg border border-[oklch(0.18_0.015_280)] bg-[oklch(0.10_0.01_280)] px-2.5 py-1.5">
-              <span className="text-xs font-bold text-[oklch(0.75_0.01_280)]">{pos}</span>
+            <div key={pos} className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-overlay)] px-2.5 py-1.5">
+              <span className="text-xs font-bold text-foreground/80">{pos}</span>
               <div className="flex items-center gap-1.5">
                 <button
-                  className="w-5 h-5 rounded flex items-center justify-center text-[oklch(0.50_0.01_280)] hover:text-white hover:bg-[oklch(0.20_0.01_280)] transition-colors text-sm font-bold"
+                  className="w-5 h-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-white hover:bg-[var(--bg-surface)] transition-colors text-sm font-bold"
                   onClick={() => {
                     const slots = { ...form.rosterSlots };
                     slots[pos] = Math.max(0, count - 1);
                     update({ rosterSlots: slots });
                   }}
                 >−</button>
-                <span className="w-4 text-center text-xs font-black text-[oklch(0.90_0.005_85)]">{count}</span>
+                <span className="w-4 text-center text-xs font-black text-foreground">{count}</span>
                 <button
-                  className="w-5 h-5 rounded flex items-center justify-center text-[oklch(0.50_0.01_280)] hover:text-white hover:bg-[oklch(0.20_0.01_280)] transition-colors text-sm font-bold"
+                  className="w-5 h-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-white hover:bg-[var(--bg-surface)] transition-colors text-sm font-bold"
                   onClick={() => {
                     const slots = { ...form.rosterSlots };
                     slots[pos] = count + 1;
@@ -739,7 +739,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
           `${form.leagueSize} teams`,
           LEAGUE_TYPES[form.sport]?.find(t => t.value === form.leagueType)?.label ?? form.leagueType,
         ].map((chip, i) => (
-          <span key={i} className="px-2 py-0.5 rounded-full bg-[oklch(0.14_0.015_280)] border border-[oklch(0.22_0.02_280)] text-[oklch(0.55_0.01_280)] font-medium">
+          <span key={i} className="px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-muted)] font-medium">
             {chip}
           </span>
         ))}
@@ -790,14 +790,14 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
     : ['Choose Your Sport', 'Choose Your Platform', 'League Size', 'Scoring Format', 'Roster & Settings'];
 
   return (
-    <div className="w-full max-w-lg mx-auto rounded-2xl bg-[oklch(0.10_0.01_280)] border border-[oklch(0.20_0.02_280)] overflow-hidden">
+    <div className="w-full max-w-lg mx-auto rounded-2xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] overflow-hidden">
       {/* Header */}
       <div className="px-5 pt-5 pb-0">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-xl">{sportMeta.icon}</span>
-          <h2 className="text-base font-bold text-[oklch(0.92_0.005_85)]">Create Fantasy League</h2>
+          <h2 className="text-base font-bold text-foreground">Create Fantasy League</h2>
         </div>
-        <p className="text-xs text-[oklch(0.45_0.01_280)] mb-4">{stepTitles[step - 1]}</p>
+        <p className="text-xs text-[var(--text-muted)] mb-4">{stepTitles[step - 1]}</p>
         <StepIndicator step={step} labels={stepLabels} />
       </div>
 

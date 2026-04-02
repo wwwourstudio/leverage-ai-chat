@@ -113,7 +113,7 @@ export function SuggestedPrompts({
         <div className="mb-3 sm:block">
           {pendingWelcomeCategory === null ? (
             <>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-2 px-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)] mb-2 px-1">
                 Get started — choose a category
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2">
@@ -127,7 +127,7 @@ export function SuggestedPrompts({
                       <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${color}`} />
                       <span className={`text-[11px] sm:text-xs font-bold ${color}`}>{label}</span>
                     </div>
-                    <p className="text-[9px] sm:text-[10px] text-[oklch(0.45_0.008_280)] leading-tight">{desc}</p>
+                    <p className="text-[9px] sm:text-[10px] text-[var(--text-muted)] leading-tight">{desc}</p>
                   </button>
                 ))}
               </div>
@@ -137,12 +137,12 @@ export function SuggestedPrompts({
               <div className="flex items-center gap-2 mb-2 px-1">
                 <button
                   onClick={() => setPendingWelcomeCategory(null)}
-                  className="flex items-center gap-1 text-[10px] font-bold text-[oklch(0.40_0.01_280)] hover:text-white transition-colors"
+                  className="flex items-center gap-1 text-[10px] font-bold text-[var(--text-faint)] hover:text-white transition-colors"
                 >
                   <ChevronLeft className="w-3 h-3" />
                   Back
                 </button>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)]">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">
                   {pendingWelcomeCategory}
                   {selectedSport ? ` · ${selectedSport.replace(/-/g, ' ').toUpperCase()}` : ''}
                   {' '}— choose a focus
@@ -204,7 +204,7 @@ export function SuggestedPrompts({
                       ? 'bg-[var(--bg-overlay)] border-blue-500/50 text-white/80 hover:bg-gradient-to-r hover:from-blue-600/20 hover:via-purple-600/20 hover:to-blue-600/20 hover:border-blue-400/70'
                       : selectedCategory === 'kalshi'
                         ? 'bg-[var(--bg-overlay)] border-cyan-800/50 text-[var(--text-muted)] hover:bg-cyan-900/20 hover:border-cyan-600/50 hover:text-cyan-300'
-                        : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:border-[oklch(0.28_0.02_280)] hover:text-white/80'
+                        : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] hover:text-white/80'
                 }`}
               >
                 <Icon className={`w-3 h-3 md:w-4 md:h-4 flex-shrink-0 ${

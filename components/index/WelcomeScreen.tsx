@@ -75,7 +75,7 @@ function LiveStrip({ data, onAsk }: { data: LiveData; onAsk?: (q: string) => voi
         {[0, 1, 2].map(i => (
           <div
             key={i}
-            className="shrink-0 w-48 h-14 rounded-lg bg-[oklch(0.11_0.01_280)] border border-[oklch(0.16_0.01_280)] animate-pulse"
+            className="shrink-0 w-48 h-14 rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)] animate-pulse"
           />
         ))}
       </div>
@@ -96,9 +96,9 @@ function LiveStrip({ data, onAsk }: { data: LiveData; onAsk?: (q: string) => voi
             `Analyze ${event.away_team} vs ${event.home_team} — best odds, sharp action, and value bets`,
           )
         }
-        className="shrink-0 w-52 bg-[oklch(0.11_0.01_280)] border border-[oklch(0.18_0.02_280)] rounded-lg px-3 py-2 text-left hover:border-blue-500/40 transition-colors"
+        className="shrink-0 w-52 bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-left hover:border-blue-500/40 transition-colors"
       >
-        <div className="text-[9px] text-[oklch(0.40_0.01_280)] mb-1 uppercase tracking-wide truncate">
+        <div className="text-[9px] text-[var(--text-faint)] mb-1 uppercase tracking-wide truncate">
           {event.sport_key?.replace(/_/g, ' ')}
         </div>
         <div className="text-[11px] font-semibold text-white/80 truncate leading-tight">
@@ -107,7 +107,7 @@ function LiveStrip({ data, onAsk }: { data: LiveData; onAsk?: (q: string) => voi
         {home && away && (
           <div className="flex gap-2 mt-1 text-[10px] tabular-nums">
             <span className="text-blue-400">{away.price >= 0 ? '+' : ''}{away.price}</span>
-            <span className="text-[oklch(0.38_0.01_280)]">/</span>
+            <span className="text-[var(--text-faint)]">/</span>
             <span className="text-violet-400">{home.price >= 0 ? '+' : ''}{home.price}</span>
           </div>
         )}
@@ -125,7 +125,7 @@ function LiveStrip({ data, onAsk }: { data: LiveData; onAsk?: (q: string) => voi
             `Analyze this Kalshi market: "${market.title}". Is ${market.yesPrice}¢ YES good value?`,
           )
         }
-        className="shrink-0 w-52 bg-[oklch(0.11_0.01_280)] border border-[oklch(0.18_0.02_280)] rounded-lg px-3 py-2 text-left hover:border-violet-500/40 transition-colors"
+        className="shrink-0 w-52 bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-left hover:border-violet-500/40 transition-colors"
       >
         <div className="text-[9px] text-violet-400/60 mb-1 uppercase tracking-wide">Kalshi</div>
         <div className="text-[11px] font-semibold text-white/80 line-clamp-1 leading-tight">
@@ -134,7 +134,7 @@ function LiveStrip({ data, onAsk }: { data: LiveData; onAsk?: (q: string) => voi
         {market.priceIsReal && (
           <div className="flex gap-2 mt-1 text-[10px] tabular-nums">
             <span className="text-blue-400">YES {market.yesPrice}¢</span>
-            <span className="text-[oklch(0.38_0.01_280)]">/</span>
+            <span className="text-[var(--text-faint)]">/</span>
             <span className="text-white/40">NO {market.noPrice}¢</span>
           </div>
         )}
@@ -146,7 +146,7 @@ function LiveStrip({ data, onAsk }: { data: LiveData; onAsk?: (q: string) => voi
 
   return (
     <div className="w-full max-w-2xl">
-      <div className="text-[10px] font-semibold tracking-widest uppercase text-[oklch(0.40_0.01_280)] mb-2">
+      <div className="text-[10px] font-semibold tracking-widest uppercase text-[var(--text-faint)] mb-2">
         Live Markets
       </div>
       <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">{items}</div>
@@ -218,7 +218,7 @@ export function WelcomeScreen({ onPromptSelect }: Props) {
         <h2 className="text-2xl font-black text-white tracking-tight">
           Your AI sports betting edge
         </h2>
-        <p className="text-sm text-[oklch(0.50_0.01_280)] max-w-sm">
+        <p className="text-sm text-[var(--text-muted)] max-w-sm">
           Real-time odds, sharp money signals, EV calculations, and prop analytics — all in one
           conversation.
         </p>
@@ -247,10 +247,10 @@ export function WelcomeScreen({ onPromptSelect }: Props) {
                 className={`flex flex-col items-center gap-2 p-3 rounded-xl border ${tile.bg} hover:scale-105 active:scale-95 transition-all duration-150`}
               >
                 <Icon className={`w-5 h-5 ${tile.color}`} />
-                <span className="text-[10px] font-black uppercase tracking-wider text-[oklch(0.65_0.01_280)]">
+                <span className="text-[10px] font-black uppercase tracking-wider text-[var(--text-muted)]">
                   {tile.label}
                 </span>
-                <span className="text-[9px] text-[oklch(0.42_0.01_280)]">{tile.desc}</span>
+                <span className="text-[9px] text-[var(--text-faint)]">{tile.desc}</span>
                 {count && (
                   <span className={`text-[9px] font-semibold ${tile.color} opacity-80`}>
                     {count}
@@ -269,7 +269,7 @@ export function WelcomeScreen({ onPromptSelect }: Props) {
             <button
               key={prompt}
               onClick={() => onPromptSelect(prompt)}
-              className="px-3 py-1.5 rounded-full text-xs font-semibold border border-[oklch(0.25_0.02_260)] bg-[oklch(0.11_0.015_260)] text-[oklch(0.65_0.01_280)] hover:border-blue-500/50 hover:text-blue-300 hover:bg-blue-500/10 transition-all duration-150"
+              className="px-3 py-1.5 rounded-full text-xs font-semibold border border-[var(--border-subtle)] bg-[var(--bg-overlay)] text-[var(--text-muted)] hover:border-blue-500/50 hover:text-blue-300 hover:bg-blue-500/10 transition-all duration-150"
             >
               {prompt}
             </button>

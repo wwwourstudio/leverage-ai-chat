@@ -189,7 +189,7 @@ function MarkdownContent({ text }: { text: string }) {
     elements.push(
       <ul key={`ul-${key}`} className="space-y-1.5 my-2 ml-1">
         {bulletBuffer.map((item, i) => (
-          <li key={i} className="flex gap-2 text-sm leading-relaxed text-[oklch(0.82_0.005_85)]">
+          <li key={i} className="flex gap-2 text-sm leading-relaxed text-foreground">
             <span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" aria-hidden="true" />
             <span>{renderInline(item)}</span>
           </li>
@@ -205,7 +205,7 @@ function MarkdownContent({ text }: { text: string }) {
     elements.push(
       <ol key={`ol-${key}`} className="space-y-1.5 my-2 ml-1">
         {numberedBuffer.map((item, i) => (
-          <li key={i} className="flex gap-2 text-sm leading-relaxed text-[oklch(0.82_0.005_85)]">
+          <li key={i} className="flex gap-2 text-sm leading-relaxed text-foreground">
             <span className="mt-0.5 min-w-[18px] h-[18px] rounded bg-blue-500/20 text-blue-400 text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
             <span>{renderInline(item)}</span>
           </li>
@@ -479,13 +479,13 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
               ) : isLong && !expanded ? (
                 <>
                   <MarkdownContent text={message.content.slice(0, COLLAPSE_THRESHOLD)} />
-                  <div className="mt-3 pt-2 border-t border-[oklch(0.20_0.015_280)]">
+                  <div className="mt-3 pt-2 border-t border-[var(--border-subtle)]">
                     <button
                       onClick={() => setExpanded(true)}
                       className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
                     >
                       <span>Show full response</span>
-                      <span className="text-[oklch(0.42_0.01_280)]">
+                      <span className="text-[var(--text-faint)]">
                         ({Math.ceil((message.content.length - COLLAPSE_THRESHOLD) / 1000)}k more chars)
                       </span>
                     </button>
@@ -495,11 +495,11 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                 <div className={message.isStreaming ? 'content-streaming' : undefined}>
                   {/* Plain text during streaming — avoids markdown re-parse jank on every token */}
                   {message.isStreaming
-                    ? <p className="text-sm leading-relaxed text-[oklch(0.82_0.005_85)] whitespace-pre-wrap">{message.content}</p>
+                    ? <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">{message.content}</p>
                     : <MarkdownContent text={message.content} />
                   }
                   {isLong && expanded && (
-                    <div className="mt-3 pt-2 border-t border-[oklch(0.20_0.015_280)]">
+                    <div className="mt-3 pt-2 border-t border-[var(--border-subtle)]">
                       <button
                         onClick={() => setExpanded(false)}
                         className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
@@ -512,15 +512,15 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
               )}
 
               {!isUser && (
-                <div className="mt-3 pt-2.5 border-t border-[oklch(0.18_0.012_280)]">
+                <div className="mt-3 pt-2.5 border-t border-[var(--border-subtle)]">
                   <div className="flex items-center justify-between gap-2">
                     {/* Left: model + confidence + sources */}
-                    <div className="flex items-center gap-2 flex-wrap text-[11px] text-[oklch(0.40_0.01_280)] min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap text-[11px] text-[var(--text-faint)] min-w-0">
                       {(message.modelUsed || message.processingTime) && (
                         <span className="flex items-center gap-1 shrink-0">
                           <Brain className="w-3 h-3 text-violet-500/60" />
                           {message.modelUsed && (
-                            <span className="font-medium text-[oklch(0.46_0.01_280)]">
+                            <span className="font-medium text-[var(--text-muted)]">
                               {message.modelUsed.replace(/grok-3(-fast)?/gi, 'Grok 3 Fast').replace(/grok-4/gi, 'Grok 3 Fast')}
                             </span>
                           )}
@@ -616,7 +616,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
           <p
             suppressHydrationWarning
             className={cn(
-              'text-[10px] mt-1 text-[oklch(0.38_0.008_280)]',
+              'text-[10px] mt-1 text-[var(--text-faint)]',
               isUser ? 'text-right' : 'text-left'
             )}
           >

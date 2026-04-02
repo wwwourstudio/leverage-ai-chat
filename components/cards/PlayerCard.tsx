@@ -45,18 +45,18 @@ export function PlayerCard({ player, onAsk, variant = 'default' }: PlayerCardPro
     player.avg_exit_velocity != null;
 
   return (
-    <div className="bg-[oklch(0.11_0.01_280)] border border-[oklch(0.18_0.02_280)] rounded-xl p-4 flex flex-col gap-3 hover:border-[oklch(0.28_0.05_270)] transition-colors">
+    <div className="bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-xl p-4 flex flex-col gap-3 hover:border-[var(--border-hover)] transition-colors">
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="text-[13px] font-semibold text-white/90">{name}</div>
-          <div className="text-[11px] text-[oklch(0.45_0.01_280)]">
+          <div className="text-[11px] text-[var(--text-muted)]">
             {[player.team, player.positions].filter(Boolean).join(' · ')}
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
           {player.adp != null && (
-            <span className="text-[10px] text-[oklch(0.38_0.01_280)]">
+            <span className="text-[10px] text-[var(--text-faint)]">
               ADP {player.adp.toFixed(1)}
             </span>
           )}
@@ -71,7 +71,7 @@ export function PlayerCard({ player, onAsk, variant = 'default' }: PlayerCardPro
                 'text-[11px] font-bold px-2 py-0.5 rounded',
                 player.value_delta > 0
                   ? 'bg-violet-500/20 text-violet-400'
-                  : 'bg-[oklch(0.16_0.01_280)] text-white/40',
+                  : 'bg-[var(--bg-surface)] text-white/40',
               )}
             >
               {player.value_delta > 0 ? '+' : ''}
@@ -85,7 +85,7 @@ export function PlayerCard({ player, onAsk, variant = 'default' }: PlayerCardPro
       {variant === 'dfs' && (player.dk_pts_mean != null || player.auction_value != null) && (
         <div className="flex gap-2 text-[11px]">
           {player.auction_value != null && (
-            <span className="bg-[oklch(0.14_0.01_280)] rounded px-2 py-1 text-white/60">
+            <span className="bg-[var(--bg-elevated)] rounded px-2 py-1 text-white/60">
               ${player.auction_value} auction
             </span>
           )}
@@ -106,7 +106,7 @@ export function PlayerCard({ player, onAsk, variant = 'default' }: PlayerCardPro
       {hasStatcast && (
         <div className="grid grid-cols-4 gap-1">
           {player.xwoba != null && (
-            <div className="bg-[oklch(0.08_0.01_280)] rounded p-2 text-center">
+            <div className="bg-[var(--bg-overlay)] rounded p-2 text-center">
               <div
                 className={cn(
                   'text-[13px] font-bold tabular-nums',
@@ -119,7 +119,7 @@ export function PlayerCard({ player, onAsk, variant = 'default' }: PlayerCardPro
             </div>
           )}
           {player.barrel_rate != null && (
-            <div className="bg-[oklch(0.08_0.01_280)] rounded p-2 text-center">
+            <div className="bg-[var(--bg-overlay)] rounded p-2 text-center">
               <div
                 className={cn(
                   'text-[13px] font-bold tabular-nums',
@@ -132,7 +132,7 @@ export function PlayerCard({ player, onAsk, variant = 'default' }: PlayerCardPro
             </div>
           )}
           {player.hard_hit_pct != null && (
-            <div className="bg-[oklch(0.08_0.01_280)] rounded p-2 text-center">
+            <div className="bg-[var(--bg-overlay)] rounded p-2 text-center">
               <div
                 className={cn(
                   'text-[13px] font-bold tabular-nums',
@@ -145,7 +145,7 @@ export function PlayerCard({ player, onAsk, variant = 'default' }: PlayerCardPro
             </div>
           )}
           {player.avg_exit_velocity != null && (
-            <div className="bg-[oklch(0.08_0.01_280)] rounded p-2 text-center">
+            <div className="bg-[var(--bg-overlay)] rounded p-2 text-center">
               <div
                 className={cn(
                   'text-[13px] font-bold tabular-nums',

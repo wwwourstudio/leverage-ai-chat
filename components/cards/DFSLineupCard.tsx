@@ -24,13 +24,13 @@ export function DFSLineupCard({ lineup, totalProjected, site = 'DK', onAsk }: DF
     totalProjected ?? lineup.reduce((sum, p) => sum + (p.dk_pts_mean ?? 0), 0);
 
   return (
-    <div className="bg-[oklch(0.11_0.01_280)] border border-[oklch(0.18_0.02_280)] rounded-xl p-4 flex flex-col gap-3">
+    <div className="bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-xl p-4 flex flex-col gap-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-semibold tracking-widest uppercase text-blue-400/70">
           {site} Projections
         </span>
-        <div className="flex gap-3 text-[10px] text-[oklch(0.45_0.01_280)]">
+        <div className="flex gap-3 text-[10px] text-[var(--text-muted)]">
           <span>{total.toFixed(1)} pts proj.</span>
         </div>
       </div>
@@ -40,14 +40,14 @@ export function DFSLineupCard({ lineup, totalProjected, site = 'DK', onAsk }: DF
         {lineup.map((p, i) => (
           <div
             key={i}
-            className="flex items-center gap-2 py-1 border-b border-[oklch(0.14_0.01_280)] last:border-0"
+            className="flex items-center gap-2 py-1 border-b border-[var(--border-subtle)] last:border-0"
           >
             <span className="text-[9px] font-mono text-violet-400/60 w-14 text-right uppercase shrink-0">
               {p.player_type}
             </span>
             <span className="flex-1 text-[12px] text-white/80 truncate">{p.player_name}</span>
             {p.p90 != null && (
-              <span className="text-[10px] text-[oklch(0.40_0.01_280)] tabular-nums">
+              <span className="text-[10px] text-[var(--text-faint)] tabular-nums">
                 P90: {p.p90.toFixed(1)}
               </span>
             )}

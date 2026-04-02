@@ -42,7 +42,7 @@ export function ArbitrageOpportunityCard({ opportunity: opp, onAsk }: ArbitrageO
       ].filter((s): s is { name: string; book: string; price: number } => s !== null);
 
   return (
-    <div className="bg-[oklch(0.11_0.01_280)] border border-blue-500/30 rounded-xl p-4 flex flex-col gap-3">
+    <div className="bg-[var(--bg-overlay)] border border-blue-500/30 rounded-xl p-4 flex flex-col gap-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold tracking-widest uppercase text-blue-400/70">
@@ -61,13 +61,13 @@ export function ArbitrageOpportunityCard({ opportunity: opp, onAsk }: ArbitrageO
           {sides.map((s, i) => (
             <div
               key={i}
-              className="flex items-center justify-between bg-[oklch(0.08_0.01_280)] rounded-lg px-3 py-2"
+              className="flex items-center justify-between bg-[var(--bg-overlay)] rounded-lg px-3 py-2"
             >
               <span className="text-[11px] text-white/70 truncate flex-1">{s.name}</span>
               <span className="text-[11px] font-bold text-violet-400 tabular-nums mx-3">
                 {formatOdds(s.price)}
               </span>
-              <span className="text-[10px] text-[oklch(0.40_0.01_280)]">{s.book}</span>
+              <span className="text-[10px] text-[var(--text-faint)]">{s.book}</span>
             </div>
           ))}
         </div>

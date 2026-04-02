@@ -69,7 +69,7 @@ function RankCircle({ rank }: { rank: number }) {
     ? 'bg-emerald-400/15 border-emerald-400/40 text-emerald-300'
     : rank <= 150
     ? 'bg-sky-400/15 border-sky-400/40 text-sky-300'
-    : 'bg-[oklch(0.10_0.01_280)] border-[oklch(0.18_0.01_280)] text-[oklch(0.38_0.01_280)]';
+    : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-faint)]';
   return (
     <span className={cn(
       'inline-flex items-center justify-center w-6 h-6 rounded-full border text-[9px] font-black tabular-nums shrink-0',
@@ -125,10 +125,10 @@ export const ADPCard = memo(function ADPCard({
   return (
     <div className="animate-fade-in-up">
       <article className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.09_0.012_280)] border transition-all duration-300',
+        'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-overlay)] border transition-all duration-300',
         isHero
-          ? 'border-[oklch(0.28_0.025_260)] shadow-[0_0_32px_oklch(0.3_0.06_260/0.15)]'
-          : 'border-[oklch(0.18_0.016_280)] hover:border-[oklch(0.28_0.02_280)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.08)]',
+          ? 'border-[var(--border-hover)] shadow-[0_0_32px_oklch(0.3_0.06_260/0.15)]'
+          : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.08)]',
       )}>
         {/* Gradient header */}
         <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', s.headerGrad)}>
@@ -139,10 +139,10 @@ export const ADPCard = memo(function ADPCard({
           </div>
           {/* Breadcrumb */}
           <div className="flex items-center gap-1.5 mb-1.5">
-            <BarChart2 className="w-3 h-3 text-white/60" />
-            <span className="text-[9px] font-black uppercase tracking-widest text-white/70">{category}</span>
-            <span className="text-white/30">·</span>
-            <span className="text-[9px] text-white/50 truncate">{subcategory}</span>
+            <BarChart2 className="w-3 h-3 text-foreground/60" />
+            <span className="text-[9px] font-black uppercase tracking-widest text-foreground/70">{category}</span>
+            <span className="text-foreground/30">·</span>
+            <span className="text-[9px] text-foreground/50 truncate">{subcategory}</span>
           </div>
           <h3 className={cn('font-black text-white leading-snug text-balance pr-16', isHero ? 'text-lg' : 'text-sm')}>
             {title}
@@ -155,11 +155,11 @@ export const ADPCard = memo(function ADPCard({
           {players.length > 0 && (
             <div className="flex items-center gap-2 px-2">
               <span className="w-6 shrink-0" />
-              <span className="flex-1 text-[9px] font-black uppercase tracking-wider text-[oklch(0.38_0.01_280)]">Player</span>
+              <span className="flex-1 text-[9px] font-black uppercase tracking-wider text-[var(--text-faint)]">Player</span>
               {hasAuctionValues && (
-                <span className="w-8 text-right text-[9px] font-black uppercase tracking-wider text-[oklch(0.38_0.01_280)] shrink-0">$Val</span>
+                <span className="w-8 text-right text-[9px] font-black uppercase tracking-wider text-[var(--text-faint)] shrink-0">$Val</span>
               )}
-              <span className="w-10 text-right text-[9px] font-black uppercase tracking-wider text-[oklch(0.38_0.01_280)] shrink-0">
+              <span className="w-10 text-right text-[9px] font-black uppercase tracking-wider text-[var(--text-faint)] shrink-0">
                 {hasValuePicks ? 'ADP/Δ' : 'ADP'}
               </span>
             </div>
@@ -175,21 +175,21 @@ export const ADPCard = memo(function ADPCard({
                 ? 'bg-teal-500/8 border-teal-500/20'
                 : isTopPick
                 ? 'bg-yellow-400/5 border-yellow-400/15'
-                : 'bg-[oklch(0.08_0.01_280)] border-[oklch(0.15_0.01_280)]';
+                : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)]';
 
               return (
                 <div
                   key={`${p.displayName}-${p.rank}`}
                   className={cn(
-                    'flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-colors hover:bg-[oklch(0.12_0.01_280)]',
+                    'flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-colors hover:bg-[var(--bg-surface)]',
                     rowBg,
                   )}
                 >
                   <RankCircle rank={p.rank} />
-                  <span className="text-xs font-bold text-white flex-1 truncate min-w-0">
+                  <span className="text-xs font-bold text-foreground flex-1 truncate min-w-0">
                     {p.displayName}
                     {p.team && (
-                      <span className="text-[10px] font-normal text-[oklch(0.42_0.01_280)] ml-1">{p.team}</span>
+                      <span className="text-[10px] font-normal text-[var(--text-muted)] ml-1">{p.team}</span>
                     )}
                   </span>
                   {p.isValuePick && (
@@ -224,7 +224,7 @@ export const ADPCard = memo(function ADPCard({
           </div>
 
           {players.length === 0 && (
-            <p className="text-xs text-[oklch(0.45_0.01_280)] text-center py-3">
+            <p className="text-xs text-[var(--text-muted)] text-center py-3">
               No ADP data matched — try broadening your search.
             </p>
           )}
@@ -232,8 +232,8 @@ export const ADPCard = memo(function ADPCard({
           {/* Footer: source + dataset size */}
           <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-1">
-              <TrendingUp className="w-3 h-3 text-[oklch(0.32_0.01_280)]" />
-              <span className="text-[9px] font-bold text-[oklch(0.32_0.01_280)]">
+              <TrendingUp className="w-3 h-3 text-[var(--text-faint)]" />
+              <span className="text-[9px] font-bold text-[var(--text-faint)]">
                 {source}{totalInDataset ? ` · ${totalInDataset} players ranked` : ''}
               </span>
             </div>
@@ -242,7 +242,7 @@ export const ADPCard = memo(function ADPCard({
           {onAnalyze && (
             <button
               onClick={onAnalyze}
-              className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[oklch(0.08_0.01_280)] border border-[oklch(0.17_0.015_280)] text-xs font-semibold text-[oklch(0.46_0.01_280)] hover:text-white hover:bg-[oklch(0.14_0.015_280)] hover:border-[oklch(0.26_0.02_280)] transition-all duration-150"
+              className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] transition-all duration-150"
             >
               <TrendingUp className="w-3.5 h-3.5" />
               Full Analysis

@@ -99,9 +99,9 @@ export const CardLayout = memo(function CardLayout({
           trustLevel={trustLevel}
         />
         {insight && (
-          <div className="flex items-start gap-2 mt-2 px-3 py-2 rounded-xl bg-[oklch(0.10_0.012_260)] border border-[oklch(0.20_0.025_260)]">
+          <div className="flex items-start gap-2 mt-2 px-3 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
             <Sparkles className="w-3 h-3 text-blue-400 mt-0.5 shrink-0" aria-hidden="true" />
-            <p className="text-[11px] text-[oklch(0.65_0.01_280)] leading-relaxed">{insight}</p>
+            <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{insight}</p>
           </div>
         )}
       </div>
@@ -158,7 +158,7 @@ export const CardLayout = memo(function CardLayout({
                   'flex items-center justify-center w-6 h-6 rounded-lg transition-all duration-150',
                   page === 0
                     ? 'opacity-0 pointer-events-none'
-                    : 'text-[oklch(0.45_0.01_280)] hover:text-white hover:bg-[oklch(0.18_0.015_280)]',
+                    : 'text-[var(--text-faint)] hover:text-foreground hover:bg-[var(--bg-elevated)]',
                 )}
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
@@ -177,13 +177,13 @@ export const CardLayout = memo(function CardLayout({
                       className={cn(
                         'rounded-full transition-all duration-250 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-400',
                         i === page
-                          ? 'w-5 h-1.5 bg-blue-400'
-                          : 'w-1.5 h-1.5 bg-[oklch(0.24_0.01_280)] hover:bg-[oklch(0.36_0.01_280)]',
+                          ? 'w-5 h-1.5 bg-[var(--border-hover)]'
+                          : 'w-1.5 h-1.5 bg-[var(--bg-elevated)] hover:bg-[var(--bg-surface)]',
                       )}
                     />
                   ))}
                 </div>
-                <span className="text-[9px] font-semibold tabular-nums text-[oklch(0.32_0.01_280)]">
+                <span className="text-[9px] font-semibold tabular-nums text-[var(--text-faint)]">
                   {page + 1}/{totalPages}
                 </span>
               </div>
@@ -197,7 +197,7 @@ export const CardLayout = memo(function CardLayout({
                   'flex items-center justify-center w-6 h-6 rounded-lg transition-all duration-150',
                   page === totalPages - 1
                     ? 'opacity-0 pointer-events-none'
-                    : 'text-[oklch(0.45_0.01_280)] hover:text-white hover:bg-[oklch(0.18_0.015_280)]',
+                    : 'text-[var(--text-faint)] hover:text-foreground hover:bg-[var(--bg-elevated)]',
                 )}
               >
                 <ChevronRight className="w-3.5 h-3.5" />

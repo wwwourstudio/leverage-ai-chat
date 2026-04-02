@@ -68,8 +68,8 @@ export function PitcherFatigueCard({
   return (
     <article
       className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border transition-all duration-200 animate-fade-in-up',
-        'border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)]',
+        'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-200 animate-fade-in-up',
+        'border-[var(--border-subtle)] hover:border-[var(--border-hover)]',
         isHero && 'sm:rounded-3xl',
       )}
     >
@@ -81,10 +81,10 @@ export function PitcherFatigueCard({
           <div className="flex items-center gap-2 min-w-0">
             <Wind className="w-4 h-4 text-blue-400 shrink-0" aria-hidden="true" />
             <div className="min-w-0">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.55_0.01_280)]">{category}</span>
-              <span className="text-[oklch(0.3_0.01_280)] mx-1.5">/</span>
-              <span className="text-[10px] font-medium text-[oklch(0.45_0.01_280)]">{subcategory}</span>
-              <h3 className="text-sm font-black text-[oklch(0.92_0.005_85)] mt-1 leading-snug">{title}</h3>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{category}</span>
+              <span className="text-[var(--text-faint)] mx-1.5">/</span>
+              <span className="text-[10px] font-medium text-[var(--text-faint)]">{subcategory}</span>
+              <h3 className="text-sm font-black text-foreground mt-1 leading-snug">{title}</h3>
             </div>
           </div>
 
@@ -96,12 +96,12 @@ export function PitcherFatigueCard({
         {/* Fatigue bar */}
         <div className="mb-4">
           <div className="flex justify-between items-center mb-1.5 text-[10px]">
-            <span className="text-[oklch(0.45_0.01_280)]">Fatigue Level</span>
+            <span className="text-[var(--text-faint)]">Fatigue Level</span>
             <span className={cn('font-black tabular-nums', styles.text)}>
               {multiplier.toFixed(2)}×
             </span>
           </div>
-          <div className="h-2 rounded-full bg-[oklch(0.18_0.015_280)] overflow-hidden">
+          <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
             <div
               className={cn('h-full rounded-full transition-all duration-500', styles.bar)}
               style={{ width: `${barPct}%` }}
@@ -111,7 +111,7 @@ export function PitcherFatigueCard({
               aria-valuemax={100}
             />
           </div>
-          <div className="flex justify-between text-[8px] text-[oklch(0.38_0.01_280)] mt-1">
+          <div className="flex justify-between text-[8px] text-[var(--text-faint)] mt-1">
             <span>Fresh</span>
             <span>At Risk</span>
           </div>
@@ -120,27 +120,27 @@ export function PitcherFatigueCard({
         {/* Stats grid */}
         <div className="grid grid-cols-2 gap-2 mb-3">
           {data.pitchCountLastStart !== undefined && (
-            <div className="bg-[oklch(0.09_0.01_280)] rounded-lg border border-[oklch(0.18_0.015_280)] p-2.5">
-              <p className="text-[8px] uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-1">Last Start</p>
-              <p className="text-base font-black tabular-nums text-[oklch(0.85_0.005_85)]">{data.pitchCountLastStart} P</p>
+            <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5">
+              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Last Start</p>
+              <p className="text-base font-black tabular-nums text-foreground">{data.pitchCountLastStart} P</p>
             </div>
           )}
           {data.daysRest !== undefined && (
-            <div className="bg-[oklch(0.09_0.01_280)] rounded-lg border border-[oklch(0.18_0.015_280)] p-2.5">
-              <p className="text-[8px] uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-1">Days Rest</p>
-              <p className="text-base font-black tabular-nums text-[oklch(0.85_0.005_85)]">{data.daysRest}d</p>
+            <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5">
+              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Days Rest</p>
+              <p className="text-base font-black tabular-nums text-foreground">{data.daysRest}d</p>
             </div>
           )}
           {data.inningsLastStart !== undefined && (
-            <div className="bg-[oklch(0.09_0.01_280)] rounded-lg border border-[oklch(0.18_0.015_280)] p-2.5">
-              <p className="text-[8px] uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-1">Innings</p>
-              <p className="text-base font-black tabular-nums text-[oklch(0.85_0.005_85)]">{data.inningsLastStart} IP</p>
+            <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5">
+              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Innings</p>
+              <p className="text-base font-black tabular-nums text-foreground">{data.inningsLastStart} IP</p>
             </div>
           )}
           {data.pitchCountLast7Days !== undefined && (
-            <div className="bg-[oklch(0.09_0.01_280)] rounded-lg border border-[oklch(0.18_0.015_280)] p-2.5">
-              <p className="text-[8px] uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-1">7-Day Pitches</p>
-              <p className="text-base font-black tabular-nums text-[oklch(0.85_0.005_85)]">{data.pitchCountLast7Days}</p>
+            <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5">
+              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">7-Day Pitches</p>
+              <p className="text-base font-black tabular-nums text-foreground">{data.pitchCountLast7Days}</p>
             </div>
           )}
         </div>
@@ -164,18 +164,18 @@ export function PitcherFatigueCard({
 
         {/* Betting impact */}
         {data.bettingImpact && (
-          <p className="text-[11px] text-[oklch(0.60_0.01_280)] leading-relaxed">{data.bettingImpact}</p>
+          <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{data.bettingImpact}</p>
         )}
 
         {/* Description context */}
         {data.description && (
-          <p className="text-[10px] text-[oklch(0.50_0.01_280)] italic leading-relaxed mt-1">{data.description}</p>
+          <p className="text-[10px] text-[var(--text-muted)] italic leading-relaxed mt-1">{data.description}</p>
         )}
 
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[oklch(0.20_0.015_280)] text-xs font-semibold text-[oklch(0.50_0.01_280)] hover:text-[oklch(0.85_0.005_85)] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
           >
             Full Analysis
             <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />

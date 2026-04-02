@@ -76,8 +76,8 @@ export function ClosingLineCard({
   return (
     <article
       className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border transition-all duration-200 animate-fade-in-up',
-        'border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)]',
+        'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-200 animate-fade-in-up',
+        'border-[var(--border-subtle)] hover:border-[var(--border-hover)]',
         isHero && 'sm:rounded-3xl',
       )}
     >
@@ -89,12 +89,12 @@ export function ClosingLineCard({
           <div className="flex items-center gap-2 min-w-0">
             <BarChart2 className="w-4 h-4 text-violet-400 shrink-0" aria-hidden="true" />
             <div className="min-w-0">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.55_0.01_280)]">{category}</span>
-              <span className="text-[oklch(0.3_0.01_280)] mx-1.5">/</span>
-              <span className="text-[10px] font-medium text-[oklch(0.45_0.01_280)]">{subcategory}</span>
-              <h3 className="text-sm font-black text-[oklch(0.92_0.005_85)] mt-1 leading-snug">{title}</h3>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{category}</span>
+              <span className="text-[var(--text-faint)] mx-1.5">/</span>
+              <span className="text-[10px] font-medium text-[var(--text-faint)]">{subcategory}</span>
+              <h3 className="text-sm font-black text-foreground mt-1 leading-snug">{title}</h3>
               {data.matchup && (
-                <p className="text-[10px] text-[oklch(0.50_0.01_280)] mt-0.5 truncate">{data.matchup}</p>
+                <p className="text-[10px] text-[var(--text-muted)] mt-0.5 truncate">{data.matchup}</p>
               )}
             </div>
           </div>
@@ -106,10 +106,10 @@ export function ClosingLineCard({
         </div>
 
         {/* Price comparison */}
-        <div className="flex items-center justify-between bg-[oklch(0.09_0.01_280)] rounded-xl border border-[oklch(0.18_0.015_280)] p-4 mb-3">
+        <div className="flex items-center justify-between bg-[var(--bg-overlay)] rounded-xl border border-[var(--border-subtle)] p-4 mb-3">
           <div className="text-center flex-1">
-            <p className="text-[8px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-1.5">Bet Line</p>
-            <p className="text-xl font-black tabular-nums text-[oklch(0.80_0.005_85)]">
+            <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1.5">Bet Line</p>
+            <p className="text-xl font-black tabular-nums text-foreground/80">
               {formatAmerican(data.betPrice)}
             </p>
           </div>
@@ -118,11 +118,11 @@ export function ClosingLineCard({
             <span className={cn('text-2xl font-black tabular-nums', verdictConfig.color)}>
               {clv > 0 ? '+' : ''}{clv}
             </span>
-            <span className="text-[8px] uppercase tracking-widest text-[oklch(0.38_0.01_280)]">CLV</span>
+            <span className="text-[8px] uppercase tracking-widest text-[var(--text-faint)]">CLV</span>
           </div>
 
           <div className="text-center flex-1">
-            <p className="text-[8px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-1.5">Closing</p>
+            <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1.5">Closing</p>
             <p className={cn('text-xl font-black tabular-nums', verdictConfig.color)}>
               {formatAmerican(data.closingPrice)}
             </p>
@@ -130,15 +130,15 @@ export function ClosingLineCard({
         </div>
 
         {/* CLV strength bar */}
-        <div className="rounded-xl bg-[oklch(0.09_0.01_280)] border border-[oklch(0.18_0.015_280)] px-3 py-2.5 mb-3 space-y-1.5">
+        <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5 mb-3 space-y-1.5">
           <div className="flex justify-between text-[9px] font-bold uppercase tracking-wide">
-            <span className="text-[oklch(0.40_0.01_280)]">CLV Strength</span>
+            <span className="text-[var(--text-faint)]">CLV Strength</span>
             <span className={verdictConfig.color}>{clvStrength}</span>
           </div>
-          <div className="h-1.5 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+          <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
             <div className={cn('h-full rounded-full transition-all duration-500', clvBarColor)} style={{ width: `${clvBarPct}%` }} />
           </div>
-          <div className="flex justify-between text-[8px] text-[oklch(0.38_0.01_280)]">
+          <div className="flex justify-between text-[8px] text-[var(--text-faint)]">
             <span>Missed</span>
             <span>Neutral</span>
             <span>Beat</span>
@@ -149,29 +149,29 @@ export function ClosingLineCard({
         <div className="space-y-1.5 text-xs">
           {data.market && (
             <div className="flex justify-between">
-              <span className="text-[oklch(0.45_0.01_280)]">Market</span>
-              <span className="font-semibold text-[oklch(0.80_0.005_85)]">{data.market}</span>
+              <span className="text-[var(--text-faint)]">Market</span>
+              <span className="font-semibold text-foreground/80">{data.market}</span>
             </div>
           )}
           {data.outcome && (
             <div className="flex justify-between">
-              <span className="text-[oklch(0.45_0.01_280)]">Side</span>
-              <span className="font-semibold text-[oklch(0.80_0.005_85)]">{data.outcome}</span>
+              <span className="text-[var(--text-faint)]">Side</span>
+              <span className="font-semibold text-foreground/80">{data.outcome}</span>
             </div>
           )}
           {betImplied !== null && closeImplied !== null ? (
-            <div className="rounded-xl bg-[oklch(0.09_0.01_280)] border border-[oklch(0.18_0.015_280)] px-3 py-2.5 space-y-2">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-[oklch(0.40_0.01_280)]">Implied Probability</p>
+            <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5 space-y-2">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Implied Probability</p>
               <div className="flex items-center gap-2 text-[10px]">
-                <span className="text-[oklch(0.45_0.01_280)] w-12 shrink-0">At Bet</span>
-                <div className="flex-1 h-1.5 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
-                  <div className="h-full rounded-full bg-slate-400/70 transition-all duration-500" style={{ width: `${Math.min(100, betImplied * 150)}%` }} />
+                <span className="text-[var(--text-faint)] w-12 shrink-0">At Bet</span>
+                <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                  <div className="h-full rounded-full bg-[var(--text-faint)]/70 transition-all duration-500" style={{ width: `${Math.min(100, betImplied * 150)}%` }} />
                 </div>
-                <span className="font-black w-10 text-right tabular-nums text-[oklch(0.80_0.005_85)]">{(betImplied * 100).toFixed(1)}%</span>
+                <span className="font-black w-10 text-right tabular-nums text-foreground/80">{(betImplied * 100).toFixed(1)}%</span>
               </div>
               <div className="flex items-center gap-2 text-[10px]">
-                <span className="text-[oklch(0.45_0.01_280)] w-12 shrink-0">Closing</span>
-                <div className="flex-1 h-1.5 rounded-full bg-[oklch(0.14_0.01_280)] overflow-hidden">
+                <span className="text-[var(--text-faint)] w-12 shrink-0">Closing</span>
+                <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                   <div className={cn('h-full rounded-full transition-all duration-500',
                     verdict === 'beat close' ? 'bg-emerald-500/70' : verdict === 'missed close' ? 'bg-red-500/70' : 'bg-slate-500/60'
                   )} style={{ width: `${Math.min(100, closeImplied * 150)}%` }} />
@@ -179,15 +179,15 @@ export function ClosingLineCard({
                 <span className={cn('font-black w-10 text-right tabular-nums', verdictConfig.color)}>{(closeImplied * 100).toFixed(1)}%</span>
               </div>
               {data.clvProbDelta !== undefined && (
-                <div className="flex justify-between text-[10px] pt-0.5 border-t border-[oklch(0.16_0.015_280)]">
-                  <span className="text-[oklch(0.45_0.01_280)]">Δ Edge</span>
+                <div className="flex justify-between text-[10px] pt-0.5 border-t border-[var(--border-subtle)]">
+                  <span className="text-[var(--text-faint)]">Δ Edge</span>
                   <span className={cn('font-black', verdictConfig.color)}>{probDelta >= 0 ? '+' : ''}{(probDelta * 100).toFixed(1)}pp</span>
                 </div>
               )}
             </div>
           ) : data.clvProbDelta !== undefined && (
             <div className="flex justify-between">
-              <span className="text-[oklch(0.45_0.01_280)]">Prob Edge vs Close</span>
+              <span className="text-[var(--text-faint)]">Prob Edge vs Close</span>
               <span className={cn('font-semibold', verdictConfig.color)}>
                 {probDelta >= 0 ? '+' : ''}{(probDelta * 100).toFixed(1)}%
               </span>
@@ -195,26 +195,26 @@ export function ClosingLineCard({
           )}
           {data.bookmaker && (
             <div className="flex justify-between">
-              <span className="text-[oklch(0.45_0.01_280)]">Book</span>
-              <span className="font-semibold text-[oklch(0.80_0.005_85)]">{data.bookmaker}</span>
+              <span className="text-[var(--text-faint)]">Book</span>
+              <span className="font-semibold text-foreground/80">{data.bookmaker}</span>
             </div>
           )}
           {data.placedAt && (
             <div className="flex justify-between">
-              <span className="text-[oklch(0.45_0.01_280)]">Placed</span>
-              <span className="text-[oklch(0.50_0.01_280)]">{data.placedAt}</span>
+              <span className="text-[var(--text-faint)]">Placed</span>
+              <span className="text-[var(--text-muted)]">{data.placedAt}</span>
             </div>
           )}
         </div>
 
         {data.note && (
-          <p className="mt-3 text-[11px] text-[oklch(0.50_0.01_280)] italic">{data.note}</p>
+          <p className="mt-3 text-[11px] text-[var(--text-muted)] italic">{data.note}</p>
         )}
 
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[oklch(0.20_0.015_280)] text-xs font-semibold text-[oklch(0.50_0.01_280)] hover:text-violet-400 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-violet-400 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
           >
             CLV History
             <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />

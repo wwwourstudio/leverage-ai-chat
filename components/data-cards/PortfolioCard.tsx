@@ -64,7 +64,7 @@ export function PortfolioCard({
   return (
     <article
       className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] transition-all duration-200 animate-fade-in-up',
+        'group relative w-full rounded-2xl overflow-hidden bg-background border border-[var(--border-subtle)] hover:border-[var(--border-hover)] transition-all duration-200 animate-fade-in-up',
         isHero && 'sm:rounded-3xl',
       )}
     >
@@ -78,7 +78,7 @@ export function PortfolioCard({
         <div className="flex items-center justify-between gap-3 mb-2.5">
           <div className="flex items-center gap-2 min-w-0">
             <Wallet className="w-4 h-4 text-purple-400 shrink-0" aria-hidden="true" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.55_0.01_280)]">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
               {category}
             </span>
           </div>
@@ -87,28 +87,28 @@ export function PortfolioCard({
           </span>
         </div>
 
-        <h3 className="text-sm font-black text-[oklch(0.92_0.005_85)] mb-4">{title}</h3>
+        <h3 className="text-sm font-black text-foreground mb-4">{title}</h3>
 
         {hasLiveData ? (
           <>
             {/* Bankroll hero */}
             <div className="mb-4">
-              <p className="text-[9px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-0.5">
+              <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-0.5">
                 Total Bankroll
               </p>
-              <p className="text-3xl font-black text-[oklch(0.92_0.005_85)] tabular-nums leading-none">
+              <p className="text-3xl font-black text-foreground tabular-nums leading-none">
                 {data.totalBankroll}
               </p>
             </div>
 
             {/* Deployed / Available split */}
             <div className="grid grid-cols-2 gap-2 mb-4">
-              <div className="bg-[oklch(0.09_0.01_280)] rounded-xl border border-[oklch(0.18_0.015_280)] p-2.5 text-center">
-                <p className="text-[9px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-1">Deployed</p>
+              <div className="bg-[var(--bg-overlay)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
+                <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Deployed</p>
                 <p className="text-sm font-black text-emerald-400 tabular-nums">{data.deployed}</p>
               </div>
-              <div className="bg-[oklch(0.09_0.01_280)] rounded-xl border border-[oklch(0.18_0.015_280)] p-2.5 text-center">
-                <p className="text-[9px] uppercase tracking-widest text-[oklch(0.42_0.01_280)] mb-1">Available</p>
+              <div className="bg-[var(--bg-overlay)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
+                <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Available</p>
                 <p className="text-sm font-black text-sky-400 tabular-nums">{data.available}</p>
               </div>
             </div>
@@ -117,10 +117,10 @@ export function PortfolioCard({
             {utilNum !== null && (
               <div className="mb-3">
                 <div className="flex justify-between text-[10px] mb-1">
-                  <span className="text-[oklch(0.45_0.01_280)] uppercase tracking-wider">Capital Utilization</span>
+                  <span className="text-[var(--text-faint)] uppercase tracking-wider">Capital Utilization</span>
                   <span className={cn('font-bold', utilTextColor)}>{data.utilizationRate}</span>
                 </div>
-                <div className="w-full h-2 bg-[oklch(0.09_0.01_280)] rounded-full overflow-hidden">
+                <div className="w-full h-2 bg-[var(--bg-overlay)] rounded-full overflow-hidden">
                   <div
                     className={cn('h-full rounded-full transition-all', utilColor)}
                     style={{ width: `${Math.min(utilNum, 100)}%` }}
@@ -148,21 +148,21 @@ export function PortfolioCard({
             <div className="space-y-1 text-xs">
               {data.riskBudget && (
                 <div className="flex items-center justify-between">
-                  <span className="text-[oklch(0.45_0.01_280)]">Risk Budget</span>
-                  <span className="font-semibold text-[oklch(0.80_0.005_85)]">{data.riskBudget}</span>
+                  <span className="text-[var(--text-faint)]">Risk Budget</span>
+                  <span className="font-semibold text-foreground/80">{data.riskBudget}</span>
                 </div>
               )}
               {data.openBets != null && (
                 <div className="flex items-center justify-between">
-                  <span className="text-[oklch(0.45_0.01_280)]">Open Bets</span>
-                  <span className="font-semibold text-[oklch(0.80_0.005_85)]">{data.openBets}</span>
+                  <span className="text-[var(--text-faint)]">Open Bets</span>
+                  <span className="font-semibold text-foreground/80">{data.openBets}</span>
                 </div>
               )}
               {data.roi && (
                 <div className="flex items-center justify-between">
-                  <span className="text-[oklch(0.45_0.01_280)]">ROI</span>
+                  <span className="text-[var(--text-faint)]">ROI</span>
                   <div className="flex items-center gap-1.5">
-                    <span className={cn('font-semibold', roiNum === null ? 'text-emerald-400' : roiNum > 0 ? 'text-emerald-400' : roiNum < 0 ? 'text-red-400' : 'text-[oklch(0.55_0.01_280)]')}>
+                    <span className={cn('font-semibold', roiNum === null ? 'text-emerald-400' : roiNum > 0 ? 'text-emerald-400' : roiNum < 0 ? 'text-red-400' : 'text-[var(--text-muted)]')}>
                       {data.roi}
                     </span>
                     {roiNum !== null && (
@@ -170,7 +170,7 @@ export function PortfolioCard({
                         ? <span className="flex items-center gap-0.5 text-[9px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded"><TrendingUp className="w-2.5 h-2.5" />Profitable</span>
                         : roiNum < 0
                           ? <span className="flex items-center gap-0.5 text-[9px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded"><TrendingDown className="w-2.5 h-2.5" />Drawdown</span>
-                          : <span className="flex items-center gap-0.5 text-[9px] font-bold text-[oklch(0.45_0.01_280)] bg-[oklch(0.14_0.01_280)] border border-[oklch(0.20_0.015_280)] px-1.5 py-0.5 rounded"><Minus className="w-2.5 h-2.5" />Break-even</span>
+                          : <span className="flex items-center gap-0.5 text-[9px] font-bold text-[var(--text-faint)] bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-1.5 py-0.5 rounded"><Minus className="w-2.5 h-2.5" />Break-even</span>
                     )}
                   </div>
                 </div>
@@ -184,12 +184,12 @@ export function PortfolioCard({
               <PieChart className="w-8 h-8" aria-hidden="true" />
             </div>
             {data.description && (
-              <p className="text-sm text-[oklch(0.65_0.01_280)] leading-relaxed">{data.description}</p>
+              <p className="text-sm text-[var(--text-muted)] leading-relaxed">{data.description}</p>
             )}
             {Array.isArray(data.features) && data.features.length > 0 && (
               <ul className="space-y-1">
                 {data.features.map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-xs text-[oklch(0.55_0.01_280)]">
+                  <li key={f} className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
                     <span className="w-1 h-1 rounded-full bg-purple-400 shrink-0" />
                     {f}
                   </li>
@@ -197,7 +197,7 @@ export function PortfolioCard({
               </ul>
             )}
             {data.note && (
-              <p className="text-xs text-[oklch(0.42_0.01_280)] italic">{data.note}</p>
+              <p className="text-xs text-[var(--text-faint)] italic">{data.note}</p>
             )}
           </div>
         )}
@@ -205,7 +205,7 @@ export function PortfolioCard({
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[oklch(0.20_0.015_280)] text-xs font-semibold text-[oklch(0.50_0.01_280)] hover:text-[oklch(0.85_0.005_85)] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
             aria-label="Manage portfolio"
           >
             Manage Portfolio

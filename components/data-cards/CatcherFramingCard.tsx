@@ -60,7 +60,7 @@ export function CatcherFramingCard({
   const hasCscd = data.calledStrikeConversionDelta !== undefined && Math.abs(cscd) > 0.001;
   const cscdBarPct = Math.min(100, Math.max(0, ((cscd + 0.05) / 0.10) * 100));
   const cscdBarColor = cscd > 0 ? 'bg-emerald-500' : cscd < 0 ? 'bg-red-500' : 'bg-slate-500';
-  const cscdColor = cscd > 0 ? 'text-emerald-400' : cscd < 0 ? 'text-red-400' : 'text-[oklch(0.80_0.005_85)]';
+  const cscdColor = cscd > 0 ? 'text-emerald-400' : cscd < 0 ? 'text-red-400' : 'text-foreground/80';
 
   function fmtPct(v: number): string {
     return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(0)}%`;
@@ -69,8 +69,8 @@ export function CatcherFramingCard({
   return (
     <article
       className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border transition-all duration-200 animate-fade-in-up',
-        'border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)]',
+        'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-200 animate-fade-in-up',
+        'border-[var(--border-subtle)] hover:border-[var(--border-hover)]',
         isHero && 'sm:rounded-3xl',
       )}
     >
@@ -82,10 +82,10 @@ export function CatcherFramingCard({
           <div className="flex items-center gap-2 min-w-0">
             <Shield className="w-4 h-4 text-teal-400 shrink-0" aria-hidden="true" />
             <div className="min-w-0">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[oklch(0.55_0.01_280)]">{category}</span>
-              <span className="text-[oklch(0.3_0.01_280)] mx-1.5">/</span>
-              <span className="text-[10px] font-medium text-[oklch(0.45_0.01_280)]">{subcategory}</span>
-              <h3 className="text-sm font-black text-[oklch(0.92_0.005_85)] mt-1 leading-snug">{title}</h3>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{category}</span>
+              <span className="text-[var(--text-faint)] mx-1.5">/</span>
+              <span className="text-[10px] font-medium text-[var(--text-faint)]">{subcategory}</span>
+              <h3 className="text-sm font-black text-foreground mt-1 leading-snug">{title}</h3>
             </div>
           </div>
           <span className={cn('text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg border shrink-0', styles.badge)}>
@@ -94,18 +94,18 @@ export function CatcherFramingCard({
         </div>
 
         {data.catcherName && (
-          <p className="text-[10px] font-semibold text-[oklch(0.65_0.01_280)] mb-2">Catcher: {data.catcherName}</p>
+          <p className="text-[10px] font-semibold text-[var(--text-muted)] mb-2">Catcher: {data.catcherName}</p>
         )}
 
         {/* fRAA bar */}
         <div className="mb-4">
           <div className="flex justify-between items-center mb-1.5 text-[10px]">
-            <span className="text-[oklch(0.45_0.01_280)]">Framing Runs Above Avg / 1k</span>
-            <span className="font-black tabular-nums text-[oklch(0.80_0.005_85)]">
+            <span className="text-[var(--text-faint)]">Framing Runs Above Avg / 1k</span>
+            <span className="font-black tabular-nums text-foreground/80">
               {fRAA >= 0 ? '+' : ''}{fRAA.toFixed(1)}
             </span>
           </div>
-          <div className="h-2 rounded-full bg-[oklch(0.18_0.015_280)] overflow-hidden">
+          <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
             <div
               className={cn('h-full rounded-full transition-all duration-500', styles.bar)}
               style={{ width: `${barPct}%` }}
@@ -115,7 +115,7 @@ export function CatcherFramingCard({
               aria-valuemax={100}
             />
           </div>
-          <div className="flex justify-between text-[8px] text-[oklch(0.38_0.01_280)] mt-1">
+          <div className="flex justify-between text-[8px] text-[var(--text-faint)] mt-1">
             <span>-25 (worst)</span>
             <span>0 avg</span>
             <span>+25 (best)</span>
@@ -126,18 +126,18 @@ export function CatcherFramingCard({
         {hasCscd && (
           <div className="mb-4">
             <div className="flex justify-between items-center mb-1.5 text-[10px]">
-              <span className="text-[oklch(0.45_0.01_280)]">Called Strike Conversion Δ</span>
+              <span className="text-[var(--text-faint)]">Called Strike Conversion Δ</span>
               <span className={cn('font-black tabular-nums', cscdColor)}>
                 {cscd > 0 ? '+' : ''}{(cscd * 100).toFixed(1)}pp
               </span>
             </div>
-            <div className="h-1.5 rounded-full bg-[oklch(0.18_0.015_280)] overflow-hidden">
+            <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
               <div
                 className={cn('h-full rounded-full transition-all duration-500', cscdBarColor)}
                 style={{ width: `${cscdBarPct}%` }}
               />
             </div>
-            <div className="flex justify-between text-[8px] text-[oklch(0.38_0.01_280)] mt-1">
+            <div className="flex justify-between text-[8px] text-[var(--text-faint)] mt-1">
               <span>-5pp</span>
               <span>avg</span>
               <span>+5pp</span>
@@ -147,34 +147,34 @@ export function CatcherFramingCard({
 
         {/* Prop impact grid */}
         <div className="grid grid-cols-3 gap-2 mb-3">
-          <div className="bg-[oklch(0.09_0.01_280)] rounded-lg border border-[oklch(0.18_0.015_280)] p-2.5 text-center">
-            <p className="text-[8px] uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-1">K Prop</p>
-            <p className={cn('text-sm font-black tabular-nums', kImpact > 0 ? 'text-emerald-400' : kImpact < 0 ? 'text-red-400' : 'text-[oklch(0.80_0.005_85)]')}>
+          <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5 text-center">
+            <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">K Prop</p>
+            <p className={cn('text-sm font-black tabular-nums', kImpact > 0 ? 'text-emerald-400' : kImpact < 0 ? 'text-red-400' : 'text-foreground/80')}>
               {fmtPct(kImpact)}
             </p>
           </div>
-          <div className="bg-[oklch(0.09_0.01_280)] rounded-lg border border-[oklch(0.18_0.015_280)] p-2.5 text-center">
-            <p className="text-[8px] uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-1">BB Prop</p>
-            <p className={cn('text-sm font-black tabular-nums', bbImpact < 0 ? 'text-emerald-400' : bbImpact > 0 ? 'text-amber-400' : 'text-[oklch(0.80_0.005_85)]')}>
+          <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5 text-center">
+            <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">BB Prop</p>
+            <p className={cn('text-sm font-black tabular-nums', bbImpact < 0 ? 'text-emerald-400' : bbImpact > 0 ? 'text-amber-400' : 'text-foreground/80')}>
               {fmtPct(bbImpact)}
             </p>
           </div>
-          <div className="bg-[oklch(0.09_0.01_280)] rounded-lg border border-[oklch(0.18_0.015_280)] p-2.5 text-center">
-            <p className="text-[8px] uppercase tracking-widest text-[oklch(0.40_0.01_280)] mb-1">ERA Δ</p>
-            <p className={cn('text-sm font-black tabular-nums', eraImpact < 0 ? 'text-emerald-400' : eraImpact > 0 ? 'text-red-400' : 'text-[oklch(0.80_0.005_85)]')}>
+          <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5 text-center">
+            <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">ERA Δ</p>
+            <p className={cn('text-sm font-black tabular-nums', eraImpact < 0 ? 'text-emerald-400' : eraImpact > 0 ? 'text-red-400' : 'text-foreground/80')}>
               {eraImpact >= 0 ? '+' : ''}{eraImpact.toFixed(2)}
             </p>
           </div>
         </div>
 
         {data.signal && (
-          <p className="text-[11px] text-[oklch(0.60_0.01_280)] leading-relaxed">{data.signal}</p>
+          <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{data.signal}</p>
         )}
 
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[oklch(0.20_0.015_280)] text-xs font-semibold text-[oklch(0.50_0.01_280)] hover:text-teal-400 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-teal-400 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
           >
             Full Framing Analysis
             <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />

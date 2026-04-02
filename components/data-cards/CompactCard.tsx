@@ -97,7 +97,7 @@ function MiniTeamLogo({ name, sport }: { name: string; sport?: string }) {
     );
   }
   return (
-    <div className="w-5 h-5 rounded-md bg-[oklch(0.14_0.06_240)] flex items-center justify-center shrink-0 text-[7px] font-black text-[oklch(0.55_0.12_240)]">
+    <div className="w-5 h-5 rounded-md bg-[var(--bg-elevated)] flex items-center justify-center shrink-0 text-[7px] font-black text-[var(--text-muted)]">
       {abbr}
     </div>
   );
@@ -106,7 +106,7 @@ function MiniTeamLogo({ name, sport }: { name: string; sport?: string }) {
 /** Mini probability bar for Kalshi subcards */
 function MiniProbBar({ yesPct }: { yesPct: number }) {
   return (
-    <div className="h-1 rounded-full overflow-hidden bg-[oklch(0.14_0.05_240)] mt-1">
+    <div className="h-1 rounded-full overflow-hidden bg-[var(--bg-elevated)] mt-1">
       <div
         className="h-full rounded-full"
         style={{
@@ -141,15 +141,15 @@ export const CompactCard = memo(function CompactCard({ card, index, isActive, on
       onClick={onClick}
       className={cn(
         'group relative flex flex-col gap-2 p-3 rounded-xl border text-left transition-all duration-200 w-full hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50',
-        'bg-[oklch(0.09_0.03_240)] hover:bg-[oklch(0.13_0.04_240)]',
+        'bg-[var(--bg-overlay)] hover:bg-[var(--bg-surface)]',
         isActive
           ? 'border-blue-500/50 shadow-[0_0_16px_oklch(0.55_0.2_240/0.25)]'
-          : 'border-[oklch(0.20_0.06_240)] hover:border-blue-500/40 hover:shadow-[0_2px_20px_oklch(0.55_0.2_240/0.18)]',
+          : 'border-[var(--border-subtle)] hover:border-blue-500/40 hover:shadow-[0_2px_20px_oklch(0.55_0.2_240/0.18)]',
       )}
       aria-pressed={isActive}
       title={card.title}
     >
-      {/* Active indicator — Kalshi teal left bar */}
+      {/* Active indicator — left bar */}
       {isActive && (
         <div className="absolute left-0 top-2.5 bottom-2.5 w-[2px] rounded-full bg-blue-400" />
       )}
@@ -160,13 +160,13 @@ export const CompactCard = memo(function CompactCard({ card, index, isActive, on
           /* Dual team logos */
           <div className="flex items-center gap-1 shrink-0">
             <MiniTeamLogo name={teams.away} sport={sport} />
-            <span className="text-[8px] font-bold text-[oklch(0.30_0.01_280)]">@</span>
+            <span className="text-[8px] font-bold text-[var(--text-faint)]">@</span>
             <MiniTeamLogo name={teams.home} sport={sport} />
           </div>
         ) : (
           <div className={cn(
             'flex items-center justify-center w-6 h-6 rounded-md shrink-0',
-            isKalshi ? 'bg-[#00c47c15] border border-[#00c47c25]' : 'bg-[oklch(0.14_0.06_240)] border border-[oklch(0.24_0.08_240)]',
+            isKalshi ? 'bg-[#00c47c15] border border-[#00c47c25]' : 'bg-[var(--bg-elevated)] border border-[var(--border-subtle)]',
           )}>
             <Icon
               className="w-3 h-3"
@@ -184,7 +184,7 @@ export const CompactCard = memo(function CompactCard({ card, index, isActive, on
             >
               {keyStat.value}
             </span>
-            <span className="text-[9px] font-bold uppercase tracking-widest mt-0.5" style={{ color: keyStat.color ? `${keyStat.color}80` : 'oklch(0.40 0.01 280)' }}>
+            <span className="text-[9px] font-bold uppercase tracking-widest mt-0.5" style={{ color: keyStat.color ? `${keyStat.color}80` : 'var(--text-faint)' }}>
               {keyStat.label}
             </span>
           </div>
@@ -192,7 +192,7 @@ export const CompactCard = memo(function CompactCard({ card, index, isActive, on
       </div>
 
       {/* Title */}
-      <p className="text-[11px] font-semibold text-[oklch(0.82_0.008_240)] leading-tight line-clamp-2 text-balance">
+      <p className="text-[11px] font-semibold text-foreground/80 leading-tight line-clamp-2 text-balance">
         {card.title}
       </p>
 
@@ -200,7 +200,7 @@ export const CompactCard = memo(function CompactCard({ card, index, isActive, on
       {yesPct !== null && <MiniProbBar yesPct={yesPct} />}
 
       {/* Category label */}
-      <span className="text-[9px] font-bold uppercase tracking-wider text-[oklch(0.45_0.08_240)] truncate">
+      <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-faint)] truncate">
         {displayCategory}
       </span>
     </button>

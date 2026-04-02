@@ -43,8 +43,8 @@ function ErrorState({ error, className }: { error: string; className?: string })
 
 function LoadingState({ className }: { className?: string }) {
   return (
-    <div className={cn('relative rounded-2xl p-6 border bg-[oklch(0.13_0.015_280)] border-[oklch(0.22_0.02_280)]', className)} role="status" aria-live="polite">
-      <div className="flex items-center justify-center gap-3 text-[oklch(0.50_0.01_280)]">
+    <div className={cn('relative rounded-2xl p-6 border bg-background border-[var(--border-subtle)]', className)} role="status" aria-live="polite">
+      <div className="flex items-center justify-center gap-3 text-[var(--text-muted)]">
         <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
         <span className="text-sm font-medium">Loading data...</span>
       </div>
@@ -77,8 +77,8 @@ export const BaseCard = memo(function BaseCard({
 
   return (
     <article className={cn(
-      'group relative w-full rounded-2xl overflow-hidden bg-[oklch(0.13_0.015_280)] border border-[oklch(0.22_0.02_280)] hover:border-[oklch(0.30_0.02_280)] hover:shadow-[0_0_40px_oklch(0.4_0.12_240/0.12)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 transition-all duration-200 animate-fade-in-up',
-      isHero && 'border-[oklch(0.26_0.025_260)] shadow-[0_0_24px_oklch(0.3_0.08_260/0.15)]',
+      'group relative w-full rounded-2xl overflow-hidden bg-background border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_40px_oklch(0.4_0.12_240/0.12)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 transition-all duration-200 animate-fade-in-up',
+      isHero && 'border-[var(--border-hover)] shadow-[0_0_24px_oklch(0.3_0.08_260/0.15)]',
       className,
     )}>
       <div className={cn('absolute left-0 top-0 bottom-0 bg-gradient-to-b', isHero ? 'w-[3px]' : 'w-1', gradient)} aria-hidden="true" />
@@ -92,11 +92,11 @@ export const BaseCard = memo(function BaseCard({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-[oklch(0.55_0.01_280)]">{category}</span>
-                <span className="text-[oklch(0.3_0.01_280)]" aria-hidden="true">/</span>
-                <span className="text-[11px] font-medium text-[oklch(0.45_0.01_280)] truncate">{subcategory}</span>
+                <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{category}</span>
+                <span className="text-[var(--text-faint)]" aria-hidden="true">/</span>
+                <span className="text-[11px] font-medium text-[var(--text-faint)] truncate">{subcategory}</span>
               </div>
-              <h3 className={cn('font-bold text-[oklch(0.95_0.005_85)] leading-tight mt-1 text-balance', isHero ? 'text-lg' : 'text-base')}>{title}</h3>
+              <h3 className={cn('font-bold text-foreground leading-tight mt-1 text-balance', isHero ? 'text-lg' : 'text-base')}>{title}</h3>
             </div>
           </div>
 
@@ -113,7 +113,7 @@ export const BaseCard = memo(function BaseCard({
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-2 w-full pt-3 border-t border-[oklch(0.20_0.015_280)] text-xs font-semibold text-[oklch(0.50_0.01_280)] hover:text-[oklch(0.85_0.005_85)] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-2 w-full pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
             aria-label={`View full analysis for ${title}`}
           >
             View Full Analysis

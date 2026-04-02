@@ -1,7 +1,19 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Star } from 'lucide-react';
+import { Bookmark } from 'lucide-react';
+
+// ── Saved-card entry (shared with WatchlistLightbox) ──────────────────────────
+export interface SavedCardEntry {
+  id: string;       // `${type}:${title}` for dedup
+  savedAt: string;  // ISO timestamp
+  card: {
+    type: string; title: string; category: string; subcategory: string;
+    gradient: string; status: string; data: Record<string, any>;
+  };
+}
+
+const SAVED_CARDS_KEY = 'leverage_saved_cards';
 
 // Standalone typed card components (used for direct API data, not AI-generated CardData)
 import { OddsCard } from '@/components/cards/OddsCard';
@@ -137,16 +149,27 @@ export function DynamicCardRenderer({
 
   // Per-card bookmark state (persisted to localStorage)
   const bookmarkKey = `bookmark:${safeCard.type}:${safeCard.title}`;
+  const cardId = `${safeCard.type}:${safeCard.title}`;
   const [isBookmarked, setIsBookmarked] = useState(() => {
     try { return !!localStorage.getItem(bookmarkKey); } catch { return false; }
   });
   const toggleBookmark = useCallback(() => {
     setIsBookmarked(prev => {
       const next = !prev;
-      try { next ? localStorage.setItem(bookmarkKey, '1') : localStorage.removeItem(bookmarkKey); } catch {}
+      try {
+        // Flag key for fast init check
+        next ? localStorage.setItem(bookmarkKey, '1') : localStorage.removeItem(bookmarkKey);
+        // Full card data in saved_cards array
+        const existing: SavedCardEntry[] = JSON.parse(localStorage.getItem(SAVED_CARDS_KEY) ?? '[]');
+        const updated = next
+          ? [{ id: cardId, savedAt: new Date().toISOString(), card: { type: safeCard.type, title: safeCard.title, category: safeCard.category, subcategory: safeCard.subcategory, gradient: safeCard.gradient, status: safeCard.status, data: safeCard.data } }, ...existing.filter(e => e.id !== cardId)]
+          : existing.filter(e => e.id !== cardId);
+        localStorage.setItem(SAVED_CARDS_KEY, JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('saved-cards-update', { detail: { count: updated.length } }));
+      } catch {}
       return next;
     });
-  }, [bookmarkKey]);
+  }, [bookmarkKey, cardId, safeCard]);
 
   // Wraps any card element with ESTIMATED badge, trust score chip, and bookmark button.
   // Pass skipBookmark=true for card types that have their own save/watch mechanism.
@@ -158,25 +181,25 @@ export function DynamicCardRenderer({
         {!skipBookmark && (
           <button
             onClick={toggleBookmark}
-            className="absolute top-2 right-2 z-10 p-1 rounded-md opacity-0 group-hover/card:opacity-100 transition-opacity duration-150 hover:bg-white/10"
+            className={`absolute top-2 right-2 z-10 p-1 rounded-md transition-all duration-150 hover:bg-[var(--bg-elevated)] ${isBookmarked ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100'}`}
             aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark card'}
           >
-            <Star className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-amber-400 text-amber-400' : 'text-white/30'}`} />
+            <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-blue-500 text-blue-500' : 'text-[var(--text-faint)]'}`} />
           </button>
         )}
         {isEstimated && (
-          <span className="absolute top-2 right-10 z-10 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-gray-900/80 text-gray-400 border border-gray-700/50 backdrop-blur-sm pointer-events-none">
+          <span className="absolute top-2 right-10 z-10 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-[var(--bg-surface)] text-[var(--text-faint)] border border-[var(--border-subtle)] backdrop-blur-sm pointer-events-none">
             ESTIMATED
           </span>
         )}
         {hasTrustOverlay && (
-          <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-sm border border-white/10 pointer-events-none">
+          <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--bg-overlay)]/80 backdrop-blur-sm border border-[var(--border-subtle)] pointer-events-none">
             <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
               trustLevel === 'high' ? 'bg-emerald-400' :
               trustLevel === 'medium' ? 'bg-yellow-400' :
               'bg-red-400'
             }`} />
-            <span className="text-[8px] font-bold text-white/60">{trustScore}%</span>
+            <span className="text-[8px] font-bold text-[var(--text-faint)]">{trustScore}%</span>
           </div>
         )}
       </div>

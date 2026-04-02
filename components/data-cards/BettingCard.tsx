@@ -1,10 +1,10 @@
 'use client';
 
-import { memo, useState } from 'react';
+import { memo, useState, useCallback } from 'react';
 import {
   Clock, TrendingUp, TrendingDown, Minus,
   ChevronRight, Zap, Shield, AlertTriangle, Wind, BookOpen,
-  Users, Eye,
+  Users, Eye, Bookmark,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PlayerAvatar } from './PlayerAvatar';
@@ -771,6 +771,71 @@ function TabHistory({ data }: { data: BettingCardData }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// InjuryRow — single injury row with bookmark toggle
+// ─────────────────────────────────────────────────────────────────────────────
+function InjuryRow({ inj, statusCls }: { inj: any; statusCls: (s: string) => string }) {
+  const key = `bookmark:player:${(inj.player ?? '').toLowerCase().replace(/\s+/g, '_')}`;
+  const [saved, setSaved] = useState(() => {
+    try { return !!localStorage.getItem(key); } catch { return false; }
+  });
+
+  const toggle = useCallback(() => {
+    setSaved(prev => {
+      const next = !prev;
+      try {
+        const WATCHLIST_KEY = 'leverage_watchlist';
+        if (next) {
+          localStorage.setItem(key, '1');
+          const list = JSON.parse(localStorage.getItem(WATCHLIST_KEY) ?? '[]');
+          if (!list.find((e: any) => e.name === inj.player)) {
+            list.unshift({ name: inj.player, position: inj.position ?? '', team: inj.team ?? '', addedAt: new Date().toISOString() });
+            localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list));
+          }
+          window.dispatchEvent(new CustomEvent('watchlist-update', { detail: { count: JSON.parse(localStorage.getItem(WATCHLIST_KEY) ?? '[]').length } }));
+        } else {
+          localStorage.removeItem(key);
+          const list = JSON.parse(localStorage.getItem(WATCHLIST_KEY) ?? '[]').filter((e: any) => e.name !== inj.player);
+          localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list));
+          window.dispatchEvent(new CustomEvent('watchlist-update', { detail: { count: list.length } }));
+        }
+      } catch {}
+      return next;
+    });
+  }, [key, inj.player, inj.position, inj.team]);
+
+  return (
+    <div className="px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-black text-foreground truncate">{inj.player}</p>
+          <p className="text-[9px] text-[var(--text-muted)]">{inj.team}</p>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className={cn('px-2 py-0.5 rounded-full text-[8px] font-black border', statusCls(inj.status))}>
+            {inj.status?.toUpperCase()}
+          </span>
+          <button
+            onClick={toggle}
+            title={saved ? 'Remove from bookmarks' : 'Bookmark player'}
+            className={cn(
+              'p-1.5 rounded-lg transition-all',
+              saved
+                ? 'text-blue-500 bg-blue-500/10 border border-blue-500/20'
+                : 'text-[var(--text-faint)] hover:text-blue-400 hover:bg-blue-500/10',
+            )}
+          >
+            <Bookmark className="w-3.5 h-3.5" fill={saved ? 'currentColor' : 'none'} />
+          </button>
+        </div>
+      </div>
+      {inj.impact && (
+        <p className="text-[9px] text-[var(--text-muted)] mt-1.5 leading-relaxed">{inj.impact}</p>
+      )}
+    </div>
+  );
+}
+
 // TabInjuries — injury reports (Tab 5)
 // ─────────────────────────────────────────────────────────────────────────────
 function TabInjuries({ data }: { data: BettingCardData }) {
@@ -788,20 +853,7 @@ function TabInjuries({ data }: { data: BettingCardData }) {
     return (
       <div className="space-y-1.5">
         {injuries.map((inj: any, i: number) => (
-          <div key={i} className="px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-[11px] font-black text-foreground truncate">{inj.player}</p>
-                <p className="text-[9px] text-[var(--text-muted)]">{inj.team}</p>
-              </div>
-              <span className={cn('px-2 py-0.5 rounded-full text-[8px] font-black border shrink-0', statusCls(inj.status))}>
-                {inj.status?.toUpperCase()}
-              </span>
-            </div>
-            {inj.impact && (
-              <p className="text-[9px] text-[var(--text-muted)] mt-1.5 leading-relaxed">{inj.impact}</p>
-            )}
-          </div>
+          <InjuryRow key={i} inj={inj} statusCls={statusCls} />
         ))}
       </div>
     );
@@ -825,6 +877,62 @@ function TabInjuries({ data }: { data: BettingCardData }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// WatchPlayerRow — single player row with bookmark toggle
+// ─────────────────────────────────────────────────────────────────────────────
+function WatchPlayerRow({ p, sport }: { p: any; sport?: string }) {
+  const key = `bookmark:player:${(p.player ?? '').toLowerCase().replace(/\s+/g, '_')}`;
+  const [saved, setSaved] = useState(() => {
+    try { return !!localStorage.getItem(key); } catch { return false; }
+  });
+
+  const toggle = useCallback(() => {
+    setSaved(prev => {
+      const next = !prev;
+      try {
+        const WATCHLIST_KEY = 'leverage_watchlist';
+        if (next) {
+          localStorage.setItem(key, '1');
+          const list = JSON.parse(localStorage.getItem(WATCHLIST_KEY) ?? '[]');
+          if (!list.find((e: any) => e.name === p.player)) {
+            list.unshift({ name: p.player, position: p.position ?? '', team: p.team ?? '', addedAt: new Date().toISOString() });
+            localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list));
+          }
+          window.dispatchEvent(new CustomEvent('watchlist-update', { detail: { count: JSON.parse(localStorage.getItem(WATCHLIST_KEY) ?? '[]').length } }));
+        } else {
+          localStorage.removeItem(key);
+          const list = JSON.parse(localStorage.getItem(WATCHLIST_KEY) ?? '[]').filter((e: any) => e.name !== p.player);
+          localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list));
+          window.dispatchEvent(new CustomEvent('watchlist-update', { detail: { count: list.length } }));
+        }
+      } catch {}
+      return next;
+    });
+  }, [key, p.player, p.position, p.team]);
+
+  return (
+    <div className="flex items-start gap-3 px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
+      <PlayerAvatar playerName={p.player} photoUrl={p.photoUrl} sport={sport} size="md" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-black text-foreground truncate">{p.player}</p>
+        <p className="text-[9px] text-[var(--text-muted)] mb-1">{p.team}</p>
+        <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">{p.reason}</p>
+      </div>
+      <button
+        onClick={toggle}
+        title={saved ? 'Remove from bookmarks' : 'Bookmark player'}
+        className={cn(
+          'flex-shrink-0 p-1.5 rounded-lg transition-all',
+          saved
+            ? 'text-blue-500 bg-blue-500/10 border border-blue-500/20'
+            : 'text-[var(--text-faint)] hover:text-blue-400 hover:bg-blue-500/10',
+        )}
+      >
+        <Bookmark className="w-3.5 h-3.5" fill={saved ? 'currentColor' : 'none'} />
+      </button>
+    </div>
+  );
+}
+
 // TabWatch — players to watch (Tab 6)
 // ─────────────────────────────────────────────────────────────────────────────
 function TabWatch({ data, onAnalyze }: { data: BettingCardData; onAnalyze?: () => void }) {
@@ -850,14 +958,7 @@ function TabWatch({ data, onAnalyze }: { data: BettingCardData; onAnalyze?: () =
   return (
     <div className="space-y-2">
       {players.map((p: any, i: number) => (
-        <div key={i} className="flex items-start gap-3 px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
-          <PlayerAvatar playerName={p.player} photoUrl={p.photoUrl} sport={data.sport} size="md" />
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-black text-foreground truncate">{p.player}</p>
-            <p className="text-[9px] text-[var(--text-muted)] mb-1">{p.team}</p>
-            <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">{p.reason}</p>
-          </div>
-        </div>
+        <WatchPlayerRow key={i} p={p} sport={data.sport} />
       ))}
     </div>
   );

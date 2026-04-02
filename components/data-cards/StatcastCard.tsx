@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, memo } from 'react';
-import { TrendingUp, Activity, BarChart3, Heart, Zap, Wind } from 'lucide-react';
+import { TrendingUp, Activity, BarChart3, Bookmark, Zap, Wind } from 'lucide-react';
 import { AnalysisLightbox, type LightboxSection } from './AnalysisLightbox';
 import { getPlayerHeadshotUrl } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -514,15 +514,15 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
             {isPitcherCard && (
               <button
                 onClick={toggleWatch}
-                title={watched ? 'Remove from watchlist' : 'Add to watchlist'}
+                title={watched ? 'Remove bookmark' : 'Bookmark player'}
                 className={cn(
                   'w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150',
                   watched
-                    ? 'text-rose-400 bg-rose-500/20 border border-rose-500/30'
-                    : 'text-[var(--text-faint)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:text-rose-400 hover:bg-rose-500/10',
+                    ? 'text-blue-500 bg-blue-500/20 border border-blue-500/30'
+                    : 'text-[var(--text-faint)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:text-blue-500 hover:bg-blue-500/10',
                 )}
               >
-                <Heart className="w-3.5 h-3.5" fill={watched ? 'currentColor' : 'none'} />
+                <Bookmark className="w-3.5 h-3.5" fill={watched ? 'currentColor' : 'none'} />
               </button>
             )}
             {/* Status badge */}

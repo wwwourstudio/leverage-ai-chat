@@ -76,14 +76,14 @@ function formatPct(val: number, decimals = 1): string {
 function edgeColor(edge: number): string {
   if (edge > 0.05) return 'text-emerald-400';
   if (edge > 0.02) return 'text-yellow-400';
-  if (edge > 0) return 'text-gray-300';
+  if (edge > 0) return 'text-foreground/80';
   return 'text-red-400';
 }
 
 function roiColor(roi: number): string {
   if (roi > 10) return 'text-emerald-400';
   if (roi > 0) return 'text-yellow-400';
-  if (roi > -5) return 'text-gray-300';
+  if (roi > -5) return 'text-foreground/80';
   return 'text-red-400';
 }
 
@@ -455,7 +455,7 @@ function QuantSummary({ analysis, bankroll }: { analysis: QuantAnalysis; bankrol
         <StatBox
           label="P5 → P95"
           value={`${formatPct(monteCarlo.p5ROI)} / ${formatPct(monteCarlo.p95ROI)}`}
-          valueCls="text-gray-300"
+          valueCls="text-foreground/80"
         />
         <StatBox
           label="Ruin Risk"

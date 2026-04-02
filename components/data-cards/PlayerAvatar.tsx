@@ -17,7 +17,7 @@ interface PlayerAvatarProps {
 
 /** Sport-specific color for the initials fallback avatar */
 function sportAvatarColor(sport?: string): string {
-  if (!sport) return 'bg-slate-700 text-slate-300';
+  if (!sport) return 'bg-[var(--bg-surface)] text-foreground/80';
   const s = sport.toLowerCase();
   if (s.includes('basketball') || s === 'nba') return 'bg-orange-500/20 text-orange-300 border-orange-500/30';
   if (s.includes('football') || s === 'nfl') return 'bg-green-500/20 text-green-300 border-green-500/30';

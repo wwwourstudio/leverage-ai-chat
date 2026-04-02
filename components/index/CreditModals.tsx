@@ -40,12 +40,12 @@ export function CreditModals({
           onClick={onClosePurchase}
         >
           <div
-            className="relative w-full md:max-w-md max-h-[90vh] md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl animate-slide-up md:animate-scale-in"
+            className="relative w-full md:max-w-md max-h-[90vh] md:mx-4 bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl animate-slide-up md:animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={onClosePurchase}
-              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-faint)] hover:text-foreground/80"
             >
               <X className="w-5 h-5" />
             </button>
@@ -56,21 +56,21 @@ export function CreditModals({
                   <AlertCircle className="w-6 h-6 text-orange-400" />
                 </div>
                 <h2 className="text-2xl font-bold text-white mb-2">Out of Credits</h2>
-                <p className="text-sm text-gray-400">Purchase more credits to continue using AI analysis</p>
+                <p className="text-sm text-[var(--text-muted)]">Purchase more credits to continue using AI analysis</p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-400 mb-2">Amount (min $10)</label>
+                  <label className="block text-sm font-semibold text-[var(--text-muted)] mb-2">Amount (min $10)</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-faint)] font-bold">$</span>
                     <input
                       type="number"
                       min="10"
                       value={purchaseAmount}
                       onChange={(e) => setPurchaseAmount(e.target.value)}
                       placeholder="10"
-                      className="w-full pl-8 pr-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                      className="w-full pl-8 pr-4 py-3 bg-background border border-[var(--border-subtle)] rounded-xl text-white placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                     />
                   </div>
                 </div>
@@ -80,7 +80,7 @@ export function CreditModals({
                     <button
                       key={amount}
                       onClick={() => setPurchaseAmount(amount.toString())}
-                      className="flex-1 min-w-[80px] px-4 py-2.5 rounded-xl border border-gray-800 bg-gray-950 hover:bg-gray-800 hover:border-gray-700 text-white font-semibold text-sm transition-all"
+                      className="flex-1 min-w-[80px] px-4 py-2.5 rounded-xl border border-[var(--border-subtle)] bg-background hover:bg-[var(--bg-elevated)] hover:border-[var(--border-subtle)] text-white font-semibold text-sm transition-all"
                     >
                       ${amount}
                     </button>
@@ -94,7 +94,7 @@ export function CreditModals({
                   Purchase Credits
                 </button>
 
-                <div className="flex items-center justify-between pt-4 border-t border-gray-800">
+                <div className="flex items-center justify-between pt-4 border-t border-[var(--border-subtle)]">
                   <button
                     onClick={() => { onClosePurchase(); onStripeCheckout(); }}
                     className="text-sm text-blue-400 hover:text-blue-300 font-semibold transition-colors"
@@ -103,7 +103,7 @@ export function CreditModals({
                   </button>
                   <button
                     onClick={() => { onClosePurchase(); onLogin(); }}
-                    className="text-sm text-gray-400 hover:text-gray-300 font-semibold transition-colors"
+                    className="text-sm text-[var(--text-muted)] hover:text-foreground/80 font-semibold transition-colors"
                   >
                     Login
                   </button>
@@ -121,12 +121,12 @@ export function CreditModals({
           onClick={onCloseSubscription}
         >
           <div
-            className="relative w-full md:max-w-md max-h-[90vh] md:mx-4 bg-gray-900 border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl animate-slide-up md:animate-scale-in"
+            className="relative w-full md:max-w-md max-h-[90vh] md:mx-4 bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-t-2xl md:rounded-2xl shadow-2xl animate-slide-up md:animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={onCloseSubscription}
-              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-faint)] hover:text-foreground/80"
             >
               <X className="w-5 h-5" />
             </button>
@@ -137,15 +137,15 @@ export function CreditModals({
                   <Sparkles className="w-6 h-6 text-purple-400" />
                 </div>
                 <h2 className="text-2xl font-bold text-white mb-2">Monthly Subscription</h2>
-                <p className="text-sm text-gray-400">Get 20 credits every month for continuous access</p>
+                <p className="text-sm text-[var(--text-muted)]">Get 20 credits every month for continuous access</p>
               </div>
 
               <div className="bg-gradient-to-br from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-xl p-6 mb-6">
                 <div className="flex items-baseline justify-center mb-4">
                   <span className="text-4xl font-black text-white">$20</span>
-                  <span className="text-gray-400 ml-2">/month</span>
+                  <span className="text-[var(--text-muted)] ml-2">/month</span>
                 </div>
-                <div className="space-y-2 text-sm text-gray-300">
+                <div className="space-y-2 text-sm text-foreground/80">
                   {['20 credits per month', 'Auto-renews on the 1st', 'Cancel anytime', 'Priority support'].map((feature) => (
                     <div key={feature} className="flex items-center gap-2">
                       <CheckCircle className="w-4 h-4 text-green-400" />
@@ -164,7 +164,7 @@ export function CreditModals({
 
               <button
                 onClick={() => { onCloseSubscription(); onStripeSubscription(); }}
-                className="w-full py-3 text-sm text-gray-400 hover:text-gray-300 font-semibold transition-colors"
+                className="w-full py-3 text-sm text-[var(--text-muted)] hover:text-foreground/80 font-semibold transition-colors"
               >
                 One-time purchase instead
               </button>

@@ -55,7 +55,7 @@ function fmtNum(v: number | undefined, digits = 2): string {
 /** Circular gauge ring for the VPE score — mirrors MLBProjectionCard's BreakoutRing */
 function VPEGauge({ score }: { score: number }) {
   const normalized = Math.min(100, Math.max(0, score));
-  const color = normalized >= 70 ? 'text-emerald-400' : normalized >= 40 ? 'text-blue-400' : 'text-gray-500';
+  const color = normalized >= 70 ? 'text-emerald-400' : normalized >= 40 ? 'text-blue-400' : 'text-[var(--text-faint)]';
   const stroke = normalized >= 70 ? '#34d399' : normalized >= 40 ? '#60a5fa' : '#6b7280';
   const circumference = 2 * Math.PI * 20;
   const dashOffset = circumference * (1 - normalized / 100);

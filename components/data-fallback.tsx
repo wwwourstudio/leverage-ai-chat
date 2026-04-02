@@ -59,14 +59,14 @@ export function DataFallback({ error, retry, type = 'unavailable' }: DataFallbac
         </div>
         <div className="flex-1">
           <h4 className={cls.title}>{title}</h4>
-          <p className="text-sm text-gray-300 mb-3">{message}</p>
+          <p className="text-sm text-foreground/80 mb-3">{message}</p>
 
           {error && (
             <details className="mb-3">
-              <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-400">
+              <summary className="text-xs text-[var(--text-faint)] cursor-pointer hover:text-[var(--text-muted)]">
                 Error details
               </summary>
-              <pre className="mt-2 text-xs bg-black/30 p-2 rounded overflow-auto max-h-24 text-gray-400">
+              <pre className="mt-2 text-xs bg-black/30 p-2 rounded overflow-auto max-h-24 text-[var(--text-muted)]">
                 {error}
               </pre>
             </details>
@@ -79,7 +79,7 @@ export function DataFallback({ error, retry, type = 'unavailable' }: DataFallbac
             </button>
           )}
 
-          <p className="text-xs text-gray-500 mt-3">
+          <p className="text-xs text-[var(--text-faint)] mt-3">
             Using cached or default data while we resolve this issue.
           </p>
         </div>

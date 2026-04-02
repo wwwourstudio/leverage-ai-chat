@@ -106,13 +106,13 @@ export function PlayerCard({
       {/* Name + rank info */}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold text-white leading-tight">{player.playerName}</p>
-        <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mt-0.5 flex-wrap">
+        <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-faint)] mt-0.5 flex-wrap">
           <span>#{player.positionRank} {player.position}</span>
-          <span className="text-gray-700">·</span>
+          <span className="text-[var(--text-faint)]">·</span>
           <span>#{player.overallRank} OVR</span>
           {player.adp > 0 && (
             <>
-              <span className="text-gray-700">·</span>
+              <span className="text-[var(--text-faint)]">·</span>
               <span>ADP {player.adp.toFixed(1)}</span>
             </>
           )}
@@ -141,12 +141,12 @@ export function PlayerCard({
         <span className={cn('text-sm font-black tabular-nums', accent.textCls)}>
           {player.vbd.toFixed(1)}
         </span>
-        <span className="text-[9px] font-bold uppercase text-gray-600 tracking-wide">VBD</span>
+        <span className="text-[9px] font-bold uppercase text-[var(--text-faint)] tracking-wide">VBD</span>
       </div>
 
       {/* Tier badge */}
       {player.tier != null && (
-        <div className="rounded-full bg-white/10 border border-white/10 px-2 py-0.5 text-[10px] font-bold text-gray-400 shrink-0">
+        <div className="rounded-full bg-white/10 border border-white/10 px-2 py-0.5 text-[10px] font-bold text-[var(--text-muted)] shrink-0">
           T{player.tier}
         </div>
       )}

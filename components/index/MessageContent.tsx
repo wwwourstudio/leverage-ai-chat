@@ -24,7 +24,7 @@ export function MessageContent({ content }: Props) {
                         if (partIdx % 2 === 1) {
                           return <span key={partIdx} className="font-black text-white">{part}</span>;
                         } else if (part.trim()) {
-                          return <span key={partIdx} className="text-gray-300">{part}</span>;
+                          return <span key={partIdx} className="text-foreground/80">{part}</span>;
                         }
                         return null;
                       })}

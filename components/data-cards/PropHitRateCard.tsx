@@ -152,7 +152,7 @@ export const PropHitRateCard = memo(function PropHitRateCard({
   const isWeak   = hitRatePercentage <= 35;
   const accentGradient = isStrong ? 'from-emerald-600 to-green-700'
     : isWeak ? 'from-red-600 to-rose-700'
-    : 'from-slate-600 to-gray-700';
+    : 'from-[var(--bg-surface)] to-[var(--bg-elevated)]';
 
   const TrendIcon = trend === 'improving' ? TrendingUp
     : trend === 'declining' ? TrendingDown

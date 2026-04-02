@@ -158,11 +158,11 @@ export function SuggestedPrompts({
                         setPendingWelcomeCategory(null);
                         onWelcomeAction(sub.query);
                       }}
-                      className="group/sub flex flex-col items-start gap-1 p-2 sm:p-2.5 rounded-xl bg-gradient-to-br from-gray-800/40 to-gray-900/20 border border-gray-700/30 hover:border-blue-500/40 hover:from-blue-900/20 hover:to-gray-900/20 transition-all hover:scale-[1.02] active:scale-[0.98] text-left"
+                      className="group/sub flex flex-col items-start gap-1 p-2 sm:p-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:border-blue-500/40 hover:bg-blue-900/20 transition-all hover:scale-[1.02] active:scale-[0.98] text-left"
                     >
                       <div className="flex items-center gap-1.5">
                         <SubIcon className="w-3.5 h-3.5 text-blue-400 group-hover/sub:text-blue-300" />
-                        <span className="text-[11px] sm:text-xs font-bold text-gray-300 group-hover/sub:text-white">{sub.label}</span>
+                        <span className="text-[11px] sm:text-xs font-bold text-foreground/80 group-hover/sub:text-white">{sub.label}</span>
                       </div>
                     </button>
                   );

@@ -49,11 +49,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               <h3 className="text-xl font-bold text-red-400">Something went wrong</h3>
             </div>
             
-            <p className="text-gray-300 mb-4">
+            <p className="text-foreground/80 mb-4">
               We encountered an unexpected error. This might be due to:
             </p>
             
-            <ul className="text-sm text-gray-400 space-y-2 mb-6 list-disc list-inside">
+            <ul className="text-sm text-[var(--text-muted)] space-y-2 mb-6 list-disc list-inside">
               <li>Network connectivity issues</li>
               <li>Data format problems from external sources</li>
               <li>Temporary service unavailability</li>
@@ -61,7 +61,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
             {this.state.error && (
               <details className="mb-6">
-                <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-400">
+                <summary className="text-sm text-[var(--text-faint)] cursor-pointer hover:text-[var(--text-muted)]">
                   Technical details
                 </summary>
                 <pre className="mt-2 text-xs bg-black/30 p-3 rounded overflow-auto max-h-32">

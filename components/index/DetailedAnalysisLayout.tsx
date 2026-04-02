@@ -205,12 +205,12 @@ export function DetailedAnalysisLayout({ data, isTyping, onFollowUp }: Props) {
 
         {/* Secondary Options */}
         <div className="mt-4 pt-4 border-t border-indigo-600/20">
-          <p className="text-xs text-gray-400 mb-3 font-semibold">Or choose a specific action:</p>
+          <p className="text-xs text-[var(--text-muted)] mb-3 font-semibold">Or choose a specific action:</p>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => onFollowUp('correlated', card)}
               disabled={isTyping}
-              className="flex items-center gap-2 px-3.5 py-2 bg-gray-800/50 hover:bg-gray-700/50 disabled:bg-gray-800/30 disabled:cursor-not-allowed border border-gray-700/50 hover:border-blue-500/50 text-gray-300 hover:text-white font-semibold text-xs rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+              className="flex items-center gap-2 px-3.5 py-2 bg-[var(--bg-elevated)] hover:bg-[var(--bg-surface)] disabled:bg-[var(--bg-elevated)] disabled:cursor-not-allowed border border-[var(--border-subtle)] hover:border-blue-500/50 text-foreground/80 hover:text-white font-semibold text-xs rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
             >
               <Sparkles className="w-3.5 h-3.5" />
               Correlated Plays
@@ -218,7 +218,7 @@ export function DetailedAnalysisLayout({ data, isTyping, onFollowUp }: Props) {
             <button
               onClick={() => onFollowUp('metrics', card)}
               disabled={isTyping}
-              className="flex items-center gap-2 px-3.5 py-2 bg-gray-800/50 hover:bg-gray-700/50 disabled:bg-gray-800/30 disabled:cursor-not-allowed border border-gray-700/50 hover:border-purple-500/50 text-gray-300 hover:text-white font-semibold text-xs rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+              className="flex items-center gap-2 px-3.5 py-2 bg-[var(--bg-elevated)] hover:bg-[var(--bg-surface)] disabled:bg-[var(--bg-elevated)] disabled:cursor-not-allowed border border-[var(--border-subtle)] hover:border-purple-500/50 text-foreground/80 hover:text-white font-semibold text-xs rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
             >
               <BarChart className="w-3.5 h-3.5" />
               Deep Metrics

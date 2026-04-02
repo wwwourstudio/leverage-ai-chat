@@ -52,7 +52,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
       <p className="text-sm text-gray-200 leading-snug">{toast.message}</p>
       <button
         onClick={() => onRemove(toast.id)}
-        className="ml-auto shrink-0 text-gray-600 hover:text-gray-300 transition-colors text-lg leading-none"
+        className="ml-auto shrink-0 text-[var(--text-faint)] hover:text-foreground/80 transition-colors text-lg leading-none"
         aria-label="Dismiss"
       >
         ×

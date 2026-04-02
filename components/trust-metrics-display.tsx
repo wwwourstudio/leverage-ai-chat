@@ -80,8 +80,8 @@ function getFlagMeta(type: string) {
 /** Mini visual showing the valid moneyline range vs an invalid zone */
 function OddsRangeChart({ badValues }: { badValues: number[] }) {
   return (
-    <div className="mt-2 rounded-md bg-gray-900/60 border border-gray-700/40 p-2.5">
-      <p className="text-[9px] font-semibold text-gray-400 mb-1.5 uppercase tracking-wide">How moneyline odds work</p>
+    <div className="mt-2 rounded-md bg-[var(--bg-overlay)] border border-[var(--border-subtle)] p-2.5">
+      <p className="text-[9px] font-semibold text-[var(--text-muted)] mb-1.5 uppercase tracking-wide">How moneyline odds work</p>
 
       {/* Range bar */}
       <div className="relative flex items-center gap-0.5 h-5 text-[8px]">
@@ -99,7 +99,7 @@ function OddsRangeChart({ badValues }: { badValues: number[] }) {
         </div>
       </div>
 
-      <div className="flex justify-between mt-1 text-[8px] text-gray-500">
+      <div className="flex justify-between mt-1 text-[8px] text-[var(--text-faint)]">
         <span className="text-blue-500">Heavy favorite</span>
         <span className="text-red-400 font-semibold">Invalid zone</span>
         <span className="text-blue-500">Heavy underdog</span>
@@ -116,8 +116,8 @@ function OddsRangeChart({ badValues }: { badValues: number[] }) {
         </div>
       )}
 
-      <p className="text-[8px] text-gray-500 mt-1.5">
-        Favorites are listed as negative (e.g. <span className="text-gray-300 font-mono">-150</span>), underdogs as positive (e.g. <span className="text-gray-300 font-mono">+130</span>). A value like <span className="text-red-400 font-mono">-49</span> has no meaning in this format.
+      <p className="text-[8px] text-[var(--text-faint)] mt-1.5">
+        Favorites are listed as negative (e.g. <span className="text-foreground/80 font-mono">-150</span>), underdogs as positive (e.g. <span className="text-foreground/80 font-mono">+130</span>). A value like <span className="text-red-400 font-mono">-49</span> has no meaning in this format.
       </p>
     </div>
   );
@@ -279,12 +279,12 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
           <Shield className="w-3.5 h-3.5" />
           <span className="font-semibold">{metrics.trustLevel.toUpperCase()} TRUST</span>
         </div>
-        <span className="text-gray-700">·</span>
-        <span className="tabular-nums text-gray-400">{metrics.finalConfidence}%</span>
+        <span className="text-[var(--text-faint)]">·</span>
+        <span className="tabular-nums text-[var(--text-muted)]">{metrics.finalConfidence}%</span>
         {metrics.adjustedTone && (
           <>
-            <span className="text-gray-700">·</span>
-            <span className="text-gray-500">{metrics.adjustedTone}</span>
+            <span className="text-[var(--text-faint)]">·</span>
+            <span className="text-[var(--text-faint)]">{metrics.adjustedTone}</span>
           </>
         )}
       </div>
@@ -295,11 +295,11 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
     <div className="space-y-3">
       {/* ── Headline row: confidence + risk ─────────────────── */}
       <div className="flex items-stretch gap-2">
-        <div className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-3.5 py-3">
+        <div className="flex-1 bg-background border border-[var(--border-subtle)] rounded-xl px-3.5 py-3">
           <div className="flex items-center justify-between mb-1.5">
             <div className="flex items-center gap-1.5">
               <Shield className={`w-3.5 h-3.5 ${scoreColor(metrics.finalConfidence)}`} />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Integrity Score</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Integrity Score</span>
             </div>
             <div className="flex items-baseline gap-1">
               <span className={`text-2xl font-black tabular-nums leading-none ${scoreColor(metrics.finalConfidence)}`}>
@@ -310,14 +310,14 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
               </span>
             </div>
           </div>
-          <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
+          <div className="h-1 bg-[var(--bg-elevated)] rounded-full overflow-hidden">
             <div
               className={`h-full ${barFill(metrics.finalConfidence)} transition-all duration-500`}
               style={{ width: `${metrics.finalConfidence}%` }}
             />
           </div>
           {metrics.adjustedTone && (
-            <p className="mt-1.5 text-[10px] text-gray-500 font-medium">{metrics.adjustedTone}</p>
+            <p className="mt-1.5 text-[10px] text-[var(--text-faint)] font-medium">{metrics.adjustedTone}</p>
           )}
         </div>
 
@@ -336,17 +336,17 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
               <div
                 key={key}
                 title={description}
-                className="bg-gray-950 border border-gray-800/70 rounded-xl px-3 py-2.5 hover:border-gray-700 transition-colors"
+                className="bg-background border border-[var(--border-subtle)] rounded-xl px-3 py-2.5 hover:border-[var(--border-subtle)] transition-colors"
               >
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <Icon className={`w-3 h-3 ${scoreColor(val)}`} />
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">{label}</span>
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-faint)]">{label}</span>
                 </div>
                 <div className="flex items-baseline gap-1 mb-1.5">
                   <span className={`text-lg font-black tabular-nums leading-none ${scoreColor(val)}`}>{val}%</span>
                   <span className={`text-[9px] font-semibold ${scoreColor(val)}`}>{scoreLabel(val)}</span>
                 </div>
-                <div className="h-[2px] bg-gray-800 rounded-full overflow-hidden">
+                <div className="h-[2px] bg-[var(--bg-elevated)] rounded-full overflow-hidden">
                   <div
                     className={`h-full ${barFill(val)} transition-all duration-500`}
                     style={{ width: `${val}%` }}
@@ -392,7 +392,7 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
           </span>
         )}
         {metrics.processingTime && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-800 border border-gray-700/50 text-[9px] text-gray-500 font-mono">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[9px] text-[var(--text-faint)] font-mono">
             <Zap className="w-2.5 h-2.5" /> {metrics.processingTime}ms
           </span>
         )}
@@ -409,9 +409,9 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
       )}
 
       {/* ── Attribution ──────────────────────────────────────── */}
-      <div className="flex items-center gap-1.5 pt-1 border-t border-gray-800/50">
-        <Shield className="w-2.5 h-2.5 text-gray-700" />
-        <span className="text-[9px] text-gray-700 font-medium">
+      <div className="flex items-center gap-1.5 pt-1 border-t border-[var(--border-subtle)]">
+        <Shield className="w-2.5 h-2.5 text-[var(--text-faint)]" />
+        <span className="text-[9px] text-[var(--text-faint)] font-medium">
           Validated by Grok 4 · Benford's Law · {metrics.hasLiveOdds ? 'Live odds data verified' : 'Knowledge-based analysis'}
         </span>
       </div>

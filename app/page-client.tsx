@@ -3132,7 +3132,7 @@ No preamble. Start directly with section 1.`;
     return (
       <div
         key={`card-${index}-${safeCard.type}`}
-        className="group relative bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/60 hover:border-gray-500/80 transition-all duration-500 shadow-2xl hover:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] hover:scale-[1.02] overflow-hidden"
+        className="group relative bg-gradient-to-br from-[var(--bg-overlay)] to-[var(--bg-overlay)] backdrop-blur-xl rounded-2xl p-6 border border-[var(--border-subtle)] hover:border-[var(--border-hover)] transition-all duration-500 shadow-2xl hover:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] hover:scale-[1.02] overflow-hidden"
       >
         {/* Animated gradient overlay */}
         <div className={`absolute inset-0 bg-gradient-to-br ${safeCard.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-700`}></div>
@@ -3148,9 +3148,9 @@ No preamble. Start directly with section 1.`;
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{safeCard.category}</span>
-                <span className="text-gray-600">•</span>
-                <span className="text-xs font-medium text-gray-500">{safeCard.subcategory}</span>
+                <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">{safeCard.category}</span>
+                <span className="text-[var(--text-faint)]">•</span>
+                <span className="text-xs font-medium text-[var(--text-faint)]">{safeCard.subcategory}</span>
               </div>
               <h3 className="text-base font-bold text-white leading-tight mb-1">{safeCard.title}</h3>
               <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${badge.bg} ${badge.border}`}>
@@ -3179,7 +3179,7 @@ No preamble. Start directly with section 1.`;
               const isHighValue = valueStr.includes('elite') || valueStr.includes('optimal');
               
               // Assign colors based on context
-              let valueColor = 'text-gray-300';
+              let valueColor = 'text-foreground/80';
               if (isUpTrend) valueColor = 'text-blue-400';
               else if (isDownTrend) valueColor = 'text-red-400';
               else if (isHighValue) valueColor = 'text-purple-400';
@@ -3187,8 +3187,8 @@ No preamble. Start directly with section 1.`;
               
               return (
                 <div key={i} className="group/item relative">
-                  <div className="flex items-center justify-between py-2.5 px-3.5 rounded-lg bg-gradient-to-r from-gray-800/40 to-gray-800/20 hover:from-gray-800/60 hover:to-gray-800/40 transition-all duration-200 border border-gray-700/30 hover:border-gray-600/50">
-                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest flex-shrink-0 mr-4">
+                  <div className="flex items-center justify-between py-2.5 px-3.5 rounded-lg bg-gradient-to-r from-[var(--bg-elevated)]/40 to-[var(--bg-elevated)]/20 hover:from-[var(--bg-elevated)]/60 hover:to-[var(--bg-elevated)]/40 transition-all duration-200 border border-[var(--border-subtle)] hover:border-[var(--border-hover)]/50">
+                    <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex-shrink-0 mr-4">
                       {formattedKey}
                     </span>
                     <span className={`text-sm font-extrabold text-right ${valueColor} group-hover/item:scale-105 transition-transform flex items-center gap-1.5`}>
@@ -3201,7 +3201,7 @@ No preamble. Start directly with section 1.`;
               );
             })
           ) : (
-            <div className="text-center py-6 text-gray-500 text-sm font-medium">
+            <div className="text-center py-6 text-[var(--text-faint)] text-sm font-medium">
               No data available
             </div>
           )}
@@ -3642,7 +3642,7 @@ No preamble. Start directly with section 1.`;
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-black via-gray-950 to-black">
+      <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-black via-background to-black">
         {/* Header */}
         <ChatHeader
           sidebarOpen={sidebarOpen}
@@ -3713,10 +3713,10 @@ No preamble. Start directly with section 1.`;
                       message.role === 'user'
                         ? 'rounded-2xl rounded-tr-sm px-5 py-3.5 bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-lg shadow-blue-500/25 w-fit max-w-[85%] ml-auto'
                         : message.isError
-                          ? 'rounded-2xl rounded-tl-sm px-5 py-4 bg-red-950/20 text-gray-100 border border-red-800/40 border-l-2 border-l-red-500/60 shadow-lg shadow-black/30'
+                          ? 'rounded-2xl rounded-tl-sm px-5 py-4 bg-red-950/20 text-foreground border border-red-800/40 border-l-2 border-l-red-500/60 shadow-lg shadow-black/30'
                           : message.isPartial
-                            ? 'rounded-2xl rounded-tl-sm px-5 py-4 bg-gradient-to-br from-gray-900 via-gray-800/50 to-gray-900 text-gray-100 border border-gray-700/40 border-l-2 border-l-amber-500/60 shadow-lg shadow-black/30'
-                            : 'rounded-2xl rounded-tl-sm px-5 py-4 bg-gradient-to-br from-gray-900 via-gray-800/50 to-gray-900 text-gray-100 border border-gray-700/40 shadow-lg shadow-black/30'
+                            ? 'rounded-2xl rounded-tl-sm px-5 py-4 bg-gradient-to-br from-[var(--bg-overlay)] via-[var(--bg-elevated)]/50 to-[var(--bg-overlay)] text-foreground border border-[var(--border-subtle)] border-l-2 border-l-amber-500/60 shadow-lg shadow-black/30'
+                            : 'rounded-2xl rounded-tl-sm px-5 py-4 bg-gradient-to-br from-[var(--bg-overlay)] via-[var(--bg-elevated)]/50 to-[var(--bg-overlay)] text-foreground border border-[var(--border-subtle)] shadow-lg shadow-black/30'
                     }`}
                   >
                     {editingMessageIndex === index ? (
@@ -3748,7 +3748,7 @@ No preamble. Start directly with section 1.`;
                           </button>
                           <button
                             onClick={handleCancelEdit}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs font-bold transition-all"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-surface)] hover:bg-[var(--bg-surface)] text-white rounded-lg text-xs font-bold transition-all"
                           >
                             Cancel
                           </button>
@@ -3806,9 +3806,9 @@ No preamble. Start directly with section 1.`;
                         <MessageAttachments attachments={message.attachments} />
                         
                         {message.editHistory && message.editHistory.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-gray-700/50">
-                            <details className="text-xs text-gray-500">
-                              <summary className="cursor-pointer hover:text-gray-400 flex items-center gap-1.5">
+                          <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
+                            <details className="text-xs text-[var(--text-faint)]">
+                              <summary className="cursor-pointer hover:text-[var(--text-muted)] flex items-center gap-1.5">
                                 <RotateCcw className="w-3 h-3" />
                                 Edited {message.editHistory.length} time{message.editHistory.length !== 1 ? 's' : ''}
                               </summary>
@@ -3837,17 +3837,17 @@ No preamble. Start directly with section 1.`;
                   {message.role === 'assistant' && !message.isWelcome && (message.sources || message.trustMetrics) && (
                     <div className="mt-3 md:ml-11">
                       {/* Compact Metadata Summary */}
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-600">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--text-faint)]">
                         {message.modelUsed && (
                           <span className="flex items-center gap-1">
                             <BookOpen className="w-3 h-3 text-purple-500/60 shrink-0" />
-                            <span>Model: <span className="text-gray-500 font-semibold">{message.modelUsed.replace('grok-3-fast', 'Grok 3 Fast').replace('grok-4', 'Grok 3 Fast').replace('Grok 4', 'Grok 3 Fast')}</span></span>
+                            <span>Model: <span className="text-[var(--text-faint)] font-semibold">{message.modelUsed.replace('grok-3-fast', 'Grok 3 Fast').replace('grok-4', 'Grok 3 Fast').replace('Grok 4', 'Grok 3 Fast')}</span></span>
                           </span>
                         )}
                         {message.processingTime && (
                           <span className="flex items-center gap-1">
                             <Zap className="w-3 h-3 text-yellow-500/60 shrink-0" />
-                            <span>Processed in: <span className="text-gray-500 font-semibold tabular-nums">{message.processingTime}ms</span></span>
+                            <span>Processed in: <span className="text-[var(--text-faint)] font-semibold tabular-nums">{message.processingTime}ms</span></span>
                           </span>
                         )}
                       </div>
@@ -3855,10 +3855,10 @@ No preamble. Start directly with section 1.`;
                       {/* Collapsible Source Credibility */}
                       {message.sources && message.sources.length > 0 && (
                         <details className="mt-2 group/sources">
-                          <summary className="cursor-pointer list-none flex items-center gap-1.5 text-[11px] text-gray-600 hover:text-gray-500 transition-colors">
+                          <summary className="cursor-pointer list-none flex items-center gap-1.5 text-[11px] text-[var(--text-faint)] hover:text-[var(--text-faint)] transition-colors">
                             <Shield className="w-3.5 h-3.5 text-blue-500/60 shrink-0" />
                             <span className="font-semibold uppercase tracking-wide">Source Credibility</span>
-                            <span className="text-gray-700">({message.sources.length} sources)</span>
+                            <span className="text-[var(--text-faint)]">({message.sources.length} sources)</span>
                             <ChevronRight className="w-3 h-3 group-open/sources:rotate-90 transition-transform shrink-0" />
                           </summary>
                           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -3873,7 +3873,7 @@ No preamble. Start directly with section 1.`;
                               return (
                                 <div
                                   key={source.name ?? `src-${idx}`}
-                                  className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border bg-gray-900/30 ${reliabilityColor} text-[11px]`}
+                                  className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border bg-[var(--bg-overlay)] ${reliabilityColor} text-[11px]`}
                                   title={`${source.name} - ${source.reliability}% reliability`}
                                 >
                                   <Icon className="w-3 h-3" />
@@ -3889,7 +3889,7 @@ No preamble. Start directly with section 1.`;
                       {/* Collapsible AI Trust & Integrity */}
                       {message.trustMetrics && (
                         <details className="mt-2 group/trust">
-                          <summary className="cursor-pointer list-none flex flex-wrap items-center gap-1.5 text-[11px] text-gray-600 hover:text-gray-400 transition-colors">
+                          <summary className="cursor-pointer list-none flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors">
                             <Shield className={`w-3.5 h-3.5 shrink-0 ${
                               message.trustMetrics.trustLevel === 'high' ? 'text-blue-500/70' :
                               message.trustMetrics.trustLevel === 'medium' ? 'text-yellow-500/70' :
@@ -3938,11 +3938,11 @@ No preamble. Start directly with section 1.`;
                       {message.role === 'user' && editingMessageIndex !== index && (
                         <button
                           onClick={() => handleEditMessage(index)}
-                          className={`p-1.5 rounded-lg transition-all group/action border border-transparent hover:bg-gray-800/60 active:bg-gray-800/80 hover:border-gray-700`}
+                          className={`p-1.5 rounded-lg transition-all group/action border border-transparent hover:bg-[var(--bg-elevated)] active:bg-[var(--bg-elevated)] hover:border-[var(--border-subtle)]`}
                           title="Edit this message"
                           aria-label="Edit message"
                         >
-                          <Edit3 className="w-3.5 h-3.5 text-gray-500 group-hover/action:text-blue-400 transition-colors" />
+                          <Edit3 className="w-3.5 h-3.5 text-[var(--text-faint)] group-hover/action:text-blue-400 transition-colors" />
                         </button>
                       )}
                       {message.role === 'assistant' && (
@@ -3957,7 +3957,7 @@ No preamble. Start directly with section 1.`;
                             title="This response was helpful"
                             aria-label="Mark as helpful"
                           >
-                            <ThumbsUp className={`w-3.5 h-3.5 transition-colors ${message.voted === 'up' ? 'text-blue-400 fill-blue-400/30' : 'text-gray-500 group-hover/action:text-blue-400'}`} />
+                            <ThumbsUp className={`w-3.5 h-3.5 transition-colors ${message.voted === 'up' ? 'text-blue-400 fill-blue-400/30' : 'text-[var(--text-faint)] group-hover/action:text-blue-400'}`} />
                           </button>
                           <button
                             onClick={() => message.voted !== 'down' && handleVote(index, 'down')}
@@ -3969,7 +3969,7 @@ No preamble. Start directly with section 1.`;
                             title="This response needs improvement"
                             aria-label="Mark as needing improvement"
                           >
-                            <ThumbsDown className={`w-3.5 h-3.5 transition-colors ${message.voted === 'down' ? 'text-red-400 fill-red-400/30' : 'text-gray-500 group-hover/action:text-red-400'}`} />
+                            <ThumbsDown className={`w-3.5 h-3.5 transition-colors ${message.voted === 'down' ? 'text-red-400 fill-red-400/30' : 'text-[var(--text-faint)] group-hover/action:text-red-400'}`} />
                           </button>
                           <button
                             onClick={() => handleRegenerateResponse(index)}
@@ -3984,7 +3984,7 @@ No preamble. Start directly with section 1.`;
                             aria-label="Regenerate response"
                           >
                             <RotateCcw className={`w-3.5 h-3.5 transition-colors ${
-                              message.isError ? 'text-red-400' : message.isPartial ? 'text-amber-400' : 'text-gray-500 group-hover/action:text-purple-400'
+                              message.isError ? 'text-red-400' : message.isPartial ? 'text-amber-400' : 'text-[var(--text-faint)] group-hover/action:text-purple-400'
                             }`} />
                             {(message.isError || message.isPartial) && (
                               <span className="text-[11px] font-medium">Retry</span>
@@ -3998,11 +3998,11 @@ No preamble. Start directly with section 1.`;
                         title="Copy message to clipboard"
                         aria-label="Copy message"
                       >
-                        <Copy className="w-3.5 h-3.5 text-gray-500 group-hover/action:text-cyan-400 transition-colors" />
+                        <Copy className="w-3.5 h-3.5 text-[var(--text-faint)] group-hover/action:text-cyan-400 transition-colors" />
                       </button>
-                      <div className="ml-auto flex items-center gap-1 px-2 py-1 bg-gray-900/50 rounded-md border border-gray-800/50">
-                        <Clock className="w-3 h-3 text-gray-600" />
-                        <span suppressHydrationWarning className="text-[10px] font-medium text-gray-500 tabular-nums">{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <div className="ml-auto flex items-center gap-1 px-2 py-1 bg-[var(--bg-overlay)] rounded-md border border-[var(--border-subtle)]">
+                        <Clock className="w-3 h-3 text-[var(--text-faint)]" />
+                        <span suppressHydrationWarning className="text-[10px] font-medium text-[var(--text-faint)] tabular-nums">{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     </div>
                   )}
@@ -4018,7 +4018,7 @@ No preamble. Start directly with section 1.`;
             <Sparkles className="w-4 h-4 text-white" />
           </div>
           <div className="flex-1 space-y-3">
-            <div className="bg-gradient-to-br from-gray-900/95 via-gray-850/95 to-gray-900/95 backdrop-blur-xl rounded-2xl px-5 py-4 border border-gray-700/60 shadow-2xl">
+            <div className="bg-gradient-to-br from-[var(--bg-overlay)] to-[var(--bg-overlay)] backdrop-blur-xl rounded-2xl px-5 py-4 border border-[var(--border-subtle)] shadow-2xl">
               <AIProgressIndicator stage={verifyStage} />
             </div>
           </div>
@@ -4030,7 +4030,7 @@ No preamble. Start directly with section 1.`;
         </div>
 
         {/* Input Area */}
-        <div className="relative border-t border-gray-800/50 bg-gradient-to-b from-gray-950 to-black px-4 py-5 shadow-2xl backdrop-blur-xl">
+        <div className="relative border-t border-[var(--border-subtle)] bg-gradient-to-b from-background to-black px-4 py-5 shadow-2xl backdrop-blur-xl">
           <div className="absolute inset-0 bg-gradient-to-t from-blue-600/5 via-transparent to-transparent pointer-events-none"></div>
           
           {/* Rate Limit Notification */}
@@ -4046,7 +4046,7 @@ No preamble. Start directly with section 1.`;
                       <h3 className="text-sm font-bold text-white mb-1">
                         Chat Limit Reached
                       </h3>
-                      <p className="text-xs text-gray-400 leading-relaxed" suppressHydrationWarning>
+                      <p className="text-xs text-[var(--text-muted)] leading-relaxed" suppressHydrationWarning>
                         You've reached your limit of {CHAT_LIMIT} chats per 24 hours. Your limit will reset in{' '}
                         {Math.ceil((getRateLimitData().resetTime - Date.now()) / (1000 * 60 * 60))} hours.
                       </p>
@@ -4054,10 +4054,10 @@ No preamble. Start directly with section 1.`;
                   </div>
                   <button
                     onClick={() => setShowLimitNotification(false)}
-                    className="p-2 hover:bg-gray-800/50 rounded-lg transition-all"
+                    className="p-2 hover:bg-[var(--bg-elevated)] rounded-lg transition-all"
                     aria-label="Close notification"
                   >
-                    <X className="w-4 h-4 text-gray-500 hover:text-gray-300" />
+                    <X className="w-4 h-4 text-[var(--text-faint)] hover:text-foreground/80" />
                   </button>
                 </div>
               </div>
@@ -4104,7 +4104,7 @@ No preamble. Start directly with section 1.`;
                   <div className="flex items-center gap-2 mb-3">
                     <Trophy className="w-4 h-4 text-violet-400" />
                     <span className="text-sm font-bold text-violet-300">Set up your fantasy league</span>
-                    <span className="ml-auto text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    <span className="ml-auto text-[10px] font-bold text-[var(--text-faint)] uppercase tracking-wider">
                       {STEP_NAMES[fantasySetupStep]} · {fantasySetupStep + 1}/{STEP_NAMES.length}
                     </span>
                   </div>
@@ -4112,8 +4112,8 @@ No preamble. Start directly with section 1.`;
                   <div className="flex items-center gap-1 mb-4">
                     {STEP_NAMES.map((name, i) => (
                       <div key={i} className="flex items-center gap-1">
-                        <div className={`w-1.5 h-1.5 rounded-full transition-all ${i < fantasySetupStep ? 'bg-violet-400' : i === fantasySetupStep ? 'bg-violet-300 scale-125' : 'bg-gray-700'}`} />
-                        {i < STEP_NAMES.length - 1 && <div className={`w-4 h-px transition-all ${i < fantasySetupStep ? 'bg-violet-500/50' : 'bg-gray-800'}`} />}
+                        <div className={`w-1.5 h-1.5 rounded-full transition-all ${i < fantasySetupStep ? 'bg-violet-400' : i === fantasySetupStep ? 'bg-violet-300 scale-125' : 'bg-[var(--bg-surface)]'}`} />
+                        {i < STEP_NAMES.length - 1 && <div className={`w-4 h-px transition-all ${i < fantasySetupStep ? 'bg-violet-500/50' : 'bg-[var(--bg-elevated)]'}`} />}
                       </div>
                     ))}
                   </div>
@@ -4121,7 +4121,7 @@ No preamble. Start directly with section 1.`;
                   {/* Step 0: Sport */}
                   {fantasySetupStep === 0 && (
                     <div>
-                      <p className="text-xs text-gray-400 mb-2.5">What sport is your fantasy league?</p>
+                      <p className="text-xs text-[var(--text-muted)] mb-2.5">What sport is your fantasy league?</p>
                       <div className="grid grid-cols-2 gap-2">
                         {SETUP_SPORTS.map(s => (
                           <button key={s.value}
@@ -4143,7 +4143,7 @@ No preamble. Start directly with section 1.`;
                   {/* Step 1: Platform */}
                   {fantasySetupStep === 1 && (
                     <div>
-                      <p className="text-xs text-gray-400 mb-2.5">{sportIcon} Which platform is your {activeSport.toUpperCase()} league on?</p>
+                      <p className="text-xs text-[var(--text-muted)] mb-2.5">{sportIcon} Which platform is your {activeSport.toUpperCase()} league on?</p>
                       <div className="flex flex-wrap gap-2">
                         {platforms.map(p => (
                           <button key={p.value}
@@ -4164,7 +4164,7 @@ No preamble. Start directly with section 1.`;
                   {/* Step 2: Teams slider */}
                   {fantasySetupStep === 2 && (
                     <div>
-                      <p className="text-xs text-gray-400 mb-2.5">How many teams in your league?</p>
+                      <p className="text-xs text-[var(--text-muted)] mb-2.5">How many teams in your league?</p>
                       {isNfbc ? (
                         <div className="flex gap-3">
                           {[12,15].map(n => (
@@ -4179,13 +4179,13 @@ No preamble. Start directly with section 1.`;
                         <div className="space-y-3">
                           <div className="text-center">
                             <span className="text-4xl font-black text-white tabular-nums">{fantasySetupData.teams ?? 12}</span>
-                            <span className="text-xs text-gray-500 ml-1">teams</span>
+                            <span className="text-xs text-[var(--text-faint)] ml-1">teams</span>
                           </div>
                           <input type="range" min={8} max={30} step={1}
                             value={fantasySetupData.teams ?? 12}
                             onChange={(e: any) => setFantasySetupData((d: any) => ({ ...d, teams: parseInt(e.target.value) }))}
                             className="w-full accent-violet-400 cursor-pointer" />
-                          <div className="flex justify-between text-[9px] text-gray-600"><span>8</span><span>16</span><span>24</span><span>30</span></div>
+                          <div className="flex justify-between text-[9px] text-[var(--text-faint)]"><span>8</span><span>16</span><span>24</span><span>30</span></div>
                           <div className="flex flex-wrap gap-1.5 justify-center">
                             {teamSizes.map(n => (
                               <button key={n}
@@ -4207,7 +4207,7 @@ No preamble. Start directly with section 1.`;
                   {/* Step 3: League Type */}
                   {fantasySetupStep === 3 && (
                     <div>
-                      <p className="text-xs text-gray-400 mb-2.5">Scoring format for your {activeSport.toUpperCase()} league?</p>
+                      <p className="text-xs text-[var(--text-muted)] mb-2.5">Scoring format for your {activeSport.toUpperCase()} league?</p>
                       <div className="space-y-2">
                         {leagueTypes.map(t => (
                           <button key={t.value}
@@ -4223,16 +4223,16 @@ No preamble. Start directly with section 1.`;
                   {/* Step 4: League name + team name → save */}
                   {fantasySetupStep === 4 && (
                     <div className="space-y-2.5">
-                      <p className="text-xs text-gray-400 mb-1">Almost done! Name your league and team.</p>
+                      <p className="text-xs text-[var(--text-muted)] mb-1">Almost done! Name your league and team.</p>
                       <input type="text" placeholder="League name (e.g. The Winners Circle)"
                         value={fantasySetupData.leagueName || ''}
                         onChange={(e: any) => setFantasySetupData((d: any) => ({ ...d, leagueName: e.target.value }))}
-                        className="w-full bg-gray-900/60 border border-violet-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/60 transition-all"
+                        className="w-full bg-[var(--bg-overlay)] border border-violet-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-[var(--text-faint)] focus:outline-none focus:border-violet-500/60 transition-all"
                         maxLength={60} />
                       <input type="text" placeholder="Your team name (e.g. Gronk's Hammers)"
                         value={fantasySetupData.teamName || ''}
                         onChange={(e: any) => setFantasySetupData((d: any) => ({ ...d, teamName: e.target.value }))}
-                        className="w-full bg-gray-900/60 border border-violet-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/60 transition-all"
+                        className="w-full bg-[var(--bg-overlay)] border border-violet-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-[var(--text-faint)] focus:outline-none focus:border-violet-500/60 transition-all"
                         maxLength={40} />
                       {/* Summary */}
                       <div className="flex flex-wrap gap-1.5 text-[10px]">
@@ -4286,7 +4286,7 @@ No preamble. Start directly with section 1.`;
                           toast.success(`League saved! Welcome, ${league.teamName} 🏆`);
                         }}
                         disabled={!fantasySetupData.teamName?.trim()}
-                        className="w-full py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-violet-900/20">
+                        className="w-full py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 disabled:from-[var(--bg-surface)] disabled:to-[var(--bg-surface)] disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-violet-900/20">
                         Save League 🚀
                       </button>
                     </div>
@@ -4294,7 +4294,7 @@ No preamble. Start directly with section 1.`;
 
                   {fantasySetupStep > 0 && (
                     <button onClick={() => setFantasySetupStep((s: any) => Math.max(0, s - 1))}
-                      className="mt-2.5 text-[10px] text-gray-600 hover:text-gray-400 transition-colors">
+                      className="mt-2.5 text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors">
                       ← Back
                     </button>
                   )}
@@ -4306,10 +4306,10 @@ No preamble. Start directly with section 1.`;
               <div className="mb-3 flex items-center gap-2 px-1">
                 <Trophy className="w-3.5 h-3.5 text-violet-500" />
                 <span className="text-[11px] font-bold text-violet-400">{fantasyLeague.teamName}</span>
-                <span className="text-[10px] text-gray-600">
+                <span className="text-[10px] text-[var(--text-faint)]">
                   {fantasyLeague.sport?.toUpperCase()} · {fantasyLeague.platform?.toUpperCase()} · {fantasyLeague.teams} teams · {fantasyLeague.leagueType ?? fantasyLeague.scoring}
                 </span>
-                <button onClick={() => { setFantasyLeague(null); localStorage.removeItem('leverage_fantasy_league'); }} className="ml-auto text-[10px] text-gray-600 hover:text-gray-400 transition-colors">Edit league</button>
+                <button onClick={() => { setFantasyLeague(null); localStorage.removeItem('leverage_fantasy_league'); }} className="ml-auto text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors">Edit league</button>
               </div>
             )}
             {/* Suggested Prompts — welcome grid + scrollable pills */}

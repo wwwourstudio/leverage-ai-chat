@@ -73,17 +73,17 @@ function kalshiUrl(market: KalshiMarket): string {
 
 function MarketSkeleton() {
   return (
-    <div className="rounded-2xl border border-white/5 bg-slate-800/40 p-4 animate-pulse">
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-4 animate-pulse">
       <div className="flex items-start justify-between mb-3">
         <div className="space-y-2 flex-1 mr-3">
-          <div className="h-3 w-16 bg-slate-700/60 rounded" />
-          <div className="h-4 w-3/4 bg-slate-700/60 rounded" />
+          <div className="h-3 w-16 bg-[var(--bg-elevated)] rounded" />
+          <div className="h-4 w-3/4 bg-[var(--bg-elevated)] rounded" />
         </div>
-        <div className="h-8 w-12 bg-slate-700/60 rounded-lg" />
+        <div className="h-8 w-12 bg-[var(--bg-elevated)] rounded-lg" />
       </div>
       <div className="flex gap-2 mt-4">
-        <div className="h-9 flex-1 bg-slate-700/40 rounded-lg" />
-        <div className="h-9 flex-1 bg-slate-700/40 rounded-lg" />
+        <div className="h-9 flex-1 bg-[var(--bg-elevated)] rounded-lg" />
+        <div className="h-9 flex-1 bg-[var(--bg-elevated)] rounded-lg" />
       </div>
     </div>
   );
@@ -105,7 +105,7 @@ const MarketCard = memo(function MarketCard({ market, onAnalyze }: {
   // Urgency color for time remaining
   const leftColor = left.includes('m left') ? 'text-rose-400' :
                     left.includes('h left') ? 'text-amber-400' :
-                    'text-slate-400';
+                    'text-[var(--text-muted)]';
 
   const catColor: Record<string, string> = {
     Politics:    'text-blue-400  bg-blue-500/10  border-blue-500/20',
@@ -115,10 +115,10 @@ const MarketCard = memo(function MarketCard({ market, onAnalyze }: {
     Weather:     'text-cyan-400  bg-cyan-500/10  border-cyan-500/20',
     Entertainment: 'text-pink-400 bg-pink-500/10 border-pink-500/20',
   };
-  const catCls = catColor[market.category] || 'text-slate-400 bg-slate-500/10 border-slate-500/20';
+  const catCls = catColor[market.category] || 'text-[var(--text-muted)] bg-[var(--bg-elevated)] border-[var(--border-subtle)]';
 
   return (
-    <div className="group rounded-2xl border border-white/5 bg-gradient-to-br from-slate-800/60 to-slate-900/40 hover:border-white/10 transition-all duration-200 overflow-hidden shadow-md hover:shadow-lg">
+    <div className="group rounded-2xl border border-[var(--border-subtle)] bg-gradient-to-br from-slate-800/60 to-slate-900/40 hover:border-[var(--border-subtle)] transition-all duration-200 overflow-hidden shadow-md hover:shadow-lg">
       {/* Header */}
       <div className="px-4 pt-4 pb-2">
         <div className="flex items-start justify-between gap-2 mb-2">
@@ -132,7 +132,7 @@ const MarketCard = memo(function MarketCard({ market, onAnalyze }: {
 
       {/* Probability bar */}
       <div className="px-4 pb-3">
-        <div className="relative h-1.5 w-full rounded-full bg-slate-700/60 overflow-hidden mt-2">
+        <div className="relative h-1.5 w-full rounded-full bg-[var(--bg-elevated)] overflow-hidden mt-2">
           <div
             className="absolute left-0 top-0 h-full rounded-full bg-emerald-500 transition-all"
             style={{ width: `${yesProb}%` }}
@@ -145,9 +145,9 @@ const MarketCard = memo(function MarketCard({ market, onAnalyze }: {
       </div>
 
       {/* Price change + volume */}
-      <div className="px-4 pb-3 flex items-center justify-between text-[10px] text-slate-500">
+      <div className="px-4 pb-3 flex items-center justify-between text-[10px] text-[var(--text-muted)]">
         {market.priceChange !== 0 ? (
-          <span className={isUp ? 'text-emerald-400' : isDown ? 'text-rose-400' : 'text-slate-500'}>
+          <span className={isUp ? 'text-emerald-400' : isDown ? 'text-rose-400' : 'text-[var(--text-muted)]'}>
             {isUp ? '▲' : '▼'} {Math.abs(market.priceChange)}¢
           </span>
         ) : <span />}
@@ -155,10 +155,10 @@ const MarketCard = memo(function MarketCard({ market, onAnalyze }: {
       </div>
 
       {/* Actions */}
-      <div className="border-t border-white/5 grid grid-cols-2 divide-x divide-white/5">
+      <div className="border-t border-[var(--border-subtle)] grid grid-cols-2 divide-x divide-white/5">
         <button
           onClick={() => onAnalyze(`Show me analysis and edge on this Kalshi market: "${market.title}" (YES: ${yesProb}¢, NO: ${noProb}¢, Ticker: ${market.ticker})`)}
-          className="py-2.5 text-[10px] font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+          className="py-2.5 text-[10px] font-semibold text-[var(--text-muted)] hover:text-white hover:bg-white/5 transition-colors"
         >
           Analyze Edge →
         </button>
@@ -250,7 +250,7 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
-      <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b border-white/5">
+      <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b border-[var(--border-subtle)]">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
@@ -259,7 +259,7 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
             <div>
               <p className="text-xs font-bold text-white">Kalshi Prediction Markets</p>
               {lastFetch && (
-                <p className="text-[9px] text-slate-600">
+                <p className="text-[9px] text-[var(--text-faint)]">
                   Updated {lastFetch.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </p>
               )}
@@ -268,7 +268,7 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
           <button
             onClick={fetchMarkets}
             disabled={loading}
-            className="p-1.5 rounded-lg hover:bg-white/5 text-slate-500 hover:text-slate-300 transition-colors disabled:opacity-40"
+            className="p-1.5 rounded-lg hover:bg-white/5 text-[var(--text-muted)] hover:text-foreground/80 transition-colors disabled:opacity-40"
             title="Refresh markets"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -277,13 +277,13 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
 
         {/* Search */}
         <div className="relative mb-3">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
           <input
             type="text"
             placeholder="Search markets…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full bg-slate-800/60 border border-white/5 rounded-lg pl-8 pr-3 py-2 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500/40 focus:ring-1 focus:ring-purple-500/20"
+            className="w-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-lg pl-8 pr-3 py-2 text-xs text-white placeholder:text-[var(--text-faint)] focus:outline-none focus:border-purple-500/40 focus:ring-1 focus:ring-purple-500/20"
           />
         </div>
 
@@ -296,7 +296,7 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
               className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all ${
                 category === cat.id
                   ? 'bg-purple-500/25 text-purple-300 border border-purple-500/40'
-                  : 'bg-slate-800/60 text-slate-500 border border-white/5 hover:text-slate-300 hover:border-white/10'
+                  : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)] hover:text-foreground/80 hover:border-[var(--border-subtle)]'
               }`}
             >
               {cat.label}
@@ -342,7 +342,7 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
 
         {/* Markets grid */}
         {!loading && !error && markets.length === 0 && (
-          <div className="text-center py-10 text-slate-500">
+          <div className="text-center py-10 text-[var(--text-muted)]">
             <TrendingUp className="w-8 h-8 mx-auto mb-2 opacity-30" />
             <p className="text-sm font-medium">No markets found</p>
             <p className="text-xs mt-1">
@@ -357,8 +357,8 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
       </div>
 
       {/* Footer */}
-      <div className="flex-shrink-0 border-t border-white/5 px-4 py-2 flex items-center justify-between">
-        <span className="text-[9px] text-slate-600">
+      <div className="flex-shrink-0 border-t border-[var(--border-subtle)] px-4 py-2 flex items-center justify-between">
+        <span className="text-[9px] text-[var(--text-faint)]">
           {markets.length > 0 ? `${markets.length} markets · 60s cache` : 'Kalshi Prediction Markets'}
         </span>
         <a

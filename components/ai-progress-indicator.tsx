@@ -52,7 +52,7 @@ export function AIProgressIndicator({ startTime, stage = 'analyzing' }: AIProgre
   return (
     <div className="flex items-center gap-3">
       {/* Pulsing icon */}
-      <div className={`relative flex-shrink-0 w-7 h-7 rounded-lg bg-gray-900 border border-gray-800 flex items-center justify-center shadow-lg ${cfg.glow}`}>
+      <div className={`relative flex-shrink-0 w-7 h-7 rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)] flex items-center justify-center shadow-lg ${cfg.glow}`}>
         {status === 'reverifying'
           ? <RotateCcw className={`w-3.5 h-3.5 ${cfg.color} animate-spin`} style={{ animationDuration: '1.4s' }} />
           : status === 'slow'
@@ -67,10 +67,10 @@ export function AIProgressIndicator({ startTime, stage = 'analyzing' }: AIProgre
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1.5">
           <span className={`text-xs font-semibold ${cfg.color}`}>{cfg.label}</span>
-          <span className="text-[10px] text-gray-600 font-mono tabular-nums">{formatTime(elapsed)}</span>
+          <span className="text-[10px] text-[var(--text-faint)] font-mono tabular-nums">{formatTime(elapsed)}</span>
         </div>
         {/* Thin animated progress bar */}
-        <div className="h-[2px] w-full bg-gray-800 rounded-full overflow-hidden">
+        <div className="h-[2px] w-full bg-[var(--bg-elevated)] rounded-full overflow-hidden">
           <div
             className={`relative h-full ${cfg.bar} rounded-full transition-all duration-300 ease-out overflow-hidden ${elapsed > 15000 ? 'animate-pulse' : ''}`}
             style={{ width: `${progressPct}%` }}
@@ -81,7 +81,7 @@ export function AIProgressIndicator({ startTime, stage = 'analyzing' }: AIProgre
           </div>
         </div>
         {elapsed > 10000 && (
-          <p className="text-[10px] text-gray-600 mt-1">Complex query — high-precision analysis takes a moment</p>
+          <p className="text-[10px] text-[var(--text-faint)] mt-1">Complex query — high-precision analysis takes a moment</p>
         )}
       </div>
     </div>

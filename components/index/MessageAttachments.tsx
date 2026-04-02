@@ -24,7 +24,7 @@ export function MessageAttachments({ attachments }: Props) {
       {attachments.map((attachment) => (
         <div key={attachment.id}>
           {attachment.type === 'image' && (
-            <div className="relative group/img rounded-xl overflow-hidden border border-gray-700/50 bg-gray-900/50">
+            <div className="relative group/img rounded-xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-overlay)]">
               <img
                 src={attachment.url || '/placeholder.svg'}
                 alt={attachment.name}
@@ -32,29 +32,29 @@ export function MessageAttachments({ attachments }: Props) {
               />
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 opacity-0 group-hover/img:opacity-100 transition-opacity">
                 <div className="flex items-center gap-2">
-                  <ImageIcon className="w-4 h-4 text-gray-400" />
-                  <span className="text-xs font-bold text-gray-300">{attachment.name}</span>
-                  <span className="text-xs text-gray-500 ml-auto">{(attachment.size / 1024).toFixed(1)} KB</span>
+                  <ImageIcon className="w-4 h-4 text-[var(--text-muted)]" />
+                  <span className="text-xs font-bold text-foreground/80">{attachment.name}</span>
+                  <span className="text-xs text-[var(--text-faint)] ml-auto">{(attachment.size / 1024).toFixed(1)} KB</span>
                 </div>
               </div>
             </div>
           )}
 
           {attachment.type === 'csv' && attachment.data && (
-            <div className="rounded-xl border border-gray-700/50 bg-gray-900/50 overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-800/50 border-b border-gray-700/50">
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-overlay)] overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-[var(--bg-elevated)] border-b border-[var(--border-subtle)]">
                 <FileText className="w-4 h-4 text-green-400" />
-                <span className="text-xs font-bold text-gray-300">{attachment.name}</span>
-                <span className="text-xs text-gray-500 ml-auto">
+                <span className="text-xs font-bold text-foreground/80">{attachment.name}</span>
+                <span className="text-xs text-[var(--text-faint)] ml-auto">
                   {attachment.data.rows.length} rows × {attachment.data.headers.length} columns
                 </span>
               </div>
               <div className="overflow-x-auto max-h-96 custom-scrollbar">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-gray-800/80 backdrop-blur-sm">
+                  <thead className="sticky top-0 bg-[var(--bg-elevated)] backdrop-blur-sm">
                     <tr>
                       {attachment.data.headers.map((header, idx) => (
-                        <th key={`hdr-${idx}-${header}`} className="px-4 py-2.5 text-left font-bold text-gray-300 border-b border-gray-700/50">
+                        <th key={`hdr-${idx}-${header}`} className="px-4 py-2.5 text-left font-bold text-foreground/80 border-b border-[var(--border-subtle)]">
                           {header}
                         </th>
                       ))}
@@ -62,9 +62,9 @@ export function MessageAttachments({ attachments }: Props) {
                   </thead>
                   <tbody>
                     {attachment.data.rows.slice(0, 100).map((row, rowIdx) => (
-                      <tr key={rowIdx} className="hover:bg-gray-800/30 transition-colors border-b border-gray-800/30">
+                      <tr key={rowIdx} className="hover:bg-[var(--bg-elevated)] transition-colors border-b border-[var(--border-subtle)]">
                         {row.map((cell, cellIdx) => (
-                          <td key={cellIdx} className="px-4 py-2.5 text-gray-400 font-medium">
+                          <td key={cellIdx} className="px-4 py-2.5 text-[var(--text-muted)] font-medium">
                             {cell}
                           </td>
                         ))}
@@ -73,8 +73,8 @@ export function MessageAttachments({ attachments }: Props) {
                   </tbody>
                 </table>
                 {attachment.data.rows.length > 100 && (
-                  <div className="px-4 py-3 bg-gray-800/30 text-center">
-                    <span className="text-xs text-gray-500">
+                  <div className="px-4 py-3 bg-[var(--bg-elevated)] text-center">
+                    <span className="text-xs text-[var(--text-faint)]">
                       Showing first 100 rows of {attachment.data.rows.length}
                     </span>
                   </div>

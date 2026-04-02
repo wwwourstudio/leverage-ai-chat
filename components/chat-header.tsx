@@ -136,16 +136,16 @@ export const ChatHeader = memo(function ChatHeader({
               {showExportMenu && (
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setShowExportMenu(false)} />
-                  <div className="absolute right-0 top-full mt-2 z-40 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden min-w-[160px]">
+                  <div className="absolute right-0 top-full mt-2 z-40 bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-xl shadow-2xl overflow-hidden min-w-[160px]">
                     <button
                       onClick={handleExportMarkdown}
-                      className="w-full px-4 py-3 text-sm text-left text-gray-200 hover:bg-gray-800 transition-colors flex items-center gap-2"
+                      className="w-full px-4 py-3 text-sm text-left text-gray-200 hover:bg-[var(--bg-elevated)] transition-colors flex items-center gap-2"
                     >
                       <span>Export as Markdown</span>
                     </button>
                     <button
                       onClick={handleExportJSON}
-                      className="w-full px-4 py-3 text-sm text-left text-gray-200 hover:bg-gray-800 transition-colors flex items-center gap-2"
+                      className="w-full px-4 py-3 text-sm text-left text-gray-200 hover:bg-[var(--bg-elevated)] transition-colors flex items-center gap-2"
                     >
                       <span>Export as JSON</span>
                     </button>

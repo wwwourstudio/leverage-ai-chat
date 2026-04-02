@@ -378,22 +378,22 @@ export function DynamicCardRenderer({
     const sportKey = safeCard.category?.toLowerCase() ?? '';
     const emoji = sportEmojis[sportKey] ?? '📊';
     return withOverlays(
-      <div className={`group relative bg-gradient-to-br ${safeCard.gradient || 'from-blue-600/20 to-purple-900/10'} rounded-2xl p-5 border border-gray-700/40 hover:border-gray-600/60 transition-all duration-300 shadow-lg hover:shadow-xl`}>
+      <div className={`group relative bg-gradient-to-br ${safeCard.gradient || 'from-blue-600/20 to-purple-900/10'} rounded-2xl p-5 border border-[var(--border-subtle)] hover:border-[var(--border-hover)] transition-all duration-300 shadow-lg hover:shadow-xl`}>
         <div className="flex items-start gap-3 mb-3">
           <div className="text-2xl leading-none mt-0.5">{emoji}</div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{safeCard.category?.toUpperCase()} · {safeCard.subcategory}</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">{safeCard.category?.toUpperCase()} · {safeCard.subcategory}</span>
               <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/15 text-purple-400 border border-purple-500/20 uppercase tracking-wider">AI Insight</span>
             </div>
             <h3 className="text-sm font-black text-white">{safeCard.title}</h3>
           </div>
         </div>
         {safeCard.data?.insight && (
-          <p className="text-sm text-gray-300 leading-relaxed border-l-2 border-blue-500/40 pl-3">{safeCard.data.insight}</p>
+          <p className="text-sm text-foreground/80 leading-relaxed border-l-2 border-blue-500/40 pl-3">{safeCard.data.insight}</p>
         )}
-        <div className="mt-3 pt-3 border-t border-gray-700/30 flex items-center gap-1.5">
-          <span className="text-[9px] font-bold text-gray-600 uppercase tracking-wider">Powered by {safeCard.data?.source || 'Grok 4'}</span>
+        <div className="mt-3 pt-3 border-t border-[var(--border-subtle)] flex items-center gap-1.5">
+          <span className="text-[9px] font-bold text-[var(--text-faint)] uppercase tracking-wider">Powered by {safeCard.data?.source || 'Grok 4'}</span>
         </div>
       </div>
     );

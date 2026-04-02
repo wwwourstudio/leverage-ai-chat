@@ -135,11 +135,11 @@ export function MobileChatInput({
               ) : (
                 <FileText className="w-3 h-3 text-blue-400 shrink-0" />
               )}
-              <span className="text-[10px] font-semibold text-gray-300 max-w-[80px] truncate">{file.name}</span>
+              <span className="text-[10px] font-semibold text-foreground/80 max-w-[80px] truncate">{file.name}</span>
               <button
                 type="button"
                 onClick={() => removeFile(file.id)}
-                className="text-gray-600 hover:text-red-400 transition-colors"
+                className="text-[var(--text-faint)] hover:text-red-400 transition-colors"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -165,7 +165,7 @@ export function MobileChatInput({
           className="p-2.5 rounded-xl bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] transition-colors flex-shrink-0 disabled:opacity-50"
           aria-label="Attach file"
         >
-          <Paperclip className="w-4.5 h-4.5 text-gray-400" />
+          <Paperclip className="w-4.5 h-4.5 text-[var(--text-muted)]" />
         </button>
 
         <div className="flex-1 relative min-w-0">

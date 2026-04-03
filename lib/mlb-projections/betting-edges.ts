@@ -15,6 +15,7 @@ import {
   lookupHRPropOdds,
   type HRPropMarketLine,
 } from './hr-prop-market';
+import { getOddsApiKey } from '@/lib/config';
 
 export interface BettingEdgeCardData {
   type: 'hr_prop_card';
@@ -38,7 +39,7 @@ export async function buildBettingEdgeCards(opts: { limit?: number; date?: strin
   const { limit = 6 } = opts;
 
   // Fetch projections and live HR prop market odds in parallel
-  const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+  const apiKey = getOddsApiKey();
   const [projections, propLines] = await Promise.all([
     runProjectionPipeline({ playerType: 'hitter', limit: limit * 2, date: opts.date }),
     apiKey

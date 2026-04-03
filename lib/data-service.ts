@@ -1,7 +1,9 @@
 /**
- * Data Service
- * Centralized service for fetching dynamic data from APIs
- * Eliminates all hardcoded data with real-time fetches
+ * Data Service (Client-Side)
+ * Fetches dynamic data from internal API routes for use in client components.
+ * Server-side equivalents live in lib/data/index.ts.
+ *
+ * Shared types are canonical in lib/data/index.ts and re-exported here.
  */
 
 import {
@@ -13,30 +15,9 @@ import {
   ERROR_MESSAGES,
 } from '@/lib/constants';
 
-export interface DynamicCard {
-  id?: string;
-  type: string;
-  title: string;
-  icon: string;
-  category: string;
-  subcategory: string;
-  gradient: string;
-  data: Record<string, any>;
-  status: string;
-  realData: boolean;
-  metadata?: Record<string, any>;
-}
-
-export interface UserInsights {
-  totalValue: number;
-  winRate: number;
-  roi: number;
-  activeContests: number;
-  totalInvested: number;
-  avgConfidence?: number;
-  dataSource: string;
-  message?: string;
-}
+// Import and re-export canonical types from lib/data/index.ts
+import type { DynamicCard, UserInsights } from '@/lib/data/index';
+export type { DynamicCard, UserInsights };
 
 // Cache configuration (using centralized constants)
 const CACHE_DURATION = {

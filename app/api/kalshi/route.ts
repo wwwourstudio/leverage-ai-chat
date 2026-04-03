@@ -12,7 +12,7 @@ import {
   fetchKalshiEvents,
   getMarketByTicker,
   kalshiMarketToCard,
-} from '@/lib/kalshi-client';
+} from '@/lib/kalshi/index';
 
 // No edge runtime — Node.js runtime needed for in-memory cache and full API surface
 

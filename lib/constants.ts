@@ -1215,6 +1215,40 @@ export const STATUS_BADGE_CONFIG = {
 
 export type StatusBadgeKey = keyof typeof STATUS_BADGE_CONFIG;
 
+// ─── Free Tier Limits ─────────────────────────────────────────────────────────
+export const FREE_TIER = {
+  MESSAGE_LIMIT: parseInt(process.env.NEXT_PUBLIC_FREE_MESSAGE_LIMIT ?? '15', 10),
+  CHAT_LIMIT:    parseInt(process.env.NEXT_PUBLIC_FREE_CHAT_LIMIT    ?? '10', 10),
+} as const;
+
+// ─── Settings UI Config ───────────────────────────────────────────────────────
+export const SETTINGS_SPORTSBOOKS = [
+  'DraftKings', 'FanDuel', 'BetMGM', 'Caesars', 'PointsBet', 'BetRivers', 'Barstool', 'WynnBET',
+] as const;
+
+export const SETTINGS_SPORTS = [
+  'NBA', 'NFL', 'MLB', 'NHL', 'NCAAB', 'NCAAF', 'EPL', 'MLS', 'UFC', 'Tennis',
+] as const;
+
+export const TIER_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  free:        { label: 'Free',        color: 'text-[var(--text-muted)]',   bg: 'bg-[var(--bg-elevated)] border-[var(--border-subtle)]' },
+  core:        { label: 'Core',        color: 'text-blue-400',              bg: 'bg-blue-500/20 border-blue-500/30' },
+  pro:         { label: 'Pro',         color: 'text-purple-400',            bg: 'bg-purple-500/20 border-purple-500/30' },
+  high_stakes: { label: 'High Stakes', color: 'text-yellow-400',            bg: 'bg-yellow-500/20 border-yellow-500/30' },
+};
+
+export const RISK_CONFIG = [
+  { value: 'conservative', label: 'Conservative', emoji: '🛡️', desc: '~1–2% per bet',   color: 'text-blue-400',   border: 'border-blue-500/40',   bg: 'bg-blue-500/10' },
+  { value: 'medium',       label: 'Medium',       emoji: '⚖️', desc: '~2–5% per bet',   color: 'text-yellow-400', border: 'border-yellow-500/40', bg: 'bg-yellow-500/10' },
+  { value: 'aggressive',   label: 'Aggressive',   emoji: '🔥', desc: '~5–10% per bet',  color: 'text-red-400',    border: 'border-red-500/40',    bg: 'bg-red-500/10' },
+] as const;
+
+export const THEME_CONFIG = [
+  { value: 'dark',   label: 'Dark',   emoji: '🌙' },
+  { value: 'light',  label: 'Light',  emoji: '☀️' },
+  { value: 'system', label: 'System', emoji: '💻' },
+] as const;
+
 // Type Exports for TypeScript
 export type AIModelName = typeof AI_CONFIG.MODEL_NAME;
 export type AnalysisCategory = typeof ANALYSIS_CATEGORIES[keyof typeof ANALYSIS_CATEGORIES];

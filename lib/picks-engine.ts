@@ -27,6 +27,7 @@
 import { getOddsApiKey } from '@/lib/config';
 import { logger, LogCategory } from '@/lib/logger';
 import type { BetTier } from '@/lib/card-pipeline';
+import { americanToImpliedProb } from '@/lib/utils/odds-math';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -294,8 +295,7 @@ async function fetchAllHRPropPlayers(
       }>;
     }>;
 
-    const americanToProb = (odds: number) =>
-      odds > 0 ? 100 / (odds + 100) : (-odds) / (-odds + 100);
+    const americanToProb = americanToImpliedProb;
 
     for (const game of games) {
       for (const book of (game.bookmakers ?? [])) {

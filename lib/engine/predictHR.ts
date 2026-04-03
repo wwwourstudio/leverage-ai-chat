@@ -21,6 +21,7 @@ import type { GameContext } from '@/lib/engine/context';
 import { calculateMatchupFactor } from '@/lib/engine/matchup';
 import type { LineupContext } from '@/lib/engine/matchup';
 import { predictHRFromFeatures } from '@/lib/ml/predict';
+import { americanToImpliedProb } from '@/lib/utils/odds-math';
 
 // ─── Input / Output types ─────────────────────────────────────────────────────
 
@@ -113,11 +114,7 @@ function teamPowerRankFromId(_teamId: string | null | undefined): number {
   return 15; // neutral default
 }
 
-/** Convert American odds to implied probability (ignoring vig). */
-function americanToImplied(american: number): number {
-  if (american > 0) return 100 / (american + 100);
-  return Math.abs(american) / (Math.abs(american) + 100);
-}
+const americanToImplied = americanToImpliedProb;
 
 /** Clamp a number to [0, 1]. */
 function clamp01(x: number): number {

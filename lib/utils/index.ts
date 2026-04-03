@@ -249,6 +249,13 @@ export function getRuntimeEnvironment(): string {
     
     return 'node';
   }
-  
+
   return 'unknown';
 }
+
+// ============================================
+// Date / Time Utilities
+// ============================================
+
+// Re-export client-safe formatters from lib/utils so server-side callers can also use them
+export { formatRelativeTime, fmtVol } from '@/lib/utils';

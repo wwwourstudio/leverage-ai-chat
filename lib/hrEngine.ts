@@ -13,6 +13,7 @@
  */
 
 import { kellyFraction } from '@/lib/kelly/index';
+import { americanToImpliedProb } from '@/lib/utils/odds-math';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -143,13 +144,8 @@ export function fairAmericanOdds(p: number): number {
   return Math.round(((1 - p) / p) * 100);
 }
 
-/**
- * Convert American odds to implied probability (no vig).
- */
-export function impliedProbability(americanOdds: number): number {
-  if (americanOdds > 0) return 100 / (americanOdds + 100);
-  return Math.abs(americanOdds) / (Math.abs(americanOdds) + 100);
-}
+/** Convert American odds to implied probability (no vig). */
+export const impliedProbability = americanToImpliedProb;
 
 /**
  * Model edge = model probability − market implied probability.

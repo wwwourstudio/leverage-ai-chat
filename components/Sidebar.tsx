@@ -3,6 +3,7 @@
 import { useState, useEffect, memo } from 'react';
 import { Plus, Search, Star, Trash2, MessageSquare, Edit3, CheckCircle, LayoutGrid, TrendingUp, Trophy, Award, BarChart3, UserCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatRelativeTime } from '@/lib/utils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -247,16 +248,6 @@ const ChatCard = memo(function ChatCard({
   );
 });
 
-/** Format timestamp relative to now */
-function formatRelativeTime(date: Date): string {
-  const now = Date.now();
-  const diff = now - new Date(date).getTime();
-  if (diff < 60_000)          return 'now';
-  if (diff < 3_600_000)       return `${Math.floor(diff / 60_000)}m`;
-  if (diff < 86_400_000)      return `${Math.floor(diff / 3_600_000)}h`;
-  if (diff < 7 * 86_400_000)  return `${Math.floor(diff / 86_400_000)}d`;
-  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
 
 // ── Icon Rail ─────────────────────────────────────────────────────────────────
 

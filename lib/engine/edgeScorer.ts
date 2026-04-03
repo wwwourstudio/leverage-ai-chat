@@ -32,6 +32,7 @@
 import type { HRPrediction } from './predictPlayerHR';
 import { isFadeSignal } from './matchup';
 import { calculateKelly } from './runTradingEngine';
+import { americanToDecimal } from '@/lib/utils/odds-math';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -103,10 +104,6 @@ export interface EdgeFlag {
 
 // ─── American / decimal odds helpers ──────────────────────────────────────────
 
-function americanToDecimal(americanOdds: number): number {
-  if (americanOdds > 0) return americanOdds / 100 + 1;
-  return 100 / Math.abs(americanOdds) + 1;
-}
 
 function decimalToImpliedProb(decOdds: number, overround = 1.065): number {
   return (1 / decOdds) / overround;

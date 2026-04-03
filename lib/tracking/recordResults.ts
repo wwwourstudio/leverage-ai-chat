@@ -13,6 +13,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { calculateKelly } from '@/lib/engine/runTradingEngine';
+import { americanToDecimal } from '@/lib/utils/odds-math';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -245,14 +246,13 @@ function computePnL(hit: boolean, americanOdds: number | null): number {
   const UNIT = 100;
   if (!hit) return -UNIT;
   const odds = americanOdds ?? 100;
-  const profit = odds >= 0 ? UNIT * (odds / 100) : UNIT * (100 / Math.abs(odds));
+  const profit = (americanToDecimal(odds) - 1) * UNIT;
   return parseFloat(profit.toFixed(2));
 }
 
 function computeKellyStake(modelProb: number, americanOdds: number): number {
   try {
-    const decOdds =
-      americanOdds >= 0 ? 1 + americanOdds / 100 : 1 + 100 / Math.abs(americanOdds);
+    const decOdds = americanToDecimal(americanOdds);
 
     // Use a normalised bankroll of 1 so the result is directly a fraction
     const result = calculateKelly({

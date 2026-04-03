@@ -243,9 +243,9 @@ export async function POST(request: NextRequest) {
     })();
 
     // ── Guardrail 4: Response deduplication ──────────────────────────────────
-    // Hash the first 600 chars of the user message (enough to fingerprint intent
-    // without being affected by file-content variance in long messages).
-    const queryHash = djb2(userMessage.slice(0, 600));
+    // Hash the first 600 chars of the user message scoped to the user ID so that
+    // anonymous users or different authenticated users never share cached responses.
+    const queryHash = djb2(`${rateLimitUserId ?? 'anon'}:${userMessage.slice(0, 600)}`);
     evictDedupCache();
     const dedupHit = dedupCache.get(queryHash);
     if (dedupHit) {

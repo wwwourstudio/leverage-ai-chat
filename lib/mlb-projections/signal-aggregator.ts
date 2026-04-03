@@ -37,6 +37,7 @@
  */
 
 import type { PlattCalibration } from './model-config';
+import { americanToImpliedProb } from '@/lib/utils/odds-math';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -114,11 +115,6 @@ export interface CompositeSignal {
 
 // ─── American odds helpers ─────────────────────────────────────────────────────
 
-/** Convert American odds (e.g. +150, -110) to implied probability (no vig removed). */
-function americanToImpliedProb(americanOdds: number): number {
-  if (americanOdds > 0) return 100 / (americanOdds + 100);
-  return Math.abs(americanOdds) / (Math.abs(americanOdds) + 100);
-}
 
 /**
  * Remove the vig from a single-side implied probability.

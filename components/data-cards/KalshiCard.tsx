@@ -9,6 +9,7 @@ import {
   Activity, Zap, TrendingDown, Bookmark,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { fmtVol } from '@/lib/utils';
 import { useKalshiStore } from '@/lib/store/kalshi-store';
 
 // ── Props ──────────────────────────────────────────────────────────────────────
@@ -96,12 +97,6 @@ function shortenTitle(title: string, maxLen = 72): string {
   return title.slice(0, maxLen - 1) + '…';
 }
 
-function fmtVol(n?: number): string | null {
-  if (!n || n <= 0) return null;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000)     return `${(n / 1_000).toFixed(0)}K`;
-  return n.toLocaleString();
-}
 
 function timeRemaining(iso?: string | null): {
   label: string; pctElapsed: number;

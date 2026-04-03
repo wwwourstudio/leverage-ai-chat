@@ -15,6 +15,7 @@
  */
 
 import { recordOddsSnapshot } from '@/lib/line-movement-tracker';
+import { americanToImpliedProb } from '@/lib/utils/odds-math';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -46,11 +47,10 @@ function normalizeName(name: string): string {
   return name.toLowerCase().replace(/[^a-z ]/g, '').trim();
 }
 
-/** Convert American odds to raw implied probability (no vig removal) */
-function americanToImpliedProb(odds: number): number {
+/** Convert American odds to raw implied probability (no vig removal). Returns 0.5 for zero/null. */
+function americanToImpliedProbSafe(odds: number): number {
   if (!odds || odds === 0) return 0.5;
-  if (odds > 0) return 100 / (odds + 100);
-  return Math.abs(odds) / (Math.abs(odds) + 100);
+  return americanToImpliedProb(odds);
 }
 
 /**
@@ -122,7 +122,7 @@ export async function fetchHRPropMarketLines(
         for (const [playerKey, { over, under }] of byPlayer) {
           if (!over) continue;
 
-          const impliedProb = americanToImpliedProb(over.price);
+          const impliedProb = americanToImpliedProbSafe(over.price);
           const candidate: HRPropMarketLine = {
             playerName: over.description ?? playerKey,
             line:        over.point  ?? 0.5,

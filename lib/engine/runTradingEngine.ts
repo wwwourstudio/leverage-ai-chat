@@ -19,7 +19,8 @@ import {
   analyzeKalshiVolatility,
   type KalshiVolatilityInput,
   type KalshiAnalysis,
-} from '@/lib/kalshi-client';
+} from '@/lib/kalshi/index';
+import { americanToImpliedProb as americanToProbability } from '@/lib/utils/odds-math';
 
 // ---------------------------------------------------------------------------
 // Engine-local types (lightweight, no DB dependency)
@@ -96,10 +97,8 @@ export type { KalshiVolatilityInput, KalshiAnalysis };
 // Pure-computation helpers (no DB, no async)
 // ---------------------------------------------------------------------------
 
-/** Convert American odds to implied probability (0-1). */
-export function americanToProbability(odds: number): number {
-  return odds > 0 ? 100 / (odds + 100) : Math.abs(odds) / (Math.abs(odds) + 100);
-}
+/** Convert American odds to implied probability (0-1). Re-exported for backward compat. */
+export { americanToImpliedProb as americanToProbability } from '@/lib/utils/odds-math';
 
 /** Detect arbitrage across multiple books. */
 export function detectArbitrage(odds: BookOdds[]): ArbitrageOpportunity[] {

@@ -148,6 +148,9 @@ export const getStripePublishableKey = () =>
 export const isStripeConfigured = () =>
   !!getStripeSecretKey();
 
+// Runtime helpers
+export const isDev = () => process.env.NODE_ENV !== 'production';
+
 // ============================================================================
 // SERVICE STATUS CHECKS
 // ============================================================================

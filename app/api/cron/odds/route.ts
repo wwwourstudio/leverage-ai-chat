@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
     // p-retry is ESM-only; dynamic import keeps the module compatible with
     // Next.js Node.js serverless runtime bundling.
     const { default: pRetry } = await import('p-retry');
-    const { fetchLiveOdds } = await import('@/lib/unified-odds-fetcher');
+    const { fetchLiveOdds } = await import('@/lib/odds/index');
 
     const apiKey = process.env.ODDS_API_KEY ?? '';
     const activeSports = [

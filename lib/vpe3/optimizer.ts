@@ -16,6 +16,7 @@ import {
   type DFSModifiers,
   type SimulationResult,
 } from './types';
+import { americanToImpliedProb, americanToDecimal } from '@/lib/utils/odds-math';
 import { hitterVpeVal, pitcherVpeVal, ageFactor, compositeDFSMultiplier } from './core';
 import { calculateInjuryRisk } from './injury';
 
@@ -182,13 +183,7 @@ function probToAmericanOdds(prob: number): number {
   return Math.round((1 - prob) / prob * 100);
 }
 
-/**
- * Convert American odds to implied probability.
- */
-function americanOddsToProb(odds: number): number {
-  if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
-  return 100 / (odds + 100);
-}
+const americanOddsToProb = americanToImpliedProb;
 
 /**
  * Calculate betting edge for a player prop.
@@ -207,7 +202,7 @@ export function calculateBettingEdge(
   const edge = fairProbability - marketProb;
 
   // Quarter-Kelly criterion, capped at 2%
-  const decimalOdds = marketOdds > 0 ? marketOdds / 100 + 1 : 100 / Math.abs(marketOdds) + 1;
+  const decimalOdds = americanToDecimal(marketOdds);
   const fullKelly = edge > 0 ? (edge * decimalOdds - (1 - fairProbability)) / decimalOdds : 0;
   const kellyFraction = Math.min(0.02, Math.max(0, fullKelly * 0.25));
 

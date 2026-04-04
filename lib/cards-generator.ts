@@ -1077,6 +1077,35 @@ function buildKalshiUnavailableCards(_count: number): any[] {
 }
 
 /**
+ * Returns an informative empty-state card when the Kalshi API works but has 0 matching markets.
+ * Distinct from buildKalshiUnavailableCards — used when the API is reachable but empty.
+ */
+function buildKalshiNoMarketsCard(): any {
+  return {
+    type: CARD_TYPES.KALSHI_INSIGHT,
+    title: 'No Active Prediction Markets',
+    icon: 'BarChart3',
+    category: 'KALSHI',
+    subcategory: 'Markets',
+    gradient: 'from-indigo-700 to-violet-800',
+    status: CARD_STATUS.NEUTRAL,
+    realData: false,
+    data: {
+      status: 'NO_MARKETS',
+      iconLabel: 'markets',
+      yesPct: 50,
+      noPct: 50,
+      edgeScore: 0,
+      signal: 'No open prediction markets currently available on Kalshi for this category. Check kalshi.com for the latest markets.',
+      volumeTier: 'Thin',
+      spreadLabel: 'N/A',
+      priceDirection: 'flat',
+      priceChange: 0,
+    },
+  };
+}
+
+/**
  * Generate contextual cards based on category and sport
  * @param category - Type of analysis (betting, kalshi, dfs, fantasy)
  * @param sport - Sport key in either short form ('nba') or API format ('basketball_nba')
@@ -1957,7 +1986,13 @@ async function _generateContextualCards(
       } catch (dbErr) {
         console.warn('[v0] [CARDS-GEN] Kalshi DB fallback failed:', dbErr instanceof Error ? dbErr.message : String(dbErr));
       }
-      cards.push(...buildKalshiUnavailableCards(count));
+      // Distinguish "API error" from "API worked but no markets" so we show the right message.
+      const { wasKalshiFetchError } = await import('@/lib/kalshi/index');
+      if (wasKalshiFetchError()) {
+        cards.push(...buildKalshiUnavailableCards(count)); // network/API failure
+      } else {
+        cards.push(buildKalshiNoMarketsCard());            // API ok, no markets
+      }
     } catch (error) {
       console.error('[v0] [CARDS-GEN] Kalshi API error:', error instanceof Error ? error.message : String(error));
       // On hard error also attempt DB cache before showing the unavailable state
@@ -1982,7 +2017,7 @@ async function _generateContextualCards(
           return cards;
         }
       } catch { /* DB also failed — fall through to unavailable card */ }
-      cards.push(...buildKalshiUnavailableCards(count));
+      cards.push(...buildKalshiUnavailableCards(count)); // hard error path always shows unavailable
     }
     return cards;
   }

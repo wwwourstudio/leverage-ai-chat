@@ -1765,6 +1765,10 @@ async function _generateContextualCards(
         markets = raceResult.length > 0 ? raceResult : await fastFetch.catch(() => [] as any[]);
       } else if (sub === 'politics' || sub === 'elections' || sub === 'election') {
         markets = await fetchElectionMarkets({ limit: count * 5 });
+        if (markets.length === 0) {
+          console.log('[v0] [CARDS-GEN] No election/politics markets — falling back to top markets by volume');
+          markets = await fetchTopMarketsByVolume(count * 3).catch(() => [] as any[]);
+        }
       } else if (sub === 'weather' || sub === 'climate') {
         markets = await fetchWeatherMarkets(count * 5);
       } else if (['financials', 'finance', 'economics', 'crypto', 'companies'].includes(sub)) {
@@ -1924,10 +1928,16 @@ async function _generateContextualCards(
 
       // All live strategies exhausted — try the Supabase DB cache before showing unavailable.
       // The cron job (GET /api/cron/kalshi) populates api.kalshi_markets every 5 minutes.
+      // Uses the anon-key client (not the cookie-aware server client) so this is safe
+      // inside unstable_cache() contexts where cookies() is forbidden.
       console.warn('[v0] [CARDS-GEN] Kalshi live API returned 0 markets — trying DB cache');
       try {
-        const { createClient: createSbServer } = await import('@/lib/supabase/server');
-        const sb = await createSbServer();
+        const { createClient: createSb } = await import('@supabase/supabase-js');
+        const sb = createSb(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          { db: { schema: 'api' } },
+        );
         const { data: dbRows } = await sb
           .from('kalshi_markets')
           .select('market_id, title, category, yes_price, no_price, volume, close_time')
@@ -1952,8 +1962,12 @@ async function _generateContextualCards(
       console.error('[v0] [CARDS-GEN] Kalshi API error:', error instanceof Error ? error.message : String(error));
       // On hard error also attempt DB cache before showing the unavailable state
       try {
-        const { createClient: createSbServer } = await import('@/lib/supabase/server');
-        const sb = await createSbServer();
+        const { createClient: createSb } = await import('@supabase/supabase-js');
+        const sb = createSb(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          { db: { schema: 'api' } },
+        );
         const { data: dbRows } = await sb
           .from('kalshi_markets')
           .select('market_id, title, category, yes_price, no_price, volume, close_time')

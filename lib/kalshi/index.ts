@@ -573,13 +573,9 @@ export async function fetchKalshiMarkets(params?: {
         'ukraine': 'Ukraine', 'trade': 'trade', 'tariff': 'tariff',
       };
 
-      if (category) {
-        const titleSearch = categorySearchMap[category.toLowerCase()] ?? category;
-        queryParams.append('title', titleSearch);
-      }
-      if (search) {
-        queryParams.set('title', search);
-      }
+      // NOTE: The Kalshi v2 API does NOT support a 'title' query parameter —
+      // it silently ignores unknown params and returns the top-N markets by volume.
+      // Client-side filtering is applied after fetch instead.
       if (cursor) {
         queryParams.append('cursor', cursor);
       }
@@ -965,6 +961,17 @@ export async function fetchElectionMarkets(options?: {
       for (const market of broad) {
         if (!seen.has(market.ticker) && isElectionMarket(market)) {
           electionMarkets.push(market);
+        }
+      }
+      // If no political markets are open (e.g. off-cycle, far from election day),
+      // return the top open markets so cards are always populated with real data.
+      if (electionMarkets.length === 0 && broad.length > 0) {
+        console.log('[KALSHI] fetchElectionMarkets — no political markets found — returning top open markets as fallback');
+        for (const market of broad) {
+          if (!seen.has(market.ticker)) {
+            electionMarkets.push(market);
+          }
+          if (electionMarkets.length >= limit) break;
         }
       }
     } catch {

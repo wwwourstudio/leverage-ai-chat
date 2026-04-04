@@ -1922,11 +1922,52 @@ async function _generateContextualCards(
         return cards;
       }
 
-      // All strategies exhausted with 0 markets — show unavailable state, not fake data.
-      console.warn('[v0] [CARDS-GEN] Kalshi API returned 0 markets after all strategies');
+      // All live strategies exhausted — try the Supabase DB cache before showing unavailable.
+      // The cron job (GET /api/cron/kalshi) populates api.kalshi_markets every 5 minutes.
+      console.warn('[v0] [CARDS-GEN] Kalshi live API returned 0 markets — trying DB cache');
+      try {
+        const { createClient: createSbServer } = await import('@/lib/supabase/server');
+        const sb = await createSbServer();
+        const { data: dbRows } = await sb
+          .from('kalshi_markets')
+          .select('market_id, title, category, yes_price, no_price, volume, close_time')
+          .gt('expires_at', new Date().toISOString())
+          .order('cached_at', { ascending: false })
+          .limit(count * 4);
+        if (dbRows && dbRows.length > 0) {
+          const { buildKalshiMarketFromDbRow, kalshiMarketToCard: toCard } = await import('@/lib/kalshi/index');
+          const dbMarkets = dbRows.map(buildKalshiMarketFromDbRow);
+          const topMarkets = dbMarkets.slice(0, count);
+          const kalshiCards = topMarkets.map((m: any) => toCard(m, null));
+          cards.push(...kalshiCards);
+          console.log(`[v0] [CARDS-GEN] DB cache supplied ${kalshiCards.length} Kalshi cards`);
+          if (cards.length > 0) setCachedCards(cards, 'kalshi', sport);
+          return cards;
+        }
+      } catch (dbErr) {
+        console.warn('[v0] [CARDS-GEN] Kalshi DB fallback failed:', dbErr instanceof Error ? dbErr.message : String(dbErr));
+      }
       cards.push(...buildKalshiUnavailableCards(count));
     } catch (error) {
       console.error('[v0] [CARDS-GEN] Kalshi API error:', error instanceof Error ? error.message : String(error));
+      // On hard error also attempt DB cache before showing the unavailable state
+      try {
+        const { createClient: createSbServer } = await import('@/lib/supabase/server');
+        const sb = await createSbServer();
+        const { data: dbRows } = await sb
+          .from('kalshi_markets')
+          .select('market_id, title, category, yes_price, no_price, volume, close_time')
+          .gt('expires_at', new Date().toISOString())
+          .order('cached_at', { ascending: false })
+          .limit(count * 4);
+        if (dbRows && dbRows.length > 0) {
+          const { buildKalshiMarketFromDbRow, kalshiMarketToCard: toCard } = await import('@/lib/kalshi/index');
+          const dbMarkets = dbRows.map(buildKalshiMarketFromDbRow);
+          const kalshiCards = dbMarkets.slice(0, count).map((m: any) => toCard(m, null));
+          cards.push(...kalshiCards);
+          return cards;
+        }
+      } catch { /* DB also failed — fall through to unavailable card */ }
       cards.push(...buildKalshiUnavailableCards(count));
     }
     return cards;

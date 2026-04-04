@@ -121,9 +121,11 @@ function cacheMarkets(cacheKey: string, markets: KalshiMarket[], ttlMs: number =
 }
 
 /**
- * Build auth headers with RSA-PSS signing when credentials are available.
- * Public endpoints (GET /markets) work without auth — signing is best-effort.
- * Supports both KALSHI_ACCESS_KEY (new) and KALSHI_API_KEY_ID (legacy).
+ * Build auth headers.
+ * Priority:
+ *  1. RSA-PSS signed headers (KALSHI_ACCESS_KEY/KALSHI_API_KEY_ID + KALSHI_PRIVATE_KEY)
+ *  2. Bearer token (KALSHI_API_KEY) — used when no RSA key pair is configured
+ *  3. Unauthenticated — GET /markets was previously public; kept as last resort
  */
 function buildHeaders(url: string = '', method: string = 'GET'): Record<string, string> {
   const headers: Record<string, string> = {
@@ -156,6 +158,12 @@ function buildHeaders(url: string = '', method: string = 'GET'): Record<string, 
       headers['KALSHI-ACCESS-SIGNATURE'] = signature;
     } catch (err) {
       console.error('[KALSHI] RSA sign failed (auth will be skipped):', err instanceof Error ? err.message : err);
+    }
+  } else {
+    // No RSA key pair — fall back to simple bearer token if configured
+    const bearerToken = process.env.KALSHI_API_KEY;
+    if (bearerToken) {
+      headers['Authorization'] = `Bearer ${bearerToken}`;
     }
   }
   return headers;
@@ -1481,5 +1489,49 @@ export function analyzeKalshiVolatility(
     spreadPct,
     isLiquid,
     recommendation,
+  };
+}
+
+/**
+ * Convert a row from the api.kalshi_markets Supabase table into a KalshiMarket.
+ * Used as a fallback when the live Kalshi API is unavailable — the cron job
+ * populates this table every 5 minutes so recent data is always available.
+ *
+ * DB yes_price / no_price are stored in the 0–1 decimal range; KalshiMarket
+ * expects integer cents (0–100).
+ */
+export function buildKalshiMarketFromDbRow(row: {
+  market_id: string;
+  title: string;
+  category?: string | null;
+  yes_price?: number | null;
+  no_price?: number | null;
+  volume?: number | null;
+  close_time?: string | null;
+}): KalshiMarket {
+  const yesCents = Math.round((row.yes_price ?? 0.5) * 100);
+  const noCents  = Math.round((row.no_price  ?? 0.5) * 100);
+  return {
+    ticker:       row.market_id,
+    title:        row.title,
+    category:     row.category ?? 'Prediction Market',
+    subtitle:     '',
+    yesPrice:     yesCents,
+    noPrice:      noCents,
+    yesBid:       yesCents,
+    yesAsk:       yesCents,
+    noBid:        noCents,
+    noAsk:        noCents,
+    spread:       0,
+    lastPrice:    yesCents,
+    volume24h:    0,
+    eventTicker:  '',
+    seriesTicker: '',
+    priceChange:  0,
+    volume:       row.volume ?? 0,
+    openInterest: 0,
+    closeTime:    row.close_time ?? '',
+    status:       'open',
+    priceIsReal:  row.yes_price != null,
   };
 }

@@ -12,7 +12,10 @@ import {
   fetchKalshiEvents,
   getMarketByTicker,
   kalshiMarketToCard,
+  buildKalshiMarketFromDbRow,
+  type KalshiMarket,
 } from '@/lib/kalshi/index';
+import { createClient } from '@/lib/supabase/server';
 
 // No edge runtime — Node.js runtime needed for in-memory cache and full API surface
 
@@ -39,6 +42,26 @@ function kalshiActivityScore(m: { priceIsReal?: boolean; yesBid?: number; yesAsk
 function isRateLimitError(err: unknown): boolean {
   const msg = String(err);
   return msg.includes('429') || msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('too_many_requests');
+}
+
+/**
+ * Fallback: read markets from the api.kalshi_markets Supabase table.
+ * The cron job (GET /api/cron/kalshi) populates this table every 5 minutes.
+ * Returns an empty array (never throws) so callers can safely chain it.
+ */
+async function fetchMarketsFromDb(limit: number): Promise<KalshiMarket[]> {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from('kalshi_markets')
+      .select('market_id, title, category, yes_price, no_price, volume, close_time')
+      .gt('expires_at', new Date().toISOString())
+      .order('cached_at', { ascending: false })
+      .limit(limit);
+    return (data ?? []).map(buildKalshiMarketFromDbRow);
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -128,20 +151,25 @@ export async function GET(request: Request) {
         markets = await fetchKalshiMarkets({ search: subcategory, limit });
       }
 
+      let fromDbCache = false;
       if (markets.length === 0) {
-        console.log(`[v0] [API] [KALSHI] subcategory=${subcategory} returned 0 markets`);
-        // Removed: fallback to trending. When the API is unreachable the trending
-        // fetch also returns [] and just wastes time. Empty result is returned as-is.
+        console.log(`[v0] [API] [KALSHI] subcategory=${subcategory} returned 0 live markets — trying DB cache`);
+        markets = await fetchMarketsFromDb(limit * 3);
+        if (markets.length > 0) {
+          fromDbCache = true;
+          console.log(`[v0] [API] [KALSHI] DB cache returned ${markets.length} markets`);
+        }
       }
 
       markets = markets.sort((a, b) => kalshiActivityScore(b) - kalshiActivityScore(a));
-      console.log(`[v0] [API] [KALSHI] subcategory=${subcategory} → ${markets.length} markets`);
+      console.log(`[v0] [API] [KALSHI] subcategory=${subcategory} → ${markets.length} markets${fromDbCache ? ' (db cache)' : ''}`);
 
       return NextResponse.json({
         success: true,
         markets,
         count: markets.length,
         subcategory,
+        fromDbCache,
         timestamp: new Date().toISOString(),
       });
     }
@@ -194,13 +222,24 @@ export async function GET(request: Request) {
       markets = await fetchAllKalshiMarkets({ status: 'open', maxMarkets: limit > 200 ? limit : 2000 });
     }
 
-    console.log(`[v0] [API] [KALSHI] ✓ Returning ${markets.length} markets`);
+    let fromDbCache = false;
+    if (markets.length === 0) {
+      console.log('[v0] [API] [KALSHI] Live fetch returned 0 markets — trying DB cache');
+      markets = await fetchMarketsFromDb(Math.max(limit, 50));
+      if (markets.length > 0) {
+        fromDbCache = true;
+        console.log(`[v0] [API] [KALSHI] DB cache returned ${markets.length} markets`);
+      }
+    }
+
+    console.log(`[v0] [API] [KALSHI] ✓ Returning ${markets.length} markets${fromDbCache ? ' (db cache)' : ''}`);
 
     const responseData = {
       success: true,
       markets,
       count: markets.length,
       category: finalCategory || type || 'all',
+      fromDbCache,
       timestamp: new Date().toISOString(),
     };
     if (!isTest) setRouteCache(cacheKey, responseData);

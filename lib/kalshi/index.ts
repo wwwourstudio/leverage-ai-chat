@@ -1424,7 +1424,7 @@ export function kalshiMarketToCard(
       // Synthetic price history for sparkline (3-point trend from lastPrice → yesPct)
       trades: syntheticTrades,
     },
-    status: market.status === 'open' ? 'active' : 'closed',
+    status: (market.status === 'open' || market.status === 'active') ? 'active' : 'closed',
     realData: true,
   };
 }

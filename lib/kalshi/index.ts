@@ -514,7 +514,11 @@ export async function fetchKalshiMarkets(params?: {
   cacheTtlMs?: number;
 }): Promise<KalshiMarket[]> {
   const { category, status = 'open', limit = 200, search, cursor, useCache = true, cacheTtlMs = 60000 } = params || {};
-  const cacheKey = getCacheKey({ category, status, search });
+  // Since the Kalshi API no longer receives category/search as URL params (title param removed),
+  // all non-paginated open-market fetches return identical results. Use a shared cache key
+  // so fetchSportsMarkets' 12 calls all hit the same entry after the first, preventing
+  // 12 identical API requests per invocation → rate limiting → circuit breaker opening.
+  const cacheKey = cursor ? getCacheKey({ category, status, search }) : getCacheKey({ status });
 
   // Check cache first (only when not mid-pagination)
   if (useCache && !cursor) {
@@ -1230,13 +1234,18 @@ export async function fetchTopMarketsByVolume(
   status: 'open' | 'closed' = 'open',
 ): Promise<KalshiMarket[]> {
   const markets = await fetchKalshiMarketsWithRetry({ status, limit: Math.max(n * 5, 200), maxRetries: 2 });
-  const sorted = markets.sort((a, b) => (b.volume24h || b.volume) - (a.volume24h || a.volume));
-  // Prefer markets that have real price signals (not stuck at the 50¢ fallback with zero volume).
-  // Use OR logic so markets with valid price data but no recorded volume (e.g. new listings) are
-  // still included — the old AND requirement was too strict and caused collapse to 0–1 results.
-  const withActivity = sorted.filter(m => (m.volume > 0 || m.volume24h > 0) || (m.yesBid > 0 || m.yesAsk > 0 || m.lastPrice > 0));
-  // Fall back to all sorted markets if not enough active ones
-  return (withActivity.length >= n ? withActivity : sorted).slice(0, n);
+  // Sort by price signal quality (real price first), then by volume.
+  // No volume-based gate — all active markets are eligible regardless of trading activity.
+  // When all markets have volume24h=0 (as Kalshi currently reports), the old withActivity
+  // filter would collapse to markets with bid/ask/lastPrice only; using status instead
+  // ensures the full sorted list is always returned.
+  const sorted = markets
+    .filter(m => !m.status || m.status === 'active' || m.status === 'open')
+    .sort((a, b) =>
+      ((b.priceIsReal ? 1 : 0) - (a.priceIsReal ? 1 : 0)) ||
+      ((b.volume24h || b.volume) - (a.volume24h || a.volume))
+    );
+  return sorted.slice(0, n);
 }
 
 /**
@@ -1541,4 +1550,13 @@ export function buildKalshiMarketFromDbRow(row: {
     status:       'open',
     priceIsReal:  row.yes_price != null,
   };
+}
+
+/**
+ * Returns true if the most recent fetchKalshiMarkets call failed with a network or API error.
+ * Returns false if the API responded with 200 OK (even if 0 markets were returned).
+ * Used by cards-generator to distinguish "API down" from "legitimately no markets."
+ */
+export function wasKalshiFetchError(): boolean {
+  return _kalshiLastFetchHadError;
 }

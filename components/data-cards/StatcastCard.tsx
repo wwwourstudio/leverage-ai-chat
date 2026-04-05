@@ -89,6 +89,43 @@ const STATUS_CONFIG: Record<string, { label: string; dotCls: string; textCls: st
   optimal: { label: 'OPTIMAL', dotCls: 'bg-sky-400',     textCls: 'text-sky-400' },
 };
 
+// ── Pitcher Gauge constants & helpers ─────────────────────────────────────────
+
+const PITCHER_LEAGUE_AVG: Record<string, { avg: number; lowerBetter: boolean }> = {
+  'xwOBA Against':       { avg: 0.315, lowerBetter: true  },
+  'Exit Velo Against':   { avg: 88.5,  lowerBetter: true  },
+  'Hard Hit% Against':   { avg: 36.5,  lowerBetter: true  },
+  'Barrel% Against':     { avg: 7.5,   lowerBetter: true  },
+  'xwOBA':               { avg: 0.315, lowerBetter: false },
+  'Exit Velocity':       { avg: 88.5,  lowerBetter: false },
+  'Hard Hit%':           { avg: 36.5,  lowerBetter: false },
+};
+
+function getPitcherPercentile(label: string, rawValue: string): number | null {
+  const entry = PITCHER_LEAGUE_AVG[label];
+  if (!entry) return null;
+  const val = parseFloat(rawValue);
+  if (!Number.isFinite(val)) return null;
+  const { avg, lowerBetter } = entry;
+  const maxDiff = avg * 0.40;
+  const diff = lowerBetter ? avg - val : val - avg;
+  return Math.min(100, Math.max(0, Math.round(50 + (diff / maxDiff) * 50)));
+}
+
+function gaugeColor(pct: number): string {
+  if (pct >= 80) return '#4ade80';
+  if (pct >= 60) return '#60a5fa';
+  if (pct >= 40) return '#fbbf24';
+  return '#f87171';
+}
+
+const PITCH_LABEL_SHORT: Record<string, string> = {
+  'xwOBA Against':     'xwOBA vs',
+  'Exit Velo Against': 'EV vs',
+  'Hard Hit% Against': 'HH% vs',
+  'Barrel% Against':   'BBL% vs',
+};
+
 // ── Watchlist hook ─────────────────────────────────────────────────────────────
 
 const WATCHLIST_KEY = 'leverage_watchlist';
@@ -164,6 +201,74 @@ function HeroMetrics({ metrics, conf }: { metrics: Metric[]; conf: TypeConf }) {
   );
 }
 
+// ── Pitcher gauge ring components ─────────────────────────────────────────────
+
+function GaugeArc({ percentile, color }: { percentile: number; color: string }) {
+  const R = 34, CX = 44, CY = 44;
+  const startDeg = 210, totalDeg = 240;
+  const filled = totalDeg * (percentile / 100);
+
+  function arcPath(deg: number) {
+    const rad = (d: number) => (d * Math.PI) / 180;
+    const x1 = CX + R * Math.cos(rad(startDeg));
+    const y1 = CY + R * Math.sin(rad(startDeg));
+    const x2 = CX + R * Math.cos(rad(startDeg + deg));
+    const y2 = CY + R * Math.sin(rad(startDeg + deg));
+    const large = deg > 180 ? 1 : 0;
+    return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${R} ${R} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+  }
+
+  return (
+    <svg viewBox="0 0 88 88" className="w-full h-full" aria-hidden>
+      <path d={arcPath(totalDeg)} fill="none"
+        stroke="rgba(255,255,255,0.06)" strokeWidth="7" strokeLinecap="round" />
+      {percentile > 0 && (
+        <path d={arcPath(filled)} fill="none"
+          stroke={color} strokeWidth="7" strokeLinecap="round"
+          style={{ filter: `drop-shadow(0 0 5px ${color}66)` }} />
+      )}
+    </svg>
+  );
+}
+
+function PitcherGauges({ metrics }: { metrics: Metric[] }) {
+  const top = metrics.slice(0, 3);
+  if (!top.length) return null;
+  return (
+    <div className="flex justify-around items-start gap-1 mb-3">
+      {top.map((m, i) => {
+        const pct   = getPitcherPercentile(m.label, m.value);
+        const color = pct !== null ? gaugeColor(pct) : '#6b7280';
+        return (
+          <div key={i} className="flex flex-col items-center gap-0.5 flex-1 min-w-0">
+            <div className="relative w-20 h-20">
+              <GaugeArc percentile={pct ?? 50} color={color} />
+              <div className="absolute inset-0 flex flex-col items-center justify-center pt-1">
+                <span className="text-[13px] font-black tabular-nums text-white leading-none">
+                  {m.value}
+                </span>
+                {pct !== null && (
+                  <span className="text-[9px] font-bold mt-0.5" style={{ color }}>
+                    {pct}th
+                  </span>
+                )}
+              </div>
+            </div>
+            <span className="text-[9px] font-bold uppercase tracking-wider text-white/35 text-center leading-tight px-0.5">
+              {PITCH_LABEL_SHORT[m.label] ?? m.label}
+            </span>
+            {PITCHER_LEAGUE_AVG[m.label] && (
+              <span className="text-[8px] text-white/20">
+                avg {PITCHER_LEAGUE_AVG[m.label].avg}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function MetricRow({ label, value }: Metric) {
   const { textCls, barWidth } = getValueStyle(value);
   return (
@@ -220,7 +325,7 @@ function TabStats({ metrics, trendNote, conf }: {
 }) {
   return (
     <div>
-      <HeroMetrics metrics={metrics} conf={conf} />
+      <PitcherGauges metrics={metrics} />
       {trendNote && (
         <div className={`mt-3 px-3 py-2 rounded-xl ${conf.accentBg} border ${conf.accentBorder}`}>
           <p className="text-[11px] text-[var(--text-muted)] leading-relaxed italic">{trendNote}</p>
@@ -263,25 +368,31 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
       {hasPitchMix && (
         <div>
           <p className="text-[9px] font-extrabold uppercase tracking-widest text-[var(--text-faint)] mb-2">Pitch Arsenal</p>
-          <div className="flex gap-1.5">
-            {data.pitchMixFB && (
-              <div className="flex-1 flex flex-col items-center rounded-xl bg-blue-500/15 border border-blue-500/30 py-2 px-1">
-                <span className="text-sm font-black text-blue-300 tabular-nums">{data.pitchMixFB}</span>
-                <span className="text-[9px] font-bold uppercase text-blue-400/70 mt-0.5">Fastball</span>
-              </div>
-            )}
-            {data.pitchMixBrk && (
-              <div className="flex-1 flex flex-col items-center rounded-xl bg-violet-500/15 border border-violet-500/30 py-2 px-1">
-                <span className="text-sm font-black text-violet-300 tabular-nums">{data.pitchMixBrk}</span>
-                <span className="text-[9px] font-bold uppercase text-violet-400/70 mt-0.5">Breaking</span>
-              </div>
-            )}
-            {data.pitchMixOff && (
-              <div className="flex-1 flex flex-col items-center rounded-xl bg-amber-500/15 border border-amber-500/30 py-2 px-1">
-                <span className="text-sm font-black text-amber-300 tabular-nums">{data.pitchMixOff}</span>
-                <span className="text-[9px] font-bold uppercase text-amber-400/70 mt-0.5">Offspeed</span>
-              </div>
-            )}
+          <div className="space-y-2">
+            {[
+              { label: 'Fastball',  val: data.pitchMixFB,  color: '#60a5fa' },
+              { label: 'Breaking',  val: data.pitchMixBrk, color: '#a78bfa' },
+              { label: 'Offspeed',  val: data.pitchMixOff, color: '#fcd34d' },
+            ].filter(p => p.val != null).map((p, i) => {
+              const pct = parseFloat(p.val ?? '0') || 0;
+              return (
+                <div key={i}>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider"
+                      style={{ color: p.color }}>{p.label}</span>
+                    <span className="text-[10px] font-black text-white tabular-nums">{p.val}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${Math.min(100, pct)}%`,
+                        background: `linear-gradient(90deg, ${p.color}99, ${p.color})`,
+                        boxShadow: `0 0 8px ${p.color}44`,
+                      }} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -330,6 +441,27 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
       {hasLog && (
         <div>
           <p className="text-[9px] font-extrabold uppercase tracking-widest text-[var(--text-faint)] mb-2">Recent Form</p>
+          {/* Mini dot sparkline */}
+          <div className="flex items-center gap-1 mb-2">
+            <span className="text-[8px] text-white/25 uppercase tracking-widest mr-1">Form</span>
+            {gameLog.slice(0, 5).map((g, i) => {
+              const er = g.er ?? 0;
+              const ip = parseFloat(g.ip ?? '0');
+              const isQS = ip >= 6 && er <= 3;
+              const isBad = er >= 4;
+              return (
+                <div key={i}
+                  className="w-3 h-3 rounded-full flex-shrink-0"
+                  title={`${g.date} vs ${g.opp}: ${g.ip ?? '?'} IP, ${g.k ?? 0} K, ${er} ER`}
+                  style={{
+                    background: isQS ? '#4ade80' : isBad ? '#f87171' : '#fbbf24',
+                    boxShadow: isQS ? '0 0 4px #4ade8066' : isBad ? '0 0 4px #f8717166' : 'none',
+                  }}
+                />
+              );
+            })}
+            <span className="text-[8px] text-white/20 ml-1">← most recent</span>
+          </div>
           <div className="overflow-x-auto -mx-1 px-1">
             <table className="w-full text-[11px] border-collapse">
               <thead>
@@ -343,18 +475,25 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
                 </tr>
               </thead>
               <tbody>
-                {gameLog.map((g, i) => (
-                  <tr key={i} className="border-b border-[var(--border-subtle)] last:border-0">
-                    <td className="py-1.5 pr-2 text-[var(--text-muted)] whitespace-nowrap">{g.date}</td>
-                    <td className="py-1.5 pr-2 text-[var(--text-muted)] font-medium whitespace-nowrap">{g.opp}</td>
-                    <td className="py-1.5 pr-2 text-right text-foreground font-medium">{g.ip ?? '—'}</td>
-                    <td className="py-1.5 pr-2 text-right font-bold text-emerald-400">{g.k ?? '—'}</td>
-                    <td className={cn('py-1.5 pr-2 text-right font-bold',
-                      (g.er ?? 0) === 0 ? 'text-emerald-400' : (g.er ?? 0) <= 2 ? 'text-amber-400' : 'text-rose-400'
-                    )}>{g.er ?? '—'}</td>
-                    <td className="py-1.5 text-right text-[var(--text-muted)]">{g.bb ?? '—'}</td>
-                  </tr>
-                ))}
+                {gameLog.map((g, i) => {
+                  const ip = parseFloat(g.ip ?? '0');
+                  const isQS = ip >= 6 && (g.er ?? 0) <= 3;
+                  return (
+                    <tr key={i} className="border-b border-[var(--border-subtle)] last:border-0">
+                      <td className="py-1.5 pr-2 text-[var(--text-muted)] whitespace-nowrap">
+                        {g.date}
+                        {isQS && <span className="ml-1 text-[7px] font-black text-emerald-400">QS</span>}
+                      </td>
+                      <td className="py-1.5 pr-2 text-[var(--text-muted)] font-medium whitespace-nowrap">{g.opp}</td>
+                      <td className="py-1.5 pr-2 text-right text-foreground font-medium">{g.ip ?? '—'}</td>
+                      <td className="py-1.5 pr-2 text-right font-bold text-emerald-400">{g.k ?? '—'}</td>
+                      <td className={cn('py-1.5 pr-2 text-right font-bold',
+                        (g.er ?? 0) === 0 ? 'text-emerald-400' : (g.er ?? 0) <= 2 ? 'text-amber-400' : 'text-rose-400'
+                      )}>{g.er ?? '—'}</td>
+                      <td className="py-1.5 text-right text-[var(--text-muted)]">{g.bb ?? '—'}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -315,22 +315,32 @@ function parseMarket(m: any): KalshiMarket {
 // ── Circuit Breaker ───────────────────────────────────────────────────────────
 // Opens after 5 consecutive failures; auto-resets to half-open after 60 s.
 // In half-open state one probe request is allowed — success closes the breaker.
+// Force-resets to closed after maxOpenMs (default 10 min) to recover stale
+// open state in long-lived Lambda instances.
 
 class CircuitBreaker {
   private failures = 0;
   private lastFailTime = 0;
+  private openedAt = 0;
   private state: 'closed' | 'open' | 'half-open' = 'closed';
   private readonly threshold: number;
   private readonly resetTimeoutMs: number;
+  private readonly maxOpenMs: number;
 
-  constructor(threshold = 5, resetTimeoutMs = 60_000) {
-    this.threshold     = threshold;
+  constructor(threshold = 5, resetTimeoutMs = 60_000, maxOpenMs = 600_000) {
+    this.threshold      = threshold;
     this.resetTimeoutMs = resetTimeoutMs;
+    this.maxOpenMs      = maxOpenMs;
   }
 
   async execute<T>(fn: () => Promise<T>): Promise<T> {
     if (this.state === 'open') {
-      if (Date.now() - this.lastFailTime >= this.resetTimeoutMs) {
+      const msOpen = Date.now() - this.openedAt;
+      if (msOpen >= this.maxOpenMs) {
+        // Breaker stuck open in a warm Lambda for >10 min — force reset
+        this.forceReset();
+        console.warn(`[KALSHI] Circuit breaker force-reset after ${Math.round(msOpen / 60000)}m open`);
+      } else if (Date.now() - this.lastFailTime >= this.resetTimeoutMs) {
         this.state = 'half-open';
         console.log('[KALSHI] Circuit breaker → half-open (probe)');
       } else {
@@ -348,6 +358,14 @@ class CircuitBreaker {
     }
   }
 
+  forceReset(): void {
+    this.failures     = 0;
+    this.state        = 'closed';
+    this.lastFailTime = 0;
+    this.openedAt     = 0;
+    console.log('[KALSHI] Circuit breaker force-reset → closed');
+  }
+
   private _onSuccess(): void {
     this.failures = 0;
     if (this.state !== 'closed') {
@@ -360,7 +378,8 @@ class CircuitBreaker {
     this.failures++;
     this.lastFailTime = Date.now();
     if (this.failures >= this.threshold && this.state === 'closed') {
-      this.state = 'open';
+      this.state    = 'open';
+      this.openedAt = Date.now();
       console.error(`[KALSHI] Circuit breaker OPENED after ${this.failures} failures`);
     }
   }
@@ -370,6 +389,11 @@ class CircuitBreaker {
 }
 
 const kalshiCircuitBreaker = new CircuitBreaker();
+
+/** Force-close the shared Kalshi circuit breaker. Call after a confirmed successful API response. */
+export function resetKalshiCircuitBreaker(): void {
+  kalshiCircuitBreaker.forceReset();
+}
 
 /**
  * Fetch a single page of markets.

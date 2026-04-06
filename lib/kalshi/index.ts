@@ -315,22 +315,32 @@ function parseMarket(m: any): KalshiMarket {
 // ── Circuit Breaker ───────────────────────────────────────────────────────────
 // Opens after 5 consecutive failures; auto-resets to half-open after 60 s.
 // In half-open state one probe request is allowed — success closes the breaker.
+// Force-resets to closed after maxOpenMs (default 10 min) to recover stale
+// open state in long-lived Lambda instances.
 
 class CircuitBreaker {
   private failures = 0;
   private lastFailTime = 0;
+  private openedAt = 0;
   private state: 'closed' | 'open' | 'half-open' = 'closed';
   private readonly threshold: number;
   private readonly resetTimeoutMs: number;
+  private readonly maxOpenMs: number;
 
-  constructor(threshold = 5, resetTimeoutMs = 60_000) {
-    this.threshold     = threshold;
+  constructor(threshold = 5, resetTimeoutMs = 60_000, maxOpenMs = 600_000) {
+    this.threshold      = threshold;
     this.resetTimeoutMs = resetTimeoutMs;
+    this.maxOpenMs      = maxOpenMs;
   }
 
   async execute<T>(fn: () => Promise<T>): Promise<T> {
     if (this.state === 'open') {
-      if (Date.now() - this.lastFailTime >= this.resetTimeoutMs) {
+      const msOpen = Date.now() - this.openedAt;
+      if (msOpen >= this.maxOpenMs) {
+        // Breaker stuck open in a warm Lambda for >10 min — force reset
+        this.forceReset();
+        console.warn(`[KALSHI] Circuit breaker force-reset after ${Math.round(msOpen / 60000)}m open`);
+      } else if (Date.now() - this.lastFailTime >= this.resetTimeoutMs) {
         this.state = 'half-open';
         console.log('[KALSHI] Circuit breaker → half-open (probe)');
       } else {
@@ -348,6 +358,14 @@ class CircuitBreaker {
     }
   }
 
+  forceReset(): void {
+    this.failures     = 0;
+    this.state        = 'closed';
+    this.lastFailTime = 0;
+    this.openedAt     = 0;
+    console.log('[KALSHI] Circuit breaker force-reset → closed');
+  }
+
   private _onSuccess(): void {
     this.failures = 0;
     if (this.state !== 'closed') {
@@ -360,7 +378,8 @@ class CircuitBreaker {
     this.failures++;
     this.lastFailTime = Date.now();
     if (this.failures >= this.threshold && this.state === 'closed') {
-      this.state = 'open';
+      this.state    = 'open';
+      this.openedAt = Date.now();
       console.error(`[KALSHI] Circuit breaker OPENED after ${this.failures} failures`);
     }
   }
@@ -370,6 +389,11 @@ class CircuitBreaker {
 }
 
 const kalshiCircuitBreaker = new CircuitBreaker();
+
+/** Force-close the shared Kalshi circuit breaker. Call after a confirmed successful API response. */
+export function resetKalshiCircuitBreaker(): void {
+  kalshiCircuitBreaker.forceReset();
+}
 
 /**
  * Fetch a single page of markets.
@@ -1056,6 +1080,46 @@ export async function fetchFinanceMarkets(limit: number = 50): Promise<KalshiMar
 
   console.log(`[KALSHI] Finance markets total: ${all.length}`);
   return all.slice(0, limit);
+}
+
+/**
+ * Fetch entertainment / pop-culture prediction markets from Kalshi.
+ * Uses client-side title filtering since the Kalshi API has no category param for entertainment.
+ * First checks the top-1000 markets (shared cache), then pages through all markets if needed.
+ */
+export async function fetchEntertainmentMarkets(limit: number = 20): Promise<KalshiMarket[]> {
+  const ENTERTAINMENT_KEYWORDS = [
+    'oscar', 'grammy', 'emmy', 'tony award', 'golden globe', 'bafta',
+    'box office', 'billboard', 'academy award', 'best picture', 'best actor',
+    'best actress', 'netflix', 'celebrity', 'cannes', 'award season',
+    'super bowl halftime', 'music award', 'film award', 'reality show',
+    'people\'s choice', 'mtv award', 'vma', 'ama award', 'country music award',
+  ];
+
+  function isEntertainmentMarket(m: KalshiMarket): boolean {
+    const text = `${m.title} ${m.subtitle ?? ''}`.toLowerCase();
+    return ENTERTAINMENT_KEYWORDS.some(kw => text.includes(kw));
+  }
+
+  // First: check top 1000 markets (uses shared in-memory cache — free if already warm)
+  const topMarkets = await fetchKalshiMarkets({ limit: 1000 });
+  let entertainment = topMarkets.filter(isEntertainmentMarket);
+
+  // Second: if thin results, do a full paginated fetch (up to 2000 markets)
+  if (entertainment.length < 3) {
+    console.log('[KALSHI] Entertainment: top-1000 returned few results, fetching all markets...');
+    const allMarkets = await fetchAllKalshiMarkets({ maxMarkets: 2000, useCache: true });
+    const seen = new Set(topMarkets.map(m => m.ticker));
+    for (const m of allMarkets) {
+      if (!seen.has(m.ticker) && isEntertainmentMarket(m)) {
+        entertainment.push(m);
+        seen.add(m.ticker);
+      }
+    }
+  }
+
+  console.log(`[KALSHI] Entertainment markets: ${entertainment.length} found`);
+  return entertainment.slice(0, limit);
 }
 
 /**

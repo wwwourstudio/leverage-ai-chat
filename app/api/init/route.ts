@@ -13,6 +13,7 @@
 
 import { NextResponse } from 'next/server';
 import { isSupabaseConfigured } from '@/lib/config';
+import type { User } from '@supabase/supabase-js';
 
 export const runtime  = 'nodejs';
 export const maxDuration = 10;
@@ -27,9 +28,10 @@ const DEFAULT_INSIGHTS = {
   message: 'No historical data yet. Start analyzing to build your track record.',
 };
 
-async function fetchInstructions(supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server')['createClient']>>) {
+type SupabaseClient = Awaited<ReturnType<typeof import('@/lib/supabase/server')['createClient']>>;
+
+async function fetchInstructions(supabase: SupabaseClient, user: User | null) {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return '';
 
     const { data } = await supabase
@@ -44,9 +46,8 @@ async function fetchInstructions(supabase: Awaited<ReturnType<typeof import('@/l
   }
 }
 
-async function fetchCredits(supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server')['createClient']>>) {
+async function fetchCredits(supabase: SupabaseClient, user: User | null) {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { credits: 0, source: 'guest' as const };
 
     const { data } = await supabase
@@ -69,19 +70,14 @@ async function fetchCredits(supabase: Awaited<ReturnType<typeof import('@/lib/su
   }
 }
 
-async function fetchInsights(supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server')['createClient']>>) {
+async function fetchInsights(supabase: SupabaseClient, user: User | null) {
   if (!isSupabaseConfigured()) return DEFAULT_INSIGHTS;
 
   try {
+    if (!user) return DEFAULT_INSIGHTS;
+
     const timeout = <T>(ms: number): Promise<T> =>
       new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms));
-
-    const { data: { user } } = await Promise.race([
-      supabase.auth.getUser(),
-      timeout<{ data: { user: null } }>(4_000),
-    ]);
-
-    if (!user) return DEFAULT_INSIGHTS;
 
     const { data } = await Promise.race([
       supabase.from('user_insights').select('*').eq('user_id', user.id).single(),
@@ -103,9 +99,8 @@ async function fetchInsights(supabase: Awaited<ReturnType<typeof import('@/lib/s
   }
 }
 
-async function fetchChats(supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server')['createClient']>>) {
+async function fetchChats(supabase: SupabaseClient, user: User | null) {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
 
     const { data } = await supabase
@@ -143,15 +138,17 @@ export async function GET() {
 
   try {
     const { createClient } = await import('@/lib/supabase/server');
-    // Single shared Supabase client to reuse the same auth session across all 4 fetches.
+    // Single shared Supabase client; getUser() called exactly once and passed
+    // to each helper — eliminates 3 redundant auth/v1/user round-trips.
     const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
     const [instructions, creditsData, insights, chats] = await Promise.race([
       Promise.all([
-        fetchInstructions(supabase).catch(() => ''),
-        fetchCredits(supabase).catch(() => ({ credits: 0, source: 'guest' as const })),
-        fetchInsights(supabase).catch(() => DEFAULT_INSIGHTS),
-        fetchChats(supabase).catch(() => [] as unknown[]),
+        fetchInstructions(supabase, user).catch(() => ''),
+        fetchCredits(supabase, user).catch(() => ({ credits: 0, source: 'guest' as const })),
+        fetchInsights(supabase, user).catch(() => DEFAULT_INSIGHTS),
+        fetchChats(supabase, user).catch(() => [] as unknown[]),
       ]),
       deadline,
     ]);

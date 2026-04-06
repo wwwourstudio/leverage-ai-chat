@@ -3,14 +3,13 @@
  *
  * Ingest Layer — Kalshi markets refresh.
  * Fetches open Kalshi markets, filters to tracked categories (sports +
- * politics + finance), and upserts them into api.kalshi_markets for
- * card-generator cache reads.
+ * politics + finance + crypto + weather + entertainment), and upserts
+ * them into api.kalshi_markets for card-generator cache reads.
  *
- * Category matching uses two complementary strategies:
- *  1. TRACKED_CATEGORIES  — matches the Kalshi `category` string directly.
- *  2. POLITICAL_SERIES    — matches against `series_ticker` for political
- *     markets (KXUSSENATE, KXUSHOUSE, KXUSGOV, PRES, POTUS) which Kalshi
- *     may not label with a "Politics" category string in all API versions.
+ * Uses fetchKalshiMarkets() from lib/kalshi/index.ts so markets are
+ * normalised through parseMarket() / normalizeCategoryLabel() before
+ * category matching — raw Kalshi API returns empty category strings and
+ * relies on series_ticker (e.g. "KXMLB25APR6-Y1") for identification.
  *
  * Vercel Cron schedule: every 5 minutes  (*\/5 * * * *)
  * Auth: CRON_SECRET query param or header
@@ -30,26 +29,30 @@ function getServiceClient() {
   return createClient(url, key, { db: { schema: 'api' } });
 }
 
-// ── Tracked category strings (Kalshi `category` field) ────────────────────────
-// Extend this set whenever Kalshi introduces new category label variants.
+// ── Tracked category strings (normalizeCategoryLabel() output) ─────────────
+// Includes every label that normalizeCategoryLabel() can return so no live
+// market type is silently dropped.  Extend this set if Kalshi adds new
+// series prefixes and normalizeCategoryLabel() is updated accordingly.
 const TRACKED_CATEGORIES = new Set([
-  // Sports
-  'Sports', 'sports',
-  'Baseball', 'Basketball', 'Football', 'Hockey', 'Soccer',
-  'Golf', 'Tennis', 'MMA', 'Boxing', 'NFL', 'NBA', 'MLB', 'NHL',
-  'NCAAB', 'NCAAF',
-  // Politics — Kalshi uses these strings inconsistently across API versions;
-  // the POLITICAL_SERIES prefix allowlist below is the canonical path for
-  // political markets (series_ticker is always populated and exact).
-  'Politics', 'politics', 'Elections', 'elections',
-  'Government', 'government',
+  // Sports — individual leagues
+  'NFL', 'NBA', 'MLB', 'NHL',
+  'NCAAB', 'College Basketball', 'NCAAF', 'College Football',
+  'NASCAR', 'Golf', 'Formula 1', 'MMA', 'Boxing', 'WNBA',
+  'Soccer', 'Tennis',
+  // Broader sports strings (raw API fallback values)
+  'Sports', 'sports', 'Baseball', 'Basketball', 'Football', 'Hockey',
+  // Politics
+  'Politics', 'politics', 'Elections', 'elections', 'Government', 'government',
+  // Finance / Economics / Crypto
+  'Finance', 'finance', 'Crypto', 'crypto', 'Economics', 'economics',
+  // Other normalizeCategoryLabel outputs
+  'Weather', 'Entertainment', 'Prediction Market',
 ]);
 
-// ── Political series-ticker prefixes ─────────────────────────────────────────
-// Kalshi political markets always carry one of these series_ticker prefixes.
-// This list is the authoritative allowlist — it catches markets regardless of
-// what the `category` field says, and bypasses the hex-segment quality filter
-// in lib/kalshi/index.ts for known-valid political event tickers.
+// ── Political series-ticker prefixes (belt-and-suspenders fallback) ──────
+// Catches political markets when normalizeCategoryLabel() returns 'Politics'
+// AND as a direct series_ticker check in case the normalized category
+// somehow diverges from the expected value.
 const POLITICAL_SERIES_PREFIXES = [
   'KXUSSENATE',
   'KXUSHOUSE',
@@ -84,27 +87,35 @@ export async function GET(req: NextRequest) {
   const startedAt = Date.now();
 
   try {
-    const { getKalshiClient } = await import('@/lib/kalshi/kalshiClient');
-    const client = getKalshiClient();
+    const { fetchKalshiMarkets, resetKalshiCircuitBreaker } = await import('@/lib/kalshi/index');
 
-    // Fetch open markets (up to 100 at a time)
-    const { markets } = await client.getMarkets({ status: 'open', limit: 100 });
+    // useCache: false — cron always fetches fresh data; don't pollute the
+    // 60 s in-memory cache used by the card generators.
+    const markets = await fetchKalshiMarkets({ limit: 100, status: 'open', useCache: false });
+
+    // ── Step 2 instrumentation (temporary debug logs) ───────────────────
+    console.log('[kalshi-debug] markets count before filter:', markets.length);
+    console.log('[kalshi-debug] sample categories:', markets.slice(0, 5).map(m => m.category));
+    console.log('[kalshi-debug] sample statuses:', markets.slice(0, 5).map(m => m.status));
 
     if (!markets?.length) {
       console.log('[v0] [cron/kalshi] No open markets returned');
       return NextResponse.json({ ok: true, markets: 0, durationMs: Date.now() - startedAt });
     }
 
-    // Filter to tracked categories (sports + politics + finance).
+    // API is clearly responding — reset circuit breaker if it was open
+    resetKalshiCircuitBreaker();
+
+    // Filter to tracked categories.
     //
-    // Strategy A: direct `category` field match against TRACKED_CATEGORIES.
-    // Strategy B: series_ticker prefix match against POLITICAL_SERIES_PREFIXES —
-    //   this is the reliable path for political markets; the `category` field is
-    //   not consistently populated for political markets across Kalshi API versions.
-    function isTrackedMarket(m: { category?: string; series_ticker?: string }): boolean {
+    // Strategy A: normalized category from parseMarket() / normalizeCategoryLabel()
+    //   covers sports leagues (MLB → 'MLB'), crypto (KXBT → 'Crypto'), etc.
+    // Strategy B: series_ticker prefix match for political markets — belt-and-suspenders
+    //   in case normalizeCategoryLabel produces an unexpected string variant.
+    function isTrackedMarket(m: { category?: string; seriesTicker?: string }): boolean {
       if (m.category && TRACKED_CATEGORIES.has(m.category)) return true;
-      if (m.series_ticker) {
-        const s = m.series_ticker.toUpperCase();
+      if (m.seriesTicker) {
+        const s = m.seriesTicker.toUpperCase();
         if (POLITICAL_SERIES_PREFIXES.some(prefix => s.startsWith(prefix))) return true;
       }
       return false;
@@ -115,24 +126,26 @@ export async function GET(req: NextRequest) {
     console.log(`[cron/kalshi] ${trackedMarkets.length}/${markets.length} tracked markets to upsert`);
 
     if (trackedMarkets.length === 0) {
-      // Fallback: upsert a broad slice if neither the category nor any political
-      // series prefix matched. This can happen when Kalshi changes internal field
-      // names; the fallback ensures the DB is never completely empty after a run.
-      console.log('[cron/kalshi] No tracked category / series match — upserting first 50 open markets as fallback');
+      // Fallback: upsert all markets with a valid ticker when category matching
+      // produces no results.  This can happen transiently while Kalshi changes
+      // internal category/series naming — keeps the DB populated either way.
+      console.log('[cron/kalshi] No tracked category / series match — upserting all markets as fallback');
     }
 
-    const targetMarkets = trackedMarkets.length > 0 ? trackedMarkets : markets.slice(0, 50);
+    // Widen fallback from first-50 to ALL markets with valid ticker
+    const targetMarkets = trackedMarkets.length > 0 ? trackedMarkets : markets.filter(m => m.ticker);
     const now = new Date().toISOString();
 
+    // Field names come from lib/kalshi/index.ts KalshiMarket (camelCase, normalized)
     const rows = targetMarkets.map(m => ({
-      market_id: m.ticker,
-      title: m.title,
-      category: m.category ?? null,
-      yes_price: m.yes_bid != null ? m.yes_bid / 100 : null,   // Kalshi prices are in cents
-      no_price: m.no_bid != null ? m.no_bid / 100 : null,
-      volume: m.volume ?? null,
-      close_time: m.expiration_time ?? null,
-      cached_at: now,
+      market_id:  m.ticker,
+      title:      m.title,
+      category:   m.category ?? null,
+      yes_price:  m.yesPrice  != null ? m.yesPrice  / 100 : null,  // yesPrice is 0–99 cents
+      no_price:   m.noPrice   != null ? m.noPrice   / 100 : null,
+      volume:     m.volume    ?? null,
+      close_time: m.closeTime ?? null,
+      cached_at:  now,
       expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     }));
 
@@ -149,7 +162,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-      console.log(`[cron/kalshi] Upserted ${rows.length} Kalshi markets in ${Date.now() - startedAt}ms`);
+    console.log(`[cron/kalshi] Upserted ${rows.length} Kalshi markets in ${Date.now() - startedAt}ms`);
 
     return NextResponse.json({
       ok: true,

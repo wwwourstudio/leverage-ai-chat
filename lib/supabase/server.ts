@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { cache } from 'react'
 
 export async function createClient() {
   const cookieStore = await cookies()
@@ -33,3 +34,15 @@ export async function createClient() {
     },
   })
 }
+
+/**
+ * React-cache-wrapped getUser() for server components and route handlers.
+ * Next.js deduplicates cache() calls within a single server request, so
+ * calling getCachedUser() multiple times in parallel helpers only hits
+ * auth/v1/user once per request.
+ */
+export const getCachedUser = cache(async () => {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  return user ?? null
+})

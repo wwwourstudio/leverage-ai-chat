@@ -16,6 +16,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useAuth } from '@/components/AuthProvider';
 import dynamic from 'next/dynamic';
 import { fetchDynamicCards, type DynamicCard } from '@/lib/data-service';
 import { API_ENDPOINTS, PLAYER_HEADSHOT_IDS, sportToApi, FREE_TIER } from '@/lib/constants';
@@ -176,6 +177,8 @@ interface FantasyLeague {
 export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps) {
   const toast = useToast();
   const { setTheme } = useTheme();
+  const { user: authUser, loading: authLoading } = useAuth();
+  const prevAuthUserIdRef = useRef<string | null>(undefined as unknown as string | null);
 
   // Dynamic welcome message based on time, category, and selected sport
   const getWelcomeMessage = (category: string, sport?: string, userName?: string) => {
@@ -337,6 +340,10 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // firing against a placeholder ID ('chat-1' or 'chat-{timestamp}').
   const pendingThreadRef = useRef<Promise<import('@/lib/chat-service').ChatThread | null> | null>(null);
   const pendingQueryRef = useRef<string | null>(null);
+  // Set to true by loadInitData() after seeding aiQuickActions from init.defaultPrompts.
+  // The prompts useEffect checks this on its first fire to avoid clearing + re-fetching
+  // prompts that were already seeded on page load.
+  const initPromptsLoadedRef = useRef(false);
 
   // Fantasy league setup state — must NOT read localStorage here (causes SSR hydration mismatch #418)
   const [fantasyLeague, setFantasyLeague] = useState<FantasyLeague | null>(null);
@@ -481,11 +488,24 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     }
   };
 
-  // Fetch credits + instructions from /api/init and apply to state.
+  // Fetch credits + instructions + chats from /api/init and apply to state.
+  // Called on every auth resolution (signed in OR guest) — replaces the old
+  // page-load useEffect so /api/init is requested exactly once per page load.
   const loadInitData = async () => {
     try {
       const res = await fetch('/api/init');
       const init = await res.json();
+
+      // Hydrate welcome message insights
+      if (init.insights) {
+        setMessages((prev: Message[]) => {
+          const newMessages = [...prev];
+          if (newMessages[0]?.isWelcome) {
+            newMessages[0] = { ...newMessages[0], insights: init.insights };
+          }
+          return newMessages;
+        });
+      }
       if (init.credits?.credits != null) {
         const bal: number = init.credits.credits;
         setCreditsRemaining(bal);
@@ -496,8 +516,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         setCustomInstructions(init.instructions);
         localStorage.setItem('leverage_custom_instructions', init.instructions);
       }
-      // Keep quick-actions in sync when user logs in mid-session (same seeding
-      // as the page-load useEffect, so users and visitors see identical prompts).
+      // Seed quick-action prompts and mark them as loaded so the prompts
+      // useEffect skips its first-mount fetch (which would clear these).
       if (Array.isArray(init.defaultPrompts) && init.defaultPrompts.length > 0) {
         setAiQuickActions(
           init.defaultPrompts.map((p: { label: string; query: string }) => ({
@@ -507,6 +527,46 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             query: p.query,
           }))
         );
+        initPromptsLoadedRef.current = true;
+      }
+      // Populate chat threads directly from init.chats — same data as /api/chats GET,
+      // eliminating a redundant round-trip. Only applies when the user is logged in.
+      if (Array.isArray(init.chats) && init.chats.length > 0) {
+        const threads = init.chats.map((t: any) => ({
+          id: t.id,
+          title: t.title,
+          preview: t.preview ?? '',
+          timestamp: new Date(t.updated_at ?? t.created_at),
+          starred: t.starred ?? false,
+          category: t.category ?? 'all',
+          tags: t.tags ?? [],
+        }));
+        setIsLoadingChats(false);
+        setChats(threads);
+        setActiveChat(threads[0].id);
+        const firstThread = threads[0];
+        if (firstThread.category && firstThread.category !== 'all') {
+          setSelectedCategory(firstThread.category);
+        }
+        const SPORT_KEYS_LIST = ['basketball_nba', 'americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb', 'soccer_epl', 'soccer_mls'];
+        const sportTag = firstThread.tags?.find((t: string) => SPORT_KEYS_LIST.includes(t));
+        if (sportTag) setSelectedSport(sportTag);
+        loadMessages(firstThread.id).then(msgs => {
+          if (msgs.length > 0) {
+            let storedCards: Record<string, any[]> = {};
+            try { storedCards = JSON.parse(localStorage.getItem(`lev:cards:${firstThread.id}`) ?? '{}'); } catch { /* ignore */ }
+            setMessages(msgs.map((m: any) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              timestamp: m.timestamp,
+              cards: m.cards?.length ? m.cards : (storedCards[m.id ?? ''] ?? []),
+              modelUsed: m.modelUsed,
+              confidence: m.confidence,
+              isWelcome: m.isWelcome,
+            })) as any);
+          }
+        });
       }
     } catch {
       loadInstructionsFromLocalStorage();
@@ -599,124 +659,60 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     } catch { /* non-critical — localStorage fallback already loaded */ }
   };
 
-  // Check Supabase auth session on mount and sync credits
+  // Sync auth state from AuthProvider (getSession from localStorage — 0 network calls).
+  // prevAuthUserIdRef ensures side-effects (loadInitData, loadThreads) fire only on
+  // identity transitions, not on every render.
   useEffect(() => {
-    (async () => {
-      try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+    if (authLoading) return;
 
-        if (user) {
-          setIsLoggedIn(true);
-          setUser({
-            name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-            email: user.email || '',
-            avatar: user.user_metadata?.avatar_url || user.user_metadata?.picture || undefined,
-          });
-          // Load profile ID for credit sync (credits/instructions come via the page-load /api/init)
-          loadProfileId(user.id);
-          // Restore fantasy league from DB (overrides localStorage if a DB record exists)
-          loadFantasyLeagueFromDB();
-          // Load persisted chat threads from Supabase
-          setIsLoadingChats(true);
-          loadThreads().then(threads => {
-            setIsLoadingChats(false);
-            if (threads.length > 0) {
-              setChats(threads);
-              setActiveChat(threads[0].id);
-              // Restore category and sport filters from the most recent thread
-              const firstThread = threads[0];
-              if (firstThread.category && firstThread.category !== 'all') {
-                setSelectedCategory(firstThread.category);
-              }
-              const SPORT_KEYS_LIST = ['basketball_nba', 'americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb', 'soccer_epl', 'soccer_mls'];
-              const sportTag = firstThread.tags?.find((t: string) => SPORT_KEYS_LIST.includes(t));
-              if (sportTag) setSelectedSport(sportTag);
-              // Load messages for the most recent thread
-              loadMessages(threads[0].id).then(msgs => {
-                if (msgs.length > 0) {
-                  let storedCards: Record<string, any[]> = {};
-                  try { storedCards = JSON.parse(localStorage.getItem(`lev:cards:${threads[0].id}`) ?? '{}'); } catch { /* ignore */ }
-                  setMessages(msgs.map((m: any) => ({
-                    id: m.id,
-                    role: m.role,
-                    content: m.content,
-                    timestamp: m.timestamp,
-                    cards: m.cards?.length ? m.cards : (storedCards[m.id ?? ''] ?? []),
-                    modelUsed: m.modelUsed,
-                    confidence: m.confidence,
-                    isWelcome: m.isWelcome,
-                  })) as any);
-                }
-              });
-            }
-          });
-        } else {
-          // Not logged in — load instructions from localStorage
-          loadInstructionsFromLocalStorage();
-        }
+    const currentUserId = authUser?.id ?? null;
+    // undefined means "not yet initialised" — skip the first render guard check
+    const prevUserId = prevAuthUserIdRef.current === (undefined as unknown as string | null)
+      ? undefined
+      : prevAuthUserIdRef.current;
+    prevAuthUserIdRef.current = currentUserId;
 
-        // Listen for auth changes (OAuth redirect, signout, etc.)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-          if (session?.user) {
-            setIsLoggedIn(true);
-            setUser({
-              name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
-              email: session.user.email || '',
-              avatar: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || undefined,
-            });
-            setShowLoginModal(false);
-            setShowSignupModal(false);
-            // Load profile ID + refresh credits/instructions via /api/init on auth change
-            loadProfileId(session.user.id);
-            loadInitData();
-            // Restore fantasy league from DB on sign-in
-            loadFantasyLeagueFromDB();
-            // Load chat threads + most recent messages so history appears immediately
-            // after email/password login (Google OAuth handles this via page redirect).
-            setIsLoadingChats(true);
-            loadThreads().then(threads => {
-              setIsLoadingChats(false);
-              if (threads.length > 0) {
-                setChats(threads);
-                setActiveChat(threads[0].id);
-                loadMessages(threads[0].id).then(msgs => {
-                  if (msgs.length > 0) {
-                    let storedCards: Record<string, any[]> = {};
-                    try { storedCards = JSON.parse(localStorage.getItem(`lev:cards:${threads[0].id}`) ?? '{}'); } catch { /* ignore */ }
-                    setMessages(msgs.map((m: any) => ({
-                      id: m.id,
-                      role: m.role,
-                      content: m.content,
-                      timestamp: m.timestamp,
-                      cards: m.cards?.length ? m.cards : (storedCards[m.id ?? ''] ?? []),
-                      modelUsed: m.modelUsed,
-                      confidence: m.confidence,
-                      isWelcome: m.isWelcome,
-                    })) as any);
-                  }
-                });
-              }
-            });
-          } else {
-            setIsLoggedIn(false);
-            setUser(null);
-            setSupabaseProfileId(null);
-            // Clear user-specific data on logout
-            setFantasyLeague(null);
-            localStorage.removeItem('leverage_fantasy_league');
-            // Revert to localStorage instructions on logout
-            const stored = localStorage.getItem('leverage_custom_instructions') || '';
-            setCustomInstructions(stored);
-          }
-        });
+    if (authUser) {
+      setIsLoggedIn(true);
+      setUser({
+        name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
+        email: authUser.email || '',
+        avatar: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || undefined,
+      });
+      setShowLoginModal(false);
+      setShowSignupModal(false);
+      loadProfileId(authUser.id);
 
-        return () => subscription.unsubscribe();
-      } catch (err) {
-        console.error('[v0] Auth check failed:', err);
+      // Only fire data-loading side-effects on actual identity transitions (sign-in / switch),
+      // not on token-refresh events where authUser is the same person.
+      if (prevUserId !== currentUserId) {
+        loadFantasyLeagueFromDB();
+        // loadInitData() fetches /api/init which returns credits, instructions, insights,
+        // chats, and defaultPrompts in a single request — no separate /api/chats call needed.
+        setIsLoadingChats(true);
+        loadInitData();
       }
-    })();
-  }, []);
+    } else {
+      // Signed out (or first load as guest)
+      setIsLoggedIn(false);
+      setUser(null);
+      setSupabaseProfileId(null);
+      setFantasyLeague(null);
+      localStorage.removeItem('leverage_fantasy_league');
+      const stored = localStorage.getItem('leverage_custom_instructions') || '';
+      setCustomInstructions(stored);
+      if (prevUserId !== null && prevUserId !== undefined) {
+        // Actual sign-out transition — reload guest instructions
+        loadInstructionsFromLocalStorage();
+      }
+      // On first mount as guest (prevUserId is undefined), call loadInitData() to
+      // seed prompts and any guest-visible init data — replaces the old page-load useEffect.
+      if (prevUserId === undefined) {
+        loadInitData();
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser, authLoading]);
 
   // Handle Stripe checkout success: verify session server-side before adding credits
   useEffect(() => {
@@ -753,65 +749,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     })();
   }, []);
 
-  // Batch page-load data fetch — /api/init calls all 4 endpoints in parallel
-  // server-side to reduce cold-start round-trips.
-  useEffect(() => {
-    fetch('/api/init')
-      .then(r => r.json())
-      .then(init => {
-        // Hydrate welcome message insights
-        if (init.insights) {
-          setMessages((prev: Message[]) => {
-            const newMessages = [...prev];
-            if (newMessages[0]?.isWelcome) {
-              newMessages[0] = { ...newMessages[0], insights: init.insights };
-            }
-            return newMessages;
-          });
-        }
-        // Hydrate custom instructions
-        if (typeof init.instructions === 'string' && init.instructions) {
-          setCustomInstructions(init.instructions);
-          localStorage.setItem('leverage_custom_instructions', init.instructions);
-        }
-        // Hydrate credits (replaces /api/credits cold-start call)
-        if (init.credits?.credits != null) {
-          const bal: number = init.credits.credits;
-          setCreditsRemaining(bal);
-          const creditData = getCreditData();
-          localStorage.setItem('userCredits', JSON.stringify({ ...creditData, credits: bal }));
-        }
-        // Hydrate default prompts — eliminates the separate /api/prompts cold-start.
-        // The prompts useEffect below still runs when category/sport changes to fetch
-        // AI-generated, context-specific suggestions; this just covers the first paint.
-        if (Array.isArray(init.defaultPrompts) && init.defaultPrompts.length > 0) {
-          setAiQuickActions(
-            init.defaultPrompts.map((p: { label: string; query: string }) => ({
-              label: p.label,
-              icon: Sparkles,
-              category: selectedCategory,
-              query: p.query,
-            }))
-          );
-        }
-      })
-      .catch(err => {
-        console.error('[v0] Error loading initial data:', err);
-        // Fall back to individual insights endpoint
-        fetch('/api/insights')
-          .then(r => r.json())
-          .then(insights => {
-            setMessages((prev: Message[]) => {
-              const newMessages = [...prev];
-              if (newMessages[0]?.isWelcome) {
-                newMessages[0] = { ...newMessages[0], insights };
-              }
-              return newMessages;
-            });
-          })
-          .catch(() => {});
-      });
-  }, []);
+  // NOTE: The page-load /api/init fetch was here previously ([] deps useEffect).
+  // It has been removed — loadInitData() in the auth effect now covers both
+  // authenticated and guest users on first mount, preventing a duplicate fetch.
 
   // Initialize the Kalshi WebSocket store once on mount (client-side only).
   // The WS itself only opens when a KalshiCard subscribes to a ticker — this
@@ -957,7 +897,14 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
   // Fetch AI-generated quick-action prompts from the /api/prompts endpoint.
   // Refreshes when the selected platform category or sport changes.
+  // On first mount, loadInitData() already seeded aiQuickActions from init.defaultPrompts,
+  // so we skip the initial fetch to avoid clearing then re-fetching identical data.
   useEffect(() => {
+    if (initPromptsLoadedRef.current) {
+      // Init already seeded prompts — consume the guard and skip this first fire.
+      initPromptsLoadedRef.current = false;
+      return;
+    }
     let cancelled = false;
     setAiQuickActions(null); // reset so fallback shows until new prompts arrive
     fetch(`/api/prompts?category=${encodeURIComponent(selectedCategory)}&sport=${encodeURIComponent(selectedSport ?? '')}`)
@@ -1632,6 +1579,12 @@ No preamble. Start directly with section 1.`;
           if (m.includes('polit') || m.includes('election')) return 'politics';
           if (m.includes('weather') || m.includes('climate')) return 'weather';
           if (m.includes('finance') || m.includes('crypto') || m.includes('econom') || m.includes('stock')) return 'finance';
+          if (m.includes('oscar') || m.includes('grammy') || m.includes('emmy')
+            || m.includes('award') || m.includes('entertainment') || m.includes('golden globe')
+            || m.includes('bafta') || m.includes('box office') || m.includes('academy award')
+            || m.includes('celebrity') || m.includes('billboard') || m.includes('netflix')
+            || m.includes('reality show') || m.includes('music video') || m.includes('film')
+            || m.includes('movie')) return 'entertainment';
           return undefined;
         })(),
         // Pass selected tab so the API can route DFS vs fantasy correctly

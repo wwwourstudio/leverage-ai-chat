@@ -4,6 +4,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { ToastProvider } from '@/components/toast-provider'
+import { AuthProvider } from '@/components/AuthProvider'
 import { PWARegister } from '@/components/pwa-register'
 import { GlobalErrorSuppressor } from '@/components/global-error-suppressor'
 import { ThemeProvider } from '@/components/theme-provider'
@@ -92,9 +93,11 @@ export default function RootLayout({
           enableSystem
           storageKey="leverage-ai-theme"
         >
-          <ToastProvider>
-            {children}
-          </ToastProvider>
+          <AuthProvider>
+            <ToastProvider>
+              {children}
+            </ToastProvider>
+          </AuthProvider>
         </ThemeProvider>
         <Analytics />
         <SpeedInsights />

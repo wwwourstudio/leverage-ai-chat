@@ -340,6 +340,10 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // firing against a placeholder ID ('chat-1' or 'chat-{timestamp}').
   const pendingThreadRef = useRef<Promise<import('@/lib/chat-service').ChatThread | null> | null>(null);
   const pendingQueryRef = useRef<string | null>(null);
+  // Set to true by loadInitData() after seeding aiQuickActions from init.defaultPrompts.
+  // The prompts useEffect checks this on its first fire to avoid clearing + re-fetching
+  // prompts that were already seeded on page load.
+  const initPromptsLoadedRef = useRef(false);
 
   // Fantasy league setup state — must NOT read localStorage here (causes SSR hydration mismatch #418)
   const [fantasyLeague, setFantasyLeague] = useState<FantasyLeague | null>(null);
@@ -484,11 +488,24 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     }
   };
 
-  // Fetch credits + instructions from /api/init and apply to state.
+  // Fetch credits + instructions + chats from /api/init and apply to state.
+  // Called on every auth resolution (signed in OR guest) — replaces the old
+  // page-load useEffect so /api/init is requested exactly once per page load.
   const loadInitData = async () => {
     try {
       const res = await fetch('/api/init');
       const init = await res.json();
+
+      // Hydrate welcome message insights
+      if (init.insights) {
+        setMessages((prev: Message[]) => {
+          const newMessages = [...prev];
+          if (newMessages[0]?.isWelcome) {
+            newMessages[0] = { ...newMessages[0], insights: init.insights };
+          }
+          return newMessages;
+        });
+      }
       if (init.credits?.credits != null) {
         const bal: number = init.credits.credits;
         setCreditsRemaining(bal);
@@ -499,8 +516,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         setCustomInstructions(init.instructions);
         localStorage.setItem('leverage_custom_instructions', init.instructions);
       }
-      // Keep quick-actions in sync when user logs in mid-session (same seeding
-      // as the page-load useEffect, so users and visitors see identical prompts).
+      // Seed quick-action prompts and mark them as loaded so the prompts
+      // useEffect skips its first-mount fetch (which would clear these).
       if (Array.isArray(init.defaultPrompts) && init.defaultPrompts.length > 0) {
         setAiQuickActions(
           init.defaultPrompts.map((p: { label: string; query: string }) => ({
@@ -510,6 +527,46 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             query: p.query,
           }))
         );
+        initPromptsLoadedRef.current = true;
+      }
+      // Populate chat threads directly from init.chats — same data as /api/chats GET,
+      // eliminating a redundant round-trip. Only applies when the user is logged in.
+      if (Array.isArray(init.chats) && init.chats.length > 0) {
+        const threads = init.chats.map((t: any) => ({
+          id: t.id,
+          title: t.title,
+          preview: t.preview ?? '',
+          timestamp: new Date(t.updated_at ?? t.created_at),
+          starred: t.starred ?? false,
+          category: t.category ?? 'all',
+          tags: t.tags ?? [],
+        }));
+        setIsLoadingChats(false);
+        setChats(threads);
+        setActiveChat(threads[0].id);
+        const firstThread = threads[0];
+        if (firstThread.category && firstThread.category !== 'all') {
+          setSelectedCategory(firstThread.category);
+        }
+        const SPORT_KEYS_LIST = ['basketball_nba', 'americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb', 'soccer_epl', 'soccer_mls'];
+        const sportTag = firstThread.tags?.find((t: string) => SPORT_KEYS_LIST.includes(t));
+        if (sportTag) setSelectedSport(sportTag);
+        loadMessages(firstThread.id).then(msgs => {
+          if (msgs.length > 0) {
+            let storedCards: Record<string, any[]> = {};
+            try { storedCards = JSON.parse(localStorage.getItem(`lev:cards:${firstThread.id}`) ?? '{}'); } catch { /* ignore */ }
+            setMessages(msgs.map((m: any) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              timestamp: m.timestamp,
+              cards: m.cards?.length ? m.cards : (storedCards[m.id ?? ''] ?? []),
+              modelUsed: m.modelUsed,
+              confidence: m.confidence,
+              isWelcome: m.isWelcome,
+            })) as any);
+          }
+        });
       }
     } catch {
       loadInstructionsFromLocalStorage();
@@ -625,46 +682,18 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       setShowLoginModal(false);
       setShowSignupModal(false);
       loadProfileId(authUser.id);
-      loadFantasyLeagueFromDB();
 
-      // Only reload init + threads when user identity actually changes (sign-in / switch).
+      // Only fire data-loading side-effects on actual identity transitions (sign-in / switch),
+      // not on token-refresh events where authUser is the same person.
       if (prevUserId !== currentUserId) {
-        loadInitData();
+        loadFantasyLeagueFromDB();
+        // loadInitData() fetches /api/init which returns credits, instructions, insights,
+        // chats, and defaultPrompts in a single request — no separate /api/chats call needed.
         setIsLoadingChats(true);
-        loadThreads().then(threads => {
-          setIsLoadingChats(false);
-          if (threads.length > 0) {
-            setChats(threads);
-            setActiveChat(threads[0].id);
-            // Restore category and sport filters from the most recent thread
-            const firstThread = threads[0];
-            if (firstThread.category && firstThread.category !== 'all') {
-              setSelectedCategory(firstThread.category);
-            }
-            const SPORT_KEYS_LIST = ['basketball_nba', 'americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb', 'soccer_epl', 'soccer_mls'];
-            const sportTag = firstThread.tags?.find((t: string) => SPORT_KEYS_LIST.includes(t));
-            if (sportTag) setSelectedSport(sportTag);
-            loadMessages(threads[0].id).then(msgs => {
-              if (msgs.length > 0) {
-                let storedCards: Record<string, any[]> = {};
-                try { storedCards = JSON.parse(localStorage.getItem(`lev:cards:${threads[0].id}`) ?? '{}'); } catch { /* ignore */ }
-                setMessages(msgs.map((m: any) => ({
-                  id: m.id,
-                  role: m.role,
-                  content: m.content,
-                  timestamp: m.timestamp,
-                  cards: m.cards?.length ? m.cards : (storedCards[m.id ?? ''] ?? []),
-                  modelUsed: m.modelUsed,
-                  confidence: m.confidence,
-                  isWelcome: m.isWelcome,
-                })) as any);
-              }
-            });
-          }
-        });
+        loadInitData();
       }
     } else {
-      // Signed out
+      // Signed out (or first load as guest)
       setIsLoggedIn(false);
       setUser(null);
       setSupabaseProfileId(null);
@@ -675,6 +704,11 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       if (prevUserId !== null && prevUserId !== undefined) {
         // Actual sign-out transition — reload guest instructions
         loadInstructionsFromLocalStorage();
+      }
+      // On first mount as guest (prevUserId is undefined), call loadInitData() to
+      // seed prompts and any guest-visible init data — replaces the old page-load useEffect.
+      if (prevUserId === undefined) {
+        loadInitData();
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -715,65 +749,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     })();
   }, []);
 
-  // Batch page-load data fetch — /api/init calls all 4 endpoints in parallel
-  // server-side to reduce cold-start round-trips.
-  useEffect(() => {
-    fetch('/api/init')
-      .then(r => r.json())
-      .then(init => {
-        // Hydrate welcome message insights
-        if (init.insights) {
-          setMessages((prev: Message[]) => {
-            const newMessages = [...prev];
-            if (newMessages[0]?.isWelcome) {
-              newMessages[0] = { ...newMessages[0], insights: init.insights };
-            }
-            return newMessages;
-          });
-        }
-        // Hydrate custom instructions
-        if (typeof init.instructions === 'string' && init.instructions) {
-          setCustomInstructions(init.instructions);
-          localStorage.setItem('leverage_custom_instructions', init.instructions);
-        }
-        // Hydrate credits (replaces /api/credits cold-start call)
-        if (init.credits?.credits != null) {
-          const bal: number = init.credits.credits;
-          setCreditsRemaining(bal);
-          const creditData = getCreditData();
-          localStorage.setItem('userCredits', JSON.stringify({ ...creditData, credits: bal }));
-        }
-        // Hydrate default prompts — eliminates the separate /api/prompts cold-start.
-        // The prompts useEffect below still runs when category/sport changes to fetch
-        // AI-generated, context-specific suggestions; this just covers the first paint.
-        if (Array.isArray(init.defaultPrompts) && init.defaultPrompts.length > 0) {
-          setAiQuickActions(
-            init.defaultPrompts.map((p: { label: string; query: string }) => ({
-              label: p.label,
-              icon: Sparkles,
-              category: selectedCategory,
-              query: p.query,
-            }))
-          );
-        }
-      })
-      .catch(err => {
-        console.error('[v0] Error loading initial data:', err);
-        // Fall back to individual insights endpoint
-        fetch('/api/insights')
-          .then(r => r.json())
-          .then(insights => {
-            setMessages((prev: Message[]) => {
-              const newMessages = [...prev];
-              if (newMessages[0]?.isWelcome) {
-                newMessages[0] = { ...newMessages[0], insights };
-              }
-              return newMessages;
-            });
-          })
-          .catch(() => {});
-      });
-  }, []);
+  // NOTE: The page-load /api/init fetch was here previously ([] deps useEffect).
+  // It has been removed — loadInitData() in the auth effect now covers both
+  // authenticated and guest users on first mount, preventing a duplicate fetch.
 
   // Initialize the Kalshi WebSocket store once on mount (client-side only).
   // The WS itself only opens when a KalshiCard subscribes to a ticker — this
@@ -919,7 +897,14 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
   // Fetch AI-generated quick-action prompts from the /api/prompts endpoint.
   // Refreshes when the selected platform category or sport changes.
+  // On first mount, loadInitData() already seeded aiQuickActions from init.defaultPrompts,
+  // so we skip the initial fetch to avoid clearing then re-fetching identical data.
   useEffect(() => {
+    if (initPromptsLoadedRef.current) {
+      // Init already seeded prompts — consume the guard and skip this first fire.
+      initPromptsLoadedRef.current = false;
+      return;
+    }
     let cancelled = false;
     setAiQuickActions(null); // reset so fallback shows until new prompts arrive
     fetch(`/api/prompts?category=${encodeURIComponent(selectedCategory)}&sport=${encodeURIComponent(selectedSport ?? '')}`)

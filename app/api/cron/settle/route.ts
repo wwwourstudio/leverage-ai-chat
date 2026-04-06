@@ -60,11 +60,15 @@ export async function GET(req: NextRequest) {
       timestamp,
     });
   } catch (err) {
-    console.error('[v0] [cron/settle] Fatal error:', err);
+    const errMsg   = err instanceof Error ? err.message : String(err);
+    const errStack = err instanceof Error ? err.stack   : undefined;
+    console.error('[v0] [cron/settle] Fatal error:', errMsg);
+    if (errStack) console.error('[v0] [cron/settle] Stack:', errStack);
+    console.error('[v0] [cron/settle] Error details:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
     return NextResponse.json(
       {
         ok: false,
-        error: err instanceof Error ? err.message : 'Pick settlement failed',
+        error: errMsg,
         durationMs: Date.now() - startedAt,
         timestamp,
       },

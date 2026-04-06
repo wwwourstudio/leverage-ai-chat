@@ -11,7 +11,6 @@
  * with what the trading engine would recommend.
  */
 
-import { createClient } from '@/lib/supabase/server';
 import { calculateKelly } from '@/lib/engine/runTradingEngine';
 import { americanToDecimal } from '@/lib/utils/odds-math';
 
@@ -42,7 +41,9 @@ export async function recordPickResults(
 ): Promise<RecordResultsOutput> {
   const targetDate = date ?? yesterdayUTC();
   const errors: string[] = [];
-  const supabase = await createClient();
+  const { getIngestClient } = await import('@/lib/services/ingest-client.server');
+  const supabase = await getIngestClient();
+  if (!supabase) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set — settlement requires service role access');
 
   // 1. Load unsettled pick_results for the target date
   const { data: unsettledRaw, error: fetchErr } = await supabase
@@ -117,7 +118,9 @@ export async function recordPickResults(
  */
 export async function enrolPicksForTracking(date?: string): Promise<number> {
   const targetDate = date ?? todayUTC();
-  const supabase = await createClient();
+  const { getIngestClient } = await import('@/lib/services/ingest-client.server');
+  const supabase = await getIngestClient();
+  if (!supabase) return 0;
 
   // Load today's non-PASS picks
   const { data: picksRaw, error: picksErr } = await supabase

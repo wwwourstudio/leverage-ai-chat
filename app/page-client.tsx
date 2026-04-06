@@ -1632,6 +1632,12 @@ No preamble. Start directly with section 1.`;
           if (m.includes('polit') || m.includes('election')) return 'politics';
           if (m.includes('weather') || m.includes('climate')) return 'weather';
           if (m.includes('finance') || m.includes('crypto') || m.includes('econom') || m.includes('stock')) return 'finance';
+          if (m.includes('oscar') || m.includes('grammy') || m.includes('emmy')
+            || m.includes('award') || m.includes('entertainment') || m.includes('golden globe')
+            || m.includes('bafta') || m.includes('box office') || m.includes('academy award')
+            || m.includes('celebrity') || m.includes('billboard') || m.includes('netflix')
+            || m.includes('reality show') || m.includes('music video') || m.includes('film')
+            || m.includes('movie')) return 'entertainment';
           return undefined;
         })(),
         // Pass selected tab so the API can route DFS vs fantasy correctly

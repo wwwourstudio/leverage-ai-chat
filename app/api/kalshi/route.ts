@@ -6,6 +6,7 @@ import {
   fetchElectionMarkets,
   fetchWeatherMarkets,
   fetchFinanceMarkets,
+  fetchEntertainmentMarkets,
   fetchTopMarketsByVolume,
   fetchMarketOrderbook,
   fetchMarketTrades,
@@ -147,6 +148,10 @@ export async function GET(request: Request) {
         markets = await fetchFinanceMarkets(limit * 5);
       } else if (subcategory === 'trending') {
         markets = await fetchTopMarketsByVolume(limit);
+      } else if (['entertainment', 'culture', 'awards', 'oscars', 'grammys', 'emmys',
+                  'films', 'movies', 'music', 'tv', 'celebrity', 'pop culture', 'arts',
+                  'film', 'oscar', 'grammy', 'emmy'].includes(subcategory)) {
+        markets = await fetchEntertainmentMarkets(limit * 5);
       } else {
         markets = await fetchKalshiMarkets({ search: subcategory, limit });
       }
@@ -292,6 +297,10 @@ export async function POST(request: Request) {
       markets = await fetchFinanceMarkets(limit * 5);
     } else if (sub === 'trending') {
       markets = await fetchTopMarketsByVolume(limit);
+    } else if (['entertainment', 'culture', 'awards', 'oscars', 'grammys', 'emmys',
+                'films', 'movies', 'music', 'tv', 'celebrity', 'pop culture', 'arts',
+                'film', 'oscar', 'grammy', 'emmy'].includes(sub)) {
+      markets = await fetchEntertainmentMarkets(limit * 5);
     } else {
       let finalCategory = category;
       if (sport && !category) {

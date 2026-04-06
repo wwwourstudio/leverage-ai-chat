@@ -771,16 +771,21 @@ export async function POST(request: NextRequest) {
       // warm enough for card generation to reuse without a second API call.
       // A 3s timeout prevents blocking the AI call on a slow fetch.
       try {
-        const { fetchElectionMarkets, fetchKalshiMarketsWithRetry } = await import('@/lib/kalshi/index');
+        const { fetchElectionMarkets, fetchKalshiMarketsWithRetry, fetchEntertainmentMarkets } = await import('@/lib/kalshi/index');
         const sub = (context.kalshiSubcategory || '').toLowerCase();
         // Route to the appropriate market source based on Kalshi sub-category.
         // For 'sports': use a targeted keyword search — faster than fetchSportsMarkets()
         // which makes 12 sequential API calls and would exceed any reasonable timeout.
+        const ENTERTAINMENT_SUBS = ['entertainment', 'culture', 'awards', 'oscars', 'grammys',
+          'emmys', 'films', 'movies', 'music', 'tv', 'celebrity', 'pop culture', 'arts',
+          'film', 'oscar', 'grammy', 'emmy'];
         const fetchMarkets =
           (sub === 'politics' || sub === 'elections' || sub === 'election')
             ? fetchElectionMarkets({ limit: 50 })
           : (sub === 'sports' || sub === 'sport')
             ? fetchKalshiMarketsWithRetry({ search: 'NFL NBA MLB NHL Super Bowl March Madness', limit: 30, maxRetries: 2 })
+          : ENTERTAINMENT_SUBS.includes(sub)
+            ? fetchEntertainmentMarkets(50)
           : fetchKalshiMarketsWithRetry({ limit: 50, maxRetries: 3 });
         const markets = await Promise.race([
           fetchMarkets,

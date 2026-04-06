@@ -1059,6 +1059,46 @@ export async function fetchFinanceMarkets(limit: number = 50): Promise<KalshiMar
 }
 
 /**
+ * Fetch entertainment / pop-culture prediction markets from Kalshi.
+ * Uses client-side title filtering since the Kalshi API has no category param for entertainment.
+ * First checks the top-1000 markets (shared cache), then pages through all markets if needed.
+ */
+export async function fetchEntertainmentMarkets(limit: number = 20): Promise<KalshiMarket[]> {
+  const ENTERTAINMENT_KEYWORDS = [
+    'oscar', 'grammy', 'emmy', 'tony award', 'golden globe', 'bafta',
+    'box office', 'billboard', 'academy award', 'best picture', 'best actor',
+    'best actress', 'netflix', 'celebrity', 'cannes', 'award season',
+    'super bowl halftime', 'music award', 'film award', 'reality show',
+    'people\'s choice', 'mtv award', 'vma', 'ama award', 'country music award',
+  ];
+
+  function isEntertainmentMarket(m: KalshiMarket): boolean {
+    const text = `${m.title} ${m.subtitle ?? ''}`.toLowerCase();
+    return ENTERTAINMENT_KEYWORDS.some(kw => text.includes(kw));
+  }
+
+  // First: check top 1000 markets (uses shared in-memory cache — free if already warm)
+  const topMarkets = await fetchKalshiMarkets({ limit: 1000 });
+  let entertainment = topMarkets.filter(isEntertainmentMarket);
+
+  // Second: if thin results, do a full paginated fetch (up to 2000 markets)
+  if (entertainment.length < 3) {
+    console.log('[KALSHI] Entertainment: top-1000 returned few results, fetching all markets...');
+    const allMarkets = await fetchAllKalshiMarkets({ maxMarkets: 2000, useCache: true });
+    const seen = new Set(topMarkets.map(m => m.ticker));
+    for (const m of allMarkets) {
+      if (!seen.has(m.ticker) && isEntertainmentMarket(m)) {
+        entertainment.push(m);
+        seen.add(m.ticker);
+      }
+    }
+  }
+
+  console.log(`[KALSHI] Entertainment markets: ${entertainment.length} found`);
+  return entertainment.slice(0, limit);
+}
+
+/**
  * Fetch all markets across all categories. Returns categorized results.
  */
 export async function fetchAllCategoryMarkets(): Promise<Record<string, KalshiMarket[]>> {

@@ -139,9 +139,10 @@ export async function enrolPicksForTracking(date?: string): Promise<number> {
     .select('pick_id')
     .eq('pick_date', targetDate);
 
-  const existingIds = new Set((existingRaw ?? []).map((r) => r.pick_id));
+  const existingIds = new Set((existingRaw ?? []).map((r: { pick_id: string }) => r.pick_id));
 
-  const newRows = picksRaw
+  type PickRow = { id: string; player_id: string; model_probability: number; edge: number; score: number; tier: string; best_odds: number | null; best_book: string | null; sharp_boosted: boolean | null };
+  const newRows = (picksRaw as PickRow[])
     .filter((p) => !existingIds.has(p.id))
     .map((p) => {
       const kellyStake = computeKellyStake(p.model_probability, p.best_odds ?? 100);

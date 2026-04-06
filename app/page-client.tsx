@@ -16,6 +16,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useAuth } from '@/components/AuthProvider';
 import dynamic from 'next/dynamic';
 import { fetchDynamicCards, type DynamicCard } from '@/lib/data-service';
 import { API_ENDPOINTS, PLAYER_HEADSHOT_IDS, sportToApi, FREE_TIER } from '@/lib/constants';
@@ -176,6 +177,8 @@ interface FantasyLeague {
 export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps) {
   const toast = useToast();
   const { setTheme } = useTheme();
+  const { user: authUser, loading: authLoading } = useAuth();
+  const prevAuthUserIdRef = useRef<string | null>(undefined as unknown as string | null);
 
   // Dynamic welcome message based on time, category, and selected sport
   const getWelcomeMessage = (category: string, sport?: string, userName?: string) => {
@@ -599,124 +602,83 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     } catch { /* non-critical — localStorage fallback already loaded */ }
   };
 
-  // Check Supabase auth session on mount and sync credits
+  // Sync auth state from AuthProvider (getSession from localStorage — 0 network calls).
+  // prevAuthUserIdRef ensures side-effects (loadInitData, loadThreads) fire only on
+  // identity transitions, not on every render.
   useEffect(() => {
-    (async () => {
-      try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+    if (authLoading) return;
 
-        if (user) {
-          setIsLoggedIn(true);
-          setUser({
-            name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-            email: user.email || '',
-            avatar: user.user_metadata?.avatar_url || user.user_metadata?.picture || undefined,
-          });
-          // Load profile ID for credit sync (credits/instructions come via the page-load /api/init)
-          loadProfileId(user.id);
-          // Restore fantasy league from DB (overrides localStorage if a DB record exists)
-          loadFantasyLeagueFromDB();
-          // Load persisted chat threads from Supabase
-          setIsLoadingChats(true);
-          loadThreads().then(threads => {
-            setIsLoadingChats(false);
-            if (threads.length > 0) {
-              setChats(threads);
-              setActiveChat(threads[0].id);
-              // Restore category and sport filters from the most recent thread
-              const firstThread = threads[0];
-              if (firstThread.category && firstThread.category !== 'all') {
-                setSelectedCategory(firstThread.category);
-              }
-              const SPORT_KEYS_LIST = ['basketball_nba', 'americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb', 'soccer_epl', 'soccer_mls'];
-              const sportTag = firstThread.tags?.find((t: string) => SPORT_KEYS_LIST.includes(t));
-              if (sportTag) setSelectedSport(sportTag);
-              // Load messages for the most recent thread
-              loadMessages(threads[0].id).then(msgs => {
-                if (msgs.length > 0) {
-                  let storedCards: Record<string, any[]> = {};
-                  try { storedCards = JSON.parse(localStorage.getItem(`lev:cards:${threads[0].id}`) ?? '{}'); } catch { /* ignore */ }
-                  setMessages(msgs.map((m: any) => ({
-                    id: m.id,
-                    role: m.role,
-                    content: m.content,
-                    timestamp: m.timestamp,
-                    cards: m.cards?.length ? m.cards : (storedCards[m.id ?? ''] ?? []),
-                    modelUsed: m.modelUsed,
-                    confidence: m.confidence,
-                    isWelcome: m.isWelcome,
-                  })) as any);
-                }
-              });
+    const currentUserId = authUser?.id ?? null;
+    // undefined means "not yet initialised" — skip the first render guard check
+    const prevUserId = prevAuthUserIdRef.current === (undefined as unknown as string | null)
+      ? undefined
+      : prevAuthUserIdRef.current;
+    prevAuthUserIdRef.current = currentUserId;
+
+    if (authUser) {
+      setIsLoggedIn(true);
+      setUser({
+        name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
+        email: authUser.email || '',
+        avatar: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || undefined,
+      });
+      setShowLoginModal(false);
+      setShowSignupModal(false);
+      loadProfileId(authUser.id);
+      loadFantasyLeagueFromDB();
+
+      // Only reload init + threads when user identity actually changes (sign-in / switch).
+      if (prevUserId !== currentUserId) {
+        loadInitData();
+        setIsLoadingChats(true);
+        loadThreads().then(threads => {
+          setIsLoadingChats(false);
+          if (threads.length > 0) {
+            setChats(threads);
+            setActiveChat(threads[0].id);
+            // Restore category and sport filters from the most recent thread
+            const firstThread = threads[0];
+            if (firstThread.category && firstThread.category !== 'all') {
+              setSelectedCategory(firstThread.category);
             }
-          });
-        } else {
-          // Not logged in — load instructions from localStorage
-          loadInstructionsFromLocalStorage();
-        }
-
-        // Listen for auth changes (OAuth redirect, signout, etc.)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-          if (session?.user) {
-            setIsLoggedIn(true);
-            setUser({
-              name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
-              email: session.user.email || '',
-              avatar: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || undefined,
-            });
-            setShowLoginModal(false);
-            setShowSignupModal(false);
-            // Load profile ID + refresh credits/instructions via /api/init on auth change
-            loadProfileId(session.user.id);
-            loadInitData();
-            // Restore fantasy league from DB on sign-in
-            loadFantasyLeagueFromDB();
-            // Load chat threads + most recent messages so history appears immediately
-            // after email/password login (Google OAuth handles this via page redirect).
-            setIsLoadingChats(true);
-            loadThreads().then(threads => {
-              setIsLoadingChats(false);
-              if (threads.length > 0) {
-                setChats(threads);
-                setActiveChat(threads[0].id);
-                loadMessages(threads[0].id).then(msgs => {
-                  if (msgs.length > 0) {
-                    let storedCards: Record<string, any[]> = {};
-                    try { storedCards = JSON.parse(localStorage.getItem(`lev:cards:${threads[0].id}`) ?? '{}'); } catch { /* ignore */ }
-                    setMessages(msgs.map((m: any) => ({
-                      id: m.id,
-                      role: m.role,
-                      content: m.content,
-                      timestamp: m.timestamp,
-                      cards: m.cards?.length ? m.cards : (storedCards[m.id ?? ''] ?? []),
-                      modelUsed: m.modelUsed,
-                      confidence: m.confidence,
-                      isWelcome: m.isWelcome,
-                    })) as any);
-                  }
-                });
+            const SPORT_KEYS_LIST = ['basketball_nba', 'americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb', 'soccer_epl', 'soccer_mls'];
+            const sportTag = firstThread.tags?.find((t: string) => SPORT_KEYS_LIST.includes(t));
+            if (sportTag) setSelectedSport(sportTag);
+            loadMessages(threads[0].id).then(msgs => {
+              if (msgs.length > 0) {
+                let storedCards: Record<string, any[]> = {};
+                try { storedCards = JSON.parse(localStorage.getItem(`lev:cards:${threads[0].id}`) ?? '{}'); } catch { /* ignore */ }
+                setMessages(msgs.map((m: any) => ({
+                  id: m.id,
+                  role: m.role,
+                  content: m.content,
+                  timestamp: m.timestamp,
+                  cards: m.cards?.length ? m.cards : (storedCards[m.id ?? ''] ?? []),
+                  modelUsed: m.modelUsed,
+                  confidence: m.confidence,
+                  isWelcome: m.isWelcome,
+                })) as any);
               }
             });
-          } else {
-            setIsLoggedIn(false);
-            setUser(null);
-            setSupabaseProfileId(null);
-            // Clear user-specific data on logout
-            setFantasyLeague(null);
-            localStorage.removeItem('leverage_fantasy_league');
-            // Revert to localStorage instructions on logout
-            const stored = localStorage.getItem('leverage_custom_instructions') || '';
-            setCustomInstructions(stored);
           }
         });
-
-        return () => subscription.unsubscribe();
-      } catch (err) {
-        console.error('[v0] Auth check failed:', err);
       }
-    })();
-  }, []);
+    } else {
+      // Signed out
+      setIsLoggedIn(false);
+      setUser(null);
+      setSupabaseProfileId(null);
+      setFantasyLeague(null);
+      localStorage.removeItem('leverage_fantasy_league');
+      const stored = localStorage.getItem('leverage_custom_instructions') || '';
+      setCustomInstructions(stored);
+      if (prevUserId !== null && prevUserId !== undefined) {
+        // Actual sign-out transition — reload guest instructions
+        loadInstructionsFromLocalStorage();
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser, authLoading]);
 
   // Handle Stripe checkout success: verify session server-side before adding credits
   useEffect(() => {

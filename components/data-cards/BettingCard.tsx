@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useEffect } from 'react';
 import {
   Clock, TrendingUp, TrendingDown, Minus,
   ChevronRight, Zap, Shield, AlertTriangle, Wind, BookOpen,
@@ -9,6 +9,31 @@ import {
 import { cn } from '@/lib/utils';
 import { PlayerAvatar } from './PlayerAvatar';
 import { getPlayerHeadshotUrl, getTeamLogoUrl } from '@/lib/constants';
+
+function formatMarket(key: string): string {
+  const m: Record<string, string> = {
+    batter_home_runs: 'Home Runs', batter_hits: 'Hits', batter_rbis: 'RBIs',
+    batter_total_bases: 'Total Bases', batter_strikeouts: 'Strikeouts',
+    batter_runs_scored: 'Runs Scored', batter_stolen_bases: 'Stolen Bases',
+    pitcher_strikeouts: 'Ks (Pitcher)', pitcher_hits_allowed: 'Hits Allowed',
+    pitcher_earned_runs: 'Earned Runs', pitcher_walks: 'Walks (P)',
+    player_points: 'Points', player_rebounds: 'Rebounds', player_assists: 'Assists',
+    player_threes: '3-Pointers', player_blocks: 'Blocks', player_steals: 'Steals',
+    player_pass_tds: 'Pass TDs', player_pass_yds: 'Pass Yards',
+    player_rush_yds: 'Rush Yards', player_receptions: 'Receptions',
+    player_reception_yds: 'Rec Yards', player_anytime_td: 'Anytime TD',
+  };
+  return m[key] ?? key.replace(/^(batter_|pitcher_|player_)/, '').replace(/_/g, ' ');
+}
+
+function sportFromCategory(cat: string): string | null {
+  const c = cat.toLowerCase();
+  if (c.includes('mlb') || c.includes('baseball')) return 'baseball_mlb';
+  if (c.includes('nba') || c.includes('basketball')) return 'basketball_nba';
+  if (c.includes('nfl') || c.includes('football')) return 'americanfootball_nfl';
+  if (c.includes('nhl') || c.includes('hockey')) return 'icehockey_nhl';
+  return null;
+}
 
 interface BookEntry {
   name: string;
@@ -645,13 +670,20 @@ function TabOdds({
 // ─────────────────────────────────────────────────────────────────────────────
 // TabProps — player props (Tab 2)
 // ─────────────────────────────────────────────────────────────────────────────
-function TabProps({ data, onAnalyze }: { data: BettingCardData; onAnalyze?: () => void }) {
+function TabProps({ data, onAnalyze, loading = false }: { data: BettingCardData; onAnalyze?: () => void; loading?: boolean }) {
   const props = Array.isArray(data.playerProps) ? data.playerProps : [];
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="w-5 h-5 rounded-full border-2 border-[var(--border-subtle)] border-t-white/60 animate-spin" />
+      </div>
+    );
+  }
   if (props.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 py-6 text-center">
         <Users className="w-8 h-8 text-[var(--text-faint)]" />
-        <p className="text-[11px] text-[var(--text-muted)]">No prop data available</p>
+        <p className="text-[11px] text-[var(--text-muted)]">No prop data available for this game</p>
         {onAnalyze && (
           <button
             onClick={onAnalyze}
@@ -705,10 +737,11 @@ function TabProps({ data, onAnalyze }: { data: BettingCardData; onAnalyze?: () =
 // ─────────────────────────────────────────────────────────────────────────────
 // TabTeams — team comparison (Tab 3)
 // ─────────────────────────────────────────────────────────────────────────────
-function TabTeams({ data, teams, theme }: {
+function TabTeams({ data, teams, theme, onAnalyze }: {
   data: BettingCardData;
   teams: { away: string; home: string } | null;
   theme: { accentColor: string };
+  onAnalyze?: () => void;
 }) {
   const tc = data.teamComparison as any;
   const awayAbbr = teams ? abbr(teams.away) : 'AWY';
@@ -729,9 +762,17 @@ function TabTeams({ data, teams, theme }: {
 
   if (rows.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 py-6 text-center">
+      <div className="flex flex-col items-center gap-3 py-6 text-center">
         <Users className="w-8 h-8 text-[var(--text-faint)]" />
-        <p className="text-[11px] text-[var(--text-muted)]">No team comparison data available</p>
+        <p className="text-[11px] text-[var(--text-muted)]">No team stats available</p>
+        {onAnalyze && (
+          <button
+            onClick={onAnalyze}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)] hover:text-foreground hover:border-[var(--border-hover)] transition-all"
+          >
+            Ask AI to compare these teams →
+          </button>
+        )}
       </div>
     );
   }
@@ -760,7 +801,7 @@ function TabTeams({ data, teams, theme }: {
 // ─────────────────────────────────────────────────────────────────────────────
 // TabHistory — head-to-head history (Tab 4)
 // ─────────────────────────────────────────────────────────────────────────────
-function TabHistory({ data }: { data: BettingCardData }) {
+function TabHistory({ data, onAnalyze }: { data: BettingCardData; onAnalyze?: () => void }) {
   const history = Array.isArray(data.h2hHistory) ? data.h2hHistory : [];
   return (
     <div className="space-y-3">
@@ -796,7 +837,17 @@ function TabHistory({ data }: { data: BettingCardData }) {
           ))}
         </div>
       ) : (
-        <p className="text-[11px] text-[var(--text-muted)] text-center py-4">No detailed history available</p>
+        <div className="flex flex-col items-center gap-3 py-4 text-center">
+          <p className="text-[11px] text-[var(--text-muted)]">No detailed history available</p>
+          {onAnalyze && (
+            <button
+              onClick={onAnalyze}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)] hover:text-foreground hover:border-[var(--border-hover)] transition-all"
+            >
+              Ask AI for head-to-head history →
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -870,7 +921,7 @@ function InjuryRow({ inj, statusCls }: { inj: any; statusCls: (s: string) => str
 
 // TabInjuries — injury reports (Tab 5)
 // ─────────────────────────────────────────────────────────────────────────────
-function TabInjuries({ data }: { data: BettingCardData }) {
+function TabInjuries({ data, onAnalyze }: { data: BettingCardData; onAnalyze?: () => void }) {
   const injuries = Array.isArray(data.injuries) ? data.injuries : [];
 
   if (injuries.length > 0) {
@@ -901,9 +952,17 @@ function TabInjuries({ data }: { data: BettingCardData }) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-2 py-6 text-center">
+    <div className="flex flex-col items-center gap-3 py-6 text-center">
       <Shield className="w-8 h-8 text-[var(--text-faint)]" />
       <p className="text-[11px] text-[var(--text-muted)]">No injury reports for this game</p>
+      {onAnalyze && (
+        <button
+          onClick={onAnalyze}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)] hover:text-foreground hover:border-[var(--border-hover)] transition-all"
+        >
+          Ask AI about injury updates →
+        </button>
+      )}
     </div>
   );
 }
@@ -1054,6 +1113,50 @@ export const BettingCard = memo(function BettingCard({
 
   const [activeTab, setActiveTab] = useState(0);
   const [marketView, setMarketView] = useState<'ml' | 'spread' | 'total'>('ml');
+
+  // ── Lazy-load player props when the Props tab is first activated ───────────
+  const [propsLoading, setPropsLoading] = useState(false);
+  const [lazyProps, setLazyProps] = useState<any[] | null>(null);
+
+  useEffect(() => {
+    if (activeTab !== 1) return;
+    if (lazyProps !== null) return; // already fetched
+
+    const sport = data.sport ?? sportFromCategory(data.category ?? '');
+    if (!sport) { setLazyProps([]); return; }
+
+    setPropsLoading(true);
+    fetch(`/api/props?sport=${sport}`)
+      .then(r => r.ok ? r.json() : { players: [] })
+      .then((json: { players?: any[] }) => {
+        const all: any[] = Array.isArray(json.players) ? json.players : [];
+        const parsed = parseTeams(data.matchup ?? data.game ?? '');
+        const lastWord = (s: string) => s.toLowerCase().split(/\s+/).pop() ?? '';
+
+        const filtered = parsed && all.length
+          ? all.filter((p: any) => {
+              const t = (p.team ?? '').toLowerCase();
+              const hw = lastWord(parsed.home);
+              const aw = lastWord(parsed.away);
+              return hw.length > 3 && (t.includes(hw) || lastWord(t) === hw) ||
+                     aw.length > 3 && (t.includes(aw) || lastWord(t) === aw);
+            })
+          : all.slice(0, 12);
+
+        setLazyProps(
+          (filtered.length ? filtered : all.slice(0, 12)).map((p: any) => ({
+            player: p.name,
+            team:   p.team,
+            stat:   formatMarket(p.market),
+            line:   `O/U ${p.line}`,
+            odds:   p.overOdds > 0 ? `+${p.overOdds}` : String(p.overOdds),
+            hitRate: null,
+          })),
+        );
+      })
+      .catch(() => setLazyProps([]))
+      .finally(() => setPropsLoading(false));
+  }, [activeTab, lazyProps, data.sport, data.category, data.matchup, data.game]);
 
   return (
     <article className={cn(
@@ -1292,11 +1395,22 @@ export const BettingCard = memo(function BettingCard({
             accentCls={theme.avatarCls}
           />
         )}
-        {activeTab === 1 && <TabProps data={data} onAnalyze={onAnalyze} />}
-        {activeTab === 2 && <TabTeams data={data} teams={teams} theme={theme} />}
-        {activeTab === 3 && <TabHistory data={data} />}
-        {activeTab === 4 && <TabInjuries data={data} />}
-        {activeTab === 5 && <TabWatch data={data} onAnalyze={onAnalyze} />}
+        {activeTab === 1 && (
+          <TabProps
+            data={{ ...data, playerProps: lazyProps ?? data.playerProps }}
+            loading={propsLoading}
+            onAnalyze={onAnalyze}
+          />
+        )}
+        {activeTab === 2 && <TabTeams data={data} teams={teams} theme={theme} onAnalyze={onAnalyze} />}
+        {activeTab === 3 && <TabHistory data={data} onAnalyze={onAnalyze} />}
+        {activeTab === 4 && <TabInjuries data={data} onAnalyze={onAnalyze} />}
+        {activeTab === 5 && (
+          <TabWatch
+            data={{ ...data, playersToWatch: data.playersToWatch ?? (lazyProps ?? []).slice(0, 5).map((p: any) => ({ player: p.player, team: p.team, reason: `${p.stat} ${p.line} (${p.odds})` })) }}
+            onAnalyze={onAnalyze}
+          />
+        )}
 
         {/* ── Footer ────────────────────────────────────────────────── */}
         <div className="pt-2 border-t border-[var(--border-subtle)] space-y-2">

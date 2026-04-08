@@ -85,7 +85,7 @@ export const ChatHeader = memo(function ChatHeader({
   }, [activeChat, shareState]);
 
   return (
-    <div className="relative bg-[var(--bg-overlay)] border-b border-[var(--border-subtle)] px-3 py-3 md:px-6 md:py-4 shadow-2xl backdrop-blur-xl">
+    <div className="relative bg-[var(--bg-overlay)] border-b border-[var(--border-subtle)] px-3 py-2 md:px-6 md:py-4 shadow-2xl backdrop-blur-xl">
       <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-transparent to-transparent pointer-events-none"></div>
       <div className="relative flex items-center justify-between max-w-6xl mx-auto">
         {/* Left: hamburger + logo */}
@@ -108,7 +108,7 @@ export const ChatHeader = memo(function ChatHeader({
               </div>
             </div>
             <div className="flex flex-col leading-none gap-0.5">
-              <h1 className="text-sm md:text-base font-black tracking-tight text-white">
+              <h1 className="text-sm md:text-base font-black tracking-tight text-white whitespace-nowrap">
                 Leverage<span className="text-blue-400"> AI</span>
               </h1>
               <p className="hidden sm:block text-[10px] font-semibold text-[var(--text-muted)] tracking-widest uppercase">Sports Intelligence</p>

@@ -737,26 +737,36 @@ function TabProps({ data, onAnalyze, loading = false }: { data: BettingCardData;
 // ─────────────────────────────────────────────────────────────────────────────
 // TabTeams — team comparison (Tab 3)
 // ─────────────────────────────────────────────────────────────────────────────
-function TabTeams({ data, teams, theme, onAnalyze }: {
+function TabSpinner() {
+  return (
+    <div className="flex items-center justify-center py-8">
+      <div className="w-5 h-5 rounded-full border-2 border-[var(--border-subtle)] border-t-white/60 animate-spin" />
+    </div>
+  );
+}
+
+function TabTeams({ data, teams, theme, onAnalyze, loading = false }: {
   data: BettingCardData;
   teams: { away: string; home: string } | null;
   theme: { accentColor: string };
   onAnalyze?: () => void;
+  loading?: boolean;
 }) {
+  if (loading) return <TabSpinner />;
   const tc = data.teamComparison as any;
   const awayAbbr = teams ? abbr(teams.away) : 'AWY';
   const homeAbbr = teams ? abbr(teams.home) : 'HME';
 
   const rows = [
-    { label: 'Home Record', away: null as string | null, home: data.homeRecord ?? null },
-    { label: 'Away Record', away: data.awayRecord ?? null, home: null as string | null },
-    { label: 'ATS', away: data.atsRecord ?? null, home: data.atsRecord ?? null },
-    { label: 'H2H', away: data.h2hRecord ?? null, home: data.h2hRecord ?? null },
+    { label: 'Record', away: data.awayRecord ?? null, home: data.homeRecord ?? null },
+    { label: 'ATS',    away: data.atsRecord  ?? null, home: data.atsRecord  ?? null },
+    { label: 'H2H',    away: data.h2hRecord  ?? null, home: data.h2hRecord  ?? null },
     ...(tc ? [
       { label: 'Off. Rank', away: tc.away?.offenseRank != null ? `#${tc.away.offenseRank}` : null, home: tc.home?.offenseRank != null ? `#${tc.home.offenseRank}` : null },
       { label: 'Def. Rank', away: tc.away?.defenseRank != null ? `#${tc.away.defenseRank}` : null, home: tc.home?.defenseRank != null ? `#${tc.home.defenseRank}` : null },
-      { label: 'Pts/G', away: tc.away?.pointsPerGame ?? null, home: tc.home?.pointsPerGame ?? null },
-      { label: 'Last 10', away: tc.away?.last10 ?? null, home: tc.home?.last10 ?? null },
+      { label: 'Home/Away', away: tc.away?.pointsPerGame ?? null, home: tc.home?.pointsPerGame ?? null },
+      { label: 'Last 10',   away: tc.away?.last10        ?? null, home: tc.home?.last10        ?? null },
+      { label: 'Streak',    away: tc.away?.streak        ?? null, home: tc.home?.streak        ?? null },
     ] : []),
   ].filter(r => r.away != null || r.home != null);
 
@@ -801,7 +811,8 @@ function TabTeams({ data, teams, theme, onAnalyze }: {
 // ─────────────────────────────────────────────────────────────────────────────
 // TabHistory — head-to-head history (Tab 4)
 // ─────────────────────────────────────────────────────────────────────────────
-function TabHistory({ data, onAnalyze }: { data: BettingCardData; onAnalyze?: () => void }) {
+function TabHistory({ data, onAnalyze, loading = false }: { data: BettingCardData; onAnalyze?: () => void; loading?: boolean }) {
+  if (loading) return <TabSpinner />;
   const history = Array.isArray(data.h2hHistory) ? data.h2hHistory : [];
   return (
     <div className="space-y-3">
@@ -825,14 +836,27 @@ function TabHistory({ data, onAnalyze }: { data: BettingCardData; onAnalyze?: ()
             <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
               <span className="text-[9px] text-[var(--text-muted)]">{h.date}</span>
               <span className="text-[10px] font-bold text-foreground tabular-nums">{h.score ?? h.result}</span>
-              <span className={cn(
-                'px-2 py-0.5 rounded-full text-[8px] font-black border',
-                h.betResult === 'hit'
-                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                  : 'bg-red-500/15 text-red-300 border-red-500/30',
-              )}>
-                {h.betResult === 'hit' ? 'HIT' : 'MISS'}
-              </span>
+              {h.betResult != null ? (
+                <span className={cn(
+                  'px-2 py-0.5 rounded-full text-[8px] font-black border',
+                  h.betResult === 'hit'
+                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                    : 'bg-red-500/15 text-red-300 border-red-500/30',
+                )}>
+                  {h.betResult === 'hit' ? 'HIT' : 'MISS'}
+                </span>
+              ) : h.winner != null ? (
+                <span className={cn(
+                  'px-2 py-0.5 rounded-full text-[8px] font-black border uppercase',
+                  h.won === true
+                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                    : h.won === false
+                    ? 'bg-red-500/15 text-red-300 border-red-500/30'
+                    : 'bg-white/10 text-white/60 border-white/15',
+                )}>
+                  {String(h.winner).toUpperCase()}
+                </span>
+              ) : null}
             </div>
           ))}
         </div>
@@ -921,7 +945,8 @@ function InjuryRow({ inj, statusCls }: { inj: any; statusCls: (s: string) => str
 
 // TabInjuries — injury reports (Tab 5)
 // ─────────────────────────────────────────────────────────────────────────────
-function TabInjuries({ data, onAnalyze }: { data: BettingCardData; onAnalyze?: () => void }) {
+function TabInjuries({ data, onAnalyze, loading = false }: { data: BettingCardData; onAnalyze?: () => void; loading?: boolean }) {
+  if (loading) return <TabSpinner />;
   const injuries = Array.isArray(data.injuries) ? data.injuries : [];
 
   if (injuries.length > 0) {
@@ -1120,43 +1145,51 @@ export const BettingCard = memo(function BettingCard({
 
   useEffect(() => {
     if (activeTab !== 1) return;
-    if (lazyProps !== null) return; // already fetched
-
+    if (lazyProps !== null) return;
     const sport = data.sport ?? sportFromCategory(data.category ?? '');
     if (!sport) { setLazyProps([]); return; }
-
     setPropsLoading(true);
     fetch(`/api/props?sport=${sport}`)
       .then(r => r.ok ? r.json() : { players: [] })
       .then((json: { players?: any[] }) => {
         const all: any[] = Array.isArray(json.players) ? json.players : [];
         const parsed = parseTeams(data.matchup ?? data.game ?? '');
-        const lastWord = (s: string) => s.toLowerCase().split(/\s+/).pop() ?? '';
-
+        const lw = (s: string) => s.toLowerCase().split(/\s+/).pop() ?? '';
         const filtered = parsed && all.length
           ? all.filter((p: any) => {
               const t = (p.team ?? '').toLowerCase();
-              const hw = lastWord(parsed.home);
-              const aw = lastWord(parsed.away);
-              return hw.length > 3 && (t.includes(hw) || lastWord(t) === hw) ||
-                     aw.length > 3 && (t.includes(aw) || lastWord(t) === aw);
+              const hw = lw(parsed.home); const aw = lw(parsed.away);
+              return (hw.length > 3 && (t.includes(hw) || lw(t) === hw)) ||
+                     (aw.length > 3 && (t.includes(aw) || lw(t) === aw));
             })
           : all.slice(0, 12);
-
-        setLazyProps(
-          (filtered.length ? filtered : all.slice(0, 12)).map((p: any) => ({
-            player: p.name,
-            team:   p.team,
-            stat:   formatMarket(p.market),
-            line:   `O/U ${p.line}`,
-            odds:   p.overOdds > 0 ? `+${p.overOdds}` : String(p.overOdds),
-            hitRate: null,
-          })),
-        );
+        setLazyProps((filtered.length ? filtered : all.slice(0, 12)).map((p: any) => ({
+          player: p.name, team: p.team, stat: formatMarket(p.market),
+          line: `O/U ${p.line}`,
+          odds: p.overOdds > 0 ? `+${p.overOdds}` : String(p.overOdds),
+          hitRate: null,
+        })));
       })
       .catch(() => setLazyProps([]))
       .finally(() => setPropsLoading(false));
   }, [activeTab, lazyProps, data.sport, data.category, data.matchup, data.game]);
+
+  // ── Lazy-load Teams / History / Injuries context from MLB Stats API ────────
+  const [ctxLoading, setCtxLoading] = useState(false);
+  const [ctx, setCtx] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (![2, 3, 4].includes(activeTab)) return;
+    if (ctx !== null) return;
+    const sport = data.sport ?? sportFromCategory(data.category ?? '');
+    if (!sport || !teams) { setCtx({}); return; }
+    setCtxLoading(true);
+    fetch(`/api/game-context?sport=${sport}&home=${encodeURIComponent(teams.home)}&away=${encodeURIComponent(teams.away)}`)
+      .then(r => r.ok ? r.json() : {})
+      .then(json => setCtx(json))
+      .catch(() => setCtx({}))
+      .finally(() => setCtxLoading(false));
+  }, [activeTab, ctx, teams, data.sport, data.category]);
 
   return (
     <article className={cn(
@@ -1167,7 +1200,7 @@ export const BettingCard = memo(function BettingCard({
     )}>
 
       {/* ── Full-bleed gradient header ───────────────────────────────── */}
-      <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', theme.headerGrad)}>
+      <div className={cn('relative px-3 pt-2.5 pb-2 md:px-4 md:pt-3.5 md:pb-3 bg-gradient-to-br', theme.headerGrad)}>
         {/* Status badges top-right */}
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
           {/* In-game LIVE badge (pulsing) */}
@@ -1234,7 +1267,7 @@ export const BettingCard = memo(function BettingCard({
         </div>
       </div>
 
-      <div className="px-4 pb-4 space-y-3">
+      <div className="px-3 pb-3 space-y-2 md:px-4 md:pb-4 md:space-y-3">
 
         {/* ── Player prop header ──────────────────────────────────────── */}
         {isPlayerProp && data.player && (
@@ -1402,9 +1435,37 @@ export const BettingCard = memo(function BettingCard({
             onAnalyze={onAnalyze}
           />
         )}
-        {activeTab === 2 && <TabTeams data={data} teams={teams} theme={theme} onAnalyze={onAnalyze} />}
-        {activeTab === 3 && <TabHistory data={data} onAnalyze={onAnalyze} />}
-        {activeTab === 4 && <TabInjuries data={data} onAnalyze={onAnalyze} />}
+        {activeTab === 2 && (
+          <TabTeams
+            data={{
+              ...data,
+              homeRecord: ctx?.teams?.home?.record ?? data.homeRecord,
+              awayRecord: ctx?.teams?.away?.record ?? data.awayRecord,
+              teamComparison: ctx?.teams ? {
+                home: { last10: ctx.teams.home?.last10, pointsPerGame: ctx.teams.home?.splitRecord, streak: ctx.teams.home?.streak },
+                away: { last10: ctx.teams.away?.last10, pointsPerGame: ctx.teams.away?.splitRecord, streak: ctx.teams.away?.streak },
+              } : data.teamComparison,
+            }}
+            teams={teams} theme={theme} onAnalyze={onAnalyze} loading={ctxLoading && ctx === null}
+          />
+        )}
+        {activeTab === 3 && (
+          <TabHistory
+            data={{ ...data, h2hHistory: ctx?.history ?? data.h2hHistory }}
+            onAnalyze={onAnalyze} loading={ctxLoading && ctx === null}
+          />
+        )}
+        {activeTab === 4 && (
+          <TabInjuries
+            data={{
+              ...data,
+              injuries: ctx?.injuries
+                ? ctx.injuries.map((p: any) => ({ ...p, team: p.team }))
+                : data.injuries,
+            }}
+            onAnalyze={onAnalyze} loading={ctxLoading && ctx === null}
+          />
+        )}
         {activeTab === 5 && (
           <TabWatch
             data={{ ...data, playersToWatch: data.playersToWatch ?? (lazyProps ?? []).slice(0, 5).map((p: any) => ({ player: p.player, team: p.team, reason: `${p.stat} ${p.line} (${p.odds})` })) }}

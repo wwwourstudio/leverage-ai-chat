@@ -48,6 +48,7 @@ import { MessageContent } from '@/components/index/MessageContent';
 import { MessageAttachments } from '@/components/index/MessageAttachments';
 import { CreditModals } from '@/components/index/CreditModals';
 import { DetailedAnalysisLayout, type DetailedAnalysisData } from '@/components/index/DetailedAnalysisLayout';
+import { AddToHomeBanner } from '@/components/AddToHomeBanner';
 
 interface FileAttachment {
   id: string;
@@ -3596,6 +3597,8 @@ No preamble. Start directly with section 1.`;
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-black via-background to-black">
+        {/* Mobile "Add to Home Screen" banner — in normal flow, pushes header down */}
+        <AddToHomeBanner />
         {/* Header */}
         <ChatHeader
           sidebarOpen={sidebarOpen}

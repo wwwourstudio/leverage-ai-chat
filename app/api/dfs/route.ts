@@ -75,6 +75,39 @@ function buildGreedyLineup(
     totalSalary += player.salary;
   }
 
+  // ── Swap pass: upgrade players to fill remaining cap ──────────────────────
+  // Repeatedly try to swap each rostered player for the highest-salary player
+  // at the same position that fits under the remaining cap. Stop when within
+  // $2,000 of the cap or no more improving swaps exist.
+  const rosterSet = new Set(roster.map(p => p.id));
+  let improved = true;
+  while (improved && totalSalary < cap - 2000) {
+    improved = false;
+    for (let i = 0; i < roster.length; i++) {
+      const current = roster[i];
+      const pos = current.primaryPosition;
+      const remainAfterRemoval = cap - (totalSalary - current.salary);
+
+      // Find highest-salary non-rostered same-position player that fits
+      const upgrade = sorted.find(
+        p =>
+          p.primaryPosition === pos &&
+          !rosterSet.has(p.id) &&
+          p.salary > current.salary &&
+          p.salary <= remainAfterRemoval,
+      );
+
+      if (upgrade) {
+        rosterSet.delete(current.id);
+        rosterSet.add(upgrade.id);
+        totalSalary = totalSalary - current.salary + upgrade.salary;
+        roster[i] = upgrade;
+        improved = true;
+        break; // restart the pass after each swap
+      }
+    }
+  }
+
   return {
     roster,
     totalSalary,
@@ -150,7 +183,7 @@ export async function GET(request: NextRequest) {
       const salary = rankToSalary(rank);
       const projectedPoints = estimateProjectedPoints(p);
       const value = salary > 0 ? parseFloat(((projectedPoints / salary) * 1000).toFixed(2)) : 0;
-      const valueGrade = value >= 4 ? 'A' : value >= 3 ? 'B' : value >= 2 ? 'C' : 'D';
+      const valueGrade = value >= 1.4 ? 'A' : value >= 1.3 ? 'B' : value >= 1.2 ? 'C' : value >= 1.1 ? 'D' : 'F';
       // Parse primary position (first in slash-delimited list)
       const primaryPosition = (p.positions as string)?.split(/[/,]/)[0]?.trim() ?? '';
 

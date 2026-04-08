@@ -1,7 +1,7 @@
 /**
  * GET /api/roi
  *
- * Returns profitability and accuracy metrics from the pick_results +
+ * Returns profitability and accuracy metrics from the pick_outcomes +
  * model_metrics tables.
  *
  * Query params:
@@ -38,37 +38,38 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
 
-    // ── Fetch settled pick_results for the rolling window ──────────────────
+    // ── Fetch settled pick_outcomes for the rolling window ─────────────────
     const since = daysAgoUTC(days);
 
     let query = supabase
-      .from('pick_results')
-      .select('predicted_prob, actual_result, odds, kelly_stake, tier, pnl, pick_date')
+      .from('pick_outcomes')
+      .select('edge, hit, best_odds, units_wagered, tier, units_profit, pick_date')
       .gte('pick_date', since)
-      .not('actual_result', 'is', null);
+      .not('hit', 'is', null);
 
     if (tier) {
       query = query.eq('tier', tier);
     }
 
-    const { data: resultsRaw, error: fetchErr } = await query;
+    const { data: rawRows, error: fetchErr } = await query;
 
     if (fetchErr) {
       return NextResponse.json(
-        { success: false, error: `pick_results fetch failed: ${fetchErr.message}` },
+        { success: false, error: `pick_outcomes fetch failed: ${fetchErr.message}` },
         { status: 500 },
       );
     }
 
-    const results = (resultsRaw ?? []) as Array<{
-      predicted_prob: number;
-      actual_result: boolean;
-      odds: number | null;
-      kelly_stake: number | null;
-      tier: string | null;
-      pnl: number | null;
-      pick_date: string;
-    }>;
+    // Remap pick_outcomes columns to the shape calculateAccuracy/calculateROI expect
+    const results = (rawRows ?? []).map((r: any) => ({
+      predicted_prob: r.edge,
+      actual_result:  r.hit ?? false,
+      odds:           r.best_odds,
+      kelly_stake:    r.units_wagered,
+      tier:           r.tier,
+      pnl:            r.units_profit,
+      pick_date:      r.pick_date,
+    }));
 
     // ── Compute metrics ────────────────────────────────────────────────────
     const accuracy = calculateAccuracy(results);
@@ -77,13 +78,15 @@ export async function GET(req: NextRequest) {
 
     const kellyRoi = withKelly ? calculateKellyROI(results, bankroll) : undefined;
 
-    // ── Fetch latest model_metrics row ────────────────────────────────────
+    // ── Fetch latest model_metrics row (table created by migration) ────────
     const { data: metricsRaw } = await supabase
       .from('model_metrics')
       .select('*')
       .order('computed_at', { ascending: false })
       .limit(1)
-      .maybeSingle();
+      .maybeSingle()
+      .then(r => r)
+      .catch(() => ({ data: null }));
 
     return NextResponse.json({
       success: true,

@@ -17,7 +17,7 @@
  *      so the next picks-engine run picks up corrected weights automatically
  *
  * ─── Supabase tables used ─────────────────────────────────────────────────────
- *   READ:  api.pick_results        — settled picks with segmentation fields
+ *   READ:  api.pick_outcomes       — settled picks (segmentation cols mapped to null)
  *   WRITE: api.backtest_results    — stores full per-segment BacktestReport
  *   WRITE: api.model_metrics       — updates calibration_alpha + calibration_beta
  *
@@ -59,22 +59,31 @@ export async function GET(req: NextRequest) {
   const windowStart = daysAgoUTC(windowDays);
 
   const { data: picksRaw, error: fetchErr } = await supabase
-    .from('pick_results')
-    .select(
-      'predicted_prob, actual_result, odds, kelly_stake, tier, pnl, ' +
-      'park_factor, platoon, exit_velocity_bucket, weather_bucket',
-    )
+    .from('pick_outcomes')
+    .select('edge, hit, best_odds, units_wagered, tier, units_profit')
     .gte('pick_date', windowStart)
-    .not('actual_result', 'is', null);
+    .not('hit', 'is', null);
 
   if (fetchErr) {
-    const msg = `pick_results fetch failed: ${fetchErr.message}`;
+    const msg = `pick_outcomes fetch failed: ${fetchErr.message}`;
     errors.push(msg);
     console.error('[v0] [cron/backtest]', msg);
     return NextResponse.json({ success: false, errors }, { status: 500 });
   }
 
-  const picks = (picksRaw ?? []) as unknown as PickResult[];
+  // Remap pick_outcomes columns to PickResult shape; segmentation cols not yet stored
+  const picks = (picksRaw ?? []).map((r: any): PickResult => ({
+    predicted_prob:       r.edge,
+    actual_result:        r.hit ?? false,
+    odds:                 r.best_odds,
+    kelly_stake:          r.units_wagered,
+    tier:                 r.tier,
+    pnl:                  r.units_profit,
+    park_factor:          null,
+    platoon:              null,
+    exit_velocity_bucket: null,
+    weather_bucket:       null,
+  }));
 
   if (picks.length < 5) {
     const msg = `Insufficient picks for backtesting: ${picks.length} (need ≥5 settled)`;

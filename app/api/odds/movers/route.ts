@@ -10,7 +10,7 @@ export const maxDuration = 15;
  *
  * Returns the biggest game-level line movements within the requested window.
  * Uses the api.get_biggest_line_moves() SQL function; falls back to a direct
- * query of api.line_movements if the RPC call fails (e.g. migration not yet run).
+ * query of api.line_movement if the RPC call fails (e.g. migration not yet run).
  *
  * Query params:
  *   hours  — look-back window in hours (default 24, max 168)
@@ -49,12 +49,14 @@ export async function GET(req: NextRequest) {
     // ── Fallback: direct query ───────────────────────────────────────────────
     const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 
+    // api.line_movement columns: game_id_uuid, market_type, home_team, away_team,
+    //   line_change, timestamp (actual schema — no game_id, movement, or detected_at)
     const { data: fallbackRows, error: fallbackErr } = await supabase
       .schema('api')
-      .from('line_movements')
-      .select('game_id, market, selection, movement, detected_at')
-      .gt('detected_at', since)
-      .order('movement', { ascending: false })
+      .from('line_movement')
+      .select('game_id_uuid, market_type, home_team, away_team, line_change, timestamp')
+      .gt('timestamp', since)
+      .order('line_change', { ascending: false })
       .limit(limit);
 
     if (fallbackErr) {
@@ -64,17 +66,17 @@ export async function GET(req: NextRequest) {
         movers: [],
         count: 0,
         hours,
-        note: 'Run migration add-normalized-odds-schema.sql to enable line movement tracking',
+        note: 'Line movement tracking not yet available',
         timestamp: new Date().toISOString(),
       });
     }
 
     const movers = (fallbackRows ?? []).map((row: any) => ({
-      game_id:     row.game_id,
-      market:      row.market,
-      selection:   row.selection,
-      move:        Math.abs(Number(row.movement)),
-      detected_at: row.detected_at,
+      game_id:     row.game_id_uuid,
+      market:      row.market_type,
+      selection:   `${row.away_team} @ ${row.home_team}`,
+      move:        Math.abs(Number(row.line_change)),
+      detected_at: row.timestamp,
     }));
 
     return NextResponse.json({

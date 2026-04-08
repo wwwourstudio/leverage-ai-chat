@@ -151,7 +151,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const sport      = searchParams.get('sport')   ?? getDefaultSport();
-    const marketType = searchParams.get('markets') ?? 'h2h';
+    const marketType = searchParams.get('markets') ?? 'all';
     const result = await fetchOddsForSport(sport, marketType);
     const status = result.success ? HTTP_STATUS.OK : (result.error === ERROR_MESSAGES.ODDS_NOT_CONFIGURED ? HTTP_STATUS.SERVICE_UNAVAILABLE : HTTP_STATUS.BAD_REQUEST);
     return NextResponse.json(result, { status });

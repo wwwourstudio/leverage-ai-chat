@@ -5,7 +5,16 @@ import { EXTERNAL_APIS } from '@/lib/constants';
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
-// ── Module-level 15-minute cache ───────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  return Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
+    arr.slice(i * size, i * size + size),
+  );
+}
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 interface PlayerPropResult {
   name: string;
   team: string;
@@ -18,10 +27,26 @@ interface PlayerPropResult {
   bestUnderBook: string;
 }
 
+interface OddsApiBookmaker {
+  title: string;
+  markets: Array<{
+    key: string;
+    outcomes: Array<{
+      name: string;
+      description?: string;
+      price: number;
+      point?: number;
+    }>;
+  }>;
+}
+
+// ── Module-level 15-minute cache ───────────────────────────────────────────────
+
 const propCache = new Map<string, { data: PlayerPropResult[]; ts: number }>();
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 // ── Sport-specific player prop markets ────────────────────────────────────────
+
 const PROP_MARKETS: Record<string, string> = {
   baseball_mlb:
     'batter_hits,batter_home_runs,batter_rbis,pitcher_strikeouts,batter_total_bases',
@@ -34,6 +59,7 @@ const PROP_MARKETS: Record<string, string> = {
 };
 
 const BASE_URL = EXTERNAL_APIS.ODDS_API.BASE_URL;
+const MARKET_BATCH_SIZE = 4; // Odds API returns HTTP 422 when >4 markets per request
 
 // ── GET /api/props?sport=baseball_mlb ─────────────────────────────────────────
 
@@ -76,6 +102,7 @@ export async function GET(req: NextRequest) {
       await eventsRes.json();
 
     if (!Array.isArray(events) || events.length === 0) {
+      // Cache the empty result only when events genuinely don't exist
       propCache.set(sport, { data: [], ts: Date.now() });
       return NextResponse.json({
         success: true,
@@ -85,38 +112,53 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Step 2: Fetch player prop odds for up to 5 events in parallel
+    // Step 2: For each of up to 5 events, fetch prop markets in batches of ≤4.
+    // The Odds API returns HTTP 422 when more than 4 markets are passed in one
+    // request. Split into chunks of 4, fetch in parallel, then merge bookmakers.
     const markets = PROP_MARKETS[sport] ?? PROP_MARKETS.baseball_mlb;
+    const marketChunks = chunkArray(markets.split(','), MARKET_BATCH_SIZE);
     const top5 = events.slice(0, 5);
     const playerMap = new Map<string, PlayerPropResult>();
 
     await Promise.allSettled(
       top5.map(async event => {
-        const res = await fetch(
-          `${BASE_URL}/sports/${sport}/events/${event.id}/odds` +
-            `?apiKey=${apiKey}&regions=us&markets=${markets}&oddsFormat=american`,
-          { signal: AbortSignal.timeout(10_000) },
+        // Fetch each market chunk in parallel for this event
+        const chunkResults = await Promise.all(
+          marketChunks.map(async (chunk, ci) => {
+            const marketsParam = chunk.join(',');
+            const res = await fetch(
+              `${BASE_URL}/sports/${sport}/events/${event.id}/odds` +
+                `?apiKey=${apiKey}&regions=us&markets=${marketsParam}&oddsFormat=american`,
+              { signal: AbortSignal.timeout(10_000) },
+            );
+            if (!res.ok) {
+              console.warn(
+                `[API/props] Chunk ${ci + 1}/${marketChunks.length} failed` +
+                  ` for event ${event.id} (${marketsParam}): HTTP ${res.status}`,
+              );
+              return null;
+            }
+            return res.json() as Promise<{ bookmakers: OddsApiBookmaker[] }>;
+          }),
         );
-        if (!res.ok) return;
 
-        const eventOdds: {
-          home_team: string;
-          away_team: string;
-          bookmakers: Array<{
-            title: string;
-            markets: Array<{
-              key: string;
-              outcomes: Array<{
-                name: string;
-                description?: string;
-                price: number;
-                point?: number;
-              }>;
-            }>;
-          }>;
-        } = await res.json();
+        // Merge bookmakers from all chunks — deduplicate by title, concat markets
+        const bkMap = new Map<string, OddsApiBookmaker>();
+        for (const result of chunkResults) {
+          if (!result) continue;
+          for (const bk of result.bookmakers ?? []) {
+            if (bkMap.has(bk.title)) {
+              bkMap.get(bk.title)!.markets.push(...bk.markets);
+            } else {
+              bkMap.set(bk.title, { ...bk, markets: [...bk.markets] });
+            }
+          }
+        }
 
-        for (const bk of eventOdds.bookmakers ?? []) {
+        if (bkMap.size === 0) return; // all chunks failed for this event
+
+        // Process merged bookmakers into best-odds playerMap
+        for (const bk of bkMap.values()) {
           for (const mkt of bk.markets ?? []) {
             const overs  = mkt.outcomes.filter(o => o.name === 'Over');
             const unders = mkt.outcomes.filter(o => o.name === 'Under');
@@ -163,7 +205,11 @@ export async function GET(req: NextRequest) {
     );
 
     const players = Array.from(playerMap.values());
-    propCache.set(sport, { data: players, ts: Date.now() });
+    // Only cache non-empty results — a 0-player result from transient API
+    // failures (e.g. 422, 429) should not lock out fresh data for 15 minutes.
+    if (players.length > 0) {
+      propCache.set(sport, { data: players, ts: Date.now() });
+    }
 
     return NextResponse.json({
       success: true,

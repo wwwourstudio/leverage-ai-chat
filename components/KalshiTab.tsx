@@ -179,15 +179,25 @@ const MarketCard = memo(function MarketCard({ market, onAnalyze }: {
 // ─── Category Pills ────────────────────────────────────────────────────────────
 
 const CATEGORIES = [
-  { id: 'all',      label: 'All Markets' },
-  { id: 'election', label: 'Elections' },
-  { id: 'sports',   label: 'Sports' },
-  { id: 'finance',  label: 'Finance' },
-  { id: 'weather',  label: 'Weather' },
-  { id: 'trending', label: 'Trending' },
+  { id: 'all',           label: 'All' },
+  { id: 'sports',        label: 'Sports' },
+  { id: 'politics',      label: 'Politics' },
+  { id: 'economics',     label: 'Economics' },
+  { id: 'entertainment', label: 'Entertainment' },
 ] as const;
 
 type CategoryId = typeof CATEGORIES[number]['id'];
+
+/** Returns true when the Kalshi market category matches the selected filter. */
+function categoryMatches(marketCat: string, filter: CategoryId): boolean {
+  if (filter === 'all') return true;
+  const c = marketCat.toLowerCase();
+  if (filter === 'sports')        return /sport|baseball|football|basketball|hockey|soccer|tennis|golf/.test(c);
+  if (filter === 'politics')      return /election|politic|govern|congress|president|senate|vote/.test(c);
+  if (filter === 'economics')     return /financ|econom|market|trade|stock|crypto|gdp|inflation|rate|bond|oil|commodity/.test(c);
+  if (filter === 'entertainment') return /entertain|pop|music|movie|film|tv|celebrity|award|oscar|grammy|box office/.test(c);
+  return false;
+}
 
 // ─── Main Tab Component ────────────────────────────────────────────────────────
 
@@ -219,7 +229,8 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
     setLoading(true);
     setError(null);
     try {
-      const qs = new URLSearchParams({ category, limit: '24' });
+      // Fetch all markets; category filtering is done client-side
+      const qs = new URLSearchParams({ limit: '100' });
       if (debouncedSearch) qs.set('search', debouncedSearch);
       const res  = await fetch(`/api/kalshi/markets?${qs}`);
       const data: MarketsResponse = await res.json();
@@ -232,9 +243,9 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
     } finally {
       setLoading(false);
     }
-  }, [category, debouncedSearch]);
+  }, [debouncedSearch]);
 
-  // Fetch on mount and when category/search changes
+  // Fetch on mount and when search changes
   useEffect(() => { fetchMarkets(); }, [fetchMarkets]);
 
   // Auto-refresh every 60 s (matches server cache TTL)
@@ -242,6 +253,19 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
     const id = setInterval(fetchMarkets, 60_000);
     return () => clearInterval(id);
   }, [fetchMarkets]);
+
+  // Auto-retry after 5 minutes when markets come back empty (no search, no error)
+  useEffect(() => {
+    if (!loading && !error && markets.length === 0 && !debouncedSearch) {
+      const id = setTimeout(fetchMarkets, 5 * 60 * 1000);
+      return () => clearTimeout(id);
+    }
+  }, [loading, error, markets.length, debouncedSearch, fetchMarkets]);
+
+  // Client-side category filter
+  const visibleMarkets = category === 'all'
+    ? markets
+    : markets.filter(m => categoryMatches(m.category, category));
 
   const handleAnalyze = useCallback((msg: string) => {
     onChatMessage?.(msg);
@@ -341,17 +365,32 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
         )}
 
         {/* Markets grid */}
-        {!loading && !error && markets.length === 0 && (
+        {!loading && !error && visibleMarkets.length === 0 && (
           <div className="text-center py-10 text-[var(--text-muted)]">
             <TrendingUp className="w-8 h-8 mx-auto mb-2 opacity-30" />
-            <p className="text-sm font-medium">No markets found</p>
-            <p className="text-xs mt-1">
-              {debouncedSearch ? `No results for "${debouncedSearch}"` : `No ${category} markets available`}
-            </p>
+            {debouncedSearch || category !== 'all' ? (
+              <>
+                <p className="text-sm font-medium">No markets found</p>
+                <p className="text-xs mt-1">
+                  {debouncedSearch ? `No results for "${debouncedSearch}"` : `No ${category} markets available right now`}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium">Kalshi markets temporarily unavailable</p>
+                <p className="text-xs mt-1 mb-3">Will retry automatically in 5 minutes</p>
+                <button
+                  onClick={fetchMarkets}
+                  className="text-[10px] font-bold text-[var(--text-muted)] border border-[var(--border-subtle)] rounded-lg px-3 py-1.5 hover:bg-[var(--bg-elevated)] transition-colors"
+                >
+                  Refresh now
+                </button>
+              </>
+            )}
           </div>
         )}
 
-        {!loading && !error && markets.map(m => (
+        {!loading && !error && visibleMarkets.map(m => (
           <MarketCard key={m.ticker} market={m} onAnalyze={handleAnalyze} />
         ))}
       </div>
@@ -359,7 +398,7 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
       {/* Footer */}
       <div className="flex-shrink-0 border-t border-[var(--border-subtle)] px-4 py-2 flex items-center justify-between">
         <span className="text-[9px] text-[var(--text-faint)]">
-          {markets.length > 0 ? `${markets.length} markets · 60s cache` : 'Kalshi Prediction Markets'}
+          {visibleMarkets.length > 0 ? `${visibleMarkets.length} markets · 60s cache` : 'Kalshi Prediction Markets'}
         </span>
         <a
           href="https://kalshi.com"

@@ -412,6 +412,7 @@ function TabOdds({
   spreadHome, spreadAway, ou, hasOdds,
   isBestHome, isBestAway, awayML, homeML,
   confPct, sharpPct, hasLineMove, moveDir, moveNum, rawMove, vigPct,
+  marketView, setMarketView, accentCls,
 }: {
   data: BettingCardData;
   teams: { away: string; home: string } | null;
@@ -433,11 +434,42 @@ function TabOdds({
   moveNum: number;
   rawMove: string;
   vigPct: number | null;
+  marketView: 'ml' | 'spread' | 'total';
+  setMarketView: (v: 'ml' | 'spread' | 'total') => void;
+  accentCls: string;
 }) {
+  const hasSpread = !!(spreadHome || spreadAway);
+  const hasTotal  = !!ou;
+
+  // Market view pills: show only when we have spread or total data to switch to
+  const showPills = !isFinal && (hasSpread || hasTotal);
+
   return (
     <div className="space-y-3">
-      {/* Book comparison */}
-      {!isFinal && hasBookComparison && teams && (
+      {/* ── Market view pills: [Moneyline] [Spread] [Total] ─── */}
+      {showPills && (
+        <div className="flex gap-1">
+          {(['ml', 'spread', 'total'] as const)
+            .filter(v => v === 'ml' || (v === 'spread' && hasSpread) || (v === 'total' && hasTotal))
+            .map(v => (
+              <button
+                key={v}
+                onClick={() => setMarketView(v)}
+                className={cn(
+                  'px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border transition-all duration-150',
+                  marketView === v
+                    ? accentCls
+                    : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-muted)]',
+                )}
+              >
+                {v === 'ml' ? 'Moneyline' : v === 'spread' ? 'Spread' : 'Total'}
+              </button>
+            ))}
+        </div>
+      )}
+
+      {/* Book comparison — only in Moneyline view */}
+      {marketView === 'ml' && !isFinal && hasBookComparison && teams && (
         <BookComparisonRow
           books={books}
           homeTeam={teams.home}
@@ -447,8 +479,8 @@ function TabOdds({
         />
       )}
 
-      {/* Value edge indicator */}
-      {data.edge && (() => {
+      {/* Value edge indicator — only in Moneyline view */}
+      {marketView === 'ml' && data.edge && (() => {
         const edgeNum = parseFloat(String(data.edge).replace(/[^0-9.-]/g, ''));
         if (isNaN(edgeNum) || edgeNum < 2) return null;
         return (
@@ -464,17 +496,19 @@ function TabOdds({
         );
       })()}
 
-      {/* Odds grid */}
+      {/* Odds grid — filtered by market view */}
       {hasOdds && !isFinal && (
-        <div className={cn(
-          'grid gap-1.5',
-          spreadHome && spreadAway && ou
-            ? 'grid-cols-3'
-            : spreadHome && spreadAway
-            ? 'grid-cols-2'
-            : 'grid-cols-2 sm:grid-cols-3',
-        )}>
-          {spreadAway && (
+        <div className="grid grid-cols-2 gap-1.5">
+          {/* Moneyline view */}
+          {marketView === 'ml' && awayML && (
+            <OddsCell label={teams ? abbr(teams.away) : 'Away'} value={awayML.display} positive={awayML.positive} isBest={isBestAway} />
+          )}
+          {marketView === 'ml' && homeML && (
+            <OddsCell label={teams ? abbr(teams.home) : 'Home'} value={homeML.display} positive={homeML.positive} isBest={isBestHome} />
+          )}
+
+          {/* Spread view */}
+          {marketView === 'spread' && spreadAway && (
             <OddsCell
               label={teams ? `${abbr(teams.away)} SPREAD` : 'Away Spread'}
               value={spreadAway.pts}
@@ -482,7 +516,7 @@ function TabOdds({
               positive={spreadAway.pts?.startsWith('+') ? true : spreadAway.pts?.startsWith('-') ? false : undefined}
             />
           )}
-          {spreadHome && (
+          {marketView === 'spread' && spreadHome && (
             <OddsCell
               label={teams ? `${abbr(teams.home)} SPREAD` : 'Home Spread'}
               value={spreadHome.pts}
@@ -490,25 +524,23 @@ function TabOdds({
               positive={spreadHome.pts?.startsWith('+') ? true : spreadHome.pts?.startsWith('-') ? false : undefined}
             />
           )}
-          {ou && (
-            <OddsCell
-              label="TOTAL O/U"
-              value={ou.total}
-              sub={ou.overJ ? `O ${ou.overJ} · U ${ou.underJ ?? '—'}` : undefined}
-              highlight
-            />
-          )}
-          {!spreadAway && !spreadHome && !ou && awayML && (
-            <OddsCell label={teams ? abbr(teams.away) : 'Away'} value={awayML.display} positive={awayML.positive} isBest={isBestAway} />
-          )}
-          {!spreadAway && !spreadHome && !ou && homeML && (
-            <OddsCell label={teams ? abbr(teams.home) : 'Home'} value={homeML.display} positive={homeML.positive} isBest={isBestHome} />
+
+          {/* Total view — spans both columns */}
+          {marketView === 'total' && ou && (
+            <div className="col-span-2">
+              <OddsCell
+                label="TOTAL O/U"
+                value={ou.total}
+                sub={ou.overJ ? `O ${ou.overJ} · U ${ou.underJ ?? '—'}` : undefined}
+                highlight
+              />
+            </div>
           )}
         </div>
       )}
 
-      {/* Market Intelligence panel */}
-      {(confPct !== null || sharpPct !== null || hasLineMove || vigPct !== null) && (
+      {/* Market Intelligence panel — only in Moneyline view */}
+      {marketView === 'ml' && (confPct !== null || sharpPct !== null || hasLineMove || vigPct !== null) && (
         <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] p-3 space-y-2.5">
           <div className="flex items-center gap-1.5">
             <Zap className="w-3 h-3 text-amber-400" />
@@ -1021,6 +1053,7 @@ export const BettingCard = memo(function BettingCard({
   const hasBookComparison = books.length >= 2;
 
   const [activeTab, setActiveTab] = useState(0);
+  const [marketView, setMarketView] = useState<'ml' | 'spread' | 'total'>('ml');
 
   return (
     <article className={cn(
@@ -1254,6 +1287,9 @@ export const BettingCard = memo(function BettingCard({
             moveNum={moveNum}
             rawMove={String(rawMove)}
             vigPct={vigPct}
+            marketView={marketView}
+            setMarketView={setMarketView}
+            accentCls={theme.avatarCls}
           />
         )}
         {activeTab === 1 && <TabProps data={data} onAnalyze={onAnalyze} />}

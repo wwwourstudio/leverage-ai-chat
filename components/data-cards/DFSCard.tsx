@@ -53,14 +53,13 @@ const statusConfig: Record<string, {
 
 /** Letter-grade value badge based on salary efficiency (proj pts / salary * 1000) */
 function ValueGrade({ score }: { score: number }) {
-  const grade = score >= 5.5 ? 'A' : score >= 4.5 ? 'B' : score >= 3.5 ? 'C' : 'D';
-  const color = grade === 'A'
-    ? 'text-emerald-300 bg-emerald-500/15 border-emerald-500/35'
-    : grade === 'B'
-    ? 'text-blue-300 bg-blue-500/15 border-blue-500/35'
-    : grade === 'C'
-    ? 'text-amber-300 bg-amber-500/15 border-amber-500/35'
-    : 'text-red-300 bg-red-500/15 border-red-500/35';
+  const grade = score >= 1.4 ? 'A' : score >= 1.3 ? 'B' : score >= 1.2 ? 'C' : score >= 1.1 ? 'D' : 'F';
+  const color =
+    grade === 'A' ? 'text-violet-300 bg-violet-500/15 border-violet-500/35'
+    : grade === 'B' ? 'text-blue-300 bg-blue-500/15 border-blue-500/35'
+    : grade === 'C' ? 'text-slate-300 bg-slate-500/15 border-slate-500/35'
+    : grade === 'D' ? 'text-[var(--text-muted)] bg-[var(--bg-overlay)] border-[var(--border-subtle)]'
+    : 'text-red-400/70 bg-red-500/8 border-red-500/20';
   return (
     <div className={cn('flex flex-col items-center justify-center w-11 h-11 rounded-xl border font-black shrink-0', color)}>
       <span className="text-xl leading-none">{grade}</span>
@@ -233,11 +232,32 @@ export const DFSCard = memo(function DFSCard({
                 {valueScore !== null && <ValueGrade score={valueScore} />}
               </div>
             )}
+            {/* Grade summary row — shown when gradesSummary data field is provided */}
+            {data.gradesSummary && (
+              <div className="mb-2 flex items-center gap-1.5">
+                <span className="text-[8px] font-black uppercase tracking-wider text-[var(--text-muted)]">Lineup</span>
+                <span className="text-[10px] font-bold text-foreground/80 bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-0.5 rounded-full">
+                  {String(data.gradesSummary)}
+                </span>
+              </div>
+            )}
+
             <div className="grid grid-cols-3 gap-1.5">
               {salary && (
                 <div className="flex flex-col items-center gap-0.5 rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-1.5 py-2">
                   <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Salary</span>
                   <span className="text-sm font-black text-foreground tabular-nums">{String(salary)}</span>
+                  {/* Salary utilization bar — salaryNum vs $50k DK cap */}
+                  {salaryNum > 0 && (
+                    <div className="w-full mt-1">
+                      <div className="h-0.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-violet-500 to-blue-500"
+                          style={{ width: `${Math.min(100, (salaryNum / 50000) * 100).toFixed(1)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               {projection && (

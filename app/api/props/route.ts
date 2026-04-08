@@ -90,10 +90,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Step 1: Fetch today's event IDs
+    // Step 1: Fetch today's event IDs — short timeout to leave budget for Step 2
     const eventsRes = await fetch(
       `${BASE_URL}/sports/${sport}/events?apiKey=${apiKey}`,
-      { signal: AbortSignal.timeout(10_000) },
+      { signal: AbortSignal.timeout(5_000) },
     );
     if (!eventsRes.ok) {
       throw new Error(`Events fetch failed: ${eventsRes.status}`);
@@ -112,12 +112,13 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Step 2: For each of up to 5 events, fetch prop markets in batches of ≤4.
+    // Step 2: For each of up to 4 events, fetch prop markets in batches of ≤4.
     // The Odds API returns HTTP 422 when more than 4 markets are passed in one
     // request. Split into chunks of 4, fetch in parallel, then merge bookmakers.
+    // Budget: 5s (events) + 5s (props) = 10s total, well within 30s maxDuration.
     const markets = PROP_MARKETS[sport] ?? PROP_MARKETS.baseball_mlb;
     const marketChunks = chunkArray(markets.split(','), MARKET_BATCH_SIZE);
-    const top5 = events.slice(0, 5);
+    const top5 = events.slice(0, 4);
     const playerMap = new Map<string, PlayerPropResult>();
 
     await Promise.allSettled(
@@ -129,7 +130,7 @@ export async function GET(req: NextRequest) {
             const res = await fetch(
               `${BASE_URL}/sports/${sport}/events/${event.id}/odds` +
                 `?apiKey=${apiKey}&regions=us&markets=${marketsParam}&oddsFormat=american`,
-              { signal: AbortSignal.timeout(10_000) },
+              { signal: AbortSignal.timeout(5_000) },
             );
             if (!res.ok) {
               console.warn(

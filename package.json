@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.28.0",
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "sharp"]
+  },
   "scripts": {
     "build": "NODE_OPTIONS='--max-old-space-size=4096' next build",
     "dev": "rm -rf .next && NODE_OPTIONS='--max-old-space-size=4096' next dev",

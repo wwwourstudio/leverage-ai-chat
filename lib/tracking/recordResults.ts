@@ -1,17 +1,13 @@
 /**
  * Record Pick Results
  *
- * Reads yesterday's unsettled picks from `pick_results`, queries the MLB Stats
+ * Reads yesterday's unsettled picks from `pick_outcomes`, queries the MLB Stats
  * API for actual home-run outcomes, writes the settled rows back, and computes
  * per-bet P&L.
  *
- * Called daily by /api/cron/train (after games finish, ~3 AM ET / 8 AM UTC).
- *
- * Kelly stake sizing uses the existing lib/kelly module so sizing is consistent
- * with what the trading engine would recommend.
+ * Called daily by /api/cron/settle (after games finish, ~4 AM UTC).
  */
 
-import { calculateKelly } from '@/lib/engine/runTradingEngine';
 import { americanToDecimal } from '@/lib/utils/odds-math';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -45,12 +41,12 @@ export async function recordPickResults(
   const supabase = await getIngestClient();
   if (!supabase) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set — settlement requires service role access');
 
-  // 1. Load unsettled pick_results for the target date
+  // 1. Load unsettled pick_outcomes for the target date
   const { data: unsettledRaw, error: fetchErr } = await supabase
-    .from('pick_results')
-    .select('id, pick_id, player_id, predicted_prob, odds, kelly_stake, tier')
+    .from('pick_outcomes')
+    .select('id, pick_id, player_id, best_odds, tier')
     .eq('pick_date', targetDate)
-    .is('actual_result', null);
+    .is('hit', null);
 
   if (fetchErr) {
     throw new Error(`Failed to load unsettled picks: ${fetchErr.message}`);
@@ -67,10 +63,11 @@ export async function recordPickResults(
   // 3. Match and settle
   const now = new Date().toISOString();
   const updates: Array<{
-    id: string;
-    actual_result: boolean;
-    pnl: number;
-    settled_at: string;
+    id: number;
+    hit: boolean;
+    units_profit: number;
+    result_recorded_at: string;
+    result_source: string;
   }> = [];
 
   for (const row of unsettled) {
@@ -81,13 +78,14 @@ export async function recordPickResults(
     if (!result) continue; // game not in results yet — skip
 
     const hit = result.hit_hr;
-    const pnl = computePnL(hit, row.odds ?? null);
+    const pnl = computePnL(hit, row.best_odds ?? null);
 
     updates.push({
       id: row.id,
-      actual_result: hit,
-      pnl,
-      settled_at: now,
+      hit,
+      units_profit: pnl,
+      result_recorded_at: now,
+      result_source: 'mlb-stats-api',
     });
   }
 
@@ -95,7 +93,7 @@ export async function recordPickResults(
   const BATCH = 50;
   for (let i = 0; i < updates.length; i += BATCH) {
     const { error: upErr } = await supabase
-      .from('pick_results')
+      .from('pick_outcomes')
       .upsert(updates.slice(i, i + BATCH), { onConflict: 'id' });
 
     if (upErr) {
@@ -125,9 +123,7 @@ export async function enrolPicksForTracking(date?: string): Promise<number> {
   // Load today's non-PASS picks
   const { data: picksRaw, error: picksErr } = await supabase
     .from('daily_picks')
-    .select(
-      'id, player_id, model_probability, edge, score, tier, best_odds, best_book, sharp_boosted',
-    )
+    .select('id, player_id, player_name, edge, tier, best_odds')
     .eq('pick_date', targetDate)
     .not('tier', 'eq', 'PASS');
 
@@ -135,36 +131,31 @@ export async function enrolPicksForTracking(date?: string): Promise<number> {
 
   // Load already-enrolled pick_ids for today
   const { data: existingRaw } = await supabase
-    .from('pick_results')
+    .from('pick_outcomes')
     .select('pick_id')
     .eq('pick_date', targetDate);
 
-  const existingIds = new Set((existingRaw ?? []).map((r: { pick_id: string }) => r.pick_id));
+  const existingIds = new Set(
+    (existingRaw ?? []).map((r: { pick_id: number }) => String(r.pick_id)),
+  );
 
-  type PickRow = { id: string; player_id: string; model_probability: number; edge: number; score: number; tier: string; best_odds: number | null; best_book: string | null; sharp_boosted: boolean | null };
+  type PickRow = { id: number; player_id: number | null; player_name: string; edge: number; tier: string; best_odds: number | null };
   const newRows = (picksRaw as PickRow[])
-    .filter((p) => !existingIds.has(p.id))
-    .map((p) => {
-      const kellyStake = computeKellyStake(p.model_probability, p.best_odds ?? 100);
-      return {
-        pick_id: p.id,
-        player_id: p.player_id,
-        pick_date: targetDate,
-        predicted_prob: p.model_probability,
-        edge: p.edge,
-        score: p.score,
-        tier: p.tier,
-        odds: p.best_odds,
-        best_book: p.best_book,
-        kelly_stake: kellyStake,
-        sharp_boosted: p.sharp_boosted,
-      };
-    });
+    .filter((p) => !existingIds.has(String(p.id)))
+    .map((p) => ({
+      pick_id: p.id,
+      player_id: p.player_id,
+      player_name: p.player_name,
+      pick_date: targetDate,
+      edge: p.edge,
+      tier: p.tier,
+      best_odds: p.best_odds,
+    }));
 
   if (newRows.length === 0) return 0;
 
   const { error: insertErr } = await supabase
-    .from('pick_results')
+    .from('pick_outcomes')
     .insert(newRows);
 
   if (insertErr) {
@@ -252,26 +243,6 @@ function computePnL(hit: boolean, americanOdds: number | null): number {
   const odds = americanOdds ?? 100;
   const profit = (americanToDecimal(odds) - 1) * UNIT;
   return parseFloat(profit.toFixed(2));
-}
-
-function computeKellyStake(modelProb: number, americanOdds: number): number {
-  try {
-    const decOdds = americanToDecimal(americanOdds);
-
-    // Use a normalised bankroll of 1 so the result is directly a fraction
-    const result = calculateKelly({
-      probability: modelProb,
-      decimalOdds: decOdds,
-      bankroll: 1,
-      fraction: 0.25, // quarter-Kelly
-    });
-
-    // Cap at 5% of bankroll
-    const raw = result.fractionalKellyStake ?? result.recommendedStake ?? 0;
-    return parseFloat(Math.min(0.05, Math.max(0, raw)).toFixed(6));
-  } catch {
-    return 0.02; // default 2% if Kelly fails
-  }
 }
 
 function todayUTC(): string {

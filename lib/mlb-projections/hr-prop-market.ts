@@ -128,7 +128,7 @@ export async function fetchHRPropMarketLines(
     // /sports/{sport}/odds returns 422 for player prop market keys.
     const eventsRes = await fetch(
       `${BASE_URL}/sports/baseball_mlb/events?apiKey=${apiKey}`,
-      { signal: AbortSignal.timeout(8000) },
+      { signal: AbortSignal.timeout(4000) },
     );
     if (!eventsRes.ok) {
       console.warn(`[HRPropMarket] Events fetch failed: HTTP ${eventsRes.status} — using cached lines`);
@@ -142,7 +142,8 @@ export async function fetchHRPropMarketLines(
 
     // Step 2: For each event (up to 8), fetch market chunks in parallel.
     const marketChunks = chunkArray(HR_MARKETS, MARKET_BATCH_SIZE);
-    const eventsToFetch = events.slice(0, 8);
+    // Limit to 5 events: 4s (events) + 4s (props) ≈ 8s, fits mlb-projections 25s budget
+    const eventsToFetch = events.slice(0, 5);
 
     // Collect raw bookmaker arrays from all events and chunks
     const allBookmakers: Array<{ bk: OddsApiBookmaker }> = [];
@@ -155,7 +156,7 @@ export async function fetchHRPropMarketLines(
             const res = await fetch(
               `${BASE_URL}/sports/baseball_mlb/events/${event.id}/odds` +
                 `?apiKey=${apiKey}&regions=us&markets=${marketsParam}&oddsFormat=american`,
-              { signal: AbortSignal.timeout(8000) },
+              { signal: AbortSignal.timeout(4000) },
             );
             if (!res.ok) {
               console.warn(

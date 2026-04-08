@@ -61,23 +61,24 @@ export async function GET(req: NextRequest) {
 
   const windowStart = daysAgoUTC(30);
   const { data: resultsRaw, error: fetchErr } = await supabase
-    .from('pick_results')
-    .select('predicted_prob, actual_result, odds, kelly_stake, tier, pnl')
+    .from('pick_outcomes')
+    .select('edge, hit, best_odds, units_wagered, tier, units_profit')
     .gte('pick_date', windowStart)
-    .not('actual_result', 'is', null);
+    .not('hit', 'is', null);
 
   if (fetchErr) {
-    errors.push(`pick_results fetch failed: ${fetchErr.message}`);
+    errors.push(`pick_outcomes fetch failed: ${fetchErr.message}`);
   }
 
-  const results = (resultsRaw ?? []) as Array<{
-    predicted_prob: number;
-    actual_result: boolean;
-    odds: number | null;
-    kelly_stake: number | null;
-    tier: string | null;
-    pnl: number | null;
-  }>;
+  // Remap pick_outcomes columns to the shape calculateAccuracy/calculateROI expect
+  const results = (resultsRaw ?? []).map((r: any) => ({
+    predicted_prob: r.edge,
+    actual_result:  r.hit ?? false,
+    odds:           r.best_odds,
+    kelly_stake:    r.units_wagered,
+    tier:           r.tier,
+    pnl:            r.units_profit,
+  }));
 
   // ── Step 3: Compute metrics ───────────────────────────────────────────────
   const {

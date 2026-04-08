@@ -79,14 +79,16 @@ export async function GET(req: NextRequest) {
     const kellyRoi = withKelly ? calculateKellyROI(results, bankroll) : undefined;
 
     // ── Fetch latest model_metrics row (table created by migration) ────────
-    const { data: metricsRaw } = await supabase
-      .from('model_metrics')
-      .select('*')
-      .order('computed_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(r => r)
-      .catch(() => ({ data: null }));
+    let metricsRaw = null;
+    try {
+      const { data } = await supabase
+        .from('model_metrics')
+        .select('*')
+        .order('computed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      metricsRaw = data;
+    } catch { /* table may not exist yet */ }
 
     return NextResponse.json({
       success: true,

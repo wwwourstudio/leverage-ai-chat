@@ -86,6 +86,12 @@ export interface PlayerPropsOptions {
   storeResults?: boolean;
 }
 
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  return Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
+    arr.slice(i * size, i * size + size)
+  );
+}
+
 /**
  * Fetch player props from The Odds API with Supabase caching
  */
@@ -231,37 +237,63 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
     }
 
     const allProps: PlayerProp[] = [];
-    const marketsParam = playerPropMarkets.join(',');
+    // The Odds API returns HTTP 422 when more than 4 markets are passed in a
+    // single event-odds request. Split into chunks of 4 and merge results.
+    const MARKET_BATCH_SIZE = 4;
+    const marketChunks = chunkArray(playerPropMarkets, MARKET_BATCH_SIZE);
 
     console.log(`[v0] [PLAYER-PROPS] Queue status: ${playerPropsQueue.getQueueLength()} pending, ${playerPropsQueue.getActiveRequests()} active`);
 
-    // Step 2: For each event, fetch prop markets.
+    // Step 2: For each event, fetch prop markets in batches of ≤4 markets each.
     // Fetch up to 8 events to cover a full day slate (MLB has 14 games/day).
     // This also captures next-day games within the 48-hour window above.
     const eventsToFetch = events.slice(0, 8);
     const fetchPromises = eventsToFetch.map((event: OddsApiEvent, i: number) => {
       return playerPropsQueue.enqueue(async () => {
-        const url = `${baseUrl}/sports/${sport}/events/${event.id}/odds?apiKey=${apiKey}&regions=us&markets=${marketsParam}&oddsFormat=american`;
-
-        console.log(`[v0] [PLAYER-PROPS] Fetching event ${i + 1}/${eventsToFetch.length}: ${event.away_team} @ ${event.home_team}`);
+        console.log(`[v0] [PLAYER-PROPS] Fetching event ${i + 1}/${eventsToFetch.length}: ${event.away_team} @ ${event.home_team} (${marketChunks.length} batch(es))`);
 
         try {
-          const response = await fetch(url);
+          // Fetch each market chunk in parallel for this event
+          const chunkResults = await Promise.all(
+            marketChunks.map(async (chunk) => {
+              const marketsParam = chunk.join(',');
+              const url = `${baseUrl}/sports/${sport}/events/${event.id}/odds?apiKey=${apiKey}&regions=us&markets=${marketsParam}&oddsFormat=american`;
+              const response = await fetch(url);
 
-          if (!response.ok) {
-            if (response.status === 429) {
-              console.warn(`[v0] [PLAYER-PROPS] Rate limited on event ${event.id} (HTTP 429)`);
-              return null;
-            } else if (response.status === 422) {
-              console.log(`[v0] [PLAYER-PROPS] No player prop markets for event ${event.id} (HTTP 422) - props not yet available`);
-              return null;
+              if (!response.ok) {
+                if (response.status === 429) {
+                  console.warn(`[v0] [PLAYER-PROPS] Rate limited on event ${event.id} chunk [${marketsParam}] (HTTP 429)`);
+                  return null;
+                } else if (response.status === 422) {
+                  console.log(`[v0] [PLAYER-PROPS] No markets for event ${event.id} chunk [${marketsParam}] (HTTP 422)`);
+                  return null;
+                }
+                console.error(`[v0] [PLAYER-PROPS] API error for event ${event.id} chunk [${marketsParam}]: ${response.status}`);
+                return null;
+              }
+
+              return await response.json() as OddsApiEventOdds;
+            })
+          );
+
+          // Merge chunk results: deduplicate bookmakers and concatenate their markets
+          const validResults = chunkResults.filter((r): r is OddsApiEventOdds => r !== null);
+          if (validResults.length === 0) return null;
+
+          const merged: OddsApiEventOdds = { ...validResults[0], bookmakers: [] };
+          const bookmakerMap = new Map<string, OddsApiBookmaker>();
+          for (const result of validResults) {
+            for (const bk of result.bookmakers) {
+              if (bookmakerMap.has(bk.key)) {
+                bookmakerMap.get(bk.key)!.markets.push(...bk.markets);
+              } else {
+                bookmakerMap.set(bk.key, { ...bk, markets: [...bk.markets] });
+              }
             }
-            console.error(`[v0] [PLAYER-PROPS] API error for event ${event.id}: ${response.status}`);
-            return null;
           }
+          merged.bookmakers = Array.from(bookmakerMap.values());
 
-          const data = await response.json();
-          return { event, data };
+          return { event, data: merged };
         } catch (fetchError) {
           console.error(`[v0] [PLAYER-PROPS] Fetch exception for event ${event.id}:`, fetchError);
           return null;

@@ -1,10 +1,18 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
 import { createXai } from '@ai-sdk/xai';
 import { getOddsApiKey } from '@/lib/config';
 import { AI_CONFIG } from '@/lib/constants';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const secret = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
+  if (secret) {
+    const auth = request.headers.get('authorization') ?? '';
+    if (auth !== `Bearer ${secret}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
   const results: Record<string, any> = {};
 
   // ── 1. XAI / Grok ─────────────────────────────────────────────────────────

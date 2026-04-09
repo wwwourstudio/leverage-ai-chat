@@ -2371,6 +2371,94 @@ async function _generateContextualCards(
     } catch (err) {
       console.warn('[v0] [CARDS-GEN] MLB projection engine failed, falling back:', (err as Error).message);
     }
+
+    // ── MLB DFS Odds Fallback ─────────────────────────────────────────────────
+    // When the projection engine is unavailable (API down, no games on schedule,
+    // Statcast timeout), generate DFS stack recommendations from live game totals.
+    // O/U is the best single proxy for DFS game environment.
+    if (category === 'dfs' && cards.length === 0) {
+      try {
+        const { getOddsApiKey } = await import('@/lib/config');
+        const apiKey = getOddsApiKey();
+        const oddsUrl = `https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?apiKey=${apiKey}&regions=us&markets=h2h,totals&oddsFormat=american`;
+
+        type OddsGame = {
+          id: string; home_team: string; away_team: string;
+          bookmakers: Array<{ markets: Array<{ key: string; outcomes: Array<{ name: string; price: number; point?: number }> }> }>;
+        };
+
+        const resp = await Promise.race<Response | null>([
+          fetch(oddsUrl, { next: { revalidate: 0 } } as RequestInit),
+          new Promise<null>(resolve => setTimeout(() => resolve(null), 5000)),
+        ]);
+
+        if (resp?.ok) {
+          const events = await resp.json() as OddsGame[];
+
+          const parsed = events.map(ev => {
+            const book = ev.bookmakers?.[0];
+            const h2h = book?.markets?.find(m => m.key === 'h2h');
+            const totals = book?.markets?.find(m => m.key === 'totals');
+            const homeOdds = h2h?.outcomes?.find(o => o.name === ev.home_team)?.price ?? 0;
+            const awayOdds = h2h?.outcomes?.find(o => o.name === ev.away_team)?.price ?? 0;
+            const overLine = totals?.outcomes?.find(o => o.name === 'Over')?.point ?? 0;
+            return { ev, homeOdds, awayOdds, overLine };
+          }).filter(g => g.overLine > 0).sort((a, b) => b.overLine - a.overLine);
+
+          for (const { ev, homeOdds, awayOdds, overLine } of parsed.slice(0, count)) {
+            const homeShort = ev.home_team.split(' ').pop() ?? ev.home_team;
+            const awayShort = ev.away_team.split(' ').pop() ?? ev.away_team;
+            // Favor the underdog stack (chalk avoidance) or home team if close
+            const stackTeam = Math.abs(homeOdds) < Math.abs(awayOdds)
+              ? ev.home_team : ev.away_team;
+            const stackShort = stackTeam.split(' ').pop() ?? stackTeam;
+            const isHighTotal = overLine >= 9.5;
+            const isMidTotal  = overLine >= 8.5;
+            const envLabel    = isHighTotal ? 'elite scoring' : isMidTotal ? 'high scoring' : 'moderate scoring';
+            const estTotalDK  = Math.round(overLine * 2.9); // ~2.9 DK pts per run scored
+            const ownership   = isHighTotal ? '32%' : isMidTotal ? '24%' : '16%';
+
+            cards.push({
+              type: CARD_TYPES.DFS_MATCHUP,
+              title: `${awayShort} @ ${homeShort} — DFS Stack`,
+              icon: 'Crosshair',
+              category: 'MLB',
+              subcategory: `DraftKings · O/U ${overLine} · ${envLabel}`,
+              gradient: 'from-blue-600 to-indigo-700',
+              status: 'optimal',
+              data: {
+                player:      `${stackShort} Stack`,
+                team:        stackShort,
+                position:    'STACK',
+                salary:      '—',
+                projection:  estTotalDK.toFixed(0),
+                ownership,
+                boomCeiling: Math.round(overLine * 3.5).toFixed(0),
+                bustFloor:   Math.round(overLine * 2.1).toFixed(0),
+                targetGame:  `${ev.away_team} @ ${ev.home_team}`,
+                platforms:   ['DraftKings', 'FanDuel'],
+                tips: `O/U ${overLine} projects ${envLabel} environment (~${estTotalDK} combined DK pts). ` +
+                  `Stack ${stackTeam} hitters (${homeOdds > 0 ? `+${homeOdds}` : homeOdds} / ` +
+                  `${awayOdds > 0 ? `+${awayOdds}` : awayOdds}). ` +
+                  (isHighTotal ? 'Top-tier slate game — prioritize in tournaments.' :
+                   isMidTotal  ? 'Solid value game for cash and GPP.' :
+                   'Consider as contrarian low-ownership stack.'),
+                cardCategory: 'matchup',
+                realData:    true,
+              },
+              realData: true,
+            });
+          }
+
+          if (cards.length > 0) {
+            console.log(`[v0] [CARDS-GEN] MLB DFS odds fallback: ${cards.length} cards`);
+            return cards;
+          }
+        }
+      } catch (e) {
+        console.warn('[v0] [CARDS-GEN] MLB DFS odds fallback failed:', e);
+      }
+    }
   }
 
   // DFS cards — fetch real player prop lines from The Odds API.

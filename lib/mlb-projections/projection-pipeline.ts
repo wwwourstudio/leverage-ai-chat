@@ -127,27 +127,19 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
 
   console.log('[MLBProj] Starting projection pipeline:', opts);
 
-  // 1. Fetch today's games
-  const games = await fetchTodaysGames(opts.date);
-  if (games.length === 0) {
-    console.warn('[MLBProj] No games found for date:', opts.date ?? 'today');
-    return [];
-  }
-
-  // Persist game schedule + rosters to DB (fire-and-forget — never blocks pipeline)
-  void import('@/lib/services/game-ingest').then(({ persistGames }) =>
-    persistGames(games)
-  ).catch(() => {/* non-critical */});
-
-  // 2. Fetch all Statcast data in parallel
-  const [allHitters, allPitchers] = await Promise.all([
-    fetchStatcastHitters(200),
-    fetchStatcastPitchers(60),
+  // 1. Fetch today's games + Statcast data in parallel
+  // We fetch Statcast regardless of games so the no-games fallback can use it.
+  const [games, [allHitters, allPitchers]] = await Promise.all([
+    fetchTodaysGames(opts.date),
+    Promise.all([fetchStatcastHitters(200), fetchStatcastPitchers(60)]),
   ]);
 
-  // Note: Statcast leaderboard is persisted to statcast_daily by the analyze route
-  // (which uses StatcastPlayer from baseball-savant.ts). The mlb-projections statcast
-  // client uses a different type, so we don't duplicate the write here.
+  // Persist game schedule + rosters to DB (fire-and-forget — never blocks pipeline)
+  if (games.length > 0) {
+    void import('@/lib/services/game-ingest').then(({ persistGames }) =>
+      persistGames(games)
+    ).catch(() => {/* non-critical */});
+  }
 
   // No games today (pre-season / off-day) — fall back to top Statcast performers
   if (games.length === 0) {

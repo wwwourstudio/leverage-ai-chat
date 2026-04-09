@@ -2463,6 +2463,7 @@ async function _generateContextualCards(
               category: 'DFS',
               subcategory: `${displaySport || 'Daily Fantasy'} · GPP Stack`,
               gradient: 'from-orange-600 to-red-700',
+              status: 'optimal',
               data: {
                 player: top.player,
                 team: '—',
@@ -2494,6 +2495,7 @@ async function _generateContextualCards(
                 category: 'DFS',
                 subcategory: `${displaySport || 'Daily Fantasy'} · Best Value`,
                 gradient: 'from-emerald-600 to-teal-700',
+                status: 'value',
                 data: {
                   player: vp.player,
                   team: '—',
@@ -2525,6 +2527,7 @@ async function _generateContextualCards(
                 category: 'DFS',
                 subcategory: `${displaySport || 'Daily Fantasy'} · Matchup Edge`,
                 gradient: 'from-blue-600 to-indigo-700',
+                status: 'optimal',
                 data: {
                   player: mp.player,
                   team: '—',

@@ -351,7 +351,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [fantasySetupStep, setFantasySetupStep] = useState(0);
   const [fantasySetupData, setFantasySetupData] = useState<Partial<FantasyLeague>>({ sport: 'nfl', platform: 'espn', teams: 12, leagueType: 'ppr' });
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   
@@ -872,16 +871,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       if (saved) setFantasyLeague(JSON.parse(saved));
     } catch { /* ignore parse errors */ }
   }, []);
-
-  const scrollToBottom = () => {
-    requestAnimationFrame(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, isTyping]);
 
   const handleStarChat = (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -3981,7 +3970,6 @@ No preamble. Start directly with section 1.`;
         </div>
       )}
             
-            <div ref={messagesEndRef} />
           </div>
         </div>
 

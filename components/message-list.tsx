@@ -138,16 +138,6 @@ export const MessageList = memo(function MessageList({ messages, isTyping, onRet
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, []);
 
-  // Auto-scroll to bottom when new messages arrive (only if already near bottom)
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    if (distFromBottom < 300) {
-      el.scrollTop = el.scrollHeight;
-    }
-  }, [messages.length, isTyping]);
-
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;

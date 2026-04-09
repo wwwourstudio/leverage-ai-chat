@@ -2463,6 +2463,7 @@ async function _generateContextualCards(
               category: 'DFS',
               subcategory: `${displaySport || 'Daily Fantasy'} · GPP Stack`,
               gradient: 'from-orange-600 to-red-700',
+              status: 'optimal',
               data: {
                 player: top.player,
                 team: '—',
@@ -2494,6 +2495,7 @@ async function _generateContextualCards(
                 category: 'DFS',
                 subcategory: `${displaySport || 'Daily Fantasy'} · Best Value`,
                 gradient: 'from-emerald-600 to-teal-700',
+                status: 'value',
                 data: {
                   player: vp.player,
                   team: '—',
@@ -2525,6 +2527,7 @@ async function _generateContextualCards(
                 category: 'DFS',
                 subcategory: `${displaySport || 'Daily Fantasy'} · Matchup Edge`,
                 gradient: 'from-blue-600 to-indigo-700',
+                status: 'optimal',
                 data: {
                   player: mp.player,
                   team: '—',
@@ -2582,7 +2585,8 @@ async function _generateContextualCards(
 
   // If we have a sport and still need cards, try fetching sport-specific data
   // (handles category='all' with a specific sport, e.g. "MLB Offseason" query)
-  if (cards.length < count && normalizedSport) {
+  // Skip this fallback for DFS requests — we don't want betting/odds cards shown in place of DFS cards.
+  if (cards.length < count && normalizedSport && category !== 'dfs') {
     console.log(`[v0] [CARDS-GEN] Still need cards, attempting sport-specific fetch for ${displaySport}`);
     try {
       const sportCards = await generateSportSpecificCards(normalizedSport, count - cards.length, 'betting');
@@ -2614,6 +2618,8 @@ async function _generateContextualCards(
   }
 
   // Final fallback: add informative placeholder cards (deduplicated by index)
+  // Skip for DFS — let the AI answer DFS questions directly rather than showing betting placeholders.
+  if (category === 'dfs') return cards;
   const fallbackLabels = [
     `${displaySport} Futures Markets`,
     `${displaySport} Line Movement`,

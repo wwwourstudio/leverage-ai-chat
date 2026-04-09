@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, LogOut, Save, Loader2, CheckCircle, Bot, ChevronDown, Paperclip, FileText, ImageIcon, Trash2 } from 'lucide-react';
-import { SPORT_KEYS } from '@/lib/constants';
+import { X, LogOut, Save, Loader2, CheckCircle, Bot, ChevronDown, Paperclip, FileText, ImageIcon, Trash2, Volume2, Play } from 'lucide-react';
+import { SPORT_KEYS, GROK_VOICES, GROK_VOICE_STORAGE_KEY, GROK_VOICE_DEFAULT, type GrokVoiceId } from '@/lib/constants';
 import { useToast } from '@/components/toast-provider';
 
 const SAVED_FILES_KEY = 'leverage_saved_files';
@@ -54,6 +54,44 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
 
   // Saved files state
   const [savedFiles, setSavedFiles] = useState<SavedFile[]>([]);
+
+  // Grok voice selection
+  const [grokVoice, setGrokVoice] = useState<GrokVoiceId>(GROK_VOICE_DEFAULT);
+  const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(GROK_VOICE_STORAGE_KEY);
+    if (stored && GROK_VOICES.some(v => v.id === stored)) {
+      setGrokVoice(stored as GrokVoiceId);
+    }
+  }, []);
+
+  const handleVoiceSelect = (id: GrokVoiceId) => {
+    setGrokVoice(id);
+    localStorage.setItem(GROK_VOICE_STORAGE_KEY, id);
+  };
+
+  const handleVoicePreview = async (voiceId: string) => {
+    if (previewingVoice) return;
+    setPreviewingVoice(voiceId);
+    const sample = "Sharp money is moving on the over. Here's what the line movement is telling us.";
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: sample, voice: voiceId }),
+      });
+      if (!res.ok) throw new Error('TTS error');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.onended = () => { URL.revokeObjectURL(url); setPreviewingVoice(null); };
+      audio.onerror = () => { URL.revokeObjectURL(url); setPreviewingVoice(null); };
+      audio.play();
+    } catch {
+      setPreviewingVoice(null);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -348,6 +386,57 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
                   </div>
                 ))
               )}
+            </div>
+          </details>
+
+          {/* Grok Voice */}
+          <details className="mt-4 group" open>
+            <summary className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[var(--text-muted)] hover:text-foreground transition-colors select-none list-none">
+              <ChevronDown className="w-3.5 h-3.5 transition-transform group-open:rotate-180" />
+              <Volume2 className="w-3.5 h-3.5 text-indigo-400" />
+              Grok Voice
+              <span className="ml-auto text-[10px] font-normal text-indigo-400">
+                {GROK_VOICES.find(v => v.id === grokVoice)?.name ?? 'Alloy'}
+              </span>
+            </summary>
+            <div className="mt-3 p-4 bg-[var(--bg-overlay)]/60 border border-[var(--border-subtle)] rounded-xl">
+              <p className="text-[11px] text-[var(--text-faint)] mb-3">
+                Choose the voice Grok uses when reading responses aloud. Enable voice mode in the chat input to hear replies automatically.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {GROK_VOICES.map(v => (
+                  <button
+                    key={v.id}
+                    onClick={() => handleVoiceSelect(v.id as GrokVoiceId)}
+                    className={`relative flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all ${
+                      grokVoice === v.id
+                        ? 'bg-indigo-500/15 border-indigo-500/50 text-foreground'
+                        : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-[var(--border-hover)] hover:text-foreground'
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-black leading-none mb-0.5">{v.name}</p>
+                      <p className="text-[9px] text-[var(--text-faint)] leading-none">{v.description}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={e => { e.stopPropagation(); handleVoicePreview(v.id); }}
+                      className={`shrink-0 p-1 rounded-lg transition-colors ${
+                        previewingVoice === v.id
+                          ? 'bg-indigo-500/20 text-indigo-300 animate-pulse'
+                          : 'hover:bg-[var(--bg-elevated)] text-[var(--text-faint)] hover:text-indigo-300'
+                      }`}
+                      aria-label={`Preview ${v.name}`}
+                      title="Preview voice"
+                    >
+                      <Play className="w-3 h-3" />
+                    </button>
+                    {grokVoice === v.id && (
+                      <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           </details>
         </div>

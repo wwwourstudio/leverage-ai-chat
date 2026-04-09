@@ -131,6 +131,7 @@ export const DFSCard = memo(function DFSCard({
   title,
   category,
   subcategory,
+  gradient,
   data,
   status,
   onAnalyze,
@@ -174,7 +175,7 @@ export const DFSCard = memo(function DFSCard({
     )}>
 
       {/* ── Gradient header ──────────────────────────────────────────── */}
-      <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', cfg.headerGrad)}>
+      <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', gradient || cfg.headerGrad)}>
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
           {realData && (
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[8px] font-bold text-emerald-400/80">

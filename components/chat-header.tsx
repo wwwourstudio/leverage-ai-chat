@@ -122,7 +122,7 @@ export const ChatHeader = memo(function ChatHeader({
         </div>
 
         {/* Right: export/share + user actions */}
-        <div className="flex items-center gap-2 md:gap-3">
+        <div className="flex items-center gap-0.5 md:gap-3">
           {/* Export dropdown — shown when there are messages */}
           {hasMessages && activeChat && (
             <div className="relative">
@@ -202,7 +202,7 @@ export const ChatHeader = memo(function ChatHeader({
               {onOpenWatchlist && (
                 <button
                   onClick={onOpenWatchlist}
-                  className="relative p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
+                  className="relative p-1.5 md:p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
                   title="Saved Bookmarks"
                 >
                   <Bookmark className={`w-5 h-5 transition-colors ${watchlistCount > 0 ? 'text-blue-500 fill-blue-500' : 'text-[var(--text-muted)] group-hover:text-blue-500'}`} fill={watchlistCount > 0 ? 'currentColor' : 'none'} />
@@ -215,7 +215,7 @@ export const ChatHeader = memo(function ChatHeader({
               )}
               <button
                 onClick={onOpenAlerts}
-                className="relative p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
+                className="relative p-1.5 md:p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
               >
                 <Bell className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
                 {alertCount > 0 && (
@@ -224,7 +224,7 @@ export const ChatHeader = memo(function ChatHeader({
               </button>
               <button
                 onClick={onOpenSettings}
-                className="p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
+                className="p-1.5 md:p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
               >
                 <Settings className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
               </button>

@@ -205,11 +205,9 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
     // Calling the game odds endpoint with player prop markets returns HTTP 422.
     let events: OddsApiEvent[] = [];
     try {
-      // Limit to games starting within the next 48 hours — props are posted
-      // for today's and next-day games; requesting beyond that wastes API credits.
-      const now = new Date();
-      const cutoff = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-      const eventsUrl = `${baseUrl}/sports/${sport}/events?apiKey=${apiKey}&commenceTimeFrom=${now.toISOString()}&commenceTimeTo=${cutoff.toISOString()}`;
+      // No date-range parameters — the events endpoint returns upcoming events
+      // by default; adding commenceTimeFrom/To causes HTTP 422 on some sports.
+      const eventsUrl = `${baseUrl}/sports/${sport}/events?apiKey=${apiKey}`;
       // Route through the queue so parallel sport fetches don't all hit the
       // events endpoint simultaneously and trigger HTTP 429 rate limits.
       const eventsResp = await playerPropsQueue.enqueue(() => fetch(eventsUrl), 1);

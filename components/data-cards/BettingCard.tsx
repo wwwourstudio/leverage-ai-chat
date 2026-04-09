@@ -111,6 +111,7 @@ interface BettingCardProps {
   data: BettingCardData;
   status: string;
   onAnalyze?: () => void;
+  onAsk?: (query: string) => void;
   isLoading?: boolean;
   error?: string;
   isHero?: boolean;
@@ -670,7 +671,7 @@ function TabOdds({
 // ─────────────────────────────────────────────────────────────────────────────
 // TabProps — player props (Tab 2)
 // ─────────────────────────────────────────────────────────────────────────────
-function TabProps({ data, onAnalyze, loading = false }: { data: BettingCardData; onAnalyze?: () => void; loading?: boolean }) {
+function TabProps({ data, onAnalyze, onAsk, loading = false }: { data: BettingCardData; onAnalyze?: () => void; onAsk?: (q: string) => void; loading?: boolean }) {
   const props = Array.isArray(data.playerProps) ? data.playerProps : [];
   if (loading) {
     return (
@@ -700,8 +701,18 @@ function TabProps({ data, onAnalyze, loading = false }: { data: BettingCardData;
       {props.map((p: any, i: number) => {
         const oddsNum = parseFloat(p.odds);
         const hitRate = parseFloat(p.hitRate);
+        const handleClick = onAsk
+          ? () => onAsk(`Show me the prop card for ${p.player} ${p.stat} ${p.line} — analysis, hit rate, and betting value`)
+          : undefined;
         return (
-          <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
+          <div
+            key={i}
+            onClick={handleClick}
+            className={cn(
+              'flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] transition-colors',
+              handleClick && 'cursor-pointer hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] active:scale-[0.99]',
+            )}
+          >
             <div className="flex-1 min-w-0">
               <p className="text-[11px] font-black text-foreground truncate">{p.player}</p>
               <p className="text-[9px] text-[var(--text-muted)] truncate">{p.team} · {p.stat}</p>
@@ -727,6 +738,7 @@ function TabProps({ data, onAnalyze, loading = false }: { data: BettingCardData;
                 {p.hitRate}%
               </span>
             )}
+            {handleClick && <ChevronRight className="w-3 h-3 text-[var(--text-faint)] shrink-0" />}
           </div>
         );
       })}
@@ -745,11 +757,12 @@ function TabSpinner() {
   );
 }
 
-function TabTeams({ data, teams, theme, onAnalyze, loading = false }: {
+function TabTeams({ data, teams, theme, onAnalyze, onAsk, loading = false }: {
   data: BettingCardData;
   teams: { away: string; home: string } | null;
   theme: { accentColor: string };
   onAnalyze?: () => void;
+  onAsk?: (q: string) => void;
   loading?: boolean;
 }) {
   if (loading) return <TabSpinner />;
@@ -791,11 +804,36 @@ function TabTeams({ data, teams, theme, onAnalyze, loading = false }: {
     <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] overflow-hidden">
       <div className="grid grid-cols-3 px-3 py-2 border-b border-[var(--border-subtle)]">
         <span className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Stat</span>
-        <span className={cn('text-[10px] font-black uppercase text-center', theme.accentColor)}>{awayAbbr}</span>
-        <span className={cn('text-[10px] font-black uppercase text-center', theme.accentColor)}>{homeAbbr}</span>
+        {teams ? (
+          <button
+            onClick={onAsk ? () => onAsk(`Show me detailed team stats and analysis for the ${teams.away}`) : undefined}
+            className={cn('text-[10px] font-black uppercase text-center', theme.accentColor, onAsk && 'hover:underline cursor-pointer')}
+          >
+            {awayAbbr}
+          </button>
+        ) : (
+          <span className={cn('text-[10px] font-black uppercase text-center', theme.accentColor)}>{awayAbbr}</span>
+        )}
+        {teams ? (
+          <button
+            onClick={onAsk ? () => onAsk(`Show me detailed team stats and analysis for the ${teams.home}`) : undefined}
+            className={cn('text-[10px] font-black uppercase text-center', theme.accentColor, onAsk && 'hover:underline cursor-pointer')}
+          >
+            {homeAbbr}
+          </button>
+        ) : (
+          <span className={cn('text-[10px] font-black uppercase text-center', theme.accentColor)}>{homeAbbr}</span>
+        )}
       </div>
       {rows.map(({ label, away, home }) => (
-        <div key={label} className="grid grid-cols-3 px-3 py-2 border-b border-[var(--border-subtle)] last:border-0">
+        <div
+          key={label}
+          onClick={onAsk && teams ? () => onAsk(`Compare ${teams.away} vs ${teams.home} — ${label} breakdown`) : undefined}
+          className={cn(
+            'grid grid-cols-3 px-3 py-2 border-b border-[var(--border-subtle)] last:border-0 transition-colors',
+            onAsk && teams && 'cursor-pointer hover:bg-[var(--bg-elevated)]',
+          )}
+        >
           <span className="text-[9px] text-[var(--text-muted)] self-center">{label}</span>
           <span className="text-[10px] font-bold text-foreground text-center self-center">{away ?? '—'}</span>
           <span className="text-[10px] font-bold text-foreground text-center self-center">{home ?? '—'}</span>
@@ -811,9 +849,10 @@ function TabTeams({ data, teams, theme, onAnalyze, loading = false }: {
 // ─────────────────────────────────────────────────────────────────────────────
 // TabHistory — head-to-head history (Tab 4)
 // ─────────────────────────────────────────────────────────────────────────────
-function TabHistory({ data, onAnalyze, loading = false }: { data: BettingCardData; onAnalyze?: () => void; loading?: boolean }) {
+function TabHistory({ data, onAnalyze, onAsk, loading = false }: { data: BettingCardData; onAnalyze?: () => void; onAsk?: (q: string) => void; loading?: boolean }) {
   if (loading) return <TabSpinner />;
   const history = Array.isArray(data.h2hHistory) ? data.h2hHistory : [];
+  const matchup = data.matchup ?? data.game ?? '';
   return (
     <div className="space-y-3">
       {(data.atsRecord || data.h2hRecord) && (
@@ -832,33 +871,46 @@ function TabHistory({ data, onAnalyze, loading = false }: { data: BettingCardDat
       )}
       {history.length > 0 ? (
         <div className="space-y-1.5">
-          {history.map((h: any, i: number) => (
-            <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
-              <span className="text-[9px] text-[var(--text-muted)]">{h.date}</span>
-              <span className="text-[10px] font-bold text-foreground tabular-nums">{h.score ?? h.result}</span>
-              {h.betResult != null ? (
-                <span className={cn(
-                  'px-2 py-0.5 rounded-full text-[8px] font-black border',
-                  h.betResult === 'hit'
-                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                    : 'bg-red-500/15 text-red-300 border-red-500/30',
-                )}>
-                  {h.betResult === 'hit' ? 'HIT' : 'MISS'}
-                </span>
-              ) : h.winner != null ? (
-                <span className={cn(
-                  'px-2 py-0.5 rounded-full text-[8px] font-black border uppercase',
-                  h.won === true
-                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                    : h.won === false
-                    ? 'bg-red-500/15 text-red-300 border-red-500/30'
-                    : 'bg-white/10 text-white/60 border-white/15',
-                )}>
-                  {String(h.winner).toUpperCase()}
-                </span>
-              ) : null}
-            </div>
-          ))}
+          {history.map((h: any, i: number) => {
+            const handleClick = onAsk
+              ? () => onAsk(`Analyze this ${matchup} H2H matchup — ${h.date} final score ${h.score ?? h.result}, winner: ${h.winner ?? 'unknown'}. What trends matter for today's game?`)
+              : undefined;
+            return (
+              <div
+                key={i}
+                onClick={handleClick}
+                className={cn(
+                  'flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)] transition-colors',
+                  handleClick && 'cursor-pointer hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] active:scale-[0.99]',
+                )}
+              >
+                <span className="text-[9px] text-[var(--text-muted)]">{h.date}</span>
+                <span className="text-[10px] font-bold text-foreground tabular-nums">{h.score ?? h.result}</span>
+                {h.betResult != null ? (
+                  <span className={cn(
+                    'px-2 py-0.5 rounded-full text-[8px] font-black border',
+                    h.betResult === 'hit'
+                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                      : 'bg-red-500/15 text-red-300 border-red-500/30',
+                  )}>
+                    {h.betResult === 'hit' ? 'HIT' : 'MISS'}
+                  </span>
+                ) : h.winner != null ? (
+                  <span className={cn(
+                    'px-2 py-0.5 rounded-full text-[8px] font-black border uppercase',
+                    h.won === true
+                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                      : h.won === false
+                      ? 'bg-red-500/15 text-red-300 border-red-500/30'
+                      : 'bg-white/10 text-white/60 border-white/15',
+                  )}>
+                    {String(h.winner).toUpperCase()}
+                  </span>
+                ) : null}
+                {handleClick && <ChevronRight className="w-3 h-3 text-[var(--text-faint)] shrink-0" />}
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div className="flex flex-col items-center gap-3 py-4 text-center">
@@ -881,7 +933,7 @@ function TabHistory({ data, onAnalyze, loading = false }: { data: BettingCardDat
 // ─────────────────────────────────────────────────────────────────────────────
 // InjuryRow — single injury row with bookmark toggle
 // ─────────────────────────────────────────────────────────────────────────────
-function InjuryRow({ inj, statusCls }: { inj: any; statusCls: (s: string) => string }) {
+function InjuryRow({ inj, statusCls, onAsk }: { inj: any; statusCls: (s: string) => string; onAsk?: (q: string) => void }) {
   const key = `bookmark:player:${(inj.player ?? '').toLowerCase().replace(/\s+/g, '_')}`;
   const [saved, setSaved] = useState(() => {
     try { return !!localStorage.getItem(key); } catch { return false; }
@@ -912,7 +964,13 @@ function InjuryRow({ inj, statusCls }: { inj: any; statusCls: (s: string) => str
   }, [key, inj.player, inj.position, inj.team]);
 
   return (
-    <div className="px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
+    <div
+      onClick={onAsk ? () => onAsk(`Show me the injury analysis and betting impact for ${inj.player} (${inj.status}) on the ${inj.team}`) : undefined}
+      className={cn(
+        'px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] transition-colors',
+        onAsk && 'cursor-pointer hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] active:scale-[0.99]',
+      )}
+    >
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-black text-foreground truncate">{inj.player}</p>
@@ -923,7 +981,7 @@ function InjuryRow({ inj, statusCls }: { inj: any; statusCls: (s: string) => str
             {inj.status?.toUpperCase()}
           </span>
           <button
-            onClick={toggle}
+            onClick={(e) => { e.stopPropagation(); toggle(); }}
             title={saved ? 'Remove from bookmarks' : 'Bookmark player'}
             className={cn(
               'p-1.5 rounded-lg transition-all',
@@ -934,6 +992,7 @@ function InjuryRow({ inj, statusCls }: { inj: any; statusCls: (s: string) => str
           >
             <Bookmark className="w-3.5 h-3.5" fill={saved ? 'currentColor' : 'none'} />
           </button>
+          {onAsk && <ChevronRight className="w-3 h-3 text-[var(--text-faint)]" />}
         </div>
       </div>
       {inj.impact && (
@@ -945,7 +1004,7 @@ function InjuryRow({ inj, statusCls }: { inj: any; statusCls: (s: string) => str
 
 // TabInjuries — injury reports (Tab 5)
 // ─────────────────────────────────────────────────────────────────────────────
-function TabInjuries({ data, onAnalyze, loading = false }: { data: BettingCardData; onAnalyze?: () => void; loading?: boolean }) {
+function TabInjuries({ data, onAnalyze, onAsk, loading = false }: { data: BettingCardData; onAnalyze?: () => void; onAsk?: (q: string) => void; loading?: boolean }) {
   if (loading) return <TabSpinner />;
   const injuries = Array.isArray(data.injuries) ? data.injuries : [];
 
@@ -961,7 +1020,7 @@ function TabInjuries({ data, onAnalyze, loading = false }: { data: BettingCardDa
     return (
       <div className="space-y-1.5">
         {injuries.map((inj: any, i: number) => (
-          <InjuryRow key={i} inj={inj} statusCls={statusCls} />
+          <InjuryRow key={i} inj={inj} statusCls={statusCls} onAsk={onAsk} />
         ))}
       </div>
     );
@@ -995,7 +1054,7 @@ function TabInjuries({ data, onAnalyze, loading = false }: { data: BettingCardDa
 // ─────────────────────────────────────────────────────────────────────────────
 // WatchPlayerRow — single player row with bookmark toggle
 // ─────────────────────────────────────────────────────────────────────────────
-function WatchPlayerRow({ p, sport }: { p: any; sport?: string }) {
+function WatchPlayerRow({ p, sport, onAsk }: { p: any; sport?: string; onAsk?: (q: string) => void }) {
   const key = `bookmark:player:${(p.player ?? '').toLowerCase().replace(/\s+/g, '_')}`;
   const [saved, setSaved] = useState(() => {
     try { return !!localStorage.getItem(key); } catch { return false; }
@@ -1026,7 +1085,13 @@ function WatchPlayerRow({ p, sport }: { p: any; sport?: string }) {
   }, [key, p.player, p.position, p.team]);
 
   return (
-    <div className="flex items-start gap-3 px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
+    <div
+      onClick={onAsk ? () => onAsk(`Show me stats and prop card for ${p.player} (${p.team}) — ${p.reason}`) : undefined}
+      className={cn(
+        'flex items-start gap-3 px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] transition-colors',
+        onAsk && 'cursor-pointer hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] active:scale-[0.99]',
+      )}
+    >
       <PlayerAvatar playerName={p.player} photoUrl={p.photoUrl} sport={sport} size="md" />
       <div className="min-w-0 flex-1">
         <p className="text-[11px] font-black text-foreground truncate">{p.player}</p>
@@ -1034,7 +1099,7 @@ function WatchPlayerRow({ p, sport }: { p: any; sport?: string }) {
         <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">{p.reason}</p>
       </div>
       <button
-        onClick={toggle}
+        onClick={(e) => { e.stopPropagation(); toggle(); }}
         title={saved ? 'Remove from bookmarks' : 'Bookmark player'}
         className={cn(
           'flex-shrink-0 p-1.5 rounded-lg transition-all',
@@ -1045,13 +1110,14 @@ function WatchPlayerRow({ p, sport }: { p: any; sport?: string }) {
       >
         <Bookmark className="w-3.5 h-3.5" fill={saved ? 'currentColor' : 'none'} />
       </button>
+      {onAsk && <ChevronRight className="w-3 h-3 text-[var(--text-faint)] self-center shrink-0" />}
     </div>
   );
 }
 
 // TabWatch — players to watch (Tab 6)
 // ─────────────────────────────────────────────────────────────────────────────
-function TabWatch({ data, onAnalyze }: { data: BettingCardData; onAnalyze?: () => void }) {
+function TabWatch({ data, onAnalyze, onAsk }: { data: BettingCardData; onAnalyze?: () => void; onAsk?: (q: string) => void }) {
   const players = Array.isArray(data.playersToWatch) ? data.playersToWatch : [];
 
   if (players.length === 0) {
@@ -1074,7 +1140,7 @@ function TabWatch({ data, onAnalyze }: { data: BettingCardData; onAnalyze?: () =
   return (
     <div className="space-y-2">
       {players.map((p: any, i: number) => (
-        <WatchPlayerRow key={i} p={p} sport={data.sport} />
+        <WatchPlayerRow key={i} p={p} sport={data.sport} onAsk={onAsk} />
       ))}
     </div>
   );
@@ -1089,6 +1155,7 @@ export const BettingCard = memo(function BettingCard({
   subcategory,
   data,
   onAnalyze,
+  onAsk,
   isHero = false,
 }: BettingCardProps) {
   const teams = parseTeams(data.matchup || data.game);
@@ -1433,6 +1500,7 @@ export const BettingCard = memo(function BettingCard({
             data={{ ...data, playerProps: lazyProps ?? data.playerProps }}
             loading={propsLoading}
             onAnalyze={onAnalyze}
+            onAsk={onAsk}
           />
         )}
         {activeTab === 2 && (
@@ -1446,13 +1514,13 @@ export const BettingCard = memo(function BettingCard({
                 away: { last10: ctx.teams.away?.last10, pointsPerGame: ctx.teams.away?.splitRecord, streak: ctx.teams.away?.streak },
               } : data.teamComparison,
             }}
-            teams={teams} theme={theme} onAnalyze={onAnalyze} loading={ctxLoading && ctx === null}
+            teams={teams} theme={theme} onAnalyze={onAnalyze} onAsk={onAsk} loading={ctxLoading && ctx === null}
           />
         )}
         {activeTab === 3 && (
           <TabHistory
             data={{ ...data, h2hHistory: ctx?.history ?? data.h2hHistory }}
-            onAnalyze={onAnalyze} loading={ctxLoading && ctx === null}
+            onAnalyze={onAnalyze} onAsk={onAsk} loading={ctxLoading && ctx === null}
           />
         )}
         {activeTab === 4 && (
@@ -1463,13 +1531,14 @@ export const BettingCard = memo(function BettingCard({
                 ? ctx.injuries.map((p: any) => ({ ...p, team: p.team }))
                 : data.injuries,
             }}
-            onAnalyze={onAnalyze} loading={ctxLoading && ctx === null}
+            onAnalyze={onAnalyze} onAsk={onAsk} loading={ctxLoading && ctx === null}
           />
         )}
         {activeTab === 5 && (
           <TabWatch
             data={{ ...data, playersToWatch: data.playersToWatch ?? (lazyProps ?? []).slice(0, 5).map((p: any) => ({ player: p.player, team: p.team, reason: `${p.stat} ${p.line} (${p.odds})` })) }}
             onAnalyze={onAnalyze}
+            onAsk={onAsk}
           />
         )}
 

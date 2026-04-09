@@ -80,7 +80,7 @@ export function AddToHomeBanner() {
   if (!show) return null;
 
   return (
-    <div className="w-full bg-[var(--bg-overlay)] border-b border-[var(--border-subtle)] px-4 py-3 flex items-center gap-3">
+    <div className="w-full bg-gradient-to-r from-blue-950 via-indigo-950 to-[var(--bg-overlay)] border-b border-blue-800/40 px-4 py-3 flex items-center gap-3">
       {/* App icon */}
       <div className="shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
         {/* eslint-disable-next-line @next/next/no-img-element */}

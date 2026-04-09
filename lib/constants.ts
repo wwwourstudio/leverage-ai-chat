@@ -37,6 +37,20 @@ export const AI_CONFIG = {
   FALLBACK_MODEL: 'Grok 3 Fast',
 } as const;
 
+// Grok Voice Chat — TTS voice options (xAI grok-3-mini-tts, OpenAI-compatible)
+export const GROK_VOICES = [
+  { id: 'alloy',   name: 'Alloy',   description: 'Balanced · versatile'  },
+  { id: 'echo',    name: 'Echo',    description: 'Clear · analytical'    },
+  { id: 'fable',   name: 'Fable',   description: 'Warm · engaging'       },
+  { id: 'onyx',    name: 'Onyx',    description: 'Deep · authoritative'  },
+  { id: 'nova',    name: 'Nova',    description: 'Energetic · sharp'     },
+  { id: 'shimmer', name: 'Shimmer', description: 'Smooth · measured'     },
+] as const;
+
+export type GrokVoiceId = typeof GROK_VOICES[number]['id'];
+export const GROK_VOICE_STORAGE_KEY = 'leverage_grok_voice';
+export const GROK_VOICE_DEFAULT: GrokVoiceId = 'alloy';
+
 // API Endpoints
 export const API_ENDPOINTS = {
   ANALYZE: '/api/analyze',
@@ -56,6 +70,7 @@ export const API_ENDPOINTS = {
   USER_PROFILE: '/api/user/profile',
   USER_INSTRUCTIONS: '/api/user/instructions',
   USER_FILES: '/api/user/files',
+  TTS: '/api/tts',
   FEEDBACK: '/api/feedback',
   ALERTS_CHECK: '/api/alerts/check',
   ALERTS: '/api/alerts',

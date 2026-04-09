@@ -1,8 +1,9 @@
 'use client';
 
 import { memo, useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
-import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles, Brain, Square } from 'lucide-react';
+import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles, Brain, Square, Mic, MicOff } from 'lucide-react';
 import { useToast } from '@/components/toast-provider';
+import { useVoiceInput } from '@/lib/hooks/use-voice-input';
 
 interface FileAttachment {
   id: string;
@@ -64,6 +65,12 @@ export const ChatInput = memo(function ChatInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const toast = useToast();
+
+  const { isRecording, isSupported: micSupported, toggle: toggleMic } = useVoiceInput(
+    useCallback((transcript: string) => {
+      onInputChange(input ? `${input} ${transcript}` : transcript);
+    }, [input, onInputChange]),
+  );
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -192,7 +199,7 @@ export const ChatInput = memo(function ChatInput({
             onKeyDown={handleKeyDown}
             placeholder={defaultPlaceholder}
             disabled={isTyping}
-            className="flex-1 bg-transparent resize-none pl-4 pr-2 pt-3.5 pb-2 text-sm font-medium text-foreground placeholder-[var(--text-faint)] focus:outline-none leading-relaxed disabled:opacity-50"
+            className="flex-1 bg-transparent resize-none pl-4 pr-2 pt-3 pb-2 text-[13px] sm:text-sm leading-tight sm:leading-relaxed font-medium text-foreground placeholder-[var(--text-faint)] focus:outline-none disabled:opacity-50"
             style={{ minHeight: '52px', maxHeight: '180px' }}
           />
           {/* Attach — floats right of textarea, vertically centered */}
@@ -211,8 +218,24 @@ export const ChatInput = memo(function ChatInput({
 
         {/* Bottom action bar */}
         <div className="flex items-center justify-between px-3 pb-3 pt-1">
-          {/* Left: think harder */}
+          {/* Left: mic + think harder */}
           <div className="flex items-center gap-1.5">
+            {/* Voice input */}
+            {micSupported && (
+              <button
+                type="button"
+                onClick={toggleMic}
+                disabled={isTyping}
+                title={isRecording ? 'Stop recording' : 'Voice input'}
+                className={`flex items-center justify-center h-8 w-8 rounded-xl border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                  isRecording
+                    ? 'bg-red-500/15 border-red-500/40 text-red-400 animate-pulse'
+                    : 'text-[var(--text-faint)] border-transparent hover:text-foreground hover:bg-[var(--bg-elevated)] hover:border-[var(--border-subtle)]'
+                }`}
+              >
+                {isRecording ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+              </button>
+            )}
             {/* Think Harder */}
             {onToggleDeepThink && (
               <button

@@ -227,6 +227,7 @@ export function DynamicCardRenderer({
         data={safeCard.data}
         status={safeCard.status}
         onAnalyze={handleAnalyze}
+        onAsk={onAsk}
         error={error}
         isHero={isHero}
       />

@@ -149,11 +149,17 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
 
   const projections: MLBProjectionCardData[] = [];
 
+  // Prefetch weather for all games in parallel so sequential timeouts don't compound.
+  // buildWeatherConditions never throws (has internal fallback), so Promise.all is safe.
+  const weatherByGame = new Map<number, WeatherConditions>(
+    await Promise.all(games.map(async game => [game.gamePk, await buildWeatherConditions(game)] as const))
+  );
+
   for (const game of games) {
     if (projections.length >= limit) break;
 
-    // 3. Build weather conditions for this game's venue
-    const weather = await buildWeatherConditions(game);
+    // 3. Build weather conditions for this game's venue (pre-fetched above)
+    const weather = weatherByGame.get(game.gamePk)!;
 
     // 4. Process pitchers
     if (playerType !== 'hitter') {

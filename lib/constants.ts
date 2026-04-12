@@ -37,19 +37,18 @@ export const AI_CONFIG = {
   FALLBACK_MODEL: 'Grok 3 Fast',
 } as const;
 
-// Grok Voice Chat — TTS voice options (xAI grok-3-mini-tts, OpenAI-compatible)
+// Grok Voice Chat — TTS voice options (xAI native Voice API — api.x.ai/v1/tts)
 export const GROK_VOICES = [
-  { id: 'alloy',   name: 'Alloy',   description: 'Balanced · versatile'  },
-  { id: 'echo',    name: 'Echo',    description: 'Clear · analytical'    },
-  { id: 'fable',   name: 'Fable',   description: 'Warm · engaging'       },
-  { id: 'onyx',    name: 'Onyx',    description: 'Deep · authoritative'  },
-  { id: 'nova',    name: 'Nova',    description: 'Energetic · sharp'     },
-  { id: 'shimmer', name: 'Shimmer', description: 'Smooth · measured'     },
+  { id: 'ara', name: 'Ara', description: 'Balanced · natural'       },
+  { id: 'eve', name: 'Eve', description: 'Clear · expressive'       },
+  { id: 'rex', name: 'Rex', description: 'Deep · confident'         },
+  { id: 'sal', name: 'Sal', description: 'Warm · conversational'    },
+  { id: 'leo', name: 'Leo', description: 'Energetic · bold'         },
 ] as const;
 
 export type GrokVoiceId = typeof GROK_VOICES[number]['id'];
 export const GROK_VOICE_STORAGE_KEY = 'leverage_grok_voice';
-export const GROK_VOICE_DEFAULT: GrokVoiceId = 'alloy';
+export const GROK_VOICE_DEFAULT: GrokVoiceId = 'ara';
 
 // API Endpoints
 export const API_ENDPOINTS = {

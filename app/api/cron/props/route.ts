@@ -47,6 +47,10 @@ export async function GET(req: NextRequest) {
   const sport = 'baseball_mlb';
 
   try {
+    // p-retry is ESM-only; dynamic import keeps the module compatible with
+    // Next.js Node.js serverless runtime bundling.
+    const { default: pRetry } = await import('p-retry');
+
     // Game-level endpoint — batter_* and pitcher_* markets are available here
     const url =
       `https://api.the-odds-api.com/v4/sports/${sport}/odds/` +
@@ -54,7 +58,37 @@ export async function GET(req: NextRequest) {
       `&markets=batter_hits,batter_total_bases,batter_home_runs,pitcher_strikeouts` +
       `&oddsFormat=american`;
 
-    const resp = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+    // Retry once on 5xx (transient upstream errors); bail immediately on 4xx.
+    // 10 s per attempt keeps worst-case total (10 + 2 + 10 = 22 s) under the 30 s limit.
+    let resp: Response;
+    try {
+      resp = await pRetry(
+        async () => {
+          const r = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+          // 422 = no active markets — not retryable, surface immediately
+          if (r.status === 422) return r;
+          if (!r.ok) {
+            const err = Object.assign(new Error(`Odds API returned HTTP ${r.status}`), { status: r.status });
+            throw err;
+          }
+          return r;
+        },
+        {
+          retries: 1,
+          minTimeout: 2000,
+          shouldRetry: (err: any) => {
+            const status = err?.status ?? err?.response?.status;
+            return !status || status >= 500;
+          },
+          onFailedAttempt: (err) => {
+            console.warn(`[v0] [cron/props] attempt ${err.attemptNumber} failed: ${err.message}`);
+          },
+        }
+      );
+    } catch (err: any) {
+      console.warn(`[v0] [cron/props] ${err.message}`);
+      return NextResponse.json({ ok: false, error: err.message }, { status: 502 });
+    }
 
     if (!resp.ok) {
       // 422 = no active prop markets for this sport/date; not an error
@@ -62,6 +96,7 @@ export async function GET(req: NextRequest) {
         console.log(`[v0] [cron/props] No active ${sport} prop markets (422) — skipping`);
         return NextResponse.json({ ok: true, inserted: 0, note: 'No active prop markets' });
       }
+      // Any other non-ok status that slipped through (shouldn't happen)
       const msg = `Odds API returned HTTP ${resp.status}`;
       console.warn(`[v0] [cron/props] ${msg}`);
       return NextResponse.json({ ok: false, error: msg }, { status: 502 });

@@ -19,12 +19,14 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import dynamic from 'next/dynamic';
 import { fetchDynamicCards, type DynamicCard } from '@/lib/data-service';
-import { API_ENDPOINTS, PLAYER_HEADSHOT_IDS, sportToApi, FREE_TIER } from '@/lib/constants';
+import { API_ENDPOINTS, PLAYER_HEADSHOT_IDS, sportToApi, FREE_TIER, GROK_VOICE_STORAGE_KEY, GROK_VOICE_DEFAULT } from '@/lib/constants';
+import { speakText, stopVoice } from '@/lib/voice-player';
+import { cardsToSpeech } from '@/lib/card-speech';
 import { isDev as getIsDev } from '@/lib/config';
 import { createClient } from '@/lib/supabase/client';
 import { useKalshiStore } from '@/lib/store/kalshi-store';
 const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ default: m.AuthModals })), { ssr: false });
-import { TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, MessageSquare, Clock, Star, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, X, CheckCheck, AlertTriangle, BarChart, Info, FileText, ImageIcon, Loader2 } from 'lucide-react';
+import { TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, MessageSquare, Clock, Star, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, X, CheckCheck, AlertTriangle, BarChart, Info, FileText, ImageIcon, Loader2, Volume2 } from 'lucide-react';
 import { CardLayout } from '@/components/data-cards/CardLayout';
 import { DatabaseStatusBanner } from '@/components/database-status-banner';
 import { TrustMetricsDisplay } from '@/components/trust-metrics-display';
@@ -317,6 +319,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [customInstructions, setCustomInstructions] = useState('');
   const [deepThink, setDeepThink] = useState(false);
   const [purchaseAmount, setPurchaseAmount] = useState('');
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(!!serverData?.userSession);
   const [isLoadingChats, setIsLoadingChats] = useState(false);
   const [user, setUser] = useState<{ name: string; email: string; avatar?: string } | null>(
@@ -3934,6 +3937,34 @@ No preamble. Start directly with section 1.`;
                             {(message.isError || message.isPartial) && (
                               <span className="text-[11px] font-medium">Retry</span>
                             )}
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (speakingMessageId === message.id) {
+                                stopVoice();
+                                setSpeakingMessageId(null);
+                              } else {
+                                const cards = (message as any).cards;
+                                const text = message.content + (cards?.length ? '\n\n' + cardsToSpeech(cards) : '');
+                                const voice_id = typeof window !== 'undefined'
+                                  ? (localStorage.getItem(GROK_VOICE_STORAGE_KEY) ?? GROK_VOICE_DEFAULT)
+                                  : GROK_VOICE_DEFAULT;
+                                setSpeakingMessageId(message.id);
+                                speakText(text, {
+                                  voice_id,
+                                  onEnd: () => setSpeakingMessageId(null),
+                                });
+                              }
+                            }}
+                            className={`p-1.5 rounded-lg transition-all group/action border ${
+                              speakingMessageId === message.id
+                                ? 'bg-blue-500/15 border-blue-500/40 text-blue-400 animate-pulse'
+                                : 'hover:bg-blue-500/10 active:bg-blue-500/20 border-transparent hover:border-blue-500/30'
+                            }`}
+                            title={speakingMessageId === message.id ? 'Stop speaking' : 'Read aloud'}
+                            aria-label={speakingMessageId === message.id ? 'Stop speaking' : 'Read aloud'}
+                          >
+                            <Volume2 className={`w-3.5 h-3.5 transition-colors ${speakingMessageId === message.id ? 'text-blue-400' : 'text-[var(--text-faint)] group-hover/action:text-blue-400'}`} />
                           </button>
                         </>
                       )}

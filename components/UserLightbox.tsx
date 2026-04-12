@@ -396,7 +396,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
               <Volume2 className="w-3.5 h-3.5 text-indigo-400" />
               Grok Voice
               <span className="ml-auto text-[10px] font-normal text-indigo-400">
-                {GROK_VOICES.find(v => v.id === grokVoice)?.name ?? 'Alloy'}
+                {GROK_VOICES.find(v => v.id === grokVoice)?.name ?? 'Ara'}
               </span>
             </summary>
             <div className="mt-3 p-4 bg-[var(--bg-overlay)]/60 border border-[var(--border-subtle)] rounded-xl">

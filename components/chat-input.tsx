@@ -1,9 +1,10 @@
 'use client';
 
 import { memo, useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
-import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles, Brain, Square, Mic, MicOff } from 'lucide-react';
+import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles, Brain, Square, Mic, MicOff, Volume2 } from 'lucide-react';
 import { useToast } from '@/components/toast-provider';
 import { useVoiceInput } from '@/lib/hooks/use-voice-input';
+import { useVoiceTTS } from '@/lib/hooks/use-voice-tts';
 
 interface FileAttachment {
   id: string;
@@ -37,6 +38,8 @@ interface ChatInputProps {
   deepThink?: boolean;
   onToggleDeepThink?: () => void;
   systemStatus?: 'ok' | 'degraded' | 'down';
+  /** Latest assistant message — auto-spoken when voice mode is enabled */
+  lastAssistantMessage?: string;
 }
 
 const MAX_CHARS = 2000;
@@ -60,6 +63,7 @@ export const ChatInput = memo(function ChatInput({
   placeholder,
   deepThink = false,
   onToggleDeepThink,
+  lastAssistantMessage,
 }: ChatInputProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -71,6 +75,8 @@ export const ChatInput = memo(function ChatInput({
       onInputChange(input ? `${input} ${transcript}` : transcript);
     }, [input, onInputChange]),
   );
+
+  const { voiceMode, isSpeaking, toggleVoiceMode, stopSpeaking } = useVoiceTTS(lastAssistantMessage);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -236,6 +242,21 @@ export const ChatInput = memo(function ChatInput({
                 {isRecording ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
               </button>
             )}
+            {/* Grok voice readback */}
+            <button
+              type="button"
+              onClick={isSpeaking ? stopSpeaking : toggleVoiceMode}
+              title={isSpeaking ? 'Stop speaking' : voiceMode ? 'Voice mode on' : 'Enable Grok voice'}
+              className={`flex items-center justify-center h-8 w-8 rounded-xl border transition-all ${
+                isSpeaking
+                  ? 'bg-blue-500/15 border-blue-500/40 text-blue-400 animate-pulse'
+                  : voiceMode
+                  ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-400'
+                  : 'text-[var(--text-faint)] border-transparent hover:text-foreground hover:bg-[var(--bg-elevated)] hover:border-[var(--border-subtle)]'
+              }`}
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+            </button>
             {/* Think Harder */}
             {onToggleDeepThink && (
               <button

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Send, Paperclip, X, FileText, ImageIcon, Mic, MicOff, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVoiceInput } from '@/lib/hooks/use-voice-input';
-import { GROK_VOICE_STORAGE_KEY, GROK_VOICE_DEFAULT } from '@/lib/constants';
+import { useVoiceTTS } from '@/lib/hooks/use-voice-tts';
 
 interface MobileFileAttachment {
   id: string;
@@ -32,76 +32,10 @@ export function MobileChatInput({
   const [input, setInput] = useState('');
   const [files, setFiles] = useState<MobileFileAttachment[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [voiceMode, setVoiceMode] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const prevMessageRef = useRef<string | undefined>(undefined);
 
-  // Persist voice mode preference
-  useEffect(() => {
-    const stored = localStorage.getItem('leverage_voice_mode');
-    if (stored === '1') setVoiceMode(true);
-  }, []);
-
-  const toggleVoiceMode = useCallback(() => {
-    setVoiceMode(v => {
-      const next = !v;
-      localStorage.setItem('leverage_voice_mode', next ? '1' : '0');
-      return next;
-    });
-  }, []);
-
-  // Auto-speak when a new assistant message arrives and voice mode is on
-  useEffect(() => {
-    if (!voiceMode || !lastAssistantMessage) return;
-    if (lastAssistantMessage === prevMessageRef.current) return;
-    prevMessageRef.current = lastAssistantMessage;
-
-    const voice = localStorage.getItem(GROK_VOICE_STORAGE_KEY) ?? GROK_VOICE_DEFAULT;
-    // Strip markdown symbols before speaking
-    const clean = lastAssistantMessage
-      .replace(/\*\*(.+?)\*\*/g, '$1')
-      .replace(/\*(.+?)\*/g, '$1')
-      .replace(/#+\s/g, '')
-      .replace(/`(.+?)`/g, '$1')
-      .slice(0, 600);
-
-    setIsSpeaking(true);
-    fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: clean, voice }),
-    })
-      .then(r => {
-        if (!r.ok) throw new Error('TTS failed');
-        return r.blob();
-      })
-      .then(blob => {
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audioRef.current = audio;
-        audio.onended = () => {
-          URL.revokeObjectURL(url);
-          setIsSpeaking(false);
-        };
-        audio.onerror = () => {
-          URL.revokeObjectURL(url);
-          setIsSpeaking(false);
-        };
-        audio.play();
-      })
-      .catch(() => setIsSpeaking(false));
-  }, [voiceMode, lastAssistantMessage]);
-
-  const stopSpeaking = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    setIsSpeaking(false);
-  }, []);
+  const { voiceMode, isSpeaking, toggleVoiceMode, stopSpeaking } = useVoiceTTS(lastAssistantMessage);
 
   const processFile = useCallback(async (file: File): Promise<MobileFileAttachment | null> => {
     const isImage = file.type.startsWith('image/');

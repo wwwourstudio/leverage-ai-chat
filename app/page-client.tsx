@@ -4315,6 +4315,7 @@ No preamble. Start directly with section 1.`;
               deepThink={deepThink}
               onToggleDeepThink={() => setDeepThink((v) => !v)}
               systemStatus={systemStatus}
+              lastAssistantMessage={[...messages].reverse().find((m: any) => m.role === 'assistant')?.content as string | undefined}
             />
           </div>
         </div>

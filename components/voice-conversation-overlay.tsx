@@ -104,26 +104,6 @@ export function VoiceConversationOverlay({
       style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(24px)' }}
       onClick={e => { if (e.target === overlayRef.current) onClose(); }}
     >
-      {/* Keyframe injection */}
-      <style>{`
-        @keyframes voiceWave {
-          0%, 100% { transform: scaleY(0.3); opacity: 0.6; }
-          50%       { transform: scaleY(1);   opacity: 1;   }
-        }
-        @keyframes voicePingFast {
-          0%   { transform: scale(1);   opacity: 0.6; }
-          100% { transform: scale(2.2); opacity: 0;   }
-        }
-        @keyframes voicePingSlow {
-          0%   { transform: scale(1);   opacity: 0.4; }
-          100% { transform: scale(2.8); opacity: 0;   }
-        }
-        @keyframes voiceGlow {
-          0%, 100% { opacity: 0.4; transform: scale(0.95); }
-          50%       { opacity: 0.8; transform: scale(1.05); }
-        }
-      `}</style>
-
       {/* Top bar */}
       <div className="absolute top-5 left-0 right-0 flex items-center justify-between px-5">
         <div className="flex items-center gap-2">

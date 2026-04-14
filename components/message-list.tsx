@@ -47,12 +47,6 @@ function TypingIndicator() {
 
   return (
     <div className="flex gap-3 justify-start" role="status" aria-label="AI is thinking">
-      <style>{`
-        @keyframes leverageWave {
-          0%, 100% { transform: scaleY(0.35); opacity: 0.5; }
-          50% { transform: scaleY(1); opacity: 1; }
-        }
-      `}</style>
       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-900/30">
         <Sparkles className="w-4 h-4 text-white animate-pulse" />
       </div>

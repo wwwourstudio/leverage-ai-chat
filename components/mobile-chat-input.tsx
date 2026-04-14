@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Send, Paperclip, X, FileText, ImageIcon, Mic, MicOff, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVoiceInput } from '@/lib/hooks/use-voice-input';
-import { GROK_VOICE_STORAGE_KEY, GROK_VOICE_DEFAULT } from '@/lib/constants';
+import { useVoiceTTS } from '@/lib/hooks/use-voice-tts';
 
 interface MobileFileAttachment {
   id: string;
@@ -32,86 +32,10 @@ export function MobileChatInput({
   const [input, setInput] = useState('');
   const [files, setFiles] = useState<MobileFileAttachment[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [voiceMode, setVoiceMode] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const prevMessageRef = useRef<string | undefined>(undefined);
 
-  // Persist voice mode preference
-  useEffect(() => {
-    const stored = localStorage.getItem('leverage_voice_mode');
-    if (stored === '1') setVoiceMode(true);
-  }, []);
-
-  const toggleVoiceMode = useCallback(() => {
-    setVoiceMode(v => {
-      const next = !v;
-      localStorage.setItem('leverage_voice_mode', next ? '1' : '0');
-      return next;
-    });
-  }, []);
-
-  // Auto-speak when a new assistant message arrives and voice mode is on
-  // Uses browser SpeechSynthesis (free, instant, no API key needed)
-  useEffect(() => {
-    if (!voiceMode || !lastAssistantMessage) return;
-    if (lastAssistantMessage === prevMessageRef.current) return;
-    prevMessageRef.current = lastAssistantMessage;
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-
-    const voice = localStorage.getItem(GROK_VOICE_STORAGE_KEY) ?? GROK_VOICE_DEFAULT;
-    const clean = lastAssistantMessage
-      .replace(/\*\*([\s\S]+?)\*\*/g, '$1')
-      .replace(/\*([\s\S]+?)\*/g, '$1')
-      .replace(/^#{1,6}\s+/gm, '')
-      .replace(/`{1,3}[\s\S]*?`{1,3}/g, '')
-      .replace(/\n/g, ' ')
-      .trim()
-      .slice(0, 700);
-
-    if (!clean) return;
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(clean);
-    const voiceMap: Record<string, string[]> = {
-      alloy:   ['Samantha', 'Google US English'],
-      echo:    ['Daniel', 'Google UK English Male'],
-      fable:   ['Karen', 'Tessa'],
-      onyx:    ['Alex', 'Fred'],
-      nova:    ['Victoria', 'Zira'],
-      shimmer: ['Fiona', 'Moira'],
-    };
-    const trySetVoice = () => {
-      const voices = window.speechSynthesis.getVoices();
-      const prefs = voiceMap[voice] ?? voiceMap.alloy;
-      const chosen = prefs.reduce<SpeechSynthesisVoice | null>((acc, name) =>
-        acc ?? voices.find(v => v.name.includes(name)) ?? null, null
-      ) ?? voices.find(v => v.lang.startsWith('en')) ?? null;
-      if (chosen) utterance.voice = chosen;
-    };
-    trySetVoice();
-    if (window.speechSynthesis.getVoices().length === 0) {
-      window.speechSynthesis.onvoiceschanged = trySetVoice;
-    }
-
-    setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utterance);
-  }, [voiceMode, lastAssistantMessage]);
-
-  const stopSpeaking = useCallback(() => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    setIsSpeaking(false);
-  }, []);
+  const { voiceMode, isSpeaking, toggleVoiceMode, stopSpeaking } = useVoiceTTS(lastAssistantMessage);
 
   const processFile = useCallback(async (file: File): Promise<MobileFileAttachment | null> => {
     const isImage = file.type.startsWith('image/');

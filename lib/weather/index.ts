@@ -141,7 +141,7 @@ export async function fetchWeatherForLocation(
     
     const response = await fetch(url, {
       headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(8000)
+      signal: AbortSignal.timeout(4000)
     });
     
     if (!response.ok) {

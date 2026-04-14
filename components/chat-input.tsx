@@ -1,9 +1,10 @@
 'use client';
 
 import { memo, useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
-import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles, Brain, Square, Mic, MicOff, Radio } from 'lucide-react';
+import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles, Brain, Square, Mic, MicOff, Volume2, Radio } from 'lucide-react';
 import { useToast } from '@/components/toast-provider';
 import { useVoiceInput } from '@/lib/hooks/use-voice-input';
+import { useVoiceTTS } from '@/lib/hooks/use-voice-tts';
 import type { VoiceConvState } from '@/lib/hooks/use-voice-conversation';
 
 interface FileAttachment {
@@ -38,9 +39,11 @@ interface ChatInputProps {
   deepThink?: boolean;
   onToggleDeepThink?: () => void;
   systemStatus?: 'ok' | 'degraded' | 'down';
+  /** Latest assistant message — auto-spoken when voice mode is enabled */
+  lastAssistantMessage?: string;
   /** Voice conversation state — controls the voice chat button appearance */
   voiceConvState?: VoiceConvState;
-  /** Whether the voice conversation hook is supported in this browser */
+  /** Whether the full voice conversation is supported in this browser */
   voiceConvSupported?: boolean;
   /** Activate full voice conversation mode */
   onActivateVoice?: () => void;
@@ -67,6 +70,7 @@ export const ChatInput = memo(function ChatInput({
   placeholder,
   deepThink = false,
   onToggleDeepThink,
+  lastAssistantMessage,
   voiceConvState = 'idle',
   voiceConvSupported = false,
   onActivateVoice,
@@ -81,6 +85,8 @@ export const ChatInput = memo(function ChatInput({
       onInputChange(input ? `${input} ${transcript}` : transcript);
     }, [input, onInputChange]),
   );
+
+  const { voiceMode, isSpeaking, toggleVoiceMode, stopSpeaking } = useVoiceTTS(lastAssistantMessage);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -246,19 +252,33 @@ export const ChatInput = memo(function ChatInput({
                 {isRecording ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
               </button>
             )}
-            {/* Voice Conversation */}
+            {/* Grok voice readback */}
+            <button
+              type="button"
+              onClick={isSpeaking ? stopSpeaking : toggleVoiceMode}
+              title={isSpeaking ? 'Stop speaking' : voiceMode ? 'Voice mode on' : 'Enable Grok voice'}
+              className={`flex items-center justify-center h-8 w-8 rounded-xl border transition-all ${
+                isSpeaking
+                  ? 'bg-blue-500/15 border-blue-500/40 text-blue-400 animate-pulse'
+                  : voiceMode
+                  ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-400'
+                  : 'text-[var(--text-faint)] border-transparent hover:text-foreground hover:bg-[var(--bg-elevated)] hover:border-[var(--border-subtle)]'
+              }`}
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+            </button>
+            {/* Voice Conversation — full duplex chat mode */}
             {voiceConvSupported && onActivateVoice && (
               <button
                 type="button"
                 onClick={onActivateVoice}
-                disabled={isTyping && voiceConvState === 'idle'}
                 title={
                   voiceConvState === 'listening'  ? 'Grok is listening…' :
                   voiceConvState === 'processing' ? 'Grok is thinking…' :
                   voiceConvState === 'speaking'   ? 'Grok is speaking…' :
                   'Start voice conversation'
                 }
-                className={`flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-medium border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                className={`flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-medium border transition-all ${
                   voiceConvState === 'listening'
                     ? 'bg-blue-600/20 border-blue-500/50 text-blue-300 animate-pulse'
                     : voiceConvState === 'processing'

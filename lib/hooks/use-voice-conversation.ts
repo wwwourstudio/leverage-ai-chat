@@ -59,8 +59,8 @@ export function useVoiceConversation({
 
     // Strip markdown and cap for natural speech
     const clean = text
-      .replace(/\*\*(.+?)\*\*/gs, '$1')
-      .replace(/\*(.+?)\*/gs, '$1')
+      .replace(/\*\*([\s\S]+?)\*\*/g, '$1')
+      .replace(/\*([\s\S]+?)\*/g, '$1')
       .replace(/^#{1,6}\s+/gm, '')
       .replace(/`{1,3}[\s\S]*?`{1,3}/g, '')
       .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')

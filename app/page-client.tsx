@@ -51,6 +51,8 @@ import { MessageAttachments } from '@/components/index/MessageAttachments';
 import { CreditModals } from '@/components/index/CreditModals';
 import { DetailedAnalysisLayout, type DetailedAnalysisData } from '@/components/index/DetailedAnalysisLayout';
 import { AddToHomeBanner } from '@/components/AddToHomeBanner';
+import { useVoiceConversation } from '@/lib/hooks/use-voice-conversation';
+const VoiceConversationOverlay = dynamic(() => import('@/components/voice-conversation-overlay').then(m => ({ default: m.VoiceConversationOverlay })), { ssr: false });
 
 interface FileAttachment {
   id: string;
@@ -258,6 +260,31 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   });
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+
+  // Last complete (non-streaming, non-pending) assistant message — fed to voice conversation
+  const lastCompleteAssistantMessage = useMemo(() => {
+    const complete = [...messages]
+      .reverse()
+      .find(m => m.role === 'assistant' && !m.isStreaming && !m.isPending && !m.isWelcome && m.content?.length > 20);
+    return complete?.content;
+  }, [messages]);
+
+  // Voice conversation — full duplex voice chat using browser Web Speech APIs
+  const voiceConv = useVoiceConversation({
+    onSendMessage: useCallback((text: string) => {
+      // Fire the same path as pressing Enter in the chat box
+      // We need to set input and then trigger generateRealResponse directly
+      setInput('');
+      // Defer to next tick so generateRealResponse ref is settled
+      setTimeout(() => {
+        if (generateRealResponseRef.current) {
+          generateRealResponseRef.current(text);
+        }
+      }, 0);
+    }, []),
+    lastCompleteAssistantMessage,
+    isAITyping: isTyping,
+  });
 
   // Client-side odds cache: key = sportKey, TTL = 5 minutes
   const oddsCacheRef = useRef<Map<string, { data: unknown; ts: number }>>(new Map());
@@ -3895,6 +3922,17 @@ No preamble. Start directly with section 1.`;
                       )}
                       {message.role === 'assistant' && (
                         <>
+                          {/* Read aloud */}
+                          {!message.isStreaming && !message.isPending && message.content?.length > 20 && voiceConv.isSupported && (
+                            <button
+                              onClick={() => voiceConv.readAloud(message.content)}
+                              className="p-1.5 rounded-lg transition-all group/action border border-transparent hover:bg-violet-500/10 active:bg-violet-500/20 hover:border-violet-500/30"
+                              title="Read aloud"
+                              aria-label="Read message aloud"
+                            >
+                              <Volume2 className="w-3.5 h-3.5 text-[var(--text-faint)] group-hover/action:text-violet-400 transition-colors" />
+                            </button>
+                          )}
                           <button
                             onClick={() => message.voted !== 'up' && handleVote(index, 'up')}
                             className={`p-1.5 rounded-lg transition-all group/action border ${
@@ -4346,6 +4384,9 @@ No preamble. Start directly with section 1.`;
               deepThink={deepThink}
               onToggleDeepThink={() => setDeepThink((v) => !v)}
               systemStatus={systemStatus}
+              voiceConvState={voiceConv.convState}
+              voiceConvSupported={voiceConv.isSupported}
+              onActivateVoice={voiceConv.activate}
               lastAssistantMessage={[...messages].reverse().find((m: any) => m.role === 'assistant')?.content as string | undefined}
             />
           </div>
@@ -4418,6 +4459,16 @@ No preamble. Start directly with section 1.`;
         creditsRemaining={creditsRemaining}
         userEmail={user?.email}
       />
+
+      {/* Voice Conversation Overlay */}
+      {voiceConv.isActive && (
+        <VoiceConversationOverlay
+          state={voiceConv.convState}
+          liveTranscript={voiceConv.liveTranscript}
+          speakingPreview={voiceConv.speakingPreview}
+          onClose={voiceConv.deactivate}
+        />
+      )}
 
       <style>
         {`

@@ -26,6 +26,8 @@ export function useVoiceConversation({
   const [convState, setConvState] = useState<VoiceConvState>('idle');
   const [liveTranscript, setLiveTranscript] = useState('');
   const [speakingPreview, setSpeakingPreview] = useState('');
+  // Start false to match SSR — set to true in useEffect once we know the browser supports it
+  const [isSupported, setIsSupported] = useState(false);
 
   // Refs to avoid stale closures inside speech event handlers
   const isActiveRef = useRef(false);
@@ -39,10 +41,13 @@ export function useVoiceConversation({
   useEffect(() => { isAITypingRef.current = isAITyping; }, [isAITyping]);
   useEffect(() => { convStateRef.current = convState; }, [convState]);
 
-  const isSupported =
-    typeof window !== 'undefined' &&
-    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) &&
-    typeof window.speechSynthesis !== 'undefined';
+  // Detect browser support client-side only (avoids SSR hydration mismatch)
+  useEffect(() => {
+    setIsSupported(
+      ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) &&
+      typeof window.speechSynthesis !== 'undefined',
+    );
+  }, []);
 
   // ── Speech Synthesis (output) ──────────────────────────────────────────────
 

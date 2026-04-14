@@ -307,6 +307,30 @@
   animation: backdrop-in var(--duration-fast, 150ms) ease-out both;
 }
 
+/* ── Typing indicator waveform ────────────────────────────────────────────── */
+@keyframes leverageWave {
+  0%, 100% { transform: scaleY(0.35); opacity: 0.5; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
+/* ── Voice conversation overlay animations ────────────────────────────────── */
+@keyframes voiceWave {
+  0%, 100% { transform: scaleY(0.3); opacity: 0.6; }
+  50%       { transform: scaleY(1);   opacity: 1;   }
+}
+@keyframes voicePingFast {
+  0%   { transform: scale(1);   opacity: 0.6; }
+  100% { transform: scale(2.2); opacity: 0;   }
+}
+@keyframes voicePingSlow {
+  0%   { transform: scale(1);   opacity: 0.4; }
+  100% { transform: scale(2.8); opacity: 0;   }
+}
+@keyframes voiceGlow {
+  0%, 100% { opacity: 0.4; transform: scale(0.95); }
+  50%       { opacity: 0.8; transform: scale(1.05); }
+}
+
 /* ── Streaming cursor ─────────────────────────────────────────────────────── */
 @keyframes cursor-blink {
   0%,  49% { opacity: 1; }

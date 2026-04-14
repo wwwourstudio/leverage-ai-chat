@@ -2459,6 +2459,90 @@ async function _generateContextualCards(
         console.warn('[v0] [CARDS-GEN] MLB DFS odds fallback failed:', e);
       }
     }
+
+    // ── Guaranteed MLB DFS Strategy Cards ────────────────────────────────────
+    // Final safety net: always produce DFS value cards even when all live APIs
+    // are unavailable. Uses general MLB DFS strategy that's valid year-round.
+    if (category === 'dfs' && cards.length === 0) {
+      const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const strategies = [
+        {
+          title: 'MLB Stack Builder Guide',
+          subcategory: `DFS Strategy · ${today}`,
+          gradient: 'from-orange-600 to-red-700',
+          status: 'optimal',
+          position: 'STACK',
+          player: 'Game Stack',
+          tip: 'Target 4–5 man stacks from teams in high O/U games (9.0+). Prioritize teams with favorable park factors (Coors, Globe Life, Yankee Stadium). Stack against pitchers with FIP > 4.50 and low strikeout rates.',
+          projection: '42', boomCeiling: '58', bustFloor: '24',
+          salary: '$45,000', ownership: '28%', dkValue: '5.7',
+        },
+        {
+          title: 'SP Value Play Framework',
+          subcategory: `Pitching Strategy · ${today}`,
+          gradient: 'from-blue-600 to-indigo-700',
+          status: 'value',
+          position: 'SP',
+          player: 'Strikeout Upside SP',
+          tip: 'Look for mid-priced SPs ($7.5K–$9.5K) with K/9 > 9.0 facing teams ranked bottom-10 in K rate. Win equity matters most on DK — target SPs with implied win probability > 62%.',
+          projection: '34', boomCeiling: '48', bustFloor: '14',
+          salary: '$8,200', ownership: '12%', dkValue: '4.1',
+        },
+        {
+          title: 'Contrarian Tournament Stack',
+          subcategory: `GPP Leverage · ${today}`,
+          gradient: 'from-violet-600 to-purple-700',
+          status: 'value',
+          position: 'FLEX',
+          player: 'Low-Own Stack',
+          tip: 'Win GPPs by going against the field. Identify dog-stack games where the underdog has an O/U share above 4.5 runs. Target catchers and 2B from the chalk-avoided team for sub-5% ownership.',
+          projection: '38', boomCeiling: '65', bustFloor: '8',
+          salary: '$22,000', ownership: '6%', dkValue: '5.2',
+        },
+        {
+          title: 'Cash Game Construction',
+          subcategory: `Safe Floor Plays · ${today}`,
+          gradient: 'from-emerald-600 to-teal-700',
+          status: 'value',
+          position: 'ROSTER',
+          player: 'Floor-Safe Lineup',
+          tip: 'For cash games, prioritize floor over ceiling. Use an elite SP with high win probability + run support, then fill bats from a single strong-lineup team. Avoid pitchers in extreme hitter parks and 3B with high strikeout rates.',
+          projection: '36', boomCeiling: '44', bustFloor: '28',
+          salary: '$50,000', ownership: '45%', dkValue: '5.4',
+        },
+      ];
+
+      for (const s of strategies.slice(0, count)) {
+        cards.push({
+          type: CARD_TYPES.DFS_MATCHUP,
+          title: s.title,
+          icon: 'Crosshair',
+          category: 'MLB',
+          subcategory: s.subcategory,
+          gradient: s.gradient,
+          status: s.status,
+          data: {
+            player: s.player,
+            team: 'MLB',
+            position: s.position,
+            salary: s.salary,
+            projection: s.projection,
+            ownership: s.ownership,
+            boomCeiling: s.boomCeiling,
+            bustFloor: s.bustFloor,
+            targetGame: 'MLB Slate',
+            platforms: ['DraftKings', 'FanDuel'],
+            tips: s.tip,
+            cardCategory: 'matchup',
+            dkValue: s.dkValue,
+            realData: false,
+          },
+          realData: false,
+        });
+      }
+      console.log(`[v0] [CARDS-GEN] MLB DFS strategy fallback: ${cards.length} cards`);
+      return cards;
+    }
   }
 
   // DFS cards — fetch real player prop lines from The Odds API.

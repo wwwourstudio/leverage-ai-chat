@@ -1,9 +1,10 @@
 'use client';
 
 import { memo, useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
-import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles, Brain, Square, Mic, MicOff } from 'lucide-react';
+import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles, Brain, Square, Mic, MicOff, Radio } from 'lucide-react';
 import { useToast } from '@/components/toast-provider';
 import { useVoiceInput } from '@/lib/hooks/use-voice-input';
+import type { VoiceConvState } from '@/lib/hooks/use-voice-conversation';
 
 interface FileAttachment {
   id: string;
@@ -37,6 +38,12 @@ interface ChatInputProps {
   deepThink?: boolean;
   onToggleDeepThink?: () => void;
   systemStatus?: 'ok' | 'degraded' | 'down';
+  /** Voice conversation state — controls the voice chat button appearance */
+  voiceConvState?: VoiceConvState;
+  /** Whether the voice conversation hook is supported in this browser */
+  voiceConvSupported?: boolean;
+  /** Activate full voice conversation mode */
+  onActivateVoice?: () => void;
 }
 
 const MAX_CHARS = 2000;
@@ -60,6 +67,9 @@ export const ChatInput = memo(function ChatInput({
   placeholder,
   deepThink = false,
   onToggleDeepThink,
+  voiceConvState = 'idle',
+  voiceConvSupported = false,
+  onActivateVoice,
 }: ChatInputProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -236,6 +246,38 @@ export const ChatInput = memo(function ChatInput({
                 {isRecording ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
               </button>
             )}
+            {/* Voice Conversation */}
+            {voiceConvSupported && onActivateVoice && (
+              <button
+                type="button"
+                onClick={onActivateVoice}
+                disabled={isTyping && voiceConvState === 'idle'}
+                title={
+                  voiceConvState === 'listening'  ? 'Grok is listening…' :
+                  voiceConvState === 'processing' ? 'Grok is thinking…' :
+                  voiceConvState === 'speaking'   ? 'Grok is speaking…' :
+                  'Start voice conversation'
+                }
+                className={`flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-medium border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                  voiceConvState === 'listening'
+                    ? 'bg-blue-600/20 border-blue-500/50 text-blue-300 animate-pulse'
+                    : voiceConvState === 'processing'
+                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 animate-pulse'
+                    : voiceConvState === 'speaking'
+                    ? 'bg-violet-500/15 border-violet-500/40 text-violet-300 animate-pulse'
+                    : 'text-[var(--text-faint)] border-transparent hover:text-foreground hover:bg-[var(--bg-elevated)] hover:border-[var(--border-subtle)]'
+                }`}
+              >
+                <Radio className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden sm:inline">
+                  {voiceConvState === 'listening'  ? 'Listening' :
+                   voiceConvState === 'processing' ? 'Thinking' :
+                   voiceConvState === 'speaking'   ? 'Speaking' :
+                   'Voice Chat'}
+                </span>
+              </button>
+            )}
+
             {/* Think Harder */}
             {onToggleDeepThink && (
               <button

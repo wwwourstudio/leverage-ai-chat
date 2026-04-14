@@ -71,26 +71,42 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
     localStorage.setItem(GROK_VOICE_STORAGE_KEY, id);
   };
 
-  const handleVoicePreview = async (voiceId: string) => {
-    if (previewingVoice) return;
-    setPreviewingVoice(voiceId);
-    const sample = "Sharp money is moving on the over. Here's what the line movement is telling us.";
-    try {
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: sample, voice: voiceId }),
-      });
-      if (!res.ok) throw new Error('TTS error');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audio.onended = () => { URL.revokeObjectURL(url); setPreviewingVoice(null); };
-      audio.onerror = () => { URL.revokeObjectURL(url); setPreviewingVoice(null); };
-      audio.play();
-    } catch {
+  const handleVoicePreview = (voiceId: string) => {
+    if (previewingVoice) {
+      window.speechSynthesis?.cancel();
       setPreviewingVoice(null);
+      return;
     }
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    setPreviewingVoice(voiceId);
+    const sample = "Sharp money is moving on the over. Here's what the line movement tells us about tonight's slate.";
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(sample);
+    const voiceMap: Record<string, string[]> = {
+      alloy:   ['Samantha', 'Google US English'],
+      echo:    ['Daniel', 'Google UK English Male'],
+      fable:   ['Karen', 'Tessa'],
+      onyx:    ['Alex', 'Fred'],
+      nova:    ['Victoria', 'Zira'],
+      shimmer: ['Fiona', 'Moira'],
+    };
+    const trySetVoice = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const prefs = voiceMap[voiceId] ?? voiceMap.alloy;
+      const chosen = prefs.reduce<SpeechSynthesisVoice | null>((acc, name) =>
+        acc ?? (voices.find(v => v.name.includes(name)) ?? null), null
+      ) ?? voices.find(v => v.lang.startsWith('en')) ?? null;
+      if (chosen) utterance.voice = chosen;
+      utterance.rate  = voiceId === 'nova' ? 1.08 : voiceId === 'onyx' ? 0.92 : 1.0;
+      utterance.pitch = voiceId === 'onyx' ? 0.85 : voiceId === 'nova' ? 1.08 : 1.0;
+    };
+    trySetVoice();
+    if (window.speechSynthesis.getVoices().length === 0) {
+      window.speechSynthesis.onvoiceschanged = trySetVoice;
+    }
+    utterance.onend   = () => setPreviewingVoice(null);
+    utterance.onerror = () => setPreviewingVoice(null);
+    window.speechSynthesis.speak(utterance);
   };
 
   useEffect(() => {

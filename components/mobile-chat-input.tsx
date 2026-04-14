@@ -54,48 +54,58 @@ export function MobileChatInput({
   }, []);
 
   // Auto-speak when a new assistant message arrives and voice mode is on
+  // Uses browser SpeechSynthesis (free, instant, no API key needed)
   useEffect(() => {
     if (!voiceMode || !lastAssistantMessage) return;
     if (lastAssistantMessage === prevMessageRef.current) return;
     prevMessageRef.current = lastAssistantMessage;
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
 
     const voice = localStorage.getItem(GROK_VOICE_STORAGE_KEY) ?? GROK_VOICE_DEFAULT;
-    // Strip markdown symbols before speaking
     const clean = lastAssistantMessage
-      .replace(/\*\*(.+?)\*\*/g, '$1')
-      .replace(/\*(.+?)\*/g, '$1')
-      .replace(/#+\s/g, '')
-      .replace(/`(.+?)`/g, '$1')
-      .slice(0, 600);
+      .replace(/\*\*(.+?)\*\*/gs, '$1')
+      .replace(/\*(.+?)\*/gs, '$1')
+      .replace(/^#{1,6}\s+/gm, '')
+      .replace(/`{1,3}[\s\S]*?`{1,3}/g, '')
+      .replace(/\n/g, ' ')
+      .trim()
+      .slice(0, 700);
+
+    if (!clean) return;
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(clean);
+    const voiceMap: Record<string, string[]> = {
+      alloy:   ['Samantha', 'Google US English'],
+      echo:    ['Daniel', 'Google UK English Male'],
+      fable:   ['Karen', 'Tessa'],
+      onyx:    ['Alex', 'Fred'],
+      nova:    ['Victoria', 'Zira'],
+      shimmer: ['Fiona', 'Moira'],
+    };
+    const trySetVoice = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const prefs = voiceMap[voice] ?? voiceMap.alloy;
+      const chosen = prefs.reduce<SpeechSynthesisVoice | null>((acc, name) =>
+        acc ?? voices.find(v => v.name.includes(name)) ?? null, null
+      ) ?? voices.find(v => v.lang.startsWith('en')) ?? null;
+      if (chosen) utterance.voice = chosen;
+    };
+    trySetVoice();
+    if (window.speechSynthesis.getVoices().length === 0) {
+      window.speechSynthesis.onvoiceschanged = trySetVoice;
+    }
 
     setIsSpeaking(true);
-    fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: clean, voice }),
-    })
-      .then(r => {
-        if (!r.ok) throw new Error('TTS failed');
-        return r.blob();
-      })
-      .then(blob => {
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audioRef.current = audio;
-        audio.onended = () => {
-          URL.revokeObjectURL(url);
-          setIsSpeaking(false);
-        };
-        audio.onerror = () => {
-          URL.revokeObjectURL(url);
-          setIsSpeaking(false);
-        };
-        audio.play();
-      })
-      .catch(() => setIsSpeaking(false));
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    window.speechSynthesis.speak(utterance);
   }, [voiceMode, lastAssistantMessage]);
 
   const stopSpeaking = useCallback(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;

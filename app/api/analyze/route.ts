@@ -63,7 +63,7 @@ const MLB_POSITION_ABBREVS = new Set([
 // Prevents identical queries (e.g. double-taps, retry on same message) from
 // hitting the Grok API a second time within the TTL window.
 // Module-level: survives across requests on the same warm serverless instance.
-const DEDUP_CACHE_TTL_MS = 60_000; // 1 minute
+const DEDUP_CACHE_TTL_MS = 15_000; // 15 seconds — short enough not to block follow-up queries
 const DEDUP_CACHE_MAX = 50;
 const dedupCache = new Map<number, { text: string; cards: unknown[]; confidence: number; ts: number }>();
 

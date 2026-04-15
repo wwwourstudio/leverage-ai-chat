@@ -2265,7 +2265,7 @@ async function _generateContextualCards(
             category: c.category,
             subcategory: c.subcategory,
             gradient: 'from-blue-600 to-indigo-700',
-            status: 'optimal',
+            status: 'value',
             data: { ...c.data, cardCategory: 'matchup' },
             metadata: { realData: true, source: 'LeverageMetrics' },
           });

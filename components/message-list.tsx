@@ -237,7 +237,7 @@ export const MessageList = memo(function MessageList({ messages, isTyping, onRet
         <button
           onClick={scrollToBottom}
           aria-label="Jump to latest message"
-          className="fixed bottom-24 right-4 z-20 flex items-center gap-1.5 rounded-full px-3 py-1.5 bg-blue-600/90 hover:bg-blue-500 text-white text-xs font-bold shadow-lg transition-colors"
+          className="fixed bottom-36 right-4 z-20 flex items-center gap-1.5 rounded-full px-3 py-1.5 bg-blue-600/90 hover:bg-blue-500 text-white text-xs font-bold shadow-lg transition-colors"
         >
           <ChevronDown className="w-3.5 h-3.5" />
           Latest
@@ -246,7 +246,7 @@ export const MessageList = memo(function MessageList({ messages, isTyping, onRet
 
       {/* New content below banner — fades in when response arrives below viewport */}
       {showNewContentBanner && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-20 pointer-events-auto animate-fade-in-up">
+        <div className="fixed bottom-36 left-1/2 -translate-x-1/2 z-20 pointer-events-auto animate-fade-in-up">
           <button
             onClick={scrollToBottom}
             className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold text-white shadow-xl border border-blue-500/30 backdrop-blur-sm transition-all hover:scale-105 active:scale-95"

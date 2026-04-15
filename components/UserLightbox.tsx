@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, LogOut, Save, Loader2, CheckCircle, Bot, ChevronDown, Paperclip, FileText, ImageIcon, Trash2, Volume2, Play } from 'lucide-react';
 import { SPORT_KEYS, GROK_VOICES, GROK_VOICE_STORAGE_KEY, GROK_VOICE_DEFAULT, type GrokVoiceId } from '@/lib/constants';
 import { useToast } from '@/components/toast-provider';
+import { speakText, stopVoice } from '@/lib/voice-player';
 
 const SAVED_FILES_KEY = 'leverage_saved_files';
 
@@ -73,40 +74,15 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
 
   const handleVoicePreview = (voiceId: string) => {
     if (previewingVoice) {
-      window.speechSynthesis?.cancel();
+      stopVoice();
       setPreviewingVoice(null);
       return;
     }
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     setPreviewingVoice(voiceId);
-    const sample = "Sharp money is moving on the over. Here's what the line movement tells us about tonight's slate.";
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(sample);
-    const voiceMap: Record<string, string[]> = {
-      alloy:   ['Samantha', 'Google US English'],
-      echo:    ['Daniel', 'Google UK English Male'],
-      fable:   ['Karen', 'Tessa'],
-      onyx:    ['Alex', 'Fred'],
-      nova:    ['Victoria', 'Zira'],
-      shimmer: ['Fiona', 'Moira'],
-    };
-    const trySetVoice = () => {
-      const voices = window.speechSynthesis.getVoices();
-      const prefs = voiceMap[voiceId] ?? voiceMap.alloy;
-      const chosen = prefs.reduce<SpeechSynthesisVoice | null>((acc, name) =>
-        acc ?? (voices.find(v => v.name.includes(name)) ?? null), null
-      ) ?? voices.find(v => v.lang.startsWith('en')) ?? null;
-      if (chosen) utterance.voice = chosen;
-      utterance.rate  = voiceId === 'nova' ? 1.08 : voiceId === 'onyx' ? 0.92 : 1.0;
-      utterance.pitch = voiceId === 'onyx' ? 0.85 : voiceId === 'nova' ? 1.08 : 1.0;
-    };
-    trySetVoice();
-    if (window.speechSynthesis.getVoices().length === 0) {
-      window.speechSynthesis.onvoiceschanged = trySetVoice;
-    }
-    utterance.onend   = () => setPreviewingVoice(null);
-    utterance.onerror = () => setPreviewingVoice(null);
-    window.speechSynthesis.speak(utterance);
+    speakText(
+      "Sharp money is moving on the over. Here's what the line movement tells us about tonight's slate.",
+      { voice_id: voiceId, onEnd: () => setPreviewingVoice(null) },
+    );
   };
 
   useEffect(() => {

@@ -75,34 +75,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'text is required' }, { status: 400 });
   }
 
-  // Normalize text for speech, then cap at 4096 chars
-  const input = prepareSpeechText(text).slice(0, 4096);
-
-  const resp = await fetch(TTS_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      text: input,
-      voice_id,
-      language: 'en',
-      output_format: { codec: 'mp3', sample_rate: 44100, bit_rate: 128000 },
-    }),
-  });
-
-  if (!resp.ok) {
-    const err = await resp.text().catch(() => '');
-    console.error('[TTS] xAI error:', resp.status, err.slice(0, 200));
-    return NextResponse.json({ error: 'TTS request failed' }, { status: 502 });
-  }
-
-  // Stream audio bytes directly — no server-side buffering
-  return new Response(resp.body, {
-    headers: {
-      'Content-Type': 'audio/mpeg',
-      'Cache-Control': 'no-store',
-    },
-  });
+  // xAI does not provide a TTS endpoint — server-side TTS is unavailable.
+  // All voice playback uses the browser's SpeechSynthesis API via lib/voice-player.ts.
+  void prepareSpeechText; // keep helper available if server TTS is added later
+  void voice_id;
+  return NextResponse.json(
+    { error: 'Server-side TTS is not available. Voice playback uses browser SpeechSynthesis.' },
+    { status: 501 },
+  );
 }

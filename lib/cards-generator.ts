@@ -2699,7 +2699,7 @@ async function _generateContextualCards(
                 category: 'DFS',
                 subcategory: `${displaySport || 'Daily Fantasy'} · Matchup Edge`,
                 gradient: 'from-blue-600 to-indigo-700',
-                status: 'optimal',
+                status: 'value',
                 data: {
                   player: mp.player,
                   team: '—',

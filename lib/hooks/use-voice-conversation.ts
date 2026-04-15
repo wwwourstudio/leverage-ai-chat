@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { GROK_VOICE_STORAGE_KEY, GROK_VOICE_DEFAULT } from '@/lib/constants';
+import { speakText, stopVoice } from '@/lib/voice-player';
 
 export type VoiceConvState = 'idle' | 'listening' | 'processing' | 'speaking';
 
@@ -14,8 +14,11 @@ interface UseVoiceConversationOpts {
 }
 
 /**
- * Manages a full voice conversation loop using Web Speech APIs.
+ * Manages a full voice conversation loop using Web Speech APIs + xAI Grok TTS.
  * Cycle: listen → user speaks → processing → AI responds → speak → listen → ...
+ *
+ * Speech output: xAI Grok TTS via /api/tts (real voices) with browser fallback.
+ * Speech input:  Web Speech Recognition API.
  */
 export function useVoiceConversation({
   onSendMessage,
@@ -26,7 +29,7 @@ export function useVoiceConversation({
   const [convState, setConvState] = useState<VoiceConvState>('idle');
   const [liveTranscript, setLiveTranscript] = useState('');
   const [speakingPreview, setSpeakingPreview] = useState('');
-  // Start false to match SSR — set to true in useEffect once we know the browser supports it
+  // Start false to match SSR — set true in useEffect (avoids hydration mismatch)
   const [isSupported, setIsSupported] = useState(false);
 
   // Refs to avoid stale closures inside speech event handlers
@@ -49,97 +52,40 @@ export function useVoiceConversation({
     );
   }, []);
 
-  // ── Speech Synthesis (output) ──────────────────────────────────────────────
+  // ── Speech Output (xAI TTS via voice-player singleton) ────────────────────
 
   const stopSpeaking = useCallback(() => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
+    stopVoice();
     setSpeakingPreview('');
   }, []);
 
   const speak = useCallback((text: string) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-
-    // Strip markdown and cap for natural speech
-    const clean = text
-      .replace(/\*\*([\s\S]+?)\*\*/g, '$1')
-      .replace(/\*([\s\S]+?)\*/g, '$1')
-      .replace(/^#{1,6}\s+/gm, '')
-      .replace(/`{1,3}[\s\S]*?`{1,3}/g, '')
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-      .replace(/\n{2,}/g, '. ')
+    // Show a preview of what's being spoken (first 160 chars)
+    const preview = text
+      .replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1')
+      .replace(/#{1,6}\s+/g, '')
+      .replace(/`[^`]+`/g, '')
       .replace(/\n/g, ' ')
       .trim()
-      .slice(0, 900);
+      .slice(0, 160);
 
-    if (!clean) {
-      if (isActiveRef.current) {
-        setConvState('listening');
-        // startListening called below — use a flag
-      }
-      return;
-    }
-
-    const voicePref = localStorage.getItem(GROK_VOICE_STORAGE_KEY) ?? GROK_VOICE_DEFAULT;
-    const utterance = new SpeechSynthesisUtterance(clean);
-
-    const applyVoice = () => {
-      const voices = window.speechSynthesis.getVoices();
-      // Map our voice names to system voice preferences
-      const voiceMap: Record<string, string[]> = {
-        alloy:   ['Samantha', 'Google US English', 'en-US-Neural2-F', 'Microsoft Aria'],
-        echo:    ['Daniel', 'Google UK English Male', 'Microsoft Guy', 'Tom'],
-        fable:   ['Karen', 'Tessa', 'Google UK English Female', 'Microsoft Hazel'],
-        onyx:    ['Alex', 'Fred', 'Google UK English Male', 'Microsoft David'],
-        nova:    ['Victoria', 'Zira', 'Google US English', 'Microsoft Zira'],
-        shimmer: ['Fiona', 'Moira', 'Google UK English Female', 'Microsoft Susan'],
-      };
-      const prefs = voiceMap[voicePref] ?? voiceMap.alloy;
-      let selected: SpeechSynthesisVoice | null = null;
-      for (const name of prefs) {
-        selected = voices.find(v => v.name.includes(name)) ?? null;
-        if (selected) break;
-      }
-      if (!selected) selected = voices.find(v => v.lang.startsWith('en')) ?? null;
-      if (selected) utterance.voice = selected;
-
-      utterance.rate   = voicePref === 'nova' ? 1.08 : voicePref === 'onyx' ? 0.92 : 1.0;
-      utterance.pitch  = voicePref === 'onyx' ? 0.85 : voicePref === 'nova' ? 1.08 : 1.0;
-      utterance.volume = 1.0;
-    };
-
-    applyVoice();
-
-    utterance.onstart = () => {
-      setConvState('speaking');
-      setSpeakingPreview(clean.slice(0, 180));
-    };
-
-    const afterSpeak = () => {
-      setSpeakingPreview('');
-      if (isActiveRef.current) {
-        setConvState('listening');
-      } else {
-        setConvState('idle');
-      }
-    };
-    utterance.onend   = afterSpeak;
-    utterance.onerror = afterSpeak;
-
-    // If voices not loaded yet, wait for them
-    if (window.speechSynthesis.getVoices().length === 0) {
-      window.speechSynthesis.onvoiceschanged = () => {
-        applyVoice();
-        window.speechSynthesis.speak(utterance);
-      };
-    } else {
-      window.speechSynthesis.speak(utterance);
-    }
+    speakText(text, {
+      onStart: () => {
+        setConvState('speaking');
+        setSpeakingPreview(preview);
+      },
+      onEnd: () => {
+        setSpeakingPreview('');
+        if (isActiveRef.current) {
+          setConvState('listening');
+        } else {
+          setConvState('idle');
+        }
+      },
+    });
   }, []);
 
-  // ── Speech Recognition (input) ─────────────────────────────────────────────
+  // ── Speech Input (Web Speech Recognition) ─────────────────────────────────
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop();
@@ -175,7 +121,7 @@ export function useVoiceConversation({
     };
 
     rec.onerror = (e: any) => {
-      // 'no-speech' is normal (user was quiet) — restart
+      // 'no-speech' is normal (user was quiet) — restart after brief delay
       if (isActiveRef.current && !isAITypingRef.current) {
         if (e.error === 'no-speech') {
           setTimeout(() => {
@@ -196,7 +142,7 @@ export function useVoiceConversation({
     setConvState('listening');
   }, [stopListening, onSendMessage]);
 
-  // When AI finishes typing, speak the new complete message
+  // When AI finishes typing → speak the new complete message via xAI TTS
   useEffect(() => {
     if (!isActive) return;
     if (isAITyping) return; // still streaming
@@ -207,7 +153,7 @@ export function useVoiceConversation({
     speak(lastCompleteAssistantMessage);
   }, [isActive, lastCompleteAssistantMessage, isAITyping, speak]);
 
-  // While AI is typing, show processing state and pause listening
+  // While AI is typing → stop speaking, pause listening, show processing state
   useEffect(() => {
     if (!isActive) return;
     if (isAITyping) {
@@ -217,7 +163,7 @@ export function useVoiceConversation({
     }
   }, [isActive, isAITyping, stopSpeaking, stopListening]);
 
-  // When listening state is set (after speak ends), restart mic
+  // When state becomes 'listening' (after speak ends) → restart mic
   useEffect(() => {
     if (isActive && convState === 'listening' && !recognitionRef.current) {
       startListening();
@@ -247,7 +193,7 @@ export function useVoiceConversation({
     stopListening();
   }, [stopSpeaking, stopListening]);
 
-  /** Read a specific message aloud (for individual message playback) */
+  /** Read a specific message aloud via xAI TTS */
   const readAloud = useCallback((text: string) => {
     speak(text);
     setConvState('speaking');
@@ -256,10 +202,10 @@ export function useVoiceConversation({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      stopSpeaking();
+      stopVoice();
       stopListening();
     };
-  }, [stopSpeaking, stopListening]);
+  }, [stopListening]);
 
   return {
     isActive,

@@ -3922,17 +3922,6 @@ No preamble. Start directly with section 1.`;
                       )}
                       {message.role === 'assistant' && (
                         <>
-                          {/* Read aloud */}
-                          {!message.isStreaming && !message.isPending && message.content?.length > 20 && voiceConv.isSupported && (
-                            <button
-                              onClick={() => voiceConv.readAloud(message.content)}
-                              className="p-1.5 rounded-lg transition-all group/action border border-transparent hover:bg-violet-500/10 active:bg-violet-500/20 hover:border-violet-500/30"
-                              title="Read aloud"
-                              aria-label="Read message aloud"
-                            >
-                              <Volume2 className="w-3.5 h-3.5 text-[var(--text-faint)] group-hover/action:text-violet-400 transition-colors" />
-                            </button>
-                          )}
                           <button
                             onClick={() => message.voted !== 'up' && handleVote(index, 'up')}
                             className={`p-1.5 rounded-lg transition-all group/action border ${

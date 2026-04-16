@@ -155,6 +155,15 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
     await Promise.all(games.map(async game => [game.gamePk, await buildWeatherConditions(game)] as const))
   );
 
+  // Diagnostics — count why players get skipped so zero-projection runs are debuggable
+  const diag = {
+    pitchersTotal: 0,
+    pitchersSkippedNoStatcast: 0,
+    hittersTotal: 0,
+    hittersSkippedNoStatcast: 0,
+    gamesWithoutLineups: 0,
+  };
+
   for (const game of games) {
     if (projections.length >= limit) break;
 
@@ -168,11 +177,12 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
         if (projections.length >= limit) break;
         if (playerName && !pitcher.fullName.toLowerCase().includes(playerName.toLowerCase())) continue;
 
+        diag.pitchersTotal++;
         const statcast = allPitchers.find(p => p.playerId === pitcher.id) ??
           await findPitcherByName(pitcher.fullName).catch(() => null) ??
           null;
 
-        if (!statcast) continue;
+        if (!statcast) { diag.pitchersSkippedNoStatcast++; continue; }
 
         const parkFactors = getParkFactors(pitcher.teamAbbr);
         const features = buildPitcherFeatures(statcast, parkFactors, weather);
@@ -190,12 +200,15 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
     // 5. Process hitters
     if (playerType !== 'pitcher') {
       const lineups = [...(game.homeLineup ?? []), ...(game.awayLineup ?? [])];
+      if (lineups.length === 0) diag.gamesWithoutLineups++;
       // If no lineups posted, skip hitters (we can't project without lineup order)
       const hittersToProcess = lineups.length > 0 ? lineups.slice(0, 6) : []; // Top 6 in lineup
 
       for (const batter of hittersToProcess) {
         if (projections.length >= limit) break;
         if (playerName && !batter.fullName.toLowerCase().includes(playerName.toLowerCase())) continue;
+
+        diag.hittersTotal++;
 
         // Find opposing pitcher
         const isHome = batter.teamAbbr === game.homeTeamAbbr;
@@ -205,7 +218,7 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
           await findHitterByName(batter.fullName).catch(() => null) ??
           null;
 
-        if (!statcast) continue;
+        if (!statcast) { diag.hittersSkippedNoStatcast++; continue; }
 
         const parkFactors = getParkFactors(batter.teamAbbr);
         const features = buildHitterFeatures(
@@ -235,6 +248,17 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
         projections.push(card);
       }
     }
+  }
+
+  // Log why we ended with zero projections (pre-dawn cron runs before probable
+  // pitchers / lineups are posted is the most common cause).
+  if (projections.length === 0) {
+    console.warn(
+      `[MLBProj] Zero projections. games=${games.length} ` +
+      `pitchers=${diag.pitchersTotal} (skipped-no-statcast=${diag.pitchersSkippedNoStatcast}) ` +
+      `hitters=${diag.hittersTotal} (skipped-no-statcast=${diag.hittersSkippedNoStatcast}) ` +
+      `games-without-lineups=${diag.gamesWithoutLineups}`,
+    );
   }
 
   // Sort: hot first, then by HR projection descending

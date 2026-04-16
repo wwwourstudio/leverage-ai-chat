@@ -141,7 +141,7 @@ export async function fetchWeatherForLocation(
     
     const response = await fetch(url, {
       headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(4000)
+      signal: AbortSignal.timeout(6000)
     });
     
     if (!response.ok) {
@@ -172,7 +172,14 @@ export async function fetchWeatherForLocation(
     
     return weatherData;
   } catch (error) {
-    console.error(`${LOG_PREFIXES.API} Weather fetch error:`, error);
+    // Timeouts are expected under load — callers have neutral-weather fallbacks,
+    // so don't spam the logs. Surface non-timeout errors at warn level.
+    const isTimeout =
+      error instanceof Error &&
+      (error.name === 'TimeoutError' || error.name === 'AbortError');
+    if (!isTimeout) {
+      console.warn(`${LOG_PREFIXES.API} Weather fetch error:`, error instanceof Error ? error.message : error);
+    }
     return null;
   }
 }

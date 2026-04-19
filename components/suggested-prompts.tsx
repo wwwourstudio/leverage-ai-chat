@@ -187,7 +187,7 @@ export function SuggestedPrompts({
       <div className="relative mb-5">
         <div className="absolute left-0 inset-y-0 w-6 bg-gradient-to-r from-black to-transparent z-10 pointer-events-none" />
         <div className="absolute right-0 inset-y-0 w-14 bg-gradient-to-l from-black to-transparent z-10 pointer-events-none" />
-        <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory md:snap-none scrollbar-hide pb-1 px-2">
+        <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory md:snap-none scrollbar-hide pb-1 px-2 pr-14">
           {pills.map((action, idx) => {
             const Icon = action.icon;
             const submitText = action.query || action.label;

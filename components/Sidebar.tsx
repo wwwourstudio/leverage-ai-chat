@@ -417,8 +417,8 @@ export function Sidebar({
             <div>
               <div className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-1.5 px-0.5">Platform</div>
               <div className="relative">
-                <div className="absolute right-0 inset-y-0 w-6 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
-                <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide pr-4">
+                <div className="absolute right-0 inset-y-0 w-10 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
+                <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide pr-10">
                   {categories.map(cat => {
                     const Icon = cat.icon;
                     const isActive = selectedCategory === cat.id;
@@ -452,8 +452,8 @@ export function Sidebar({
               {/* Sport / Kalshi sub-filter */}
               {selectedCategory !== 'kalshi' && (
                 <div className="relative mt-1.5">
-                  <div className="absolute right-0 inset-y-0 w-6 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide pr-4">
+                  <div className="absolute right-0 inset-y-0 w-10 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide pr-10">
                     {sports
                       .filter(s => !(['fantasy', 'dfs'].includes(selectedCategory) && s.id.startsWith('ncaa')))
                       .map(sport => {
@@ -484,8 +484,8 @@ export function Sidebar({
 
               {selectedCategory === 'kalshi' && (
                 <div className="relative mt-1.5">
-                  <div className="absolute right-0 inset-y-0 w-6 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide pr-4">
+                  <div className="absolute right-0 inset-y-0 w-10 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide pr-10">
                     {KALSHI_TOPICS.map(topic => (
                       <button
                         key={topic}

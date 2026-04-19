@@ -277,7 +277,7 @@ export function detectHallucinations(
   const historicalAccuracy = scoreCoherence(aiText, userMessage);
 
   // Weighted composite
-  const finalConfidence = hasRealOdds
+  const rawConfidence = hasRealOdds
     ? Math.round(
         benfordIntegrity * 0.15 +
         oddsAlignment    * 0.55 +
@@ -290,6 +290,10 @@ export function detectHallucinations(
         marketConsensus  * 0.30 +
         historicalAccuracy * 0.20,
       );
+  // When any sub-score is critically low, cap the composite to avoid "Excellent"
+  // appearing alongside a failing metric (e.g. 47% Benford / 95% overall).
+  const minSubScore = Math.min(benfordIntegrity, oddsAlignment, marketConsensus, historicalAccuracy);
+  const finalConfidence = minSubScore < 50 ? Math.min(rawConfidence, 80) : rawConfidence;
 
   const trustLevel: 'high' | 'medium' | 'low' =
     finalConfidence >= 75 ? 'high' : finalConfidence >= 55 ? 'medium' : 'low';

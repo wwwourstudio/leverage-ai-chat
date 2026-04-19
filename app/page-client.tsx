@@ -187,8 +187,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
   // Dynamic welcome message based on time, category, and selected sport
   const getWelcomeMessage = (category: string, sport?: string, userName?: string) => {
-    // Use server time to prevent hydration mismatch
-    const now = serverData?.serverTime ? new Date(serverData.serverTime) : new Date();
+    const now = new Date();
     const hour = now.getHours();
     const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
     const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });

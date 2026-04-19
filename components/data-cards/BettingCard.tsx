@@ -437,7 +437,7 @@ function TabBar({ activeTab, onSelect, accentCls }: {
 // TabOdds — existing market data (Tab 1)
 // ─────────────────────────────────────────────────────────────────────────────
 function TabOdds({
-  data, teams, isFinal, hasBookComparison, books,
+  data, teams, isFinal, isExtremeOdds, hasBookComparison, books,
   spreadHome, spreadAway, ou, hasOdds,
   isBestHome, isBestAway, awayML, homeML,
   confPct, sharpPct, hasLineMove, moveDir, moveNum, rawMove, vigPct,
@@ -446,6 +446,7 @@ function TabOdds({
   data: BettingCardData;
   teams: { away: string; home: string } | null;
   isFinal: boolean;
+  isExtremeOdds: boolean;
   hasBookComparison: boolean;
   books: BookEntry[];
   spreadHome: { pts: string; juice?: string } | null;
@@ -1494,6 +1495,7 @@ export const BettingCard = memo(function BettingCard({
             data={data}
             teams={teams}
             isFinal={isFinal}
+            isExtremeOdds={isExtremeOdds}
             hasBookComparison={hasBookComparison}
             books={books}
             spreadHome={spreadHome}

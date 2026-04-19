@@ -55,9 +55,10 @@ function extractAllNumbers(text: string): number[] {
     .filter((n) => !isNaN(n) && n !== 0 && Math.abs(n) < 1_000_000);
 }
 
-/** Extract US-style moneylines: +125, -110, +2200, -350, etc. */
+/** Extract US-style moneylines: +125, -110, +2200, -350, etc.
+ *  Requires 3+ digits so game scores/spreads (-13, -7) are never mistaken for odds. */
 function extractMoneylines(text: string): number[] {
-  const tokens = text.match(/[+\-]\d{2,4}(?!\d)/g) ?? [];
+  const tokens = text.match(/[+\-]\d{3,4}(?!\d)/g) ?? [];
   return tokens.map(Number).filter((n) => !isNaN(n));
 }
 

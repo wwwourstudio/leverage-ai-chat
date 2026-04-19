@@ -198,6 +198,31 @@ function normalizeCategoryLabel(raw: string): string {
   return 'Prediction Market';
 }
 
+// Sports series-ticker prefixes — ground truth for identifying sports markets.
+// The Kalshi v2 API returns these in the series_ticker field; normalizeCategoryLabel()
+// maps them to readable names but seriesTicker is authoritative.
+export const SPORTS_SERIES_PREFIXES = [
+  'NFL', 'NBA', 'MLB', 'NHL', 'NCAAB', 'NCAAF',
+  'NASCAR', 'PGA', 'UFC', 'WNBA',
+  'KXNFL', 'KXNBA', 'KXMLB', 'KXNHL', 'KXNCAAB', 'KXNCAAF',
+  'KXNASCAR', 'KXPGA', 'KXUFC', 'KXWNBA', 'KXMMA', 'KXBOXING',
+  'KXF1', 'KXGOLF', 'KXTENNIS', 'KXSOCCER',
+];
+
+const _SPORTS_CATEGORIES = new Set([
+  'NFL', 'NBA', 'MLB', 'NHL',
+  'NCAAB', 'College Basketball', 'NCAAF', 'College Football',
+  'NASCAR', 'Golf', 'Formula 1', 'MMA', 'Boxing', 'WNBA',
+  'Soccer', 'Tennis', 'Sports', 'Baseball', 'Basketball', 'Football', 'Hockey',
+]);
+
+/** Returns true when the market is a sports/prop market based on seriesTicker + category. */
+export function isSportsMarket(m: { seriesTicker?: string; category?: string }): boolean {
+  const series = (m.seriesTicker || '').toUpperCase();
+  if (SPORTS_SERIES_PREFIXES.some(p => series.startsWith(p))) return true;
+  return _SPORTS_CATEGORIES.has(m.category || '');
+}
+
 /**
  * Parse a dollar string from the Kalshi v2 API into integer cents.
  * Kalshi transitioned from integer cents (yes_bid=56) to dollar strings
@@ -551,6 +576,8 @@ export async function fetchKalshiMarkets(params?: {
       return cached;
     }
 
+    console.log('[KALSHI] Cache miss, fetching from API...');
+
     // Coalesce: if an identical request is already in-flight, await that promise
     const pending = pendingRequests.get(cacheKey);
     if (pending) {
@@ -559,8 +586,6 @@ export async function fetchKalshiMarkets(params?: {
     }
   }
 
-  console.log('[KALSHI] Cache miss, fetching from API...');
-
   const doFetch = async (): Promise<KalshiMarket[]> => {
     try {
       const queryParams = new URLSearchParams({
@@ -568,47 +593,13 @@ export async function fetchKalshiMarkets(params?: {
         status,
       });
 
-      // Use title keyword search (series_ticker expects exact IDs like "KXBT", not names)
-      const categorySearchMap: Record<string, string> = {
-        // Elections & Politics
-        'election': 'election', 'elections': 'election', 'politics': 'senate',
-        'political': 'senate', '2026': '2026', 'president': 'president',
-        'presidential': 'president', 'congress': 'congress', 'senate': 'senate',
-        'house': 'house representatives', 'governor': 'governor',
-        // Finance & Economics
-        'finance': 'stock', 'financial': 'stock market', 'stocks': 'stock',
-        'crypto': 'bitcoin', 'bitcoin': 'bitcoin', 'ethereum': 'ethereum',
-        'interest_rate': 'interest rate', 'fed': 'federal reserve',
-        'inflation': 'inflation', 'gdp': 'GDP', 'recession': 'recession',
-        'unemployment': 'unemployment', 'sp500': 'S&P', 'nasdaq': 'NASDAQ',
-        'economy': 'economic',
-        // Weather & Climate
-        'weather': 'temperature', 'climate': 'climate', 'hurricane': 'hurricane',
-        'tornado': 'tornado', 'temperature': 'temperature', 'snow': 'snow',
-        'rain': 'rainfall', 'wildfire': 'wildfire', 'earthquake': 'earthquake',
-        // Sports
-        'sports': 'game', 'nfl': 'NFL', 'nba': 'NBA', 'mlb': 'MLB',
-        'nhl': 'NHL', 'soccer': 'soccer', 'mma': 'UFC', 'boxing': 'boxing',
-        'golf': 'golf', 'tennis': 'tennis', 'f1': 'Formula',
-        // Entertainment & Culture
-        'entertainment': 'award', 'oscars': 'Oscar', 'grammys': 'Grammy',
-        'emmys': 'Emmy', 'movies': 'box office', 'tv': 'ratings',
-        // Tech & Science
-        'tech': 'technology', 'ai': 'artificial intelligence', 'spacex': 'SpaceX',
-        'space': 'space', 'nasa': 'NASA',
-        // Global Events
-        'war': 'conflict', 'global': 'global', 'china': 'China', 'russia': 'Russia',
-        'ukraine': 'Ukraine', 'trade': 'trade', 'tariff': 'tariff',
-      };
-
-      // NOTE: The Kalshi v2 API does NOT support a 'title' query parameter —
-      // it silently ignores unknown params and returns the top-N markets by volume.
-      // Client-side filtering is applied after fetch instead.
+      // NOTE: The Kalshi v2 API does NOT support 'category', 'title', or 'search'
+      // query parameters — they are silently ignored. All filtering is client-side.
       if (cursor) {
         queryParams.append('cursor', cursor);
       }
 
-      console.log('[KALSHI] Fetching markets — params:', { category, status, limit, search, cursor: !!cursor });
+      console.log('[KALSHI] Fetching markets — status:', status, 'limit:', Math.min(limit, 1000), cursor ? '(paginating)' : '(page 1)');
 
       const { markets: meaningfulMarkets } = await fetchKalshiPage(queryParams);
 

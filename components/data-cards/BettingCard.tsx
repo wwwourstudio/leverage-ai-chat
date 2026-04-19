@@ -411,21 +411,24 @@ function TabBar({ activeTab, onSelect, accentCls }: {
 }) {
   const tabs = ['Odds', 'Props', 'Teams', 'History', 'Injuries', 'Watch'];
   return (
-    <div className="flex overflow-x-auto gap-1 py-1" style={{ scrollbarWidth: 'none' }}>
-      {tabs.map((tab, i) => (
-        <button
-          key={tab}
-          onClick={() => onSelect(i)}
-          className={cn(
-            'px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 border transition-all duration-150',
-            activeTab === i
-              ? accentCls
-              : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-muted)]',
-          )}
-        >
-          {tab}
-        </button>
-      ))}
+    <div className="relative">
+      <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
+      <div className="flex overflow-x-auto gap-1 py-1 pr-8" style={{ scrollbarWidth: 'none' }}>
+        {tabs.map((tab, i) => (
+          <button
+            key={tab}
+            onClick={() => onSelect(i)}
+            className={cn(
+              'px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 border transition-all duration-150',
+              activeTab === i
+                ? accentCls
+                : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-muted)]',
+            )}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -434,7 +437,7 @@ function TabBar({ activeTab, onSelect, accentCls }: {
 // TabOdds — existing market data (Tab 1)
 // ─────────────────────────────────────────────────────────────────────────────
 function TabOdds({
-  data, teams, isFinal, hasBookComparison, books,
+  data, teams, isFinal, isExtremeOdds, hasBookComparison, books,
   spreadHome, spreadAway, ou, hasOdds,
   isBestHome, isBestAway, awayML, homeML,
   confPct, sharpPct, hasLineMove, moveDir, moveNum, rawMove, vigPct,
@@ -443,6 +446,7 @@ function TabOdds({
   data: BettingCardData;
   teams: { away: string; home: string } | null;
   isFinal: boolean;
+  isExtremeOdds: boolean;
   hasBookComparison: boolean;
   books: BookEntry[];
   spreadHome: { pts: string; juice?: string } | null;
@@ -523,7 +527,7 @@ function TabOdds({
       })()}
 
       {/* Odds grid — filtered by market view */}
-      {hasOdds && !isFinal && (
+      {hasOdds && !isFinal && !isExtremeOdds && (
         <div className="grid grid-cols-2 gap-1.5">
           {/* Moneyline view */}
           {marketView === 'ml' && awayML && (
@@ -1193,6 +1197,17 @@ export const BettingCard = memo(function BettingCard({
   const homeProb = impliedProb(data.homeOdds);
   const awayProb = impliedProb(data.awayOdds);
 
+  // Detect live/in-progress games via extreme odds: implied prob > 97% means the
+  // API is returning in-game lines (e.g. -20000), not pre-game bettable prices.
+  const isExtremeOdds = (() => {
+    const h = Number(data.homeOdds);
+    const a = Number(data.awayOdds);
+    if (isNaN(h) || isNaN(a) || h === 0 || a === 0) return false;
+    const hProb = h < 0 ? (-h) / (-h + 100) : 100 / (h + 100);
+    const aProb = a < 0 ? (-a) / (-a + 100) : 100 / (a + 100);
+    return Math.max(hProb, aProb) > 0.97;
+  })();
+
   // Best-odds flags for highlighting in the matchup block
   const isBestHome = !!(data.bestHomeOdds && data.homeOdds && data.homeOdds === data.bestHomeOdds);
   const isBestAway = !!(data.bestAwayOdds && data.awayOdds && data.awayOdds === data.bestAwayOdds);
@@ -1277,8 +1292,15 @@ export const BettingCard = memo(function BettingCard({
               LIVE
             </span>
           )}
+          {/* In-progress indicator when API returns extreme in-game odds */}
+          {isExtremeOdds && !isLiveGame && !isFinal && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-[9px] font-bold text-amber-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              IN PROGRESS
+            </span>
+          )}
           {/* Real API data indicator (non-in-game) */}
-          {data.realData && !isLiveGame && !isFinal && (
+          {data.realData && !isLiveGame && !isFinal && !isExtremeOdds && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-bold text-emerald-400/80">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
               LIVE DATA
@@ -1473,6 +1495,7 @@ export const BettingCard = memo(function BettingCard({
             data={data}
             teams={teams}
             isFinal={isFinal}
+            isExtremeOdds={isExtremeOdds}
             hasBookComparison={hasBookComparison}
             books={books}
             spreadHome={spreadHome}

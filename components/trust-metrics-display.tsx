@@ -358,6 +358,23 @@ export function TrustMetricsDisplay({ metrics, compact = false, showDetails = tr
         </div>
       )}
 
+      {/* ── Caution: overall high but a sub-score is critically low ─ */}
+      {showDetails && metrics.finalConfidence >= 75 && (() => {
+        const criticalLow = METRIC_DEFS.find(d => (metrics[d.key] as number) < 55);
+        if (!criticalLow) return null;
+        return (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-[10px] text-amber-400">
+            <div className="flex items-center gap-1.5 font-semibold mb-0.5">
+              <AlertTriangle className="w-3 h-3 shrink-0" />
+              {criticalLow.label} is flagging concerns
+            </div>
+            <p className="text-[9px] opacity-80 leading-relaxed">
+              This sub-score is below 55%. The composite score weights multiple signals — treat this metric as a caution, not a full disqualifier.
+            </p>
+          </div>
+        );
+      })()}
+
       {/* ── Sources ──────────────────────────────────────────── */}
       {metrics.sources && metrics.sources.length > 0 && (
         <div className="flex flex-wrap gap-1.5">

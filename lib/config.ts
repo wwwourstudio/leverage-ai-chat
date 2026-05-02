@@ -117,8 +117,9 @@ export const getSupabaseUrl = () =>
 export const getSupabaseAnonKey = () => 
   getServerEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', { required: false });
 
-export const getSupabaseServiceKey = () => 
-  getServerEnv('SUPABASE_SERVICE_ROLE_KEY', { required: false });
+export const getSupabaseServiceKey = () =>
+  getServerEnv('SUPABASE_SERVICE_ROLE_KEY', { required: false }) ||
+  getServerEnv('SUPABASE_SECRET_KEY', { required: false });
 
 // AI Services
 export const getGrokApiKey = () => 
@@ -447,21 +448,24 @@ export interface EnvValidationResult {
 }
 
 const REQUIRED_ENV_VARS: Record<string, string> = {
-  NEXT_PUBLIC_SUPABASE_URL:   'Supabase project URL',
+  NEXT_PUBLIC_SUPABASE_URL:      'Supabase project URL',
   NEXT_PUBLIC_SUPABASE_ANON_KEY: 'Supabase anonymous key',
-  SUPABASE_SERVICE_ROLE_KEY:  'Supabase service role key (server-side only)',
-  XAI_API_KEY:                'xAI Grok API key for AI responses',
-  ODDS_API_KEY:               'The Odds API key for sports betting data',
+  XAI_API_KEY:                   'xAI Grok API key for AI responses',
+  ODDS_API_KEY:                  'The Odds API key for sports betting data',
 };
 
 const OPTIONAL_ENV_VARS: Record<string, string> = {
-  NEXT_PUBLIC_SITE_URL:  'Site URL for absolute links',
-  WEATHER_API_KEY:       'Weather API key for outdoor sports',
-  STRIPE_SECRET_KEY:     'Stripe secret key for payments',
-  STRIPE_PUBLISHABLE_KEY:'Stripe publishable key for payments',
-  KALSHI_API_KEY:        'Kalshi API key (bearer token for public market data)',
-  KALSHI_API_KEY_ID:     'Kalshi API key ID (for authenticated trading)',
-  KALSHI_PRIVATE_KEY:    'Kalshi RSA private key (for authenticated trading)',
+  SUPABASE_SERVICE_ROLE_KEY: 'Supabase service role key (server-side admin operations)',
+  SUPABASE_SECRET_KEY:       'Supabase service role key (alias for SUPABASE_SERVICE_ROLE_KEY)',
+  SUPABASE_JWT_SECRET:       'Supabase JWT secret for token verification',
+  CRON_SECRET:               'Bearer token for authenticating cron job requests',
+  NEXT_PUBLIC_SITE_URL:      'Site URL for absolute links',
+  WEATHER_API_KEY:           'Weather API key for outdoor sports',
+  STRIPE_SECRET_KEY:         'Stripe secret key for payments',
+  STRIPE_PUBLISHABLE_KEY:    'Stripe publishable key for payments',
+  KALSHI_API_KEY:            'Kalshi API key (bearer token for public market data)',
+  KALSHI_API_KEY_ID:         'Kalshi API key ID (for authenticated trading)',
+  KALSHI_PRIVATE_KEY:        'Kalshi RSA private key (for authenticated trading)',
 };
 
 export function validateServerEnv(): EnvValidationResult {

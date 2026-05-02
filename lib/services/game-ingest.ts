@@ -146,7 +146,7 @@ export async function persistGames(games: MLBGame[]): Promise<void> {
     await upsertTeams(db, games);
     await upsertPlayers(db, games);
     await upsertGames(db, games);
-    console.log(`[game-ingest] Persisted ${games.length} mlb_games, teams, and lineup players`);
+    console.log(`[game-ingest] Persisted ${games.length} mlb_games, teams, and player biographical records (lineup order is fetched live from MLB Stats API, not stored)`);
   } catch (err) {
     console.warn('[game-ingest] Unexpected error:', err instanceof Error ? err.message : String(err));
   }

@@ -90,6 +90,36 @@ function setCachedCards(cards: InsightCard[], category: string, sport?: string, 
   cardCacheMap.set(key, { cards, timestamp: Date.now(), category });
 }
 
+// ── Odds sanity helpers ───────────────────────────────────────────────────────
+
+/** American odds beyond ±1000 indicate live/in-progress betting lines — not useful pre-game. */
+const MAX_DISPLAY_ODDS = 1000;
+function sanitizePrice(price: number): number | null {
+  return Math.abs(price) <= MAX_DISPLAY_ODDS ? price : null;
+}
+
+/**
+ * Returns true when both moneylines are missing AND at least one spread/total
+ * price is extreme (|price| > 800). This pattern reliably identifies in-progress
+ * games whose live run-line / total odds have drifted to degenerate values.
+ */
+function isDegenerate(card: {
+  homeOdds: string;
+  awayOdds: string;
+  homeSpread?: string;
+  awaySpread?: string;
+  overUnder?: string;
+}): boolean {
+  if (card.homeOdds !== '—' || card.awayOdds !== '—') return false;
+  const nums = [card.homeSpread, card.awaySpread, card.overUnder]
+    .join(' ')
+    .match(/-?\d+/g)
+    ?.map(Number) ?? [];
+  return nums.some(n => Math.abs(n) > 800);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
  * Convert raw Odds API event objects into BettingCards with realData: true.
  * Used by the /api/analyze route to build cards directly from context.oddsData
@@ -186,6 +216,26 @@ export function oddsEventsToBettingCards(
       if (bAway && (bestAwayRaw === null || bAway.price > bestAwayRaw)) bestAwayRaw = bAway.price;
     }
 
+    // Build displayable strings with sanitized prices
+    const homeOddsStr = homeOdds ? (homeOdds.price > 0 ? `+${homeOdds.price}` : `${homeOdds.price}`) : '—';
+    const awayOddsStr = awayOdds ? (awayOdds.price > 0 ? `+${awayOdds.price}` : `${awayOdds.price}`) : '—';
+    const hsPrice = homeSpread ? sanitizePrice(homeSpread.price) : null;
+    const asPrice = awaySpread ? sanitizePrice(awaySpread.price) : null;
+    const overPrice = over ? sanitizePrice(over.price) : null;
+    const underPrice = under ? sanitizePrice(under.price) : null;
+    const homeSpreadStr = homeSpread && hsPrice !== null
+      ? `${homeSpread.point > 0 ? '+' : ''}${homeSpread.point} (${hsPrice > 0 ? '+' : ''}${hsPrice})`
+      : 'N/A';
+    const awaySpreadStr = awaySpread && asPrice !== null
+      ? `${awaySpread.point > 0 ? '+' : ''}${awaySpread.point} (${asPrice > 0 ? '+' : ''}${asPrice})`
+      : 'N/A';
+    const ouStr = over && under && overPrice !== null && underPrice !== null
+      ? `O/U ${over.point}: Over ${overPrice > 0 ? '+' : ''}${overPrice} / Under ${underPrice > 0 ? '+' : ''}${underPrice}`
+      : 'N/A';
+
+    // Skip in-progress / degenerate games (no moneyline + extreme spread/total prices)
+    if (isDegenerate({ homeOdds: homeOddsStr, awayOdds: awayOddsStr, homeSpread: homeSpreadStr, awaySpread: awaySpreadStr, overUnder: ouStr })) continue;
+
     cards.push({
       type: CARD_TYPES.LIVE_ODDS,
       title: `${game.away_team} @ ${game.home_team}`,
@@ -198,11 +248,11 @@ export function oddsEventsToBettingCards(
         matchup: `${game.away_team} @ ${game.home_team}`,
         sport,
         gameTime: gameTimeStr,
-        homeOdds: homeOdds ? (homeOdds.price > 0 ? `+${homeOdds.price}` : `${homeOdds.price}`) : '—',
-        awayOdds: awayOdds ? (awayOdds.price > 0 ? `+${awayOdds.price}` : `${awayOdds.price}`) : '—',
-        homeSpread: homeSpread ? `${homeSpread.point > 0 ? '+' : ''}${homeSpread.point} (${homeSpread.price > 0 ? '+' : ''}${homeSpread.price})` : 'N/A',
-        awaySpread: awaySpread ? `${awaySpread.point > 0 ? '+' : ''}${awaySpread.point} (${awaySpread.price > 0 ? '+' : ''}${awaySpread.price})` : 'N/A',
-        overUnder: over && under ? `O/U ${over.point}: Over ${over.price > 0 ? '+' : ''}${over.price} / Under ${under.price > 0 ? '+' : ''}${under.price}` : 'N/A',
+        homeOdds: homeOddsStr,
+        awayOdds: awayOddsStr,
+        homeSpread: homeSpreadStr,
+        awaySpread: awaySpreadStr,
+        overUnder: ouStr,
         bookmaker: book?.title ?? (hasOdds ? 'Multiple Books' : 'Upcoming'),
         bookmakerCount: bookmakers.length,
         books: topBooks.length >= 2 ? topBooks : undefined,
@@ -364,6 +414,26 @@ async function generateSportSpecificCards(
             if (bAway && (bestAwayRaw === null || bAway.price > bestAwayRaw)) bestAwayRaw = bAway.price;
           }
 
+          // Build displayable strings with sanitized prices
+          const homeOddsStr = homeOdds ? (homeOdds.price > 0 ? `+${homeOdds.price}` : `${homeOdds.price}`) : '—';
+          const awayOddsStr = awayOdds ? (awayOdds.price > 0 ? `+${awayOdds.price}` : `${awayOdds.price}`) : '—';
+          const hsPrice = homeSpread ? sanitizePrice(homeSpread.price) : null;
+          const asPrice = awaySpread ? sanitizePrice(awaySpread.price) : null;
+          const overPrice = over ? sanitizePrice(over.price) : null;
+          const underPrice = under ? sanitizePrice(under.price) : null;
+          const homeSpreadStr = homeSpread && hsPrice !== null
+            ? `${homeSpread.point > 0 ? '+' : ''}${homeSpread.point} (${hsPrice > 0 ? '+' : ''}${hsPrice})`
+            : 'N/A';
+          const awaySpreadStr = awaySpread && asPrice !== null
+            ? `${awaySpread.point > 0 ? '+' : ''}${awaySpread.point} (${asPrice > 0 ? '+' : ''}${asPrice})`
+            : 'N/A';
+          const ouStr = over && under && overPrice !== null && underPrice !== null
+            ? `O/U ${over.point}: Over ${overPrice > 0 ? '+' : ''}${overPrice} / Under ${underPrice > 0 ? '+' : ''}${underPrice}`
+            : 'N/A';
+
+          // Skip in-progress / degenerate games (no moneyline + extreme spread/total prices)
+          if (isDegenerate({ homeOdds: homeOddsStr, awayOdds: awayOddsStr, homeSpread: homeSpreadStr, awaySpread: awaySpreadStr, overUnder: ouStr })) continue;
+
           cards.push({
             type: CARD_TYPES.LIVE_ODDS,
             title: `${game.away_team} @ ${game.home_team}`,
@@ -375,11 +445,11 @@ async function generateSportSpecificCards(
               matchup: `${game.away_team} @ ${game.home_team}`,
               sport,
               gameTime: gameTimeStr,
-              homeOdds: homeOdds ? (homeOdds.price > 0 ? `+${homeOdds.price}` : `${homeOdds.price}`) : '—',
-              awayOdds: awayOdds ? (awayOdds.price > 0 ? `+${awayOdds.price}` : `${awayOdds.price}`) : '—',
-              homeSpread: homeSpread ? `${homeSpread.point > 0 ? '+' : ''}${homeSpread.point} (${homeSpread.price > 0 ? '+' : ''}${homeSpread.price})` : 'N/A',
-              awaySpread: awaySpread ? `${awaySpread.point > 0 ? '+' : ''}${awaySpread.point} (${awaySpread.price > 0 ? '+' : ''}${awaySpread.price})` : 'N/A',
-              overUnder: over && under ? `O/U ${over.point}: Over ${over.price > 0 ? '+' : ''}${over.price} / Under ${under.price > 0 ? '+' : ''}${under.price}` : 'N/A',
+              homeOdds: homeOddsStr,
+              awayOdds: awayOddsStr,
+              homeSpread: homeSpreadStr,
+              awaySpread: awaySpreadStr,
+              overUnder: ouStr,
               bookmaker: book?.title ?? (hasOdds ? 'Multiple Books' : 'Upcoming'),
               bookmakerCount: bookmakers.length,
               books: topBooks.length >= 2 ? topBooks : undefined,

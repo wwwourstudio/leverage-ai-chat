@@ -813,6 +813,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       try {
         const msgLow = (lastUserQuery || '').toLowerCase();
         const hasFantasyOrDFSQuery = /\b(adp|draft|waiver|sleeper|fantasy|dfs|best ball|lineup|vbd|tier|rank)\b/i.test(lastUserQuery || '');
+        const hasDFSQuery = /\b(dfs|daily fantasy|showdown|gpp|gpps|tournament lineup)\b/i.test(lastUserQuery || '');
         const hasPropQuery = msgLow.includes('prop') || msgLow.includes('strikeout')
                           || msgLow.includes('hits over') || msgLow.includes('home run over')
                           || msgLow.includes('player bet');
@@ -824,6 +825,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           msgLow.includes('contract pricing') ||
           msgLow.includes('winner contract')
         ) ? 'kalshi'
+          : hasFantasyOrDFSQuery && selectedCategory !== 'betting' && selectedCategory !== 'props'
+          ? (hasDFSQuery ? 'dfs' : 'fantasy')
           : selectedCategory === 'fantasy' && !hasFantasyOrDFSQuery
           ? 'betting'
           : selectedCategory;

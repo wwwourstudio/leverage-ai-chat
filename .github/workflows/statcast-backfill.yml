@@ -65,14 +65,13 @@ jobs:
       # ── 2. Set up pnpm ───────────────────────────────────────────────────────
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
+        # version omitted — auto-resolved from packageManager in package.json
 
-      # ── 3. Set up Node.js 20 ─────────────────────────────────────────────────
-      - name: Set up Node.js 20
+      # ── 3. Set up Node.js 24 ─────────────────────────────────────────────────
+      - name: Set up Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'pnpm'
 
       # ── 4. Install dependencies ───────────────────────────────────────────────

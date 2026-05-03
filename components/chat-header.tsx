@@ -21,8 +21,9 @@ interface ChatHeaderProps {
   // Export / share props (optional — hidden when not provided)
   activeChat?: ExportChat | null;
   messages?: ExportMessage[];
-  // Active sport context
+  // Active context
   currentSport?: string;
+  currentCategory?: string;
 }
 
 export const ChatHeader = memo(function ChatHeader({
@@ -41,6 +42,7 @@ export const ChatHeader = memo(function ChatHeader({
   activeChat,
   messages = [],
   currentSport,
+  currentCategory,
 }: ChatHeaderProps) {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [shareState, setShareState] = useState<'idle' | 'loading' | 'copied'>('idle');
@@ -114,8 +116,23 @@ export const ChatHeader = memo(function ChatHeader({
               <p className="hidden sm:block text-[10px] font-semibold text-[var(--text-muted)] tracking-widest uppercase">Sports Intelligence</p>
             </div>
           </div>
-          {currentSport && currentSport !== 'all' && (
-            <span className="hidden lg:inline-flex text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-[var(--text-muted)]">
+          {currentCategory && currentCategory !== 'all' && (
+            <span className={`hidden lg:inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+              currentCategory === 'betting'  ? 'bg-orange-500/10 border-orange-500/25 text-orange-400' :
+              currentCategory === 'fantasy'  ? 'bg-violet-500/10 border-violet-500/25 text-violet-400' :
+              currentCategory === 'dfs'      ? 'bg-purple-500/10 border-purple-500/25 text-purple-400' :
+              currentCategory === 'kalshi'   ? 'bg-cyan-500/10 border-cyan-500/25 text-cyan-400' :
+              'bg-[var(--bg-overlay)] border-[var(--border-subtle)] text-[var(--text-muted)]'
+            }`}>
+              {currentCategory === 'betting' ? 'Sports Betting' :
+               currentCategory === 'fantasy' ? 'Fantasy' :
+               currentCategory === 'dfs'     ? 'DFS Optimizer' :
+               currentCategory === 'kalshi'  ? 'Kalshi Markets' :
+               currentCategory.toUpperCase()}
+            </span>
+          )}
+          {currentSport && currentSport !== 'all' && currentSport !== currentCategory && (
+            <span className="hidden lg:inline-flex text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-[var(--text-muted)]">
               {currentSport.toUpperCase()}
             </span>
           )}

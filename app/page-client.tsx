@@ -3647,7 +3647,8 @@ No preamble. Start directly with section 1.`;
           watchlistCount={savedPlayersCount + savedCardsCount}
           onOpenLogin={() => setShowLoginModal(true)}
           onOpenSignup={() => setShowSignupModal(true)}
-          currentSport={selectedSport || selectedCategory}
+          currentSport={selectedSport || undefined}
+          currentCategory={selectedCategory !== 'all' ? selectedCategory : undefined}
         />
 
         {/* Messages Container - Dynamic Data-Driven Interface */}

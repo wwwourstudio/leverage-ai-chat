@@ -118,9 +118,12 @@ function timeRemaining(iso?: string | null): {
   return { label, pctElapsed, urgency };
 }
 
-/** True when the ticker is a real public Kalshi identifier (no UUID/hex segments) */
+/** True when the ticker is a real public Kalshi identifier (no UUID/hex segments or cross-category markers) */
 const isPublicTicker = (t?: string) =>
-  Boolean(t) && (t as string).length <= 35 && !/-[0-9a-f]{8,}/i.test(t as string);
+  Boolean(t) &&
+  (t as string).length <= 35 &&
+  !/-[0-9a-f]{8,}/i.test(t as string) &&
+  !/CROSS.*CATEGORY/i.test(t as string);
 
 // ── Sparkline ──────────────────────────────────────────────────────────────────
 
@@ -1185,12 +1188,12 @@ export const KalshiCard = memo(function KalshiCard({
           )}
         </div>
 
-        {/* Title — full exact text from Kalshi API */}
+        {/* Title — shortened for composite/multi-leg markets */}
         <h3
-          className={cn('font-black text-white leading-snug pr-20', isHero ? 'text-[15px]' : 'text-sm', 'line-clamp-4')}
+          className={cn('font-black text-white leading-snug pr-20', isHero ? 'text-[15px]' : 'text-sm', 'line-clamp-3')}
           title={title}
         >
-          {title}
+          {shortenTitle(title)}
         </h3>
 
         {/* Subtitle */}
@@ -1278,32 +1281,40 @@ export const KalshiCard = memo(function KalshiCard({
         {/* ── CTAs — always visible ──────────────────────────────────────────── */}
         <div className="space-y-2">
 
-          {/* Primary: Place Bet on Kalshi */}
-          {hasSpecificMarket && (
-            <a
-              href={tradeBase}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-black tracking-wide transition-all duration-150"
-              style={{
-                background: `linear-gradient(135deg, ${accentColor}22, ${accentColor}12)`,
-                border: `1px solid ${accentColor}40`,
-                color: accentColor,
-              }}
-              onMouseEnter={e => {
+          {/* Primary CTA — "Place Bet" for known markets, "Browse" for generic fallback */}
+          <a
+            href={tradeBase}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-black tracking-wide transition-all duration-150"
+            style={{
+              background: hasSpecificMarket
+                ? `linear-gradient(135deg, ${accentColor}22, ${accentColor}12)`
+                : 'oklch(0.22 0.01 260 / 0.6)',
+              border: hasSpecificMarket ? `1px solid ${accentColor}40` : '1px solid oklch(0.35 0.01 260)',
+              color: hasSpecificMarket ? accentColor : 'oklch(0.65 0.02 260)',
+            }}
+            onMouseEnter={e => {
+              if (hasSpecificMarket) {
                 e.currentTarget.style.background = `linear-gradient(135deg, ${accentColor}35, ${accentColor}22)`;
                 e.currentTarget.style.boxShadow = `0 4px 20px ${accentColor}20`;
-              }}
-              onMouseLeave={e => {
+              } else {
+                e.currentTarget.style.background = 'oklch(0.26 0.01 260 / 0.8)';
+              }
+            }}
+            onMouseLeave={e => {
+              if (hasSpecificMarket) {
                 e.currentTarget.style.background = `linear-gradient(135deg, ${accentColor}22, ${accentColor}12)`;
                 e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              <Globe className="w-4 h-4" />
-              Place Bet on Kalshi
-              <ExternalLink className="w-3.5 h-3.5 opacity-60" />
-            </a>
-          )}
+              } else {
+                e.currentTarget.style.background = 'oklch(0.22 0.01 260 / 0.6)';
+              }
+            }}
+          >
+            <Globe className="w-4 h-4" />
+            {hasSpecificMarket ? 'Place Bet on Kalshi' : 'Browse Kalshi Markets'}
+            <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+          </a>
 
           {/* YES / NO trade buttons — only for active (open) markets with price data */}
           {isActive && hasSpecificMarket && d.priceIsReal && (

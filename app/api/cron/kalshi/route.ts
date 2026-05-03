@@ -126,15 +126,17 @@ export async function GET(req: NextRequest) {
 
     const now = new Date().toISOString();
     const rows = sportsMarkets.map(m => ({
-      market_id:  m.ticker,
-      title:      m.title,
-      category:   m.category ?? null,
-      yes_price:  m.yesPrice  != null ? m.yesPrice  / 100 : null,
-      no_price:   m.noPrice   != null ? m.noPrice   / 100 : null,
-      volume:     m.volume    ?? null,
-      close_time: m.closeTime ?? null,
-      cached_at:  now,
-      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      market_id:    m.ticker,
+      title:        m.title,
+      category:     m.category ?? null,
+      yes_price:    m.yesPrice  != null ? m.yesPrice  / 100 : null,
+      no_price:     m.noPrice   != null ? m.noPrice   / 100 : null,
+      volume:       m.volume    ?? null,
+      close_time:   m.closeTime ?? null,
+      event_ticker: m.eventTicker  || null,
+      series_ticker: m.seriesTicker || null,
+      cached_at:    now,
+      expires_at:   new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     }));
 
     const supabase = getServiceClient();

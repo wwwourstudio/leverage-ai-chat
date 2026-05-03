@@ -201,9 +201,15 @@ CREATE TABLE IF NOT EXISTS kalshi_markets (
   no_price NUMERIC,
   volume NUMERIC,
   close_time TIMESTAMPTZ,
+  event_ticker VARCHAR(255),
+  series_ticker VARCHAR(255),
   cached_at TIMESTAMPTZ DEFAULT NOW(),
   expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '5 minutes'
 );
+
+-- Add new columns to existing deployments without event_ticker / series_ticker
+ALTER TABLE kalshi_markets ADD COLUMN IF NOT EXISTS event_ticker VARCHAR(255);
+ALTER TABLE kalshi_markets ADD COLUMN IF NOT EXISTS series_ticker VARCHAR(255);
 
 CREATE INDEX IF NOT EXISTS idx_kalshi_category ON kalshi_markets(category);
 CREATE INDEX IF NOT EXISTS idx_kalshi_cached ON kalshi_markets(cached_at DESC);

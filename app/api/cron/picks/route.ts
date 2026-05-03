@@ -15,23 +15,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyCronSecret } from '@/lib/config';
 
 export const runtime = 'nodejs';
 export const maxDuration = 20;
 
 export async function GET(req: NextRequest) {
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const querySecret = req.nextUrl.searchParams.get('secret');
-    const headerSecret =
-      req.headers.get('authorization')?.replace('Bearer ', '') ??
-      req.headers.get('x-cron-secret') ??
-      '';
-    if (querySecret !== cronSecret && headerSecret !== cronSecret) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-  }
+  if (!verifyCronSecret(req)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
   const startedAt = Date.now();
   const date = todayUTC();

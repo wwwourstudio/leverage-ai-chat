@@ -19,7 +19,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getSupabaseUrl, getSupabaseServiceKey } from '@/lib/config';
+import { getSupabaseUrl, getSupabaseServiceKey, verifyCronSecret } from '@/lib/config';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30; // increased from 20 — pagination needs extra time
@@ -58,18 +58,7 @@ function isSportsMarket(m: { seriesTicker?: string; category?: string }): boolea
 }
 
 export async function GET(req: NextRequest) {
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const querySecret = req.nextUrl.searchParams.get('secret');
-    const headerSecret =
-      req.headers.get('authorization')?.replace('Bearer ', '') ??
-      req.headers.get('x-cron-secret') ??
-      '';
-    if (querySecret !== cronSecret && headerSecret !== cronSecret) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-  }
+  if (!verifyCronSecret(req)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
   // ── Kalshi key guard ────────────────────────────────────────────────────
   const hasKey =
@@ -137,15 +126,17 @@ export async function GET(req: NextRequest) {
 
     const now = new Date().toISOString();
     const rows = sportsMarkets.map(m => ({
-      market_id:  m.ticker,
-      title:      m.title,
-      category:   m.category ?? null,
-      yes_price:  m.yesPrice  != null ? m.yesPrice  / 100 : null,
-      no_price:   m.noPrice   != null ? m.noPrice   / 100 : null,
-      volume:     m.volume    ?? null,
-      close_time: m.closeTime ?? null,
-      cached_at:  now,
-      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      market_id:    m.ticker,
+      title:        m.title,
+      category:     m.category ?? null,
+      yes_price:    m.yesPrice  != null ? m.yesPrice  / 100 : null,
+      no_price:     m.noPrice   != null ? m.noPrice   / 100 : null,
+      volume:       m.volume    ?? null,
+      close_time:   m.closeTime ?? null,
+      event_ticker: m.eventTicker  || null,
+      series_ticker: m.seriesTicker || null,
+      cached_at:    now,
+      expires_at:   new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     }));
 
     const supabase = getServiceClient();

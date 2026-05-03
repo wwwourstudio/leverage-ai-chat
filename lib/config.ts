@@ -528,3 +528,33 @@ export function logEnvValidation(result: EnvValidationResult, context: 'server' 
 export function getMissingAPIKeys(): string[] {
   return ['XAI_API_KEY', 'ODDS_API_KEY'].filter(key => !process.env[key]);
 }
+
+/**
+ * Verify a cron request carries the correct CRON_SECRET.
+ *
+ * Accepts the secret via:
+ *   1. Authorization: Bearer <secret>  (Vercel injects this automatically)
+ *   2. x-cron-secret: <secret>         (manual/webhook callers)
+ *   3. ?secret=<secret>                (query param, for testing)
+ *
+ * Trims whitespace from both the stored secret and the provided value so
+ * accidental newlines in Vercel environment variable values don't cause
+ * every invocation to fail with 401.
+ *
+ * Returns true when:
+ *   - CRON_SECRET is not set (open — useful for dev environments)
+ *   - CRON_SECRET is set and the request carries the matching token
+ */
+export function verifyCronSecret(req: { headers: { get(name: string): string | null }; nextUrl?: { searchParams: URLSearchParams } }): boolean {
+  const stored = process.env.CRON_SECRET?.trim();
+  if (!stored) return true; // no secret configured → allow all
+
+  // Extract token from Authorization header (case-insensitive Bearer prefix)
+  const authHeader = req.headers.get('authorization') ?? '';
+  const fromAuth = authHeader.replace(/^bearer\s+/i, '').trim();
+
+  const fromXHeader = req.headers.get('x-cron-secret')?.trim() ?? '';
+  const fromQuery = req.nextUrl?.searchParams.get('secret')?.trim() ?? '';
+
+  return fromAuth === stored || fromXHeader === stored || fromQuery === stored;
+}

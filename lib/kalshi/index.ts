@@ -493,8 +493,14 @@ async function _fetchKalshiPageInner(queryParams: URLSearchParams): Promise<Kals
       ];
       const rawCount = data.markets.length;
 
+      // Cross-category/multi-leg internal markets — ticker prefix check.
+      // HEX_SEGMENT_RE alone misses formats like KXMVECROSSCATEGORY-S202696CC1DA4643
+      // because "S" is not a hex character and breaks the consecutive-hex match.
+      // This explicit prefix RE catches them regardless of the UUID format Kalshi uses.
+      const CROSS_CATEGORY_PREFIX_RE = /^KXMVE?CROSS/i;
+
       // Rejection counters — logged once per page so we can diagnose filter drift
-      let rejShort = 0, rejTicker = 0, rejHexEvent = 0, rejHexTicker = 0;
+      let rejShort = 0, rejTicker = 0, rejHexEvent = 0, rejHexTicker = 0, rejCrossCategory = 0;
 
       const markets = data.markets
         .map(parseMarket)
@@ -509,6 +515,14 @@ async function _fetchKalshiPageInner(queryParams: URLSearchParams): Promise<Kals
           const isPolitical = POLITICAL_SERIES_PREFIXES.some(p => seriesUpper.startsWith(p));
           if (isPolitical) return true;
 
+          // Explicit cross-category prefix check (catches S-prefixed UUID formats
+          // that HEX_SEGMENT_RE misses because S is not a hex digit)
+          if (
+            CROSS_CATEGORY_PREFIX_RE.test(m.seriesTicker || '') ||
+            CROSS_CATEGORY_PREFIX_RE.test(m.eventTicker   || '') ||
+            CROSS_CATEGORY_PREFIX_RE.test(m.ticker        || '')
+          ) { rejCrossCategory++; return false; }
+
           // Exclude internal cross-category markets (no public Kalshi URLs)
           if (m.eventTicker && HEX_SEGMENT_RE.test(m.eventTicker)) { rejHexEvent++; return false; }
           if (m.ticker && HEX_SEGMENT_RE.test(m.ticker)) { rejHexTicker++; return false; }
@@ -518,7 +532,7 @@ async function _fetchKalshiPageInner(queryParams: URLSearchParams): Promise<Kals
       if (markets.length < rawCount) {
         console.log(
           `[KALSHI] Quality filter: ${rawCount} raw → ${markets.length} kept` +
-          ` (short/empty:${rejShort} ticker-title:${rejTicker} hex-event:${rejHexEvent} hex-ticker:${rejHexTicker})`
+          ` (short/empty:${rejShort} ticker-title:${rejTicker} cross-category:${rejCrossCategory} hex-event:${rejHexEvent} hex-ticker:${rejHexTicker})`
         );
         // Log a sample of the first rejected market so drift is immediately diagnosable
         if (markets.length === 0 && data.markets.length > 0) {
@@ -1579,6 +1593,8 @@ export function buildKalshiMarketFromDbRow(row: {
   no_price?: number | null;
   volume?: number | null;
   close_time?: string | null;
+  event_ticker?: string | null;
+  series_ticker?: string | null;
 }): KalshiMarket {
   const yesCents = Math.round((row.yes_price ?? 0.5) * 100);
   const noCents  = Math.round((row.no_price  ?? 0.5) * 100);
@@ -1596,8 +1612,8 @@ export function buildKalshiMarketFromDbRow(row: {
     spread:       0,
     lastPrice:    yesCents,
     volume24h:    0,
-    eventTicker:  '',
-    seriesTicker: '',
+    eventTicker:  row.event_ticker  || '',
+    seriesTicker: row.series_ticker || '',
     priceChange:  0,
     volume:       row.volume ?? 0,
     openInterest: 0,

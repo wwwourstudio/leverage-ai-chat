@@ -147,6 +147,17 @@ export function DynamicCardRenderer({
   const isEstimated = safeCard.realData === false;
   const hasTrustOverlay = trustScore !== undefined;
 
+  // Data staleness: show "Updated X ago" when fetchedAt is in metadata
+  const fetchedAt: string | undefined = (safeCard.metadata as any)?.fetchedAt;
+  const dataAgeLabel = (() => {
+    if (!fetchedAt || isEstimated) return null;
+    const ageMs = Date.now() - new Date(fetchedAt).getTime();
+    const mins = Math.floor(ageMs / 60_000);
+    if (mins < 1) return null; // < 1 min: don't show (fresh enough)
+    if (mins < 60) return `${mins}m ago`;
+    return `${Math.floor(mins / 60)}h ago`;
+  })();
+
   // Per-card bookmark state (persisted to localStorage)
   const bookmarkKey = `bookmark:${safeCard.type}:${safeCard.title}`;
   const cardId = `${safeCard.type}:${safeCard.title}`;
@@ -190,6 +201,11 @@ export function DynamicCardRenderer({
         {isEstimated && (
           <span className="absolute top-2 right-10 z-10 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-[var(--bg-surface)] text-[var(--text-faint)] border border-[var(--border-subtle)] backdrop-blur-sm pointer-events-none">
             ESTIMATED
+          </span>
+        )}
+        {dataAgeLabel && !isEstimated && (
+          <span className="absolute bottom-2 right-2 z-10 px-1.5 py-0.5 rounded text-[8px] font-semibold tabular-nums bg-[var(--bg-overlay)]/80 text-[var(--text-faint)] border border-[var(--border-subtle)] backdrop-blur-sm pointer-events-none">
+            {dataAgeLabel}
           </span>
         )}
         {hasTrustOverlay && (

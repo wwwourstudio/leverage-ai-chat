@@ -1223,6 +1223,13 @@ async function _generateContextualCards(
   
   // 'all' category — mix betting + Kalshi cards so the default view shows card variety
   if (category === 'all') {
+    if (normalizedSport) {
+      // Sport-specific query → pure betting cards, no Kalshi contamination
+      console.log(`[v0] [CARDS-GEN] All-category with sport=${normalizedSport}: pure betting mode`);
+      const cards = await _generateContextualCards('betting', sport, count);
+      if (cards.length > 0) setCachedCards(cards, 'all', sport);
+      return cards;
+    }
     console.log('[v0] [CARDS-GEN] All-category mode: generating mixed betting + Kalshi cards');
     const bettingCount = Math.max(1, count - 1);
     const kalshiCount  = Math.max(1, count - bettingCount);

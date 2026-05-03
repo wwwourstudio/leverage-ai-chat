@@ -805,21 +805,24 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       const fetchKey = `${lastUserQuery}::${selectedCategory}`;
       if (fetchedForQueryRef.current === fetchKey) return;
 
+      // Hoist prop detection so the guard below can exempt prop queries
+      const msgLow = (lastUserQuery || '').toLowerCase();
+      const hasPropQuery = msgLow.includes('prop') || msgLow.includes('strikeout')
+                        || msgLow.includes('hits over') || msgLow.includes('home run over')
+                        || msgLow.includes('player bet');
+
       // Skip if the last AI message already has cards (AI-aligned, do not replace)
+      // Exception: prop queries need their own card fetch even when AI has moneyline cards
       const lastAIMessage = [...messages].reverse().find((m: any) => m.role === 'assistant');
-      if (lastAIMessage?.cards?.length) return;
+      if (lastAIMessage?.cards?.length && !hasPropQuery) return;
 
       fetchedForQueryRef.current = fetchKey;
 
       try {
-        const msgLow = (lastUserQuery || '').toLowerCase();
         const hasFantasyOrDFSQuery = /\b(adp|draft|waiver|sleeper|fantasy|dfs|best ball|lineup|vbd|tier|rank)\b/i.test(lastUserQuery || '');
         const hasDFSQuery = /\b(dfs|daily fantasy|showdown|gpp|gpps|tournament lineup)\b/i.test(lastUserQuery || '');
         // Sportsbook-name + betting-word → force betting category even if DraftKings/FanDuel detected
         const hasBettingPlatformQuery = /\b(draftkings|fanduel|betmgm|caesars|pointsbet|barstool)\b.*\b(odds|bet|line|ml|moneyline|spread|over.under|pick|prop)\b/i.test(lastUserQuery || '');
-        const hasPropQuery = msgLow.includes('prop') || msgLow.includes('strikeout')
-                          || msgLow.includes('hits over') || msgLow.includes('home run over')
-                          || msgLow.includes('player bet');
         const detectedCategory = hasPropQuery ? 'props'
           : (
           msgLow.includes('kalshi') ||
@@ -3647,7 +3650,8 @@ No preamble. Start directly with section 1.`;
           watchlistCount={savedPlayersCount + savedCardsCount}
           onOpenLogin={() => setShowLoginModal(true)}
           onOpenSignup={() => setShowSignupModal(true)}
-          currentSport={selectedSport || selectedCategory}
+          currentSport={selectedSport || undefined}
+          currentCategory={selectedCategory !== 'all' ? selectedCategory : undefined}
         />
 
         {/* Messages Container - Dynamic Data-Driven Interface */}

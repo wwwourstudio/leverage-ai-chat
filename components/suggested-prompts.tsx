@@ -173,12 +173,15 @@ export function SuggestedPrompts({
         </div>
       )}
 
-      {/* Clarification header — amber pulsing dot, shown when a sport choice is needed */}
+      {/* Clarification header — shown when a sport choice is needed */}
       {clarificationMode && (
         <div className="mb-3 px-1 flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-amber-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-            Choose a sport to continue:
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-300/90">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+            {lastUserQuery
+              ? <>I can help with that — which sport are you asking about?</>
+              : <>Which sport would you like to explore?</>
+            }
           </span>
         </div>
       )}

@@ -29,7 +29,9 @@ export async function POST(request: NextRequest) {
     );
     const benford = validateBenford(allNums);
 
-    // Attach Benford result to each card's metadata
+    const fetchedAt = new Date().toISOString();
+
+    // Attach Benford result + fetch timestamp to each card's metadata
     const validatedCards = cards.map((c: any) => ({
       ...c,
       metadata: {
@@ -37,6 +39,7 @@ export async function POST(request: NextRequest) {
         benfordValid: benford.isValid,
         benfordScore: Math.round(benford.score * 100) / 100,
         benfordConfidence: benford.confidence,
+        fetchedAt,
       },
     }));
 

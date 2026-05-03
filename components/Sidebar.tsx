@@ -432,17 +432,22 @@ export function Sidebar({
                         }}
                         title={cat.desc}
                         className={cn(
-                          'group/pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0',
+                          'group/pill flex flex-col items-start gap-0.5 px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0',
                           isActive
                             ? 'bg-[var(--bg-elevated)] text-foreground'
                             : 'text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
                         )}
                       >
-                        <Icon className={cn(
-                          'w-3 h-3 transition-colors',
-                          isActive ? cat.color : 'text-[var(--text-faint)] group-hover/pill:text-[var(--text-muted)]',
-                        )} />
-                        <span>{cat.id === 'all' ? 'ALL' : cat.name.toUpperCase()}</span>
+                        <div className="flex items-center gap-1.5">
+                          <Icon className={cn(
+                            'w-3 h-3 transition-colors',
+                            isActive ? cat.color : 'text-[var(--text-faint)] group-hover/pill:text-[var(--text-muted)]',
+                          )} />
+                          <span>{cat.id === 'all' ? 'ALL' : cat.name.toUpperCase()}</span>
+                        </div>
+                        {isActive && (
+                          <span className="text-[8px] font-semibold text-[var(--text-faint)] pl-4.5 leading-none">{cat.desc}</span>
+                        )}
                       </button>
                     );
                   })}

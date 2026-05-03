@@ -1285,30 +1285,23 @@ export const BettingCard = memo(function BettingCard({
       <div className={cn('relative px-3 pt-2.5 pb-2 md:px-4 md:pt-3.5 md:pb-3 bg-gradient-to-br', theme.headerGrad)}>
         {/* Status badges top-right */}
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
-          {/* In-game LIVE badge (pulsing) */}
-          {isLiveGame && (
+          {/* Game in progress — pulsing LIVE (marked LIVE or extreme in-game odds) */}
+          {(isLiveGame || isExtremeOdds) && !isFinal && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-[9px] font-black text-emerald-300 uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               LIVE
             </span>
           )}
-          {/* In-progress indicator when API returns extreme in-game odds */}
-          {isExtremeOdds && !isLiveGame && !isFinal && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-[9px] font-bold text-amber-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-              IN PROGRESS
-            </span>
-          )}
-          {/* Real API data indicator (non-in-game) */}
+          {/* Pre-game with live odds — static LIVE dot */}
           {data.realData && !isLiveGame && !isFinal && !isExtremeOdds && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-bold text-emerald-400/80">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              LIVE DATA
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/70" />
+              LIVE
             </span>
           )}
-          {/* Final badge */}
+          {/* Game finished */}
           {isFinal && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-[9px] font-black text-emerald-300 uppercase tracking-wider">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-500/20 border border-slate-500/30 text-[9px] font-black text-slate-300 uppercase tracking-wider">
               FINAL
             </span>
           )}

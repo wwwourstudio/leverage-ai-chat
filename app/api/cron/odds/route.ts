@@ -272,6 +272,18 @@ export async function GET(req: NextRequest) {
         if (snapshotsInserted > 0) {
           console.log(`[v0] [cron/odds] Inserted ${snapshotsInserted} odds snapshots, ${closingLinesWritten} closing lines`);
         }
+
+        // Retention cleanup — keep odds_snapshots to 48h window, closing_lines to 90d.
+        // Fire-and-forget: never blocks the cron response even if cleanup is slow.
+        void supabase.rpc('cleanup_odds_snapshots', { retention_hours: 48 })
+          .then(({ data, error }) => {
+            if (error) console.warn('[v0] [cron/odds] Snapshot cleanup error:', error.message);
+            else if ((data as number) > 0) console.log(`[v0] [cron/odds] Cleaned ${data} old snapshots`);
+          });
+        void supabase.rpc('cleanup_closing_lines', { retention_days: 90 })
+          .then(({ error }) => {
+            if (error) console.warn('[v0] [cron/odds] Closing lines cleanup error:', error.message);
+          });
       } catch (snapErr) {
         console.error('[v0] [cron/odds] Snapshot write exception:', snapErr);
       }

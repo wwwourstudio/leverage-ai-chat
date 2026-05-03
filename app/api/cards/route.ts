@@ -63,14 +63,22 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error('[API/cards] Error:', error);
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    const isTimeout = msg.toLowerCase().includes('timeout') || (error as any)?.name === 'AbortError';
+    const isRateLimit = msg.includes('429') || msg.toLowerCase().includes('rate limit');
+    const userMessage = isTimeout
+      ? 'Card generation timed out — try a more specific query'
+      : isRateLimit
+      ? 'API rate limit reached — try again in a minute'
+      : ERROR_MESSAGES.INTERNAL_ERROR;
     return NextResponse.json(
       {
         success: false,
         cards: [],
-        error: ERROR_MESSAGES.INTERNAL_ERROR,
-        details: error instanceof Error ? error.message : 'Unknown error',
+        error: userMessage,
+        details: msg,
       },
-      { status: HTTP_STATUS.INTERNAL_ERROR }
+      { status: isTimeout ? 504 : isRateLimit ? 429 : HTTP_STATUS.INTERNAL_ERROR }
     );
   }
 }

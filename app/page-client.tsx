@@ -360,6 +360,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [aiQuickActions, setAiQuickActions] = useState<Array<{ label: string; icon: any; category: string; query: string }> | null>(null);
   const [lastUserQuery, setLastUserQuery] = useState<string>('');
   const [selectedSport, setSelectedSport] = useState<string>('');
+  const [kalshiBettingBannerVisible, setKalshiBettingBannerVisible] = useState(false);
   const [_cardsRefreshedAt, setCardsRefreshedAt] = useState<Date | null>(null);
   const cardsRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fetchedForQueryRef = useRef<string | null>(null);
@@ -814,6 +815,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         const msgLow = (lastUserQuery || '').toLowerCase();
         const hasFantasyOrDFSQuery = /\b(adp|draft|waiver|sleeper|fantasy|dfs|best ball|lineup|vbd|tier|rank)\b/i.test(lastUserQuery || '');
         const hasDFSQuery = /\b(dfs|daily fantasy|showdown|gpp|gpps|tournament lineup)\b/i.test(lastUserQuery || '');
+        // Sportsbook-name + betting-word → force betting category even if DraftKings/FanDuel detected
+        const hasBettingPlatformQuery = /\b(draftkings|fanduel|betmgm|caesars|pointsbet|barstool)\b.*\b(odds|bet|line|ml|moneyline|spread|over.under|pick|prop)\b/i.test(lastUserQuery || '');
         const hasPropQuery = msgLow.includes('prop') || msgLow.includes('strikeout')
                           || msgLow.includes('hits over') || msgLow.includes('home run over')
                           || msgLow.includes('player bet');
@@ -825,6 +828,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           msgLow.includes('contract pricing') ||
           msgLow.includes('winner contract')
         ) ? 'kalshi'
+          : hasBettingPlatformQuery ? 'betting'
           : hasFantasyOrDFSQuery && selectedCategory !== 'betting' && selectedCategory !== 'props'
           ? (hasDFSQuery ? 'dfs' : 'fantasy')
           : selectedCategory === 'fantasy' && !hasFantasyOrDFSQuery
@@ -1568,6 +1572,13 @@ No preamble. Start directly with section 1.`;
       // - Otherwise → use message-based detection
       const finalIsPoliticalMarket = selectedCategory === 'kalshi' ||
         ((isPoliticalMarket || detectedPlatform === 'kalshi') && selectedCategory !== 'betting');
+
+      // Show banner when user is on Kalshi tab but their query looks like a sports bet
+      if (selectedCategory === 'kalshi' && hasBettingIntent && !isPoliticalMarket) {
+        setKalshiBettingBannerVisible(true);
+      } else {
+        setKalshiBettingBannerVisible(false);
+      }
 
       const context: any = {
         sport: effectiveSport,
@@ -2329,6 +2340,8 @@ No preamble. Start directly with section 1.`;
         console.log('[v0] - Category detected:', category);
         console.log('[v0] - API endpoint configured:', API_ENDPOINTS?.CARDS || 'undefined');
         console.log('[v0] - Context provided:', context);
+      } else if (dynamicCards.length > 0 && dynamicCards.every((c: any) => c.realData === false || c.data?.realData === false)) {
+        toast.info('Live data unavailable — showing AI estimates. Data will refresh shortly.');
       }
       
       // Convert DynamicCard to InsightCard format
@@ -3648,6 +3661,14 @@ No preamble. Start directly with section 1.`;
           <div className="max-w-5xl mx-auto space-y-6">
             {/* Database Status Banner */}
             <DatabaseStatusBanner />
+            {/* Kalshi sports-query banner */}
+            {kalshiBettingBannerVisible && (
+              <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-amber-500/8 border border-amber-500/25 text-amber-300 text-[11px] font-semibold">
+                <span className="shrink-0">⚠️</span>
+                <span>Showing Kalshi prediction markets. For live sportsbook odds, switch to the <strong>Betting</strong> tab.</span>
+                <button onClick={() => setKalshiBettingBannerVisible(false)} className="ml-auto text-amber-400/60 hover:text-amber-300 text-xs">✕</button>
+              </div>
+            )}
             {messages.length === 0 ? (
               <WelcomeScreen onPromptSelect={(q) => generateRealResponse(q)} />
             ) : (

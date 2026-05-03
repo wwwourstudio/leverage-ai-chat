@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getSupabaseUrl, getSupabaseServiceKey } from '@/lib/config';
+import { getSupabaseUrl, getSupabaseServiceKey, verifyCronSecret } from '@/lib/config';
 
 export const runtime = 'nodejs';
 export const maxDuration = 45;
@@ -25,18 +25,7 @@ function getServiceClient() {
 }
 
 export async function GET(req: NextRequest) {
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const querySecret = req.nextUrl.searchParams.get('secret');
-    const headerSecret =
-      req.headers.get('authorization')?.replace('Bearer ', '') ??
-      req.headers.get('x-cron-secret') ??
-      '';
-    if (querySecret !== cronSecret && headerSecret !== cronSecret) {
-      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
-    }
-  }
+  if (!verifyCronSecret(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
 
   const startedAt = Date.now();
   const today = new Date().toISOString().slice(0, 10);

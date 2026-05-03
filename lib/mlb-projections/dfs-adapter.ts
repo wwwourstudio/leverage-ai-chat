@@ -47,6 +47,7 @@ export interface DFSCardData {
     stackType?:      string;  // 'full'|'mini'
     stackPartners?:  string[];
     playerId?:       string;  // numeric player ID for lookups
+    gameDate?:       string;  // ISO datetime of the game (for today-filter)
   };
 }
 
@@ -195,6 +196,7 @@ function projectionToDFSCard(proj: MLBProjectionCardData, todaysGames: Awaited<R
       boomCeiling:  p90DK,
       bustFloor:    p10DK,
       targetGame,
+      gameDate:     matchingGame?.gameDate ?? undefined,
       tips:         tip,
       matchupScore: `${(proj.matchup_score * 100).toFixed(0)}/100`,
       parkFactor:   parkFactor.toFixed(2),

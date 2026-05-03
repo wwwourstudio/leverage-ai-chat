@@ -2306,6 +2306,8 @@ async function _generateContextualCards(
               totalProjPts: totalPts,
               totalSalary:  totalSal,
               gamesCount:   String(multi.metadata.gamesCount),
+              capValid:     multi.metadata.capValid,
+              playingTodayCount: multi.metadata.playingTodayCount,
             },
             metadata: { realData: true, source: 'LeverageMetrics' },
           });

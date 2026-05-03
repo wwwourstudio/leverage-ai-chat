@@ -52,6 +52,13 @@ export const DFSSlateCard = memo(function DFSSlateCard({
   const totalProjPts: string = data.totalProjPts ?? '—';
   const totalSalary:  string = data.totalSalary  ?? '—';
   const gamesCount:   string = data.gamesCount   ?? '—';
+  const capValid:     boolean = data.capValid !== false; // default true if not provided
+  const playingTodayCount: number = typeof data.playingTodayCount === 'number' ? data.playingTodayCount : slate.length;
+
+  // Parse total salary as a number for the cap bar
+  const totalSalaryNum = parseInt(String(totalSalary).replace(/[^0-9]/g, ''), 10) || 0;
+  const totalSalaryFull = totalSalaryNum < 1000 ? totalSalaryNum * 1000 : totalSalaryNum; // handle "$49k" → 49000
+  const capPct = Math.min(100, (totalSalaryFull / 50000) * 100);
 
   return (
     <article className={cn(
@@ -162,6 +169,48 @@ export const DFSSlateCard = memo(function DFSSlateCard({
           <div className="flex items-center gap-2 px-3 pt-2 pb-1 border-t border-[var(--border-subtle)]">
             <span className="flex-1 text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Player</span>
             <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)] text-right">Sal · Proj · Own · Val</span>
+          </div>
+        )}
+
+        {/* ── Cap status bar ──────────────────────────────────────────── */}
+        {slate.length > 0 && totalSalary !== '—' && (
+          <div className="mx-3 mb-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-overlay)] px-3 py-2.5 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                Salary Cap
+              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-black tabular-nums text-amber-400">
+                  {totalSalary} / $50k
+                </span>
+                <span className={cn(
+                  'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-wider',
+                  capValid
+                    ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
+                    : 'bg-red-500/10 border-red-500/25 text-red-400',
+                )}>
+                  {capValid ? '✓ CAP VALID' : '✗ OVER CAP'}
+                </span>
+              </div>
+            </div>
+            <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+              <div
+                className={cn('h-full rounded-full transition-all duration-700',
+                  capValid ? 'bg-gradient-to-r from-emerald-500 to-teal-400' : 'bg-gradient-to-r from-red-500 to-rose-400'
+                )}
+                style={{ width: `${capPct}%` }}
+              />
+            </div>
+            {playingTodayCount > 0 && playingTodayCount < slate.length && (
+              <div className="text-[9px] text-amber-400 font-bold">
+                {playingTodayCount}/{slate.length} players confirmed playing today
+              </div>
+            )}
+            {playingTodayCount === slate.length && slate.length > 0 && (
+              <div className="text-[9px] text-emerald-400 font-bold">
+                All {slate.length} players playing today ✓
+              </div>
+            )}
           </div>
         )}
 

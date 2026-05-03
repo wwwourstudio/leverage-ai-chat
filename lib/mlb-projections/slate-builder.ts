@@ -30,7 +30,7 @@ export interface DFSSlateMulti {
   chalkLineup:      DFSCardData[];
   topStack:         { team: string; players: string[]; type: 'full' | 'mini' } | null;
   slateForCard:     DFSCardData[];
-  metadata:         { date: string; gamesCount: number; totalProjPts: number; totalSalary: number };
+  metadata:         { date: string; gamesCount: number; totalProjPts: number; totalSalary: number; capValid: boolean; playingTodayCount: number };
 }
 
 /**
@@ -60,35 +60,40 @@ export async function buildDFSSlateMulti(opts: { limit?: number; date?: string }
     optimalLineup: [], valueLineup: [], matchupLineup: [],
     contrarianLineup: [], chalkLineup: [], topStack: null,
     slateForCard: [],
-    metadata: { date: opts.date ?? new Date().toISOString().slice(0, 10), gamesCount: games.length, totalProjPts: 0, totalSalary: 0 },
+    metadata: { date: opts.date ?? new Date().toISOString().slice(0, 10), gamesCount: games.length, totalProjPts: 0, totalSalary: 0, capValid: true, playingTodayCount: 0 },
   };
 
   if (allCards.length === 0) return empty;
 
-  // ── Optimal lineup (position-balanced, max projected pts) ────────────────
-  const optimalLineup = buildOptimalLineup(allCards, limit);
+  // ── Filter to players with games today ────────────────────────────────────
+  const todayCards = allCards.filter(c => isToday(c.data.gameDate));
+  // Fall back to all cards if the today-filter removes everyone (e.g. no gameDate data)
+  const poolCards = todayCards.length >= limit ? todayCards : allCards;
+
+  // ── Optimal lineup (position-balanced, max projected pts, cap-enforced) ──
+  const optimalLineup = buildOptimalLineup(poolCards, limit);
 
   // ── Value lineup (top 5 by pts/$K) ────────────────────────────────────────
-  const valueLineup = [...allCards]
+  const valueLineup = [...poolCards]
     .sort((a, b) => parseFloat(b.data.dkValue) - parseFloat(a.data.dkValue))
     .slice(0, 5)
     .map(c => ({ ...c, data: { ...c.data, cardCategory: 'value' } }));
 
   // ── Matchup lineup (top 5 by matchup score) ───────────────────────────────
-  const matchupLineup = [...allCards]
+  const matchupLineup = [...poolCards]
     .sort((a, b) => parseFloat(b.data.matchupScore) - parseFloat(a.data.matchupScore))
     .slice(0, 5)
     .map(c => ({ ...c, data: { ...c.data, cardCategory: 'matchup' } }));
 
   // ── Contrarian lineup (low ownership, decent projection) ──────────────────
-  const contrarianLineup = allCards
+  const contrarianLineup = poolCards
     .filter(c => parseFloat(c.data.ownership) < 15 && parseFloat(c.data.projection) > 5)
     .sort((a, b) => parseFloat(b.data.projection) - parseFloat(a.data.projection))
     .slice(0, 5)
     .map(c => ({ ...c, data: { ...c.data, cardCategory: 'contrarian' } }));
 
   // ── Chalk lineup (high ownership) ─────────────────────────────────────────
-  const chalkLineup = allCards
+  const chalkLineup = poolCards
     .filter(c => parseFloat(c.data.ownership) > 25)
     .sort((a, b) => parseFloat(b.data.projection) - parseFloat(a.data.projection))
     .slice(0, 5)
@@ -125,7 +130,9 @@ export async function buildDFSSlateMulti(opts: { limit?: number; date?: string }
 
   // ── Metadata ──────────────────────────────────────────────────────────────
   const totalProjPts = optimalLineup.reduce((s, c) => s + parseFloat(c.data.projection), 0);
-  const totalSalary  = optimalLineup.reduce((s, c) => s + parseFloat(String(c.data.salary).replace(/[^0-9]/g, '')), 0);
+  const totalSalary  = optimalLineup.reduce((s, c) => s + parseSalary(c.data.salary), 0);
+  const capValid     = totalSalary <= 50000;
+  const playingTodayCount = optimalLineup.filter(c => isToday(c.data.gameDate)).length;
 
   return {
     optimalLineup,
@@ -140,11 +147,29 @@ export async function buildDFSSlateMulti(opts: { limit?: number; date?: string }
       gamesCount: games.length,
       totalProjPts: Math.round(totalProjPts * 10) / 10,
       totalSalary,
+      capValid,
+      playingTodayCount,
     },
   };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const DK_CAP = 50_000;
+const MIN_SALARY_PER_SLOT = 2_500;
+
+function parseSalary(s: string | number | undefined): number {
+  return parseInt(String(s ?? '').replace(/[^0-9]/g, ''), 10) || 0;
+}
+
+function isToday(dateStr?: string): boolean {
+  if (!dateStr) return true; // don't filter if unknown
+  const d = new Date(dateStr);
+  const now = new Date();
+  return d.getUTCFullYear() === now.getUTCFullYear()
+    && d.getUTCMonth() === now.getUTCMonth()
+    && d.getUTCDate() === now.getUTCDate();
+}
 
 function buildOptimalLineup(cards: DFSCardData[], limit: number): DFSCardData[] {
   const byPosition: Record<string, DFSCardData[]> = {};
@@ -154,26 +179,41 @@ function buildOptimalLineup(cards: DFSCardData[], limit: number): DFSCardData[] 
     byPosition[pos].push(card);
   }
 
-  // DK MLB lineup: SP, C, 1B, 2B, 3B, SS, OF, OF, OF (+ optional UTIL)
-  const lineup: DFSCardData[] = [];
+  // DK MLB lineup: SP, C, 1B, 2B, 3B, SS, OF, OF, OF
   const positionPriority = ['SP', 'C', '1B', '2B', '3B', 'SS', 'OF', 'OF', 'OF'];
+  const lineup: DFSCardData[] = [];
+  let remainingBudget = DK_CAP;
 
-  for (const pos of positionPriority) {
+  for (let i = 0; i < positionPriority.length; i++) {
     if (lineup.length >= limit) break;
+    const pos = positionPriority[i];
+    const slotsRemaining = positionPriority.length - i - 1;
+    // Reserve enough budget for remaining slots at minimum salary
+    const budgetForThisSlot = remainingBudget - (slotsRemaining * MIN_SALARY_PER_SLOT);
+
     const available = (byPosition[pos] ?? byPosition['UTIL'] ?? [])
       .filter(c => !lineup.includes(c));
-    if (available.length > 0) {
-      available.sort((a, b) => parseFloat(b.data.projection) - parseFloat(a.data.projection));
-      lineup.push(available[0]);
-    }
+
+    if (available.length === 0) continue;
+
+    // Sort by projection descending; pick highest that fits within budget
+    available.sort((a, b) => parseFloat(b.data.projection) - parseFloat(a.data.projection));
+    const pick = available.find(c => parseSalary(c.data.salary) <= budgetForThisSlot)
+      ?? available.sort((a, b) => parseSalary(a.data.salary) - parseSalary(b.data.salary))[0]; // fallback: cheapest
+
+    lineup.push(pick);
+    remainingBudget -= parseSalary(pick.data.salary);
   }
 
-  // Fill remaining slots with highest-projected players
+  // Fill any remaining slots (e.g. if position pool was short)
   const remaining = cards.filter(c => !lineup.includes(c))
     .sort((a, b) => parseFloat(b.data.projection) - parseFloat(a.data.projection));
   for (const card of remaining) {
     if (lineup.length >= limit) break;
-    lineup.push(card);
+    if (parseSalary(card.data.salary) <= remainingBudget) {
+      lineup.push(card);
+      remainingBudget -= parseSalary(card.data.salary);
+    }
   }
 
   return lineup.slice(0, limit);

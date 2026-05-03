@@ -244,7 +244,7 @@ export const DFSCard = memo(function DFSCard({
             )}
 
             <div className="grid grid-cols-3 gap-1.5">
-              {salary && (
+              {salary && salary !== '—' && salary !== '' && salary !== '$0' && (
                 <div className="flex flex-col items-center gap-0.5 rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-1.5 py-2">
                   <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Salary</span>
                   <span className="text-sm font-black text-foreground tabular-nums">{String(salary)}</span>

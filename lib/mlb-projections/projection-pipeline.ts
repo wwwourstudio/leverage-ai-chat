@@ -259,6 +259,14 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
       `hitters=${diag.hittersTotal} (skipped-no-statcast=${diag.hittersSkippedNoStatcast}) ` +
       `games-without-lineups=${diag.gamesWithoutLineups}`,
     );
+
+    // Games are scheduled but lineups haven't been posted yet (pre-dawn / early morning).
+    // Fall back to Statcast-only projections so DFS cards show real player data instead
+    // of empty game-stack cards from the odds API fallback.
+    if (diag.gamesWithoutLineups === games.length) {
+      console.warn('[MLBProj] All games lack lineups — using Statcast-only fallback for DFS cards');
+      return buildNoGamesCards({ allHitters, allPitchers, playerType, playerName, limit });
+    }
   }
 
   // Sort: hot first, then by HR projection descending

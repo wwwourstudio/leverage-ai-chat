@@ -181,7 +181,7 @@ export async function GET(req: NextRequest) {
                   name:          playerName,
                   homeTeam:      event.home_team,
                   awayTeam:      event.away_team,
-                  team:          undefined,
+                  team:          '',
                   market:        mkt.key,
                   line,
                   overOdds:      over.price,

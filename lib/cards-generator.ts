@@ -2321,9 +2321,13 @@ async function _generateContextualCards(
         } else {
           // ADP fallback: projection engine returned no slate — build lineup from nfbc_adp
           try {
-            const { createClient } = await import('@/lib/supabase/server');
+            const { createClient: supaCreate } = await import('@supabase/supabase-js');
             const { buildGreedyLineup } = await import('@/lib/dfs-lineup-builder');
-            const supa = await createClient();
+            const supa = supaCreate(
+              process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
+              process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+              { db: { schema: 'api' } },
+            );
             const { data: adpRows } = await supa
               .from('nfbc_adp')
               .select('id,player_name,display_name,team,positions,rank,value_delta,is_value_pick')
@@ -2847,9 +2851,13 @@ async function _generateContextualCards(
           } else {
             // ADP fallback: no live prop markets yet — build lineup from nfbc_adp
             try {
-              const { createClient } = await import('@/lib/supabase/server');
+              const { createClient: supaCreate } = await import('@supabase/supabase-js');
               const { buildGreedyLineup } = await import('@/lib/dfs-lineup-builder');
-              const supa = await createClient();
+              const supa = supaCreate(
+                process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
+                process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+                { db: { schema: 'api' } },
+              );
               const sportPattern = normalizedSport === 'basketball_nba' ? '%nba%'
                 : normalizedSport === 'americanfootball_nfl' ? '%nfl%'
                 : normalizedSport === 'icehockey_nhl' ? '%nhl%' : '%';

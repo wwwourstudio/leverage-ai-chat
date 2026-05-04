@@ -240,7 +240,7 @@ function SplitBar({ leftPct, leftLabel, rightLabel, leftColor, rightColor }: {
         <div className={cn('h-full transition-all duration-700', leftColor)} style={{ width: `${leftPct}%` }} />
         <div className={cn('h-full flex-1', rightColor)} />
       </div>
-      <div className="flex justify-between text-[9px] font-semibold text-[var(--text-faint)]">
+      <div className="flex justify-between text-[10px] font-semibold text-[var(--text-faint)]">
         <span>{leftLabel} {leftPct}%</span>
         <span>{100 - leftPct}% {rightLabel}</span>
       </div>
@@ -267,13 +267,13 @@ function OddsCell({ label, value, sub, positive, highlight, isBest }: {
         ? 'bg-blue-500/10 border-blue-500/20'
         : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)]',
     )}>
-      <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{label}</span>
+      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{label}</span>
       <span className={cn('text-lg font-black tabular-nums',
         positive === true ? 'text-emerald-400' :
         positive === false ? 'text-red-400' :
         'text-foreground'
       )}>{value}</span>
-      {sub && <span className="text-[9px] text-[var(--text-muted)]">{sub}</span>}
+      {sub && <span className="text-[10px] text-[var(--text-muted)]">{sub}</span>}
       {isBest && <span className="text-[7px] font-black text-emerald-500 uppercase tracking-wider">BEST</span>}
     </div>
   );
@@ -318,8 +318,8 @@ function BookComparisonRow({
       {/* Header */}
       <div className="flex items-center gap-1.5 px-3 pt-2 pb-1.5">
         <BookOpen className="w-3 h-3 text-[var(--text-muted)]" />
-        <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)]">Odds Comparison</span>
-        <span className="ml-auto text-[8px] text-[var(--text-faint)]">ML</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Odds Comparison</span>
+        <span className="ml-auto text-[10px] text-[var(--text-faint)]">ML</span>
       </div>
 
       {/* Column headers */}
@@ -331,7 +331,7 @@ function BookComparisonRow({
         {books.map((b) => (
           <span
             key={b.name}
-            className="text-[9px] font-bold text-[var(--text-muted)] text-center truncate"
+            className="text-[10px] font-bold text-[var(--text-muted)] text-center truncate"
           >
             {shortName(b.name)}
           </span>
@@ -362,7 +362,7 @@ function BookComparisonRow({
                 )}
               >
                 {b.awayOdds ?? '—'}
-                {isBest && <span className="text-[8px] ml-0.5 text-emerald-500">★</span>}
+                {isBest && <span className="text-[10px] ml-0.5 text-emerald-500">★</span>}
               </span>
             );
           })}
@@ -393,7 +393,7 @@ function BookComparisonRow({
                 )}
               >
                 {b.homeOdds ?? '—'}
-                {isBest && <span className="text-[8px] ml-0.5 text-emerald-500">★</span>}
+                {isBest && <span className="text-[10px] ml-0.5 text-emerald-500">★</span>}
               </span>
             );
           })}
@@ -419,7 +419,7 @@ function TabBar({ activeTab, onSelect, accentCls }: {
             key={tab}
             onClick={() => onSelect(i)}
             className={cn(
-              'px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 border transition-all duration-150',
+              'px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 border transition-all duration-150',
               activeTab === i
                 ? accentCls
                 : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-muted)]',
@@ -486,7 +486,7 @@ function TabOdds({
                 key={v}
                 onClick={() => setMarketView(v)}
                 className={cn(
-                  'px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border transition-all duration-150',
+                  'px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border transition-all duration-150',
                   marketView === v
                     ? accentCls
                     : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-muted)]',
@@ -574,12 +574,12 @@ function TabOdds({
         <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] p-3 space-y-2.5">
           <div className="flex items-center gap-1.5">
             <Zap className="w-3 h-3 text-amber-400" />
-            <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)]">Market Intelligence</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Market Intelligence</span>
           </div>
 
           {confPct !== null && (
             <div className="space-y-1">
-              <div className="flex justify-between text-[9px] font-semibold text-[var(--text-muted)]">
+              <div className="flex justify-between text-[10px] font-semibold text-[var(--text-muted)]">
                 <span>Model Confidence</span>
                 <span className={cn(
                   confPct >= 70 ? 'text-emerald-400' : confPct >= 50 ? 'text-blue-400' : 'text-amber-400'
@@ -598,7 +598,7 @@ function TabOdds({
 
           {sharpPct !== null && (
             <div className="space-y-1">
-              <div className="flex justify-between text-[9px] font-semibold text-[var(--text-muted)]">
+              <div className="flex justify-between text-[10px] font-semibold text-[var(--text-muted)]">
                 <span>Sharp Money</span>
                 <span className={cn(sharpPct >= 60 ? 'text-purple-400' : 'text-[var(--text-faint)]')}>{Math.round(sharpPct)}%</span>
               </div>
@@ -613,7 +613,7 @@ function TabOdds({
 
           {hasLineMove && (
             <div className="flex items-center justify-between">
-              <span className="text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Line Movement</span>
+              <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Line Movement</span>
               <span className={cn(
                 'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border',
                 moveDir === 'up' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
@@ -630,13 +630,13 @@ function TabOdds({
             <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/8 border border-amber-500/20">
               <Zap className="w-3 h-3 text-amber-400 shrink-0" />
               <span className="text-[10px] font-bold text-amber-300">Reverse Line Movement</span>
-              <span className="text-[9px] text-amber-400/70 ml-0.5">— sharp action against public</span>
+              <span className="text-[10px] text-amber-400/70 ml-0.5">— sharp action against public</span>
             </div>
           )}
 
           {vigPct !== null && vigPct > 0 && (
             <div className="flex items-center justify-between">
-              <span className="text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Book Vig</span>
+              <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Book Vig</span>
               <span className={cn(
                 'text-[10px] font-bold',
                 vigPct > 5 ? 'text-red-400' : vigPct > 3 ? 'text-amber-400' : 'text-emerald-400',
@@ -719,12 +719,12 @@ function TabProps({ data, onAnalyze, onAsk, loading = false }: { data: BettingCa
           >
             <div className="flex-1 min-w-0">
               <p className="text-[11px] font-black text-foreground truncate">{p.player}</p>
-              <p className="text-[9px] text-[var(--text-muted)] truncate">{p.team} · {p.stat}</p>
+              <p className="text-[10px] text-[var(--text-muted)] truncate">{p.team} · {p.stat}</p>
             </div>
             <span className="text-[11px] font-bold text-[var(--text-faint)] tabular-nums shrink-0">{p.line}</span>
             {p.odds && (
               <span className={cn(
-                'px-2 py-0.5 rounded-full text-[9px] font-black border shrink-0',
+                'px-2 py-0.5 rounded-full text-[10px] font-black border shrink-0',
                 !isNaN(oddsNum) && oddsNum > 0
                   ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25'
                   : 'bg-red-500/10 text-red-300 border-red-500/25',
@@ -807,7 +807,7 @@ function TabTeams({ data, teams, theme, onAnalyze, onAsk, loading = false }: {
   return (
     <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] overflow-hidden">
       <div className="grid grid-cols-3 px-3 py-2 border-b border-[var(--border-subtle)]">
-        <span className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Stat</span>
+        <span className="text-[10px] font-black uppercase tracking-wider text-[var(--text-muted)]">Stat</span>
         {teams ? (
           <button
             onClick={onAsk ? () => onAsk(`Show me detailed team stats and analysis for the ${teams.away}`) : undefined}
@@ -838,13 +838,13 @@ function TabTeams({ data, teams, theme, onAnalyze, onAsk, loading = false }: {
             onAsk && teams && 'cursor-pointer hover:bg-[var(--bg-elevated)]',
           )}
         >
-          <span className="text-[9px] text-[var(--text-muted)] self-center">{label}</span>
+          <span className="text-[10px] text-[var(--text-muted)] self-center">{label}</span>
           <span className="text-[10px] font-bold text-foreground text-center self-center">{away ?? '—'}</span>
           <span className="text-[10px] font-bold text-foreground text-center self-center">{home ?? '—'}</span>
         </div>
       ))}
       {!tc && (
-        <p className="text-[9px] text-[var(--text-faint)] px-3 py-2">Full statistical comparison not available</p>
+        <p className="text-[10px] text-[var(--text-faint)] px-3 py-2">Full statistical comparison not available</p>
       )}
     </div>
   );
@@ -862,12 +862,12 @@ function TabHistory({ data, onAnalyze, onAsk, loading = false }: { data: Betting
       {(data.atsRecord || data.h2hRecord) && (
         <div className="flex gap-2 flex-wrap">
           {data.atsRecord && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[9px] font-black text-[var(--text-muted)]">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-black text-[var(--text-muted)]">
               ATS <span className="text-foreground">{data.atsRecord}</span>
             </span>
           )}
           {data.h2hRecord && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[9px] font-black text-[var(--text-muted)]">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-black text-[var(--text-muted)]">
               H2H <span className="text-foreground">{data.h2hRecord}</span>
             </span>
           )}
@@ -888,11 +888,11 @@ function TabHistory({ data, onAnalyze, onAsk, loading = false }: { data: Betting
                   handleClick && 'cursor-pointer hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] active:scale-[0.99]',
                 )}
               >
-                <span className="text-[9px] text-[var(--text-muted)]">{h.date}</span>
+                <span className="text-[10px] text-[var(--text-muted)]">{h.date}</span>
                 <span className="text-[10px] font-bold text-foreground tabular-nums">{h.score ?? h.result}</span>
                 {h.betResult != null ? (
                   <span className={cn(
-                    'px-2 py-0.5 rounded-full text-[8px] font-black border',
+                    'px-2 py-0.5 rounded-full text-[10px] font-black border',
                     h.betResult === 'hit'
                       ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                       : 'bg-red-500/15 text-red-300 border-red-500/30',
@@ -901,7 +901,7 @@ function TabHistory({ data, onAnalyze, onAsk, loading = false }: { data: Betting
                   </span>
                 ) : h.winner != null ? (
                   <span className={cn(
-                    'px-2 py-0.5 rounded-full text-[8px] font-black border uppercase',
+                    'px-2 py-0.5 rounded-full text-[10px] font-black border uppercase',
                     h.won === true
                       ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                       : h.won === false
@@ -978,10 +978,10 @@ function InjuryRow({ inj, statusCls, onAsk }: { inj: any; statusCls: (s: string)
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-black text-foreground truncate">{inj.player}</p>
-          <p className="text-[9px] text-[var(--text-muted)]">{inj.team}</p>
+          <p className="text-[10px] text-[var(--text-muted)]">{inj.team}</p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className={cn('px-2 py-0.5 rounded-full text-[8px] font-black border', statusCls(inj.status))}>
+          <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-black border', statusCls(inj.status))}>
             {inj.status?.toUpperCase()}
           </span>
           <button
@@ -1000,7 +1000,7 @@ function InjuryRow({ inj, statusCls, onAsk }: { inj: any; statusCls: (s: string)
         </div>
       </div>
       {inj.impact && (
-        <p className="text-[9px] text-[var(--text-muted)] mt-1.5 leading-relaxed">{inj.impact}</p>
+        <p className="text-[10px] text-[var(--text-muted)] mt-1.5 leading-relaxed">{inj.impact}</p>
       )}
     </div>
   );
@@ -1099,7 +1099,7 @@ function WatchPlayerRow({ p, sport, onAsk }: { p: any; sport?: string; onAsk?: (
       <PlayerAvatar playerName={p.player} photoUrl={p.photoUrl} sport={sport} size="md" />
       <div className="min-w-0 flex-1">
         <p className="text-[11px] font-black text-foreground truncate">{p.player}</p>
-        <p className="text-[9px] text-[var(--text-muted)] mb-1">{p.team}</p>
+        <p className="text-[10px] text-[var(--text-muted)] mb-1">{p.team}</p>
         <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">{p.reason}</p>
       </div>
       <button
@@ -1287,21 +1287,21 @@ export const BettingCard = memo(function BettingCard({
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
           {/* Game in progress — pulsing LIVE (marked LIVE or extreme in-game odds) */}
           {(isLiveGame || isExtremeOdds) && !isFinal && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-[9px] font-black text-emerald-300 uppercase tracking-wider">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-[10px] font-black text-emerald-300 uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               LIVE
             </span>
           )}
           {/* Pre-game with live odds — static LIVE dot */}
           {data.realData && !isLiveGame && !isFinal && !isExtremeOdds && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-bold text-emerald-400/80">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-400/80">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/70" />
               LIVE
             </span>
           )}
           {/* Game finished */}
           {isFinal && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-500/20 border border-slate-500/30 text-[9px] font-black text-slate-300 uppercase tracking-wider">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-500/20 border border-slate-500/30 text-[10px] font-black text-slate-300 uppercase tracking-wider">
               FINAL
             </span>
           )}
@@ -1309,9 +1309,9 @@ export const BettingCard = memo(function BettingCard({
 
         {/* Category breadcrumb */}
         <div className="flex items-center gap-1.5 mb-1.5">
-          <span className="text-[9px] font-black uppercase tracking-widest text-white/70">{category}</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-white/70">{category}</span>
           <span className="text-white/30">·</span>
-          <span className="text-[9px] text-white/50 truncate">{subcategory}</span>
+          <span className="text-[10px] text-white/50 truncate">{subcategory}</span>
         </div>
 
         {/* Bottom row: game time + edge badge + line move pill */}
@@ -1330,14 +1330,14 @@ export const BettingCard = memo(function BettingCard({
               ? 'bg-amber-500/20 border-amber-500/35 text-amber-300'
               : 'bg-white/10 border-white/20 text-white/70';
             return (
-              <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider', edgeCls)}>
+              <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider', edgeCls)}>
                 EDGE {data.edge}
               </span>
             );
           })()}
           {hasLineMove && (
             <span className={cn(
-              'inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full border text-[9px] font-bold',
+              'inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full border text-[10px] font-bold',
               moveDir === 'up'   ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
               : moveDir === 'down' ? 'bg-red-500/15 border-red-500/30 text-red-300'
               : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-muted)]',
@@ -1372,13 +1372,13 @@ export const BettingCard = memo(function BettingCard({
           <div className={cn('grid gap-1.5', [data.line != null, data.hitRate != null, confPct !== null].filter(Boolean).length === 3 ? 'grid-cols-3' : [data.line != null, data.hitRate != null, confPct !== null].filter(Boolean).length === 2 ? 'grid-cols-2' : 'grid-cols-1')}>
             {data.line != null && (
               <div className="flex flex-col items-center rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2">
-                <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Line</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Line</span>
                 <span className="text-base font-black text-foreground tabular-nums">{data.line}</span>
               </div>
             )}
             {data.hitRate != null && (
               <div className="flex flex-col items-center rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2">
-                <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Hit Rate</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Hit Rate</span>
                 <span className={cn('text-base font-black tabular-nums',
                   Number(data.hitRate) >= 65 ? 'text-emerald-400' : Number(data.hitRate) <= 35 ? 'text-red-400' : 'text-foreground'
                 )}>{data.hitRate}%</span>
@@ -1386,7 +1386,7 @@ export const BettingCard = memo(function BettingCard({
             )}
             {confPct !== null && (
               <div className="flex flex-col items-center rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2">
-                <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Confidence</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Confidence</span>
                 <span className={cn('text-base font-black tabular-nums',
                   confPct >= 70 ? 'text-emerald-400' : confPct >= 50 ? 'text-amber-400' : 'text-red-400'
                 )}>{confPct}%</span>
@@ -1411,7 +1411,7 @@ export const BettingCard = memo(function BettingCard({
                     isBestAway && 'ring-1 ring-emerald-400/40 rounded-md px-1 bg-emerald-500/8',
                   )}>
                     {awayML.display}
-                    {isBestAway && <span className="text-[8px] ml-0.5 text-emerald-500 font-black">★</span>}
+                    {isBestAway && <span className="text-[10px] ml-0.5 text-emerald-500 font-black">★</span>}
                   </span>
                 )}
                 {awayProb !== null && (
@@ -1432,7 +1432,7 @@ export const BettingCard = memo(function BettingCard({
                   <span className={cn('text-xs font-black uppercase tracking-wider opacity-60', theme.accentColor)}>VS</span>
                 )}
                 {!isFinal && data.gameTime && (
-                  <span className="text-[9px] text-[var(--text-faint)]">{data.gameTime}</span>
+                  <span className="text-[10px] text-[var(--text-faint)]">{data.gameTime}</span>
                 )}
               </div>
 
@@ -1448,7 +1448,7 @@ export const BettingCard = memo(function BettingCard({
                     isBestHome && 'ring-1 ring-emerald-400/40 rounded-md px-1 bg-emerald-500/8',
                   )}>
                     {homeML.display}
-                    {isBestHome && <span className="text-[8px] ml-0.5 text-emerald-500 font-black">★</span>}
+                    {isBestHome && <span className="text-[10px] ml-0.5 text-emerald-500 font-black">★</span>}
                   </span>
                 )}
                 {homeProb !== null && (

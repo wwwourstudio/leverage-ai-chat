@@ -3685,7 +3685,7 @@ No preamble. Start directly with section 1.`;
             WebkitOverflowScrolling: 'touch'
           }}
         >
-          <div className="max-w-5xl mx-auto space-y-6">
+          <div className="max-w-5xl xl:max-w-6xl mx-auto space-y-6">
             {/* Database Status Banner */}
             <DatabaseStatusBanner />
             {/* Kalshi sports-query banner */}
@@ -3877,79 +3877,59 @@ No preamble. Start directly with section 1.`;
                         )}
                       </div>
 
-                      {/* Collapsible Source Credibility */}
-                      {message.sources && message.sources.length > 0 && (
-                        <details className="mt-2 group/sources">
-                          <summary className="cursor-pointer list-none flex items-center gap-1.5 text-[11px] text-[var(--text-faint)] hover:text-[var(--text-faint)] transition-colors">
-                            <Shield className="w-3.5 h-3.5 text-blue-500/60 shrink-0" />
-                            <span className="font-semibold uppercase tracking-wide">Source Credibility</span>
-                            <span className="text-[var(--text-faint)]">({message.sources.length} sources)</span>
-                            <ChevronRight className="w-3 h-3 group-open/sources:rotate-90 transition-transform shrink-0" />
-                          </summary>
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            {message.sources.map((source: any, idx: any) => {
-                              const reliabilityColor = source.reliability >= 95 ? 'text-blue-500 border-blue-600/20' :
-                                                      source.reliability >= 90 ? 'text-blue-500 border-blue-600/20' :
-                                                      'text-yellow-500 border-yellow-600/20';
-                              const Icon = source.type === 'database' ? Database :
-                                          source.type === 'api' ? Activity :
-                                          source.type === 'model' ? Sparkles :
-                                          RefreshCw;
-                              return (
-                                <div
-                                  key={source.name ?? `src-${idx}`}
-                                  className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border bg-[var(--bg-overlay)] ${reliabilityColor} text-[11px]`}
-                                  title={`${source.name} - ${source.reliability}% reliability`}
-                                >
-                                  <Icon className="w-3 h-3" />
-                                  <span className="font-semibold">{source.name}</span>
-                                  <span className="font-bold tabular-nums">{source.reliability}%</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </details>
-                      )}
-
-                      {/* Collapsible AI Trust & Integrity */}
-                      {message.trustMetrics && (
+                      {/* Single collapsible: Sources & Trust combined */}
+                      {(message.sources?.length || message.trustMetrics) && (
                         <details className="mt-2 group/trust">
                           <summary className="cursor-pointer list-none flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors">
                             <Shield className={`w-3.5 h-3.5 shrink-0 ${
-                              message.trustMetrics.trustLevel === 'high' ? 'text-blue-500/70' :
-                              message.trustMetrics.trustLevel === 'medium' ? 'text-yellow-500/70' :
-                              'text-red-500/70'
+                              message.trustMetrics?.trustLevel === 'high' ? 'text-blue-500/70' :
+                              message.trustMetrics?.trustLevel === 'medium' ? 'text-yellow-500/70' :
+                              'text-blue-500/60'
                             }`} />
-                            <span className="font-semibold uppercase tracking-wide">AI Trust & Integrity</span>
-                            {/* Confidence badge */}
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              message.trustMetrics.trustLevel === 'high' ? 'bg-blue-600/20 text-blue-400' :
-                              message.trustMetrics.trustLevel === 'medium' ? 'bg-yellow-600/20 text-yellow-400' :
-                              'bg-red-600/20 text-red-400'
-                            }`}>
-                              {message.trustMetrics.finalConfidence}%
-                            </span>
-                            {/* Live odds badge */}
-                            {(message.trustMetrics as any).hasLiveOdds && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/10 text-blue-500/80">
-                                LIVE
+                            <span className="font-semibold uppercase tracking-wide">Sources & Trust</span>
+                            {message.trustMetrics && (
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                message.trustMetrics.trustLevel === 'high' ? 'bg-blue-600/20 text-blue-400' :
+                                message.trustMetrics.trustLevel === 'medium' ? 'bg-yellow-600/20 text-yellow-400' :
+                                'bg-red-600/20 text-red-400'
+                              }`}>
+                                {message.trustMetrics.finalConfidence}%
                               </span>
                             )}
-                            {/* Model badge */}
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-500/10 text-purple-400/80">
-                              {message.modelUsed || 'Grok 4'}
-                            </span>
+                            {message.sources?.length ? (
+                              <span className="text-[var(--text-faint)]">· {message.sources.length} sources</span>
+                            ) : null}
+                            {(message.trustMetrics as any)?.hasLiveOdds && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/10 text-blue-500/80">LIVE</span>
+                            )}
                             <ChevronRight className="w-3 h-3 group-open/trust:rotate-90 transition-transform shrink-0" />
                           </summary>
-                          <div className="mt-2">
-                            <TrustMetricsDisplay
-                              metrics={{
-                                ...message.trustMetrics,
-                                sources: (message.trustMetrics as any).sources || message.sources,
-                                modelUsed: (message.trustMetrics as any).modelUsed || message.modelUsed || 'Grok 4',
-                                processingTime: (message.trustMetrics as any).processingTime || message.processingTime,
-                              }}
-                            />
+                          <div className="mt-2 space-y-2">
+                            {message.sources && message.sources.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {message.sources.map((source: any, idx: any) => {
+                                  const reliabilityColor = source.reliability >= 90 ? 'text-blue-500 border-blue-600/20' : 'text-yellow-500 border-yellow-600/20';
+                                  const Icon = source.type === 'database' ? Database : source.type === 'api' ? Activity : source.type === 'model' ? Sparkles : RefreshCw;
+                                  return (
+                                    <div key={source.name ?? `src-${idx}`} className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border bg-[var(--bg-overlay)] ${reliabilityColor} text-[11px]`} title={`${source.name} - ${source.reliability}% reliability`}>
+                                      <Icon className="w-3 h-3" />
+                                      <span className="font-semibold">{source.name}</span>
+                                      <span className="font-bold tabular-nums">{source.reliability}%</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            {message.trustMetrics && (
+                              <TrustMetricsDisplay
+                                metrics={{
+                                  ...message.trustMetrics,
+                                  sources: (message.trustMetrics as any).sources || message.sources,
+                                  modelUsed: (message.trustMetrics as any).modelUsed || message.modelUsed || 'Grok 4',
+                                  processingTime: (message.trustMetrics as any).processingTime || message.processingTime,
+                                }}
+                              />
+                            )}
                           </div>
                         </details>
                       )}
@@ -4087,7 +4067,7 @@ No preamble. Start directly with section 1.`;
           
           {/* Rate Limit Notification */}
           {showLimitNotification && (
-            <div className="relative max-w-5xl mx-auto mb-4">
+            <div className="relative max-w-5xl xl:max-w-6xl mx-auto mb-4">
               <div className="bg-gradient-to-r from-orange-500/10 via-red-500/10 to-orange-500/10 border border-orange-500/30 rounded-2xl p-4 backdrop-blur-sm shadow-xl">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3 flex-1">
@@ -4116,7 +4096,7 @@ No preamble. Start directly with section 1.`;
             </div>
           )}
 
-          <div className="relative max-w-5xl mx-auto">
+          <div className="relative max-w-5xl xl:max-w-6xl mx-auto">
             {/* Fantasy League Setup Flow — shown when Fantasy is selected and no league is configured */}
             {selectedCategory === 'fantasy' && !fantasyLeague?.setupComplete && (() => {
               // ── Inline config data ─────────────────────────────────────────
@@ -4279,12 +4259,12 @@ No preamble. Start directly with section 1.`;
                       <input type="text" placeholder="League name (e.g. The Winners Circle)"
                         value={fantasySetupData.leagueName || ''}
                         onChange={(e: any) => setFantasySetupData((d: any) => ({ ...d, leagueName: e.target.value }))}
-                        className="w-full bg-[var(--bg-overlay)] border border-violet-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-[var(--text-faint)] focus:outline-none focus:border-violet-500/60 transition-all"
+                        className="w-full bg-[var(--bg-overlay)] border border-violet-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-[var(--text-faint)] focus:outline-none focus:border-violet-500/60 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-1 focus-visible:ring-offset-transparent transition-all"
                         maxLength={60} />
                       <input type="text" placeholder="Your team name (e.g. Gronk's Hammers)"
                         value={fantasySetupData.teamName || ''}
                         onChange={(e: any) => setFantasySetupData((d: any) => ({ ...d, teamName: e.target.value }))}
-                        className="w-full bg-[var(--bg-overlay)] border border-violet-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-[var(--text-faint)] focus:outline-none focus:border-violet-500/60 transition-all"
+                        className="w-full bg-[var(--bg-overlay)] border border-violet-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-[var(--text-faint)] focus:outline-none focus:border-violet-500/60 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-1 focus-visible:ring-offset-transparent transition-all"
                         maxLength={40} />
                       {/* Summary */}
                       <div className="flex flex-wrap gap-1.5 text-[10px]">

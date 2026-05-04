@@ -184,7 +184,7 @@ function WindCompass({ direction }: { direction: string }) {
 // Sport-specific impact context lookup
 const SPORT_WEATHER_CONTEXT: Record<string, Array<{ condition: (w: number, p: number, t: number) => boolean; text: string }>> = {
   nfl: [
-    { condition: (w) => w >= 15, text: `≥${Math.round}mph crosswind reduces passing efficiency` },
+    { condition: (w) => w >= 15, text: '≥15mph crosswind reduces passing efficiency' },
     { condition: (_, p) => p > 0.1, text: 'Rain increases fumble risk and reduces passing yards' },
     { condition: (__, ___, t) => t < 32, text: 'Freezing temps favor running game over pass-heavy offenses' },
   ],

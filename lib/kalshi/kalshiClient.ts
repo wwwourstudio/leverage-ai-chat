@@ -8,6 +8,7 @@
  */
 
 import { createSign, constants } from 'crypto';
+import { getKalshiApiKey, getKalshiPrivateKey } from '@/lib/config';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -118,13 +119,8 @@ export class KalshiClient {
     demo?: boolean;
   }) {
     // Support both KALSHI_ACCESS_KEY (new) and KALSHI_API_KEY_ID (legacy) env vars
-    this.apiKey = options?.apiKey
-      || process.env.KALSHI_PRIVATE_KEY
-      || '';
-    this.apiKeyId = options?.apiKeyId
-      || process.env.KALSHI_ACCESS_KEY
-      || process.env.KALSHI_API_KEY_ID
-      || '';
+    this.apiKey = options?.apiKey || getKalshiPrivateKey() || '';
+    this.apiKeyId = options?.apiKeyId || getKalshiApiKey() || '';
     const isDemoEnv = process.env.KALSHI_ENV === 'demo';
     this.baseUrl = (options?.demo || isDemoEnv)
       ? 'https://demo-api.kalshi.co/trade-api/v2'

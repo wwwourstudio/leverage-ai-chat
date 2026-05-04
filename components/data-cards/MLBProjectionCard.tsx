@@ -81,7 +81,7 @@ function PercentileBar({ p10, p50, p90, label }: { p10: number; p50: number; p90
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-faint)]">{label} Range</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">{label} Range</span>
       </div>
       <div className="relative h-4 bg-[var(--bg-surface)] rounded-full overflow-hidden">
         {/* P10–P90 range bar */}
@@ -95,7 +95,7 @@ function PercentileBar({ p10, p50, p90, label }: { p10: number; p50: number; p90
           style={{ left: `${p50Pct}%` }}
         />
       </div>
-      <div className="flex justify-between text-[9px] font-bold text-[var(--text-faint)]">
+      <div className="flex justify-between text-[10px] font-bold text-[var(--text-faint)]">
         <span>P10: {p10}</span>
         <span className="text-emerald-400">P50: {p50}</span>
         <span>P90: {p90}</span>
@@ -130,22 +130,23 @@ function BreakoutRing({ score }: { score: number }) {
           <span className={cn('text-[11px] font-black', color)}>{score}</span>
         </div>
       </div>
-      <span className={cn('text-[8px] font-black uppercase tracking-wider', color)}>{label}</span>
+      <span className={cn('text-[10px] font-black uppercase tracking-wider', color)}>{label}</span>
     </div>
   );
 }
 
 // ─── DK Sparkline (recent form) ──────────────────────────────────────────────
 
-function DKSparkline({ data, width = 140, height = 28 }: { data: Array<{ price: number }>; width?: number; height?: number }) {
+function DKSparkline({ data, height = 28 }: { data: Array<{ price: number }>; height?: number }) {
   const uid = useId();
   if (data.length < 2) return null;
   const prices = data.map(d => d.price);
   const min = Math.min(...prices), max = Math.max(...prices);
   const range = max - min || 1;
+  const viewW = 200;
   const pad = 2, innerH = height - pad * 2;
   const pts = prices.map((p, i) => [
-    (i / (prices.length - 1)) * width,
+    (i / (prices.length - 1)) * viewW,
     pad + innerH - ((p - min) / range) * innerH,
   ] as [number, number]);
   let d = `M ${pts[0][0]},${pts[0][1]}`;
@@ -154,12 +155,12 @@ function DKSparkline({ data, width = 140, height = 28 }: { data: Array<{ price: 
     const cpx = (x0 + x1) / 2;
     d += ` C ${cpx},${y0} ${cpx},${y1} ${x1},${y1}`;
   }
-  const area = `${d} L ${width},${height} L 0,${height} Z`;
+  const area = `${d} L ${viewW},${height} L 0,${height} Z`;
   const isUp  = prices[prices.length - 1] >= prices[0];
   const color = isUp ? '#10b981' : '#94a3b8';
   const gid   = `dksp-${uid.replace(/:/g, '')}`;
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="overflow-visible" aria-hidden="true">
+    <svg width="100%" height={height} viewBox={`0 0 ${viewW} ${height}`} preserveAspectRatio="none" className="overflow-visible" aria-hidden="true">
       <defs>
         <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%"   stopColor={color} stopOpacity="0.25" />
@@ -251,13 +252,13 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
         <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', data.gradient || cfg.header)}>
           <div className="absolute top-3 right-3 flex items-center gap-1">
             <span className={cn('w-1.5 h-1.5 rounded-full animate-pulse', cfg.dot)} />
-            <span className={cn('text-[9px] font-black uppercase tracking-widest', cfg.text)}>{cfg.label}</span>
+            <span className={cn('text-[10px] font-black uppercase tracking-widest', cfg.text)}>{cfg.label}</span>
           </div>
           <div className="flex items-center gap-1.5 mb-1.5">
             <Activity className="w-3 h-3 text-white/60" />
-            <span className="text-[9px] font-black uppercase tracking-widest text-white/70">MLB · LeverageMetrics</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/70">MLB · LeverageMetrics</span>
             <span className="text-white/40">·</span>
-            <span className="text-[9px] text-white/50 truncate">{data.subcategory}</span>
+            <span className="text-[10px] text-white/50 truncate">{data.subcategory}</span>
           </div>
           <div className="flex items-start justify-between gap-2 pr-16">
             <div>
@@ -273,7 +274,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
                 {playerName}
               </h3>
               {(team || position) && (
-                <p className="text-[9px] font-bold text-[var(--text-muted)] mt-0.5">
+                <p className="text-[10px] font-bold text-[var(--text-muted)] mt-0.5">
                   {team}{team && position ? ' · ' : ''}{position}
                 </p>
               )}
@@ -308,12 +309,12 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
           {sparkData.length >= 3 && (
             <div className="px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
               <div className="flex justify-between items-center mb-1.5">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Recent Form</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Recent Form</span>
                 {recentAvgLabel && (
-                  <span className="text-[9px] text-[var(--text-faint)]">{recentAvgLabel}</span>
+                  <span className="text-[10px] text-[var(--text-faint)]">{recentAvgLabel}</span>
                 )}
               </div>
-              <DKSparkline data={sparkData} width={200} height={28} />
+              <DKSparkline data={sparkData} height={28} />
             </div>
           )}
 
@@ -324,14 +325,14 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
                 <div className="flex flex-col items-center gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2">
                   <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Home</span>
                   <span className="text-sm font-black text-foreground tabular-nums">{homeDkAvg}</span>
-                  {homeGames && <span className="text-[8px] text-[var(--text-faint)]">{homeGames}</span>}
+                  {homeGames && <span className="text-[10px] text-[var(--text-faint)]">{homeGames}</span>}
                 </div>
               )}
               {roadDkAvg && (
                 <div className="flex flex-col items-center gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2">
                   <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Road</span>
                   <span className="text-sm font-black text-foreground tabular-nums">{roadDkAvg}</span>
-                  {roadGames && <span className="text-[8px] text-[var(--text-faint)]">{roadGames}</span>}
+                  {roadGames && <span className="text-[10px] text-[var(--text-faint)]">{roadGames}</span>}
                 </div>
               )}
             </div>
@@ -398,13 +399,13 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
           <div className="flex items-center justify-between pt-1 border-t border-[var(--border-subtle)]">
             <div className="flex items-center gap-1">
               <Target className="w-2.5 h-2.5 text-[var(--border-subtle)]" />
-              <span className="text-[8px] font-bold text-[var(--text-faint)] uppercase tracking-wider">LeverageMetrics Engine</span>
+              <span className="text-[10px] font-bold text-[var(--text-faint)] uppercase tracking-wider">LeverageMetrics Engine</span>
             </div>
             <div className="flex items-center gap-2">
               {data.last_updated && (
-                <span className="text-[8px] text-[var(--text-faint)]">{data.last_updated}</span>
+                <span className="text-[10px] text-[var(--text-faint)]">{data.last_updated}</span>
               )}
-              <span className="text-[8px] text-[var(--text-faint)]">Monte Carlo N=1,000</span>
+              <span className="text-[10px] text-[var(--text-faint)]">Monte Carlo N=1,000</span>
             </div>
           </div>
         </div>

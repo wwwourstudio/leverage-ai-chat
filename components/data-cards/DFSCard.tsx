@@ -80,11 +80,11 @@ function OwnershipBar({ pct }: { pct: number }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Users className="w-3 h-3 text-[var(--text-faint)]" />
-          <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Field Ownership</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Field Ownership</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className={cn('text-[10px] font-black tabular-nums', tier.textCls)}>{pct.toFixed(1)}%</span>
-          <span className={cn('inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-wider', tier.badgeCls)}>
+          <span className={cn('inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider', tier.badgeCls)}>
             <Star className="w-2 h-2" />{tier.label}
           </span>
         </div>
@@ -113,7 +113,7 @@ function ValueEfficiencyBar({ score }: { score: number }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <BarChart2 className="w-3 h-3 text-[var(--text-faint)]" />
-          <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Value Efficiency</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Value Efficiency</span>
         </div>
         <span className={cn('text-[10px] font-black tabular-nums', textCls)}>{score.toFixed(2)}x pts/$K</span>
       </div>
@@ -179,13 +179,13 @@ export const DFSCard = memo(function DFSCard({
       <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', gradient || cfg.headerGrad)}>
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
           {realData && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[8px] font-bold text-emerald-400/80">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-400/80">
               <span className="w-1 h-1 rounded-full bg-emerald-400" />
               LIVE
             </span>
           )}
           {cardCategory && (
-            <span className={cn('text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border',
+            <span className={cn('text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border',
               cardCategory === 'value'      ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400' :
               cardCategory === 'matchup'    ? 'bg-blue-500/10 border-blue-500/25 text-blue-400' :
               cardCategory === 'contrarian' ? 'bg-violet-500/10 border-violet-500/25 text-violet-400' :
@@ -199,13 +199,13 @@ export const DFSCard = memo(function DFSCard({
             </span>
           )}
           <span className={cn('w-1.5 h-1.5 rounded-full animate-pulse', cfg.dotCls)} />
-          <span className={cn('text-[9px] font-black uppercase tracking-widest', cfg.textCls)}>{cfg.label}</span>
+          <span className={cn('text-[10px] font-black uppercase tracking-widest', cfg.textCls)}>{cfg.label}</span>
         </div>
         <div className="flex items-center gap-1.5 mb-1.5">
           <Gamepad2 className="w-3 h-3 text-foreground/60" />
-          <span className="text-[9px] font-black uppercase tracking-widest text-foreground/70">{category}</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-foreground/70">{category}</span>
           <span className="text-foreground/40">·</span>
-          <span className="text-[9px] text-foreground/50 truncate">{subcategory}</span>
+          <span className="text-[10px] text-foreground/50 truncate">{subcategory}</span>
         </div>
         <h3 className={cn('font-black text-foreground leading-snug text-balance pr-20', isHero ? 'text-lg' : 'text-sm')}>
           {title}
@@ -218,9 +218,9 @@ export const DFSCard = memo(function DFSCard({
         {isStackPlay ? (
           <div className="mt-3 rounded-xl border border-blue-500/30 bg-blue-500/6 px-3 py-3">
             <div className="flex items-center gap-1.5 mb-2">
-              <span className="text-[8px] font-black uppercase tracking-wider text-blue-400">Stack Recommendation</span>
+              <span className="text-[10px] font-black uppercase tracking-wider text-blue-400">Stack Recommendation</span>
               {(stackTeam || team) && (
-                <span className="text-[8px] font-bold text-blue-300/70 bg-blue-500/10 border border-blue-500/25 px-1.5 py-0.5 rounded-full">
+                <span className="text-[10px] font-bold text-blue-300/70 bg-blue-500/10 border border-blue-500/25 px-1.5 py-0.5 rounded-full">
                   {stackTeam ?? team}
                 </span>
               )}
@@ -250,12 +250,12 @@ export const DFSCard = memo(function DFSCard({
                 <span className={cn('font-black text-foreground leading-tight', isHero ? 'text-xl' : 'text-xl')}>{player}</span>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   {position && (
-                    <span className="text-[8px] font-black text-teal-300/70 bg-teal-500/10 border border-teal-500/25 px-1.5 py-0.5 rounded-full">
+                    <span className="text-[10px] font-black text-teal-300/70 bg-teal-500/10 border border-teal-500/25 px-1.5 py-0.5 rounded-full">
                       {position}
                     </span>
                   )}
                   {team && (
-                    <span className="text-[9px] font-bold text-[var(--text-muted)]">{team}</span>
+                    <span className="text-[10px] font-bold text-[var(--text-muted)]">{team}</span>
                   )}
                 </div>
               </div>
@@ -265,7 +265,7 @@ export const DFSCard = memo(function DFSCard({
             {/* Grade summary row */}
             {data.gradesSummary && (
               <div className="mb-2 flex items-center gap-1.5">
-                <span className="text-[8px] font-black uppercase tracking-wider text-[var(--text-muted)]">Lineup</span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-[var(--text-muted)]">Lineup</span>
                 <span className="text-[10px] font-bold text-foreground/80 bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-0.5 rounded-full">
                   {String(data.gradesSummary)}
                 </span>
@@ -303,13 +303,13 @@ export const DFSCard = memo(function DFSCard({
               )}
             </div>
           </div>
-        ) : (
+        ) : (!salary && !projection && !ownership) ? (
           <div className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-overlay)] px-3 py-4 text-center">
             <span className="text-[10px] text-[var(--text-faint)]">
               Player projections loading · Lineups typically post by 11am ET
             </span>
           </div>
-        )}
+        ) : null}
 
         {/* ── Value efficiency bar (player cards only) ── */}
         {!isStackPlay && hasCorePlay && valueScore !== null && (
@@ -328,13 +328,13 @@ export const DFSCard = memo(function DFSCard({
           <div className="grid grid-cols-2 gap-1.5">
             {boomCeiling && (
               <div className="flex flex-col items-center gap-0.5 rounded-xl bg-emerald-500/8 border border-emerald-500/20 px-2 py-2">
-                <span className="text-[8px] font-bold uppercase tracking-wider text-emerald-400/70">Ceiling</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/70">Ceiling</span>
                 <span className="text-sm font-black text-emerald-400 tabular-nums">{String(boomCeiling)}</span>
               </div>
             )}
             {bustFloor && (
               <div className="flex flex-col items-center gap-0.5 rounded-xl bg-red-500/8 border border-red-500/20 px-2 py-2">
-                <span className="text-[8px] font-bold uppercase tracking-wider text-red-400/70">Floor</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-red-400/70">Floor</span>
                 <span className="text-sm font-black text-red-400 tabular-nums">{String(bustFloor)}</span>
               </div>
             )}
@@ -349,9 +349,9 @@ export const DFSCard = memo(function DFSCard({
           return (
             <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[8px] font-black uppercase tracking-wider text-[var(--text-muted)]">Recent Form</span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-[var(--text-muted)]">Recent Form</span>
                 {recentGamesAvg && (
-                  <span className="text-[9px] text-[var(--text-muted)] tabular-nums">{recentGamesAvg}</span>
+                  <span className="text-[10px] text-[var(--text-muted)] tabular-nums">{recentGamesAvg}</span>
                 )}
               </div>
               <div className="flex items-end gap-1 h-8">
@@ -379,14 +379,14 @@ export const DFSCard = memo(function DFSCard({
                 Home {homeSplitGames ? `· ${homeSplitGames}` : ''}
               </span>
               <span className="text-sm font-black text-foreground tabular-nums">{homeDKAvg ?? '—'}</span>
-              <span className="text-[8px] text-[var(--text-faint)] ml-0.5">DK avg</span>
+              <span className="text-[10px] text-[var(--text-faint)] ml-0.5">DK avg</span>
             </div>
             <div className="rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2 text-center">
               <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-muted)] block mb-0.5">
                 Road {roadSplitGames ? `· ${roadSplitGames}` : ''}
               </span>
               <span className="text-sm font-black text-foreground tabular-nums">{roadDKAvg ?? '—'}</span>
-              <span className="text-[8px] text-[var(--text-faint)] ml-0.5">DK avg</span>
+              <span className="text-[10px] text-[var(--text-faint)] ml-0.5">DK avg</span>
             </div>
           </div>
         )}
@@ -394,7 +394,7 @@ export const DFSCard = memo(function DFSCard({
         {/* ── Matchup score bar ─────────────────────────────────────── */}
         {matchupScoreNum !== null && !isNaN(matchupScoreNum) && (
           <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5 space-y-1">
-            <div className="flex justify-between text-[9px] font-bold uppercase tracking-wide">
+            <div className="flex justify-between text-[10px] font-bold uppercase tracking-wide">
               <span className="text-[var(--text-muted)]">Matchup Score</span>
               <span className={cn(
                 matchupScoreNum >= 70 ? 'text-emerald-400' : matchupScoreNum >= 50 ? 'text-amber-400' : 'text-red-400'
@@ -416,9 +416,9 @@ export const DFSCard = memo(function DFSCard({
           <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5">
             <div className="flex items-center gap-1.5 mb-2">
               <Link2 className="w-3 h-3 text-indigo-400" />
-              <span className="text-[9px] font-black uppercase tracking-wider text-indigo-400">Stack Correlation</span>
+              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400">Stack Correlation</span>
               {targetGame && (
-                <span className="ml-auto text-[9px] font-bold text-[var(--text-faint)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-2 py-0.5 rounded-md">
+                <span className="ml-auto text-[10px] font-bold text-[var(--text-faint)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-2 py-0.5 rounded-md">
                   <Award className="w-2.5 h-2.5 inline mr-1" />{targetGame}
                 </span>
               )}
@@ -481,7 +481,7 @@ export const DFSCard = memo(function DFSCard({
         {/* ── Description fallback ──────────────────────────────────── */}
         {!isStackPlay && !hasCorePlay && description && (
           <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-overlay)] px-3 py-2.5 mt-3">
-            <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-muted)] mb-1 block">Overview</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] mb-1 block">Overview</span>
             <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">{description}</p>
           </div>
         )}

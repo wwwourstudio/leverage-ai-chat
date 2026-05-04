@@ -179,8 +179,9 @@ export async function GET(req: NextRequest) {
               if (!existing) {
                 playerMap.set(key, {
                   name:          playerName,
-                  team:          event.home_team,
-                  opponent:      event.away_team,
+                  homeTeam:      event.home_team,
+                  awayTeam:      event.away_team,
+                  team:          undefined,
                   market:        mkt.key,
                   line,
                   overOdds:      over.price,

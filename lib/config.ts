@@ -168,6 +168,14 @@ export const isGrokConfigured = () =>
 export const isOddsApiConfigured = () =>
   !!getOddsApiKey();
 
+export function getKalshiApiKey(): string | undefined {
+  return process.env.KALSHI_API_KEY || process.env.KALSHI_ACCESS_KEY || process.env.KALSHI_API_KEY_ID || undefined;
+}
+
+export function getKalshiPrivateKey(): string | undefined {
+  return process.env.KALSHI_PRIVATE_KEY || undefined;
+}
+
 export const isKalshiConfigured = () => {
   // Support bearer-only mode (KALSHI_API_KEY) for unauthenticated public endpoints,
   // and full RSA-signed mode (KALSHI_ACCESS_KEY/KALSHI_API_KEY_ID + KALSHI_PRIVATE_KEY).

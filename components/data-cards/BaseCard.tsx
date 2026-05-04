@@ -29,7 +29,7 @@ interface BaseCardProps {
 
 function ErrorState({ error, className }: { error: string; className?: string }) {
   return (
-    <div className={cn('relative rounded-2xl p-6 border bg-red-500/10 border-red-500/20', className)} role="alert" aria-live="polite">
+    <div className={cn('relative rounded-2xl p-6 border bg-red-500/20 border-red-500/40', className)} role="alert" aria-live="polite">
       <div className="flex items-center gap-3">
         <AlertCircle className="w-5 h-5 text-red-400 shrink-0" aria-hidden="true" />
         <div className="min-w-0">

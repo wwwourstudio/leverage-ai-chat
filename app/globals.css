@@ -337,11 +337,10 @@
   50%, 100% { opacity: 0; }
 }
 
-/* Blinking insertion cursor appended inline after the last streamed character.
-   Works because both MarkdownContent and MessageContent return a wrapper <div>
-   whose direct children are block elements — the ::after on the last <p> appears
-   inline at the end of that paragraph's final line. */
-.content-streaming > :last-child::after {
+/* Blinking insertion cursor appended after the streaming content wrapper.
+   Using ::after on the wrapper itself (not :last-child) ensures the cursor
+   appears after all block-level children including tables, code blocks, and lists. */
+.content-streaming::after {
   content: '';
   display: inline-block;
   width: 2px;

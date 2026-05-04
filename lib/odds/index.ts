@@ -275,6 +275,7 @@ export async function fetchLiveOdds(
         const errorText = await response.text();
         const error: any = new Error(`Odds API error (${response.status}): ${errorText}`);
         error.status = response.status;
+        if (response.status === 429) error.isQuota = true;
         throw error;
       }
 

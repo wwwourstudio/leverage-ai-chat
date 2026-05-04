@@ -13,6 +13,7 @@ import { unstable_cache } from 'next/cache';
 import { CARD_TYPES, CARD_STATUS, SPORT_KEYS, sportToApi, apiToSport, getSportGradient } from '@/lib/constants';
 import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
 import { logger, LogCategory } from '@/lib/logger';
+import { getSupabaseUrl, getSupabaseAnonKey } from '@/lib/config';
 
 // ============================================================================
 // Deterministic card ID — djb2 hash over the card's key dimensions.
@@ -288,11 +289,6 @@ async function generateSportSpecificCards(
   if (category === 'betting' || category === 'all' || !category) {
     try {
       const { getOddsWithCache } = await import('@/lib/odds/index');
-      
-      const apiKey = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
-      if (!apiKey) {
-        throw new Error('ODDS_API_KEY not configured');
-      }
       
       const oddsData = await getOddsWithCache(sport, {
         useCache: false,
@@ -2044,8 +2040,8 @@ async function _generateContextualCards(
       try {
         const { createClient: createSb } = await import('@supabase/supabase-js');
         const sb = createSb(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          getSupabaseUrl()!,
+          getSupabaseAnonKey()!,
           { db: { schema: 'api' } },
         );
         const { data: dbRows } = await sb
@@ -2080,8 +2076,8 @@ async function _generateContextualCards(
       try {
         const { createClient: createSb } = await import('@supabase/supabase-js');
         const sb = createSb(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          getSupabaseUrl()!,
+          getSupabaseAnonKey()!,
           { db: { schema: 'api' } },
         );
         const { data: dbRows } = await sb

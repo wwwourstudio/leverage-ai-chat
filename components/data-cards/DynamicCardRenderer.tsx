@@ -192,14 +192,14 @@ export function DynamicCardRenderer({
         {!skipBookmark && (
           <button
             onClick={toggleBookmark}
-            className={`absolute top-2 right-2 z-10 p-1 rounded-md transition-all duration-150 hover:bg-[var(--bg-elevated)] ${isBookmarked ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100'}`}
+            className={`absolute top-2 right-2 z-10 p-1 rounded-md transition-all duration-150 hover:bg-[var(--bg-elevated)] ${isBookmarked ? 'opacity-100' : 'opacity-40 group-hover/card:opacity-100'}`}
             aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark card'}
           >
             <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-blue-500 text-blue-500' : 'text-[var(--text-faint)]'}`} />
           </button>
         )}
         {isEstimated && (
-          <span className="absolute top-2 right-10 z-10 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-[var(--bg-surface)] text-[var(--text-faint)] border border-[var(--border-subtle)] backdrop-blur-sm pointer-events-none">
+          <span className="absolute top-2 right-10 z-10 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-amber-500/20 text-amber-300 border border-amber-500/30 backdrop-blur-sm pointer-events-none">
             ESTIMATED
           </span>
         )}

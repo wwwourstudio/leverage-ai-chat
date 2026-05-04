@@ -52,19 +52,19 @@ function getCategoryAccent(label?: string): string {
 }
 
 const CATEGORY_HEADER_GRAD: Record<string, string> = {
-  election:      'from-blue-500/25 via-blue-500/10 to-transparent',
-  politics:      'from-blue-500/25 via-blue-500/10 to-transparent',
-  sports:        'from-emerald-500/25 via-emerald-500/10 to-transparent',
-  weather:       'from-cyan-400/25 via-cyan-400/10 to-transparent',
-  finance:       'from-amber-500/25 via-amber-500/10 to-transparent',
-  crypto:        'from-violet-500/25 via-violet-500/10 to-transparent',
-  tech:          'from-violet-600/25 via-violet-600/10 to-transparent',
-  entertainment: 'from-pink-500/25 via-pink-500/10 to-transparent',
-  market:        'from-indigo-500/25 via-indigo-500/10 to-transparent',
+  election:      'from-blue-600/80 via-blue-700/60 to-blue-900/40',
+  politics:      'from-blue-600/80 via-blue-700/60 to-blue-900/40',
+  sports:        'from-emerald-600/80 via-emerald-700/60 to-emerald-900/40',
+  weather:       'from-cyan-600/80 via-cyan-700/60 to-cyan-900/40',
+  finance:       'from-amber-600/80 via-amber-700/60 to-amber-900/40',
+  crypto:        'from-violet-600/80 via-violet-700/60 to-violet-900/40',
+  tech:          'from-violet-600/80 via-violet-700/60 to-violet-900/40',
+  entertainment: 'from-pink-600/80 via-pink-700/60 to-pink-900/40',
+  market:        'from-indigo-600/80 via-indigo-700/60 to-indigo-900/40',
 };
 
 function getCategoryHeaderGrad(label?: string): string {
-  return CATEGORY_HEADER_GRAD[(label || '').toLowerCase()] ?? 'from-indigo-500/25 via-indigo-500/10 to-transparent';
+  return CATEGORY_HEADER_GRAD[(label || '').toLowerCase()] ?? 'from-indigo-600/80 via-indigo-700/60 to-indigo-900/40';
 }
 
 function CategoryIcon({ label, size = 14, style }: { label?: string; size?: number; style?: React.CSSProperties }) {
@@ -266,7 +266,7 @@ function ProbabilityHero({
 
         {/* YES block */}
         <div className="flex flex-col gap-0.5 min-w-0">
-          <span className="text-[9px] font-black uppercase tracking-[0.14em]"
+          <span className="text-[10px] font-black uppercase tracking-[0.14em]"
                 style={{ color: YES_COLOR + '99' }}>Yes</span>
           <div className="flex items-baseline gap-1.5">
             <span
@@ -279,12 +279,12 @@ function ProbabilityHero({
             <span className="text-sm font-bold mb-0.5"
                   style={{ color: yesLeads ? YES_COLOR + 'aa' : 'var(--text-faint)' }}>¢</span>
           </div>
-          <span className="text-[9px] font-medium tabular-nums"
+          <span className="text-[10px] font-medium tabular-nums"
                 style={{ color: yesLeads ? YES_COLOR + '70' : 'var(--text-faint)' }}>
             {yesPct}% implied
           </span>
           {lastPrice != null && lastPrice > 0 && lastPrice !== yesPct && (
-            <span className="text-[9px] text-[var(--text-faint)] tabular-nums">
+            <span className="text-[10px] text-[var(--text-faint)] tabular-nums">
               last {lastPrice}¢
             </span>
           )}
@@ -295,7 +295,7 @@ function ProbabilityHero({
 
         {/* NO block */}
         <div className="flex flex-col items-end gap-0.5 min-w-0">
-          <span className="text-[9px] font-black uppercase tracking-[0.14em]"
+          <span className="text-[10px] font-black uppercase tracking-[0.14em]"
                 style={{ color: NO_COLOR + '99' }}>No</span>
           <div className="flex items-baseline gap-1.5">
             <span
@@ -308,7 +308,7 @@ function ProbabilityHero({
             <span className="text-sm font-bold mb-0.5"
                   style={{ color: !yesLeads ? NO_COLOR + 'aa' : 'var(--text-faint)' }}>¢</span>
           </div>
-          <span className="text-[9px] font-medium tabular-nums"
+          <span className="text-[10px] font-medium tabular-nums"
                 style={{ color: !yesLeads ? NO_COLOR + '70' : 'var(--text-faint)' }}>
             {noPct}% implied
           </span>
@@ -341,7 +341,7 @@ function ProbabilityHero({
           {/* 50¢ center notch */}
           <div className="absolute left-1/2 -translate-x-px top-0 h-full w-0.5 bg-[var(--bg-overlay)]" />
         </div>
-        <div className="flex justify-between text-[8px] font-semibold">
+        <div className="flex justify-between text-[10px] font-semibold">
           <span style={{ color: YES_COLOR + '66' }}>0¢</span>
           <span className="text-[var(--text-faint)]">50¢</span>
           <span style={{ color: NO_COLOR + '66' }}>100¢</span>
@@ -369,25 +369,25 @@ function OrderBookMini({
       <div className="grid grid-cols-2">
         {/* Bids (YES) */}
         <div className="p-2.5 space-y-1 border-r border-r-[var(--border-subtle)]">
-          <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: YES_COLOR + '88' }}>Bids</span>
+          <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: YES_COLOR + '88' }}>Bids</span>
           {top3Bids.map((row, i) => (
             <div key={i} className="relative flex items-center justify-between text-[10px] tabular-nums rounded overflow-hidden px-1.5 py-0.5">
               <div className="absolute inset-0 rounded"
                    style={{ backgroundColor: YES_COLOR + '0f', width: `${(row.quantity / maxQty) * 100}%`, transition: 'width 600ms' }} />
               <span className="relative font-bold z-10" style={{ color: YES_COLOR + 'cc' }}>{row.price}¢</span>
-              <span className="relative text-[9px] z-10 text-[var(--text-muted)]">{row.quantity.toLocaleString()}</span>
+              <span className="relative text-[10px] z-10 text-[var(--text-muted)]">{row.quantity.toLocaleString()}</span>
             </div>
           ))}
         </div>
         {/* Asks (NO) */}
         <div className="p-2.5 space-y-1">
-          <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: NO_COLOR + '88' }}>Asks</span>
+          <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: NO_COLOR + '88' }}>Asks</span>
           {top3Asks.map((row, i) => (
             <div key={i} className="relative flex items-center justify-between text-[10px] tabular-nums rounded overflow-hidden px-1.5 py-0.5">
               <div className="absolute right-0 inset-y-0 rounded"
                    style={{ backgroundColor: NO_COLOR + '0f', width: `${(row.quantity / maxQty) * 100}%`, transition: 'width 600ms' }} />
               <span className="relative font-bold z-10" style={{ color: NO_COLOR + 'cc' }}>{row.price}¢</span>
-              <span className="relative text-[9px] z-10 text-[var(--text-muted)]">{row.quantity.toLocaleString()}</span>
+              <span className="relative text-[10px] z-10 text-[var(--text-muted)]">{row.quantity.toLocaleString()}</span>
             </div>
           ))}
         </div>
@@ -418,9 +418,9 @@ function PriceChips({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">Best price to buy</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-faint)]">Best price to buy</span>
         {spreadConf && (
-          <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={spreadConf.style}>
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={spreadConf.style}>
             {spreadConf.text}
           </span>
         )}
@@ -429,14 +429,14 @@ function PriceChips({
         {yesBuy != null && yesBuy > 0 && (
           <div className="flex flex-col items-center py-2.5 px-2 rounded-xl text-[13px] font-black tabular-nums"
                style={{ color: YES_COLOR, backgroundColor: YES_COLOR + '10', border: `1px solid ${YES_COLOR}28` }}>
-            <span className="text-[8px] font-black uppercase tracking-widest mb-1" style={{ color: YES_COLOR + '88' }}>Yes ask</span>
+            <span className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: YES_COLOR + '88' }}>Yes ask</span>
             {yesBuy}¢
           </div>
         )}
         {noBuy != null && noBuy > 0 && (
           <div className="flex flex-col items-center py-2.5 px-2 rounded-xl text-[13px] font-black tabular-nums"
                style={{ color: NO_COLOR, backgroundColor: NO_COLOR + '0d', border: `1px solid ${NO_COLOR}25` }}>
-            <span className="text-[8px] font-black uppercase tracking-widest mb-1" style={{ color: NO_COLOR + '88' }}>No ask</span>
+            <span className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: NO_COLOR + '88' }}>No ask</span>
             {noBuy}¢
           </div>
         )}
@@ -466,9 +466,9 @@ function StatsRow({
   return (
     <div className="rounded-xl px-3 py-2.5 space-y-2 bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
       <div className="flex items-center justify-between">
-        <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-faint)]">Market Depth</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-faint)]">Market Depth</span>
         {volumeTier && (
-          <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full"
+          <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full"
                 style={{ color: tierColor, backgroundColor: tierColor + '15', border: `1px solid ${tierColor}28` }}>
             {volumeTier}
           </span>
@@ -476,15 +476,15 @@ function StatsRow({
       </div>
       <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col gap-0.5">
-          <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)]">24h Vol</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">24h Vol</span>
           <span className="text-[12px] font-black tabular-nums text-foreground/80">{vol24h ?? '—'}</span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Total</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Total</span>
           <span className="text-[12px] font-black tabular-nums text-foreground/80">{volAll ?? '—'}</span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Open Int</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Open Int</span>
           <span className="text-[12px] font-black tabular-nums" style={{ color: '#6366f1' }}>{oi ?? '—'}</span>
         </div>
       </div>
@@ -503,7 +503,7 @@ function TimeBar({ closeTimeIso }: { closeTimeIso?: string | null }) {
 
   if (urgency === 'closed') {
     return (
-      <div className="flex items-center justify-between text-[9px]">
+      <div className="flex items-center justify-between text-[10px]">
         <span className="font-black uppercase tracking-widest text-[var(--text-faint)]">Settled</span>
         {closeDateStr && <span className="text-[var(--text-faint)]">{closeDateStr}</span>}
       </div>
@@ -523,14 +523,14 @@ function TimeBar({ closeTimeIso }: { closeTimeIso?: string | null }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">Closes in</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-faint)]">Closes in</span>
         <div className="flex items-center gap-1.5">
           <span className={cn('flex items-center gap-1 text-[10px] font-bold', !textStyle.color && 'text-[var(--text-muted)]')} style={textStyle}>
             <Clock className={cn('w-3 h-3', urgency === 'critical' && 'animate-pulse')} />
             {label}
           </span>
           {closeDateStr && (
-            <span className="text-[9px] text-[var(--text-faint)]">· {closeDateStr}</span>
+            <span className="text-[10px] text-[var(--text-faint)]">· {closeDateStr}</span>
           )}
         </div>
       </div>
@@ -633,7 +633,7 @@ function VolumeBar({ volume24hRaw, volumeRaw }: { volume24hRaw?: number; volumeR
   const pct = Math.min(100, Math.round((volume24hRaw / volumeRaw) * 100));
   return (
     <div className="space-y-1 pt-1">
-      <div className="flex justify-between text-[8px] font-semibold text-[var(--text-faint)]">
+      <div className="flex justify-between text-[10px] font-semibold text-[var(--text-faint)]">
         <span>24h Activity</span>
         <span>{pct}% of total vol</span>
       </div>
@@ -702,7 +702,7 @@ function KalshiTabBar({ activeTab, onSelect, accentColor }: {
           key={tab}
           onClick={() => onSelect(i)}
           className={cn(
-            'px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 border transition-all duration-150',
+            'px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 border transition-all duration-150',
             activeTab !== i && 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-muted)]',
           )}
           style={activeTab === i ? {
@@ -796,10 +796,10 @@ function TabDepth({
       {typeof spread === 'number' && (
         <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5 space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">Spread Quality</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-faint)]">Spread Quality</span>
             {spreadLabel && spreadConf && (
               <span
-                className="text-[9px] font-bold px-2 py-0.5 rounded-full"
+                className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                 style={{ color: spreadConf.color, backgroundColor: spreadConf.color + '15', border: `1px solid ${spreadConf.color}28` }}
               >
                 {spreadLabel}
@@ -812,7 +812,7 @@ function TabDepth({
               style={{ width: `${spreadBarPct}%`, backgroundColor: spreadConf?.color ?? '#6366f1' }}
             />
           </div>
-          <div className="flex justify-between text-[8px] text-[var(--text-faint)]">
+          <div className="flex justify-between text-[10px] text-[var(--text-faint)]">
             <span>Tight (1¢)</span>
             <span>Wide (10¢+)</span>
           </div>
@@ -849,8 +849,8 @@ function TabTrade({
         <div className="w-full rounded-xl overflow-hidden bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 pt-2 pb-1.5">
           <Sparkline trades={trades} fullWidth height={isHero ? 96 : 80} />
           <div className="flex items-center justify-between mt-1 px-1">
-            <span className="text-[8px] font-semibold text-[var(--text-faint)]">Entry price history</span>
-            <span className="text-[8px] font-semibold text-[var(--text-faint)]">24h</span>
+            <span className="text-[10px] font-semibold text-[var(--text-faint)]">Entry price history</span>
+            <span className="text-[10px] font-semibold text-[var(--text-faint)]">24h</span>
           </div>
         </div>
       ) : (
@@ -883,13 +883,13 @@ function TabTrade({
         <div className="grid grid-cols-2 gap-2">
           {volume24h && (
             <div className="flex flex-col gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5">
-              <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)]">24h Volume</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">24h Volume</span>
               <span className="text-[13px] font-black tabular-nums text-foreground/80">{volume24h}</span>
             </div>
           )}
           {volumeTier && (
             <div className="flex flex-col gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5">
-              <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Tier</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Tier</span>
               <span className="text-[13px] font-black" style={{ color: tierColor }}>{volumeTier}</span>
             </div>
           )}
@@ -1093,14 +1093,14 @@ export const KalshiCard = memo(function KalshiCard({
   if (d.status === 'API_UNAVAILABLE' || d.ticker === 'UNAVAILABLE') {
     return (
       <article className="group relative w-full rounded-2xl overflow-hidden bg-background border border-[var(--border-subtle)] transition-all duration-300">
-        <div className="px-4 pt-3.5 pb-3 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-transparent">
+        <div className="px-4 pt-3.5 pb-3 bg-gradient-to-br from-indigo-600/80 via-indigo-700/60 to-indigo-900/40">
           <div className="flex items-center gap-1.5 mb-2">
             <div className="flex items-center justify-center w-4 h-4 rounded shrink-0 bg-indigo-500/20">
               <TrendingUp className="w-2.5 h-2.5 text-indigo-400" />
             </div>
-            <span className="text-[9px] font-black uppercase tracking-widest text-white/70">Kalshi</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/70">Kalshi</span>
             <span className="text-white/30">·</span>
-            <span className="text-[9px] text-white/50">Prediction Markets</span>
+            <span className="text-[10px] text-white/50">Prediction Markets</span>
           </div>
           <h3 className="font-black text-white text-sm leading-snug pr-4">{title}</h3>
         </div>
@@ -1148,13 +1148,13 @@ export const KalshiCard = memo(function KalshiCard({
         {/* Status badge — top right */}
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
           {!isActive ? (
-            <span className="text-[9px] font-black uppercase tracking-widest text-white/40">
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/40">
               Closed
             </span>
           ) : !d.priceIsReal ? (
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
               <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
-              <span className="text-[8px] font-black uppercase tracking-widest text-white/50">
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/50">
                 Pending
               </span>
             </div>
@@ -1163,7 +1163,7 @@ export const KalshiCard = memo(function KalshiCard({
                  style={{ backgroundColor: YES_COLOR + '0d', border: `1px solid ${livePrice ? YES_COLOR + '55' : YES_COLOR + '22'}` }}>
               <span className={cn('w-1.5 h-1.5 rounded-full', livePrice ? 'animate-pulse' : '')}
                     style={{ backgroundColor: YES_COLOR }} />
-              <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: YES_COLOR }}>
+              <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: YES_COLOR }}>
                 {livePrice ? 'WS Live' : 'Live'}
               </span>
             </div>
@@ -1178,11 +1178,11 @@ export const KalshiCard = memo(function KalshiCard({
           >
             <CategoryIcon label={d.iconLabel} size={10} style={{ color: accentColor }} />
           </div>
-          <span className="text-[9px] font-black uppercase tracking-widest text-white/70">Kalshi</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-white/70">Kalshi</span>
           <span className="text-white/30">·</span>
-          <span className="text-[9px] text-white/50 truncate">{marketCat}</span>
+          <span className="text-[10px] text-white/50 truncate">{marketCat}</span>
           {d.isHot && (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0 text-orange-400 bg-orange-500/10 border border-orange-500/20">
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 text-orange-400 bg-orange-500/10 border border-orange-500/20">
               <Flame className="w-2.5 h-2.5" /> Hot
             </span>
           )}
@@ -1190,7 +1190,7 @@ export const KalshiCard = memo(function KalshiCard({
 
         {/* Title — shortened for composite/multi-leg markets */}
         <h3
-          className={cn('font-black text-white leading-snug pr-20', isHero ? 'text-[15px]' : 'text-sm', 'line-clamp-3')}
+          className={cn('font-black text-white leading-snug pr-20', isHero ? 'text-base' : 'text-sm', 'line-clamp-3')}
           title={title}
         >
           {shortenTitle(title)}
@@ -1205,7 +1205,7 @@ export const KalshiCard = memo(function KalshiCard({
 
         {/* Ticker badge — exact Kalshi market ID */}
         {d.ticker && (
-          <span className="inline-block mt-1.5 font-mono text-[9px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-white/30 select-all tracking-wider">
+          <span className="inline-block mt-1.5 font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-white/30 select-all tracking-wider">
             {d.ticker}
           </span>
         )}

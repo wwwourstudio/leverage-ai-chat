@@ -146,7 +146,7 @@ export const DFSCard = memo(function DFSCard({
     boomCeiling, bustFloor, realData,
     cardCategory, recentDKPts, recentGamesAvg,
     homeDKAvg, roadDKAvg, homeSplitGames, roadSplitGames,
-    stackTeam, stackType, stackPartners, playerId, // structural — exclude from overflow
+    stackTeam, stackType, stackPartners, playerId, isStack, // structural — exclude from overflow
     matchupScore, parkFactor,
     ...rest
   } = data;
@@ -160,6 +160,7 @@ export const DFSCard = memo(function DFSCard({
   const valueScore   = projNum > 0 && salaryNum > 0 ? projNum / (salaryNum / 1000) : null;
 
   const hasCorePlay  = Boolean(player && (salary || projection || ownership));
+  const isStackPlay  = Boolean(isStack || position === 'STACK');
   const stackPlayers = Array.isArray(targetPlayers) ? targetPlayers : targetPlayers ? [targetPlayers] : [];
 
   const extraKeys = Object.keys(rest).filter(k =>
@@ -213,27 +214,55 @@ export const DFSCard = memo(function DFSCard({
 
       <div className="px-4 pb-4 space-y-3">
 
-        {/* ── Core Play ─────────────────────────────────────────────── */}
-        {hasCorePlay && (
-          <div className="mt-3 rounded-xl border border-teal-500/30 bg-teal-500/6 px-3 py-3">
-            <div className="flex items-center gap-1.5 mb-2.5">
-              <span className="text-[8px] font-black uppercase tracking-wider text-teal-400">Core Play</span>
-              {position && (
-                <span className="text-[8px] font-black text-teal-300/70 bg-teal-500/10 border border-teal-500/25 px-1.5 py-0.5 rounded-full">
-                  {position}
+        {/* ── Stack Recommendation / Core Play / Empty State ──────── */}
+        {isStackPlay ? (
+          <div className="mt-3 rounded-xl border border-blue-500/30 bg-blue-500/6 px-3 py-3">
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-[8px] font-black uppercase tracking-wider text-blue-400">Stack Recommendation</span>
+              {(stackTeam || team) && (
+                <span className="text-[8px] font-bold text-blue-300/70 bg-blue-500/10 border border-blue-500/25 px-1.5 py-0.5 rounded-full">
+                  {stackTeam ?? team}
                 </span>
               )}
-              {team && (
-                <span className="text-[9px] font-bold text-[var(--text-muted)] ml-1">{team}</span>
+            </div>
+            {targetGame && (
+              <p className="text-sm font-bold text-foreground mb-2.5">{targetGame}</p>
+            )}
+            <div className="grid grid-cols-2 gap-1.5">
+              {projection && (
+                <div className="flex flex-col items-center gap-0.5 rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-1.5 py-2">
+                  <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Proj Pts</span>
+                  <span className="text-sm font-black text-emerald-400 tabular-nums">{String(projection)}</span>
+                </div>
+              )}
+              {ownership && (
+                <div className="flex flex-col items-center gap-0.5 rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-1.5 py-2">
+                  <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Own %</span>
+                  <span className="text-sm font-black text-foreground tabular-nums">{String(ownership)}</span>
+                </div>
               )}
             </div>
-            {player && (
-              <div className="flex items-center justify-between gap-2 mb-2.5">
-                <span className={cn('font-black text-foreground leading-tight', isHero ? 'text-xl' : 'text-lg')}>{player}</span>
-                {valueScore !== null && <ValueGrade score={valueScore} />}
+          </div>
+        ) : hasCorePlay ? (
+          <div className="mt-3 rounded-xl border border-teal-500/30 bg-teal-500/6 px-3 py-3">
+            <div className="flex items-start justify-between mb-1">
+              <div>
+                <span className={cn('font-black text-foreground leading-tight', isHero ? 'text-xl' : 'text-xl')}>{player}</span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  {position && (
+                    <span className="text-[8px] font-black text-teal-300/70 bg-teal-500/10 border border-teal-500/25 px-1.5 py-0.5 rounded-full">
+                      {position}
+                    </span>
+                  )}
+                  {team && (
+                    <span className="text-[9px] font-bold text-[var(--text-muted)]">{team}</span>
+                  )}
+                </div>
               </div>
-            )}
-            {/* Grade summary row — shown when gradesSummary data field is provided */}
+              {valueScore !== null && <ValueGrade score={valueScore} />}
+            </div>
+
+            {/* Grade summary row */}
             {data.gradesSummary && (
               <div className="mb-2 flex items-center gap-1.5">
                 <span className="text-[8px] font-black uppercase tracking-wider text-[var(--text-muted)]">Lineup</span>
@@ -243,12 +272,11 @@ export const DFSCard = memo(function DFSCard({
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-3 gap-1.5 mt-2.5">
               {salary && salary !== '—' && salary !== '' && salary !== '$0' && (
-                <div className="flex flex-col items-center gap-0.5 rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-1.5 py-2">
-                  <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Salary</span>
-                  <span className="text-sm font-black text-foreground tabular-nums">{String(salary)}</span>
-                  {/* Salary utilization bar — salaryNum vs $50k DK cap */}
+                <div className="flex flex-col items-center gap-0.5 rounded-lg bg-violet-500/8 border border-violet-500/20 px-1.5 py-2">
+                  <span className="text-[7px] font-bold uppercase tracking-wider text-violet-400/70">Salary</span>
+                  <span className="text-sm font-black text-violet-300 tabular-nums">{String(salary)}</span>
                   {salaryNum > 0 && (
                     <div className="w-full mt-1">
                       <div className="h-0.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
@@ -275,15 +303,21 @@ export const DFSCard = memo(function DFSCard({
               )}
             </div>
           </div>
+        ) : (
+          <div className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-overlay)] px-3 py-4 text-center">
+            <span className="text-[10px] text-[var(--text-faint)]">
+              Player projections loading · Lineups typically post by 11am ET
+            </span>
+          </div>
         )}
 
-        {/* ── Value efficiency bar (when core play shown and value computed) ── */}
-        {hasCorePlay && valueScore !== null && (
+        {/* ── Value efficiency bar (player cards only) ── */}
+        {!isStackPlay && hasCorePlay && valueScore !== null && (
           <ValueEfficiencyBar score={valueScore} />
         )}
 
         {/* ── Ownership risk bar ─────────────────────────────────────── */}
-        {!isNaN(ownershipNum) && ownershipNum > 0 && (
+        {!isStackPlay && !isNaN(ownershipNum) && ownershipNum > 0 && (
           <div className="px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
             <OwnershipBar pct={ownershipNum} />
           </div>
@@ -445,7 +479,7 @@ export const DFSCard = memo(function DFSCard({
         )}
 
         {/* ── Description fallback ──────────────────────────────────── */}
-        {!hasCorePlay && description && (
+        {!isStackPlay && !hasCorePlay && description && (
           <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-overlay)] px-3 py-2.5 mt-3">
             <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-muted)] mb-1 block">Overview</span>
             <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">{description}</p>

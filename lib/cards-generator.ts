@@ -2498,23 +2498,21 @@ async function _generateContextualCards(
             const ownership   = isHighTotal ? '32%' : isMidTotal ? '24%' : '16%';
 
             cards.push({
-              type: CARD_TYPES.DFS_MATCHUP,
+              type: 'dfs-stack',
               title: `${awayShort} @ ${homeShort} — DFS Stack`,
               icon: 'Crosshair',
               category: 'MLB',
               subcategory: `DraftKings · O/U ${overLine} · ${envLabel}`,
               gradient: 'from-blue-600 to-indigo-700',
-              status: 'optimal',
+              status: 'value',
               data: {
-                player:      `${stackShort} Stack`,
+                stackTeam:   stackShort,
                 team:        stackShort,
-                position:    'STACK',
-                salary:      '—',
+                targetGame:  `${ev.away_team} @ ${ev.home_team}`,
                 projection:  estTotalDK.toFixed(0),
                 ownership,
                 boomCeiling: Math.round(overLine * 3.5).toFixed(0),
                 bustFloor:   Math.round(overLine * 2.1).toFixed(0),
-                targetGame:  `${ev.away_team} @ ${ev.home_team}`,
                 platforms:   ['DraftKings', 'FanDuel'],
                 tips: `O/U ${overLine} projects ${envLabel} environment (~${estTotalDK} combined DK pts). ` +
                   `Stack ${stackTeam} hitters (${homeOdds > 0 ? `+${homeOdds}` : homeOdds} / ` +
@@ -2523,6 +2521,7 @@ async function _generateContextualCards(
                    isMidTotal  ? 'Solid value game for cash and GPP.' :
                    'Consider as contrarian low-ownership stack.'),
                 cardCategory: 'matchup',
+                isStack:     true,
                 realData:    true,
               },
               realData: true,

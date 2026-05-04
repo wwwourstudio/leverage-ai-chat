@@ -42,6 +42,8 @@ export interface SidebarProps {
   setSelectedCategory: (c: string) => void;
   selectedSport: string;
   setSelectedSport: (s: string) => void;
+  selectedKalshiTopic: string;
+  setSelectedKalshiTopic: (t: string) => void;
   filteredChats: Chat[];
   editingChatId: string | null;
   editingChatTitle: string;
@@ -61,6 +63,22 @@ export interface SidebarProps {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+const SHORT_CAT_NAMES: Record<string, string> = {
+  all: 'All',
+  betting: 'Betting',
+  fantasy: 'Fantasy',
+  dfs: 'DFS',
+  kalshi: 'Kalshi',
+};
+
+/** Returns active sport pill color classes by category */
+function activeSportColor(category: string): string {
+  if (category === 'fantasy') return 'bg-emerald-600/20 text-emerald-300 border-emerald-500/30';
+  if (category === 'dfs')     return 'bg-amber-600/20 text-amber-300 border-amber-500/30';
+  if (category === 'kalshi')  return 'bg-cyan-600/20 text-cyan-300 border-cyan-500/30';
+  return 'bg-blue-600/20 text-blue-300 border-blue-500/30';
+}
 
 /** Returns a Tailwind left-border accent class based on the chat's first tag */
 function tagAccentClass(tags: string[]): string {
@@ -91,10 +109,10 @@ function groupChatsByDate(chats: Chat[]): Array<{ label: string; chats: Chat[] }
 
   for (const chat of chats) {
     const t = new Date(chat.timestamp).getTime();
-    if (t >= todayMs)       groups[0].chats.push(chat);
-    else if (t >= yesterMs) groups[1].chats.push(chat);
+    if (t >= todayMs)        groups[0].chats.push(chat);
+    else if (t >= yesterMs)  groups[1].chats.push(chat);
     else if (t >= weekAgoMs) groups[2].chats.push(chat);
-    else                    groups[3].chats.push(chat);
+    else                     groups[3].chats.push(chat);
   }
 
   return groups.filter(g => g.chats.length > 0);
@@ -109,9 +127,12 @@ const RAIL_ICONS: Record<string, React.FC<{ className?: string }>> = {
   kalshi:  BarChart3,
 };
 
+const KALSHI_TOPICS = [
+  'Trending', 'Politics', 'Sports', 'Culture', 'Crypto',
+  'Climate', 'Economics', 'Mentions', 'Companies', 'Financials', 'Tech & Science',
+];
+
 // ── Chat Card ─────────────────────────────────────────────────────────────────
-// Memoized so that only the active/editing card re-renders during search input
-// changes — prevents all 50+ cards from reconciling on every keystroke.
 
 const ChatCard = memo(function ChatCard({
   chat,
@@ -306,7 +327,7 @@ function IconRail({
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* User avatar — only shown when logged in */}
+      {/* User avatar */}
       {user && (
         <div
           className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 mb-1 cursor-pointer hover:ring-2 hover:ring-blue-400/50 active:scale-95 transition-all"
@@ -336,6 +357,8 @@ export function Sidebar({
   setSelectedCategory,
   selectedSport,
   setSelectedSport,
+  selectedKalshiTopic,
+  setSelectedKalshiTopic,
   filteredChats,
   editingChatId,
   editingChatTitle,
@@ -353,20 +376,24 @@ export function Sidebar({
   onUserClick,
   isLoadingChats = false,
 }: SidebarProps) {
-  // Avoid server/client hydration mismatch (#418): date grouping uses Date.now() which
-  // differs between UTC server and local-timezone client. Defer to after mount.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
   const starredChats = filteredChats.filter(c => c.starred);
   const unstarredChats = filteredChats.filter(c => !c.starred);
-  // Before hydration completes, put all chats under "Recent" (stable SSR output).
-  // After mount, switch to proper date groups.
   const dateGroups = mounted
     ? groupChatsByDate(unstarredChats)
     : (unstarredChats.length > 0 ? [{ label: 'Recent', chats: unstarredChats }] : []);
 
-  const KALSHI_TOPICS = ['Trending', 'Politics', 'Sports', 'Culture', 'Crypto', 'Climate', 'Economics', 'Mentions', 'Companies', 'Financials', 'Tech & Science'];
+  const activeCategory = categories.find(c => c.id === selectedCategory);
+
+  function handleCategorySelect(catId: string) {
+    setSelectedCategory(catId);
+    setSuggestedPrompts([]);
+    setLastUserQuery('');
+    // Reset Kalshi topic when leaving kalshi
+    if (catId !== 'kalshi') setSelectedKalshiTopic('');
+  }
 
   return (
     <div
@@ -375,7 +402,7 @@ export function Sidebar({
         open ? 'w-72' : 'w-14',
       )}
     >
-      {/* Icon rail (always rendered when closed) */}
+      {/* Icon rail (collapsed state) */}
       {!open && (
         <IconRail
           categories={categories}
@@ -387,11 +414,11 @@ export function Sidebar({
         />
       )}
 
-      {/* Full sidebar (rendered when open) */}
+      {/* Full sidebar (open state) */}
       {open && (
         <>
           {/* ── Header ─────────────────────────────────────────────────────── */}
-          <div className="px-3 pt-3 pb-3 border-b border-[var(--border-subtle)] bg-[var(--bg-overlay)] space-y-3 flex-shrink-0">
+          <div className="px-3 pt-3 pb-2 border-b border-[var(--border-subtle)] bg-[var(--bg-overlay)] space-y-2.5 flex-shrink-0">
             {/* New Analysis button */}
             <button
               onClick={onNewChat}
@@ -413,98 +440,104 @@ export function Sidebar({
               />
             </div>
 
-            {/* Platform category pills */}
+            {/* ── Category tabs ──────────────────────────────────────────── */}
             <div>
               <div className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-1.5 px-0.5">Platform</div>
-              <div className="relative">
-                <div className="absolute right-0 inset-y-0 w-10 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
-                <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide pr-10">
-                  {categories.map(cat => {
-                    const Icon = cat.icon;
-                    const isActive = selectedCategory === cat.id;
-                    return (
-                      <button
-                        key={cat.id}
-                        onClick={() => {
-                          setSelectedCategory(cat.id);
-                          setSuggestedPrompts([]);
-                          setLastUserQuery('');
-                        }}
-                        title={cat.desc}
-                        className={cn(
-                          'group/pill flex flex-col items-start gap-0.5 px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0',
-                          isActive
-                            ? 'bg-[var(--bg-elevated)] text-foreground'
-                            : 'text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
-                        )}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <Icon className={cn(
-                            'w-3 h-3 transition-colors',
-                            isActive ? cat.color : 'text-[var(--text-faint)] group-hover/pill:text-[var(--text-muted)]',
-                          )} />
-                          <span>{cat.id === 'all' ? 'ALL' : cat.name.toUpperCase()}</span>
-                        </div>
-                        {isActive && (
-                          <span className="text-[8px] font-semibold text-[var(--text-faint)] pl-4.5 leading-none">{cat.desc}</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+              {/* Compact pill row — short names fit on one line */}
+              <div className="flex gap-1 flex-wrap">
+                {categories.map(cat => {
+                  const Icon = cat.icon;
+                  const isActive = selectedCategory === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => handleCategorySelect(cat.id)}
+                      title={cat.desc}
+                      className={cn(
+                        'flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all duration-200 whitespace-nowrap border',
+                        isActive
+                          ? `bg-[var(--bg-elevated)] border-[var(--border-subtle)] ${cat.color}`
+                          : 'border-transparent text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
+                      )}
+                    >
+                      <Icon className={cn(
+                        'w-3 h-3 flex-shrink-0 transition-colors',
+                        isActive ? cat.color : 'text-[var(--text-faint)]',
+                      )} />
+                      <span>{SHORT_CAT_NAMES[cat.id] ?? cat.name}</span>
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* Sport / Kalshi sub-filter */}
+              {/* Active category description */}
+              {activeCategory && selectedCategory !== 'all' && (
+                <p className="text-[9px] text-[var(--text-faint)] px-0.5 mt-1 leading-tight">
+                  {activeCategory.desc}
+                </p>
+              )}
+
+              {/* ── Sport sub-filter (non-Kalshi) ──────────────────────── */}
               {selectedCategory !== 'kalshi' && (
-                <div className="relative mt-1.5">
-                  <div className="absolute right-0 inset-y-0 w-10 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide pr-10">
-                    {sports
-                      .filter(s => !(['fantasy', 'dfs'].includes(selectedCategory) && s.id.startsWith('ncaa')))
-                      .map(sport => {
-                        const isActive = selectedSport === sport.id;
-                        return (
-                          <button
-                            key={sport.id}
-                            onClick={() => setSelectedSport(isActive ? '' : sport.id)}
-                            className={cn(
-                              'flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0',
-                              isActive
-                                ? 'bg-blue-600/20 text-blue-300'
-                                : sport.isInSeason
-                                  ? 'text-[var(--text-muted)] hover:text-foreground hover:bg-[var(--bg-surface)]'
-                                  : 'text-[var(--text-faint)] hover:text-[var(--text-faint)] hover:bg-[var(--bg-surface)]',
-                            )}
-                          >
-                            {sport.isInSeason && !isActive && (
-                              <span className="w-1 h-1 rounded-full bg-green-400/60 shrink-0" />
-                            )}
-                            {sport.name}
-                          </button>
-                        );
-                      })}
+                <div className="relative mt-2">
+                  <div className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-1 px-0.5">Sport</div>
+                  <div className="relative">
+                    <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
+                    <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-hide pr-8">
+                      {sports
+                        .filter(s => !(['fantasy', 'dfs'].includes(selectedCategory) && s.id.startsWith('ncaa')))
+                        .map(sport => {
+                          const isActive = selectedSport === sport.id;
+                          return (
+                            <button
+                              key={sport.id}
+                              onClick={() => setSelectedSport(isActive ? '' : sport.id)}
+                              className={cn(
+                                'flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0 border',
+                                isActive
+                                  ? activeSportColor(selectedCategory)
+                                  : sport.isInSeason
+                                    ? 'border-transparent text-[var(--text-muted)] hover:text-foreground hover:bg-[var(--bg-surface)]'
+                                    : 'border-transparent text-[var(--text-faint)] hover:text-[var(--text-faint)] hover:bg-[var(--bg-surface)]',
+                              )}
+                            >
+                              {sport.isInSeason && (
+                                <span className={cn(
+                                  'w-1 h-1 rounded-full shrink-0',
+                                  isActive ? 'bg-current opacity-70' : 'bg-green-400/70',
+                                )} />
+                              )}
+                              {sport.name}
+                            </button>
+                          );
+                        })}
+                    </div>
                   </div>
                 </div>
               )}
 
+              {/* ── Kalshi topic sub-filter ────────────────────────────── */}
               {selectedCategory === 'kalshi' && (
-                <div className="relative mt-1.5">
-                  <div className="absolute right-0 inset-y-0 w-10 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide pr-10">
-                    {KALSHI_TOPICS.map(topic => (
-                      <button
-                        key={topic}
-                        onClick={() => setSelectedSport(selectedSport === topic ? '' : topic)}
-                        className={cn(
-                          'px-2 py-1 rounded-full text-[9px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0',
-                          selectedSport === topic
-                            ? 'bg-cyan-600/20 text-cyan-300'
-                            : 'text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
-                        )}
-                      >
-                        {topic}
-                      </button>
-                    ))}
+                <div className="mt-2">
+                  <div className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-1 px-0.5">Topic</div>
+                  <div className="relative">
+                    <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
+                    <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-hide pr-8">
+                      {KALSHI_TOPICS.map(topic => (
+                        <button
+                          key={topic}
+                          onClick={() => setSelectedKalshiTopic(selectedKalshiTopic === topic ? '' : topic)}
+                          className={cn(
+                            'px-2 py-1 rounded-full text-[9px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0 border',
+                            selectedKalshiTopic === topic
+                              ? 'bg-cyan-600/20 text-cyan-300 border-cyan-500/30'
+                              : 'border-transparent text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
+                          )}
+                        >
+                          {topic}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
@@ -527,6 +560,7 @@ export function Sidebar({
                 ))}
               </div>
             )}
+
             {/* Starred section */}
             {starredChats.length > 0 && (
               <div className="space-y-1">
@@ -595,7 +629,7 @@ export function Sidebar({
             ))}
 
             {/* Empty state */}
-            {filteredChats.length === 0 && (
+            {filteredChats.length === 0 && !isLoadingChats && (
               <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
                 <div className="w-10 h-10 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center mb-3">
                   <MessageSquare className="w-5 h-5 text-[var(--text-faint)]" />
@@ -607,7 +641,6 @@ export function Sidebar({
               </div>
             )}
           </div>
-
         </>
       )}
     </div>

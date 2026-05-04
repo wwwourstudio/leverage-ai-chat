@@ -31,6 +31,7 @@ interface SuggestedPromptsProps {
   // For welcome grid
   showWelcomeGrid: boolean;
   onWelcomeAction: (query: string) => void;
+  onCategorySelect?: (categoryId: string) => void;
 
   // For prompt pills
   suggestedPrompts: SuggestedAction[];
@@ -44,11 +45,19 @@ interface SuggestedPromptsProps {
   clarificationMode?: boolean;
 }
 
+// Maps welcome grid category label → sidebar category id
+const WELCOME_CAT_TO_ID: Record<string, string> = {
+  Betting: 'betting',
+  Fantasy: 'fantasy',
+  DFS: 'dfs',
+  Predictions: 'kalshi',
+};
+
 const WELCOME_CATEGORIES = [
-  { label: 'Betting', desc: 'Live odds & arbitrage', icon: TrendingUp, color: 'text-blue-400', bg: 'from-blue-600/10 to-blue-900/5', border: 'border-blue-500/20' },
-  { label: 'Fantasy', desc: 'Draft & waiver tools', icon: Trophy, color: 'text-purple-400', bg: 'from-purple-600/10 to-purple-900/5', border: 'border-purple-500/20' },
-  { label: 'DFS', desc: 'Optimal lineups', icon: Medal, color: 'text-amber-400', bg: 'from-amber-600/10 to-amber-900/5', border: 'border-amber-500/20' },
-  { label: 'Predictions', desc: 'Kalshi markets', icon: Activity, color: 'text-cyan-400', bg: 'from-cyan-600/10 to-cyan-900/5', border: 'border-cyan-500/20' },
+  { label: 'Betting',     desc: 'Live odds & arbitrage',  icon: TrendingUp, color: 'text-blue-400',   bg: 'from-blue-600/10 to-blue-900/5',     border: 'border-blue-500/20' },
+  { label: 'Fantasy',     desc: 'Draft & waiver tools',   icon: Trophy,     color: 'text-purple-400', bg: 'from-purple-600/10 to-purple-900/5', border: 'border-purple-500/20' },
+  { label: 'DFS',         desc: 'Optimal lineups',        icon: Medal,      color: 'text-amber-400',  bg: 'from-amber-600/10 to-amber-900/5',   border: 'border-amber-500/20' },
+  { label: 'Predictions', desc: 'Kalshi markets',         icon: Activity,   color: 'text-cyan-400',   bg: 'from-cyan-600/10 to-cyan-900/5',     border: 'border-cyan-500/20' },
 ];
 
 function getSubCategories(category: string, sport: string): SubCategoryOption[] {
@@ -58,31 +67,31 @@ function getSubCategories(category: string, sport: string): SubCategoryOption[] 
   switch (category) {
     case 'Betting':
       return [
-        { label: `${s}Live Odds`, query: `Show me ${sport ? sport + ' ' : ''}live odds and best lines across all sportsbooks`, icon: Zap },
-        { label: `${s}Spread Bets`, query: `Best ${sport ? sport + ' ' : ''}point spread bets and value plays today`, icon: TrendingUp },
+        { label: `${s}Live Odds`,    query: `Show me ${sport ? sport + ' ' : ''}live odds and best lines across all sportsbooks`, icon: Zap },
+        { label: `${s}Spread Bets`,  query: `Best ${sport ? sport + ' ' : ''}point spread bets and value plays today`, icon: TrendingUp },
         { label: `${s}Player Props`, query: `Top ${sport ? sport + ' ' : ''}player prop bets with hit rate analysis`, icon: Award },
-        { label: 'Arbitrage', query: `Find ${sport ? sport + ' ' : ''}arbitrage opportunities across all sportsbooks`, icon: BarChart3 },
+        { label: 'Arbitrage',        query: `Find ${sport ? sport + ' ' : ''}arbitrage opportunities across all sportsbooks`, icon: BarChart3 },
       ];
     case 'Fantasy':
       return [
-        { label: `${s}Waiver Wire`, query: `Best ${sport ? sport + ' ' : ''}waiver wire pickups and free agent adds this week`, icon: Trophy },
+        { label: `${s}Waiver Wire`,    query: `Best ${sport ? sport + ' ' : ''}waiver wire pickups and free agent adds this week`, icon: Trophy },
         { label: `${s}Trade Analysis`, query: `${sport ? sport + ' ' : ''}trade value chart and who to target in trades`, icon: TrendingUp },
-        { label: `${s}Start/Sit`, query: `${sport ? sport + ' ' : ''}start or sit recommendations for this week`, icon: Award },
+        { label: `${s}Start/Sit`,      query: `${sport ? sport + ' ' : ''}start or sit recommendations for this week`, icon: Award },
         { label: `${s}Draft Strategy`, query: `${sport ? sport + ' ' : ''}fantasy draft strategy, ADP analysis, and sleepers`, icon: Medal },
       ];
     case 'DFS':
       return [
         { label: `${s}DraftKings`, query: `Optimal ${sport ? sport + ' ' : ''}DraftKings lineup for tonight's slate`, icon: Award },
-        { label: `${s}FanDuel`, query: `Best ${sport ? sport + ' ' : ''}FanDuel lineup and top value plays`, icon: Medal },
-        { label: `${s}GPP Plays`, query: `Top ${sport ? sport + ' ' : ''}GPP tournament picks and contrarian plays`, icon: Sparkles },
-        { label: 'Showdown', query: `${sport ? sport + ' ' : ''}DFS showdown slate captain and flex strategy`, icon: BarChart3 },
+        { label: `${s}FanDuel`,    query: `Best ${sport ? sport + ' ' : ''}FanDuel lineup and top value plays`, icon: Medal },
+        { label: `${s}GPP Plays`,  query: `Top ${sport ? sport + ' ' : ''}GPP tournament picks and contrarian plays`, icon: Sparkles },
+        { label: 'Showdown',       query: `${sport ? sport + ' ' : ''}DFS showdown slate captain and flex strategy`, icon: BarChart3 },
       ];
     case 'Predictions':
       return [
-        { label: 'Top Trending', query: 'Show me the top trending Kalshi prediction markets right now', icon: Activity },
-        { label: 'Sports Markets', query: 'What are the best sports prediction markets on Kalshi today?', icon: TrendingUp },
+        { label: 'Top Trending',      query: 'Show me the top trending Kalshi prediction markets right now', icon: Activity },
+        { label: 'Sports Markets',    query: 'What are the best sports prediction markets on Kalshi today?', icon: TrendingUp },
         { label: 'Political Markets', query: 'Show me political prediction markets and election probabilities', icon: BarChart3 },
-        { label: 'High Volume', query: 'Which Kalshi markets have the highest trading volume right now?', icon: Sparkles },
+        { label: 'High Volume',       query: 'Which Kalshi markets have the highest trading volume right now?', icon: Sparkles },
       ];
     default:
       return [];
@@ -92,6 +101,7 @@ function getSubCategories(category: string, sport: string): SubCategoryOption[] 
 export function SuggestedPrompts({
   showWelcomeGrid,
   onWelcomeAction,
+  onCategorySelect,
   suggestedPrompts,
   quickActions,
   hasMessages,
@@ -120,7 +130,12 @@ export function SuggestedPrompts({
                 {WELCOME_CATEGORIES.map(({ label, desc, icon: Icon, color, bg, border }) => (
                   <button
                     key={label}
-                    onClick={() => setPendingWelcomeCategory(label)}
+                    onClick={() => {
+                      // Sync sidebar category tab with welcome grid selection
+                      const catId = WELCOME_CAT_TO_ID[label];
+                      if (catId) onCategorySelect?.(catId);
+                      setPendingWelcomeCategory(label);
+                    }}
                     className={`group/cat flex flex-col items-start gap-1 p-2 sm:p-2.5 rounded-xl bg-gradient-to-br ${bg} border ${border} hover:border-opacity-60 transition-all hover:scale-[1.02] active:scale-[0.98] text-left`}
                   >
                     <div className="flex items-center gap-1.5">
@@ -136,7 +151,10 @@ export function SuggestedPrompts({
             <>
               <div className="flex items-center gap-2 mb-2 px-1">
                 <button
-                  onClick={() => setPendingWelcomeCategory(null)}
+                  onClick={() => {
+                    setPendingWelcomeCategory(null);
+                    onCategorySelect?.('all');
+                  }}
                   className="flex items-center gap-1 text-[10px] font-bold text-[var(--text-faint)] hover:text-white transition-colors"
                 >
                   <ChevronLeft className="w-3 h-3" />

@@ -360,6 +360,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [aiQuickActions, setAiQuickActions] = useState<Array<{ label: string; icon: any; category: string; query: string }> | null>(null);
   const [lastUserQuery, setLastUserQuery] = useState<string>('');
   const [selectedSport, setSelectedSport] = useState<string>('');
+  const [selectedKalshiTopic, setSelectedKalshiTopic] = useState<string>('');
   const [kalshiBettingBannerVisible, setKalshiBettingBannerVisible] = useState(false);
   const [_cardsRefreshedAt, setCardsRefreshedAt] = useState<Date | null>(null);
   const cardsRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -3205,6 +3206,10 @@ No preamble. Start directly with section 1.`;
   const filteredChats = chats
     .filter((chat: Chat) => selectedCategory === 'all' || chat.category === selectedCategory)
     .filter((chat: Chat) => {
+      if (!selectedSport) return true;
+      return chat.tags.some((tag: string) => tag.toLowerCase() === selectedSport.toLowerCase());
+    })
+    .filter((chat: Chat) => {
       if (!chatSearch.trim()) return true;
       const q = chatSearch.toLowerCase();
       return chat.title.toLowerCase().includes(q) || (chat.preview || '').toLowerCase().includes(q);
@@ -3555,8 +3560,8 @@ No preamble. Start directly with section 1.`;
   // AI-generated prompts (aiQuickActions) take priority when available;
   // fall back to hardcoded arrays on network failure or while loading.
   const hardcodedQuickActions = (() => {
-    if (selectedCategory === 'kalshi' && selectedSport && kalshiTopicPrompts[selectedSport]) {
-      return kalshiTopicPrompts[selectedSport];
+    if (selectedCategory === 'kalshi' && selectedKalshiTopic && kalshiTopicPrompts[selectedKalshiTopic]) {
+      return kalshiTopicPrompts[selectedKalshiTopic];
     }
     if (selectedSport) {
       if (selectedCategory === 'betting' && sportBettingPrompts[selectedSport]) return sportBettingPrompts[selectedSport];
@@ -3613,6 +3618,8 @@ No preamble. Start directly with section 1.`;
           setSelectedCategory={setSelectedCategory}
           selectedSport={selectedSport}
           setSelectedSport={setSelectedSport}
+          selectedKalshiTopic={selectedKalshiTopic}
+          setSelectedKalshiTopic={setSelectedKalshiTopic}
           filteredChats={filteredChats}
           editingChatId={editingChatId}
           editingChatTitle={editingChatTitle}
@@ -4350,6 +4357,7 @@ No preamble. Start directly with section 1.`;
                 setInput('');
                 generateRealResponse(query);
               }}
+              onCategorySelect={setSelectedCategory}
               suggestedPrompts={suggestedPrompts}
               quickActions={quickActions}
               hasMessages={messages.length > 1}

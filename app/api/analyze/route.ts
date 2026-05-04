@@ -205,9 +205,9 @@ export async function POST(request: NextRequest) {
 
   // Per-AI-call timeouts (independent from each other and from card generation):
   //   grok-3-fast primary: ~15-30s first-token | fallback: 10s
-  // Vercel serverless functions have a 60s wall-clock limit. Keeping primary+fallback
-  // to ≤58s gives a small buffer for the response serialisation overhead.
-  const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 28_000 : 52_000;
+  // Vercel serverless functions have a 60s wall-clock limit.
+  // primary(46s non-fast / 28s fast) + fallback(10s) + overhead(4s) = 60s max.
+  const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 28_000 : 46_000;
   const FALLBACK_TIMEOUT_MS = 10_000;
 
   try {

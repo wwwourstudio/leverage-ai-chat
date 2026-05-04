@@ -372,6 +372,12 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // firing against a placeholder ID ('chat-1' or 'chat-{timestamp}').
   const pendingThreadRef = useRef<Promise<import('@/lib/chat-service').ChatThread | null> | null>(null);
   const pendingQueryRef = useRef<string | null>(null);
+
+  const handleCategorySelect = (catId: string) => {
+    setSelectedCategory(catId);
+    if (catId !== 'kalshi') setKalshiBettingBannerVisible(false);
+  };
+
   // Set to true by loadInitData() after seeding aiQuickActions from init.defaultPrompts.
   // The prompts useEffect checks this on its first fire to avoid clearing + re-fetching
   // prompts that were already seeded on page load.
@@ -822,8 +828,10 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       try {
         const hasFantasyOrDFSQuery = /\b(adp|draft|waiver|sleeper|fantasy|dfs|best ball|lineup|vbd|tier|rank)\b/i.test(lastUserQuery || '');
         const hasDFSQuery = /\b(dfs|daily fantasy|showdown|gpp|gpps|tournament lineup)\b/i.test(lastUserQuery || '');
-        // Sportsbook-name + betting-word → force betting category even if DraftKings/FanDuel detected
-        const hasBettingPlatformQuery = /\b(draftkings|fanduel|betmgm|caesars|pointsbet|barstool)\b.*\b(odds|bet|line|ml|moneyline|spread|over.under|pick|prop)\b/i.test(lastUserQuery || '');
+        // Sportsbook name present but NOT DFS-specific → route to betting
+        const hasBettingPlatformQuery =
+          /\b(draftkings|fanduel|betmgm|caesars|pointsbet|barstool)\b/i.test(lastUserQuery || '') &&
+          !/\b(lineup|slate|dfs|daily fantasy|gpp|showdown)\b/i.test(lastUserQuery || '');
         const detectedCategory = hasPropQuery ? 'props'
           : (
           msgLow.includes('kalshi') ||
@@ -910,6 +918,14 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       const saved = localStorage.getItem('leverage_fantasy_league');
       if (saved) setFantasyLeague(JSON.parse(saved));
     } catch { /* ignore parse errors */ }
+  }, []);
+
+  useEffect(() => {
+    if (serverData?.fetchErrors?.length) {
+      toast.info('Live data unavailable — showing AI estimates. Data will refresh shortly.');
+    }
+  // Run once on mount — serverData is static SSR props
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleStarChat = (chatId: string, e: React.MouseEvent) => {
@@ -3615,7 +3631,7 @@ No preamble. Start directly with section 1.`;
           activeChat={activeChat}
           onSelectChat={handleSelectChat}
           selectedCategory={selectedCategory}
-          setSelectedCategory={setSelectedCategory}
+          setSelectedCategory={handleCategorySelect}
           selectedSport={selectedSport}
           setSelectedSport={setSelectedSport}
           selectedKalshiTopic={selectedKalshiTopic}
@@ -4357,7 +4373,7 @@ No preamble. Start directly with section 1.`;
                 setInput('');
                 generateRealResponse(query);
               }}
-              onCategorySelect={setSelectedCategory}
+              onCategorySelect={handleCategorySelect}
               suggestedPrompts={suggestedPrompts}
               quickActions={quickActions}
               hasMessages={messages.length > 1}

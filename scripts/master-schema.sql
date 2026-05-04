@@ -196,6 +196,9 @@ CREATE INDEX IF NOT EXISTS idx_kalshi_cached   ON kalshi_markets(cached_at DESC)
 ALTER TABLE kalshi_markets ADD COLUMN IF NOT EXISTS event_ticker  VARCHAR(255);
 ALTER TABLE kalshi_markets ADD COLUMN IF NOT EXISTS series_ticker VARCHAR(255);
 
+CREATE INDEX IF NOT EXISTS idx_kalshi_event_ticker  ON kalshi_markets(event_ticker);
+CREATE INDEX IF NOT EXISTS idx_kalshi_series_ticker ON kalshi_markets(series_ticker);
+
 -- ── 5. STATCAST / MLB PROJECTIONS ────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS statcast_daily (
@@ -225,6 +228,17 @@ CREATE TABLE IF NOT EXISTS statcast_daily (
 CREATE INDEX IF NOT EXISTS idx_statcast_daily_player   ON statcast_daily(player_id);
 CREATE INDEX IF NOT EXISTS idx_statcast_daily_type     ON statcast_daily(player_type);
 CREATE INDEX IF NOT EXISTS idx_statcast_daily_fetched  ON statcast_daily(fetched_at DESC);
+
+-- Persistent cache for Baseball Savant leaderboard payloads (full JSON blobs).
+-- Replaces in-memory Map which is wiped on every Vercel cold start.
+CREATE TABLE IF NOT EXISTS statcast_leaderboard_cache (
+  cache_key  TEXT        PRIMARY KEY,
+  payload    TEXT        NOT NULL,
+  cached_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '6 hours')
+);
+ALTER TABLE statcast_leaderboard_cache ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ
+  NOT NULL DEFAULT (NOW() + INTERVAL '6 hours');
 
 -- Statcast pitch-level events (populated by /api/cron/statcast)
 CREATE TABLE IF NOT EXISTS statcast_events (

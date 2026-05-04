@@ -1240,8 +1240,12 @@ async function _generateContextualCards(
     const betting = bettingResult.status === 'fulfilled' ? bettingResult.value : [];
     const kalshi  = kalshiResult.status  === 'fulfilled' ? kalshiResult.value  : [];
     const mixed = [...betting.slice(0, bettingCount), ...kalshi.slice(0, kalshiCount)].slice(0, count);
-    if (mixed.length > 0) setCachedCards(mixed, 'all', sport);
-    return mixed;
+    if (mixed.length > 0) {
+      setCachedCards(mixed, 'all', sport);
+      return mixed;
+    }
+    // Both sources failed — fall back to pure betting cards
+    return _generateContextualCards('betting', sport, count);
   }
 
   // Player-specific query — fetch live Statcast data for the named player
@@ -2869,7 +2873,26 @@ async function _generateContextualCards(
 
   // Final fallback: add informative placeholder cards (deduplicated by index)
   // Skip for DFS — let the AI answer DFS questions directly rather than showing betting placeholders.
-  if (category === 'dfs') return cards;
+  if (category === 'dfs') {
+    if (cards.length === 0) {
+      cards.push({
+        type: 'dfs-stack',
+        title: 'DFS Strategy',
+        icon: 'Award',
+        category: displaySport,
+        subcategory: 'Tips',
+        gradient: 'from-purple-900/80 to-violet-900/80',
+        status: CARD_STATUS.NEUTRAL,
+        data: {
+          stackTeam: displaySport,
+          tip: 'Target confirmed starters and high-usage players. Check for late lineup news.',
+          isStack: true,
+          realData: false,
+        },
+      } as any);
+    }
+    return cards;
+  }
   const fallbackLabels = [
     `${displaySport} Futures Markets`,
     `${displaySport} Line Movement`,

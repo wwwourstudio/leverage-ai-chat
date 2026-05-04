@@ -596,7 +596,7 @@ export async function fetchKalshiMarkets(params?: {
     const pending = pendingRequests.get(cacheKey);
     if (pending) {
       console.log('[KALSHI] Request already in-flight, coalescing:', cacheKey);
-      return pending;
+      return pending.catch((err: unknown) => { pendingRequests.delete(cacheKey); throw err; });
     }
   }
 

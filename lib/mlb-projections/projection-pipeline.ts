@@ -119,6 +119,31 @@ interface PipelineOptions {
 }
 
 /**
+ * Name-based fallback match: Baseball Savant stores names as "Last, First" while
+ * the MLB Stats API uses "First Last". This bridges the two when playerId doesn't match
+ * (e.g. when Statcast falls back to defaults that have different stored IDs).
+ */
+function nameMatchesPlayer(statcastName: string, mlbName: string): boolean {
+  if (!statcastName || !mlbName) return false;
+  // Strip Jr./Sr./II/III/IV before comparing so "Fernando Tatis Jr." matches "Tatis, Fernando"
+  const stripSuffix = (s: string) => s.replace(/\b(jr|sr|ii|iii|iv)\b\.?/gi, '').trim();
+  const clean = (s: string) => stripSuffix(s).toLowerCase().replace(/[^a-z ]/g, '').trim();
+  // Savant format: "Cole, Gerrit" or "Tatis, Fernando"
+  const parts = statcastName.split(',');
+  if (parts.length >= 2) {
+    const savantLast  = clean(parts[0]);
+    const savantFirst = clean(parts[1]).split(' ')[0]; // first word after comma
+    const mlbWords    = clean(mlbName).split(' ');
+    const mlbFirst    = mlbWords[0] ?? '';
+    const mlbLast     = mlbWords.slice(1).join(' ');
+    // 4-char prefix for first name (reduces "José" ↔ "Joel" false-positives vs 3-char)
+    return mlbLast.includes(savantLast) && mlbFirst.startsWith(savantFirst.substring(0, 4));
+  }
+  // Fallback: plain substring check
+  return clean(statcastName).includes(clean(mlbName)) || clean(mlbName).includes(clean(statcastName));
+}
+
+/**
  * Run the full projection pipeline for today's MLB slate.
  * Returns MLBProjectionCardData[] ready for DynamicCardRenderer.
  */
@@ -179,6 +204,7 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
 
         diag.pitchersTotal++;
         const statcast = allPitchers.find(p => p.playerId === pitcher.id) ??
+          allPitchers.find(p => nameMatchesPlayer(p.playerName, pitcher.fullName)) ??
           await findPitcherByName(pitcher.fullName).catch(() => null) ??
           null;
 
@@ -215,6 +241,7 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
         const opposingPitcher = isHome ? game.probableAwayPitcher : game.probableHomePitcher;
 
         const statcast = allHitters.find(h => h.playerId === batter.id) ??
+          allHitters.find(h => nameMatchesPlayer(h.playerName, batter.fullName)) ??
           await findHitterByName(batter.fullName).catch(() => null) ??
           null;
 

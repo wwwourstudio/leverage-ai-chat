@@ -18,7 +18,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 30;
 
 export async function GET(req: NextRequest) {
-  if (!verifyCronSecret(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  if (!verifyCronSecret(req)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
   const startedAt = Date.now();
   // Optional override: ?date=YYYY-MM-DD (defaults to yesterday UTC)
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      ok: true,
+      success: true,
       date: result.date,
       picksScanned: result.picksScanned,
       picksSettled: result.picksSettled,
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
     console.error('[v0] [cron/settle] Error details:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
     return NextResponse.json(
       {
-        ok: false,
+        success: false,
         error: errMsg,
         durationMs: Date.now() - startedAt,
         timestamp,

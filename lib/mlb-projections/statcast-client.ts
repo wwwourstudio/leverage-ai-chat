@@ -50,17 +50,65 @@ export interface StatcastPitcherStats {
   throws: 'R' | 'L';
 }
 
-/** In-memory cache with 30-minute TTL (Statcast data changes slowly) */
-const cache = new Map<string, { data: unknown; ts: number }>();
-const CACHE_TTL = 30 * 60 * 1000;
+/**
+ * L1: in-process cache for within-request reuse (lost on cold start — that's OK,
+ *     its only purpose is to avoid duplicate fetches within the same invocation).
+ * L2: Supabase `statcast_leaderboard_cache` table for cross-invocation persistence
+ *     (6-hour TTL). This is the fix for Vercel serverless cold-start cache misses.
+ */
+const memCache = new Map<string, { data: unknown; ts: number }>();
+const MEM_TTL  = 5 * 60 * 1000; // 5 min — reuse within the same warm instance
 
-function getCached<T>(key: string): T | null {
-  const entry = cache.get(key) as { data: T; ts: number } | undefined;
-  if (entry && Date.now() - entry.ts < CACHE_TTL) return entry.data;
+function getMemCached<T>(key: string): T | null {
+  const entry = memCache.get(key) as { data: T; ts: number } | undefined;
+  if (entry && Date.now() - entry.ts < MEM_TTL) return entry.data;
   return null;
 }
-function setCached<T>(key: string, data: T) {
-  cache.set(key, { data, ts: Date.now() });
+function setMemCached<T>(key: string, data: T) {
+  memCache.set(key, { data, ts: Date.now() });
+}
+
+// Keep old names as aliases so existing callers (if any) don't break
+const getCached  = getMemCached;
+const setCached  = setMemCached;
+
+function getSupabaseCache() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+  try {
+    const { createClient } = require('@supabase/supabase-js');
+    return createClient(url, key, { db: { schema: 'api' } }) as import('@supabase/supabase-js').SupabaseClient;
+  } catch { return null; }
+}
+
+async function getLeaderboardFromDB<T>(key: string): Promise<T | null> {
+  try {
+    const sb = getSupabaseCache();
+    if (!sb) return null;
+    const { data, error } = await sb
+      .from('statcast_leaderboard_cache')
+      .select('payload')
+      .eq('cache_key', key)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle();
+    if (error || !data?.payload) return null;
+    return JSON.parse(data.payload) as T;
+  } catch { return null; }
+}
+
+async function saveLeaderboardToDB<T>(key: string, value: T): Promise<void> {
+  try {
+    const sb = getSupabaseCache();
+    if (!sb) return;
+    const expiresAt = new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString();
+    await sb.from('statcast_leaderboard_cache').upsert({
+      cache_key:  key,
+      payload:    JSON.stringify(value),
+      cached_at:  new Date().toISOString(),
+      expires_at: expiresAt,
+    });
+  } catch { /* non-critical — projection pipeline continues without it */ }
 }
 
 const SAVANT_BASE = 'https://baseballsavant.mlb.com';
@@ -74,8 +122,14 @@ const SEASON = now.getMonth() < 3 /* Jan–Mar */ ? now.getFullYear() - 1 : now.
  */
 export async function fetchStatcastHitters(limit = 50): Promise<StatcastHitterStats[]> {
   const cacheKey = `hitters:${SEASON}:${limit}`;
-  const cached = getCached<StatcastHitterStats[]>(cacheKey);
-  if (cached) return cached;
+
+  // L1: in-process memory cache
+  const memHit = getCached<StatcastHitterStats[]>(cacheKey);
+  if (memHit) return memHit;
+
+  // L2: Supabase persistent cache (survives Vercel cold starts)
+  const dbHit = await getLeaderboardFromDB<StatcastHitterStats[]>(cacheKey);
+  if (dbHit?.length) { setCached(cacheKey, dbHit); return dbHit; }
 
   try {
     // Expected stats leaderboard (JSON)
@@ -134,6 +188,7 @@ export async function fetchStatcastHitters(limit = 50): Promise<StatcastHitterSt
     });
 
     setCached(cacheKey, hitters);
+    void saveLeaderboardToDB(cacheKey, hitters); // fire-and-forget — never blocks response
     return hitters;
   } catch (err) {
     console.error('[StatcastClient] fetchStatcastHitters error:', err);
@@ -146,8 +201,12 @@ export async function fetchStatcastHitters(limit = 50): Promise<StatcastHitterSt
  */
 export async function fetchStatcastPitchers(limit = 30): Promise<StatcastPitcherStats[]> {
   const cacheKey = `pitchers:${SEASON}:${limit}`;
-  const cached = getCached<StatcastPitcherStats[]>(cacheKey);
-  if (cached) return cached;
+
+  const memHit = getCached<StatcastPitcherStats[]>(cacheKey);
+  if (memHit) return memHit;
+
+  const dbHit = await getLeaderboardFromDB<StatcastPitcherStats[]>(cacheKey);
+  if (dbHit?.length) { setCached(cacheKey, dbHit); return dbHit; }
 
   try {
     const url = `${SAVANT_BASE}/leaderboard/expected_statistics?type=pitcher&year=${SEASON}&position=&team=&min=20&csv=false`;
@@ -196,6 +255,7 @@ export async function fetchStatcastPitchers(limit = 30): Promise<StatcastPitcher
     }));
 
     setCached(cacheKey, pitchers);
+    void saveLeaderboardToDB(cacheKey, pitchers);
     return pitchers;
   } catch (err) {
     console.error('[StatcastClient] fetchStatcastPitchers error:', err);

@@ -67,7 +67,7 @@
       "maxDuration": 30
     },
     "app/api/cron/kalshi/route.ts": {
-      "maxDuration": 30
+      "maxDuration": 45
     },
     "app/api/cron/props/route.ts": {
       "maxDuration": 30

@@ -13,7 +13,6 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { validateServerEnv, getMissingAPIKeys } from '@/lib/config';
-import { generateContextualCards } from '@/lib/cards-generator';
 
 export interface ServerDataResult {
   initialCards: any[];
@@ -32,29 +31,6 @@ interface FetchOptions {
   limit?: number;
   includeKalshi?: boolean;
   includeOdds?: boolean;
-}
-
-/**
- * Fetch initial cards by calling the generator directly (no HTTP round-trip).
- * This avoids the NEXT_PUBLIC_SITE_URL / localhost:3000 problem in serverless.
- */
-async function fetchInitialCards(options: FetchOptions = {}): Promise<{
-  cards: any[];
-  sources: string[];
-  errors: string[];
-}> {
-  const { category = 'all', sport, limit = 12 } = options;
-
-  try {
-    console.log('[v0] Server: Generating cards directly (category:', category, ', sport:', sport ?? 'any', ')');
-    const cards = await generateContextualCards(category, sport, Math.min(limit, 12));
-    console.log('[v0] Server: ✓ Generated', cards.length, 'cards');
-    return { cards, sources: ['cards-generator'], errors: [] };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('[v0] Server: ✗ Error generating cards:', errorMessage);
-    return { cards: [], sources: [], errors: [errorMessage] };
-  }
 }
 
 /**

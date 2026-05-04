@@ -25,11 +25,11 @@ function getServiceClient() {
 }
 
 export async function GET(req: NextRequest) {
-  if (!verifyCronSecret(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  if (!verifyCronSecret(req)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
   const apiKey = process.env.ODDS_API_KEY ?? '';
   if (!apiKey) {
-    return NextResponse.json({ ok: false, error: 'ODDS_API_KEY not set' }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'ODDS_API_KEY not set' }, { status: 500 });
   }
 
   const startedAt = Date.now();
@@ -76,24 +76,24 @@ export async function GET(req: NextRequest) {
       );
     } catch (err: any) {
       console.warn(`[v0] [cron/props] ${err.message}`);
-      return NextResponse.json({ ok: false, error: err.message }, { status: 502 });
+      return NextResponse.json({ success: false, error: err.message }, { status: 502 });
     }
 
     if (!resp.ok) {
       // 422 = no active prop markets for this sport/date; not an error
       if (resp.status === 422) {
         console.log(`[v0] [cron/props] No active ${sport} prop markets (422) — skipping`);
-        return NextResponse.json({ ok: true, inserted: 0, note: 'No active prop markets' });
+        return NextResponse.json({ success: true, inserted: 0, note: 'No active prop markets' });
       }
       // Any other non-ok status that slipped through (shouldn't happen)
       const msg = `Odds API returned HTTP ${resp.status}`;
       console.warn(`[v0] [cron/props] ${msg}`);
-      return NextResponse.json({ ok: false, error: msg }, { status: 502 });
+      return NextResponse.json({ success: false, error: msg }, { status: 502 });
     }
 
     const games: any[] = await resp.json();
     if (!games.length) {
-      return NextResponse.json({ ok: true, inserted: 0, note: 'No upcoming games' });
+      return NextResponse.json({ success: true, inserted: 0, note: 'No upcoming games' });
     }
 
     // Deduplicate by (player_name, stat_type, bookmaker, game_id) — the unique
@@ -156,7 +156,7 @@ export async function GET(req: NextRequest) {
       if (error) {
         console.error('[v0] [cron/props] Upsert error:', error);
         return NextResponse.json(
-          { ok: false, error: error.message, durationMs: Date.now() - startedAt },
+          { success: false, error: error.message, durationMs: Date.now() - startedAt },
           { status: 500 },
         );
       }
@@ -166,7 +166,7 @@ export async function GET(req: NextRequest) {
     console.log(`[v0] [cron/props] Upserted ${inserted} MLB props from ${games.length} games in ${Date.now() - startedAt}ms`);
 
     return NextResponse.json({
-      ok: true,
+      success: true,
       inserted,
       sport,
       games: games.length,
@@ -176,7 +176,7 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error('[v0] [cron/props] Error:', err);
     return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : 'Props ingest failed', durationMs: Date.now() - startedAt },
+      { success: false, error: err instanceof Error ? err.message : 'Props ingest failed', durationMs: Date.now() - startedAt },
       { status: 500 },
     );
   }

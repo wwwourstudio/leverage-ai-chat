@@ -1312,7 +1312,7 @@ export const KalshiCard = memo(function KalshiCard({
             }}
           >
             <Globe className="w-4 h-4" />
-            {hasSpecificMarket ? 'Place Bet on Kalshi' : 'Browse Kalshi Markets'}
+            {isActive && hasSpecificMarket ? 'Place Bet on Kalshi' : 'Browse Kalshi Markets'}
             <ExternalLink className="w-3.5 h-3.5 opacity-60" />
           </a>
 

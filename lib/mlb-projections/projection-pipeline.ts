@@ -125,17 +125,19 @@ interface PipelineOptions {
  */
 function nameMatchesPlayer(statcastName: string, mlbName: string): boolean {
   if (!statcastName || !mlbName) return false;
-  const clean = (s: string) => s.toLowerCase().replace(/[^a-z ]/g, '').trim();
-  // Savant format: "Cole, Gerrit" or "Judge, Aaron"
+  // Strip Jr./Sr./II/III/IV before comparing so "Fernando Tatis Jr." matches "Tatis, Fernando"
+  const stripSuffix = (s: string) => s.replace(/\b(jr|sr|ii|iii|iv)\b\.?/gi, '').trim();
+  const clean = (s: string) => stripSuffix(s).toLowerCase().replace(/[^a-z ]/g, '').trim();
+  // Savant format: "Cole, Gerrit" or "Tatis, Fernando"
   const parts = statcastName.split(',');
   if (parts.length >= 2) {
     const savantLast  = clean(parts[0]);
-    const savantFirst = clean(parts[1]).split(' ')[0]; // first token after comma
+    const savantFirst = clean(parts[1]).split(' ')[0]; // first word after comma
     const mlbWords    = clean(mlbName).split(' ');
     const mlbFirst    = mlbWords[0] ?? '';
     const mlbLast     = mlbWords.slice(1).join(' ');
-    // Match if last name matches AND first 3 chars of first name match
-    return mlbLast.includes(savantLast) && mlbFirst.startsWith(savantFirst.substring(0, 3));
+    // 4-char prefix for first name (reduces "José" ↔ "Joel" false-positives vs 3-char)
+    return mlbLast.includes(savantLast) && mlbFirst.startsWith(savantFirst.substring(0, 4));
   }
   // Fallback: plain substring check
   return clean(statcastName).includes(clean(mlbName)) || clean(mlbName).includes(clean(statcastName));

@@ -25,7 +25,7 @@ function getServiceClient() {
 }
 
 export async function GET(req: NextRequest) {
-  if (!verifyCronSecret(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  if (!verifyCronSecret(req)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
   const startedAt = Date.now();
   const today = new Date().toISOString().slice(0, 10);
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     if (!slate || slate.length === 0) {
       console.warn('[v0] [cron/dfs] No DFS slate generated — no games today or projections unavailable');
       return NextResponse.json({
-        ok: true,
+        success: true,
         note: 'No DFS slate available — no games or projections',
         players: 0,
         durationMs: Date.now() - startedAt,
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      ok: true,
+      success: true,
       date: today,
       players: slate.length,
       durationMs: Date.now() - startedAt,
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
     console.error('[v0] [cron/dfs] Fatal error:', err);
     return NextResponse.json(
       {
-        ok: false,
+        success: false,
         error: err instanceof Error ? err.message : 'DFS slate refresh failed',
         durationMs: Date.now() - startedAt,
         timestamp,

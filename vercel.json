@@ -15,6 +15,17 @@
       ]
     }
   ],
+  "crons": [
+    { "path": "/api/cron/odds",        "schedule": "0 * * * *"   },
+    { "path": "/api/cron/props",       "schedule": "0 * * * *"   },
+    { "path": "/api/cron/projections", "schedule": "0 * * * *"   },
+    { "path": "/api/cron/weather",     "schedule": "0 */6 * * *"  },
+    { "path": "/api/cron/kalshi",      "schedule": "0 * * * *"   },
+    { "path": "/api/cron/picks",       "schedule": "0 8 * * *"    },
+    { "path": "/api/cron/statcast",    "schedule": "0 7 * * *"    },
+    { "path": "/api/cron/dfs",         "schedule": "0 10 * * *"   },
+    { "path": "/api/cron/settle",      "schedule": "0 4 * * *"    }
+  ],
   "functions": {
     "app/api/analyze/route.ts": {
       "maxDuration": 60

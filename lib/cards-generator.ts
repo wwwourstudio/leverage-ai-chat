@@ -2318,6 +2318,53 @@ async function _generateContextualCards(
             },
             metadata: { realData: true, source: 'LeverageMetrics' },
           });
+        } else {
+          // ADP fallback: projection engine returned no slate — build lineup from nfbc_adp
+          try {
+            const { createClient } = await import('@/lib/supabase/server');
+            const { buildGreedyLineup } = await import('@/lib/dfs-lineup-builder');
+            const supa = await createClient();
+            const { data: adpRows } = await supa
+              .from('nfbc_adp')
+              .select('id,player_name,display_name,team,positions,rank,value_delta,is_value_pick')
+              .ilike('sport', '%mlb%')
+              .order('rank', { ascending: true })
+              .limit(150);
+            if (adpRows && adpRows.length > 0) {
+              const lineup = buildGreedyLineup(adpRows, 'baseball_mlb');
+              if (lineup.roster.length > 0) {
+                cards.push({
+                  type: 'dfs-slate',
+                  title: `DK Optimal Lineup · MLB · ${today}`,
+                  icon: 'Trophy',
+                  category: 'MLB',
+                  subcategory: `DraftKings · $${Math.round(lineup.totalSalary / 1000)}k used · ${lineup.totalProjected} proj pts`,
+                  gradient: 'from-orange-600 to-red-700',
+                  status: 'optimal',
+                  data: {
+                    slate: lineup.roster.map(p => ({
+                      position:     p.position,
+                      player:       p.name,
+                      team:         p.team,
+                      salary:       `$${p.salary.toLocaleString()}`,
+                      projection:   p.projectedPoints.toFixed(1),
+                      ownership:    p.ownership,
+                      dkValue:      p.value.toFixed(2),
+                      matchupScore: p.valueGrade,
+                      cardCategory: 'optimal',
+                    })),
+                    totalProjPts: lineup.totalProjected.toFixed(1),
+                    totalSalary:  `$${Math.round(lineup.totalSalary / 1000)}k`,
+                    gamesCount:   '—',
+                    capValid:     lineup.totalSalary <= 50000,
+                  },
+                  metadata: { realData: true, source: 'ADP' },
+                });
+              }
+            }
+          } catch (adpErr) {
+            console.warn('[v0] [CARDS-GEN] MLB ADP fallback failed:', (adpErr as Error).message);
+          }
         }
 
         // 2× DFS Value cards
@@ -2797,8 +2844,58 @@ async function _generateContextualCards(
                 realData: true,
               });
             }
+          } else {
+            // ADP fallback: no live prop markets yet — build lineup from nfbc_adp
+            try {
+              const { createClient } = await import('@/lib/supabase/server');
+              const { buildGreedyLineup } = await import('@/lib/dfs-lineup-builder');
+              const supa = await createClient();
+              const sportPattern = normalizedSport === 'basketball_nba' ? '%nba%'
+                : normalizedSport === 'americanfootball_nfl' ? '%nfl%'
+                : normalizedSport === 'icehockey_nhl' ? '%nhl%' : '%';
+              const { data: adpRows } = await supa
+                .from('nfbc_adp')
+                .select('id,player_name,display_name,team,positions,rank,value_delta,is_value_pick')
+                .ilike('sport', sportPattern)
+                .order('rank', { ascending: true })
+                .limit(150);
+              if (adpRows && adpRows.length > 0) {
+                const lineup = buildGreedyLineup(adpRows, normalizedSport ?? 'baseball_mlb');
+                if (lineup.roster.length > 0) {
+                  const todayLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  cards.push({
+                    type: 'dfs-slate',
+                    title: `DK Optimal Lineup · ${displaySport ?? 'DFS'} · ${todayLabel}`,
+                    icon: 'Trophy',
+                    category: displaySport ?? 'DFS',
+                    subcategory: `DraftKings · $${Math.round(lineup.totalSalary / 1000)}k used · ${lineup.totalProjected} proj pts`,
+                    gradient: 'from-orange-600 to-red-700',
+                    status: 'optimal',
+                    data: {
+                      slate: lineup.roster.map(p => ({
+                        position:     p.position,
+                        player:       p.name,
+                        team:         p.team,
+                        salary:       `$${p.salary.toLocaleString()}`,
+                        projection:   p.projectedPoints.toFixed(1),
+                        ownership:    p.ownership,
+                        dkValue:      p.value.toFixed(2),
+                        matchupScore: p.valueGrade,
+                        cardCategory: 'optimal',
+                      })),
+                      totalProjPts: lineup.totalProjected.toFixed(1),
+                      totalSalary:  `$${Math.round(lineup.totalSalary / 1000)}k`,
+                      gamesCount:   '—',
+                      capValid:     lineup.totalSalary <= 50000,
+                    },
+                    metadata: { realData: true, source: 'ADP' },
+                  });
+                }
+              }
+            } catch (adpErr) {
+              console.warn('[v0] [CARDS-GEN] Non-MLB ADP fallback failed:', (adpErr as Error).message);
+            }
           }
-          // If lines.length === 0: no props available yet — skip card so AI handles it
         }
         // If resp not ok: skip card, no hardcoded fallback
       } catch {

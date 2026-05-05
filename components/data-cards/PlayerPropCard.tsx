@@ -12,6 +12,31 @@ interface PlayerPropCardProps {
 }
 
 export function PlayerPropCard({ data, category, gradient, onAnalyze, isHero }: PlayerPropCardProps) {
+  // Placeholder card — props haven't posted yet or sport was wrong
+  if (!data.player) {
+    return (
+      <article className={cn(
+        'group relative w-full rounded-2xl overflow-hidden bg-background border border-[var(--border-subtle)] hover:border-[var(--border-hover)] transition-all duration-300 shadow-lg',
+        isHero && 'sm:rounded-3xl',
+      )}>
+        <div className="px-4 pt-3.5 pb-4 space-y-3">
+          <div className="min-w-0 space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">{category} · Player Props</span>
+            {data.description && (
+              <p className="text-sm font-semibold text-foreground leading-snug">{data.description}</p>
+            )}
+            {data.note && (
+              <p className="text-xs text-[var(--text-muted)] leading-relaxed">{data.note}</p>
+            )}
+            {data.tip && (
+              <p className="text-xs text-[var(--text-faint)] italic">{data.tip}</p>
+            )}
+          </div>
+        </div>
+      </article>
+    );
+  }
+
   const overRaw  = String(data.over  ?? '');
   const underRaw = String(data.under ?? '');
   const overNum  = parseFloat(overRaw);

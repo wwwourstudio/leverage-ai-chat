@@ -1894,19 +1894,22 @@ export async function POST(request: NextRequest) {
               maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
               maxRetries: 0,
               abortSignal: abortCtrl.signal,
-              ...(hasADPIntent && { tools: { query_adp: adpTool }, stopWhen: stepCountIs(3) }),
+              // stepCountIs capped at 2 for all tools — xAI's API rejects messages[6]+
+              // (3rd assistant tool-call) because it converts empty content to Anthropic
+              // format internally and then fails with cache_control on empty text blocks.
+              ...(hasADPIntent && { tools: { query_adp: adpTool }, stopWhen: stepCountIs(2) }),
               ...(hasHRPredictionIntent && { tools: { predict_hr: predictHRTool }, stopWhen: stepCountIs(2) }),
               ...(hasKalshiToolIntent && !hasHRPredictionIntent && !hasADPIntent && { tools: { kalshi_get_markets: kalshiGetMarketsTool, kalshi_get_price: kalshiGetPriceTool }, stopWhen: stepCountIs(2) }),
-              ...(!hasHRPredictionIntent && !hasKalshiToolIntent && hasMLBProjectionIntent && { tools: { query_mlb_projections: mlbProjectionTool }, stopWhen: stepCountIs(3) }),
-              ...(!hasHRPredictionIntent && !hasKalshiToolIntent && !hasMLBProjectionIntent && isMLBStatcastMode && { tools: { query_statcast: statcastTool }, stopWhen: stepCountIs(3) }),
+              ...(!hasHRPredictionIntent && !hasKalshiToolIntent && hasMLBProjectionIntent && { tools: { query_mlb_projections: mlbProjectionTool }, stopWhen: stepCountIs(2) }),
+              ...(!hasHRPredictionIntent && !hasKalshiToolIntent && !hasMLBProjectionIntent && isMLBStatcastMode && { tools: { query_statcast: statcastTool }, stopWhen: stepCountIs(2) }),
               // Line movement / sharp money queries
               ...(hasLineMovementIntent && { tools: { get_odds_movers: getOddsMoversTool }, stopWhen: stepCountIs(2) }),
               // Best props queries
               ...(hasPropsToolIntent && !hasLineMovementIntent && { tools: { get_props_latest: getPropsLatestTool }, stopWhen: stepCountIs(2) }),
               // Fallback: betting intent but no tool matched and no odds pre-injected → let Grok fetch live odds
               ...(!hasADPIntent && !hasHRPredictionIntent && !hasKalshiToolIntent && !hasMLBProjectionIntent && !isMLBStatcastMode && !hasLineMovementIntent && !hasPropsToolIntent && context.hasBettingIntent && !serverFetchedOdds && { tools: { get_live_odds: getLiveOddsTool }, stopWhen: stepCountIs(2) }),
-              // Deep Think: raise tool round-trips so complex multi-step analysis can call multiple tools
-              ...(body.deepThink && { maxSteps: 5 }),
+              // Deep Think: 3 max steps (more than 2 risks messages[6]+ cache_control error)
+              ...(body.deepThink && { maxSteps: 3 }),
             });
 
             // Abort if the first token doesn't arrive within the timeout budget
@@ -2113,14 +2116,20 @@ export async function POST(request: NextRequest) {
               // Primary stream failed — fall back to generateText (no streaming for fallback)
               const alreadyFast = useFastPath;
               const actualFallbackModel = alreadyFast ? AI_CONFIG.MODEL_NAME : AI_CONFIG.FAST_MODEL_NAME;
-              const errSummary = (() => {
+              const errBody = (() => {
                 if (streamErr && typeof streamErr === 'object') {
                   const e = streamErr as Record<string, unknown>;
-                  if (e.statusCode) return `HTTP ${e.statusCode} from ${e.url ?? 'xAI'}`;
+                  // Detect xAI's Anthropic-format invalid_request_error (cache_control on empty
+                  // text block) — log a clean diagnostic instead of the raw API response body.
+                  const responseBody = typeof e.responseBody === 'string' ? e.responseBody : '';
+                  if (responseBody.includes('cache_control') || responseBody.includes('invalid_request_error')) {
+                    return { summary: 'xAI 400 invalid_request_error (multi-step tool call exceeded safe depth)', isBadRequest: true };
+                  }
+                  if (e.statusCode) return { summary: `HTTP ${e.statusCode} from ${e.url ?? 'xAI'}`, isBadRequest: false };
                 }
-                return streamErr instanceof Error ? streamErr.message : String(streamErr);
+                return { summary: streamErr instanceof Error ? streamErr.message : String(streamErr), isBadRequest: false };
               })();
-              console.error(`[API/analyze] Primary stream failed — ${errSummary} | Retrying with ${actualFallbackModel}`);
+              console.error(`[API/analyze] Primary stream failed — ${errBody.summary} | Retrying with ${actualFallbackModel}`);
               try {
                 const fallbackAbort = new AbortController();
                 const fallbackTimer = setTimeout(() => fallbackAbort.abort(new Error('Fallback timeout')), FALLBACK_TIMEOUT_MS);

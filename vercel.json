@@ -16,7 +16,8 @@
     }
   ],
   "crons": [
-    { "path": "/api/cron/all", "schedule": "0 8 * * *" }
+    { "path": "/api/cron/all", "schedule": "0 8 * * *" },
+    { "path": "/api/cron/kalshi", "schedule": "*/15 * * * *" }
   ],
   "functions": {
     "app/api/cron/all/route.ts": {

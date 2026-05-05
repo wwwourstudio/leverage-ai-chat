@@ -20,12 +20,15 @@ export const maxDuration = 30;
 function getServiceClient() {
   const url = getSupabaseUrl();
   const key = getSupabaseServiceKey();
-  if (!url || !key) throw new Error('Supabase service role not configured');
+  if (!url || !key) return null;
   return createClient(url, key, { db: { schema: 'api' } });
 }
 
 export async function GET(req: NextRequest) {
   if (!verifyCronSecret(req)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  if (!getSupabaseUrl() || !getSupabaseServiceKey()) {
+    return NextResponse.json({ success: true, skipped: true, reason: 'service-role-not-configured' }, { status: 200 });
+  }
 
   const apiKey = process.env.ODDS_API_KEY ?? '';
   if (!apiKey) {
@@ -147,7 +150,7 @@ export async function GET(req: NextRequest) {
     let inserted = 0;
 
     if (rows.length > 0) {
-      const supabase = getServiceClient();
+      const supabase = getServiceClient()!;
       // player_props_unique_prop covers (player_name, stat_type, bookmaker, game_id)
       const { error } = await supabase
         .from('player_props_markets')

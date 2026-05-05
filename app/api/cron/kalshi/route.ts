@@ -27,7 +27,7 @@ export const maxDuration = 30; // increased from 20 — pagination needs extra t
 function getServiceClient() {
   const url = getSupabaseUrl();
   const key = getSupabaseServiceKey();
-  if (!url || !key) throw new Error('Supabase service role not configured');
+  if (!url || !key) return null;
   return createClient(url, key, { db: { schema: 'api' } });
 }
 
@@ -59,6 +59,9 @@ function isSportsMarket(m: { seriesTicker?: string; category?: string }): boolea
 
 export async function GET(req: NextRequest) {
   if (!verifyCronSecret(req)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  if (!getSupabaseUrl() || !getSupabaseServiceKey()) {
+    return NextResponse.json({ success: true, skipped: true, reason: 'service-role-not-configured' }, { status: 200 });
+  }
 
   // ── Kalshi key guard ────────────────────────────────────────────────────
   const hasKey =
@@ -139,7 +142,7 @@ export async function GET(req: NextRequest) {
       expires_at:   new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     }));
 
-    const supabase = getServiceClient();
+    const supabase = getServiceClient()!;
     const { error } = await supabase
       .from('kalshi_markets')
       .upsert(rows, { onConflict: 'market_id' });

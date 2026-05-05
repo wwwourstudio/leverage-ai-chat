@@ -118,18 +118,21 @@ export function DynamicCardRenderer({
     metadata: card.metadata,
   };
 
-  // Warn when a card claims to be real data (realData !== false) but its payload is empty.
-  // This catches generator regressions where a live card is emitted with no actual fields.
-  if (safeCard.realData !== false) {
-    const meaningfulKeys = Object.keys(safeCard.data).filter(
-      k => k !== 'realData' && k !== 'status' && safeCard.data[k] != null,
-    );
-    if (meaningfulKeys.length === 0) {
+  // Suppress cards with no meaningful data payload. A card is considered empty
+  // when every field in `data` is null/undefined or one of the housekeeping keys
+  // (`realData`, `status`). Prevents the user from seeing a card shell full of
+  // "—" placeholders when a generator regression emits a card without data.
+  const meaningfulKeys = Object.keys(safeCard.data).filter(
+    k => k !== 'realData' && k !== 'status' && safeCard.data[k] != null && safeCard.data[k] !== '',
+  );
+  if (meaningfulKeys.length === 0) {
+    if (safeCard.realData !== false) {
       console.warn(
-        '[v0] [DynamicCardRenderer] Card has realData≠false but data payload is empty —',
+        '[v0] [DynamicCardRenderer] Card has realData≠false but data payload is empty — suppressing render:',
         safeCard.type, '/', safeCard.title,
       );
     }
+    return null;
   }
 
   // Hide cards with no live game data — "No Games Available" placeholders and offseason stubs

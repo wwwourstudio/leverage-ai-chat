@@ -32,8 +32,15 @@ const limiter = new Bottleneck({
 function getServiceClient() {
   const url = getSupabaseUrl();
   const key = getSupabaseServiceKey();
-  if (!url || !key) throw new Error('Supabase service role not configured');
+  if (!url || !key) return null;
   return createClient(url, key, { db: { schema: 'api' } });
+}
+
+function serviceRoleSkip() {
+  return NextResponse.json(
+    { success: true, skipped: true, reason: 'service-role-not-configured' },
+    { status: 200 },
+  );
 }
 
 const SPORT_KEY_TO_LABEL: Record<string, string> = {
@@ -45,6 +52,7 @@ const SPORT_KEY_TO_LABEL: Record<string, string> = {
 
 export async function GET(req: NextRequest) {
   if (!verifyCronSecret(req)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  if (!getSupabaseUrl() || !getSupabaseServiceKey()) return serviceRoleSkip();
 
   const startedAt = Date.now();
 
@@ -107,7 +115,7 @@ export async function GET(req: NextRequest) {
         const validGames = oddsResult.filter((g: any) => g?.id && g?.home_team && g?.away_team);
 
         if (validGames.length > 0) {
-          const supabase = getServiceClient();
+          const supabase = getServiceClient()!;
 
           // Step 1 — upsert games, get UUIDs back
           // Deduplicate by external_id to avoid ON CONFLICT duplicates within the batch
@@ -197,7 +205,7 @@ export async function GET(req: NextRequest) {
     let closingLinesWritten = 0;
     if (oddsResult.length > 0) {
       try {
-        const supabase = getServiceClient();
+        const supabase = getServiceClient()!;
         const capturedAt = new Date().toISOString();
         const nowMs = Date.now();
 

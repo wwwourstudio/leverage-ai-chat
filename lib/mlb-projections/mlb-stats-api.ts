@@ -192,6 +192,7 @@ export interface PlayerSeasonStats {
 
 export interface PlayerGameLog {
   date: string;       // "Mar 28"
+  rawDate?: string;   // ISO yyyy-mm-dd from MLB API
   opp: string;        // "@BOS"
   result: string;     // "W 5-2" | "L 3-8"
   ab?: number;
@@ -200,7 +201,9 @@ export interface PlayerGameLog {
   rbi?: number;
   k?: number;         // pitchers
   er?: number;
+  bb?: number;
   ip?: string;
+  numberOfPitches?: number;  // pitchers
 }
 
 /** Search for an MLB player ID by name. Returns null on failure. */
@@ -306,6 +309,7 @@ export async function fetchPlayerGameLog(playerId: number, group: 'hitting' | 'p
         return group === 'hitting'
           ? {
               date: dateLabel,
+              rawDate: dateStr,
               opp: `${isHome ? 'vs' : '@'}${opponent}`,
               result: sp.team?.wins != null ? '' : '',
               ab: s.atBats ?? 0,
@@ -315,12 +319,14 @@ export async function fetchPlayerGameLog(playerId: number, group: 'hitting' | 'p
             }
           : {
               date: dateLabel,
+              rawDate: dateStr,
               opp: `${isHome ? 'vs' : '@'}${opponent}`,
               result: '',
               ip: s.inningsPitched ?? '0',
               k: s.strikeOuts ?? 0,
               er: s.earnedRuns ?? 0,
               bb: s.baseOnBalls ?? 0,
+              numberOfPitches: typeof s.numberOfPitches === 'number' ? s.numberOfPitches : (typeof s.pitchesThrown === 'number' ? s.pitchesThrown : undefined),
             };
       });
 

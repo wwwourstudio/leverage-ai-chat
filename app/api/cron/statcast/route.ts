@@ -19,12 +19,15 @@ export const maxDuration = 45;
 function getServiceClient() {
   const url = getSupabaseUrl();
   const key = getSupabaseServiceKey();
-  if (!url || !key) throw new Error('Supabase service role not configured');
+  if (!url || !key) return null;
   return createClient(url, key, { db: { schema: 'api' } });
 }
 
 export async function GET(req: NextRequest) {
   if (!verifyCronSecret(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  if (!getSupabaseUrl() || !getSupabaseServiceKey()) {
+    return NextResponse.json({ ok: true, skipped: true, reason: 'service-role-not-configured' }, { status: 200 });
+  }
 
   const startedAt = Date.now();
   const season = new Date().getFullYear();
@@ -62,7 +65,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const supabase = getServiceClient();
+    const supabase = getServiceClient()!;
 
     // Build upsert rows for hitters
     const hitterRows = hitters.map((h) => ({

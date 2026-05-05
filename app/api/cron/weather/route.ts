@@ -20,12 +20,15 @@ export const maxDuration = 30;
 function getServiceClient() {
   const url = getSupabaseUrl();
   const key = getSupabaseServiceKey();
-  if (!url || !key) throw new Error('Supabase service role not configured');
+  if (!url || !key) return null;
   return createClient(url, key, { db: { schema: 'api' } });
 }
 
 export async function GET(req: NextRequest) {
   if (!verifyCronSecret(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  if (!getSupabaseUrl() || !getSupabaseServiceKey()) {
+    return NextResponse.json({ ok: true, skipped: true, reason: 'service-role-not-configured' }, { status: 200 });
+  }
 
   const startedAt = Date.now();
   const today = new Date().toISOString().slice(0, 10);
@@ -33,7 +36,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const { getGameTimeForecast } = await import('@/lib/weather/index');
-    const supabase = getServiceClient();
+    const supabase = getServiceClient()!;
 
     // Load today's games that have a known home team (need team name for stadium lookup)
     const { data: games, error: gamesErr } = await supabase

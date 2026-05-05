@@ -428,6 +428,111 @@ export function gameLogToDKPts(log: PlayerGameLog): number {
   }
 }
 
+// ─── Roster status / scratches / confirmed lineups ───────────────────────────
+
+export type RosterStatus = 'active' | 'IL' | 'minors' | 'unknown';
+
+export interface RosterEntry {
+  personId: number;
+  fullName: string;
+  position: string;       // 'SP', 'OF', etc.
+  status: RosterStatus;
+  statusCode: string;     // raw MLB status code: 'A', 'IL', 'D7', 'D10', 'D60', etc.
+}
+
+/**
+ * Fetch a team's active roster (excludes IL, minors, suspended).
+ * Backed by /api/v1/teams/{teamId}/roster?rosterType=active.
+ * Returns [] on failure rather than throwing — callers degrade to "unknown" status.
+ */
+export async function fetchActiveRoster(teamId: number): Promise<RosterEntry[]> {
+  const cacheKey = `roster:active:${teamId}`;
+  const cached = getCached<RosterEntry[]>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const url = `${MLB_API}/teams/${teamId}/roster?rosterType=active`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const entries: RosterEntry[] = (json.roster ?? []).map((r: any) => ({
+      personId: Number(r.person?.id ?? 0),
+      fullName: String(r.person?.fullName ?? ''),
+      position: String(r.position?.abbreviation ?? ''),
+      status: 'active' as const,
+      statusCode: String(r.status?.code ?? 'A'),
+    })).filter((r: RosterEntry) => r.personId > 0);
+    setCached(cacheKey, entries);
+    return entries;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Build a Set of personIds that are scratched from today's lineups.
+ * Hydrates schedule with `scratches`; missing field → empty set.
+ */
+export async function fetchScratchedPlayerIds(date?: string): Promise<Set<number>> {
+  const dateStr = date ?? formatDate(new Date());
+  const cacheKey = `scratches:${dateStr}`;
+  const cached = getCached<number[]>(cacheKey);
+  if (cached) return new Set(cached);
+
+  try {
+    const url = `${MLB_API}/schedule?sportId=1&date=${dateStr}&hydrate=scratches`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return new Set();
+    const json = await res.json();
+
+    const ids: number[] = [];
+    for (const dateObj of json.dates ?? []) {
+      for (const game of dateObj.games ?? []) {
+        for (const scratch of game.scratches ?? []) {
+          const id = Number(scratch?.playerId ?? scratch?.id ?? 0);
+          if (id > 0) ids.push(id);
+        }
+      }
+    }
+    setCached(cacheKey, ids);
+    return new Set(ids);
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Fetch the confirmed batting lineup for a single game from the boxscore.
+ * Only batters with `battingOrder` set are considered confirmed starters.
+ * Returns isOfficial=false when the lineup hasn't been posted yet.
+ */
+export async function fetchConfirmedLineup(
+  gamePk: number,
+): Promise<{ homeBatters: number[]; awayBatters: number[]; isOfficial: boolean }> {
+  const cacheKey = `boxscore:${gamePk}`;
+  type Result = { homeBatters: number[]; awayBatters: number[]; isOfficial: boolean };
+  const cached = getCached<Result>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const url = `https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live?fields=liveData,boxscore,teams,home,away,batters,battingOrder,players`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return { homeBatters: [], awayBatters: [], isOfficial: false };
+    const json = await res.json();
+    const home = json.liveData?.boxscore?.teams?.home;
+    const away = json.liveData?.boxscore?.teams?.away;
+    const homeBatters: number[] = Array.isArray(home?.batters) ? home.batters : [];
+    const awayBatters: number[] = Array.isArray(away?.batters) ? away.batters : [];
+    // The feed populates `batters[]` only after the lineup card is posted.
+    const isOfficial = homeBatters.length >= 9 && awayBatters.length >= 9;
+    const result: Result = { homeBatters, awayBatters, isOfficial };
+    if (isOfficial) setCached(cacheKey, result); // only cache once it's stable
+    return result;
+  } catch {
+    return { homeBatters: [], awayBatters: [], isOfficial: false };
+  }
+}
+
 /**
  * Get remaining games in the current MLB season (for ROS projections).
  * Season window: Opening Day (≈ last week of March) → last Sunday of September.

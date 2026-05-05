@@ -4,8 +4,9 @@
  * Groups players by position, identifies stacks, and ranks by value.
  */
 
-import { buildDFSCards, type DFSCardData } from './dfs-adapter';
+import { buildDFSCardsWithSlate, type DFSCardData } from './dfs-adapter';
 import { fetchTodaysGames } from './mlb-stats-api';
+import type { DKDraftGroup } from './draftkings-api';
 
 export interface DFSSlate {
   date: string;
@@ -30,7 +31,21 @@ export interface DFSSlateMulti {
   chalkLineup:      DFSCardData[];
   topStack:         { team: string; players: string[]; type: 'full' | 'mini' } | null;
   slateForCard:     DFSCardData[];
-  metadata:         { date: string; gamesCount: number; totalProjPts: number; totalSalary: number; capValid: boolean; playingTodayCount: number };
+  metadata:         {
+    date: string;
+    gamesCount: number;
+    totalProjPts: number;
+    totalSalary: number;
+    capValid: boolean;
+    playingTodayCount: number;
+    /** DK contest slate the lineup is targeting. null when DK is unreachable (degraded mode). */
+    slate?: { draftGroupId: number; slateLabel: string; startDate: string; gameCount: number; contestType: 'classic' | 'showdown' } | null;
+    /** True when DK feed was unreachable; the lineup is projection-only and not contest-validated. */
+    degradedMode?: boolean;
+    degradedReason?: string;
+    /** True when no full lineup could be built because the available DK pool is too thin. */
+    insufficientPool?: boolean;
+  };
 }
 
 /**
@@ -38,7 +53,7 @@ export interface DFSSlateMulti {
  * Returns position-sorted DFSCard array ready for rendering.
  * (Backward-compatible — internally delegates to buildDFSSlateMulti)
  */
-export async function buildDFSSlate(opts: { limit?: number; date?: string } = {}): Promise<DFSCardData[]> {
+export async function buildDFSSlate(opts: { limit?: number; date?: string; draftGroupId?: number } = {}): Promise<DFSCardData[]> {
   const multi = await buildDFSSlateMulti(opts);
   return multi.slateForCard;
 }
@@ -48,27 +63,49 @@ export async function buildDFSSlate(opts: { limit?: number; date?: string } = {}
  * Returns optimal, value, matchup, contrarian, and chalk lineups
  * plus metadata and the annotated optimal lineup as slateForCard.
  */
-export async function buildDFSSlateMulti(opts: { limit?: number; date?: string } = {}): Promise<DFSSlateMulti> {
+export async function buildDFSSlateMulti(opts: { limit?: number; date?: string; draftGroupId?: number } = {}): Promise<DFSSlateMulti> {
   const { limit = 9 } = opts;
 
-  const [games, allCards] = await Promise.all([
+  const [games, dfsResult] = await Promise.all([
     fetchTodaysGames(opts.date).catch(() => []),
-    buildDFSCards({ limit: limit * 4, date: opts.date }), // Over-fetch for all lineup variants
+    buildDFSCardsWithSlate({ limit: limit * 4, date: opts.date, draftGroupId: opts.draftGroupId }), // Over-fetch for all lineup variants
   ]);
+  const allCards = dfsResult.cards;
+  const slateMeta = slateToMeta(dfsResult.slate);
 
   const empty: DFSSlateMulti = {
     optimalLineup: [], valueLineup: [], matchupLineup: [],
     contrarianLineup: [], chalkLineup: [], topStack: null,
     slateForCard: [],
-    metadata: { date: opts.date ?? new Date().toISOString().slice(0, 10), gamesCount: games.length, totalProjPts: 0, totalSalary: 0, capValid: true, playingTodayCount: 0 },
+    metadata: {
+      date: opts.date ?? new Date().toISOString().slice(0, 10),
+      gamesCount: dfsResult.slate?.gameCount ?? games.length,
+      totalProjPts: 0, totalSalary: 0, capValid: true, playingTodayCount: 0,
+      slate: slateMeta,
+      degradedMode: dfsResult.degradedMode,
+      degradedReason: dfsResult.degradedReason,
+    },
   };
 
   if (allCards.length === 0) return empty;
 
-  // ── Filter to players with games today ────────────────────────────────────
-  const todayCards = allCards.filter(c => isToday(c.data.gameDate));
-  // Fall back to all cards if the today-filter removes everyone (e.g. no gameDate data)
-  const poolCards = todayCards.length >= limit ? todayCards : allCards;
+  // ── Hard-filter unavailable players ───────────────────────────────────────
+  // Only players DK has in their contest pool, who are not on IL / scratched /
+  // missing from the confirmed lineup, and whose team is in this slate.
+  const playable = allCards.filter(c => c.data.isPlaying !== false);
+  const poolCards = playable.length > 0 ? playable : allCards;
+  // If the pool is still too thin (insufficient SP or hitters), surface an
+  // empty result with `insufficientPool: true` so the UI can render a banner
+  // instead of a bogus lineup.
+  const sp = poolCards.filter(c => c.data.position === 'SP' || c.data.position === 'RP').length;
+  const bat = poolCards.length - sp;
+  if (sp < 2 || bat < 8) {
+    return {
+      ...empty,
+      slateForCard: [],
+      metadata: { ...empty.metadata, insufficientPool: true },
+    };
+  }
 
   // ── Optimal lineup (position-balanced, max projected pts, cap-enforced) ──
   const optimalLineup = buildOptimalLineup(poolCards, limit);
@@ -130,9 +167,10 @@ export async function buildDFSSlateMulti(opts: { limit?: number; date?: string }
 
   // ── Metadata ──────────────────────────────────────────────────────────────
   const totalProjPts = optimalLineup.reduce((s, c) => s + parseFloat(c.data.projection), 0);
-  const totalSalary  = optimalLineup.reduce((s, c) => s + parseSalary(c.data.salary), 0);
+  const totalSalary  = optimalLineup.reduce((s, c) => s + cardSalary(c), 0);
   const capValid     = totalSalary <= 50000;
-  const playingTodayCount = optimalLineup.filter(c => isToday(c.data.gameDate)).length;
+  // After filtering, every player in the optimal lineup is playing today.
+  const playingTodayCount = optimalLineup.filter(c => c.data.isPlaying !== false).length;
 
   return {
     optimalLineup,
@@ -144,12 +182,26 @@ export async function buildDFSSlateMulti(opts: { limit?: number; date?: string }
     slateForCard,
     metadata: {
       date: opts.date ?? new Date().toISOString().slice(0, 10),
-      gamesCount: games.length,
+      gamesCount: dfsResult.slate?.gameCount ?? games.length,
       totalProjPts: Math.round(totalProjPts * 10) / 10,
       totalSalary,
       capValid,
       playingTodayCount,
+      slate: slateMeta,
+      degradedMode: dfsResult.degradedMode,
+      degradedReason: dfsResult.degradedReason,
     },
+  };
+}
+
+function slateToMeta(slate: DKDraftGroup | null) {
+  if (!slate) return null;
+  return {
+    draftGroupId: slate.draftGroupId,
+    slateLabel:   slate.slateLabel,
+    startDate:    slate.startDate,
+    gameCount:    slate.gameCount,
+    contestType:  slate.contestType,
   };
 }
 
@@ -162,13 +214,10 @@ function parseSalary(s: string | number | undefined): number {
   return parseInt(String(s ?? '').replace(/[^0-9]/g, ''), 10) || 0;
 }
 
-function isToday(dateStr?: string): boolean {
-  if (!dateStr) return true; // don't filter if unknown
-  const d = new Date(dateStr);
-  const now = new Date();
-  return d.getUTCFullYear() === now.getUTCFullYear()
-    && d.getUTCMonth() === now.getUTCMonth()
-    && d.getUTCDate() === now.getUTCDate();
+/** Prefer DK's authoritative salary; fall back to the parsed display string. */
+function cardSalary(c: DFSCardData): number {
+  if (typeof c.data.dkSalary === 'number' && c.data.dkSalary > 0) return c.data.dkSalary;
+  return cardSalary(c);
 }
 
 function buildOptimalLineup(cards: DFSCardData[], limit: number): DFSCardData[] {
@@ -198,11 +247,11 @@ function buildOptimalLineup(cards: DFSCardData[], limit: number): DFSCardData[] 
 
     // Sort by projection descending; pick highest that fits within budget
     available.sort((a, b) => parseFloat(b.data.projection) - parseFloat(a.data.projection));
-    const pick = available.find(c => parseSalary(c.data.salary) <= budgetForThisSlot)
-      ?? available.sort((a, b) => parseSalary(a.data.salary) - parseSalary(b.data.salary))[0]; // fallback: cheapest
+    const pick = available.find(c => cardSalary(c) <= budgetForThisSlot)
+      ?? available.sort((a, b) => cardSalary(a) - cardSalary(b))[0]; // fallback: cheapest
 
     lineup.push(pick);
-    remainingBudget -= parseSalary(pick.data.salary);
+    remainingBudget -= cardSalary(pick);
   }
 
   // Fill any remaining slots (e.g. if position pool was short)
@@ -210,9 +259,9 @@ function buildOptimalLineup(cards: DFSCardData[], limit: number): DFSCardData[] 
     .sort((a, b) => parseFloat(b.data.projection) - parseFloat(a.data.projection));
   for (const card of remaining) {
     if (lineup.length >= limit) break;
-    if (parseSalary(card.data.salary) <= remainingBudget) {
+    if (cardSalary(card) <= remainingBudget) {
       lineup.push(card);
-      remainingBudget -= parseSalary(card.data.salary);
+      remainingBudget -= cardSalary(card);
     }
   }
 

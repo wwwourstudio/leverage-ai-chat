@@ -32,35 +32,61 @@ export async function GET(req: NextRequest) {
   const timestamp = new Date().toISOString();
 
   try {
-    const { buildDFSSlate } = await import('@/lib/mlb-projections/slate-builder');
+    const { buildDFSSlateMulti } = await import('@/lib/mlb-projections/slate-builder');
 
-    // Build DraftKings MLB slate (9-player lineup)
-    const slate = await buildDFSSlate({ limit: 9, date: today });
+    // Build DraftKings MLB slate (9-player lineup) targeting the Main slate.
+    const multi = await buildDFSSlateMulti({ limit: 9, date: today });
+    const slate = multi.slateForCard;
+    const draftGroupId = multi.metadata.slate?.draftGroupId;
 
     if (!slate || slate.length === 0) {
-      console.warn('[v0] [cron/dfs] No DFS slate generated — no games today or projections unavailable');
+      console.warn(
+        `[v0] [cron/dfs] No DFS slate generated — degradedMode=${multi.metadata.degradedMode === true}` +
+        (multi.metadata.degradedReason ? ` reason="${multi.metadata.degradedReason}"` : ''),
+      );
       return NextResponse.json({
         success: true,
-        note: 'No DFS slate available — no games or projections',
+        note: multi.metadata.degradedMode
+          ? 'DraftKings feed unavailable — no contest-validated lineup built'
+          : multi.metadata.insufficientPool
+            ? 'Slate pool too thin to build a full lineup'
+            : 'No DFS slate available — no games or projections',
         players: 0,
+        draftGroupId: draftGroupId ?? null,
+        degradedMode: multi.metadata.degradedMode === true,
         durationMs: Date.now() - startedAt,
         timestamp,
       });
     }
 
-    console.log(`[v0] [cron/dfs] Built DFS slate with ${slate.length} players in ${Date.now() - startedAt}ms`);
+    console.log(
+      `[v0] [cron/dfs] Built DFS slate with ${slate.length} players (slate=${multi.metadata.slate?.slateLabel ?? 'unknown'} #${draftGroupId ?? '—'}) in ${Date.now() - startedAt}ms`,
+    );
 
-    // Persist to app_settings so read paths don't need to re-run the model
+    // Persist to app_settings so read paths don't need to re-run the model.
+    // Cache key includes the draftGroupId so multiple slates can coexist; the
+    // canonical `dfs_slate_today` row mirrors the Main slate.
     const supabase = getServiceClient();
-    const { error } = await supabase
-      .from('app_settings')
-      .upsert(
-        {
-          key: 'dfs_slate_today',
-          value: JSON.stringify({ date: today, players: slate, generatedAt: timestamp }),
-        },
-        { onConflict: 'key' },
+    const payload = JSON.stringify({
+      date: today,
+      players: slate,
+      generatedAt: timestamp,
+      slate: multi.metadata.slate ?? null,
+      degradedMode: multi.metadata.degradedMode === true,
+    });
+    const writes = [
+      supabase.from('app_settings').upsert({ key: 'dfs_slate_today', value: payload }, { onConflict: 'key' }),
+    ];
+    if (draftGroupId != null) {
+      writes.push(
+        supabase.from('app_settings').upsert(
+          { key: `dfs_slate_${today}_${draftGroupId}`, value: payload },
+          { onConflict: 'key' },
+        ),
       );
+    }
+    const writeResults = await Promise.all(writes);
+    const error = writeResults.find(r => r.error)?.error;
 
     if (error) {
       // Non-fatal: slate was built, just couldn't persist

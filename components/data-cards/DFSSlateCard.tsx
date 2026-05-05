@@ -15,6 +15,9 @@ interface SlatePlayer {
   matchupScore: string;
   cardCategory: string;
   stackTeam?:   string;
+  /** False when player is unavailable for this contest (IL / scratched / no game / not in confirmed lineup). */
+  isPlaying?:   boolean;
+  confirmedStarter?: boolean;
 }
 
 interface DFSSlateCardProps {
@@ -41,19 +44,35 @@ function ValueGrade({ score }: { score: number }) {
   );
 }
 
+function formatSlateStartTime(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' });
+}
+
 export const DFSSlateCard = memo(function DFSSlateCard({
   title,
   data,
   onAnalyze,
   isHero = false,
 }: DFSSlateCardProps) {
-  const slate: SlatePlayer[] = Array.isArray(data.slate) ? data.slate : [];
+  // Defense-in-depth: never render players who aren't playing, even if the
+  // builder somehow let them through.
+  const rawSlate: SlatePlayer[] = Array.isArray(data.slate) ? data.slate : [];
+  const slate = rawSlate.filter(p => p.isPlaying !== false);
   const topStack: string | undefined = data.topStack;
   const totalProjPts: string = data.totalProjPts ?? '—';
   const totalSalary:  string = data.totalSalary  ?? '—';
   const gamesCount:   string = data.gamesCount   ?? '—';
   const capValid:     boolean = data.capValid !== false; // default true if not provided
   const playingTodayCount: number = typeof data.playingTodayCount === 'number' ? data.playingTodayCount : slate.length;
+  const slateLabel:   string | undefined = data.slateLabel;
+  const draftGroupId: number | undefined = typeof data.draftGroupId === 'number' ? data.draftGroupId : undefined;
+  const slateStart:   string = formatSlateStartTime(data.slateStartDate);
+  const degradedMode: boolean = data.degradedMode === true;
+  const degradedReason: string | undefined = data.degradedReason;
+  const insufficientPool: boolean = data.insufficientPool === true;
 
   // Parse total salary as a number for the cap bar
   const totalSalaryNum = parseInt(String(totalSalary).replace(/[^0-9]/g, ''), 10) || 0;
@@ -86,6 +105,29 @@ export const DFSSlateCard = memo(function DFSSlateCard({
         <h3 className={cn('font-black text-white leading-snug pr-20', isHero ? 'text-lg' : 'text-sm')}>
           {title}
         </h3>
+        {/* Slate identity row — DK contest the lineup is built for */}
+        {slateLabel && (
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <span className="text-[9px] font-black uppercase tracking-wider text-emerald-300">
+              {slateLabel}
+            </span>
+            {gamesCount !== '—' && (
+              <>
+                <span className="text-white/30 text-[9px]">·</span>
+                <span className="text-[9px] text-white/70 font-semibold">{gamesCount} games</span>
+              </>
+            )}
+            {slateStart && (
+              <>
+                <span className="text-white/30 text-[9px]">·</span>
+                <span className="text-[9px] text-white/70">First pitch {slateStart}</span>
+              </>
+            )}
+            {draftGroupId != null && (
+              <span className="text-[8px] text-white/30 tabular-nums">#{draftGroupId}</span>
+            )}
+          </div>
+        )}
         {/* Summary row */}
         <div className="flex items-center gap-3 mt-2 flex-wrap">
           {totalSalary !== '—' && (
@@ -94,7 +136,7 @@ export const DFSSlateCard = memo(function DFSSlateCard({
           {totalProjPts !== '—' && (
             <span className="text-[10px] font-bold text-emerald-400 tabular-nums">{totalProjPts} proj pts</span>
           )}
-          {gamesCount !== '—' && (
+          {!slateLabel && gamesCount !== '—' && (
             <span className="text-[9px] text-white/50">{gamesCount} games</span>
           )}
         </div>
@@ -107,11 +149,26 @@ export const DFSSlateCard = memo(function DFSSlateCard({
         )}
       </div>
 
+      {/* ── Degraded-mode banner ────────────────────────────────────────── */}
+      {(degradedMode || insufficientPool) && (
+        <div className="mx-4 mt-3 px-3 py-2 rounded-lg border border-amber-500/40 bg-amber-500/10">
+          <div className="text-[10px] font-black uppercase tracking-wider text-amber-300 mb-0.5">
+            {insufficientPool ? 'Slate too thin' : 'DraftKings unavailable'}
+          </div>
+          <div className="text-[10px] text-amber-100/80 leading-snug">
+            {insufficientPool
+              ? 'Not enough confirmed available players in this contest pool to build a full lineup. Wait for lineups to lock and try again.'
+              : 'Could not reach the DraftKings contest feed — lineup is hidden until it can be validated against a real contest pool.'}
+            {degradedReason ? ` (${degradedReason})` : ''}
+          </div>
+        </div>
+      )}
+
       {/* ── Lineup rows ────────────────────────────────────────────────── */}
       <div className="pb-4">
         {slate.length === 0 ? (
           <div className="px-4 py-6 text-center text-[11px] text-[var(--text-faint)]">
-            Lineup data unavailable
+            {degradedMode || insufficientPool ? 'No lineup posted — see banner above.' : 'Lineup data unavailable'}
           </div>
         ) : (
           <div className="divide-y divide-[var(--border-subtle)]">

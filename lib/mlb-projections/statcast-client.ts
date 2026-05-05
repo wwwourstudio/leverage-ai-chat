@@ -115,13 +115,18 @@ const SAVANT_BASE = 'https://baseballsavant.mlb.com';
 // Use last complete MLB season (season runs Apr–Oct; before April the prior year is most recent).
 const now = new Date();
 const SEASON = now.getMonth() < 3 /* Jan–Mar */ ? now.getFullYear() - 1 : now.getFullYear();
+// Dynamic min-PA/IP threshold: in early season (first 8 weeks = before June) lower the bar
+// so pitchers with <20 IP or hitters with <100 PA still appear in the leaderboard fetch.
+const MONTH = now.getMonth(); // 0=Jan
+const MIN_PA  = MONTH >= 5 /* June+ */ ? 100 : 10;  // hitters
+const MIN_IP  = MONTH >= 5 /* June+ */ ? 20  : 1;   // pitchers
 
 /**
  * Fetch Statcast hitter leaderboard (top batters by xwOBA).
  * Returns up to `limit` players sorted by xwOBA descending.
  */
 export async function fetchStatcastHitters(limit = 50): Promise<StatcastHitterStats[]> {
-  const cacheKey = `hitters:${SEASON}:${limit}`;
+  const cacheKey = `hitters:${SEASON}:${MIN_PA}:${limit}`;
 
   // L1: in-process memory cache
   const memHit = getCached<StatcastHitterStats[]>(cacheKey);
@@ -133,7 +138,7 @@ export async function fetchStatcastHitters(limit = 50): Promise<StatcastHitterSt
 
   try {
     // Expected stats leaderboard (JSON)
-    const url = `${SAVANT_BASE}/leaderboard/expected_statistics?type=batter&year=${SEASON}&position=&team=&min=100&csv=false`;
+    const url = `${SAVANT_BASE}/leaderboard/expected_statistics?type=batter&year=${SEASON}&position=&team=&min=${MIN_PA}&csv=false`;
     const res = await fetch(url, {
       headers: { 'User-Agent': 'LeverageAI/1.0', Accept: 'application/json' },
       signal: AbortSignal.timeout(10000),
@@ -200,7 +205,7 @@ export async function fetchStatcastHitters(limit = 50): Promise<StatcastHitterSt
  * Fetch Statcast pitcher leaderboard (top starters by K%).
  */
 export async function fetchStatcastPitchers(limit = 30): Promise<StatcastPitcherStats[]> {
-  const cacheKey = `pitchers:${SEASON}:${limit}`;
+  const cacheKey = `pitchers:${SEASON}:${MIN_IP}:${limit}`;
 
   const memHit = getCached<StatcastPitcherStats[]>(cacheKey);
   if (memHit) return memHit;
@@ -209,7 +214,7 @@ export async function fetchStatcastPitchers(limit = 30): Promise<StatcastPitcher
   if (dbHit?.length) { setCached(cacheKey, dbHit); return dbHit; }
 
   try {
-    const url = `${SAVANT_BASE}/leaderboard/expected_statistics?type=pitcher&year=${SEASON}&position=&team=&min=20&csv=false`;
+    const url = `${SAVANT_BASE}/leaderboard/expected_statistics?type=pitcher&year=${SEASON}&position=&team=&min=${MIN_IP}&csv=false`;
     const res = await fetch(url, {
       headers: { 'User-Agent': 'LeverageAI/1.0', Accept: 'application/json' },
       signal: AbortSignal.timeout(10000),

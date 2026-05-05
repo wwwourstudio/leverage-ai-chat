@@ -195,6 +195,22 @@ export async function fetchDKDraftables(draftGroupId: number): Promise<Result<DK
 }
 
 /**
+ * Convert a UTC ISO string to "YYYY-MM-DD" in America/New_York.
+ * Late-evening games (e.g. 9 PM ET = 01:00 UTC next day) must be bucketed
+ * by their ET date, not their UTC date.
+ */
+function toETDate(isoUtc: string): string {
+  try {
+    const d = new Date(isoUtc);
+    if (isNaN(d.getTime())) return '';
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(d);
+    // en-CA locale formats as YYYY-MM-DD which matches our target format
+  } catch {
+    return isoUtc.slice(0, 10);
+  }
+}
+
+/**
  * Pick the "Main" classic slate for a given date — the largest classic slate
  * starting at or after 4:00 pm ET. Falls back to the largest classic slate of
  * the day if no evening slate exists. Returns Err if nothing matches.
@@ -203,17 +219,28 @@ export async function getMainSlate(date?: Date): Promise<Result<DKDraftGroup, Er
   const contests = await fetchDKContests();
   if (!contests.ok) return contests;
 
-  const target = (date ?? new Date()).toISOString().slice(0, 10);
-  const sameDay = contests.value.filter(g => g.contestType === 'classic' && g.startDate.slice(0, 10) === target);
+  // Compare in ET — a 9 PM ET game has a UTC date of the next day, so we must
+  // bucket slates by their Eastern date rather than their UTC date.
+  const targetET = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(date ?? new Date());
+  const sameDay = contests.value.filter(g => g.contestType === 'classic' && toETDate(g.startDate) === targetET);
   if (sameDay.length === 0) {
-    return Err(new Error(`No classic DK MLB slates found for ${target}`));
+    return Err(new Error(`No classic DK MLB slates found for ${targetET}`));
   }
 
-  // Prefer slates starting at or after 4pm ET (≥ 20:00 UTC during DST, 21:00 UTC outside).
-  // Use 20:00 UTC as the cutoff — slightly inclusive of late-afternoon / early-evening Main slates.
+  // Prefer slates starting at or after 4 pm ET. ET 4 pm = UTC 20:00 (EDT) or 21:00 (EST).
+  // Check by converting the slate start time to ET hours.
   const evening = sameDay.filter(g => {
-    const hourUtc = new Date(g.startDate).getUTCHours();
-    return Number.isFinite(hourUtc) && hourUtc >= 20;
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        hour: 'numeric',
+        hour12: false,
+      }).formatToParts(new Date(g.startDate));
+      const hourET = Number(parts.find(p => p.type === 'hour')?.value ?? '0');
+      return hourET >= 16; // 4 pm ET or later
+    } catch {
+      return false;
+    }
   });
   const pool = evening.length > 0 ? evening : sameDay;
 

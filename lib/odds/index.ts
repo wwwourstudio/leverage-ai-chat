@@ -291,6 +291,8 @@ export async function fetchLiveOdds(
       timestamp: Date.now(),
       promise: fetchPromise
     });
+    // Remove the in-flight entry on rejection so the next caller gets a fresh fetch
+    fetchPromise.catch(() => { requestCache.delete(cacheKey); });
   }
 
   return fetchPromise;

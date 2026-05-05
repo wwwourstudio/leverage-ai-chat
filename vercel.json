@@ -26,7 +26,7 @@
       "maxDuration": 60
     },
     "app/api/cards/route.ts": {
-      "maxDuration": 20
+      "maxDuration": 30
     },
     "app/api/mlb-projections/route.ts": {
       "maxDuration": 25

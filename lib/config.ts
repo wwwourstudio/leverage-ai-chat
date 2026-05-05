@@ -555,7 +555,12 @@ export function getMissingAPIKeys(): string[] {
  */
 export function verifyCronSecret(req: { headers: { get(name: string): string | null }; nextUrl?: { searchParams: URLSearchParams } }): boolean {
   const stored = process.env.CRON_SECRET?.trim();
-  if (!stored) return true; // no secret configured → allow all
+  if (!stored) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[SECURITY] CRON_SECRET is not set — all cron endpoints are publicly accessible');
+    }
+    return true; // no secret configured → allow all (useful for dev)
+  }
 
   // Extract token from Authorization header (case-insensitive Bearer prefix)
   const authHeader = req.headers.get('authorization') ?? '';

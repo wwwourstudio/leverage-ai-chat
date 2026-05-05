@@ -803,7 +803,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // We do NOT refresh cards that were already returned by the AI — those are aligned
   // with the AI text and replacing them would cause text/card drift.
   useEffect(() => {
-    if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current);
+    if (cardsRefreshIntervalRef.current) clearTimeout(cardsRefreshIntervalRef.current);
 
     const fillMissingCards = async () => {
       if (!lastUserQuery) return;
@@ -869,8 +869,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     };
 
     // Short delay to let the AI done-event cards arrive first
-    cardsRefreshIntervalRef.current = setTimeout(fillMissingCards, 3000) as unknown as ReturnType<typeof setInterval>;
-    return () => { if (cardsRefreshIntervalRef.current) clearInterval(cardsRefreshIntervalRef.current); };
+    cardsRefreshIntervalRef.current = setTimeout(fillMissingCards, 3000) as unknown as NodeJS.Timeout;
+    return () => { if (cardsRefreshIntervalRef.current) clearTimeout(cardsRefreshIntervalRef.current); };
   }, [lastUserQuery]);
 
   // Start with empty chat history - user creates real chats

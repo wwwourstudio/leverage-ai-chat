@@ -252,7 +252,7 @@ export async function getGameTimeForecast(
       `&timezone=${encodeURIComponent(stadium.timezone)}` +
       `&forecast_days=7`;
 
-    const response = await fetch(forecastUrl);
+    const response = await fetch(forecastUrl, { signal: AbortSignal.timeout(8_000) });
     if (!response.ok) {
       return null;
     }

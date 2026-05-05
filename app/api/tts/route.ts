@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
+    signal: AbortSignal.timeout(25_000),
     body: JSON.stringify({
       text: input,
       voice_id,

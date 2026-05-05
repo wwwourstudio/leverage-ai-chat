@@ -795,7 +795,7 @@ export function CardList({ cards, onAnalyze, isLoading, className = '' }: CardLi
     <div className={`flex flex-col gap-4 w-full ${className}`}>
       {cards.map((card, index) => (
         <DynamicCardRenderer
-          key={`${card.type}-${index}`}
+          key={`${card.type}-${card.title ?? ''}-${index}`}
           card={card}
           index={index}
           onAnalyze={onAnalyze}

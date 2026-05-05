@@ -67,15 +67,14 @@ interface CachedCards {
 const CARD_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
 const cardCacheMap = new Map<string, CachedCards>();
 
-/** Build a stable cache key from category + sport + first 80 chars of userContext */
-function makeCacheKey(category?: string, sport?: string, userContext?: string): string {
-  const contextSlug = userContext ? userContext.trim().toLowerCase().substring(0, 80) : '';
-  return `${category ?? 'all'}:${sport ?? ''}:${contextSlug}`;
+/** Build a stable cache key from category + sport. Cards are public data — not user-specific. */
+function makeCacheKey(category?: string, sport?: string): string {
+  return `${category ?? 'all'}:${sport ?? ''}`;
 }
 
-/** Retrieve cached cards if still fresh for the given category+sport+userContext */
-export function getCachedCards(category?: string, sport?: string, count: number = 6, userContext?: string): InsightCard[] | null {
-  const key = makeCacheKey(category, sport, userContext);
+/** Retrieve cached cards if still fresh for the given category+sport key */
+export function getCachedCards(category?: string, sport?: string, count: number = 6, _userContext?: string): InsightCard[] | null {
+  const key = makeCacheKey(category, sport);
   const entry = cardCacheMap.get(key);
   if (!entry) return null;
   if (Date.now() - entry.timestamp > CARD_CACHE_TTL) {
@@ -85,9 +84,9 @@ export function getCachedCards(category?: string, sport?: string, count: number 
   return entry.cards.slice(0, count);
 }
 
-/** Store cards in the in-memory cache under the given category+sport+userContext key */
-function setCachedCards(cards: InsightCard[], category: string, sport?: string, userContext?: string): void {
-  const key = makeCacheKey(category, sport, userContext);
+/** Store cards in the in-memory cache under the given category+sport key */
+function setCachedCards(cards: InsightCard[], category: string, sport?: string): void {
+  const key = makeCacheKey(category, sport);
   cardCacheMap.set(key, { cards, timestamp: Date.now(), category });
 }
 

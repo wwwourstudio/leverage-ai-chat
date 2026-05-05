@@ -1818,8 +1818,11 @@ export async function POST(request: NextRequest) {
         try {
           const baseOrigin = process.env.VERCEL_URL
             ? `https://${process.env.VERCEL_URL}`
-            : 'http://localhost:3000';
-          const res = await fetch(`${baseOrigin}/api/odds/movers?hours=${hours}`, { cache: 'no-store' });
+            : (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000');
+          const res = await fetch(`${baseOrigin}/api/odds/movers?hours=${hours}`, {
+            cache: 'no-store',
+            signal: AbortSignal.timeout(10_000),
+          });
           if (!res.ok) return { movers: [] };
           return await res.json();
         } catch (err) {
@@ -1855,11 +1858,14 @@ export async function POST(request: NextRequest) {
         try {
           const baseOrigin = process.env.VERCEL_URL
             ? `https://${process.env.VERCEL_URL}`
-            : 'http://localhost:3000';
+            : (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000');
           const params = new URLSearchParams();
           if (sport)  params.set('sport', sport);
           if (market) params.set('market', market);
-          const res = await fetch(`${baseOrigin}/api/props/latest?${params}`, { cache: 'no-store' });
+          const res = await fetch(`${baseOrigin}/api/props/latest?${params}`, {
+            cache: 'no-store',
+            signal: AbortSignal.timeout(10_000),
+          });
           if (!res.ok) return { props: [] };
           return await res.json();
         } catch (err) {

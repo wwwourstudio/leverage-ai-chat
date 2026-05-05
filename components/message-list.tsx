@@ -35,7 +35,7 @@ const TYPING_STAGES = [
   'Generating insights...',
 ];
 
-function TypingIndicator() {
+const TypingIndicator = memo(function TypingIndicator() {
   const [stage, setStage] = useState(0);
 
   useEffect(() => {
@@ -75,7 +75,7 @@ function TypingIndicator() {
       </div>
     </div>
   );
-}
+});
 
 const MessageItem = memo(function MessageItem({
   message,
@@ -154,12 +154,17 @@ export const MessageList = memo(function MessageList({ messages, isTyping, onRet
     setShowNewContentBanner(false);
   }, []);
 
+  const scrollRafRef = useRef<number | null>(null);
   const handleScroll = useCallback(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    setShowJumpBtn(distFromBottom > 200);
-    if (distFromBottom <= 60) setShowNewContentBanner(false);
+    if (scrollRafRef.current !== null) return; // already scheduled
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      const el = containerRef.current;
+      if (!el) return;
+      const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      setShowJumpBtn(distFromBottom > 200);
+      if (distFromBottom <= 60) setShowNewContentBanner(false);
+    });
   }, []);
 
   // Detect when new assistant messages arrive while user is scrolled up

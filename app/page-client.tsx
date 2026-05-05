@@ -2055,6 +2055,15 @@ No preamble. Start directly with section 1.`;
     'waiver wire', 'starting pitcher', 'starting pitchers', 'innings pitched',
     'batting average', 'on-base', 'stolen base', 'rbi', 'statcast', 'exit velocity',
     'spin rate', 'launch angle', 'park factor', 'savant',
+    // Baseball-specific prop market keywords — unambiguous identifiers of MLB prop queries
+    'hits o/u', 'hits over', 'hits under',
+    'home run o/u', 'home runs o/u', 'hr o/u',
+    'strikeouts o/u', 'ks o/u', 'k o/u',
+    'total bases o/u', 'tb o/u',
+    'rbis o/u', 'rbi o/u',
+    'stolen bases o/u',
+    'batter prop', 'pitcher prop', 'pitcher ks',
+    'first pitch', 'no-hitter', 'perfect game', 'immaculate inning',
     // All 30 MLB teams
     'yankees', 'red sox', 'blue jays', 'rays', 'orioles',
     'white sox', 'guardians', 'tigers', 'royals', 'twins',
@@ -2128,13 +2137,13 @@ No preamble. Start directly with section 1.`;
     'vikings', 'falcons', 'panthers', 'saints', 'buccaneers',
     'rams', 'seahawks', 'cardinals', '49ers',
     // Common abbreviations
-    ' ne', ' mia', ' nyj', ' buf',
+    ' mia', ' nyj', ' buf',
     ' bal', ' cin', ' cle',
     ' ten', ' ind', ' hou', ' jax',
     ' kc', ' lv', ' lac', ' den',
-    ' dal', ' phi', ' nyg', ' was',
+    ' dal', ' phi', ' nyg',
     ' chi', ' det', ' gb', ' min',
-    ' atl', ' car', ' tb',
+    ' atl', ' tb',
     ' lar', ' ari', ' sf',
     '(ne)', '(mia)', '(nyj)', '(buf)',
     '(bal)', '(cin)', '(cle)', '(pit)',
@@ -2217,6 +2226,15 @@ No preamble. Start directly with section 1.`;
       'freddie freeman', 'mookie betts', 'tatis', 'yordan alvarez',
       'corbin burnes', 'gerrit cole', 'spencer strider',
       'lindor', 'devers', 'vlad guerrero', 'wander franco',
+      // Active MLB stars frequently queried by name
+      'elly de la cruz', 'elly de la', 'de la cruz',
+      'bleday', 'jj bleday',
+      'gunnar henderson', 'bobby witt', 'corey seager',
+      'adley rutschman', 'julio rodriguez', 'pete alonso',
+      'paul skenes', 'jackson merrill', 'jackson holliday',
+      'wyatt langford', 'cj abrams', 'josh lowe',
+      'michael harris', 'james outman', 'jarren duran',
+      'jose altuve', 'will smith', 'kyle tucker',
     ].some(p => t.includes(p))) return 'mlb';
     // Deep scan: team names, positions, sport-specific terms.
     // NBA/NFL/NHL team names are checked BEFORE MLB because some abbreviations

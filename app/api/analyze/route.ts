@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const maxDuration = 60;
-import { streamText, generateText, tool, stepCountIs } from 'ai';
+import { streamText, generateText, tool, stepCountIs, wrapLanguageModel } from 'ai';
 import { createXai } from '@ai-sdk/xai';
 import { z } from 'zod';
 import {
@@ -222,6 +222,34 @@ export async function POST(request: NextRequest) {
     }
     const body = parsed.data as AnalyzeRequestBody;
     const { existingCards = [], context = {}, customInstructions } = body;
+
+    // xAI internally routes to Anthropic and adds cache_control to ALL content
+    // blocks. When an assistant message has only tool calls (no text), xAI sends
+    // content:"" which becomes an empty text block — Anthropic then rejects the
+    // request with "cache_control cannot be set for empty text blocks". Fix: wrap
+    // the model with middleware that injects a non-empty stub text into any
+    // tool-only assistant history message before xAI's SDK sees it.
+    const xaiNoEmptyContent = (rawModel: ReturnType<ReturnType<typeof createXai>>) =>
+      wrapLanguageModel({
+        model: rawModel,
+        middleware: {
+          specificationVersion: 'v3' as const,
+          transformParams: async ({ params }) => {
+            const patched = params.prompt.map((msg) => {
+              if (msg.role !== 'assistant') return msg;
+              const parts = msg.content as Array<{ type: string; text?: string }>;
+              const hasText = parts.some((p) => p.type === 'text' && p.text && p.text.length > 0);
+              const hasToolCall = parts.some((p) => p.type === 'tool-call');
+              if (!hasText && hasToolCall) {
+                // Prepend a minimal text so xAI never sends content:"" to Anthropic
+                return { ...msg, content: [{ type: 'text', text: '.' }, ...parts] };
+              }
+              return msg;
+            });
+            return { ...params, prompt: patched } as typeof params;
+          },
+        },
+      });
 
     // ── Guardrail 1: File-size guard ─────────────────────────────────────────
     // The client caps file rows at 100 (chat-input) but we add a server-side
@@ -1887,7 +1915,7 @@ export async function POST(request: NextRequest) {
 
             // streamText returns immediately; tokens arrive via textStream async iterable
             const streamResult = streamText({
-              model: createXai({ apiKey: xaiApiKey })(primaryModel),
+              model: xaiNoEmptyContent(createXai({ apiKey: xaiApiKey })(primaryModel)),
               system: systemPrompt,
               ...buildGenOptions(enrichedPrompt, hasImages ? validatedImageAttachments : undefined),
               temperature: AI_CONFIG.DEFAULT_TEMPERATURE,

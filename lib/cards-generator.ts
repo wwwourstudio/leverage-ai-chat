@@ -2307,6 +2307,8 @@ async function _generateContextualCards(
                 matchupScore: c.data.matchupScore,
                 cardCategory: c.data.cardCategory ?? 'optimal',
                 stackTeam:   c.data.stackTeam,
+                isPlaying:   c.data.isPlaying,
+                confirmedStarter: c.data.confirmedStarter,
               })),
               topStack: multi.topStack ? `${multi.topStack.type === 'full' ? 'FULL STACK' : 'MINI-STACK'}: ${multi.topStack.team}` : undefined,
               totalProjPts: totalPts,
@@ -2314,8 +2316,34 @@ async function _generateContextualCards(
               gamesCount:   String(multi.metadata.gamesCount),
               capValid:     multi.metadata.capValid,
               playingTodayCount: multi.metadata.playingTodayCount,
+              // ── DK contest slate metadata (null when DK feed was unavailable) ──
+              slateLabel:    multi.metadata.slate?.slateLabel,
+              draftGroupId:  multi.metadata.slate?.draftGroupId,
+              slateStartDate: multi.metadata.slate?.startDate,
+              slateContestType: multi.metadata.slate?.contestType,
+              degradedMode:  multi.metadata.degradedMode === true,
+              degradedReason: multi.metadata.degradedReason,
+              insufficientPool: multi.metadata.insufficientPool === true,
             },
             metadata: { realData: true, source: 'LeverageMetrics' },
+          });
+        } else if (multi.metadata.degradedMode || multi.metadata.insufficientPool) {
+          // No lineup possible — emit a single informational card instead of falling back to ADP.
+          cards.push({
+            type: 'dfs-slate',
+            title: `DK Optimal Lineup · MLB · ${today}`,
+            icon: 'Trophy',
+            category: 'MLB',
+            subcategory: 'DraftKings — slate unavailable',
+            gradient: 'from-amber-600 to-red-700',
+            status: 'fallback',
+            data: {
+              slate: [],
+              degradedMode: multi.metadata.degradedMode === true,
+              degradedReason: multi.metadata.degradedReason,
+              insufficientPool: multi.metadata.insufficientPool === true,
+            },
+            metadata: { realData: false, source: 'DraftKings (unavailable)' },
           });
         } else {
           // ADP fallback: projection engine returned no slate — build lineup from nfbc_adp

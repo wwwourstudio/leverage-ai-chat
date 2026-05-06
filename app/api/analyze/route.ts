@@ -2077,6 +2077,15 @@ export async function POST(request: NextRequest) {
               ...(body.deepThink && { maxSteps: 3 }),
             });
 
+            // Emit individual card SSE frames as soon as cards resolve (concurrently with
+            // the AI text stream). For Cases 1/2/3 cardPromise is already synchronously
+            // resolved, so this fires on the next microtask — before the first text token.
+            cardPromise.then(earlyCards => {
+              for (const c of earlyCards) {
+                controller.enqueue(sseChunk({ type: 'card', card: c }));
+              }
+            }).catch(() => {});
+
             // Abort if the first token doesn't arrive within the timeout budget
             const firstTokenTimer = setTimeout(() => abortCtrl.abort(new Error('Primary timeout')), primaryTimeoutMs);
 

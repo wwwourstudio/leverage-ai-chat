@@ -1,0 +1,1 @@
+-- Applied directly via Supabase MCP; placeholder for CLI sync.

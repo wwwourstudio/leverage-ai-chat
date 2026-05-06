@@ -16,6 +16,9 @@
 --                    api.model_metrics   (live calibration_alpha/beta)
 -- =============================================================================
 
+-- Ensure api schema exists (preview branches start from a blank DB)
+CREATE SCHEMA IF NOT EXISTS api;
+
 -- model_metrics: written by cron/train after each daily calibration run.
 -- Also written by cron/backtest (window_days=0 sentinel row = live calibration).
 CREATE TABLE IF NOT EXISTS api.model_metrics (

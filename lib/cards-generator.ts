@@ -1685,6 +1685,91 @@ async function _generateContextualCards(
     return [];
   }
 
+  // ── Standalone weather cards ──────────────────────────────────────────────
+  // When the user explicitly asks about weather, build one card per outdoor
+  // MLB game today by fetching forecasts at game time from Open-Meteo.
+  // Falls back gracefully when no games are scheduled or all venues are domed.
+  if (category === 'weather' || category === 'weather-impact') {
+    console.log('[v0] [CARDS-GEN] Weather category — building standalone game-time weather cards');
+    try {
+      const { fetchTodaysGames } = await import('@/lib/mlb-projections/mlb-stats-api');
+      const { getGameTimeForecast } = await import('@/lib/weather/index');
+
+      const games = await fetchTodaysGames().catch(() => []);
+      const weatherResults = await Promise.allSettled(
+        games.slice(0, count * 2).map(async g => {
+          const homeTeam = g.homeTeam ?? g.homeTeamAbbr ?? '';
+          const gameTime = g.gameDate ? new Date(g.gameDate) : new Date();
+          const forecast = await Promise.race([
+            getGameTimeForecast(homeTeam, gameTime),
+            new Promise<null>(res => setTimeout(() => res(null), 4_000)),
+          ]);
+          if (!forecast) return null;
+
+          const kf = forecast.kickoff; // "kickoff" = first inning for MLB
+          const isHighImpact = forecast.impact === 'high';
+          const windDir = kf.windDirection;
+          const compassPts = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+          const compassLabel = compassPts[Math.round(windDir / 45) % 8];
+          const precipPct = kf.precipitationProbability;
+
+          return {
+            type: CARD_TYPES.WEATHER_GAME,
+            title: `${g.awayTeam} @ ${g.homeTeam} — Weather`,
+            icon: 'Cloud',
+            category: 'WEATHER',
+            subcategory: 'Game-Time Forecast',
+            gradient: isHighImpact
+              ? 'from-amber-600/75 via-orange-900/55 to-slate-900/40'
+              : 'from-sky-600/75 via-blue-900/55 to-slate-900/40',
+            status: isHighImpact ? 'alert' : 'neutral',
+            realData: true,
+            data: {
+              matchup: `${g.awayTeam} @ ${g.homeTeam}`,
+              Temperature: `${Math.round(kf.temperature)}°F`,
+              Condition: kf.condition,
+              'Wind Speed': `${Math.round(kf.windSpeed)} mph ${compassLabel}`,
+              'Rain Chance': `${precipPct}%`,
+              Impact: forecast.impact.charAt(0).toUpperCase() + forecast.impact.slice(1),
+              Trend: forecast.trend,
+              Recommendation: forecast.recommendation,
+              realData: true,
+            },
+          };
+        }),
+      );
+
+      const weatherCards = weatherResults
+        .map(r => r.status === 'fulfilled' ? r.value : null)
+        .filter((c): c is NonNullable<typeof c> => c !== null);
+
+      if (weatherCards.length > 0) {
+        cards.push(...weatherCards.slice(0, count));
+        setCachedCards(cards, 'weather', sport);
+        return cards;
+      }
+    } catch (err) {
+      console.error('[v0] [CARDS-GEN] Weather card build error:', err);
+    }
+
+    // Fallback: no games today or all domed venues
+    cards.push({
+      type: CARD_TYPES.WEATHER_GAME,
+      title: 'No Outdoor Games Today',
+      icon: 'Cloud',
+      category: 'WEATHER',
+      subcategory: 'Game-Time Forecast',
+      gradient: 'from-sky-600/75 via-blue-900/55 to-slate-900/40',
+      status: 'neutral',
+      realData: false,
+      data: {
+        note: 'No outdoor MLB games scheduled today, or all venues are domed.',
+        realData: false,
+      },
+    });
+    return cards;
+  }
+
   // Betting/Arbitrage cards (default)
   if (category === 'betting' || !category) {
     // Try to detect real arbitrage opportunities

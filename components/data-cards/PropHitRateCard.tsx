@@ -94,18 +94,42 @@ function parseRecentForm(recentForm?: string): boolean[] {
   });
 }
 
+function rateChipClass(pct: number): string {
+  return pct >= 60 ? 'bg-emerald-500/15 text-emerald-400'
+    : pct >= 40 ? 'bg-amber-500/15 text-amber-400'
+    : 'bg-red-500/15 text-red-400';
+}
+
 function FormBars({ dots }: { dots: boolean[] }) {
   const [animated, setAnimated] = useState(false);
   useEffect(() => { const t = setTimeout(() => setAnimated(true), 150); return () => clearTimeout(t); }, []);
 
   if (dots.length === 0) return null;
   const last10 = dots.slice(-10);
+  const last5  = dots.slice(-5);
+
+  const l10Rate = last10.length > 0 ? Math.round((last10.filter(Boolean).length / last10.length) * 100) : null;
+  const l5Rate  = last5.length  >= 3 ? Math.round((last5.filter(Boolean).length  / last5.length)  * 100) : null;
 
   return (
     <div className="space-y-1">
-      <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-faint)]">
-        Recent form
-      </span>
+      <div className="flex items-center justify-between">
+        <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-faint)]">
+          Recent form
+        </span>
+        <div className="flex items-center gap-1">
+          {l5Rate !== null && (
+            <span className={cn('text-[8px] font-black px-1.5 py-0.5 rounded', rateChipClass(l5Rate))}>
+              L5: {l5Rate}%
+            </span>
+          )}
+          {l10Rate !== null && (
+            <span className={cn('text-[8px] font-black px-1.5 py-0.5 rounded', rateChipClass(l10Rate))}>
+              L10: {l10Rate}%
+            </span>
+          )}
+        </div>
+      </div>
       <div className="flex items-end gap-0.5 h-6">
         {last10.map((hit, i) => (
           <div

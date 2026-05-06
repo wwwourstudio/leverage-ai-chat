@@ -99,7 +99,9 @@ export async function buildDFSSlateMulti(opts: { limit?: number; date?: string; 
   // instead of a bogus lineup.
   const sp = poolCards.filter(c => c.data.position === 'SP' || c.data.position === 'RP').length;
   const bat = poolCards.length - sp;
-  if (sp < 2 || bat < 8) {
+  // In degraded mode the pool comes from projection-only data, so we can't
+  // enforce the DK-pool-size minimum — show whatever the optimizer can build.
+  if (!dfsResult.degradedMode && (sp < 2 || bat < 8)) {
     return {
       ...empty,
       slateForCard: [],

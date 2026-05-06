@@ -246,16 +246,18 @@ export async function buildDFSCards(opts: { limit?: number; date?: string; draft
 async function buildProjectionOnlyCards(opts: { limit: number; date?: string }): Promise<DFSCardData[]> {
   const { limit } = opts;
   const [projections, todaysGames] = await Promise.all([
-    runProjectionPipeline({ playerType: 'all', limit: limit * 2, date: opts.date }),
+    runProjectionPipeline({ playerType: 'all', limit: limit * 2, date: opts.date }).catch(() => []),
     fetchTodaysGames(opts.date).catch(() => []),
   ]);
   if (projections.length === 0) return [];
-  const sorted = [...projections].sort((a, b) => {
-    const aDK = a.summary_metrics.find(m => m.label === 'DK Proj Pts');
-    const bDK = b.summary_metrics.find(m => m.label === 'DK Proj Pts');
-    return parseFloat(bDK?.value ?? '0') - parseFloat(aDK?.value ?? '0');
-  });
-  const topN = sorted.slice(0, limit);
+  const dkPtsOf = (p: typeof projections[0]) =>
+    parseFloat(p.summary_metrics.find(m => m.label === 'DK Proj Pts')?.value ?? '0');
+  const sorted = [...projections].sort((a, b) => dkPtsOf(b) - dkPtsOf(a));
+  // Guarantee at least some pitchers in the pool so buildOptimalLineup can fill
+  // the SP slot without falling back to UTIL-only players.
+  const pitchers = sorted.filter(p => p.position === 'SP' || p.position === 'RP').slice(0, 8);
+  const hitters  = sorted.filter(p => p.position !== 'SP' && p.position !== 'RP').slice(0, limit - pitchers.length);
+  const topN = [...pitchers, ...hitters];
   const enriched = await Promise.allSettled(topN.map(async proj => {
     const card = projectionToDFSCard(proj, todaysGames);
     // No DK pool means we can't verify availability — flag as unknown so the

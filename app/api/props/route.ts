@@ -18,7 +18,9 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 interface PlayerPropResult {
   name: string;
   team: string;
-  opponent: string;
+  opponent?: string;
+  homeTeam?: string;
+  awayTeam?: string;
   market: string;
   line: number;
   overOdds: number;

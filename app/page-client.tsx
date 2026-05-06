@@ -820,6 +820,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     if (cardsRefreshIntervalRef.current) clearTimeout(cardsRefreshIntervalRef.current);
 
     const fillMissingCards = async () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
       if (!lastUserQuery) return;
 
       // Guard: only run once per query+category combination
@@ -946,11 +947,15 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     e.stopPropagation();
     const chat = chats.find((c: Chat) => c.id === chatId);
     const wasStarred = chat?.starred;
+    const snapshot = chats;
     setChats(chats.map((c: Chat) =>
       c.id === chatId ? { ...c, starred: !c.starred } : c
     ));
     if (isLoggedIn) {
-      updateThread(chatId, { starred: !wasStarred });
+      updateThread(chatId, { starred: !wasStarred }).catch(() => {
+        setChats(snapshot);
+        toast.error('Failed to update — please try again');
+      });
     }
     toast.success(wasStarred ? 'Removed from starred' : 'Analysis saved');
   };
@@ -2968,13 +2973,17 @@ No preamble. Start directly with section 1.`;
 
   const handleDeleteChat = (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setChats(chats.filter((chat: Chat) => chat.id !== chatId));
-    if (activeChat === chatId && chats.length > 1) {
-      const remainingChats = chats.filter((chat: Chat) => chat.id !== chatId);
-      setActiveChat(remainingChats[0].id);
+    const snapshot = chats;
+    const remaining = chats.filter((chat: Chat) => chat.id !== chatId);
+    setChats(remaining);
+    if (activeChat === chatId && remaining.length > 0) {
+      setActiveChat(remaining[0].id);
     }
     if (isLoggedIn) {
-      deleteThread(chatId);
+      deleteThread(chatId).catch(() => {
+        setChats(snapshot);
+        toast.error('Failed to delete — please try again');
+      });
     }
     toast.info('Chat deleted');
   };

@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useState, useEffect, useId } from 'react';
+import Image from 'next/image';
 import { TrendingUp, TrendingDown, Minus, Activity, BarChart2, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PlayerAvatar } from './PlayerAvatar';
@@ -218,8 +219,7 @@ export const PropHitRateCard = memo(function PropHitRateCard({
               <p className="text-[11px] text-[var(--text-faint)] truncate">{statType}</p>
               <HitRateGrade pct={hitRatePercentage} />
               {(sport === 'mlb' || sport === 'baseball') && (
-                <img src="/statcast-logo.png" alt="Statcast"
-                     className="h-3 w-auto opacity-50 flex-shrink-0" />
+                <Image src="/statcast-logo.png" alt="Statcast" width={60} height={12} className="h-3 w-auto opacity-50 flex-shrink-0" />
               )}
             </div>
             {/* Sample-size warning */}

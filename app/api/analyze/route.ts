@@ -1524,19 +1524,17 @@ export async function POST(request: NextRequest) {
     };
 
     /**
-     * Build a messages array with Anthropic prompt caching + conversation memory.
+     * Build streamText/generateText call options with conversation memory.
      *
-     * Splits the system prompt into a static "cached" body and a dynamic prefix
-     * (today's date, custom instructions). The cached body is marked with
-     * Anthropic's `cacheControl: ephemeral` so xAI/Anthropic reuses it across
-     * calls — typically a 80-90% input-token reduction on warm cache.
+     * Returns { system, messages } where `system` is a plain string (the correct
+     * Vercel AI SDK pattern for xAI/Grok) and `messages` contains only user/assistant
+     * turns. A prior approach embedded the system prompt as role:'system' inside the
+     * messages array with Anthropic cacheControl providerOptions — xAI rejects both,
+     * causing AI_InvalidPromptError on every request.
      *
      * Conversation memory: prior user/assistant turns from `context.previousMessages`
-     * are injected between the system block and the new user message. Capped at
-     * the last 6 turns and ~4000 chars total to stay well under the model context.
-     *
-     * Returns a `messages` array suitable for streamText/generateText. The caller
-     * should pass it directly via the spread operator and OMIT the `system` field.
+     * are injected before the new user message. Capped at the last 6 turns and
+     * ~4000 chars total to stay well under the model context window.
      */
     const buildMessagesWithCacheAndMemory = (
       cachedSystem: string,
@@ -1545,21 +1543,10 @@ export async function POST(request: NextRequest) {
       imgs: ImageAttachment[] | undefined,
       priorTurns: Array<{ role: string; content: string }> | undefined,
     ) => {
-      // System: two-block layout. First block is cached; second is dynamic (date, profile).
-      type TextPart = { type: 'text'; text: string; providerOptions?: Record<string, unknown> };
-      const systemContent: TextPart[] = [
-        {
-          type: 'text',
-          text: cachedSystem,
-          // Anthropic prompt caching: marks this block as ephemeral so subsequent
-          // calls with identical content reuse the cached prefix. xAI proxies to
-          // Anthropic so this passes through.
-          providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } },
-        },
-      ];
-      if (dynamicSystem.trim().length > 0) {
-        systemContent.push({ type: 'text', text: dynamicSystem });
-      }
+      // Combine static system body + dynamic prefix (date, user profile) into one string.
+      const system = dynamicSystem.trim().length > 0
+        ? `${cachedSystem}\n\n${dynamicSystem}`
+        : cachedSystem;
 
       // Memory: include up to last 6 prior turns, normalized to user/assistant roles.
       // Cap each message at 1500 chars and total memory at ~4000 chars to leave room
@@ -1593,11 +1580,10 @@ export async function POST(request: NextRequest) {
       }
 
       const messages: ModelMessage[] = [
-        { role: 'system', content: systemContent } as unknown as ModelMessage,
         ...memoryMessages,
         userMessage as unknown as ModelMessage,
       ];
-      return { messages };
+      return { system, messages };
     };
 
     // ── ADP tool (injected when hasADPIntent) ────────────────────────────────────

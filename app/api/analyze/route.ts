@@ -2012,6 +2012,24 @@ export async function POST(request: NextRequest) {
     const encoder = new TextEncoder();
     const sseChunk = (data: object) => encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
 
+    // Maps each tool name to a function that extracts a short human-readable
+    // summary from its result (shown inline in the chat as a tool-call badge).
+    const toolResultSummary = (toolName: string, result: unknown): string => {
+      try {
+        const r = result as Record<string, unknown>;
+        if (toolName === 'query_mlb_projections') return `${(r?.projections as unknown[] | undefined)?.length ?? 0} MLB projections`;
+        if (toolName === 'query_adp')             return `${(r?.players as unknown[] | undefined)?.length ?? 0} ADP entries`;
+        if (toolName === 'query_statcast')         return r?.count ? `${r.count} Statcast records` : 'Statcast data';
+        if (toolName === 'kalshi_get_markets')     return `${(r?.markets as unknown[] | undefined)?.length ?? 0} Kalshi markets`;
+        if (toolName === 'kalshi_get_price')       return r?.probability ? `${(Number(r.probability) * 100).toFixed(0)}% probability` : 'Kalshi price';
+        if (toolName === 'get_live_odds')          return `${(r?.events as unknown[] | undefined)?.length ?? 0} live odds`;
+        if (toolName === 'get_props_latest')       return `${(r?.props as unknown[] | undefined)?.length ?? (r?.total as number | undefined) ?? 0} player props`;
+        if (toolName === 'get_odds_movers')        return `${(r?.movers as unknown[] | undefined)?.length ?? 0} line movers`;
+        if (toolName === 'predict_hr')             return 'HR model computed';
+      } catch { /* ignore */ }
+      return 'data fetched';
+    };
+
     const responseStream = new ReadableStream({
       async start(controller) {
         try {
@@ -2033,6 +2051,14 @@ export async function POST(request: NextRequest) {
               maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
               maxRetries: 0,
               abortSignal: abortCtrl.signal,
+              onStepFinish: ({ toolCalls, toolResults }) => {
+                if (!toolCalls?.length) return;
+                for (const tc of toolCalls) {
+                  const result = (toolResults as any[])?.find((r: any) => r.toolCallId === tc.toolCallId)?.result;
+                  const summary = toolResultSummary(tc.toolName, result);
+                  controller.enqueue(sseChunk({ type: 'tool_call', name: tc.toolName, summary }));
+                }
+              },
               // stepCountIs capped at 2 for all tools — xAI's API rejects messages[6]+
               // (3rd assistant tool-call) because it converts empty content to Anthropic
               // format internally and then fails with cache_control on empty text blocks.

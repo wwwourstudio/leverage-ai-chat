@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { TrustMetricsDisplay } from '@/components/trust-metrics-display';
-import { Shield, Copy, Edit3, CheckCheck, X, Zap, Brain, AlertCircle, Info, RotateCcw } from 'lucide-react';
+import { Shield, Copy, Edit3, CheckCheck, X, Zap, Brain, AlertCircle, Info, RotateCcw, ChevronDown, Wrench } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/toast-provider';
 import { formatRelativeTime } from '@/lib/utils';
@@ -20,6 +20,7 @@ interface Message {
   isError?: boolean;     // request failed with no usable content
   isPending?: boolean;   // optimistic placeholder while API call is in flight
   isStreaming?: boolean; // tokens are actively arriving from the SSE stream
+  toolEvents?: Array<{ name: string; summary: string }>;
 }
 
 interface ChatMessageProps {
@@ -27,6 +28,47 @@ interface ChatMessageProps {
   onEdit?: (content: string) => void;
   onCopy?: () => void;
   onRetry?: () => void;
+}
+
+// Maps internal tool names to friendly display labels
+const TOOL_LABELS: Record<string, string> = {
+  query_mlb_projections: 'MLB Projections',
+  query_adp:             'ADP Rankings',
+  query_statcast:        'Statcast',
+  kalshi_get_markets:    'Kalshi Markets',
+  kalshi_get_price:      'Kalshi Price',
+  get_live_odds:         'Live Odds',
+  get_props_latest:      'Player Props',
+  get_odds_movers:       'Line Movement',
+  predict_hr:            'HR Model',
+};
+
+function ToolTimeline({ events, isStreaming }: { events: Array<{ name: string; summary: string }>; isStreaming?: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-3">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/60 transition-colors"
+      >
+        <Wrench className="w-3 h-3" />
+        <span>{events.length} tool{events.length !== 1 ? 's' : ''} called</span>
+        {isStreaming && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse ml-0.5" />}
+        <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="mt-1.5 pl-4 border-l border-white/10 space-y-1">
+          {events.map((e, i) => (
+            <div key={i} className="flex items-center gap-2 text-[11px]">
+              <span className="text-white/50 font-medium">{TOOL_LABELS[e.name] ?? e.name}</span>
+              <span className="text-white/30">→</span>
+              <span className="text-white/40">{e.summary}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** Render inline markdown: **bold**, _italic_, `code` */
@@ -466,6 +508,12 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                   <span className="text-[11px] text-amber-400 font-semibold">Partial response</span>
                 </div>
               )}
+
+              {/* Tool-use timeline — shown when the AI called one or more tools */}
+              {!isUser && (message.toolEvents?.length ?? 0) > 0 && (
+                <ToolTimeline events={message.toolEvents!} isStreaming={message.isStreaming} />
+              )}
+
               {isUser ? (
                 <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
               ) : isLong && !expanded ? (

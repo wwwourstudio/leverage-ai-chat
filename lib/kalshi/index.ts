@@ -792,69 +792,27 @@ export async function fetchKalshiMarketsWithRetry(params?: {
  * Searches across all supported sports using keyword title searches, deduplicated by ticker.
  */
 export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
-  // Trimmed to the 12 most consistently active sports to avoid hammering Kalshi's
-  // rate limit (previously 29 searches → 429 errors on batches 2+).
-  const sportSearches = [
-    { search: 'NFL',          label: 'NFL' },
-    { search: 'Super Bowl',   label: 'Super Bowl' },
-    { search: 'NBA',          label: 'NBA' },
-    { search: 'March Madness',label: 'March Madness' },
-    { search: 'NCAAB',        label: 'NCAAB' },
-    { search: 'MLB',          label: 'MLB' },
-    { search: 'NHL',          label: 'NHL' },
-    { search: 'Stanley Cup',  label: 'Stanley Cup' },
-    { search: 'NASCAR',       label: 'NASCAR' },
-    { search: 'UFC',          label: 'UFC' },
-    { search: 'Masters',      label: 'Masters' },
-    { search: 'Formula 1',    label: 'F1' },
-  ];
+  // Single fetch + client-side filter. The Kalshi v2 API silently ignores the
+  // `search` query param, so the previous 12-keyword loop produced 12 identical
+  // pages joined by an in-memory dedup. Result: 4 batched API calls × 600ms
+  // delay = ~2.4s wasted per cold cache. The new path issues exactly one
+  // paginated call (`fetchAllKalshiMarkets`, capped at 1000 markets) and filters
+  // client-side via `isSportsMarket()` (seriesTicker prefix + category check).
+  console.log('[KALSHI] Fetching sports markets via single paginated call + client-side filter');
 
-  const seen = new Set<string>();
-  const allMarkets: KalshiMarket[] = [];
+  const allMarkets = await fetchAllKalshiMarkets({
+    maxMarkets: 1000,
+    status: 'open',
+    useCache: true,
+  });
 
-  console.log(`[KALSHI] Fetching sports markets across ${sportSearches.length} categories...`);
+  const sportsMarkets = allMarkets.filter(isSportsMarket);
 
-  // Batch into groups of 3 with a 600 ms pause between batches to stay within
-  // Kalshi's rate limit.  Results are cached for 5 minutes to reduce re-fetches
-  // across warm Lambda invocations.
-  // limit=20 per search is enough to surface high-quality cards (we only need ~6)
-  // and keeps each fetch fast. 12 searches × 20 = 240 pre-dedup slots, sufficient
-  // to deduplicate down to a diverse set of markets.
-  const batchSize = 3;
-  const BATCH_DELAY_MS = 600;
-  const SPORTS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-  for (let i = 0; i < sportSearches.length; i += batchSize) {
-    const batch = sportSearches.slice(i, i + batchSize);
-    const results = await Promise.allSettled(
-      batch.map(({ search }) =>
-        fetchKalshiMarkets({ search, limit: 20, useCache: true, cacheTtlMs: SPORTS_CACHE_TTL_MS })
-      )
-    );
-
-    for (let j = 0; j < results.length; j++) {
-      const result = results[j];
-      if (result.status === 'fulfilled') {
-        for (const market of result.value) {
-          if (!seen.has(market.ticker)) {
-            seen.add(market.ticker);
-            allMarkets.push(market);
-          }
-        }
-        console.log(`[KALSHI] ${batch[j].label}: ${result.value.length} markets`);
-      } else {
-        console.warn(`[KALSHI] ${batch[j].label} failed:`, result.reason);
-      }
-    }
-
-    // Pause between batches (skip after the final batch)
-    if (i + batchSize < sportSearches.length) {
-      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
-    }
-  }
-
-  console.log(`[KALSHI] Sports markets total: ${allMarkets.length} (deduplicated)`);
-  return allMarkets;
+  console.log(
+    `[KALSHI] Sports markets: ${sportsMarkets.length}/${allMarkets.length} after filter ` +
+    `(seriesTicker prefix or category match)`,
+  );
+  return sportsMarkets;
 }
 
 /**

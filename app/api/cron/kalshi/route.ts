@@ -31,31 +31,10 @@ function getServiceClient() {
   return createClient(url, key, { db: { schema: 'api' } });
 }
 
-// Sports series-ticker prefixes — the ONLY reliable filter for Kalshi sports markets.
-// normalizeCategoryLabel() maps these to readable names (NBA, MLB, etc.) but
-// seriesTicker is the ground truth. We check both for belt-and-suspenders.
-const SPORTS_SERIES_PREFIXES = [
-  'NFL', 'NBA', 'MLB', 'NHL', 'NCAAB', 'NCAAF',
-  'NASCAR', 'PGA', 'UFC', 'WNBA',
-  'KXNFL', 'KXNBA', 'KXMLB', 'KXNHL', 'KXNCAAB', 'KXNCAAF',
-  'KXNASCAR', 'KXPGA', 'KXUFC', 'KXWNBA', 'KXMMA', 'KXBOXING',
-  'KXF1', 'KXGOLF', 'KXTENNIS', 'KXSOCCER',
-];
-
-// Normalized category strings that indicate a sports market
-const SPORTS_CATEGORIES = new Set([
-  'NFL', 'NBA', 'MLB', 'NHL',
-  'NCAAB', 'College Basketball', 'NCAAF', 'College Football',
-  'NASCAR', 'Golf', 'Formula 1', 'MMA', 'Boxing', 'WNBA',
-  'Soccer', 'Tennis',
-  'Sports', 'Baseball', 'Basketball', 'Football', 'Hockey',
-]);
-
-function isSportsMarket(m: { seriesTicker?: string; category?: string }): boolean {
-  const series = (m.seriesTicker || '').toUpperCase();
-  if (SPORTS_SERIES_PREFIXES.some(p => series.startsWith(p))) return true;
-  return SPORTS_CATEGORIES.has(m.category || '');
-}
+// Sports filter shared with `lib/kalshi/index.ts:isSportsMarket`. The constant
+// and predicate are imported lazily inside the handler since the kalshi module
+// is itself dynamically imported below (keeps cold-start lean for unrelated
+// crons that share this Lambda).
 
 export async function GET(req: NextRequest) {
   if (!verifyCronSecret(req)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
@@ -75,7 +54,7 @@ export async function GET(req: NextRequest) {
   const startedAt = Date.now();
 
   try {
-    const { fetchAllKalshiMarkets, resetKalshiCircuitBreaker } = await import('@/lib/kalshi/index');
+    const { fetchAllKalshiMarkets, resetKalshiCircuitBreaker, isSportsMarket } = await import('@/lib/kalshi/index');
 
     // Reset the circuit breaker at the START of each cron run.
     // Rationale: crons are scheduled by Vercel — if the invocation fired, the API

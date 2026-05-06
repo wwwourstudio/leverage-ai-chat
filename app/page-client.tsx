@@ -4536,6 +4536,12 @@ No preamble. Start directly with section 1.`;
           state={voiceConv.convState}
           liveTranscript={voiceConv.liveTranscript}
           speakingPreview={voiceConv.speakingPreview}
+          isPushToTalk={voiceConv.isPushToTalk}
+          onSetPushToTalk={voiceConv.setIsPushToTalk}
+          lang={voiceConv.lang}
+          onSetLang={voiceConv.setLang}
+          onStartListening={voiceConv.startListening}
+          onStopListening={voiceConv.stopListening}
           onClose={voiceConv.deactivate}
         />
       )}

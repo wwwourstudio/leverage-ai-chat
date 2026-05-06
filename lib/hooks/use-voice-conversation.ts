@@ -29,6 +29,8 @@ export function useVoiceConversation({
   const [convState, setConvState] = useState<VoiceConvState>('idle');
   const [liveTranscript, setLiveTranscript] = useState('');
   const [speakingPreview, setSpeakingPreview] = useState('');
+  const [isPushToTalk, setIsPushToTalk] = useState(false);
+  const [lang, setLang] = useState('en-US');
   // Start false to match SSR — set true in useEffect (avoids hydration mismatch)
   const [isSupported, setIsSupported] = useState(false);
 
@@ -38,6 +40,11 @@ export function useVoiceConversation({
   const recognitionRef = useRef<any>(null);
   const prevSpokenRef = useRef<string>('');
   const convStateRef = useRef<VoiceConvState>('idle');
+  const isPushToTalkRef = useRef(false);
+  const langRef = useRef('en-US');
+
+  useEffect(() => { isPushToTalkRef.current = isPushToTalk; }, [isPushToTalk]);
+  useEffect(() => { langRef.current = lang; }, [lang]);
 
   // Keep refs in sync
   useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
@@ -105,7 +112,7 @@ export function useVoiceConversation({
     const rec = new SR();
     rec.continuous      = false;
     rec.interimResults  = true;
-    rec.lang            = 'en-US';
+    rec.lang            = langRef.current;
     rec.maxAlternatives = 1;
 
     rec.onresult = (e: any) => {
@@ -163,9 +170,9 @@ export function useVoiceConversation({
     }
   }, [isActive, isAITyping, stopSpeaking, stopListening]);
 
-  // When state becomes 'listening' (after speak ends) → restart mic
+  // When state becomes 'listening' (after speak ends) → restart mic (not in PTT mode)
   useEffect(() => {
-    if (isActive && convState === 'listening' && !recognitionRef.current) {
+    if (isActive && convState === 'listening' && !recognitionRef.current && !isPushToTalkRef.current) {
       startListening();
     }
   }, [isActive, convState, startListening]);
@@ -180,7 +187,7 @@ export function useVoiceConversation({
     setLiveTranscript('');
     setSpeakingPreview('');
     setConvState('listening');
-    startListening();
+    if (!isPushToTalkRef.current) startListening();
   }, [isSupported, lastCompleteAssistantMessage, startListening]);
 
   const deactivate = useCallback(() => {
@@ -213,6 +220,12 @@ export function useVoiceConversation({
     convState,
     liveTranscript,
     speakingPreview,
+    isPushToTalk,
+    setIsPushToTalk,
+    lang,
+    setLang,
+    startListening,
+    stopListening,
     activate,
     deactivate,
     readAloud,

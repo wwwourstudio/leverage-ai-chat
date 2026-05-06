@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getStripeSecretKey, getStripeMonthlyPriceId, getStripeAnnualPriceId } from '@/lib/config';
+import { createClient } from '@/lib/supabase/server';
 
 /**
  * POST /api/stripe/checkout
@@ -14,6 +15,11 @@ import { getStripeSecretKey, getStripeMonthlyPriceId, getStripeAnnualPriceId } f
  * - credits: number
  * - planId: string (for subscriptions: 'monthly' | 'annual')
  * - customer_email?: string
+ *
+ * The authenticated Supabase user is read from the request cookies and
+ * attached to the Stripe session as both `client_reference_id` and
+ * `metadata.userId` so the webhook can identify the user without an
+ * email→user lookup (which is expensive and capped at 1000 users).
  *
  * Response (real mode): { clientSecret: string }
  * Response (mock mode):  { success: true, mock: true, credits: number }
@@ -35,10 +41,33 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Resolve authenticated user (if any) so the webhook can identify them
+    // directly from session metadata instead of doing an email→user lookup.
+    let userId: string | null = null;
+    let userEmail: string | undefined;
+    try {
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        userId = user.id;
+        userEmail = user.email ?? undefined;
+      }
+    } catch {
+      // Auth lookup failed — proceed as guest checkout (email-only resolution)
+    }
+
     const stripe = new Stripe(stripeSecretKey, { apiVersion: '2026-02-25.clover' });
     const origin = request.headers.get('origin') || 'http://localhost:3000';
     // After embedded checkout completes, Stripe redirects to return_url
     const returnUrl = `${origin}?session_id={CHECKOUT_SESSION_ID}`;
+
+    const sharedSessionFields = {
+      ui_mode: 'embedded' as const,
+      customer_email: customer_email || userEmail || undefined,
+      allow_promotion_codes: true,
+      return_url: returnUrl,
+      ...(userId ? { client_reference_id: userId } : {}),
+    };
 
     if (type === 'subscription') {
       const priceMap: Record<string, string> = {
@@ -57,13 +86,15 @@ export async function POST(request: NextRequest) {
       }
 
       const session = await stripe.checkout.sessions.create({
-        ui_mode: 'embedded',
+        ...sharedSessionFields,
         mode: 'subscription',
         line_items: [{ price: priceId, quantity: 1 }],
-        customer_email: customer_email || undefined,
-        allow_promotion_codes: true,
-        return_url: returnUrl,
-        metadata: { type: 'subscription', planId, credits: String(credits) },
+        metadata: {
+          type: 'subscription',
+          planId,
+          credits: String(credits ?? ''),
+          ...(userId ? { userId } : {}),
+        },
       });
 
       return NextResponse.json({ clientSecret: session.client_secret });
@@ -72,7 +103,7 @@ export async function POST(request: NextRequest) {
       const unitAmount = Math.max((amount || 10) * 100, 500); // min $5
 
       const session = await stripe.checkout.sessions.create({
-        ui_mode: 'embedded',
+        ...sharedSessionFields,
         mode: 'payment',
         line_items: [
           {
@@ -87,10 +118,11 @@ export async function POST(request: NextRequest) {
             quantity: 1,
           },
         ],
-        customer_email: customer_email || undefined,
-        allow_promotion_codes: true,
-        return_url: returnUrl,
-        metadata: { type: 'credits', credits: String(credits || amount) },
+        metadata: {
+          type: 'credits',
+          credits: String(credits || amount),
+          ...(userId ? { userId } : {}),
+        },
       });
 
       return NextResponse.json({ clientSecret: session.client_secret });

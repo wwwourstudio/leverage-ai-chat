@@ -38,6 +38,7 @@ const UserLightbox = dynamic(() => import('@/components/UserLightbox').then(m =>
 const WatchlistLightbox = dynamic(() => import('@/components/WatchlistLightbox').then(m => ({ default: m.WatchlistLightbox })), { ssr: false });
 import { useToast } from '@/components/toast-provider';
 import { Sidebar } from '@/components/Sidebar';
+import { CommandPalette } from '@/components/CommandPalette';
 import { ChatHeader, ChatInput } from '@/components/chat';
 import { SuggestedPrompts } from '@/components/suggested-prompts';
 
@@ -315,6 +316,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showSettingsLightbox, setShowSettingsLightbox] = useState(false);
   const [showAlertsLightbox, setShowAlertsLightbox] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
@@ -394,6 +396,18 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // Open sidebar by default on desktop (lg breakpoint = 1024px). Mobile/tablet stay closed.
   useEffect(() => {
     if (window.innerWidth >= 1024) setSidebarOpen(true);
+  }, []);
+
+  // Cmd+K / Ctrl+K → open command palette
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCommandPalette(v => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   // Check actual service health once on mount; wire to the status indicator in ChatInput.
@@ -4496,6 +4510,17 @@ No preamble. Start directly with section 1.`;
         onCardClick={handleSavedCardClick}
       />
 
+      {/* Command Palette (Cmd+K) */}
+      <CommandPalette
+        open={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        chats={chats}
+        activeChat={activeChat}
+        onSelectChat={(id) => { handleSelectChat(id); setSidebarOpen(false); }}
+        onNewChat={() => { handleNewChat(); setSidebarOpen(false); }}
+        onOpenSettings={() => setShowSettingsLightbox(true)}
+      />
+
       {/* Stripe Purchase Lightbox */}
       <StripeLightbox
         isOpen={showStripeLightbox}
@@ -4511,6 +4536,12 @@ No preamble. Start directly with section 1.`;
           state={voiceConv.convState}
           liveTranscript={voiceConv.liveTranscript}
           speakingPreview={voiceConv.speakingPreview}
+          isPushToTalk={voiceConv.isPushToTalk}
+          onSetPushToTalk={voiceConv.setIsPushToTalk}
+          lang={voiceConv.lang}
+          onSetLang={voiceConv.setLang}
+          onStartListening={voiceConv.startListening}
+          onStopListening={voiceConv.stopListening}
           onClose={voiceConv.deactivate}
         />
       )}

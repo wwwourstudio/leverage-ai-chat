@@ -26,11 +26,9 @@ function makeCard(overrides: Partial<DFSCardData['data']> & { player: string; po
     status: 'value',
     realData: true,
     data: {
-      player:       overrides.player,
-      team:         overrides.team ?? 'MIA',
-      position:     overrides.position,
-      salary:       overrides.salary ?? '$5,000',
-      projection:   overrides.projection ?? '8.0',
+      team:         'MIA',
+      salary:       '$5,000',
+      projection:   '8.0',
       ownership:    '15%',
       boomCeiling:  '14',
       bustFloor:    '4',
@@ -42,7 +40,7 @@ function makeCard(overrides: Partial<DFSCardData['data']> & { player: string; po
       dkValue:      '4.0',
       source:       'test',
       isPlaying:    true,
-      dkSalary:     overrides.dkSalary ?? 5000,
+      dkSalary:     5000,
       ...overrides,
     },
   };

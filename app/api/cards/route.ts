@@ -3,6 +3,26 @@ import { generateContextualCards } from '@/lib/cards-generator';
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/lib/constants';
 import { validateBenford } from '@/lib/benford-validator';
 
+// In-memory inflight map: coalesces concurrent requests with identical params
+// into a single generateContextualCards call. Auto-cleaned on promise settle.
+const inflight = new Map<string, Promise<any[]>>();
+
+function buildCardsResponse(cards: any[]): NextResponse {
+  const allNums = cards.flatMap((c: any) =>
+    Object.values(c.data ?? {}).filter((v): v is number => typeof v === 'number')
+  );
+  const benford = validateBenford(allNums);
+  const fetchedAt = new Date().toISOString();
+  const validatedCards = cards.map((c: any) => ({
+    ...c,
+    metadata: { ...c.metadata, benfordValid: benford.isValid, benfordScore: Math.round(benford.score * 100) / 100, benfordConfidence: benford.confidence, fetchedAt },
+  }));
+  return NextResponse.json(
+    { success: true, cards: validatedCards, count: validatedCards.length, message: SUCCESS_MESSAGES.CARDS_GENERATED, benfordValidation: { isValid: benford.isValid, score: Math.round(benford.score * 100) / 100, confidence: benford.confidence } },
+    { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } },
+  );
+}
+
 // ============================================================================
 // POST /api/cards
 // ============================================================================
@@ -13,57 +33,28 @@ export async function POST(request: NextRequest) {
     const { sport, category, limit = 3, userContext } = body;
 
     const clampedLimit = Math.min(Math.max(Number(limit) || 3, 1), 15);
+    const dedupeKey = `${category ?? ''}::${sport ?? ''}::${clampedLimit}`;
+
+    // Return the in-flight promise if an identical request is already running
+    if (inflight.has(dedupeKey)) {
+      const cards = await inflight.get(dedupeKey)!;
+      return buildCardsResponse(cards);
+    }
 
     // 20s hard timeout — prevents this route from hanging until Vercel's 60s wall clock
     // if an upstream API (odds, weather, kalshi) is slow or unresponsive.
-    const cards = await Promise.race([
+    const cardPromise = Promise.race([
       generateContextualCards(category ?? undefined, sport ?? undefined, clampedLimit, undefined, undefined, { userContext: userContext ?? undefined }),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('card generation timed out')), 20_000),
       ),
     ]);
 
-    // Run Benford's Law validation on all numeric values across the card batch
-    const allNums = cards.flatMap((c: any) =>
-      Object.values(c.data ?? {}).filter((v): v is number => typeof v === 'number')
-    );
-    const benford = validateBenford(allNums);
+    inflight.set(dedupeKey, cardPromise);
+    cardPromise.finally(() => inflight.delete(dedupeKey));
 
-    const fetchedAt = new Date().toISOString();
-
-    // Attach Benford result + fetch timestamp to each card's metadata
-    const validatedCards = cards.map((c: any) => ({
-      ...c,
-      metadata: {
-        ...c.metadata,
-        benfordValid: benford.isValid,
-        benfordScore: Math.round(benford.score * 100) / 100,
-        benfordConfidence: benford.confidence,
-        fetchedAt,
-      },
-    }));
-
-    return NextResponse.json(
-      {
-        success: true,
-        cards: validatedCards,
-        count: validatedCards.length,
-        message: SUCCESS_MESSAGES.CARDS_GENERATED,
-        benfordValidation: {
-          isValid: benford.isValid,
-          score: Math.round(benford.score * 100) / 100,
-          confidence: benford.confidence,
-        },
-      },
-      {
-        headers: {
-          // Cards are live data — allow CDN/browser to serve a fresh copy for up to 30s
-          // before revalidating. stale-while-revalidate lets stale content be served
-          // for another 60s while a fresh fetch happens in the background.
-          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
-        },
-      }
-    );
+    const cards = await cardPromise;
+    return buildCardsResponse(cards);
   } catch (error) {
     console.error('[API/cards] Error:', error);
     const msg = error instanceof Error ? error.message : 'Unknown error';

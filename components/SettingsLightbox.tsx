@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import {
   X, User, Bell, Sliders, Sparkles, Save, Loader2, CheckCircle,
@@ -38,7 +39,8 @@ function Avatar({ name, avatar, size = 'md' }: { name: string; avatar?: string |
   const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?';
   const sizeClass = size === 'lg' ? 'w-16 h-16 text-xl' : size === 'sm' ? 'w-8 h-8 text-xs' : 'w-12 h-12 text-sm';
   if (avatar) {
-    return <img src={avatar} alt={name} className={cn(sizeClass, 'rounded-full object-cover ring-2 ring-[var(--border-subtle)]')} />;
+    const px = size === 'lg' ? 64 : size === 'sm' ? 32 : 48;
+    return <Image src={avatar} alt={name} width={px} height={px} className={cn(sizeClass, 'rounded-full object-cover ring-2 ring-[var(--border-subtle)]')} />;
   }
   return (
     <div className={cn(sizeClass, 'rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-black text-white ring-2 ring-[var(--border-subtle)]')}>

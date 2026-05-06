@@ -14,8 +14,12 @@
  */
 
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
-import { TrendingUp, RefreshCw, ExternalLink, Search, AlertCircle, Loader2 } from 'lucide-react';
+import { TrendingUp, RefreshCw, ExternalLink, Search, AlertCircle, Loader2, Star } from 'lucide-react';
 import { useVisibilityInterval } from '@/lib/hooks/use-visibility-interval';
+import { useRealtime } from '@/lib/hooks/use-realtime';
+import { cn } from '@/lib/utils';
+
+const WATCH_KEY = 'lev:kalshi:watched';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -92,9 +96,12 @@ function MarketSkeleton() {
 
 // ─── Single Market Card ────────────────────────────────────────────────────────
 
-const MarketCard = memo(function MarketCard({ market, onAnalyze }: {
-  market:    KalshiMarket;
-  onAnalyze: (title: string) => void;
+const MarketCard = memo(function MarketCard({ market, onAnalyze, starred, onToggleStar, flashing }: {
+  market:        KalshiMarket;
+  onAnalyze:     (title: string) => void;
+  starred:       boolean;
+  onToggleStar:  (ticker: string) => void;
+  flashing:      boolean;
 }) {
   const yesProb   = market.yesPrice;          // already in cents = % implied prob
   const noProb    = 100 - yesProb;
@@ -119,14 +126,29 @@ const MarketCard = memo(function MarketCard({ market, onAnalyze }: {
   const catCls = catColor[market.category] || 'text-[var(--text-muted)] bg-[var(--bg-elevated)] border-[var(--border-subtle)]';
 
   return (
-    <div className="group rounded-2xl border border-[var(--border-subtle)] bg-gradient-to-br from-slate-800/60 to-slate-900/40 hover:border-[var(--border-subtle)] transition-all duration-200 overflow-hidden shadow-md hover:shadow-lg">
+    <div className={cn(
+      'group rounded-2xl border bg-gradient-to-br from-slate-800/60 to-slate-900/40 transition-all duration-200 overflow-hidden shadow-md hover:shadow-lg',
+      flashing ? 'border-emerald-500/60 shadow-emerald-500/10' : 'border-[var(--border-subtle)] hover:border-[var(--border-subtle)]',
+    )}>
+      {flashing && (
+        <div className="h-0.5 w-full bg-gradient-to-r from-emerald-500 to-cyan-500 animate-pulse" />
+      )}
       {/* Header */}
       <div className="px-4 pt-4 pb-2">
         <div className="flex items-start justify-between gap-2 mb-2">
           <span className={`text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded border ${catCls} flex-shrink-0`}>
             {market.category}
           </span>
-          <span className={`text-[10px] font-mono ${leftColor} flex-shrink-0`}>{left}</span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className={`text-[10px] font-mono ${leftColor}`}>{left}</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleStar(market.ticker); }}
+              className="opacity-0 group-hover:opacity-100 transition-opacity"
+              title={starred ? 'Unwatch' : 'Watch market'}
+            >
+              <Star className={cn('w-3.5 h-3.5', starred ? 'fill-yellow-400 text-yellow-400' : 'text-white/30 hover:text-yellow-400')} />
+            </button>
+          </div>
         </div>
         <p className="text-sm font-semibold text-white leading-snug line-clamp-2">{market.title}</p>
       </div>
@@ -181,6 +203,7 @@ const MarketCard = memo(function MarketCard({ market, onAnalyze }: {
 
 const CATEGORIES = [
   { id: 'all',           label: 'All' },
+  { id: 'watched',       label: '★ Watched' },
   { id: 'sports',        label: 'Sports' },
   { id: 'politics',      label: 'Politics' },
   { id: 'economics',     label: 'Economics' },
@@ -216,6 +239,24 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
   const [lastFetch, setLastFetch] = useState<Date | null>(null);
   const [configured, setConfigured] = useState(false);
 
+  // Watchlist — persisted to localStorage
+  const [watched, setWatched] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    try { return new Set(JSON.parse(localStorage.getItem(WATCH_KEY) ?? '[]')); } catch { return new Set(); }
+  });
+  const toggleWatch = useCallback((ticker: string) => {
+    setWatched(prev => {
+      const next = new Set(prev);
+      if (next.has(ticker)) next.delete(ticker); else next.add(ticker);
+      try { localStorage.setItem(WATCH_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+
+  // Price-change flash tracking
+  const prevPricesRef = useRef<Map<string, number>>(new Map());
+  const [flashingTickers, setFlashingTickers] = useState<Set<string>>(new Set());
+
   // Debounce search input
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -236,7 +277,19 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
       const res  = await fetch(`/api/kalshi/markets?${qs}`);
       const data: MarketsResponse = await res.json();
       if (!data.success) throw new Error(data.error || 'Failed to load markets');
-      setMarkets(data.markets ?? []);
+      const newMarkets = data.markets ?? [];
+      // Detect price changes for flash effect
+      const changed = new Set<string>();
+      for (const m of newMarkets) {
+        const prev = prevPricesRef.current.get(m.ticker);
+        if (prev !== undefined && prev !== m.yesPrice) changed.add(m.ticker);
+        prevPricesRef.current.set(m.ticker, m.yesPrice);
+      }
+      if (changed.size > 0) {
+        setFlashingTickers(changed);
+        setTimeout(() => setFlashingTickers(new Set()), 2500);
+      }
+      setMarkets(newMarkets);
       setConfigured(data.configured ?? false);
       setLastFetch(new Date());
     } catch (e) {
@@ -245,6 +298,19 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
       setLoading(false);
     }
   }, [debouncedSearch]);
+
+  // Supabase Realtime: listen for kalshi_markets table updates
+  useRealtime<{ ticker: string; yes_price: number; no_price: number; volume_24h: number }>('kalshi_markets', useCallback((payload: any) => {
+    if (payload.eventType !== 'UPDATE' || !payload.new?.ticker) return;
+    const incoming = payload.new;
+    setMarkets(prev => prev.map(m => m.ticker === incoming.ticker
+      ? { ...m, yesPrice: incoming.yes_price ?? m.yesPrice, noPrice: incoming.no_price ?? m.noPrice, volume24h: incoming.volume_24h ?? m.volume24h }
+      : m
+    ));
+    // Flash the updated market
+    setFlashingTickers(s => { const next = new Set(s); next.add(incoming.ticker); return next; });
+    setTimeout(() => setFlashingTickers(s => { const next = new Set(s); next.delete(incoming.ticker); return next; }), 2500);
+  }, []));
 
   // Fetch on mount and when search changes
   useEffect(() => { fetchMarkets(); }, [fetchMarkets]);
@@ -264,6 +330,8 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
   // Client-side category filter
   const visibleMarkets = category === 'all'
     ? markets
+    : category === 'watched'
+    ? markets.filter(m => watched.has(m.ticker))
     : markets.filter(m => categoryMatches(m.category, category));
 
   const handleAnalyze = useCallback((msg: string) => {
@@ -390,7 +458,14 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
         )}
 
         {!loading && !error && visibleMarkets.map(m => (
-          <MarketCard key={m.ticker} market={m} onAnalyze={handleAnalyze} />
+          <MarketCard
+            key={m.ticker}
+            market={m}
+            onAnalyze={handleAnalyze}
+            starred={watched.has(m.ticker)}
+            onToggleStar={toggleWatch}
+            flashing={flashingTickers.has(m.ticker)}
+          />
         ))}
       </div>
 

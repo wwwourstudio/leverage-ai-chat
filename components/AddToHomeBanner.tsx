@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import Image from 'next/image';
 import { X, Share, Plus } from 'lucide-react';
 
 const DISMISS_KEY = 'leverage_a2hs_dismissed';
@@ -83,8 +84,7 @@ export function AddToHomeBanner() {
     <div className="w-full bg-gradient-to-r from-blue-950 via-indigo-950 to-[var(--bg-overlay)] border-b border-blue-800/40 px-4 py-3 flex items-center gap-3">
       {/* App icon */}
       <div className="shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icon.svg" alt="Leverage AI" className="w-6 h-6" onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+          <Image src="/icon.svg" alt="Leverage AI" width={24} height={24} className="w-6 h-6" />
       </div>
 
       {/* Text */}

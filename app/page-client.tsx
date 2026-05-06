@@ -38,6 +38,7 @@ const UserLightbox = dynamic(() => import('@/components/UserLightbox').then(m =>
 const WatchlistLightbox = dynamic(() => import('@/components/WatchlistLightbox').then(m => ({ default: m.WatchlistLightbox })), { ssr: false });
 import { useToast } from '@/components/toast-provider';
 import { Sidebar } from '@/components/Sidebar';
+import { CommandPalette } from '@/components/CommandPalette';
 import { ChatHeader, ChatInput } from '@/components/chat';
 import { SuggestedPrompts } from '@/components/suggested-prompts';
 
@@ -315,6 +316,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showSettingsLightbox, setShowSettingsLightbox] = useState(false);
   const [showAlertsLightbox, setShowAlertsLightbox] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
@@ -394,6 +396,18 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // Open sidebar by default on desktop (lg breakpoint = 1024px). Mobile/tablet stay closed.
   useEffect(() => {
     if (window.innerWidth >= 1024) setSidebarOpen(true);
+  }, []);
+
+  // Cmd+K / Ctrl+K → open command palette
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCommandPalette(v => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   // Check actual service health once on mount; wire to the status indicator in ChatInput.
@@ -806,6 +820,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     if (cardsRefreshIntervalRef.current) clearTimeout(cardsRefreshIntervalRef.current);
 
     const fillMissingCards = async () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
       if (!lastUserQuery) return;
 
       // Guard: only run once per query+category combination
@@ -932,11 +947,15 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     e.stopPropagation();
     const chat = chats.find((c: Chat) => c.id === chatId);
     const wasStarred = chat?.starred;
+    const snapshot = chats;
     setChats(chats.map((c: Chat) =>
       c.id === chatId ? { ...c, starred: !c.starred } : c
     ));
     if (isLoggedIn) {
-      updateThread(chatId, { starred: !wasStarred });
+      updateThread(chatId, { starred: !wasStarred }).catch(() => {
+        setChats(snapshot);
+        toast.error('Failed to update — please try again');
+      });
     }
     toast.success(wasStarred ? 'Removed from starred' : 'Analysis saved');
   };
@@ -2954,13 +2973,17 @@ No preamble. Start directly with section 1.`;
 
   const handleDeleteChat = (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setChats(chats.filter((chat: Chat) => chat.id !== chatId));
-    if (activeChat === chatId && chats.length > 1) {
-      const remainingChats = chats.filter((chat: Chat) => chat.id !== chatId);
-      setActiveChat(remainingChats[0].id);
+    const snapshot = chats;
+    const remaining = chats.filter((chat: Chat) => chat.id !== chatId);
+    setChats(remaining);
+    if (activeChat === chatId && remaining.length > 0) {
+      setActiveChat(remaining[0].id);
     }
     if (isLoggedIn) {
-      deleteThread(chatId);
+      deleteThread(chatId).catch(() => {
+        setChats(snapshot);
+        toast.error('Failed to delete — please try again');
+      });
     }
     toast.info('Chat deleted');
   };
@@ -3048,9 +3071,11 @@ No preamble. Start directly with section 1.`;
 
   const handleSaveChatTitle = (chatId: string) => {
     if (editingChatTitle.trim()) {
+      const newTitle = editingChatTitle.trim();
       setChats(chats.map((chat: any) =>
-        chat.id === chatId ? { ...chat, title: editingChatTitle.trim() } : chat
+        chat.id === chatId ? { ...chat, title: newTitle } : chat
       ));
+      if (isLoggedIn) updateThread(chatId, { title: newTitle });
       toast.success('Chat renamed');
     }
     setEditingChatId(null);
@@ -3636,13 +3661,15 @@ No preamble. Start directly with section 1.`;
       {/* Mobile backdrop — closes sidebar when tapping outside */}
       {sidebarOpen && (
         <div
-          className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm animate-backdrop-in"
+          className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm animate-backdrop-in"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar wrapper — overlay when open on mobile/tablet, icon rail in flow when closed */}
-      <div className={`flex-shrink-0 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]${sidebarOpen ? ' max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:w-72 max-lg:animate-fade-in' : ''}`}>
+      {/* Sidebar wrapper
+          Mobile (< md): fixed overlay, translate drives show/hide — chat area stays full-width
+          Desktop (≥ md): in-flow, width-animated by the Sidebar component itself */}
+      <div className={`flex-shrink-0 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:transition-transform max-md:duration-300 max-md:ease-in-out ${sidebarOpen ? 'max-md:translate-x-0' : 'max-md:-translate-x-full'}`}>
         <Sidebar
           open={sidebarOpen}
           onNewChat={handleNewChat}
@@ -3672,6 +3699,7 @@ No preamble. Start directly with section 1.`;
           user={user}
           onUserClick={() => isLoggedIn ? setShowUserLightbox(true) : setShowLoginModal(true)}
           isLoadingChats={isLoadingChats}
+          onClose={() => setSidebarOpen(false)}
         />
       </div>
 
@@ -4491,6 +4519,17 @@ No preamble. Start directly with section 1.`;
         onCardClick={handleSavedCardClick}
       />
 
+      {/* Command Palette (Cmd+K) */}
+      <CommandPalette
+        open={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        chats={chats}
+        activeChat={activeChat}
+        onSelectChat={(id) => { handleSelectChat(id); setSidebarOpen(false); }}
+        onNewChat={() => { handleNewChat(); setSidebarOpen(false); }}
+        onOpenSettings={() => setShowSettingsLightbox(true)}
+      />
+
       {/* Stripe Purchase Lightbox */}
       <StripeLightbox
         isOpen={showStripeLightbox}
@@ -4506,6 +4545,12 @@ No preamble. Start directly with section 1.`;
           state={voiceConv.convState}
           liveTranscript={voiceConv.liveTranscript}
           speakingPreview={voiceConv.speakingPreview}
+          isPushToTalk={voiceConv.isPushToTalk}
+          onSetPushToTalk={voiceConv.setIsPushToTalk}
+          lang={voiceConv.lang}
+          onSetLang={voiceConv.setLang}
+          onStartListening={voiceConv.startListening}
+          onStopListening={voiceConv.stopListening}
           onClose={voiceConv.deactivate}
         />
       )}

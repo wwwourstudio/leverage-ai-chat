@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, memo } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import Image from 'next/image';
 import { Plus, Search, Star, Trash2, MessageSquare, Edit3, CheckCircle, LayoutGrid, TrendingUp, Trophy, Award, BarChart3, UserCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/utils';
@@ -60,6 +61,7 @@ export interface SidebarProps {
   user: { name: string; email: string; avatar?: string } | null;
   onUserClick?: () => void;
   isLoadingChats?: boolean;
+  onClose?: () => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -210,7 +212,7 @@ const ChatCard = memo(function ChatCard({
                 <button
                   onClick={(e: any) => onEditChatTitle(chat.id, chat.title, e)}
                   className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-[var(--bg-elevated)] rounded transition-all flex-shrink-0"
-                  title="Edit title"
+                  title="Edit title" aria-label="Edit chat title"
                 >
                   <Edit3 className="w-2.5 h-2.5 text-[var(--text-faint)] hover:text-blue-400" />
                 </button>
@@ -249,7 +251,7 @@ const ChatCard = memo(function ChatCard({
               'p-1 rounded-md hover:bg-[var(--bg-elevated)] transition-all',
               chat.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
             )}
-            title={chat.starred ? 'Unstar' : 'Star'}
+            title={chat.starred ? 'Unstar' : 'Star'} aria-label={chat.starred ? 'Unstar chat' : 'Star chat'}
           >
             <Star className={cn(
               'w-3 h-3',
@@ -259,7 +261,7 @@ const ChatCard = memo(function ChatCard({
           <button
             onClick={(e: any) => onDeleteChat(chat.id, e)}
             className="p-1 rounded-md hover:bg-[var(--bg-elevated)] opacity-0 group-hover:opacity-100 transition-all"
-            title="Delete"
+            title="Delete" aria-label="Delete chat"
           >
             <Trash2 className="w-3 h-3 text-[var(--text-faint)] hover:text-red-400 transition-colors" />
           </button>
@@ -293,7 +295,7 @@ function IconRail({
       <button
         onClick={onNewChat}
         className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 flex items-center justify-center transition-all duration-200 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/35 mb-2 flex-shrink-0"
-        title="New Analysis"
+        title="New Analysis" aria-label="New analysis chat"
       >
         <Plus className="w-4 h-4 text-white" />
       </button>
@@ -335,7 +337,7 @@ function IconRail({
           onClick={onUserClick}
         >
           {user.avatar
-            ? <img src={user.avatar} className="w-8 h-8 rounded-full object-cover" alt="" />
+            ? <Image src={user.avatar} className="w-8 h-8 rounded-full object-cover" alt="" width={32} height={32} />
             : <span className="text-[11px] font-black text-white">{user.name[0]?.toUpperCase()}</span>
           }
         </div>
@@ -357,6 +359,7 @@ export function Sidebar({
   setSelectedCategory,
   selectedSport,
   setSelectedSport,
+
   selectedKalshiTopic,
   setSelectedKalshiTopic,
   filteredChats,
@@ -375,9 +378,65 @@ export function Sidebar({
   user,
   onUserClick,
   isLoadingChats = false,
+  onClose,
 }: SidebarProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  const searchRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const SCROLL_KEY = 'sidebar_scroll';
+
+  // Restore scroll position from sessionStorage on open
+  useEffect(() => {
+    if (!open || !scrollRef.current) return;
+    const saved = sessionStorage.getItem(SCROLL_KEY);
+    if (saved) scrollRef.current.scrollTop = Number(saved);
+  }, [open]);
+
+  // Persist scroll position
+  const handleScroll = useCallback(() => {
+    if (scrollRef.current) {
+      sessionStorage.setItem(SCROLL_KEY, String(scrollRef.current.scrollTop));
+    }
+  }, []);
+
+  // Keyboard navigation: j/k=prev/next chat, /=focus search, Escape=clear/close
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (e.key === '/') {
+        e.preventDefault();
+        searchRef.current?.focus();
+        return;
+      }
+      if (e.key === 'Escape') {
+        if (chatSearch) { setChatSearch(''); return; }
+        onClose?.();
+        return;
+      }
+      if (e.key === 'j' || e.key === 'k') {
+        e.preventDefault();
+        const flat = filteredChats;
+        if (flat.length === 0) return;
+        const idx = flat.findIndex(c => c.id === activeChat);
+        const next = e.key === 'j'
+          ? Math.min(idx + 1, flat.length - 1)
+          : Math.max(idx - 1, 0);
+        onSelectChat(flat[next].id);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [filteredChats, activeChat, chatSearch, onSelectChat, setChatSearch, onClose]);
+
+  const handleSelectChatWithClose = useCallback((id: string) => {
+    onSelectChat(id);
+    onClose?.();
+  }, [onSelectChat, onClose]);
 
   const starredChats = filteredChats.filter(c => c.starred);
   const unstarredChats = filteredChats.filter(c => !c.starred);
@@ -398,25 +457,29 @@ export function Sidebar({
   return (
     <div
       className={cn(
-        'flex flex-col h-full bg-[var(--bg-overlay)] border-r border-[var(--border-subtle)] transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0',
-        open ? 'w-72' : 'w-14',
+        'flex flex-col h-full bg-[var(--bg-overlay)] border-r border-[var(--border-subtle)] overflow-hidden flex-shrink-0',
+        // Desktop: animate width. Mobile: always full-width drawer (transform handles visibility).
+        open ? 'w-72' : 'w-72 md:w-14',
+        'md:transition-all md:duration-300 md:ease-in-out',
       )}
     >
-      {/* Icon rail (collapsed state) */}
+      {/* Icon rail — desktop only, collapsed state */}
       {!open && (
-        <IconRail
-          categories={categories}
-          selectedCategory={selectedCategory}
-          setSelectedCategory={setSelectedCategory}
-          onNewChat={onNewChat}
-          user={user}
-          onUserClick={onUserClick}
-        />
+        <div className="hidden md:flex flex-col h-full">
+          <IconRail
+            categories={categories}
+            selectedCategory={selectedCategory}
+            setSelectedCategory={setSelectedCategory}
+            onNewChat={onNewChat}
+            user={user}
+            onUserClick={onUserClick}
+          />
+        </div>
       )}
 
-      {/* Full sidebar (open state) */}
-      {open && (
-        <>
+      {/* Full sidebar body: always rendered on mobile (off-screen via transform when closed);
+          only rendered when open on desktop */}
+      <div className={cn('flex flex-col h-full', !open && 'md:hidden')}>
           {/* ── Header ─────────────────────────────────────────────────────── */}
           <div className="px-3 pt-3 pb-2 border-b border-[var(--border-subtle)] bg-[var(--bg-overlay)] space-y-2.5 flex-shrink-0">
             {/* New Analysis button */}
@@ -433,9 +496,10 @@ export function Sidebar({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-faint)] pointer-events-none" />
               <input
+                ref={searchRef}
                 value={chatSearch}
                 onChange={(e: any) => setChatSearch(e.target.value)}
-                placeholder="Search chats…"
+                placeholder="Search chats… ( / )"
                 className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg py-2 pl-8 pr-3 text-sm text-[var(--text-muted)] placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50 transition-colors"
               />
             </div>
@@ -545,7 +609,7 @@ export function Sidebar({
           </div>
 
           {/* ── Chat list ──────────────────────────────────────────────────── */}
-          <div className="flex-1 overflow-y-auto p-2 space-y-3 custom-scrollbar">
+          <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-2 space-y-3 custom-scrollbar">
             {/* Loading skeletons */}
             {isLoadingChats && (
               <div className="space-y-1.5 px-1 pt-1" aria-busy="true" aria-label="Loading chats">
@@ -586,7 +650,7 @@ export function Sidebar({
                       onEditChatTitle={onEditChatTitle}
                       onSaveChatTitle={onSaveChatTitle}
                       onKeyDownChatTitle={onKeyDownChatTitle}
-                      onSelectChat={onSelectChat}
+                      onSelectChat={handleSelectChatWithClose}
                       onStarChat={onStarChat}
                       onDeleteChat={onDeleteChat}
                     />
@@ -619,7 +683,7 @@ export function Sidebar({
                       onEditChatTitle={onEditChatTitle}
                       onSaveChatTitle={onSaveChatTitle}
                       onKeyDownChatTitle={onKeyDownChatTitle}
-                      onSelectChat={onSelectChat}
+                      onSelectChat={handleSelectChatWithClose}
                       onStarChat={onStarChat}
                       onDeleteChat={onDeleteChat}
                     />
@@ -641,8 +705,7 @@ export function Sidebar({
               </div>
             )}
           </div>
-        </>
-      )}
+        </div>
     </div>
   );
 }

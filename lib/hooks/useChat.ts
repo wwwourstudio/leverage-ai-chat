@@ -33,6 +33,7 @@ export interface ChatMessage {
   insights?: Record<string, number | undefined>;
   clarificationOptions?: string[];
   useFallback?: boolean;
+  toolEvents?: Array<{ name: string; summary: string }>;
 }
 
 export interface UseChatOptions {
@@ -72,6 +73,17 @@ interface SseReplaceEvent {
   text?: string;
 }
 
+interface SseToolCallEvent {
+  type: 'tool_call';
+  name: string;
+  summary: string;
+}
+
+interface SseCardEvent {
+  type: 'card';
+  card: unknown;
+}
+
 interface SseDoneEvent {
   type: 'done';
   success: boolean;
@@ -87,7 +99,7 @@ interface SseDoneEvent {
   [key: string]: unknown;
 }
 
-type SseEvent = SseTextEvent | SseReplaceEvent | SseDoneEvent;
+type SseEvent = SseTextEvent | SseReplaceEvent | SseToolCallEvent | SseCardEvent | SseDoneEvent;
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -307,6 +319,28 @@ export function useChat<T extends ChatMessage = ChatMessage>(options: UseChatOpt
                     setMessages((prev) =>
                       prev.map((m) =>
                         m.id === streamingId ? ({ ...m, content: streamContent } as T) : m
+                      )
+                    );
+                  }
+                } else if (ev.type === 'card') {
+                  const ce = ev as SseCardEvent;
+                  if (mountedRef.current) {
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === streamingId
+                          ? ({ ...m, cards: [...(m.cards ?? []), ce.card] } as T)
+                          : m
+                      )
+                    );
+                  }
+                } else if (ev.type === 'tool_call') {
+                  const te = ev as SseToolCallEvent;
+                  if (mountedRef.current) {
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === streamingId
+                          ? ({ ...m, toolEvents: [...(m.toolEvents ?? []), { name: te.name, summary: te.summary }] } as T)
+                          : m
                       )
                     );
                   }

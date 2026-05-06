@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, memo } from 'react';
+import Image from 'next/image';
 import { TrendingUp, Activity, BarChart3, Bookmark, Zap, Wind } from 'lucide-react';
 import { AnalysisLightbox, type LightboxSection } from './AnalysisLightbox';
 import { getPlayerHeadshotUrl } from '@/lib/constants';
@@ -630,7 +631,7 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
           <div className="flex items-center gap-2.5 min-w-0">
             <div className={`flex items-center justify-center flex-shrink-0 rounded-xl ${conf.iconBg} border ${conf.accentBorder} overflow-hidden ${isHero ? 'w-11 h-11 text-xl' : 'w-9 h-9 text-lg'}`}>
               {headshotUrl && !imgError ? (
-                <img src={headshotUrl} alt={playerName} className="w-full h-full object-cover" onError={() => setImgError(true)} />
+                <Image src={headshotUrl} alt={playerName} width={isHero ? 44 : 36} height={isHero ? 44 : 36} className="w-full h-full object-cover" onError={() => setImgError(true)} />
               ) : conf.emoji}
             </div>
             <div className="min-w-0">

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { X, Bookmark, Trash2, LayoutGrid, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getPlayerHeadshotUrl } from '@/lib/constants';
@@ -51,7 +52,7 @@ function PlayerRow({
       {/* Avatar */}
       <div className="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-500/25 flex items-center justify-center flex-shrink-0 overflow-hidden">
         {headshotUrl && !imgError ? (
-          <img src={headshotUrl} alt={entry.name} className="w-full h-full object-cover" onError={() => setImgError(true)} />
+          <Image src={headshotUrl} alt={entry.name} width={36} height={36} className="w-full h-full object-cover" onError={() => setImgError(true)} />
         ) : (
           <span className="text-sm">⚾</span>
         )}

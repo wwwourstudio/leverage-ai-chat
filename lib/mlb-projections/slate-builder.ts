@@ -217,7 +217,7 @@ function parseSalary(s: string | number | undefined): number {
 /** Prefer DK's authoritative salary; fall back to the parsed display string. */
 function cardSalary(c: DFSCardData): number {
   if (typeof c.data.dkSalary === 'number' && c.data.dkSalary > 0) return c.data.dkSalary;
-  return cardSalary(c);
+  return parseSalary(c.data.salary);
 }
 
 function buildOptimalLineup(cards: DFSCardData[], limit: number): DFSCardData[] {

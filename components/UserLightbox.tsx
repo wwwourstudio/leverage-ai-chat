@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { X, LogOut, Save, Loader2, CheckCircle, Bot, ChevronDown, Paperclip, FileText, ImageIcon, Trash2, Volume2, Play } from 'lucide-react';
 import { SPORT_KEYS, GROK_VOICES, GROK_VOICE_STORAGE_KEY, GROK_VOICE_DEFAULT, type GrokVoiceId } from '@/lib/constants';
 import { useToast } from '@/components/toast-provider';
@@ -206,7 +207,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-foreground text-xl font-bold shrink-0">
               {user?.avatar ? (
-                <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full object-cover" />
+                <Image src={user.avatar} alt={user.name} width={56} height={56} className="w-full h-full rounded-full object-cover" />
               ) : (
                 initials
               )}

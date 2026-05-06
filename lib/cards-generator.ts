@@ -3135,7 +3135,7 @@ async function _generateContextualCards(
 
   // Populate the in-memory cache so subsequent calls (e.g. /api/analyze) reuse these
   if (cards.length > 0) {
-    setCachedCards(cards, category || 'all', sport, userContext);
+    setCachedCards(cards, category || 'all', sport);
   }
 
   // Add weather cards for outdoor sports if betting category

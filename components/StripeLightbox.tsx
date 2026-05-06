@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { X, CreditCard, Sparkles, CheckCircle, Loader2, Shield, Zap, Crown, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { X, CreditCard, Sparkles, CheckCircle, Loader2, Shield, Zap, Crown, AlertTriangle, ArrowLeft, Settings, Calendar } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
 import { CREDIT_PACKAGES, SUBSCRIPTION_PLANS } from '@/lib/constants';
@@ -9,6 +9,41 @@ import { CREDIT_PACKAGES, SUBSCRIPTION_PLANS } from '@/lib/constants';
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ''
 );
+
+interface SubscriptionInfo {
+  tier: string;
+  periodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+}
+
+const TIER_LABELS: Record<string, string> = {
+  free: 'Free',
+  core: 'Core',
+  pro: 'Pro',
+  high_stakes: 'High Stakes',
+};
+
+const TIER_COLOR: Record<string, string> = {
+  free: 'text-white/50',
+  core: 'text-blue-400',
+  pro: 'text-purple-400',
+  high_stakes: 'text-amber-400',
+};
+
+function daysRemaining(isoDate: string | null): number | null {
+  if (!isoDate) return null;
+  const diff = new Date(isoDate).getTime() - Date.now();
+  return diff > 0 ? Math.ceil(diff / 86_400_000) : 0;
+}
+
+const TIER_FEATURES: Record<string, string[]> = {
+  free:        ['Basic odds', 'Public analysis'],
+  core:        ['Full betting analysis', 'Fantasy tools', '3 DFS lineups/mo'],
+  pro:         ['All Core features', '150 DFS lineups/mo', 'Priority AI'],
+  high_stakes: ['All Pro features', 'Annual pricing discount'],
+};
+
+const TIER_ORDER = ['free', 'core', 'pro'];
 
 interface StripeLightboxProps {
   isOpen: boolean;
@@ -30,6 +65,38 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
   const [customAmount, setCustomAmount] = useState('');
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [pendingCredits, setPendingCredits] = useState(0);
+  const [subInfo, setSubInfo] = useState<SubscriptionInfo | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  // Fetch subscription info when opening
+  useEffect(() => {
+    if (!isOpen) return;
+    fetch('/api/user/subscription')
+      .then(r => r.json())
+      .then(d => { if (d.success) setSubInfo({ tier: d.tier, periodEnd: d.periodEnd, cancelAtPeriodEnd: d.cancelAtPeriodEnd }); })
+      .catch(() => {});
+  }, [isOpen]);
+
+  const handleOpenPortal = async () => {
+    setPortalLoading(true);
+    try {
+      const res = await fetch('/api/stripe/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ returnUrl: window.location.href }),
+      });
+      const data = await res.json();
+      if (data.success && data.url) {
+        window.open(data.url, '_blank', 'noopener');
+      } else {
+        setCheckoutError(data.error ?? 'Could not open billing portal');
+      }
+    } catch {
+      setCheckoutError('Could not open billing portal');
+    } finally {
+      setPortalLoading(false);
+    }
+  };
 
   // fetchClientSecret is memoized so EmbeddedCheckoutProvider doesn't re-fetch on re-render
   const [fetchClientSecret, setFetchClientSecret] = useState<(() => Promise<string>) | null>(null);
@@ -179,6 +246,62 @@ export function StripeLightbox({ isOpen, onClose, onCreditsAdded, creditsRemaini
                 Subscribe
               </button>
             </div>
+
+            {/* Subscription status banner — shown when user has an active paid tier */}
+            {subInfo && subInfo.tier !== 'free' && (
+              <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-xl bg-white/5 border border-white/10 px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-white/40 flex-shrink-0" />
+                  <div>
+                    <p className={`text-sm font-bold ${TIER_COLOR[subInfo.tier] ?? 'text-white'}`}>
+                      {TIER_LABELS[subInfo.tier] ?? subInfo.tier} Plan
+                      {subInfo.cancelAtPeriodEnd && <span className="ml-2 text-xs text-amber-400">(cancels at period end)</span>}
+                    </p>
+                    {(() => { const days = daysRemaining(subInfo.periodEnd); return days !== null && <p className="text-xs text-white/40">{days} day{days !== 1 ? 's' : ''} remaining</p>; })()}
+                  </div>
+                </div>
+                <button
+                  onClick={handleOpenPortal}
+                  disabled={portalLoading}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-semibold text-white/70 hover:text-white transition-all disabled:opacity-50"
+                >
+                  {portalLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Settings className="w-3.5 h-3.5" />}
+                  Manage
+                </button>
+              </div>
+            )}
+
+            {/* Tier comparison — compact 3-column table */}
+            {activeTab === 'subscription' && (
+              <div className="mx-6 mt-4 overflow-hidden rounded-xl border border-white/10">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-white/5">
+                      <th className="text-left px-3 py-2 text-white/40 font-medium w-1/2">Feature</th>
+                      {TIER_ORDER.map(t => (
+                        <th key={t} className={`text-center px-2 py-2 font-bold ${subInfo?.tier === t ? TIER_COLOR[t] : 'text-white/50'}`}>
+                          {TIER_LABELS[t]}
+                          {subInfo?.tier === t && <span className="block text-[9px] font-normal opacity-60">current</span>}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {['AI analysis', 'Betting tools', 'Fantasy tools', 'DFS lineups'].map((feat, i) => (
+                      <tr key={feat} className={i % 2 === 0 ? '' : 'bg-white/[0.02]'}>
+                        <td className="px-3 py-2 text-white/50">{feat}</td>
+                        {/* Free */}
+                        <td className="text-center px-2 py-2 text-white/30">{i === 0 ? 'Basic' : i === 3 ? '0' : '—'}</td>
+                        {/* Core */}
+                        <td className="text-center px-2 py-2 text-white/60">{i === 3 ? '3/mo' : <CheckCircle className="w-3 h-3 text-blue-400 mx-auto" />}</td>
+                        {/* Pro */}
+                        <td className="text-center px-2 py-2 text-white/60">{i === 3 ? '150/mo' : <CheckCircle className="w-3 h-3 text-purple-400 mx-auto" />}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6">

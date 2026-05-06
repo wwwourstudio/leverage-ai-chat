@@ -2011,6 +2011,32 @@ export async function POST(request: NextRequest) {
     // ── SSE streaming response — wraps AI generation + post-processing ──────────
     const encoder = new TextEncoder();
     const sseChunk = (data: object) => encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
+    // safeEnqueue: wraps controller.enqueue so that writes after abort/close are silently dropped.
+    // The ReadableStream controller throws if enqueued after the stream is cancelled (e.g. client
+    // disconnects mid-generation), which would surface as an unhandled rejection in Vercel logs.
+    let streamClosed = false;
+    const safeEnqueue = (ctrl: ReadableStreamDefaultController, chunk: Uint8Array) => {
+      if (streamClosed) return;
+      try { ctrl.enqueue(chunk); } catch { streamClosed = true; }
+    };
+
+    // Maps each tool name to a function that extracts a short human-readable
+    // summary from its result (shown inline in the chat as a tool-call badge).
+    const toolResultSummary = (toolName: string, result: unknown): string => {
+      try {
+        const r = result as Record<string, unknown>;
+        if (toolName === 'query_mlb_projections') return `${(r?.projections as unknown[] | undefined)?.length ?? 0} MLB projections`;
+        if (toolName === 'query_adp')             return `${(r?.players as unknown[] | undefined)?.length ?? 0} ADP entries`;
+        if (toolName === 'query_statcast')         return r?.count ? `${r.count} Statcast records` : 'Statcast data';
+        if (toolName === 'kalshi_get_markets')     return `${(r?.markets as unknown[] | undefined)?.length ?? 0} Kalshi markets`;
+        if (toolName === 'kalshi_get_price')       return r?.probability ? `${(Number(r.probability) * 100).toFixed(0)}% probability` : 'Kalshi price';
+        if (toolName === 'get_live_odds')          return `${(r?.events as unknown[] | undefined)?.length ?? 0} live odds`;
+        if (toolName === 'get_props_latest')       return `${(r?.props as unknown[] | undefined)?.length ?? (r?.total as number | undefined) ?? 0} player props`;
+        if (toolName === 'get_odds_movers')        return `${(r?.movers as unknown[] | undefined)?.length ?? 0} line movers`;
+        if (toolName === 'predict_hr')             return 'HR model computed';
+      } catch { /* ignore */ }
+      return 'data fetched';
+    };
 
     const responseStream = new ReadableStream({
       async start(controller) {
@@ -2033,6 +2059,14 @@ export async function POST(request: NextRequest) {
               maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
               maxRetries: 0,
               abortSignal: abortCtrl.signal,
+              onStepFinish: ({ toolCalls, toolResults }) => {
+                if (!toolCalls?.length) return;
+                for (const tc of toolCalls) {
+                  const result = (toolResults as any[])?.find((r: any) => r.toolCallId === tc.toolCallId)?.result;
+                  const summary = toolResultSummary(tc.toolName, result);
+                  safeEnqueue(controller, sseChunk({ type: 'tool_call', name: tc.toolName, summary }));
+                }
+              },
               // stepCountIs capped at 2 for all tools — xAI's API rejects messages[6]+
               // (3rd assistant tool-call) because it converts empty content to Anthropic
               // format internally and then fails with cache_control on empty text blocks.
@@ -2050,6 +2084,15 @@ export async function POST(request: NextRequest) {
               // Deep Think: 3 max steps (more than 2 risks messages[6]+ cache_control error)
               ...(body.deepThink && { maxSteps: 3 }),
             });
+
+            // Emit individual card SSE frames as soon as cards resolve (concurrently with
+            // the AI text stream). For Cases 1/2/3 cardPromise is already synchronously
+            // resolved, so this fires on the next microtask — before the first text token.
+            cardPromise.then(earlyCards => {
+              for (const c of earlyCards) {
+                safeEnqueue(controller, sseChunk({ type: 'card', card: c }));
+              }
+            }).catch(() => {});
 
             // Abort if the first token doesn't arrive within the timeout budget
             const firstTokenTimer = setTimeout(() => abortCtrl.abort(new Error('Primary timeout')), primaryTimeoutMs);
@@ -2069,17 +2112,17 @@ export async function POST(request: NextRequest) {
                   if (remaining > 0) {
                     const partial = delta.slice(0, remaining);
                     aiText += partial;
-                    controller.enqueue(sseChunk({ type: 'text', delta: partial }));
+                    safeEnqueue(controller, sseChunk({ type: 'text', delta: partial }));
                   }
                   const notice = '\n\n---\n_Response truncated — ask me to continue or be more specific._';
                   aiText += notice;
-                  controller.enqueue(sseChunk({ type: 'text', delta: notice }));
+                  safeEnqueue(controller, sseChunk({ type: 'text', delta: notice }));
                   responseTruncated = true;
                   console.warn(`[API/analyze] Response truncated at ${RESPONSE_CHAR_LIMIT} chars`);
                   continue;
                 }
                 aiText += delta;
-                controller.enqueue(sseChunk({ type: 'text', delta }));
+                safeEnqueue(controller, sseChunk({ type: 'text', delta }));
               }
               clearTimeout(firstTokenTimer);
               modelUsed = useFastPath ? AI_CONFIG.FAST_MODEL_DISPLAY_NAME : AI_CONFIG.MODEL_DISPLAY_NAME;
@@ -2302,7 +2345,7 @@ export async function POST(request: NextRequest) {
                 aiText = fallbackResult.text;
                 modelUsed = alreadyFast ? `${AI_CONFIG.MODEL_DISPLAY_NAME} (fallback)` : `${AI_CONFIG.FAST_MODEL_DISPLAY_NAME} (fallback)`;
                 console.log(`[API/analyze] Fallback succeeded with ${actualFallbackModel}`);
-                controller.enqueue(sseChunk({ type: 'text', delta: aiText }));
+                safeEnqueue(controller, sseChunk({ type: 'text', delta: aiText }));
               } catch (fallbackErr) {
                 const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
                 console.error('[API/analyze] Fallback also failed:', fallbackMsg);
@@ -2315,11 +2358,11 @@ export async function POST(request: NextRequest) {
                   const errMsg = isRateLimit
                     ? 'AI rate limit reached — please wait a moment and try again.'
                     : 'AI API key error — contact support if this persists.';
-                  controller.enqueue(sseChunk({ type: 'error', message: errMsg }));
+                  safeEnqueue(controller, sseChunk({ type: 'error', message: errMsg }));
                   aiText = errMsg;
                 } else {
                   aiText = generateFallbackResponse(userMessage, context);
-                  controller.enqueue(sseChunk({ type: 'text', delta: aiText }));
+                  safeEnqueue(controller, sseChunk({ type: 'text', delta: aiText }));
                 }
                 modelUsed = isRateLimit ? 'Fallback (rate limited)' : isAuthError ? 'Fallback (auth error)' : fallbackMsg.includes('timeout') ? 'Fallback (timeout)' : 'Fallback (API error — check XAI_API_KEY)';
                 usedFallback = true;
@@ -2330,7 +2373,7 @@ export async function POST(request: NextRequest) {
             aiText = generateFallbackResponse(userMessage, context);
             modelUsed = 'Fallback';
             usedFallback = true;
-            controller.enqueue(sseChunk({ type: 'text', delta: aiText }));
+            safeEnqueue(controller, sseChunk({ type: 'text', delta: aiText }));
           }
 
           // ── Post-processing: cards, trust metrics, done event ─────────────────
@@ -2405,7 +2448,7 @@ export async function POST(request: NextRequest) {
               ].filter(Boolean).join('\n');
               aiText = cleanText;
               // Replace the raw JSON the client already received with readable prose
-              controller.enqueue(sseChunk({ type: 'replace', text: cleanText }));
+              safeEnqueue(controller, sseChunk({ type: 'replace', text: cleanText }));
             } else if (expectsStatcastJSON) {
               // Grok returned markdown/text despite JSON instructions — log with context
               // so we can diagnose prompt-compliance issues without surface-level noise.
@@ -2515,7 +2558,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Send done event with full metadata
-          controller.enqueue(sseChunk({
+          safeEnqueue(controller, sseChunk({
             type: 'done',
             success: true,
             text: aiText,
@@ -2534,7 +2577,7 @@ export async function POST(request: NextRequest) {
         } catch (innerError) {
           console.error('[API/analyze] Stream controller error:', innerError);
           try {
-            controller.enqueue(sseChunk({
+            safeEnqueue(controller, sseChunk({
               type: 'done',
               success: true,
               text: generateFallbackResponse(userMessage, context),
@@ -2555,7 +2598,7 @@ export async function POST(request: NextRequest) {
             }));
           } catch { /* ignore if controller already errored */ }
         } finally {
-          try { controller.close(); } catch { /* ignore */ }
+          streamClosed = true; try { controller.close(); } catch { /* ignore */ }
         }
       },
     });

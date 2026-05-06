@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useState, useCallback } from 'react';
+import Image from 'next/image';
 import { Menu, X, TrendingUp, Bell, Settings, LogIn, UserPlus, Download, Share2, Check, Copy, Bookmark } from 'lucide-react';
 import { exportChatAsMarkdown, exportChatAsJSON, downloadFile, chatFilename, type ExportMessage, type ExportChat } from '@/lib/chat-export';
 import { useToast } from '@/components/toast-provider';
@@ -146,7 +147,7 @@ export const ChatHeader = memo(function ChatHeader({
               <button
                 onClick={() => setShowExportMenu((v: any) => !v)}
                 className="p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
-                title="Export chat"
+                title="Export chat" aria-label="Export chat"
               >
                 <Download className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
               </button>
@@ -179,6 +180,7 @@ export const ChatHeader = memo(function ChatHeader({
               disabled={shareState === 'loading'}
               className="p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent disabled:opacity-50"
               title={shareState === 'copied' ? 'Link copied!' : 'Share chat'}
+              aria-label={shareState === 'copied' ? 'Link copied' : 'Share chat'}
             >
               {shareState === 'copied' ? (
                 <Check className="w-5 h-5 text-blue-400 transition-colors" />
@@ -201,7 +203,7 @@ export const ChatHeader = memo(function ChatHeader({
                   <div className="relative">
                     <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
                       {user.avatar ? (
-                        <img src={user.avatar || "/placeholder.svg"} alt={user.name} className="w-full h-full rounded-full object-cover" />
+                        <Image src={user.avatar || "/placeholder.svg"} alt={user.name} width={32} height={32} className="w-full h-full rounded-full object-cover" />
                       ) : (
                         user.name.charAt(0).toUpperCase()
                       )}
@@ -220,7 +222,7 @@ export const ChatHeader = memo(function ChatHeader({
                 <button
                   onClick={onOpenWatchlist}
                   className="relative p-1.5 md:p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
-                  title="Saved Bookmarks"
+                  title="Saved Bookmarks" aria-label="Open saved bookmarks"
                 >
                   <Bookmark className={`w-5 h-5 transition-colors ${watchlistCount > 0 ? 'text-blue-500 fill-blue-500' : 'text-[var(--text-muted)] group-hover:text-blue-500'}`} fill={watchlistCount > 0 ? 'currentColor' : 'none'} />
                   {watchlistCount > 0 && (

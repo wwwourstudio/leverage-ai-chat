@@ -3048,9 +3048,11 @@ No preamble. Start directly with section 1.`;
 
   const handleSaveChatTitle = (chatId: string) => {
     if (editingChatTitle.trim()) {
+      const newTitle = editingChatTitle.trim();
       setChats(chats.map((chat: any) =>
-        chat.id === chatId ? { ...chat, title: editingChatTitle.trim() } : chat
+        chat.id === chatId ? { ...chat, title: newTitle } : chat
       ));
+      if (isLoggedIn) updateThread(chatId, { title: newTitle });
       toast.success('Chat renamed');
     }
     setEditingChatId(null);
@@ -3636,13 +3638,15 @@ No preamble. Start directly with section 1.`;
       {/* Mobile backdrop — closes sidebar when tapping outside */}
       {sidebarOpen && (
         <div
-          className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm animate-backdrop-in"
+          className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm animate-backdrop-in"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar wrapper — overlay when open on mobile/tablet, icon rail in flow when closed */}
-      <div className={`flex-shrink-0 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]${sidebarOpen ? ' max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:w-72 max-lg:animate-fade-in' : ''}`}>
+      {/* Sidebar wrapper
+          Mobile (< md): fixed overlay, translate drives show/hide — chat area stays full-width
+          Desktop (≥ md): in-flow, width-animated by the Sidebar component itself */}
+      <div className={`flex-shrink-0 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:transition-transform max-md:duration-300 max-md:ease-in-out ${sidebarOpen ? 'max-md:translate-x-0' : 'max-md:-translate-x-full'}`}>
         <Sidebar
           open={sidebarOpen}
           onNewChat={handleNewChat}
@@ -3672,6 +3676,7 @@ No preamble. Start directly with section 1.`;
           user={user}
           onUserClick={() => isLoggedIn ? setShowUserLightbox(true) : setShowLoginModal(true)}
           isLoadingChats={isLoadingChats}
+          onClose={() => setSidebarOpen(false)}
         />
       </div>
 

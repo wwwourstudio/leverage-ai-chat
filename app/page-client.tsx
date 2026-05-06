@@ -3726,9 +3726,12 @@ No preamble. Start directly with section 1.`;
         />
 
         {/* Messages Container - Dynamic Data-Driven Interface */}
-        <div 
+        <div
           className="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar scroll-smooth"
-          style={{ 
+          aria-live="polite"
+          aria-label="Conversation"
+          role="log"
+          style={{
             scrollBehavior: 'smooth',
             WebkitOverflowScrolling: 'touch'
           }}

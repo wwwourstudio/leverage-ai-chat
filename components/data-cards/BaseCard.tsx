@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode, memo } from 'react';
-import { LucideIcon, AlertCircle, Loader2, ChevronRight } from 'lucide-react';
+import { LucideIcon, AlertCircle, Loader2, ChevronRight, FlaskConical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface StatusBadge {
@@ -25,6 +25,8 @@ interface BaseCardProps {
   error?: string;
   className?: string;
   isHero?: boolean;
+  isEstimated?: boolean;
+  dataAgeLabel?: string;
 }
 
 function ErrorState({ error, className }: { error: string; className?: string }) {
@@ -65,6 +67,8 @@ export const BaseCard = memo(function BaseCard({
   error,
   className,
   isHero = false,
+  isEstimated = false,
+  dataAgeLabel,
 }: BaseCardProps) {
   if (error) return <ErrorState error={error} className={className} />;
   if (isLoading) return <LoadingState className={className} />;
@@ -77,7 +81,7 @@ export const BaseCard = memo(function BaseCard({
 
   return (
     <article className={cn(
-      'group relative w-full rounded-2xl overflow-hidden bg-background border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_40px_oklch(0.4_0.12_240/0.12)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 transition-all duration-200 animate-fade-in-up',
+      'group relative w-full rounded-2xl overflow-hidden bg-background border border-[var(--border-subtle)] cursor-pointer hover:border-[var(--border-hover)] hover:shadow-[0_0_40px_oklch(0.4_0.12_240/0.12)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sport-default)]/60 transition-all duration-200 animate-fade-in-up',
       isHero && 'border-[var(--border-hover)] shadow-[0_0_24px_oklch(0.3_0.08_260/0.15)]',
       className,
     )}>
@@ -91,29 +95,46 @@ export const BaseCard = memo(function BaseCard({
               <Icon className={cn('text-white', isHero ? 'w-5 h-5' : 'w-4 h-4')} />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{category}</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[length:var(--text-label)] font-bold uppercase tracking-widest text-[var(--text-muted)]">{category}</span>
                 <span className="text-[var(--text-faint)]" aria-hidden="true">/</span>
-                <span className="text-[11px] font-medium text-[var(--text-faint)] truncate">{subcategory}</span>
+                <span className="text-[length:var(--text-label)] font-medium text-[var(--text-faint)] truncate">{subcategory}</span>
               </div>
               <h3 className={cn('font-bold text-foreground leading-tight mt-1 text-balance', isHero ? 'text-lg' : 'text-base')}>{title}</h3>
             </div>
           </div>
 
-          {status && StatusIcon && (
-            <div className={cn('flex items-center gap-1.5 px-2.5 py-1 rounded-full border shrink-0', status.bg, status.border)} role="status">
-              <StatusIcon className={cn('w-3 h-3', status.text)} aria-hidden="true" />
-              <span className={cn('text-[10px] font-bold uppercase tracking-wider', status.text)}>{status.label}</span>
-            </div>
-          )}
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            {status && StatusIcon && (
+              <div className={cn('flex items-center gap-1.5 px-2.5 py-1 rounded-full border', status.bg, status.border)} role="status">
+                <StatusIcon className={cn('w-3 h-3', status.text)} aria-hidden="true" />
+                <span className={cn('text-[10px] font-bold uppercase tracking-wider', status.text)}>{status.label}</span>
+              </div>
+            )}
+            {isEstimated && (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold" role="note" aria-label="Estimated data">
+                <FlaskConical className="w-3 h-3" aria-hidden="true" />
+                Estimated
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="relative">{children}</div>
 
+        {/* Data age label shown for real or estimated data */}
+        {dataAgeLabel && (
+          <div className="flex justify-end">
+            <span className="text-[length:var(--text-micro)] font-semibold tabular-nums text-[var(--text-faint)]">
+              Updated {dataAgeLabel}
+            </span>
+          </div>
+        )}
+
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-2 w-full pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-2 w-full pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground active:scale-[0.99] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sport-default)]/60 rounded-lg py-2"
             aria-label={`View full analysis for ${title}`}
           >
             View Full Analysis

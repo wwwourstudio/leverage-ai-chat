@@ -591,8 +591,9 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                         <button
                           onClick={onRetry}
                           title="Retry"
+                          aria-label="Retry message"
                           className={cn(
-                            'p-1.5 rounded-lg text-[11px] transition-all',
+                            'p-1.5 rounded-lg text-[11px] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sport-default)]/60',
                             message.isError
                               ? 'text-red-400 hover:bg-red-950/40'
                               : message.isPartial
@@ -611,7 +612,8 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                           setTimeout(() => setJustCopied(false), 1500);
                         }}
                         title="Copy response"
-                        className="p-1.5 rounded-lg text-[var(--text-faint)] hover:text-blue-400 hover:bg-[var(--bg-elevated)] transition-all"
+                        aria-label={justCopied ? 'Copied!' : 'Copy response'}
+                        className="p-1.5 rounded-lg text-[var(--text-faint)] hover:text-blue-400 hover:bg-[var(--bg-elevated)] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sport-default)]/60"
                       >
                         {justCopied
                           ? <CheckCheck className="w-3.5 h-3.5 text-blue-400 animate-scale-in" />
@@ -619,8 +621,9 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                       </button>
                       <button
                         onClick={() => setIsEditing(true)}
-                        title="Edit"
-                        className="p-1.5 rounded-lg text-[var(--text-faint)] hover:text-blue-400 hover:bg-[var(--bg-elevated)] transition-all"
+                        title="Edit message"
+                        aria-label="Edit message"
+                        className="p-1.5 rounded-lg text-[var(--text-faint)] hover:text-blue-400 hover:bg-[var(--bg-elevated)] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sport-default)]/60"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
@@ -628,8 +631,10 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                         <button
                           onClick={() => setShowTrust((v: any) => !v)}
                           title="Trust metrics"
+                          aria-label={showTrust ? 'Hide trust metrics' : 'Show trust metrics'}
+                          aria-expanded={showTrust}
                           className={cn(
-                            'p-1.5 rounded-lg transition-all',
+                            'p-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sport-default)]/60',
                             showTrust
                               ? 'text-blue-400 bg-blue-950/30'
                               : 'text-[var(--text-faint)] hover:text-blue-400 hover:bg-[var(--bg-elevated)]',

@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import { Bookmark } from 'lucide-react';
+import { Bookmark, FlaskConical } from 'lucide-react';
 
 // ── Saved-card entry (shared with WatchlistLightbox) ──────────────────────────
 export interface SavedCardEntry {
@@ -32,7 +32,7 @@ import { ArbitrageCard } from './ArbitrageCard';
 import { LineMovementCard } from './LineMovementCard';
 import { KellyBetCard } from './KellyBetCard';
 import { PortfolioCard } from './PortfolioCard';
-import { CardSkeleton } from './CardSkeleton';
+import { CardSkeleton, CardGrid, SkeletonVariant } from './CardSkeleton';
 import { StatcastCard } from './StatcastCard';
 import { ADPCard } from './ADPCard';
 const ADPUploadModal = dynamic(
@@ -80,6 +80,22 @@ interface DynamicCardRendererProps {
   trustLevel?: 'high' | 'medium' | 'low';
 }
 
+const STATS_CARD_TYPES = new Set([
+  'statcast', 'statcast_summary_card', 'hr_prop_card', 'leaderboard_card',
+  'pitch_analysis_card', 'mlb_projection_card', 'vpe_projection_card',
+]);
+
+const MINIMAL_CARD_TYPES = new Set([
+  'betting-insight', 'insight', 'adp-upload',
+]);
+
+function getSkeletonVariant(type: string): SkeletonVariant {
+  const t = type.toLowerCase();
+  if (STATS_CARD_TYPES.has(t) || t.includes('statcast') || t.includes('simulation')) return 'stats';
+  if (MINIMAL_CARD_TYPES.has(t) || t.includes('insight')) return 'minimal';
+  return 'betting';
+}
+
 export function DynamicCardRenderer({
   card,
   index = 0,
@@ -93,7 +109,7 @@ export function DynamicCardRenderer({
 }: DynamicCardRendererProps) {
   // Loading state
   if (isLoading) {
-    return <CardSkeleton />;
+    return <CardSkeleton variant={card ? getSkeletonVariant(card.type) : 'betting'} />;
   }
 
   // Validate card data
@@ -155,7 +171,7 @@ export function DynamicCardRenderer({
   const hasTrustOverlay = trustScore !== undefined;
 
   // Data staleness: show "Updated X ago" when fetchedAt is in metadata
-  const fetchedAt: string | undefined = (safeCard.metadata as any)?.fetchedAt;
+  const fetchedAt: string | undefined = (safeCard.metadata as Record<string, unknown> | undefined)?.fetchedAt as string | undefined;
   const dataAgeLabel = (() => {
     if (!fetchedAt || isEstimated) return null;
     const ageMs = Date.now() - new Date(fetchedAt).getTime();
@@ -206,8 +222,9 @@ export function DynamicCardRenderer({
           </button>
         )}
         {isEstimated && (
-          <span className="absolute top-2 right-10 z-10 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-amber-500/20 text-amber-300 border border-amber-500/30 backdrop-blur-sm pointer-events-none">
-            ESTIMATED
+          <span className="absolute top-2 right-10 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold backdrop-blur-sm pointer-events-none" role="note" aria-label="Estimated data">
+            <FlaskConical className="w-3 h-3" aria-hidden="true" />
+            Estimated
           </span>
         )}
         {dataAgeLabel && !isEstimated && (
@@ -780,13 +797,7 @@ interface CardListProps {
 
 export function CardList({ cards, onAnalyze, isLoading, className = '' }: CardListProps) {
   if (isLoading) {
-    return (
-      <div className={`flex flex-col gap-4 w-full ${className}`}>
-        {[1, 2, 3].map((i) => (
-          <CardSkeleton key={i} />
-        ))}
-      </div>
-    );
+    return <CardGrid count={3} className={className} />;
   }
 
   if (!cards || cards.length === 0) {

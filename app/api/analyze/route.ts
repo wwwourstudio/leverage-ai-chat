@@ -2543,6 +2543,14 @@ export async function POST(request: NextRequest) {
             });
           }
 
+          // Log response metrics for size monitoring
+          const responsePayloadSize = aiText.length + JSON.stringify(finalCards).length;
+          console.log(
+            `[API/analyze] done — text=${aiText.length}B cards=${finalCards.length} payload≈${responsePayloadSize}B` +
+            (tokenUsage ? ` tokens=${tokenUsage.totalTokens}` : '') +
+            ` time=${processingTime}ms`,
+          );
+
           // Send done event with full metadata
           safeEnqueue(controller, sseChunk({
             type: 'done',
@@ -2599,8 +2607,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[API/analyze] Unhandled error:', error);
 
-    // Check if timeout error
-    if (error instanceof Error && error.message.includes('timeout')) {
+    // Check if timeout or abort error
+    if (error instanceof Error && (error.message.includes('timeout') || error.name === 'AbortError')) {
       return NextResponse.json(
         {
           success: true, // Return success with fallback to avoid breaking UI

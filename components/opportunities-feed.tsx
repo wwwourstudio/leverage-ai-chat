@@ -165,7 +165,7 @@ export function OpportunitiesFeed() {
     }
   };
 
-  const filteredOpportunities = opportunities.filter((opp: any) => 
+  const filteredOpportunities = opportunities.filter((opp: Opportunity) =>
     filter === 'all' || opp.type === filter
   );
 
@@ -250,7 +250,7 @@ export function OpportunitiesFeed() {
                 </p>
               </div>
             ) : (
-              filteredOpportunities.map((opp: any, i: number) => (
+              filteredOpportunities.map((opp: Opportunity, i: number) => (
                 <div
                   key={opp.id}
                   className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6 transition-all hover:border-blue-500/40 cursor-pointer animate-fade-in-up"

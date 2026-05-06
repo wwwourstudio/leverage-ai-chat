@@ -64,6 +64,24 @@
   --shadow-card: 0 2px 8px oklch(0 0 0 / 0.08);
   --shadow-elevated: 0 8px 24px oklch(0 0 0 / 0.12);
   --shadow-glow: 0 0 32px oklch(0.5 0.06 260 / 0.08);
+
+  /* Sport-specific accent colors */
+  --sport-basketball: oklch(0.65 0.18 50);
+  --sport-baseball:   oklch(0.55 0.15 265);
+  --sport-hockey:     oklch(0.60 0.14 215);
+  --sport-football:   oklch(0.52 0.18 155);
+  --sport-soccer:     oklch(0.58 0.16 140);
+  --sport-default:    oklch(0.55 0.22 255);
+
+  /* Status semantic tokens */
+  --status-hot:   oklch(0.60 0.22 25);
+  --status-value: oklch(0.55 0.20 145);
+  --status-edge:  oklch(0.65 0.18 85);
+  --status-cold:  oklch(0.50 0.08 250);
+
+  /* Typography scale */
+  --text-label: 0.6875rem;
+  --text-micro: 0.5625rem;
 }
 
 .dark {
@@ -141,6 +159,20 @@
   --shadow-card:     0 2px 8px oklch(0 0 0 / 0.30);
   --shadow-elevated: 0 8px 24px oklch(0 0 0 / 0.45);
   --shadow-glow:     0 0 32px oklch(0.40 0.12 255 / 0.18);
+
+  /* ── Sport-specific accent colors (dark — slightly brighter) ────── */
+  --sport-basketball: oklch(0.72 0.20 50);
+  --sport-baseball:   oklch(0.65 0.18 265);
+  --sport-hockey:     oklch(0.68 0.16 215);
+  --sport-football:   oklch(0.62 0.20 155);
+  --sport-soccer:     oklch(0.66 0.18 140);
+  --sport-default:    oklch(0.65 0.24 255);
+
+  /* ── Status semantic tokens (dark) ─────────────────────────────── */
+  --status-hot:   oklch(0.68 0.24 25);
+  --status-value: oklch(0.65 0.22 145);
+  --status-edge:  oklch(0.75 0.20 85);
+  --status-cold:  oklch(0.58 0.10 250);
 }
 
 @theme inline {
@@ -350,4 +382,13 @@
   vertical-align: text-bottom;
   border-radius: 1px;
   animation: cursor-blink 1s step-end infinite;
+}
+
+/* ── Reduced-motion: disable all animations for users who prefer it ──── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

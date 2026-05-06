@@ -168,37 +168,61 @@ function calcVig(homeML?: string, awayML?: string): number | null {
   return Math.round((h + a - 100) * 10) / 10;
 }
 
-/** Sport-specific gradient + accent colours */
+/** Maps sport strings to the CSS custom property holding that sport's accent color. */
+const SPORT_VAR: Record<string, string> = {
+  basketball: '--sport-basketball',
+  hockey:     '--sport-hockey',
+  baseball:   '--sport-baseball',
+  football:   '--sport-football',
+  soccer:     '--sport-soccer',
+};
+
+function getSportVar(sport?: string): string {
+  if (!sport) return '--sport-default';
+  const s = sport.toLowerCase();
+  for (const [key, val] of Object.entries(SPORT_VAR)) {
+    if (s.includes(key)) return val;
+  }
+  return '--sport-default';
+}
+
+/** Sport-specific gradient + accent colours, using CSS custom properties for colors. */
 function sportTheme(sport?: string): {
   headerGrad: string;
   accentColor: string;
   avatarCls: string;
   probBarColor: string;
+  sportVar: string;
 } {
+  const sportVar = getSportVar(sport);
   if (sport?.includes('basketball')) return {
     headerGrad: 'from-orange-600/80 via-amber-700/60 to-orange-900/40',
-    accentColor: 'text-orange-400',
-    avatarCls: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+    accentColor: `text-[color:var(${sportVar})]`,
+    avatarCls: `bg-[color:var(${sportVar})]/15 text-[color:var(${sportVar})] border-[color:var(${sportVar})]/30`,
     probBarColor: 'from-orange-500 to-amber-400',
+    sportVar,
   };
   if (sport?.includes('hockey')) return {
     headerGrad: 'from-sky-600/80 via-blue-700/60 to-sky-900/40',
-    accentColor: 'text-sky-400',
-    avatarCls: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
+    accentColor: `text-[color:var(${sportVar})]`,
+    avatarCls: `bg-[color:var(${sportVar})]/15 text-[color:var(${sportVar})] border-[color:var(${sportVar})]/30`,
     probBarColor: 'from-sky-500 to-blue-400',
+    sportVar,
   };
   if (sport?.includes('baseball')) return {
     headerGrad: 'from-indigo-600/80 via-violet-700/60 to-indigo-900/40',
-    accentColor: 'text-indigo-400',
-    avatarCls: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+    accentColor: `text-[color:var(${sportVar})]`,
+    avatarCls: `bg-[color:var(${sportVar})]/15 text-[color:var(${sportVar})] border-[color:var(${sportVar})]/30`,
     probBarColor: 'from-indigo-500 to-violet-400',
+    sportVar,
   };
   // NFL / soccer / default → green
   return {
     headerGrad: 'from-green-600/80 via-emerald-700/60 to-green-900/40',
-    accentColor: 'text-emerald-400',
-    avatarCls: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    accentColor: `text-[color:var(${sportVar})]`,
+    avatarCls: `bg-[color:var(${sportVar})]/15 text-[color:var(${sportVar})] border-[color:var(${sportVar})]/30`,
     probBarColor: 'from-green-500 to-emerald-400',
+    sportVar,
   };
 }
 

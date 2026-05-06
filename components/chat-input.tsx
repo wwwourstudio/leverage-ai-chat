@@ -149,6 +149,8 @@ export const ChatInput = memo(function ChatInput({
         multiple
         onChange={onFileUpload}
         className="hidden"
+        aria-label="Attach files"
+        tabIndex={-1}
       />
 
       {/* Attached file chips — shown above the card */}
@@ -225,7 +227,8 @@ export const ChatInput = memo(function ChatInput({
               onClick={() => fileInputRef.current?.click()}
               disabled={isTyping}
               title="Attach file"
-              className="flex items-center justify-center w-8 h-8 rounded-xl text-[var(--text-faint)] hover:text-foreground hover:bg-[var(--bg-elevated)] border border-transparent hover:border-[var(--border-subtle)] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Attach file"
+              className="flex items-center justify-center w-8 h-8 rounded-xl text-[var(--text-faint)] hover:text-foreground hover:bg-[var(--bg-elevated)] border border-transparent hover:border-[var(--border-subtle)] transition-all disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sport-default)]/60"
             >
               <Paperclip className="w-4 h-4" />
             </button>
@@ -335,7 +338,12 @@ export const ChatInput = memo(function ChatInput({
 
             {/* Char counter — appears near limit */}
             {input.length > MAX_CHARS * 0.65 && (
-              <div className="relative flex items-center justify-center w-8 h-8 shrink-0">
+              <div
+                className="relative flex items-center justify-center w-8 h-8 shrink-0"
+                role="status"
+                aria-live="polite"
+                aria-label={overLimit ? `${Math.abs(charsLeft)} characters over limit` : `${charsLeft} characters remaining`}
+              >
                 <svg className="-rotate-90 absolute inset-0 w-8 h-8" viewBox="0 0 32 32" aria-hidden="true">
                   <circle cx="16" cy="16" r="12" fill="none" stroke="var(--border-subtle)" strokeWidth="2.5" />
                   <circle
@@ -347,7 +355,7 @@ export const ChatInput = memo(function ChatInput({
                     style={{ transition: 'stroke-dashoffset 0.2s, stroke 0.2s' }}
                   />
                 </svg>
-                <span className={`relative z-10 text-[9px] font-bold tabular-nums leading-none ${overLimit ? 'text-red-400' : nearLimit ? 'text-orange-400' : 'text-[var(--text-faint)]'}`}>
+                <span aria-hidden="true" className={`relative z-10 text-[9px] font-bold tabular-nums leading-none ${overLimit ? 'text-red-400' : nearLimit ? 'text-orange-400' : 'text-[var(--text-faint)]'}`}>
                   {overLimit ? `-${Math.abs(charsLeft)}` : charsLeft}
                 </span>
               </div>

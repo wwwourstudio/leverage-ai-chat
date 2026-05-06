@@ -609,7 +609,7 @@ export function Sidebar({
           </div>
 
           {/* ── Chat list ──────────────────────────────────────────────────── */}
-          <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-2 space-y-3 custom-scrollbar">
+          <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] space-y-3 custom-scrollbar">
             {/* Loading skeletons */}
             {isLoadingChats && (
               <div className="space-y-1.5 px-1 pt-1" aria-busy="true" aria-label="Loading chats">
@@ -694,14 +694,26 @@ export function Sidebar({
 
             {/* Empty state */}
             {filteredChats.length === 0 && !isLoadingChats && (
-              <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-                <div className="w-10 h-10 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center mb-3">
-                  <MessageSquare className="w-5 h-5 text-[var(--text-faint)]" />
-                </div>
-                <p className="text-xs font-bold text-[var(--text-faint)] mb-1">No chats found</p>
-                <p className="text-[10px] text-[var(--text-faint)]">
-                  {chatSearch ? 'Try a different search term' : 'Start a new analysis above'}
-                </p>
+              <div className="flex flex-col items-center justify-center py-10 px-4 text-center animate-fade-in">
+                {chatSearch ? (
+                  <>
+                    <Search className="w-7 h-7 text-[var(--text-faint)] mb-3 opacity-50" />
+                    <p className="text-xs font-bold text-[var(--text-faint)] mb-1">No results</p>
+                    <p className="text-[10px] text-[var(--text-faint)] opacity-70">
+                      Nothing matches &ldquo;{chatSearch}&rdquo;
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-blue-500/20 flex items-center justify-center mb-3">
+                      <MessageSquare className="w-5 h-5 text-[var(--text-faint)]" />
+                    </div>
+                    <p className="text-xs font-bold text-[var(--text-faint)] mb-1">No chats yet</p>
+                    <p className="text-[10px] text-[var(--text-faint)] opacity-70">
+                      Start a new analysis above
+                    </p>
+                  </>
+                )}
               </div>
             )}
           </div>

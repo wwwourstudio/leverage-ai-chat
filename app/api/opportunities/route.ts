@@ -31,6 +31,8 @@ export async function GET(req: NextRequest) {
         .order('profit_margin', { ascending: false })
         .limit(20);
 
+      const cacheHeaders = { 'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30' };
+
       if (!error && stored && stored.length > 0) {
         const opportunities = stored.map((row: any) => ({
           event: `${row.away_team} @ ${row.home_team}`,
@@ -41,7 +43,7 @@ export async function GET(req: NextRequest) {
           profitPercentage: (row.profit_margin ?? 0) * 100,
           totalStake: row.total_stake ?? 100,
         }));
-        return NextResponse.json({ success: true, opportunities });
+        return NextResponse.json({ success: true, opportunities }, { headers: cacheHeaders });
       }
 
       // Fallback: run live arbitrage detection
@@ -58,8 +60,10 @@ export async function GET(req: NextRequest) {
           profitPercentage: c.data?.profitPercentage ?? 0,
           totalStake: c.data?.stake ?? 100,
         }));
-      return NextResponse.json({ success: true, opportunities });
+      return NextResponse.json({ success: true, opportunities }, { headers: cacheHeaders });
     }
+
+    const edgeCacheHeaders = { 'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30' };
 
     // Default: type=edge — value bets with positive EV
     const { data: edgeData, error: edgeError } = await supabase
@@ -87,11 +91,11 @@ export async function GET(req: NextRequest) {
           created_at: row.created_at,
         };
       });
-      return NextResponse.json({ success: true, opportunities });
+      return NextResponse.json({ success: true, opportunities }, { headers: edgeCacheHeaders });
     }
 
     // No stored data — return empty set so feed shows "no opportunities"
-    return NextResponse.json({ success: true, opportunities: [] });
+    return NextResponse.json({ success: true, opportunities: [] }, { headers: edgeCacheHeaders });
   } catch (err) {
     console.error('[API/opportunities] Error:', err);
     return NextResponse.json(

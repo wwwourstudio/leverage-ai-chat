@@ -20,12 +20,15 @@ export const maxDuration = 45;
 function getServiceClient() {
   const url = getSupabaseUrl();
   const key = getSupabaseServiceKey();
-  if (!url || !key) throw new Error('Supabase service role not configured');
+  if (!url || !key) return null;
   return createClient(url, key, { db: { schema: 'api' } });
 }
 
 export async function GET(req: NextRequest) {
   if (!verifyCronSecret(req)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  if (!getSupabaseUrl() || !getSupabaseServiceKey()) {
+    return NextResponse.json({ success: true, skipped: true, reason: 'service-role-not-configured' }, { status: 200 });
+  }
 
   const startedAt = Date.now();
   const today = new Date().toISOString().slice(0, 10);
@@ -66,7 +69,7 @@ export async function GET(req: NextRequest) {
     // Persist to app_settings so read paths don't need to re-run the model.
     // Cache key includes the draftGroupId so multiple slates can coexist; the
     // canonical `dfs_slate_today` row mirrors the Main slate.
-    const supabase = getServiceClient();
+    const supabase = getServiceClient()!;
     const payload = JSON.stringify({
       date: today,
       players: slate,

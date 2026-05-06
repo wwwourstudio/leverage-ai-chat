@@ -35,14 +35,19 @@ export interface OddsHistoryRow extends OddsRow {
 
 export interface PlayerPropRow {
   id: string;
+  sport: string;
   game_id: string;
-  player_id: string;
-  sportsbook_id: string;
-  market_id: string;
-  line: number;
-  over_price: number;
-  under_price: number;
-  updated_at: string;
+  home_team: string | null;
+  away_team: string | null;
+  player_name: string;
+  stat_type: string;
+  line: number | null;
+  over_odds: string | null;
+  under_odds: string | null;
+  bookmaker: string | null;
+  game_time: string | null;
+  fetched_at: string;
+  created_at: string;
 }
 
 export interface LineMovementRow {
@@ -63,20 +68,16 @@ export interface OddsStreamState {
   odds: ReturnType<typeof useRealtime<OddsRow>>;
   /** Append-only snapshots from api.odds_history */
   oddsHistory: ReturnType<typeof useRealtime<OddsHistoryRow>>;
-  /** Current player prop lines from api.player_props */
+  /** Current player prop lines from api.player_props_markets */
   playerProps: ReturnType<typeof useRealtime<PlayerPropRow>>;
   /** Game-level line movements (≥1 pt) from api.line_movements */
   lineMovements: ReturnType<typeof useRealtime<LineMovementRow>>;
 }
 
 /**
- * @param sport  Optional sport key to filter odds and player_props streams.
+ * @param sport  Optional sport key to filter odds and player_props_markets streams.
  *               If omitted, all sports are streamed.
- *               Passed as a Supabase eq filter on the `sport` column of the
- *               joined games table — only works if your view exposes sport
- *               directly on the table row. For the normalized schema you may
- *               need to denormalize sport onto odds/player_props rows, or
- *               filter client-side from the joined data.
+ *               Passed as a Supabase eq filter on the `sport` column.
  */
 export function useOddsStream(sport?: string): OddsStreamState {
   // Memoize filter objects to prevent re-subscription on every render cycle.
@@ -88,9 +89,7 @@ export function useOddsStream(sport?: string): OddsStreamState {
 
   const odds         = useRealtime<OddsRow>('odds');
   const oddsHistory  = useRealtime<OddsHistoryRow>('odds_history');
-  // player_props doesn't have a sport column directly, but the filter is passed
-  // through for future schema versions that denormalize sport onto the row.
-  const playerProps  = useRealtime<PlayerPropRow>('player_props', oddsFilter);
+  const playerProps  = useRealtime<PlayerPropRow>('player_props_markets', oddsFilter);
   const lineMovements = useRealtime<LineMovementRow>('line_movements');
 
   return { odds, oddsHistory, playerProps, lineMovements };

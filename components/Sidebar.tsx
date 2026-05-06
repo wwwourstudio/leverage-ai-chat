@@ -211,7 +211,7 @@ const ChatCard = memo(function ChatCard({
                 <button
                   onClick={(e: any) => onEditChatTitle(chat.id, chat.title, e)}
                   className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-[var(--bg-elevated)] rounded transition-all flex-shrink-0"
-                  title="Edit title"
+                  title="Edit title" aria-label="Edit chat title"
                 >
                   <Edit3 className="w-2.5 h-2.5 text-[var(--text-faint)] hover:text-blue-400" />
                 </button>
@@ -250,7 +250,7 @@ const ChatCard = memo(function ChatCard({
               'p-1 rounded-md hover:bg-[var(--bg-elevated)] transition-all',
               chat.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
             )}
-            title={chat.starred ? 'Unstar' : 'Star'}
+            title={chat.starred ? 'Unstar' : 'Star'} aria-label={chat.starred ? 'Unstar chat' : 'Star chat'}
           >
             <Star className={cn(
               'w-3 h-3',
@@ -260,7 +260,7 @@ const ChatCard = memo(function ChatCard({
           <button
             onClick={(e: any) => onDeleteChat(chat.id, e)}
             className="p-1 rounded-md hover:bg-[var(--bg-elevated)] opacity-0 group-hover:opacity-100 transition-all"
-            title="Delete"
+            title="Delete" aria-label="Delete chat"
           >
             <Trash2 className="w-3 h-3 text-[var(--text-faint)] hover:text-red-400 transition-colors" />
           </button>
@@ -294,7 +294,7 @@ function IconRail({
       <button
         onClick={onNewChat}
         className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 flex items-center justify-center transition-all duration-200 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/35 mb-2 flex-shrink-0"
-        title="New Analysis"
+        title="New Analysis" aria-label="New analysis chat"
       >
         <Plus className="w-4 h-4 text-white" />
       </button>

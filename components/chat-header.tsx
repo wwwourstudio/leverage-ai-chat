@@ -146,7 +146,7 @@ export const ChatHeader = memo(function ChatHeader({
               <button
                 onClick={() => setShowExportMenu((v: any) => !v)}
                 className="p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
-                title="Export chat"
+                title="Export chat" aria-label="Export chat"
               >
                 <Download className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
               </button>
@@ -179,6 +179,7 @@ export const ChatHeader = memo(function ChatHeader({
               disabled={shareState === 'loading'}
               className="p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent disabled:opacity-50"
               title={shareState === 'copied' ? 'Link copied!' : 'Share chat'}
+              aria-label={shareState === 'copied' ? 'Link copied' : 'Share chat'}
             >
               {shareState === 'copied' ? (
                 <Check className="w-5 h-5 text-blue-400 transition-colors" />
@@ -220,7 +221,7 @@ export const ChatHeader = memo(function ChatHeader({
                 <button
                   onClick={onOpenWatchlist}
                   className="relative p-1.5 md:p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
-                  title="Saved Bookmarks"
+                  title="Saved Bookmarks" aria-label="Open saved bookmarks"
                 >
                   <Bookmark className={`w-5 h-5 transition-colors ${watchlistCount > 0 ? 'text-blue-500 fill-blue-500' : 'text-[var(--text-muted)] group-hover:text-blue-500'}`} fill={watchlistCount > 0 ? 'currentColor' : 'none'} />
                   {watchlistCount > 0 && (

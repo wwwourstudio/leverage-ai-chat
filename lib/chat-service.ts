@@ -179,3 +179,26 @@ export async function saveMessage(
     return null;
   }
 }
+
+/**
+ * Append multiple messages to a thread in a single round-trip.
+ * Returns the server-assigned UUIDs in insertion order; null entries indicate per-row failures.
+ * Falls back to sequential single-saves on any error.
+ */
+export async function saveMessagesBatch(
+  threadId: string,
+  msgs: Array<{ role: 'user' | 'assistant'; content: string; model_used?: string; confidence?: number; is_welcome?: boolean; cards?: unknown[] }>
+): Promise<(string | null)[]> {
+  if (!isUUID(threadId) || msgs.length === 0) return msgs.map(() => null);
+  try {
+    const json = await apiCall(`/api/chats/${threadId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ messages: msgs }),
+    });
+    const rows: Array<{ id: string }> = json.messages ?? [];
+    return rows.map(r => r.id ?? null);
+  } catch (err) {
+    console.warn('[v0] [Chat] saveMessagesBatch failed, falling back to sequential:', err);
+    return Promise.all(msgs.map(m => saveMessage(threadId, m)));
+  }
+}

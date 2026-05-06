@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import Image from 'next/image';
 import { Plus, Search, Star, Trash2, MessageSquare, Edit3, CheckCircle, LayoutGrid, TrendingUp, Trophy, Award, BarChart3, UserCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/utils';
@@ -336,7 +337,7 @@ function IconRail({
           onClick={onUserClick}
         >
           {user.avatar
-            ? <img src={user.avatar} className="w-8 h-8 rounded-full object-cover" alt="" />
+            ? <Image src={user.avatar} className="w-8 h-8 rounded-full object-cover" alt="" width={32} height={32} />
             : <span className="text-[11px] font-black text-white">{user.name[0]?.toUpperCase()}</span>
           }
         </div>

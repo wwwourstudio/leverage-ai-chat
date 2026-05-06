@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useState, useCallback, useEffect } from 'react';
+import Image from 'next/image';
 import {
   Clock, TrendingUp, TrendingDown, Minus,
   ChevronRight, Zap, Shield, AlertTriangle, Wind, BookOpen,
@@ -217,7 +218,7 @@ function TeamLogo({
   if (logoUrl && !imgFailed) {
     return (
       <div className={cn('rounded-xl overflow-hidden flex items-center justify-center shrink-0 bg-[var(--bg-elevated)]', sz)}>
-        <img src={logoUrl} alt={name} className="w-full h-full object-contain p-1 drop-shadow" onError={() => setImgFailed(true)} />
+        <Image src={logoUrl} alt={name} width={isLarge ? 56 : 44} height={isLarge ? 56 : 44} className="w-full h-full object-contain p-1 drop-shadow" onError={() => setImgFailed(true)} />
       </div>
     );
   }

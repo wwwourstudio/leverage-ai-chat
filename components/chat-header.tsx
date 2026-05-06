@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useState, useCallback } from 'react';
+import Image from 'next/image';
 import { Menu, X, TrendingUp, Bell, Settings, LogIn, UserPlus, Download, Share2, Check, Copy, Bookmark } from 'lucide-react';
 import { exportChatAsMarkdown, exportChatAsJSON, downloadFile, chatFilename, type ExportMessage, type ExportChat } from '@/lib/chat-export';
 import { useToast } from '@/components/toast-provider';
@@ -202,7 +203,7 @@ export const ChatHeader = memo(function ChatHeader({
                   <div className="relative">
                     <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
                       {user.avatar ? (
-                        <img src={user.avatar || "/placeholder.svg"} alt={user.name} className="w-full h-full rounded-full object-cover" />
+                        <Image src={user.avatar || "/placeholder.svg"} alt={user.name} width={32} height={32} className="w-full h-full rounded-full object-cover" />
                       ) : (
                         user.name.charAt(0).toUpperCase()
                       )}

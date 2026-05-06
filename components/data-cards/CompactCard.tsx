@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useState } from 'react';
+import Image from 'next/image';
 import { LucideIcon, TrendingUp, Activity, Zap, Trophy, BarChart2, CloudRain, GitMerge, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getTeamLogoUrl } from '@/lib/constants';
@@ -92,7 +93,7 @@ function MiniTeamLogo({ name, sport }: { name: string; sport?: string }) {
   if (url && !failed) {
     return (
       <div className="w-5 h-5 rounded-md overflow-hidden bg-white/5 flex items-center justify-center shrink-0">
-        <img src={url} alt={name} className="w-full h-full object-contain" onError={() => setFailed(true)} />
+        <Image src={url} alt={name} width={20} height={20} className="w-full h-full object-contain" onError={() => setFailed(true)} />
       </div>
     );
   }

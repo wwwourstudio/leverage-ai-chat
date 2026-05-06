@@ -153,12 +153,12 @@ export const DFSSlateCard = memo(function DFSSlateCard({
       {(degradedMode || insufficientPool) && (
         <div className="mx-4 mt-3 px-3 py-2 rounded-lg border border-amber-500/40 bg-amber-500/10">
           <div className="text-[10px] font-black uppercase tracking-wider text-amber-300 mb-0.5">
-            {insufficientPool ? 'Slate too thin' : 'DraftKings unavailable'}
+            {insufficientPool ? 'Slate too thin' : 'Projection only'}
           </div>
           <div className="text-[10px] text-amber-100/80 leading-snug">
             {insufficientPool
               ? 'Not enough confirmed available players in this contest pool to build a full lineup. Wait for lineups to lock and try again.'
-              : 'Could not reach the DraftKings contest feed — lineup is hidden until it can be validated against a real contest pool.'}
+              : 'DraftKings contest feed unavailable — lineup built from LeverageMetrics projections. Salary and ownership are modeled estimates, not DK-validated.'}
             {degradedReason ? ` (${degradedReason})` : ''}
           </div>
         </div>

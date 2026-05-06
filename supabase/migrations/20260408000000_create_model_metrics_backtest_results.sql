@@ -16,6 +16,15 @@
 --                    api.model_metrics   (live calibration_alpha/beta)
 -- =============================================================================
 
+-- Ensure api schema exists with PostgREST-accessible grants.
+-- On production these already exist from foundation migrations; the statements
+-- are safe to re-run (GRANT is idempotent, schema creation is IF NOT EXISTS).
+CREATE SCHEMA IF NOT EXISTS api;
+GRANT USAGE ON SCHEMA api TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA api GRANT ALL ON TABLES    TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA api GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA api GRANT ALL ON ROUTINES  TO anon, authenticated, service_role;
+
 -- model_metrics: written by cron/train after each daily calibration run.
 -- Also written by cron/backtest (window_days=0 sentinel row = live calibration).
 CREATE TABLE IF NOT EXISTS api.model_metrics (

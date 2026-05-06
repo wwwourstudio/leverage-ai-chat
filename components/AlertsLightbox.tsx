@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useVisibilityInterval } from '@/lib/hooks/use-visibility-interval';
 import {
   X, Bell, Plus, Trash2, TrendingUp, Target, Activity, Zap,
   Loader2, CheckCircle, ToggleLeft, ToggleRight, Sparkles,
@@ -140,8 +141,6 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [resettingId, setResettingId] = useState<string | null>(null);
 
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   // ── Auth check ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -200,29 +199,27 @@ export function AlertsLightbox({ isOpen, onClose, onAlertsCountChange }: AlertsL
   }, [authChecked, isAuthenticated, loadAlerts]);
 
   // ── Polling ─────────────────────────────────────────────────────────────────
+  // Pauses when the tab is hidden (no point pinging /api/alerts/check while
+  // the user is on another tab — they'll see fired toasts on return).
 
-  useEffect(() => {
+  const checkAlerts = useCallback(async () => {
     if (!isAuthenticated || !isOpen) return;
-
-    const checkAlerts = async () => {
-      try {
-        const res = await fetch('/api/alerts/check');
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.triggered?.length > 0) {
-          for (const a of data.triggered as { title: string }[]) {
-            toast.success(`Alert fired: ${a.title}`);
-          }
-          await loadAlerts();
+    try {
+      const res = await fetch('/api/alerts/check');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.triggered?.length > 0) {
+        for (const a of data.triggered as { title: string }[]) {
+          toast.success(`Alert fired: ${a.title}`);
         }
-      } catch {
-        // non-fatal
+        await loadAlerts();
       }
-    };
-
-    pollingRef.current = setInterval(checkAlerts, 60_000);
-    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+    } catch {
+      // non-fatal
+    }
   }, [isAuthenticated, isOpen, loadAlerts, toast]);
+
+  useVisibilityInterval(checkAlerts, 60_000, { enabled: isAuthenticated && isOpen });
 
   // ── CRUD handlers ────────────────────────────────────────────────────────────
 

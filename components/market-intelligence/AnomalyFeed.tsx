@@ -10,6 +10,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { useVisibilityInterval } from '@/lib/hooks/use-visibility-interval';
 
 interface Anomaly {
   id: string;
@@ -78,11 +79,9 @@ export function AnomalyFeed({ sport, limit = 10 }: Props) {
     }
   }, [sport, limit]);
 
-  useEffect(() => {
-    fetchAnomalies();
-    const interval = setInterval(fetchAnomalies, 30_000);
-    return () => clearInterval(interval);
-  }, [fetchAnomalies]);
+  useEffect(() => { fetchAnomalies(); }, [fetchAnomalies]);
+  // Pause polling when the tab is hidden — anomaly feed isn't useful in background.
+  useVisibilityInterval(fetchAnomalies, 30_000);
 
   if (loading) {
     return (

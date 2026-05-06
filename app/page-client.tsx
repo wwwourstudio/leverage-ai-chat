@@ -41,7 +41,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { ChatHeader, ChatInput } from '@/components/chat';
 import { SuggestedPrompts } from '@/components/suggested-prompts';
 
-import { createThread, updateThread, deleteThread, loadMessages, saveMessage } from '@/lib/chat-service';
+import { createThread, updateThread, deleteThread, loadMessages, saveMessagesBatch } from '@/lib/chat-service';
 import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
 import { useChat, type ChatMessage as HookChatMessage } from '@/lib/hooks/useChat';
 import { useTheme } from 'next-themes';
@@ -1933,14 +1933,16 @@ No preamble. Start directly with section 1.`;
         ];
         resolveThreadId().then(async (threadId) => {
           if (!threadId) return;
-          saveMessage(threadId, { role: 'user', content: userMessage });
-          const savedMsgId = await saveMessage(threadId, {
-            role: 'assistant',
-            content: capturedMsg.content,
-            model_used: capturedMsg.modelUsed,
-            confidence: capturedMsg.confidence,
-            cards: (capturedMsg.cards as unknown[])?.length ? capturedMsg.cards as unknown[] : undefined,
-          });
+          const [, savedMsgId] = await saveMessagesBatch(threadId, [
+            { role: 'user', content: userMessage },
+            {
+              role: 'assistant',
+              content: capturedMsg.content,
+              model_used: capturedMsg.modelUsed,
+              confidence: capturedMsg.confidence,
+              cards: (capturedMsg.cards as unknown[])?.length ? capturedMsg.cards as unknown[] : undefined,
+            },
+          ]);
           // Re-key cards in localStorage to use real DB IDs so they survive page reloads.
           // The early save above used client-side UUIDs (temp thread ID + streaming message ID).
           // Now we have the real Supabase-assigned IDs for both the thread and the message.

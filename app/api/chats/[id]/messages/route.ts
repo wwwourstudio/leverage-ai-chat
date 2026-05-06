@@ -79,9 +79,15 @@ export async function POST(
     } catch {
       return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: HTTP_STATUS.BAD_REQUEST });
     }
-    const { role, content, model_used, confidence, is_welcome = false, cards } = body as any;
 
-    if (!role || !content) {
+    // Normalize to array: batch mode uses `{ messages: [...] }`, single uses `{ role, content, ... }`
+    type MsgInput = { role: string; content: string; model_used?: string; confidence?: number; is_welcome?: boolean; cards?: unknown[] };
+    const isBatch = Array.isArray((body as any).messages);
+    const msgs: MsgInput[] = isBatch
+      ? (body as any).messages
+      : [{ role: (body as any).role, content: (body as any).content, model_used: (body as any).model_used, confidence: (body as any).confidence, is_welcome: (body as any).is_welcome ?? false, cards: (body as any).cards }];
+
+    if (!msgs.length || msgs.some(m => !m.role || !m.content)) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields: role, content' },
         { status: HTTP_STATUS.BAD_REQUEST }
@@ -103,10 +109,11 @@ export async function POST(
       // Auto-recreate it under the same UUID so the client state stays valid.
       // ignoreDuplicates handles the race when two saveMessage calls (user +
       // assistant) arrive simultaneously before the first insert commits.
+      const firstContent = String(msgs[0].content).slice(0, 80);
       const { error: createErr } = await supabase
         .from('chat_threads')
         .upsert(
-          { id, user_id: user.id, title: String(content).slice(0, 80) },
+          { id, user_id: user.id, title: firstContent },
           { onConflict: 'id', ignoreDuplicates: true }
         );
 
@@ -120,19 +127,20 @@ export async function POST(
       console.log(`[v0] [API/chats/messages] Auto-recreated stale thread ${id} for user ${user.id}`);
     }
 
-    const { data: message, error } = await supabase
+    const rows = msgs.map(m => ({
+      thread_id: id,
+      role: m.role,
+      content: String(m.content).slice(0, 50000),
+      cards: Array.isArray(m.cards) ? m.cards : null,
+      model_used: m.model_used ?? null,
+      confidence: m.confidence ?? null,
+      is_welcome: m.is_welcome ?? false,
+    }));
+
+    const { data: inserted, error } = await supabase
       .from('chat_messages')
-      .insert({
-        thread_id: id,
-        role,
-        content: String(content).slice(0, 50000),
-        cards: Array.isArray(cards) ? cards : null,
-        model_used: model_used ?? null,
-        confidence: confidence ?? null,
-        is_welcome,
-      })
-      .select()
-      .single();
+      .insert(rows)
+      .select();
 
     if (error) {
       console.error('[v0] [API/chats/messages] POST error:', error);
@@ -142,17 +150,21 @@ export async function POST(
       );
     }
 
+    const lastMsg = msgs[msgs.length - 1];
     // Update thread's updated_at so it sorts to top of sidebar
     await supabase
       .from('chat_threads')
       .update({
         updated_at: new Date().toISOString(),
-        preview: String(content).slice(0, 120),
+        preview: String(lastMsg.content).slice(0, 120),
       })
       .eq('id', id)
       .eq('user_id', user.id);
 
-    return NextResponse.json({ success: true, message });
+    // Return single message for backwards-compat; array for batch callers
+    return NextResponse.json(isBatch
+      ? { success: true, messages: inserted ?? [] }
+      : { success: true, message: (inserted ?? [])[0] });
   } catch (err) {
     console.error('[v0] [API/chats/messages] POST error:', err);
     return NextResponse.json(

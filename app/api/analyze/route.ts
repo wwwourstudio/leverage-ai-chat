@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const maxDuration = 60;
-import { streamText, generateText, tool, stepCountIs, wrapLanguageModel } from 'ai';
+import { streamText, generateText, tool, stepCountIs, wrapLanguageModel, type ModelMessage } from 'ai';
 import { createXai } from '@ai-sdk/xai';
 import { z } from 'zod';
 import {
@@ -587,6 +587,35 @@ export async function POST(request: NextRequest) {
     const systemPrompt = body.deepThink
       ? `${baseWithProfile}${DEEP_THINK_ADDENDUM}`
       : baseWithProfile;
+
+    // ── Prompt cache split (Phase 1.3) ────────────────────────────────────────
+    // The cached body excludes the date line and the per-user profile so the
+    // prefix is stable across calls and across users. The addendum (per-intent)
+    // and DEEP_THINK_ADDENDUM remain in the cached body — they vary across at
+    // most ~5 intent buckets so we still get high cache hit rate.
+    //
+    // Dynamic prefix carries `Today: ${dateStr}.` and the sanitized user
+    // profile block (if any). These change per-day / per-user and would bust
+    // the cache if included in the static block.
+    const cachedSystemBaseNoDate = SYSTEM_PROMPT.replace('Today: [CURRENT_DATE].', '').replace(/^\n+/, '');
+    const cachedWithAddendum = hasStartSitIntent
+      ? `${cachedSystemBaseNoDate}${FANTASY_STARTSIT_ADDENDUM}`
+      : hasMLBProjectionIntent
+        ? `${cachedSystemBaseNoDate}${MLB_PROJECTION_ADDENDUM}`
+        : isMLBStatcastMode
+          ? `${cachedSystemBaseNoDate}${MLB_ANALYSIS_ADDENDUM}`
+          : hasADPIntent
+            ? `${cachedSystemBaseNoDate}${NFBC_ADP_ADDENDUM}`
+            : cachedSystemBaseNoDate;
+    const cachedSystem = body.deepThink
+      ? `${cachedWithAddendum}${DEEP_THINK_ADDENDUM}`
+      : cachedWithAddendum;
+
+    const dynamicSystemParts: string[] = [`Today: ${dateStr}.`];
+    if (customInstructions?.trim()) {
+      dynamicSystemParts.push(`## USER PROFILE & BETTING PREFERENCES\n${sanitizeCustomInstructions(customInstructions)}`);
+    }
+    const dynamicSystem = dynamicSystemParts.join('\n\n');
 
     // ── Auto-save inline TSV/CSV ADP uploads ─────────────────────────────────────
     // When a user drags a TSV file into the chat, the content is embedded inline
@@ -1494,6 +1523,83 @@ export async function POST(request: NextRequest) {
       return { prompt };
     };
 
+    /**
+     * Build a messages array with Anthropic prompt caching + conversation memory.
+     *
+     * Splits the system prompt into a static "cached" body and a dynamic prefix
+     * (today's date, custom instructions). The cached body is marked with
+     * Anthropic's `cacheControl: ephemeral` so xAI/Anthropic reuses it across
+     * calls — typically a 80-90% input-token reduction on warm cache.
+     *
+     * Conversation memory: prior user/assistant turns from `context.previousMessages`
+     * are injected between the system block and the new user message. Capped at
+     * the last 6 turns and ~4000 chars total to stay well under the model context.
+     *
+     * Returns a `messages` array suitable for streamText/generateText. The caller
+     * should pass it directly via the spread operator and OMIT the `system` field.
+     */
+    const buildMessagesWithCacheAndMemory = (
+      cachedSystem: string,
+      dynamicSystem: string,
+      userPrompt: string,
+      imgs: ImageAttachment[] | undefined,
+      priorTurns: Array<{ role: string; content: string }> | undefined,
+    ) => {
+      // System: two-block layout. First block is cached; second is dynamic (date, profile).
+      type TextPart = { type: 'text'; text: string; providerOptions?: Record<string, unknown> };
+      const systemContent: TextPart[] = [
+        {
+          type: 'text',
+          text: cachedSystem,
+          // Anthropic prompt caching: marks this block as ephemeral so subsequent
+          // calls with identical content reuse the cached prefix. xAI proxies to
+          // Anthropic so this passes through.
+          providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } },
+        },
+      ];
+      if (dynamicSystem.trim().length > 0) {
+        systemContent.push({ type: 'text', text: dynamicSystem });
+      }
+
+      // Memory: include up to last 6 prior turns, normalized to user/assistant roles.
+      // Cap each message at 1500 chars and total memory at ~4000 chars to leave room
+      // for the new user message and the AI response within the model context window.
+      const memoryMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+      if (Array.isArray(priorTurns) && priorTurns.length > 0) {
+        const last6 = priorTurns.slice(-6);
+        let totalChars = 0;
+        for (const m of last6) {
+          const role = m.role === 'user' || m.role === 'assistant' ? m.role : 'assistant';
+          const content = (m.content ?? '').slice(0, 1500);
+          if (!content) continue;
+          if (totalChars + content.length > 4000) break;
+          totalChars += content.length;
+          memoryMessages.push({ role, content });
+        }
+      }
+
+      // User message: text-only or multimodal (image attachments)
+      let userMessage: { role: 'user'; content: string | Array<{ type: 'text'; text: string } | { type: 'image'; image: string; mimeType: string }> };
+      if (imgs?.length) {
+        const content: Array<{ type: 'text'; text: string } | { type: 'image'; image: string; mimeType: string }> = [
+          { type: 'text', text: userPrompt },
+        ];
+        for (const img of imgs) {
+          content.push({ type: 'image', image: img.base64, mimeType: img.mimeType });
+        }
+        userMessage = { role: 'user', content };
+      } else {
+        userMessage = { role: 'user', content: userPrompt };
+      }
+
+      const messages: ModelMessage[] = [
+        { role: 'system', content: systemContent } as unknown as ModelMessage,
+        ...memoryMessages,
+        userMessage as unknown as ModelMessage,
+      ];
+      return { messages };
+    };
+
     // ── ADP tool (injected when hasADPIntent) ────────────────────────────────────
     const adpParams = z.object({
       player:    z.string().optional().describe('Partial player name — case-insensitive (e.g. "Judge", "Ohtani", "Trout")'),
@@ -1916,8 +2022,13 @@ export async function POST(request: NextRequest) {
             // streamText returns immediately; tokens arrive via textStream async iterable
             const streamResult = streamText({
               model: xaiNoEmptyContent(createXai({ apiKey: xaiApiKey })(primaryModel)),
-              system: systemPrompt,
-              ...buildGenOptions(enrichedPrompt, hasImages ? validatedImageAttachments : undefined),
+              ...buildMessagesWithCacheAndMemory(
+                cachedSystem,
+                dynamicSystem,
+                enrichedPrompt,
+                hasImages ? validatedImageAttachments : undefined,
+                context?.previousMessages,
+              ),
               temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
               maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
               maxRetries: 0,
@@ -1982,6 +2093,18 @@ export async function POST(request: NextRequest) {
                     completionTokens: usage.outputTokens ?? 0,
                     totalTokens: usage.totalTokens ?? 0,
                   };
+                  // Anthropic prompt cache metrics — only present when caching is honored
+                  // by the upstream provider. xAI proxies to Anthropic so these may flow
+                  // through. Logged for visibility into cache hit rate.
+                  const anthrUsage = usage as Record<string, unknown>;
+                  const cacheRead = anthrUsage.cacheReadInputTokens as number | undefined;
+                  const cacheWrite = anthrUsage.cacheCreationInputTokens as number | undefined;
+                  if (typeof cacheRead === 'number' || typeof cacheWrite === 'number') {
+                    console.log(
+                      `[API/analyze] Cache: read=${cacheRead ?? 0} write=${cacheWrite ?? 0} ` +
+                      `(input total=${usage.inputTokens ?? 0})`,
+                    );
+                  }
                 }
               } catch {
                 // Non-fatal — usage may not be available for all model configurations
@@ -2163,8 +2286,13 @@ export async function POST(request: NextRequest) {
                 const fallbackTimer = setTimeout(() => fallbackAbort.abort(new Error('Fallback timeout')), FALLBACK_TIMEOUT_MS);
                 const fallbackResult = await generateText({
                   model: createXai({ apiKey: xaiApiKey })(actualFallbackModel),
-                  system: systemPrompt,
-                  prompt: enrichedPrompt,
+                  ...buildMessagesWithCacheAndMemory(
+                    cachedSystem,
+                    dynamicSystem,
+                    enrichedPrompt,
+                    undefined, // fallback path is text-only
+                    context?.previousMessages,
+                  ),
                   temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
                   maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS,
                   maxRetries: 0,

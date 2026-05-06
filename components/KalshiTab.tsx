@@ -15,6 +15,7 @@
 
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { TrendingUp, RefreshCw, ExternalLink, Search, AlertCircle, Loader2 } from 'lucide-react';
+import { useVisibilityInterval } from '@/lib/hooks/use-visibility-interval';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -248,11 +249,9 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
   // Fetch on mount and when search changes
   useEffect(() => { fetchMarkets(); }, [fetchMarkets]);
 
-  // Auto-refresh every 60 s (matches server cache TTL)
-  useEffect(() => {
-    const id = setInterval(fetchMarkets, 60_000);
-    return () => clearInterval(id);
-  }, [fetchMarkets]);
+  // Auto-refresh every 60 s (matches server cache TTL).
+  // Pauses when the tab is hidden so background tabs don't burn API quota.
+  useVisibilityInterval(fetchMarkets, 60_000);
 
   // Auto-retry after 5 minutes when markets come back empty (no search, no error)
   useEffect(() => {

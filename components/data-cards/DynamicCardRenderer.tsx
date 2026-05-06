@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { Bookmark } from 'lucide-react';
 
 // ── Saved-card entry (shared with WatchlistLightbox) ──────────────────────────
@@ -34,7 +35,10 @@ import { PortfolioCard } from './PortfolioCard';
 import { CardSkeleton } from './CardSkeleton';
 import { StatcastCard } from './StatcastCard';
 import { ADPCard } from './ADPCard';
-import { ADPUploadModal } from '@/components/ADPUploadModal';
+const ADPUploadModal = dynamic(
+  () => import('@/components/ADPUploadModal').then(m => ({ default: m.ADPUploadModal })),
+  { ssr: false, loading: () => null },
+);
 import { MLBProjectionCard } from './MLBProjectionCard';
 import { VPECard } from './VPECard';
 import { HRPredictionCard } from './HRPredictionCard';

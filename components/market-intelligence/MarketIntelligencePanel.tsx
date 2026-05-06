@@ -11,8 +11,9 @@
  * existing chat layout — no restructuring of page-client.tsx is required.
  */
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { X, TrendingUp, Activity, Shield, Zap, RefreshCw } from 'lucide-react';
+import { useVisibilityInterval } from '@/lib/hooks/use-visibility-interval';
 import { Badge } from '@/components/ui/badge';
 import { AnomalyFeed } from './AnomalyFeed';
 import { ExplainabilityTimeline } from './ExplainabilityTimeline';
@@ -81,7 +82,6 @@ export function MarketIntelligencePanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastFetch, setLastFetch] = useState<Date | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Tracks whether the panel has ever been opened so we keep DOM nodes alive
   // for the CSS slide transition. Until first open the panel renders null,
   // matching the server render (ssr:false → no server HTML) and avoiding the
@@ -116,19 +116,17 @@ export function MarketIntelligencePanel({
     }
   }, [eventId, sport, oddsEvent, kalshiMarkets]);
 
-  // Start/stop polling based on panel state and available data
+  // Initial fetch when panel opens with valid params; polling cadence below
   useEffect(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    if (!isOpen) return;
+    if (isOpen && eventId && sport && oddsEvent) fetchSnapshot();
+  }, [isOpen, eventId, sport, oddsEvent, fetchSnapshot]);
 
-    if (eventId && sport && oddsEvent) {
-      fetchSnapshot();
-      intervalRef.current = setInterval(fetchSnapshot, 30_000);
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [isOpen, fetchSnapshot, eventId, sport, oddsEvent]);
+  // Pause polling when the tab is hidden or the panel is closed.
+  useVisibilityInterval(
+    fetchSnapshot,
+    30_000,
+    { enabled: isOpen && Boolean(eventId && sport && oddsEvent) },
+  );
 
   const timeline: TimelineEvent[] = report?.timeline ?? [];
 

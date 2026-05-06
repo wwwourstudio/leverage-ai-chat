@@ -24,6 +24,9 @@ import { speakText, stopVoice } from '@/lib/voice-player';
 import { cardsToSpeech } from '@/lib/card-speech';
 import { isDev as getIsDev } from '@/lib/config';
 import { createClient } from '@/lib/supabase/client';
+import { detectSportFromText, extractSport, extractSportFromText, extractMarketType, extractPlatform } from '@/lib/sport-detection';
+import { useModalState } from '@/lib/hooks/useModalState';
+import { useFileHandling, type FileAttachment } from '@/lib/hooks/useFileHandling';
 import { useKalshiStore } from '@/lib/store/kalshi-store';
 const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ default: m.AuthModals })), { ssr: false });
 import { TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, MessageSquare, Clock, Star, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, X, CheckCheck, AlertTriangle, BarChart, Info, FileText, ImageIcon, Loader2, Volume2 } from 'lucide-react';
@@ -51,21 +54,12 @@ import { MessageContent } from '@/components/index/MessageContent';
 import { MessageAttachments } from '@/components/index/MessageAttachments';
 import { CreditModals } from '@/components/index/CreditModals';
 import { DetailedAnalysisLayout, type DetailedAnalysisData } from '@/components/index/DetailedAnalysisLayout';
+import { FantasyLeagueSetup, type FantasyLeague as FantasyLeagueType } from '@/components/index/FantasyLeagueSetup';
 import { AddToHomeBanner } from '@/components/AddToHomeBanner';
 import { useVoiceConversation } from '@/lib/hooks/use-voice-conversation';
 const VoiceConversationOverlay = dynamic(() => import('@/components/voice-conversation-overlay').then(m => ({ default: m.VoiceConversationOverlay })), { ssr: false });
 
-interface FileAttachment {
-  id: string;
-  name: string;
-  type: 'image' | 'csv' | 'text' | 'json';
-  url: string;
-  size: number;
-  data?: { headers: string[]; rows: string[][] } | null; // For CSV parsed data
-  textContent?: string | null; // For txt / json / pdf files
-  imageBase64?: string | null;  // Raw base64 (no data: prefix) for vision API
-  mimeType?: string | null;     // e.g. 'image/jpeg'
-}
+// FileAttachment interface is imported from @/lib/hooks/useFileHandling
 
 interface APIResponse<T = any> {
   success: boolean;
@@ -167,18 +161,8 @@ interface UnifiedAIPlatformProps {
   serverData?: ServerDataProps;
 }
 
-interface FantasyLeague {
-  sport: string;       // 'nfl' | 'mlb' | 'nba' | 'nhl'
-  platform: string;   // 'espn' | 'yahoo' | 'fantrax' | 'cbs' | 'nfbc' | 'nfl_com'
-  teams: number;
-  leagueType: string; // 'ppr' | 'half_ppr' | 'standard' | 'h2h' | 'roto' | 'roto_h2h'
-  teamName: string;
-  leagueName: string;
-  // legacy compat
-  type?: string;
-  scoring?: string;
-  setupComplete: boolean;
-}
+// FantasyLeague type is imported from @/components/index/FantasyLeagueSetup
+type FantasyLeague = FantasyLeagueType;
 
 export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps) {
   const toast = useToast();
@@ -299,7 +283,20 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [editingContent, setEditingContent] = useState('');
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editingChatTitle, setEditingChatTitle] = useState('');
-  const [showLimitNotification, setShowLimitNotification] = useState(false);
+
+  const {
+    showLoginModal, setShowLoginModal,
+    showSignupModal, setShowSignupModal,
+    showUserLightbox, setShowUserLightbox,
+    showSettingsLightbox, setShowSettingsLightbox,
+    showAlertsLightbox, setShowAlertsLightbox,
+    showWatchlistLightbox, setShowWatchlistLightbox,
+    showStripeLightbox, setShowStripeLightbox,
+    showPurchaseModal, setShowPurchaseModal,
+    showSubscriptionModal, setShowSubscriptionModal,
+    showCommandPalette, setShowCommandPalette,
+    showLimitNotification, setShowLimitNotification,
+  } = useModalState();
 
   const [creditsRemaining, setCreditsRemaining] = useState(15);
   const [systemStatus, setSystemStatus] = useState<'ok' | 'degraded' | 'down'>('ok');
@@ -312,15 +309,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     setCreditsRemaining(data.credits);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
-  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [showSignupModal, setShowSignupModal] = useState(false);
-  const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [showSettingsLightbox, setShowSettingsLightbox] = useState(false);
-  const [showAlertsLightbox, setShowAlertsLightbox] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
-  const [showWatchlistLightbox, setShowWatchlistLightbox] = useState(false);
   const [savedPlayersCount, setSavedPlayersCount] = useState(0);
   const [savedCardsCount, setSavedCardsCount] = useState(0);
   // Sync bookmark badge counts from localStorage on mount + on updates from card toggles
@@ -342,8 +331,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       window.removeEventListener('saved-cards-update', cardsHandler);
     };
   }, []);
-  const [showStripeLightbox, setShowStripeLightbox] = useState(false);
-  const [showUserLightbox, setShowUserLightbox] = useState(false);
   const [customInstructions, setCustomInstructions] = useState('');
   const [deepThink, setDeepThink] = useState(false);
   const [purchaseAmount, setPurchaseAmount] = useState('');
@@ -356,7 +343,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       email: serverData.userSession.user.email,
     } : null
   );
-  const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
+  // uploadedFiles state is managed by useFileHandling hook
   const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string; query?: string }>>([]);
   const [isClarificationPills, setIsClarificationPills] = useState(false);
   const [aiQuickActions, setAiQuickActions] = useState<Array<{ label: string; icon: any; category: string; query: string }> | null>(null);
@@ -389,7 +376,10 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [fantasyLeague, setFantasyLeague] = useState<FantasyLeague | null>(null);
   const [fantasySetupStep, setFantasySetupStep] = useState(0);
   const [fantasySetupData, setFantasySetupData] = useState<Partial<FantasyLeague>>({ sport: 'nfl', platform: 'espn', teams: 12, leagueType: 'ppr' });
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { uploadedFiles, fileInputRef, processFiles, handleFileUpload, removeAttachment, saveFileToProfile, setUploadedFiles } = useFileHandling();
+  const handleSaveFile = useCallback((file: FileAttachment) => {
+    saveFileToProfile(file, (msg) => toast.success(msg), (msg) => toast.error(msg));
+  }, [saveFileToProfile, toast]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   
@@ -2060,302 +2050,7 @@ No preamble. Start directly with section 1.`;
   // Keep the ref current so the player-click event handler always calls the latest version
   generateRealResponseRef.current = generateRealResponse;
 
-  // Helper functions for context extraction
-  // ─── Sport keyword tables ────────────────────────────────────────────────
-  // Checked in order: league acronym → sport-specific terms → team names.
-  // History inheritance only fires when the current message has NO match here.
-  const MLB_KEYWORDS = [
-    // League / generic
-    'mlb', 'baseball', 'adp',
-    // Positions
-    ' 1b', ' 2b', ' 3b', ' ss', ' of', ' sp', ' rp', ' dh', ' lf', ' cf', ' rf',
-    '(1b)', '(2b)', '(3b)', '(ss)', '(of)', '(sp)', '(rp)', '(dh)', '(lf)', '(cf)', '(rf)',
-    // Terms
-    'pitcher', 'pitching', 'batter', 'batting', 'strikeout', 'strikeouts', 'home run', 'home runs',
-    'era', 'whip', 'ops', 'slugging', 'bullpen', 'closer', 'reliever', 'rotation',
-    'waiver wire', 'starting pitcher', 'starting pitchers', 'innings pitched',
-    'batting average', 'on-base', 'stolen base', 'rbi', 'statcast', 'exit velocity',
-    'spin rate', 'launch angle', 'park factor', 'savant',
-    // Baseball-specific prop market keywords — unambiguous identifiers of MLB prop queries
-    'hits o/u', 'hits over', 'hits under',
-    'home run o/u', 'home runs o/u', 'hr o/u',
-    'strikeouts o/u', 'ks o/u', 'k o/u',
-    'total bases o/u', 'tb o/u',
-    'rbis o/u', 'rbi o/u',
-    'stolen bases o/u',
-    'batter prop', 'pitcher prop', 'pitcher ks',
-    'first pitch', 'no-hitter', 'perfect game', 'immaculate inning',
-    // All 30 MLB teams
-    'yankees', 'red sox', 'blue jays', 'rays', 'orioles',
-    'white sox', 'guardians', 'tigers', 'royals', 'twins',
-    'astros', 'rangers', 'mariners', 'athletics', 'angels',
-    'braves', 'mets', 'phillies', 'marlins', 'nationals',
-    'cubs', 'cardinals', 'brewers', 'reds', 'pirates',
-    'dodgers', 'giants', 'padres', 'diamondbacks', 'rockies',
-    // Common team abbreviations used in player analysis cards
-    ' nyy', ' bos', ' tor', ' tb', ' bal',
-    ' cws', ' cle', ' det', ' kc', ' min',
-    ' hou', ' tex', ' sea', ' ath', ' laa',
-    ' atl', ' nym', ' phi', ' mia', ' wsh',
-    ' chc', ' stl', ' mil', ' cin', ' pit',
-    ' lad', ' sf', ' sd', ' ari', ' col',
-    '(nyy)', '(bos)', '(tor)', '(tb)', '(bal)',
-    '(cws)', '(cle)', '(det)', '(kc)', '(min)',
-    '(hou)', '(tex)', '(sea)', '(ath)', '(laa)',
-    '(atl)', '(nym)', '(phi)', '(mia)', '(wsh)',
-    '(chc)', '(stl)', '(mil)', '(cin)', '(pit)',
-    '(lad)', '(sf)', '(sd)', '(ari)', '(col)',
-  ];
-
-  const NBA_KEYWORDS = [
-    // League / generic
-    'nba', 'basketball',
-    // Positions (use word boundary pattern — avoid false matches like "pgs")
-    ' pg', ' sg', ' sf', ' pf',
-    '(pg)', '(sg)', '(sf)', '(pf)',
-    // Terms
-    'points prop', 'assists prop', 'rebounds prop', 'three-pointer', '3-pointer',
-    'triple double', 'double double', 'nba prop', 'nba odds', 'nba bet',
-    'field goal', 'free throw', 'plus/minus', 'plus minus',
-    // All 30 NBA teams
-    'celtics', 'nets', 'knicks', 'sixers', '76ers', 'raptors',
-    'bulls', 'cavaliers', 'pistons', 'pacers', 'bucks',
-    'hawks', 'hornets', 'heat', 'magic', 'wizards',
-    'nuggets', 'timberwolves', 'thunder', 'trail blazers', 'blazers', 'jazz',
-    'warriors', 'clippers', 'lakers', 'suns', 'kings',
-    'mavericks', 'mavs', 'rockets', 'grizzlies', 'pelicans', 'spurs',
-    // Team abbreviations in parenthetical card format e.g. "Tatum (BOS)"
-    '(bos)', '(bkn)', '(nyk)', '(phi)', '(tor)',
-    '(chi)', '(cle)', '(det)', '(ind)', '(mil)',
-    '(atl)', '(cha)', '(mia)', '(orl)', '(was)',
-    '(den)', '(min)', '(okc)', '(por)', '(uta)',
-    '(gsw)', '(lac)', '(lal)', '(phx)', '(sac)',
-    '(dal)', '(hou)', '(mem)', '(nop)', '(sas)',
-    // Well-known players whose names alone signal NBA
-    'jokic', 'lebron', 'curry', 'giannis', 'luka', 'doncic', 'embiid',
-    'tatum', 'jayson', 'durant', 'westbrook', 'harden', 'lillard',
-    'butler', 'booker', 'davis', 'adebayo', 'mitchell', 'morant',
-  ];
-
-  const NFL_KEYWORDS = [
-    // League / generic
-    'nfl', 'football',
-    // Positions
-    ' qb', ' wr', ' rb', ' te', ' k ', ' def',
-    '(qb)', '(wr)', '(rb)', '(te)', '(k)', '(def)',
-    // Terms
-    'touchdown', 'passing yards', 'rushing yards', 'receiving yards',
-    'fantasy lineup', 'start sit', 'flex play', 'flex pick',
-    'cornerback', 'wide receiver', 'running back', 'tight end', 'quarterback',
-    'nfl prop', 'nfl odds', 'super bowl', 'playoff seed',
-    // All 32 NFL teams
-    'patriots', 'dolphins', 'jets', 'bills',
-    'ravens', 'bengals', 'browns', 'steelers',
-    'titans', 'colts', 'texans', 'jaguars',
-    'chiefs', 'raiders', 'chargers', 'broncos',
-    'cowboys', 'eagles', 'giants', 'commanders',
-    'bears', 'lions', 'packers',
-    'vikings', 'falcons', 'panthers', 'saints', 'buccaneers',
-    'rams', 'seahawks', 'cardinals', '49ers',
-    // Common abbreviations
-    ' mia', ' nyj', ' buf',
-    ' bal', ' cin', ' cle',
-    ' ten', ' ind', ' hou', ' jax',
-    ' kc', ' lv', ' lac', ' den',
-    ' dal', ' phi', ' nyg',
-    ' chi', ' det', ' gb', ' min',
-    ' atl', ' tb',
-    ' lar', ' ari', ' sf',
-    '(ne)', '(mia)', '(nyj)', '(buf)',
-    '(bal)', '(cin)', '(cle)', '(pit)',
-    '(ten)', '(ind)', '(hou)', '(jax)',
-    '(kc)', '(lv)', '(lac)', '(den)',
-    '(dal)', '(phi)', '(nyg)', '(was)',
-    '(chi)', '(det)', '(gb)', '(min)',
-    '(atl)', '(car)', '(no)', '(tb)',
-    '(lar)', '(sea)', '(ari)', '(sf)',
-    // Well-known players
-    'mahomes', 'lamar', 'burrow', 'allen', 'hurts', 'purdy',
-    'waddle', 'jaylen waddle', 'garrett wilson', 'davante', 'stefon diggs',
-    'kelce', 'mccaffrey', 'henry', 'chubb', 'ekeler',
-  ];
-
-  const NHL_KEYWORDS = [
-    'nhl', 'hockey',
-    ' lw', ' rw', ' d ',
-    '(lw)', '(rw)', '(d)',
-    'goalie', 'goaltender', 'power play', 'penalty kill', 'faceoff',
-    'goals against', 'save percentage', 'stanley cup',
-    'bruins', 'sabres', 'red wings', 'panthers', 'canadiens',
-    'senators', 'lightning', 'maple leafs', 'hurricanes', 'blue jackets',
-    'devils', 'islanders', 'rangers', 'flyers', 'penguins',
-    'coyotes', 'blackhawks', 'avalanche', 'stars', 'wild',
-    'predators', 'blues', 'jets', 'ducks', 'flames', 'oilers',
-    'kings', 'sharks', 'golden knights', 'canucks', 'kraken',
-  ];
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const detectSportFromText = (text: string): string | null => {
-    const t = text.toLowerCase();
-    // Kalshi is a prediction market platform — queries on it never need sports-odds routing.
-    // Also prevents false positives like "sports" → ' sp' (Starting Pitcher) → MLB.
-    if (t.includes('kalshi') || t.includes('prediction market')) return null;
-    // NFBC/NFFC must come first — TSV data can contain "nba" inside player names
-    if (t.includes('nfbc') || t.includes('nffc') || t.includes('nfbkc') || t.includes('tgfbi')) return 'mlb';
-    // ── NCAA must be checked BEFORE generic sport terms ─────────────────────
-    // "college basketball" / "ncaab" must not be caught by t.includes('basketball') → 'nba'
-    // "college football"  / "ncaaf" must not be caught by t.includes('football')  → 'nfl'
-    if (t.includes('ncaaw') || t.includes('wncaab') || t.includes("women's college basketball") || t.includes("womens college basketball")) return 'ncaaw';
-    if (t.includes('ncaab') || t.includes('college basketball') || t.includes("men's college basketball")) return 'ncaab';
-    if (t.includes('ncaaf') || t.includes('college football'))  return 'ncaaf';
-    // Bare "ncaa" without a qualifier — return null so the sidebar sport selection
-    // takes precedence rather than silently defaulting to football.
-    if (t.includes('ncaa')) {
-      if (t.includes("women") && t.includes('basketball')) return 'ncaaw';
-      if (t.includes('basketball')) return 'ncaab';
-      if (t.includes('football'))   return 'ncaaf';
-      return null;
-    }
-    // Check league acronyms first (fastest, most reliable)
-    if (t.includes('nba') || t.includes('basketball')) return 'nba';
-    if (t.includes('nfl') || t.includes('football')) return 'nfl';
-    if (t.includes('mlb') || t.includes('baseball')) return 'mlb';
-    if (t.includes('nhl') || t.includes('hockey')) return 'nhl';
-    // ── Position-first disambiguation ──────────────────────────────────────
-    // Check sport-specific position abbreviations BEFORE team name keywords.
-    // This prevents ambiguous team abbreviations (PHI, MIA, HOU, ATL) from
-    // winning over position codes that uniquely identify the sport.
-    // Only codes that are NOT common English words are checked aggressively.
-    // MLB positions unique to baseball (sp, rp, cp, 1b, 2b, 3b, ss, dh, lf, cf, rf):
-    if (/(?:^|[\s(])(?:sp|rp|cp|1b|2b|3b|ss|dh|lf|cf|rf)(?:[\s).,]|$)/.test(t)) return 'mlb';
-    // "OF" and "C" (catcher) are ambiguous as standalone tokens — only match when
-    // preceded by a 2-3 char team abbreviation (e.g. "PHI OF", "(NYM OF)", "(SEA C)"):
-    if (/(?:^|[\s(])[a-z]{2,3}\s+(?:of|c)(?:[\s).,]|$)/.test(t)) return 'mlb';
-    // NBA positions (pg, sg, pf — unique, not common English words; sf excluded: San Francisco):
-    if (/(?:^|[\s(])(?:pg|sg|pf)(?:[\s).,]|$)/.test(t)) return 'nba';
-    // NFL positions (qb, wr, rb, te — unique, not common English words):
-    if (/(?:^|[\s(])(?:qb|wr|rb|te)(?:[\s).,]|$)/.test(t)) return 'nfl';
-    // ── Known MLB player names ────────────────────────────────────────────────
-    // Explicit player names override ambiguous team abbreviations (PHI, MIA, ATL…).
-    // Only names that are unambiguous as standalone substrings are included.
-    if ([
-      // Phillies
-      'schwarber', 'bryce harper', 'castellanos', 'trea turner', 'alec bohm',
-      'realmuto', 'aaron nola', 'zack wheeler', 'ranger suarez', 'ranger suárez',
-      // Other high-profile MLB stars
-      'ohtani', 'shohei', 'acuña', 'acuna', 'juan soto',
-      'freddie freeman', 'mookie betts', 'tatis', 'yordan alvarez',
-      'corbin burnes', 'gerrit cole', 'spencer strider',
-      'lindor', 'devers', 'vlad guerrero', 'wander franco',
-      // Active MLB stars frequently queried by name
-      'elly de la cruz', 'elly de la', 'de la cruz',
-      'bleday', 'jj bleday',
-      'gunnar henderson', 'bobby witt', 'corey seager',
-      'adley rutschman', 'julio rodriguez', 'pete alonso',
-      'paul skenes', 'jackson merrill', 'jackson holliday',
-      'wyatt langford', 'cj abrams', 'josh lowe',
-      'michael harris', 'james outman', 'jarren duran',
-      'jose altuve', 'will smith', 'kyle tucker',
-    ].some(p => t.includes(p))) return 'mlb';
-    // Deep scan: team names, positions, sport-specific terms.
-    // NBA/NFL/NHL team names are checked BEFORE MLB because some abbreviations
-    // overlap across leagues (e.g. ATL=Braves/Hawks, MIA=Marlins/Heat, HOU=Astros/Rockets).
-    // NBA/NFL team full names (lakers, warriors, chiefs, eagles) are unambiguous and
-    // fire here. The position-first block above ensures MLB queries with position
-    // codes (OF, SP, RP, etc.) are detected before ambiguous team abbreviations fire.
-    if (NBA_KEYWORDS.some(k => t.includes(k))) return 'nba';
-    // For NFL vs MLB, score both and pick the winner — "giants" appears in both
-    // keyword lists so a query like "Yankees vs Giants" would wrongly fire NFL first.
-    const nflCount = NFL_KEYWORDS.filter(k => t.includes(k)).length;
-    const mlbCount = MLB_KEYWORDS.filter(k => t.includes(k)).length;
-    if (nflCount > 0 || mlbCount > 0) {
-      // MLB wins ties (baseball season active; NFL is offseason Mar–Aug)
-      return mlbCount >= nflCount ? 'mlb' : 'nfl';
-    }
-    if (NHL_KEYWORDS.some(k => t.includes(k))) return 'nhl';
-    return null;
-  };
-  // Regression guard: MLB player names must override ambiguous team code matches.
-  if (getIsDev()) {
-    console.assert(
-      detectSportFromText('Kyle Schwarber HR prop') === 'mlb',
-      '[v0] detectSportFromText regression: "Kyle Schwarber HR prop" should return "mlb"',
-    );
-  }
-
-  const extractSport = (message: string, conversationHistory?: Array<{ role: string; content: string }>): string | null => {
-    console.log('[v0] Extracting sport from:', message);
-
-    // Always try to detect sport directly from the current message first
-    const direct = detectSportFromText(message);
-    if (direct) {
-      console.log('[v0] Detected sport:', direct.toUpperCase());
-      return direct;
-    }
-
-    // Check for contextual references that indicate user is continuing a conversation
-    const contextualKeywords = [
-      'this game', 'that game', 'the game', 'same game',
-      'this match', 'that match', 'the match', 'same match',
-      'these props', 'those props', 'these players', 'those players',
-      'this parlay', 'that parlay', 'for this', 'for that',
-      'correlated', 'same-game', 'sgp'
-    ];
-    const hasContextualReference = contextualKeywords.some(k => message.toLowerCase().includes(k));
-
-    // Only inherit from history when the message has no sport signals at all
-    if ((conversationHistory && conversationHistory.length > 0) || hasContextualReference) {
-      if (hasContextualReference) {
-        console.log('[v0] Contextual reference detected, checking conversation history...');
-      } else {
-        console.log('[v0] No sport in current message, checking conversation history...');
-      }
-      if (conversationHistory) {
-        for (let i = conversationHistory.length - 1; i >= Math.max(0, conversationHistory.length - 5); i--) {
-          const historicalMsg = conversationHistory[i];
-          if (historicalMsg?.content) {
-            const historicalSport = detectSportFromText(historicalMsg.content);
-            if (historicalSport) {
-              // Don't inherit an offseason sport — it has no live games to query.
-              const seasonInfo = getSeasonInfo(sportToApi(historicalSport));
-              if (!seasonInfo.isInSeason) {
-                console.log(`[v0] Skipping inherited sport '${historicalSport}' — currently offseason`);
-                continue;
-              }
-              console.log('[v0] Inherited sport from conversation history:', historicalSport.toUpperCase());
-              return historicalSport;
-            }
-          }
-        }
-      }
-    }
-
-    console.log('[v0] No specific sport detected');
-    return null;
-  };
-
-  // Helper to extract sport from text without recursion (delegates to shared detector)
-  const extractSportFromText = (text: string): string | null => {
-    return detectSportFromText(text);
-  };
-
-  const extractMarketType = (message: string): string | null => {
-    const msgLower = message.toLowerCase();
-    if (msgLower.includes('spread')) return 'spreads';
-    if (msgLower.includes('total') || msgLower.includes('over') || msgLower.includes('under')) return 'totals';
-    if (msgLower.includes('moneyline') || msgLower.includes('ml')) return 'h2h';
-    if (msgLower.includes('prop')) return 'player_props';
-    return 'h2h'; // default to head-to-head
-  };
-
-  const extractPlatform = (message: string): string | null => {
-    const msgLower = message.toLowerCase();
-    if (msgLower.includes('draftkings') || msgLower.includes('dk')) return 'draftkings';
-    if (msgLower.includes('fanduel') || msgLower.includes('fd')) return 'fanduel';
-    if (msgLower.includes('kalshi')) return 'kalshi';
-    if (msgLower.includes('nfbc') || msgLower.includes('nffc')) return 'fantasy';
-    return null;
-  };
+  // Sport detection helpers are imported from @/lib/sport-detection
 
   const selectRelevantCards = async (userMessage: string, context?: any): Promise<InsightCard[]> => {
     const msgLower = userMessage.toLowerCase();
@@ -2483,169 +2178,7 @@ No preamble. Start directly with section 1.`;
 
 
 
-  /** Read a File as raw base64 (no data: URI prefix) for vision API */
-  const readFileAsBase64 = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        resolve(result.includes(',') ? result.split(',')[1] : result);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
-  /** Basic PDF text extraction — filters printable chars from raw PDF bytes */
-  const extractPdfText = async (file: File): Promise<string> => {
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const decoder = new TextDecoder('latin1');
-      const rawText = decoder.decode(arrayBuffer);
-      const matches = rawText.match(/\(([^)]{1,300})\)\s*(?:Tj|TJ|'|")/g) ?? [];
-      const extracted = matches
-        .map(m => m.replace(/^\(/, '').replace(/\)\s*(?:Tj|TJ|'|")$/, ''))
-        .join(' ')
-        .replace(/\\[nrt]/g, ' ')
-        .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
-        .replace(/\s{3,}/g, '\n')
-        .trim();
-      if (extracted.length > 50) return extracted.slice(0, 10000);
-      return rawText
-        .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
-        .replace(/\s{3,}/g, '\n')
-        .trim()
-        .slice(0, 10000);
-    } catch {
-      return '';
-    }
-  };
-
-  const processFiles = async (fileList: FileList | File[]): Promise<FileAttachment[]> => {
-    const files = Array.from(fileList);
-    const newAttachments: FileAttachment[] = [];
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const fileType = file.type;
-
-      const isCsvOrTsv = fileType === 'text/csv' || fileType === 'text/tab-separated-values'
-        || file.name.endsWith('.tsv') || file.name.endsWith('.csv');
-      const isTextFile = fileType === 'text/plain' || file.name.endsWith('.txt');
-      const isJsonFile = fileType === 'application/json' || fileType === 'text/json' || file.name.endsWith('.json');
-      const isImage = fileType.startsWith('image/');
-      const isPdf = fileType === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-
-      if (!isImage && !isCsvOrTsv && !isTextFile && !isJsonFile && !isPdf) {
-        alert(`File type not supported: ${file.name}. Supported: images, CSV, TSV, TXT, JSON, PDF.`);
-        continue;
-      }
-
-      const fileUrl = isImage ? URL.createObjectURL(file) : '';
-
-      const attachment: FileAttachment = {
-        id: `${Date.now()}-${i}`,
-        name: file.name,
-        type: isImage ? 'image' : isCsvOrTsv ? 'csv' : isJsonFile ? 'json' : 'text',
-        url: fileUrl,
-        size: file.size,
-        mimeType: isImage ? fileType : undefined,
-      };
-
-      if (isImage) {
-        try {
-          attachment.imageBase64 = await readFileAsBase64(file);
-        } catch {
-          // Vision skipped; filename still included in text prompt
-        }
-      } else if (isCsvOrTsv) {
-        const text = await file.text();
-        const delimiter = file.name.endsWith('.tsv') || fileType === 'text/tab-separated-values' ? '\t' : ',';
-        attachment.data = parseDelimitedFile(text, delimiter);
-      } else if (isTextFile) {
-        const text = await file.text();
-        attachment.textContent = text.slice(0, 10000);
-      } else if (isJsonFile) {
-        try {
-          const text = await file.text();
-          const parsed = JSON.parse(text);
-          attachment.textContent = JSON.stringify(parsed, null, 2).slice(0, 10000);
-        } catch {
-          const text = await file.text();
-          attachment.textContent = text.slice(0, 10000);
-        }
-      } else if (isPdf) {
-        const pdfText = await extractPdfText(file);
-        attachment.textContent = pdfText.length > 50
-          ? `[PDF: ${file.name}]\n${pdfText}`
-          : `[PDF: ${file.name} — text extraction limited. Please describe what you want analyzed from this document.]`;
-      }
-
-      newAttachments.push(attachment);
-    }
-
-    return newAttachments;
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const newAttachments = await processFiles(files);
-    setUploadedFiles((prev: FileAttachment[]) => [...prev, ...newAttachments]);
-    console.log('[v0] Files uploaded:', newAttachments.length);
-
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const parseDelimitedFile = (text: string, delimiter: string = ',') => {
-    // Safety limits — prevent RangeError: Invalid array length on huge or binary files
-    const MAX_BYTES = 5_000_000; // 5 MB
-    const MAX_ROWS  = 5_000;
-    const MAX_COLS  = 200;
-
-    const safeText = text.length > MAX_BYTES ? text.slice(0, MAX_BYTES) : text;
-    const lines = safeText.split('\n').filter(line => line.trim());
-    if (lines.length === 0) return { headers: [], rows: [], truncated: false };
-
-    const headers = lines[0].split(delimiter).map(h => h.trim()).slice(0, MAX_COLS);
-    const dataLines = lines.slice(1, MAX_ROWS + 1);
-    const rows = dataLines.map(line =>
-      line.split(delimiter).map(cell => cell.trim()).slice(0, MAX_COLS)
-    );
-
-    return { headers, rows, truncated: lines.length > MAX_ROWS + 1 };
-  };
-
-  const removeAttachment = (id: string) => {
-    setUploadedFiles((prev: FileAttachment[]) => {
-      const file = prev.find(f => f.id === id);
-      if (file && file.url) URL.revokeObjectURL(file.url);
-      return prev.filter(f => f.id !== id);
-    });
-  };
-
-  const saveFileToProfile = (file: FileAttachment) => {
-    try {
-      const existing = JSON.parse(localStorage.getItem('leverage_saved_files') || '[]');
-      const entry = {
-        id: file.id,
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        data: file.data ?? null,
-        textContent: file.textContent ?? null,
-        savedAt: new Date().toISOString(),
-      };
-      const deduped = existing.filter((f: any) => f.name !== entry.name);
-      localStorage.setItem('leverage_saved_files', JSON.stringify([entry, ...deduped].slice(0, 20)));
-      toast.success(`"${file.name}" saved to your profile`);
-    } catch {
-      toast.error('Could not save file to profile');
-    }
-  };
+  // File handling functions provided by useFileHandling hook
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -4149,241 +3682,20 @@ No preamble. Start directly with section 1.`;
 
           <div className="relative max-w-5xl xl:max-w-6xl mx-auto">
             {/* Fantasy League Setup Flow — shown when Fantasy is selected and no league is configured */}
-            {selectedCategory === 'fantasy' && !fantasyLeague?.setupComplete && (() => {
-              // ── Inline config data ─────────────────────────────────────────
-              const SETUP_SPORTS = [
-                { value: 'nfl', label: 'Football', icon: '🏈' },
-                { value: 'mlb', label: 'Baseball', icon: '⚾' },
-                { value: 'nba', label: 'Basketball', icon: '🏀' },
-                { value: 'nhl', label: 'Hockey', icon: '🏒' },
-              ] as const;
-              const SETUP_PLATFORMS: Record<string, Array<{ value: string; label: string }>> = {
-                nfl: [{ value:'espn',label:'ESPN' },{ value:'yahoo',label:'Yahoo' },{ value:'fantrax',label:'Fantrax' },{ value:'cbs',label:'CBS' },{ value:'nfl_com',label:'NFL.com' }],
-                mlb: [{ value:'espn',label:'ESPN' },{ value:'yahoo',label:'Yahoo' },{ value:'fantrax',label:'Fantrax' },{ value:'cbs',label:'CBS' },{ value:'nfbc',label:'NFBC' }],
-                nba: [{ value:'espn',label:'ESPN' },{ value:'yahoo',label:'Yahoo' },{ value:'fantrax',label:'Fantrax' },{ value:'cbs',label:'CBS' }],
-                nhl: [{ value:'espn',label:'ESPN' },{ value:'yahoo',label:'Yahoo' },{ value:'fantrax',label:'Fantrax' },{ value:'cbs',label:'CBS' }],
-              };
-              const SETUP_TYPES: Record<string, Array<{ value: string; label: string }>> = {
-                nfl: [{ value:'ppr',label:'PPR' },{ value:'half_ppr',label:'Half PPR' },{ value:'standard',label:'Standard' }],
-                mlb: [{ value:'h2h',label:'Head-to-Head' },{ value:'roto',label:'Rotisserie' },{ value:'roto_h2h',label:'Roto H2H' }],
-                nba: [{ value:'h2h',label:'Head-to-Head' },{ value:'roto',label:'Rotisserie' }],
-                nhl: [{ value:'h2h',label:'Head-to-Head' },{ value:'roto',label:'Rotisserie' }],
-              };
-              const activeSport = (fantasySetupData.sport || 'nfl') as string;
-              const platforms = SETUP_PLATFORMS[activeSport] ?? SETUP_PLATFORMS.nfl;
-              const leagueTypes = SETUP_TYPES[activeSport] ?? SETUP_TYPES.nfl;
-              const isNfbc = fantasySetupData.platform === 'nfbc';
-              const teamSizes = isNfbc ? [12, 15] : [8,10,12,14,16,20,24,30];
-              const sportIcon = SETUP_SPORTS.find(s => s.value === activeSport)?.icon ?? '🏆';
-
-              const STEP_NAMES = ['Sport', 'Platform', 'Teams', 'Format', 'Save'];
-              const btnBase = 'px-3 py-1.5 rounded-xl border text-xs font-bold transition-all';
-              const btnActive = 'border-violet-400/70 bg-violet-700/30 text-violet-200';
-              const btnInactive = 'border-violet-700/40 bg-violet-900/15 text-violet-400 hover:bg-violet-700/20 hover:border-violet-500/50';
-
-              return (
-                <div className="mb-5 bg-gradient-to-br from-[oklch(0.12_0.03_280/0.5)] via-[oklch(0.09_0.01_280/0.8)] to-[oklch(0.10_0.04_300/0.3)] border border-violet-700/30 rounded-2xl p-4 backdrop-blur-sm">
-                  {/* Header */}
-                  <div className="flex items-center gap-2 mb-3">
-                    <Trophy className="w-4 h-4 text-violet-400" />
-                    <span className="text-sm font-bold text-violet-300">Set up your fantasy league</span>
-                    <span className="ml-auto text-[10px] font-bold text-[var(--text-faint)] uppercase tracking-wider">
-                      {STEP_NAMES[fantasySetupStep]} · {fantasySetupStep + 1}/{STEP_NAMES.length}
-                    </span>
-                  </div>
-                  {/* Step indicators */}
-                  <div className="flex items-center gap-1 mb-4">
-                    {STEP_NAMES.map((name, i) => (
-                      <div key={i} className="flex items-center gap-1">
-                        <div className={`w-1.5 h-1.5 rounded-full transition-all ${i < fantasySetupStep ? 'bg-violet-400' : i === fantasySetupStep ? 'bg-violet-300 scale-125' : 'bg-[var(--bg-surface)]'}`} />
-                        {i < STEP_NAMES.length - 1 && <div className={`w-4 h-px transition-all ${i < fantasySetupStep ? 'bg-violet-500/50' : 'bg-[var(--bg-elevated)]'}`} />}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Step 0: Sport */}
-                  {fantasySetupStep === 0 && (
-                    <div>
-                      <p className="text-xs text-[var(--text-muted)] mb-2.5">What sport is your fantasy league?</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {SETUP_SPORTS.map(s => (
-                          <button key={s.value}
-                            onClick={() => {
-                              const defaultPlatform = (SETUP_PLATFORMS[s.value] ?? SETUP_PLATFORMS.nfl)[0].value;
-                              const defaultType = (SETUP_TYPES[s.value] ?? SETUP_TYPES.nfl)[0].value;
-                              setFantasySetupData((d: any) => ({ ...d, sport: s.value, platform: defaultPlatform, leagueType: defaultType }));
-                              setFantasySetupStep(1);
-                            }}
-                            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all ${fantasySetupData.sport === s.value ? btnActive : btnInactive}`}>
-                            <span className="text-xl">{s.icon}</span>
-                            <span className="text-sm font-bold">{s.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Step 1: Platform */}
-                  {fantasySetupStep === 1 && (
-                    <div>
-                      <p className="text-xs text-[var(--text-muted)] mb-2.5">{sportIcon} Which platform is your {activeSport.toUpperCase()} league on?</p>
-                      <div className="flex flex-wrap gap-2">
-                        {platforms.map(p => (
-                          <button key={p.value}
-                            onClick={() => {
-                              const sizes = p.value === 'nfbc' ? [12,15] : [8,10,12,14,16,20,24,30];
-                              const newSize = sizes.includes(fantasySetupData.teams ?? 12) ? (fantasySetupData.teams ?? 12) : 12;
-                              setFantasySetupData((d: any) => ({ ...d, platform: p.value, teams: newSize }));
-                              setFantasySetupStep(2);
-                            }}
-                            className={`${btnBase} ${fantasySetupData.platform === p.value ? btnActive : btnInactive}`}>
-                            {p.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Step 2: Teams slider */}
-                  {fantasySetupStep === 2 && (
-                    <div>
-                      <p className="text-xs text-[var(--text-muted)] mb-2.5">How many teams in your league?</p>
-                      {isNfbc ? (
-                        <div className="flex gap-3">
-                          {[12,15].map(n => (
-                            <button key={n}
-                              onClick={() => { setFantasySetupData((d: any) => ({ ...d, teams: n })); setFantasySetupStep(3); }}
-                              className={`flex-1 py-4 rounded-xl border text-2xl font-black transition-all ${(fantasySetupData.teams ?? 12) === n ? btnActive : btnInactive}`}>
-                              {n}<span className="block text-[10px] font-normal opacity-60 mt-0.5">teams</span>
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="text-center">
-                            <span className="text-4xl font-black text-white tabular-nums">{fantasySetupData.teams ?? 12}</span>
-                            <span className="text-xs text-[var(--text-faint)] ml-1">teams</span>
-                          </div>
-                          <input type="range" min={8} max={30} step={1}
-                            value={fantasySetupData.teams ?? 12}
-                            onChange={(e: any) => setFantasySetupData((d: any) => ({ ...d, teams: parseInt(e.target.value) }))}
-                            className="w-full accent-violet-400 cursor-pointer" />
-                          <div className="flex justify-between text-[9px] text-[var(--text-faint)]"><span>8</span><span>16</span><span>24</span><span>30</span></div>
-                          <div className="flex flex-wrap gap-1.5 justify-center">
-                            {teamSizes.map(n => (
-                              <button key={n}
-                                onClick={() => setFantasySetupData((d: any) => ({ ...d, teams: n }))}
-                                className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${(fantasySetupData.teams ?? 12) === n ? btnActive : btnInactive}`}>
-                                {n}
-                              </button>
-                            ))}
-                          </div>
-                          <button onClick={() => setFantasySetupStep(3)}
-                            className="w-full py-2 rounded-xl bg-violet-700/30 border border-violet-500/40 text-violet-300 text-xs font-bold hover:bg-violet-700/40 transition-all">
-                            Continue →
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Step 3: League Type */}
-                  {fantasySetupStep === 3 && (
-                    <div>
-                      <p className="text-xs text-[var(--text-muted)] mb-2.5">Scoring format for your {activeSport.toUpperCase()} league?</p>
-                      <div className="space-y-2">
-                        {leagueTypes.map(t => (
-                          <button key={t.value}
-                            onClick={() => { setFantasySetupData((d: any) => ({ ...d, leagueType: t.value })); setFantasySetupStep(4); }}
-                            className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all ${fantasySetupData.leagueType === t.value ? btnActive : btnInactive}`}>
-                            <span className="font-bold">{t.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Step 4: League name + team name → save */}
-                  {fantasySetupStep === 4 && (
-                    <div className="space-y-2.5">
-                      <p className="text-xs text-[var(--text-muted)] mb-1">Almost done! Name your league and team.</p>
-                      <input type="text" placeholder="League name (e.g. The Winners Circle)"
-                        value={fantasySetupData.leagueName || ''}
-                        onChange={(e: any) => setFantasySetupData((d: any) => ({ ...d, leagueName: e.target.value }))}
-                        className="w-full bg-[var(--bg-overlay)] border border-violet-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-[var(--text-faint)] focus:outline-none focus:border-violet-500/60 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-1 focus-visible:ring-offset-transparent transition-all"
-                        maxLength={60} />
-                      <input type="text" placeholder="Your team name (e.g. Gronk's Hammers)"
-                        value={fantasySetupData.teamName || ''}
-                        onChange={(e: any) => setFantasySetupData((d: any) => ({ ...d, teamName: e.target.value }))}
-                        className="w-full bg-[var(--bg-overlay)] border border-violet-700/40 rounded-xl px-3 py-2 text-sm text-white placeholder-[var(--text-faint)] focus:outline-none focus:border-violet-500/60 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-1 focus-visible:ring-offset-transparent transition-all"
-                        maxLength={40} />
-                      {/* Summary */}
-                      <div className="flex flex-wrap gap-1.5 text-[10px]">
-                        {[
-                          `${sportIcon} ${activeSport.toUpperCase()}`,
-                          (fantasySetupData.platform ?? 'ESPN').toUpperCase(),
-                          `${fantasySetupData.teams ?? 12} teams`,
-                          leagueTypes.find(t => t.value === fantasySetupData.leagueType)?.label ?? fantasySetupData.leagueType ?? '',
-                        ].map((chip, i) => (
-                          <span key={i} className="px-2 py-0.5 rounded-full bg-violet-900/20 border border-violet-700/30 text-violet-400 font-medium">{chip}</span>
-                        ))}
-                      </div>
-                      <button
-                        onClick={async () => {
-                          if (!fantasySetupData.teamName?.trim()) return;
-                          const league: FantasyLeague = {
-                            sport: fantasySetupData.sport || 'nfl',
-                            platform: fantasySetupData.platform || 'espn',
-                            teams: fantasySetupData.teams || 12,
-                            leagueType: fantasySetupData.leagueType || 'ppr',
-                            teamName: fantasySetupData.teamName.trim(),
-                            leagueName: (fantasySetupData.leagueName || '').trim() || 'My League',
-                            setupComplete: true,
-                            // legacy compat
-                            scoring: fantasySetupData.leagueType === 'ppr' ? 'PPR' : fantasySetupData.leagueType === 'half_ppr' ? 'Half-PPR' : 'Standard',
-                          };
-                          // Persist to Supabase when logged in
-                          if (isLoggedIn) {
-                            try {
-                              const res = await fetch('/api/fantasy/leagues', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                  name: league.leagueName,
-                                  sport: league.sport,
-                                  platform: league.platform,
-                                  leagueSize: league.teams,
-                                  scoringType: league.leagueType,
-                                  teams: [{ name: league.teamName, draftPosition: 1 }],
-                                }),
-                              });
-                              if (!res.ok) console.warn('[fantasy] League DB save failed:', res.status);
-                            } catch (err) {
-                              console.warn('[fantasy] League DB save error:', err);
-                            }
-                          }
-                          localStorage.setItem('leverage_fantasy_league', JSON.stringify(league));
-                          setFantasyLeague(league);
-                          setFantasySetupStep(0);
-                          setFantasySetupData({ sport: 'nfl', platform: 'espn', teams: 12, leagueType: 'ppr' });
-                          toast.success(`League saved! Welcome, ${league.teamName} 🏆`);
-                        }}
-                        disabled={!fantasySetupData.teamName?.trim()}
-                        className="w-full py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 disabled:from-[var(--bg-surface)] disabled:to-[var(--bg-surface)] disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-violet-900/20">
-                        Save League 🚀
-                      </button>
-                    </div>
-                  )}
-
-                  {fantasySetupStep > 0 && (
-                    <button onClick={() => setFantasySetupStep((s: any) => Math.max(0, s - 1))}
-                      className="mt-2.5 text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors">
-                      ← Back
-                    </button>
-                  )}
-                </div>
-              );
-            })()}
+            {selectedCategory === 'fantasy' && !fantasyLeague?.setupComplete && (
+              <FantasyLeagueSetup
+                fantasySetupData={fantasySetupData}
+                fantasySetupStep={fantasySetupStep}
+                setFantasySetupData={setFantasySetupData as any}
+                setFantasySetupStep={setFantasySetupStep as any}
+                isLoggedIn={isLoggedIn}
+                onSave={(league) => {
+                  setFantasyLeague(league);
+                  setFantasySetupStep(0);
+                  setFantasySetupData({ sport: 'nfl', platform: 'espn', teams: 12, leagueType: 'ppr' });
+                }}
+              />
+            )}
             {/* Show configured league context + reset button */}
             {selectedCategory === 'fantasy' && fantasyLeague?.setupComplete && isLoggedIn && (
               <div className="mb-3 flex items-center gap-2 px-1">
@@ -4445,7 +3757,7 @@ No preamble. Start directly with section 1.`;
               uploadedFiles={uploadedFiles}
               onFileUpload={handleFileUpload}
               onRemoveFile={removeAttachment}
-              onSaveFile={saveFileToProfile}
+              onSaveFile={handleSaveFile}
               onFileDrop={processFiles}
               onFilesAdded={(files: any) => setUploadedFiles((prev: any) => [...prev, ...files])}
               creditsRemaining={creditsRemaining}

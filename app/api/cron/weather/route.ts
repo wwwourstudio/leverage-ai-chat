@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getSupabaseUrl, getSupabaseServiceKey, verifyCronSecret } from '@/lib/config';
+import { getSupabaseUrl, getSupabaseServiceKey, verifyCronSecretWithDbFallback } from '@/lib/config';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -25,7 +25,7 @@ function getServiceClient() {
 }
 
 export async function GET(req: NextRequest) {
-  if (!verifyCronSecret(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  if (!await verifyCronSecretWithDbFallback(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   if (!getSupabaseUrl() || !getSupabaseServiceKey()) {
     return NextResponse.json({ ok: true, skipped: true, reason: 'service-role-not-configured' }, { status: 200 });
   }

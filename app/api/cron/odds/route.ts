@@ -16,7 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Bottleneck from 'bottleneck';
-import { getSupabaseUrl, getSupabaseServiceKey, verifyCronSecret } from '@/lib/config';
+import { getSupabaseUrl, getSupabaseServiceKey, verifyCronSecretWithDbFallback } from '@/lib/config';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -51,7 +51,7 @@ const SPORT_KEY_TO_LABEL: Record<string, string> = {
 };
 
 export async function GET(req: NextRequest) {
-  if (!verifyCronSecret(req)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  if (!await verifyCronSecretWithDbFallback(req)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   if (!getSupabaseUrl() || !getSupabaseServiceKey()) return serviceRoleSkip();
 
   const startedAt = Date.now();

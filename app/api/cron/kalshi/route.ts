@@ -19,7 +19,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getSupabaseUrl, getSupabaseServiceKey, verifyCronSecret } from '@/lib/config';
+import { getSupabaseUrl, getSupabaseServiceKey, verifyCronSecretWithDbFallback } from '@/lib/config';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30; // increased from 20 — pagination needs extra time
@@ -37,7 +37,7 @@ function getServiceClient() {
 // crons that share this Lambda).
 
 export async function GET(req: NextRequest) {
-  if (!verifyCronSecret(req)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  if (!await verifyCronSecretWithDbFallback(req)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   if (!getSupabaseUrl() || !getSupabaseServiceKey()) {
     return NextResponse.json({ success: true, skipped: true, reason: 'service-role-not-configured' }, { status: 200 });
   }

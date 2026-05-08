@@ -380,7 +380,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const handleSaveFile = useCallback((file: FileAttachment) => {
     saveFileToProfile(file, (msg) => toast.success(msg), (msg) => toast.error(msg));
   }, [saveFileToProfile, toast]);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   
   // Open sidebar by default on desktop (lg breakpoint = 1024px). Mobile/tablet stay closed.
@@ -2629,19 +2628,6 @@ No preamble. Start directly with section 1.`;
     }
   };
 
-  const adjustTextareaHeight = () => {
-    if (textareaRef.current) {
-      // Use requestAnimationFrame to batch DOM changes and prevent forced reflows
-      requestAnimationFrame(() => {
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto';
-          const newHeight = textareaRef.current.scrollHeight;
-          textareaRef.current.style.height = `${newHeight}px`;
-        }
-      });
-    }
-  };
-
   const adjustEditTextareaHeight = () => {
     if (editTextareaRef.current) {
       requestAnimationFrame(() => {
@@ -3646,7 +3632,7 @@ No preamble. Start directly with section 1.`;
         </div>
 
         {/* Input Area */}
-        <div className="relative border-t border-[var(--border-subtle)] bg-gradient-to-b from-background to-black px-4 py-5 shadow-2xl backdrop-blur-xl">
+        <div className="relative border-t border-[var(--border-subtle)] bg-gradient-to-b from-background to-black px-4 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl backdrop-blur-xl">
           <div className="absolute inset-0 bg-gradient-to-t from-blue-600/5 via-transparent to-transparent pointer-events-none"></div>
           
           {/* Rate Limit Notification */}

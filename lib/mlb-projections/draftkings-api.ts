@@ -12,8 +12,10 @@ import { Result, Ok, Err, tryAsync } from '@/lib/types';
 
 const LOG = '[v0] [DFS]';
 
-/** DK contest type ids — 21 is the classic single-game / multi-game format. */
-const CLASSIC_CONTEST_TYPE_ID = 21;
+/** DK showdown contest type ids — single-game head-to-head formats. */
+const SHOWDOWN_CONTEST_TYPE_IDS = new Set([96, 97, 98, 114, 115]);
+/** Minimum game count to be treated as a classic multi-game slate. */
+const CLASSIC_MIN_GAMES = 2;
 
 const LOBBY_URL = 'https://www.draftkings.com/lobby/getcontests?sport=MLB';
 const DRAFTABLES_URL = (id: number) => `https://api.draftkings.com/draftgroups/v1/draftgroups/${id}/draftables`;
@@ -123,8 +125,14 @@ export async function fetchDKContests(): Promise<Result<DKDraftGroup[], Error>> 
   const groups: DKDraftGroup[] = raw
     .filter(g => g && typeof g.DraftGroupId === 'number')
     .map(g => {
+      // Classify as showdown if DK explicitly marks it as a single-game format,
+      // OR if it has only 1 game (showdown slates always have gameCount === 1).
+      // Classic multi-game slates are everything else.
+      const gameCount = Number(g.GameCount ?? (Array.isArray(g.Games) ? g.Games.length : 0));
+      const isShowdownByTypeId = SHOWDOWN_CONTEST_TYPE_IDS.has(Number(g.ContestTypeId));
+      const isShowdownByGameCount = gameCount < CLASSIC_MIN_GAMES;
       const contestType: DKDraftGroup['contestType'] =
-        g.ContestTypeId === CLASSIC_CONTEST_TYPE_ID ? 'classic' : 'showdown';
+        (isShowdownByTypeId || isShowdownByGameCount) ? 'showdown' : 'classic';
       const games: DKGameRef[] = Array.isArray(g.Games)
         ? g.Games.map((gm: any) => ({
             gameId: Number(gm.GameId ?? gm.gameId ?? 0),
@@ -135,7 +143,6 @@ export async function fetchDKContests(): Promise<Result<DKDraftGroup[], Error>> 
         : [];
 
       const tag = String(g.DraftGroupTag ?? g.ContestStartTimeSuffix ?? '').trim();
-      const gameCount = Number(g.GameCount ?? games.length ?? 0);
       const slateLabel = tag || (contestType === 'showdown' ? 'Showdown' : `${gameCount}-game slate`);
 
       return {
@@ -145,7 +152,8 @@ export async function fetchDKContests(): Promise<Result<DKDraftGroup[], Error>> 
         slateLabel,
         contestType,
         games,
-      };
+        _rawContestTypeId: Number(g.ContestTypeId ?? -1),
+      } as DKDraftGroup & { _rawContestTypeId: number };
     })
     .filter(g => g.draftGroupId > 0)
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
@@ -222,9 +230,14 @@ export async function getMainSlate(date?: Date): Promise<Result<DKDraftGroup, Er
   // Compare in ET — a 9 PM ET game has a UTC date of the next day, so we must
   // bucket slates by their Eastern date rather than their UTC date.
   const targetET = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(date ?? new Date());
-  const sameDay = contests.value.filter(g => g.contestType === 'classic' && toETDate(g.startDate) === targetET);
+  const allToday = contests.value.filter(g => toETDate(g.startDate) === targetET);
+  const sameDay = allToday.filter(g => g.contestType === 'classic');
+  console.log(
+    `${LOG} getMainSlate(${targetET}): total=${contests.value.length} today=${allToday.length} ` +
+    `classic=${sameDay.length} typeIds=${[...new Set(contests.value.map(g => (g as any)._rawContestTypeId))].join(',')}`,
+  );
   if (sameDay.length === 0) {
-    return Err(new Error(`No classic DK MLB slates found for ${targetET}`));
+    return Err(new Error(`No classic DK MLB slates found for ${targetET} (${allToday.length} total today, ${contests.value.length} total returned)`));
   }
 
   // Prefer slates starting at or after 4 pm ET. ET 4 pm = UTC 20:00 (EDT) or 21:00 (EST).

@@ -80,12 +80,11 @@ export async function fetchTodaysGames(date?: string): Promise<MLBGame[]> {
   if (cached) return cached;
 
   try {
+    // Drop the `fields=` filter — it flattens nested paths and strips out
+    // game.lineups.homePlayers/awayPlayers even when lineups are hydrated.
     const url =
       `${MLB_API}/schedule?sportId=1&date=${dateStr}` +
-      `&hydrate=probablePitcher(note),lineups,team,venue(location)` +
-      `&fields=dates,games,gamePk,gameDate,status,statusCode,teams,team,name,abbreviation,` +
-      `teamCode,probablePitcher,id,fullName,pitchHand,strikeZoneTop,lineups,homePlayers,awayPlayers,` +
-      `person,primaryPosition,batSide,jerseyNumber,venue,name,location,defaultCoordinates,latitude,longitude`;
+      `&hydrate=probablePitcher(note),lineups,team,venue(location)`;
 
     const res = await fetch(url, {
       headers: { 'User-Agent': 'LeverageAI/1.0' },

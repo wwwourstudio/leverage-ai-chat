@@ -2030,6 +2030,11 @@ export async function POST(request: NextRequest) {
           if (xaiApiKey) {
             const primaryTimeoutMs = PRIMARY_TIMEOUT_MS(useFastPath);
             const abortCtrl = new AbortController();
+            // Record wall-clock start so the per-step timer reset can budget against
+            // total Vercel function time (60s hard limit).
+            const streamStartMs = Date.now();
+            // 4s headroom before Vercel's 60s wall-clock kills the function.
+            const VERCEL_BUDGET_MS = 56_000;
 
             // streamText returns immediately; tokens arrive via textStream async iterable
             const streamResult = streamText({
@@ -2047,6 +2052,17 @@ export async function POST(request: NextRequest) {
               abortSignal: abortCtrl.signal,
               onStepFinish: ({ toolCalls, toolResults }) => {
                 if (!toolCalls?.length) return;
+                // A tool-call step produces no text tokens, so the firstTokenTimer
+                // never resets in the text loop below. Reset it here so the NEXT
+                // step (the synthesising response) gets its own deadline instead of
+                // running out of the original budget that started before tool execution.
+                clearTimeout(firstTokenTimer);
+                const elapsed = Date.now() - streamStartMs;
+                const remaining = Math.max(8_000, VERCEL_BUDGET_MS - elapsed);
+                firstTokenTimer = setTimeout(
+                  () => abortCtrl.abort(new Error('Primary timeout (step 2)')),
+                  remaining,
+                );
                 for (const tc of toolCalls) {
                   const result = (toolResults as any[])?.find((r: any) => r.toolCallId === tc.toolCallId)?.result;
                   const summary = toolResultSummary(tc.toolName, result);
@@ -2080,8 +2096,10 @@ export async function POST(request: NextRequest) {
               }
             }).catch(() => {});
 
-            // Abort if the first token doesn't arrive within the timeout budget
-            const firstTokenTimer = setTimeout(() => abortCtrl.abort(new Error('Primary timeout')), primaryTimeoutMs);
+            // Abort if the first token doesn't arrive within the timeout budget.
+            // Declared with `let` so onStepFinish can reset it after tool calls.
+            // eslint-disable-next-line prefer-const
+            let firstTokenTimer = setTimeout(() => abortCtrl.abort(new Error('Primary timeout')), primaryTimeoutMs);
 
             // Max chars to stream before truncating a runaway response
             const RESPONSE_CHAR_LIMIT = 8_000;

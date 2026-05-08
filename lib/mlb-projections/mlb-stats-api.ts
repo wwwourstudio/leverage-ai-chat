@@ -147,7 +147,44 @@ export async function fetchTodaysGames(date?: string): Promise<MLBGame[]> {
       }
     }
 
-    setCached(cacheKey, games);
+    // ── Boxscore fallback for games with empty lineups ─────────────────────
+    // The schedule `hydrate=lineups` only includes pre-game submissions.
+    // Once a game starts that field clears; lineups move to the boxscore.
+    // For games within ±3 hours of their scheduled start that have no lineup,
+    // fetch from the boxscore endpoint in parallel (up to 5 concurrent).
+    const now = Date.now();
+    const THREE_HOURS = 3 * 60 * 60 * 1000;
+    const needsBoxscore = games.filter(g => {
+      if (g.homeLineup.length > 0 || g.awayLineup.length > 0) return false;
+      const gameMsAgo = now - new Date(g.gameDate).getTime();
+      // Within window: game started up to 3h ago OR starts within 3h
+      return gameMsAgo > -THREE_HOURS && gameMsAgo < THREE_HOURS;
+    });
+
+    if (needsBoxscore.length > 0) {
+      console.log(`[MLBStatsAPI] Fetching boxscore lineups for ${needsBoxscore.length} games`);
+      const boxscoreResults = await Promise.allSettled(
+        needsBoxscore.slice(0, 5).map(g =>  // cap at 5 parallel requests
+          fetchBoxscoreLineups(g.gamePk, g.homeTeam, g.homeTeamAbbr, g.awayTeam, g.awayTeamAbbr)
+        ),
+      );
+      boxscoreResults.forEach((result, i) => {
+        if (result.status !== 'fulfilled' || !result.value) return;
+        const { homeLineup, awayLineup } = result.value;
+        const game = games.find(g => g.gamePk === needsBoxscore[i].gamePk);
+        if (!game) return;
+        if (homeLineup.length > 0) game.homeLineup = homeLineup;
+        if (awayLineup.length > 0) game.awayLineup = awayLineup;
+      });
+    }
+
+    // Use a shorter cache TTL when lineups are still missing so the next call
+    // retries instead of serving stale empty-lineup data for 10 minutes.
+    const hasAnyLineups = games.some(g => g.homeLineup.length > 0 || g.awayLineup.length > 0);
+    if (hasAnyLineups) {
+      setCached(cacheKey, games);
+    }
+    // Don't cache the empty-lineup result — allows immediate retry next call.
     return games;
   } catch (err) {
     console.error('[MLBStatsAPI] fetchTodaysGames error:', err);
@@ -169,6 +206,68 @@ function extractLineup(players: any[], teamName: string, teamAbbr: string): MLBB
     }))
     .filter(b => b.id > 0)
     .sort((a, b) => a.battingOrder - b.battingOrder);
+}
+
+/**
+ * Fetch batting lineups from the boxscore endpoint.
+ *
+ * The schedule `hydrate=lineups` only contains pre-game submissions; once a game
+ * starts that field goes empty. The boxscore has the authoritative lineup for
+ * any game that has had its lineup card posted (in-progress or final).
+ */
+async function fetchBoxscoreLineups(
+  gamePk: number,
+  homeTeam: string,
+  homeAbbr: string,
+  awayTeam: string,
+  awayAbbr: string,
+): Promise<{ homeLineup: MLBBatter[]; awayLineup: MLBBatter[] } | null> {
+  const cacheKey = `boxscore-lineup:${gamePk}`;
+  const cached = getCached<{ homeLineup: MLBBatter[]; awayLineup: MLBBatter[] }>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const url = `${MLB_API}/game/${gamePk}/boxscore`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'LeverageAI/1.0' },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+
+    const parseTeam = (teamData: any, teamName: string, abbr: string): MLBBatter[] => {
+      const order: number[] = Array.isArray(teamData?.battingOrder) ? teamData.battingOrder : [];
+      if (order.length === 0) return [];
+      const players: Record<string, any> = teamData?.players ?? {};
+      return order
+        .map((playerId, idx) => {
+          const p = players[`ID${playerId}`];
+          if (!p) return null;
+          return {
+            id: playerId,
+            fullName: p.person?.fullName ?? '',
+            team: teamName,
+            teamAbbr: abbr,
+            battingOrder: idx + 1,
+            position: p.position?.abbreviation ?? p.allPositions?.[0]?.abbreviation ?? 'DH',
+            bats: (p.batSide?.code ?? 'R') as 'R' | 'L' | 'S',
+          } satisfies MLBBatter;
+        })
+        .filter((b): b is MLBBatter => b !== null && b.id > 0 && b.fullName !== '');
+    };
+
+    const result = {
+      homeLineup: parseTeam(json.teams?.home, homeTeam, homeAbbr),
+      awayLineup: parseTeam(json.teams?.away, awayTeam, awayAbbr),
+    };
+    // Only cache once both lineups are populated (lineup card has been posted)
+    if (result.homeLineup.length >= 9 && result.awayLineup.length >= 9) {
+      setCached(cacheKey, result);
+    }
+    return result;
+  } catch {
+    return null;
+  }
 }
 
 // ── Player lookup + stats helpers ─────────────────────────────────────────────

@@ -4,7 +4,7 @@
  */
 
 import { fetchTodaysGames, type MLBGame, type MLBBatter, type MLBPitcher } from './mlb-stats-api';
-import { fetchStatcastHitters, fetchStatcastPitchers, findHitterByName, findPitcherByName } from './statcast-client';
+import { fetchStatcastHitters, fetchStatcastPitchers, findHitterByName, findPitcherByName, type StatcastPitcherStats } from './statcast-client';
 import { getParkFactors } from './park-factors';
 import {
   buildHitterFeatures,
@@ -203,12 +203,15 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
         if (playerName && !pitcher.fullName.toLowerCase().includes(playerName.toLowerCase())) continue;
 
         diag.pitchersTotal++;
-        const statcast = allPitchers.find(p => p.playerId === pitcher.id) ??
+        let statcast = allPitchers.find(p => p.playerId === pitcher.id) ??
           allPitchers.find(p => nameMatchesPlayer(p.playerName, pitcher.fullName)) ??
           await findPitcherByName(pitcher.fullName).catch(() => null) ??
           null;
 
-        if (!statcast) { diag.pitchersSkippedNoStatcast++; continue; }
+        if (!statcast) {
+          diag.pitchersSkippedNoStatcast++;
+          statcast = makeLeagueAvgPitcherProfile(pitcher);
+        }
 
         const parkFactors = getParkFactors(pitcher.teamAbbr);
         const features = buildPitcherFeatures(statcast, parkFactors, weather);
@@ -527,6 +530,34 @@ function defaultMatchupVars() {
 }
 
 // ─── No-games fallback ────────────────────────────────────────────────────────
+
+/**
+ * League-average Statcast profile for a probable pitcher with no Statcast data.
+ * Prevents the pipeline from skipping pitchers entirely when Baseball Savant
+ * returns an empty leaderboard (HTTP 200 but no rows).
+ */
+function makeLeagueAvgPitcherProfile(pitcher: MLBPitcher): StatcastPitcherStats {
+  return {
+    playerId: pitcher.id,
+    playerName: pitcher.fullName,
+    team: pitcher.teamAbbr,
+    ip: 120,
+    kPct: 22.0,
+    bbPct: 8.0,
+    hrPer9: 1.2,
+    avgVelocity: 92.5,
+    spinRate: 2250,
+    extension: 6.3,
+    releaseHeight: 5.7,
+    horizontalBreak: -5.0,
+    verticalBreak: 11.0,
+    fastballPct: 50,
+    breakingPct: 28,
+    offspeedPct: 22,
+    whiffPct: 24.0,
+    throws: (pitcher.throws === 'L' ? 'L' : 'R') as 'R' | 'L',
+  };
+}
 
 /**
  * Generate projection cards when no games are scheduled (pre-season, off-day).

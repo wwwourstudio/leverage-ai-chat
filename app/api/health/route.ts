@@ -13,20 +13,9 @@ interface ServiceHealth {
 interface HealthCheckResponse {
   status: 'healthy' | 'degraded' | 'unhealthy';
   timestamp: string;
-  services: {
-    odds: ServiceHealth;
-    weather: ServiceHealth;
-    kalshi: ServiceHealth;
-    database: ServiceHealth;
-    grok: ServiceHealth;
-  };
-  environment: {
-    oddsApiConfigured: boolean;
-    weatherApiConfigured: boolean;
-    kalshiApiConfigured: boolean;
-    databaseConfigured: boolean;
-    grokConfigured: boolean;
-  };
+  // Only status + responseTime are surfaced publicly; details/error fields
+  // are stripped to avoid leaking API configuration in unauthenticated responses.
+  services: Record<string, { status: ServiceHealth['status']; responseTime?: number }>;
 }
 
 async function checkOddsAPI(): Promise<ServiceHealth> {
@@ -286,23 +275,20 @@ export async function GET() {
     statuses.includes('degraded') ? 'degraded' :
     'healthy';
 
+  // Omit API-key configuration flags from the public response — they reveal
+  // which third-party services are connected and aid attacker reconnaissance.
+  // Strip per-service `details` objects as well (they may carry quota data).
+  const publicServices = Object.fromEntries(
+    Object.entries({ odds, weather, kalshi, database, grok }).map(([k, v]) => [
+      k,
+      { status: v.status, responseTime: v.responseTime },
+    ])
+  );
+
   const response: HealthCheckResponse = {
     status: overallStatus,
     timestamp: new Date().toISOString(),
-    services: {
-      odds,
-      weather,
-      kalshi,
-      database,
-      grok,
-    },
-    environment: {
-      oddsApiConfigured: isOddsApiConfigured(),
-      weatherApiConfigured: true,
-      kalshiApiConfigured: !!(process.env.KALSHI_API_KEY_ID && process.env.KALSHI_PRIVATE_KEY),
-      databaseConfigured: !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-      grokConfigured: !!getGrokApiKey(),
-    },
+    services: publicServices,
   };
   
   console.log(`[v0] [API/health] ✓ Health check complete in ${totalTime}ms - Status: ${overallStatus.toUpperCase()}`);

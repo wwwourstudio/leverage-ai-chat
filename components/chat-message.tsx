@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { TrustMetricsDisplay } from '@/components/trust-metrics-display';
 import { Shield, Copy, Edit3, CheckCheck, X, Zap, Brain, AlertCircle, Info, RotateCcw, ChevronDown, Wrench } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -408,6 +408,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
   const [editContent, setEditContent] = React.useState(message.content);
   const [showTrust, setShowTrust] = React.useState(false);
   const [justCopied, setJustCopied] = React.useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toast = useToast();
   const isLong = !message.role || message.role === 'assistant'
     ? message.content.length > COLLAPSE_THRESHOLD
@@ -593,7 +594,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                           title="Retry"
                           aria-label="Retry message"
                           className={cn(
-                            'p-1.5 rounded-lg text-[11px] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sport-default)]/60',
+                            'p-2 rounded-lg text-[11px] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sport-default)]/60',
                             message.isError
                               ? 'text-red-400 hover:bg-red-950/40'
                               : message.isPartial
@@ -609,11 +610,12 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                           onCopy?.();
                           setJustCopied(true);
                           toast.success('Copied to clipboard');
-                          setTimeout(() => setJustCopied(false), 1500);
+                          if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+                          copyTimerRef.current = setTimeout(() => setJustCopied(false), 1500);
                         }}
                         title="Copy response"
                         aria-label={justCopied ? 'Copied!' : 'Copy response'}
-                        className="p-1.5 rounded-lg text-[var(--text-faint)] hover:text-blue-400 hover:bg-[var(--bg-elevated)] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sport-default)]/60"
+                        className="p-2 rounded-lg text-[var(--text-faint)] hover:text-blue-400 hover:bg-[var(--bg-elevated)] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sport-default)]/60"
                       >
                         {justCopied
                           ? <CheckCheck className="w-3.5 h-3.5 text-blue-400 animate-scale-in" />
@@ -623,7 +625,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                         onClick={() => setIsEditing(true)}
                         title="Edit message"
                         aria-label="Edit message"
-                        className="p-1.5 rounded-lg text-[var(--text-faint)] hover:text-blue-400 hover:bg-[var(--bg-elevated)] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sport-default)]/60"
+                        className="p-2 rounded-lg text-[var(--text-faint)] hover:text-blue-400 hover:bg-[var(--bg-elevated)] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sport-default)]/60"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
@@ -634,7 +636,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
                           aria-label={showTrust ? 'Hide trust metrics' : 'Show trust metrics'}
                           aria-expanded={showTrust}
                           className={cn(
-                            'p-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sport-default)]/60',
+                            'p-2 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sport-default)]/60',
                             showTrust
                               ? 'text-blue-400 bg-blue-950/30'
                               : 'text-[var(--text-faint)] hover:text-blue-400 hover:bg-[var(--bg-elevated)]',

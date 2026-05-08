@@ -8,7 +8,10 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    unoptimized: true,
+    // Previously unoptimized:true — removed to enable WebP conversion and lazy loading
+    // which improve Core Web Vitals (LCP). If external image domains are needed,
+    // add them to `remotePatterns` here.
+    formats: ['image/webp', 'image/avif'],
   },
   experimental: {
     cpus: 2,

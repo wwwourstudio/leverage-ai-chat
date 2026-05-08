@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 
 /**
  * POST /api/admin/migrate
@@ -388,7 +389,11 @@ export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization') ?? '';
   const token = authHeader.replace(/^Bearer\s+/i, '');
 
-  if (!serviceRoleKey || token !== serviceRoleKey) {
+  // Use timing-safe comparison to prevent timing side-channel attacks.
+  const authorized = serviceRoleKey &&
+    token.length === serviceRoleKey.length &&
+    crypto.timingSafeEqual(Buffer.from(token), Buffer.from(serviceRoleKey));
+  if (!authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

@@ -45,7 +45,31 @@ export async function POST(request: NextRequest) {
     const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-12-18.acacia' });
 
     const body = await request.json().catch(() => ({}));
-    const returnUrl = (body as any).returnUrl ?? `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://leverageai.app'}/`;
+    const defaultReturnUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://leverageai.app'}/`;
+    const rawReturnUrl = (body as any).returnUrl ?? defaultReturnUrl;
+
+    // Validate returnUrl against an allowlist to prevent open-redirect attacks.
+    // An attacker who controls returnUrl can redirect users to a hostile domain
+    // after they exit the Stripe portal.
+    let returnUrl = defaultReturnUrl;
+    try {
+      const parsed = new URL(rawReturnUrl);
+      const host = parsed.hostname.toLowerCase();
+      const isAllowed =
+        host === 'leverageai.app' ||
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host.endsWith('.vercel.app') ||
+        (process.env.NEXT_PUBLIC_SITE_URL &&
+          host === new URL(process.env.NEXT_PUBLIC_SITE_URL).hostname.toLowerCase());
+      if (isAllowed) {
+        returnUrl = rawReturnUrl;
+      } else {
+        console.warn(`[Stripe/Portal] Rejected untrusted returnUrl host: ${host}`);
+      }
+    } catch {
+      // Malformed URL — fall through to default
+    }
 
     const session = await stripe.billingPortal.sessions.create({
       customer: sub.stripe_customer_id,

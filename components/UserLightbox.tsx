@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { X, LogOut, Save, Loader2, CheckCircle, Bot, ChevronDown, Paperclip, FileText, ImageIcon, Trash2, Volume2, Play } from 'lucide-react';
 import { SPORT_KEYS, GROK_VOICES, GROK_VOICE_STORAGE_KEY, GROK_VOICE_DEFAULT, type GrokVoiceId } from '@/lib/constants';
@@ -48,6 +48,7 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Betting profile state
   const [primarySport, setPrimarySport] = useState<string>(SPORT_NAMES[0]);
@@ -67,6 +68,9 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
       setGrokVoice(stored as GrokVoiceId);
     }
   }, []);
+
+  // Clear "saved" timer on unmount to prevent setState on an unmounted component
+  useEffect(() => () => { if (savedTimerRef.current) clearTimeout(savedTimerRef.current); }, []);
 
   const handleVoiceSelect = (id: GrokVoiceId) => {
     setGrokVoice(id);
@@ -153,7 +157,8 @@ export function UserLightbox({ isOpen, onClose, user, onLogout, onInstructionsCh
 
     setSaved(true);
     toast.success('Instructions saved — Grok 4 will follow these on every query');
-    setTimeout(() => setSaved(false), 2500);
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    savedTimerRef.current = setTimeout(() => setSaved(false), 2500);
     setSaving(false);
   };
 

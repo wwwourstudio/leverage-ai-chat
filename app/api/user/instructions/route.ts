@@ -76,9 +76,17 @@ export async function PUT(request: NextRequest) {
     } catch {
       return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
     }
-    const instructions: string = typeof body?.instructions === 'string'
+    const rawInstructions: string = typeof body?.instructions === 'string'
       ? body.instructions.slice(0, 2000)
       : '';
+    // Strip common prompt-injection patterns before storing. The instructions are
+    // injected into the AI system prompt, so adversarial content like "IGNORE ALL
+    // PREVIOUS INSTRUCTIONS" could override system behavior.
+    const instructions = rawInstructions
+      .replace(/ignore\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?|context)/gi, '')
+      .replace(/\bact\s+as\s+(if\s+you\s+(are|were)\s+)?(?:an?\s+)?(different|new|evil|uncensored|jailbroken|DAN)\b/gi, '')
+      .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '') // strip non-printable control chars
+      .trim();
 
     const supabase = await getSupabase();
     const { data: { user } } = await supabase.auth.getUser();

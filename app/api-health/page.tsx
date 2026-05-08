@@ -133,7 +133,7 @@ export default function APIHealthPage() {
           : 'Checking...';
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen overflow-y-auto bg-background">
       <header className="border-b border-border">
         <div className="mx-auto flex max-w-3xl items-center gap-4 px-6 py-4">
           <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">

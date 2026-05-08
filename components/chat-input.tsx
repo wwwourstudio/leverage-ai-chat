@@ -2,6 +2,7 @@
 
 import { memo, useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
 import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles, Brain, Square, Mic, MicOff, Volume2, Radio } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/components/toast-provider';
 import { useVoiceInput } from '@/lib/hooks/use-voice-input';
 import { useVoiceTTS } from '@/lib/hooks/use-voice-tts';
@@ -78,6 +79,7 @@ export const ChatInput = memo(function ChatInput({
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const dragCounterRef = useRef(0);
   const toast = useToast();
 
   const { isRecording, isSupported: micSupported, toggle: toggleMic } = useVoiceInput(
@@ -97,18 +99,22 @@ export const ChatInput = memo(function ChatInput({
     });
   }, [input]);
 
-  const defaultPlaceholder = placeholder ?? (lastUserQuery
-    ? `Follow up on your ${
-        lastUserQuery.toLowerCase().includes('nba') ? 'NBA' :
-        lastUserQuery.toLowerCase().includes('nfl') ? 'NFL' :
-        lastUserQuery.toLowerCase().includes('kalshi') ? 'Kalshi' :
-        lastUserQuery.toLowerCase().includes('dfs') ? 'DFS' :
-        lastUserQuery.toLowerCase().includes('fantasy') ? 'fantasy' : 'sports'
-      } analysis or ask something new...`
-    : selectedCategory === 'fantasy' ? 'Ask about draft picks, waiver wire, ADP values...'
-    : selectedCategory === 'dfs' ? 'Build a DFS lineup, find value plays...'
-    : selectedCategory === 'kalshi' ? 'Ask about prediction markets, implied odds, edge...'
-    : 'Ask about betting odds, fantasy, DFS, or Kalshi markets...');
+  const defaultPlaceholder = isRecording
+    ? 'Listening…'
+    : isDragOver
+    ? 'Drop files here...'
+    : placeholder ?? (lastUserQuery
+      ? `Follow up on your ${
+          lastUserQuery.toLowerCase().includes('nba') ? 'NBA' :
+          lastUserQuery.toLowerCase().includes('nfl') ? 'NFL' :
+          lastUserQuery.toLowerCase().includes('kalshi') ? 'Kalshi' :
+          lastUserQuery.toLowerCase().includes('dfs') ? 'DFS' :
+          lastUserQuery.toLowerCase().includes('fantasy') ? 'fantasy' : 'sports'
+        } analysis or ask something new...`
+      : selectedCategory === 'fantasy' ? 'Ask about draft picks, waiver wire, ADP values...'
+      : selectedCategory === 'dfs' ? 'Build a DFS lineup, find value plays...'
+      : selectedCategory === 'kalshi' ? 'Ask about prediction markets, implied odds, edge...'
+      : 'Ask about betting odds, fantasy, DFS, or Kalshi markets...');
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -117,13 +123,19 @@ export const ChatInput = memo(function ChatInput({
     }
   }, [onSubmit]);
 
-  const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); }, []);
-  const handleDragEnter = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); }, []);
+  const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); }, []);
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current++;
+    setIsDragOver(true);
+  }, []);
   const handleDragLeave = useCallback((e: React.DragEvent) => {
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false);
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) setIsDragOver(false);
   }, []);
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
+    dragCounterRef.current = 0;
     setIsDragOver(false);
     const dropped = await onFileDrop(e.dataTransfer.files);
     if (dropped.length > 0) onFilesAdded(dropped);
@@ -191,11 +203,14 @@ export const ChatInput = memo(function ChatInput({
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`relative rounded-2xl border transition-all duration-200 ${
+        className={cn(
+          'relative rounded-2xl border transition-all duration-200',
           isDragOver
             ? 'border-blue-500/60 bg-blue-500/5 ring-1 ring-blue-500/30'
-            : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)] hover:border-[var(--border-hover)] focus-within:border-blue-500/60 focus-within:ring-1 focus-within:ring-blue-500/20'
-        }`}
+            : isRecording
+            ? 'bg-[var(--bg-overlay)] border-red-500/50 ring-1 ring-red-500/20'
+            : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)] hover:border-[var(--border-hover)] focus-within:border-blue-500/60 focus-within:ring-1 focus-within:ring-blue-500/20',
+        )}
       >
         {/* Drag overlay */}
         {isDragOver && (

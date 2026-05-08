@@ -309,6 +309,21 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     setCreditsRemaining(data.credits);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Prevent body-level scrolling so that a secondary React render (produced by
+  // the hydration mismatch recovery path) cannot be revealed by scrolling past
+  // the h-screen container. Restored on unmount so other routes are unaffected.
+  useEffect(() => {
+    const prevHtml = document.documentElement.style.overflow;
+    const prevBody = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.documentElement.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+    };
+  }, []);
+
   const [alertCount, setAlertCount] = useState(0);
   const [savedPlayersCount, setSavedPlayersCount] = useState(0);
   const [savedCardsCount, setSavedCardsCount] = useState(0);

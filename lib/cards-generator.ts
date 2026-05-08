@@ -1190,12 +1190,16 @@ async function _generateContextualCards(
   options?: { playerName?: string; userContext?: string }
 ): Promise<InsightCard[]> {
   const userContext = options?.userContext;
-  // Check in-memory cache first to avoid redundant API calls
-  // (SSR page load populates this, /api/analyze reuses it)
-  const cached = getCachedCards(category, sport, count, userContext);
-  if (cached && cached.length > 0) {
-    logger.debug(LogCategory.CACHE, 'cards_cache_hit', { metadata: { count: cached.length, category, sport } });
-    return cached;
+  // Skip the card-level cache for props — the underlying prop data has its own
+  // 15-minute TTL inside fetchPlayerProps, and we need to filter/prioritize
+  // cards based on userContext (player name, stat type) on every request.
+  const isPropsCategory = category === 'props' || category === 'player_props';
+  if (!isPropsCategory) {
+    const cached = getCachedCards(category, sport, count, userContext);
+    if (cached && cached.length > 0) {
+      logger.debug(LogCategory.CACHE, 'cards_cache_hit', { metadata: { count: cached.length, category, sport } });
+      return cached;
+    }
   }
 
   const cards: InsightCard[] = [];
@@ -2304,14 +2308,14 @@ async function _generateContextualCards(
     console.log('[v0] [CARDS-GEN] Player props category - fetching live markets');
     try {
       const { fetchPlayerProps, playerPropToCard } = await import('@/lib/player-props-service');
-      
+
       if (normalizedSport) {
-        const props = await fetchPlayerProps({ 
-          sport: normalizedSport, 
-          useCache: true, 
-          storeResults: true 
+        const props = await fetchPlayerProps({
+          sport: normalizedSport,
+          useCache: true,
+          storeResults: true
         });
-        
+
         const propsWithData = props.filter(p => p.overOdds && p.underOdds);
         console.log(
           `[v0] [CARDS-GEN] props: ${props.length} total | ${propsWithData.length} with O/U odds` +
@@ -2319,10 +2323,45 @@ async function _generateContextualCards(
         );
 
         if (props.length > 0) {
-          const propCards = props.slice(0, count).map(playerPropToCard);
+          // Prioritise by player name when userContext names a specific player.
+          // Fall back to a shuffled subset so repeated generic queries don't
+          // always surface the same first-N entries from the sorted API list.
+          let ranked = [...props];
+          if (userContext) {
+            const uc = userContext.toLowerCase();
+            // Score each prop: +2 for full name match, +1 for last-name match, +0.5 for stat type match
+            ranked = props
+              .map(p => {
+                const pn = p.playerName.toLowerCase();
+                const lastName = pn.split(' ').pop() ?? '';
+                const statKey = (p.statType ?? '').toLowerCase().replace(/_/g, ' ');
+                let score = 0;
+                if (uc.includes(pn)) score += 2;
+                else if (lastName.length > 2 && uc.includes(lastName)) score += 1;
+                if (statKey && uc.includes(statKey)) score += 0.5;
+                return { prop: p, score };
+              })
+              .sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                // Stable tie-break: sort by player name so SSR and client agree
+                return a.prop.playerName.localeCompare(b.prop.playerName);
+              })
+              .map(x => x.prop);
+          } else {
+            // No specific context — rotate through the prop pool each 15-minute window
+            // using a deterministic seed so SSR and client render the same order.
+            const seed = Math.floor(Date.now() / (15 * 60 * 1000));
+            let s = seed;
+            const lcg = () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0x100000000; };
+            for (let i = ranked.length - 1; i > 0; i--) {
+              const j = Math.floor(lcg() * (i + 1));
+              [ranked[i], ranked[j]] = [ranked[j], ranked[i]];
+            }
+          }
+
+          const propCards = ranked.slice(0, count).map(playerPropToCard);
           cards.push(...propCards);
           console.log(`[v0] [CARDS-GEN] Built ${propCards.length} prop cards (requested: ${count})`);
-          if (cards.length > 0) setCachedCards(cards, 'props', normalizedSport);
           return cards;
         }
       }

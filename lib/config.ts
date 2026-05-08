@@ -571,3 +571,47 @@ export function verifyCronSecret(req: { headers: { get(name: string): string | n
 
   return fromAuth === stored || fromXHeader === stored || fromQuery === stored;
 }
+
+/**
+ * Async variant of verifyCronSecret that also accepts the cron_secret stored in
+ * api.app_settings as a secondary check.  pg_cron jobs call Vercel routes
+ * directly via net.http_get() and pass the DB-stored secret as ?secret=…; they
+ * cannot use the Authorization: Bearer header that Vercel injects for its own
+ * managed-cron invocations.
+ *
+ * Auth order:
+ *   1. Env-var check (fast, no network — handles Vercel-managed crons)
+ *   2. DB lookup (fallback — handles pg_cron calls using api.get_cron_secret())
+ */
+export async function verifyCronSecretWithDbFallback(
+  req: { headers: { get(name: string): string | null }; nextUrl?: { searchParams: URLSearchParams } }
+): Promise<boolean> {
+  if (verifyCronSecret(req)) return true;
+
+  try {
+    const supabaseUrl = getSupabaseUrl();
+    const supabaseKey = getSupabaseServiceKey() ?? getSupabaseAnonKey();
+    if (!supabaseUrl || !supabaseKey) return false;
+
+    const { createClient } = await import('@supabase/supabase-js');
+    const client = createClient(supabaseUrl, supabaseKey, { db: { schema: 'api' } });
+    const { data } = await client
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'cron_secret')
+      .single();
+
+    const dbSecret = (data as { value?: string } | null)?.value?.trim();
+    if (!dbSecret) return false;
+
+    const authHeader = req.headers.get('authorization') ?? '';
+    const fromAuth = authHeader.replace(/^bearer\s+/i, '').trim();
+    const fromXHeader = req.headers.get('x-cron-secret')?.trim() ?? '';
+    const fromQuery = req.nextUrl?.searchParams.get('secret')?.trim() ?? '';
+
+    return fromAuth === dbSecret || fromXHeader === dbSecret || fromQuery === dbSecret;
+  } catch (err) {
+    console.error('[config] verifyCronSecretWithDbFallback: DB lookup failed', err);
+    return false;
+  }
+}

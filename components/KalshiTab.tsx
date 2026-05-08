@@ -239,11 +239,17 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
   const [lastFetch, setLastFetch] = useState<Date | null>(null);
   const [configured, setConfigured] = useState(false);
 
-  // Watchlist — persisted to localStorage
-  const [watched, setWatched] = useState<Set<string>>(() => {
-    if (typeof window === 'undefined') return new Set();
-    try { return new Set(JSON.parse(localStorage.getItem(WATCH_KEY) ?? '[]')); } catch { return new Set(); }
-  });
+  // Watchlist — persisted to localStorage.
+  // Initialise to empty Set so server and client render identically (avoids
+  // React #418 hydration mismatch). localStorage is read in a useEffect so it
+  // only runs client-side, after hydration succeeds.
+  const [watched, setWatched] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(WATCH_KEY);
+      if (stored) setWatched(new Set(JSON.parse(stored)));
+    } catch { /* ignore corrupt data */ }
+  }, []);
   const toggleWatch = useCallback((ticker: string) => {
     setWatched(prev => {
       const next = new Set(prev);

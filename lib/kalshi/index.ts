@@ -216,11 +216,59 @@ const _SPORTS_CATEGORIES = new Set([
   'Soccer', 'Tennis', 'Sports', 'Baseball', 'Basketball', 'Football', 'Hockey',
 ]);
 
-/** Returns true when the market is a sports/prop market based on seriesTicker + category. */
-export function isSportsMarket(m: { seriesTicker?: string; category?: string }): boolean {
+// Title-based sports detection — used when Kalshi returns empty seriesTicker and
+// category='Prediction Market' (observed May 2026: Kalshi reclassified combo/parlay
+// markets to a single generic category, breaking the seriesTicker prefix approach).
+
+/** Matches sports-specific prop language in a market title. */
+const _SPORTS_TITLE_RE = /\b(goals?|strikeouts?|touchdowns?|rebounds?|assists?|home\s*runs?|stolen\s*bases?|rushing\s*yards?|passing\s*yards?|receiving\s*yards?|receptions?|tackles?|sacks?|blocks?|steals?|field\s*goals?|free\s*throws?|three[\s-]?pointers?|shots?\s*on\s*goal|clean\s*sheets?|both\s*teams?\s*to\s*score|runs?\s*scored|batting|pitching)\b/i;
+
+/** Player-prop format: "Firstname Lastname: N+" or "F. Lastname: N+" */
+const _PLAYER_PROP_TITLE_RE = /[A-Z][a-z][\w.]* [A-Z][a-z]\w*:\s*\d+[+]/;
+
+/** Keywords that reliably indicate NON-sports markets — suppresses title heuristics. */
+const _NON_SPORTS_TITLE_RE = /\b(election|senator?|congress(?:ional)?|president(?:ial)?|trump|biden|harris|kennedy|vote|democrat|republican|electoral|inaugur|ballot|governor|primary|bitcoin|ethereum|crypto\b|BTC|ETH|nasdaq|S&P|GDP|CPI|inflation|federal\s*reserve|FOMC|oscar|grammy|emmy|golden\s*globe|box\s*office|hurricane|tornado|earthquake|temperature|weather|rainfall)\b/i;
+
+/**
+ * Returns true when the market is a sports/prop market.
+ *
+ * Detection order:
+ *  1. seriesTicker prefix match (most authoritative)
+ *  2. Normalized category string
+ *  3. ticker / eventTicker prefix match (populated even when seriesTicker is empty)
+ *  4. Title-based heuristics (fallback for Kalshi combo/parlay markets reclassified
+ *     to category='Prediction Market' with empty seriesTicker)
+ */
+export function isSportsMarket(m: {
+  seriesTicker?: string;
+  category?: string;
+  ticker?: string;
+  eventTicker?: string;
+  title?: string;
+}): boolean {
   const series = (m.seriesTicker || '').toUpperCase();
-  if (SPORTS_SERIES_PREFIXES.some(p => series.startsWith(p))) return true;
-  return _SPORTS_CATEGORIES.has(m.category || '');
+  if (series && SPORTS_SERIES_PREFIXES.some(p => series.startsWith(p))) return true;
+  if (_SPORTS_CATEGORIES.has(m.category || '')) return true;
+
+  // ticker / eventTicker may contain sports prefixes even when seriesTicker is empty
+  const tkr = (m.ticker || '').toUpperCase();
+  const evt = (m.eventTicker || '').toUpperCase();
+  if (tkr && SPORTS_SERIES_PREFIXES.some(p => tkr.startsWith(p))) return true;
+  if (evt && SPORTS_SERIES_PREFIXES.some(p => evt.startsWith(p))) return true;
+
+  // Title-based fallback
+  const title = m.title || '';
+  if (!title || _NON_SPORTS_TITLE_RE.test(title)) return false;
+  if (_PLAYER_PROP_TITLE_RE.test(title)) return true;
+  if (_SPORTS_TITLE_RE.test(title)) return true;
+  // Multi-leg sports combo: · separated legs where at least one is a player prop,
+  // OR 3+ legs that all begin with a capital letter (team-combo parlay).
+  // The NON_SPORTS check above already blocks political multi-leg combos.
+  const parts = title.split(/\s*[·•]\s*/).map(p => p.trim()).filter(p => p.length > 3);
+  if (parts.length >= 2 && parts.some(p => _PLAYER_PROP_TITLE_RE.test(p))) return true;
+  if (parts.length >= 3 && parts.every(p => /^[A-Z]/.test(p))) return true;
+
+  return false;
 }
 
 /**

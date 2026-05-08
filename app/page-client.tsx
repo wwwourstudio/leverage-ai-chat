@@ -3223,7 +3223,7 @@ No preamble. Start directly with section 1.`;
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-black via-background to-black">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-gradient-to-br from-black via-background to-black">
         {/* Mobile "Add to Home Screen" banner — in normal flow, pushes header down */}
         <AddToHomeBanner />
         {/* Header */}
@@ -3246,7 +3246,7 @@ No preamble. Start directly with section 1.`;
 
         {/* Messages Container - Dynamic Data-Driven Interface */}
         <div
-          className="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar scroll-smooth"
+          className="flex-1 min-h-0 overflow-y-auto px-4 py-6 custom-scrollbar scroll-smooth"
           aria-live="polite"
           aria-label="Conversation"
           role="log"

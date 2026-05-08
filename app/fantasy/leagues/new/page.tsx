@@ -48,7 +48,7 @@ export default function NewLeaguePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen overflow-y-auto bg-background">
       <div className="max-w-2xl mx-auto px-4 py-10">
         <div className="mb-6">
           <Link href="/fantasy/leagues" className="text-sm text-muted-foreground hover:text-foreground">

@@ -807,7 +807,7 @@ export default function TradingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-white">
+    <div className="h-screen overflow-y-auto bg-background text-white">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="border-b border-[var(--border-subtle)] bg-[var(--bg-overlay)]">
         <div className="mx-auto max-w-[1600px] flex items-center gap-4 px-4 py-3">

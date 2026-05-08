@@ -6,7 +6,28 @@
 
 import { buildDFSCardsWithSlate, type DFSCardData } from './dfs-adapter';
 import { fetchTodaysGames } from './mlb-stats-api';
-import type { DKDraftGroup } from './draftkings-api';
+import { fetchDKContests, type DKDraftGroup } from './draftkings-api';
+import type { MLBGame } from './mlb-stats-api';
+
+/** A game matchup enriched with probable pitcher names. */
+export interface EnrichedGameRef {
+  gameId: number;
+  awayTeamAbbr: string;
+  homeTeamAbbr: string;
+  startTime: string;       // ISO
+  awayPitcher?: string;    // probable pitcher full name
+  homePitcher?: string;
+}
+
+/** A DK contest slate enriched with game + pitcher details. */
+export interface EnrichedSlate {
+  draftGroupId: number;
+  slateLabel: string;
+  contestType: 'classic' | 'showdown';
+  startDate: string;
+  gameCount: number;
+  games: EnrichedGameRef[];
+}
 
 export interface DFSSlate {
   date: string;
@@ -45,6 +66,10 @@ export interface DFSSlateMulti {
     degradedReason?: string;
     /** True when no full lineup could be built because the available DK pool is too thin. */
     insufficientPool?: boolean;
+    /** All available DK slates for today, enriched with game + pitcher info. */
+    allSlates: EnrichedSlate[];
+    /** Games in the selected (Main) slate, enriched with pitcher names. */
+    slateGames: EnrichedGameRef[];
   };
 }
 
@@ -66,12 +91,27 @@ export async function buildDFSSlate(opts: { limit?: number; date?: string; draft
 export async function buildDFSSlateMulti(opts: { limit?: number; date?: string; draftGroupId?: number } = {}): Promise<DFSSlateMulti> {
   const { limit = 9 } = opts;
 
-  const [games, dfsResult] = await Promise.all([
-    fetchTodaysGames(opts.date).catch(() => []),
+  const [games, dfsResult, contestsResult] = await Promise.all([
+    fetchTodaysGames(opts.date).catch(() => [] as MLBGame[]),
     buildDFSCardsWithSlate({ limit: limit * 4, date: opts.date, draftGroupId: opts.draftGroupId }), // Over-fetch for all lineup variants
+    fetchDKContests().catch(() => ({ ok: false as const, error: new Error('contests unavailable') })),
   ]);
   const allCards = dfsResult.cards;
   const slateMeta = slateToMeta(dfsResult.slate);
+
+  // Build enriched slate/game lists for the games-picker card.
+  const rawSlates = contestsResult.ok ? contestsResult.value : [];
+  const allSlates: EnrichedSlate[] = rawSlates.map(s => ({
+    draftGroupId: s.draftGroupId,
+    slateLabel:   s.slateLabel,
+    contestType:  s.contestType,
+    startDate:    s.startDate,
+    gameCount:    s.gameCount,
+    games:        enrichGames(s.games, games),
+  }));
+  const slateGames: EnrichedGameRef[] = dfsResult.slate
+    ? enrichGames(dfsResult.slate.games, games)
+    : [];
 
   const empty: DFSSlateMulti = {
     optimalLineup: [], valueLineup: [], matchupLineup: [],
@@ -84,6 +124,8 @@ export async function buildDFSSlateMulti(opts: { limit?: number; date?: string; 
       slate: slateMeta,
       degradedMode: dfsResult.degradedMode,
       degradedReason: dfsResult.degradedReason,
+      allSlates,
+      slateGames,
     },
   };
 
@@ -192,8 +234,28 @@ export async function buildDFSSlateMulti(opts: { limit?: number; date?: string; 
       slate: slateMeta,
       degradedMode: dfsResult.degradedMode,
       degradedReason: dfsResult.degradedReason,
+      allSlates,
+      slateGames,
     },
   };
+}
+
+/** Join DK game refs with MLB Stats API game data to add probable pitcher names. */
+function enrichGames(dkGames: DKDraftGroup['games'], mlbGames: MLBGame[]): EnrichedGameRef[] {
+  return dkGames.map(g => {
+    const match = mlbGames.find(m =>
+      m.awayTeamAbbr?.toUpperCase() === g.awayTeamAbbr?.toUpperCase() &&
+      m.homeTeamAbbr?.toUpperCase() === g.homeTeamAbbr?.toUpperCase(),
+    );
+    return {
+      gameId:       g.gameId,
+      awayTeamAbbr: g.awayTeamAbbr,
+      homeTeamAbbr: g.homeTeamAbbr,
+      startTime:    g.startTime,
+      awayPitcher:  match?.probableAwayPitcher?.fullName,
+      homePitcher:  match?.probableHomePitcher?.fullName,
+    };
+  });
 }
 
 function slateToMeta(slate: DKDraftGroup | null) {

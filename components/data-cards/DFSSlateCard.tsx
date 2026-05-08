@@ -73,6 +73,8 @@ export const DFSSlateCard = memo(function DFSSlateCard({
   const degradedMode: boolean = data.degradedMode === true;
   const degradedReason: string | undefined = data.degradedReason;
   const insufficientPool: boolean = data.insufficientPool === true;
+  const slateGames: Array<{ gameId: number; awayTeamAbbr: string; homeTeamAbbr: string; startTime: string; awayPitcher?: string; homePitcher?: string }> =
+    Array.isArray(data.slateGames) ? data.slateGames : [];
 
   // Parse total salary as a number for the cap bar
   const totalSalaryNum = parseInt(String(totalSalary).replace(/[^0-9]/g, ''), 10) || 0;
@@ -160,6 +162,34 @@ export const DFSSlateCard = memo(function DFSSlateCard({
               ? 'Not enough confirmed available players in this contest pool to build a full lineup. Wait for lineups to lock and try again.'
               : 'DraftKings contest feed unavailable — lineup built from LeverageMetrics projections. Salary and ownership are modeled estimates, not DK-validated.'}
             {degradedReason ? ` (${degradedReason})` : ''}
+          </div>
+        </div>
+      )}
+
+      {/* ── Slate games ────────────────────────────────────────────────── */}
+      {slateGames.length > 0 && (
+        <div className="mx-3 mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-3 py-2">
+          <p className="text-[8px] font-black uppercase tracking-wider text-[var(--text-faint)] mb-1.5">Games on Slate</p>
+          <div className="grid grid-cols-2 gap-1">
+            {slateGames.map(g => (
+              <div key={g.gameId} className="rounded-md bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-1">
+                <div className="flex items-center gap-1 text-[10px] font-black text-white">
+                  <span>{g.awayTeamAbbr}</span>
+                  <span className="text-white/30 text-[8px]">@</span>
+                  <span>{g.homeTeamAbbr}</span>
+                  {g.startTime && (
+                    <span className="ml-auto text-[8px] font-semibold text-white/40 tabular-nums">
+                      {new Date(g.startTime).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })}
+                    </span>
+                  )}
+                </div>
+                {(g.awayPitcher || g.homePitcher) && (
+                  <div className="text-[8px] text-[var(--text-faint)] truncate mt-0.5">
+                    {g.awayPitcher?.split(' ').pop() ?? 'TBD'} vs. {g.homePitcher?.split(' ').pop() ?? 'TBD'}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}

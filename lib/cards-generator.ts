@@ -2407,6 +2407,25 @@ async function _generateContextualCards(
           ? `$${(multi.metadata.totalSalary / 1000).toFixed(0)}k`
           : '';
 
+        // 0× DFS Games picker card — shows all available slates + game matchups
+        if (multi.metadata.allSlates.length > 0) {
+          const totalGames = multi.metadata.allSlates.reduce((n, s) => n + s.gameCount, 0);
+          cards.push({
+            type: 'dfs-games',
+            title: `Today's DraftKings Slates`,
+            icon: 'Calendar',
+            category: 'DFS',
+            subcategory: `${multi.metadata.allSlates.length} slate${multi.metadata.allSlates.length !== 1 ? 's' : ''} · ${totalGames} games`,
+            gradient: 'from-blue-700 to-indigo-700',
+            status: 'live',
+            data: {
+              slates: multi.metadata.allSlates,
+              selectedDraftGroupId: multi.metadata.slate?.draftGroupId ?? null,
+            },
+            metadata: { realData: true, source: 'DraftKings' },
+          });
+        }
+
         // 1× DFS Slate card (full optimal lineup roster)
         if (multi.slateForCard.length > 0) {
           cards.push({
@@ -2443,6 +2462,7 @@ async function _generateContextualCards(
               draftGroupId:  multi.metadata.slate?.draftGroupId,
               slateStartDate: multi.metadata.slate?.startDate,
               slateContestType: multi.metadata.slate?.contestType,
+              slateGames:    multi.metadata.slateGames,
               degradedMode:  multi.metadata.degradedMode === true,
               degradedReason: multi.metadata.degradedReason,
               insufficientPool: multi.metadata.insufficientPool === true,

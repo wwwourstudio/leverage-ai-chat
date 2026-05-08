@@ -20,13 +20,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyCronSecret } from '@/lib/config';
+import { verifyCronSecretWithDbFallback } from '@/lib/config';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
-  if (!verifyCronSecret(req)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  if (!await verifyCronSecretWithDbFallback(req)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
   const startedAt = Date.now();
   const errors: string[] = [];

@@ -233,7 +233,8 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
       onUserUpdate?.({ name, email: user?.email ?? '', avatar: user?.avatar });
       setSaved(true);
       toast.success('Settings saved');
-      setTimeout(() => setSaved(false), 2000);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
     } catch (err: any) {
       console.error('[Settings] handleSave error:', err);
       setSaveError(err?.message || 'Failed to save settings');

@@ -101,7 +101,7 @@ const MessageItem = memo(function MessageItem({
         <button
           onClick={() => onReadAloud(message.content)}
           aria-label="Read message aloud"
-          className={`absolute -bottom-1 right-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-[var(--text-faint)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:text-blue-400 hover:border-blue-500/40 transition-all duration-200 ${showReadBtn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1 pointer-events-none'}`}
+          className={`absolute -bottom-1 right-2 flex items-center gap-1 px-3 py-1.5 rounded-full text-[10px] font-medium text-[var(--text-faint)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:text-blue-400 hover:border-blue-500/40 transition-all duration-200 ${showReadBtn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1 pointer-events-none'}`}
         >
           <Volume2 className="w-2.5 h-2.5" />
           Read

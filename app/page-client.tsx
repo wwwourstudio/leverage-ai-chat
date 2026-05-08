@@ -2087,17 +2087,22 @@ No preamble. Start directly with section 1.`;
       category = 'props';
     }
 
-    console.log('[v0] Fetching dynamic cards for:', { sport, category });
-    
+    // Extract DraftKings draft group ID from prompts like "DraftKings #12345"
+    const draftGroupIdMatch = userMessage.match(/DraftKings #(\d+)/i);
+    const draftGroupId = draftGroupIdMatch ? parseInt(draftGroupIdMatch[1], 10) : undefined;
+
+    console.log('[v0] Fetching dynamic cards for:', { sport, category, draftGroupId });
+
     try {
       // Fetch dynamic cards from API
-      console.log('[v0] Requesting dynamic cards with params:', { sport, category, context, limit: 3 });
-      
+      console.log('[v0] Requesting dynamic cards with params:', { sport, category, context, limit: 3, draftGroupId });
+
       const dynamicCards = await fetchDynamicCards({
         sport: sport || undefined,
         category,
         userContext: context,
-        limit: 3
+        limit: 3,
+        draftGroupId,
       });
       
       console.log('[v0] Received dynamic cards response:', dynamicCards.length, 'cards');

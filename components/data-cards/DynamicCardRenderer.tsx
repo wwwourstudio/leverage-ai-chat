@@ -51,6 +51,7 @@ import { UmpireImpactCard } from './UmpireImpactCard';
 import { CatcherFramingCard } from './CatcherFramingCard';
 import { ClosingLineCard } from './ClosingLineCard';
 import { DFSSlateCard } from './DFSSlateCard';
+import { DFSGamesCard } from './DFSGamesCard';
 import { PropHitRateCard } from './PropHitRateCard';
 import { PlayerPropCard } from './PlayerPropCard';
 
@@ -271,6 +272,17 @@ export function DynamicCardRenderer({
         error={error}
         isHero={isHero}
       />
+    );
+  }
+
+  // DFS games / slate picker card
+  if (cardType === 'dfs-games') {
+    return withOverlays(
+      <DFSGamesCard
+        data={safeCard.data as any}
+        onAsk={onAsk}
+      />,
+      true, // skip bookmark (interactive card)
     );
   }
 

@@ -298,6 +298,7 @@ export const CARD_TYPES = {
   DFS_MATCHUP: 'dfs-matchup',
   DFS_CONTRARIAN: 'dfs-contrarian',
   DFS_SLATE: 'dfs-slate',
+  DFS_GAMES: 'dfs-games',
   FANTASY_INSIGHT: 'fantasy-insight',
   ADP_ANALYSIS: 'adp-analysis',
   BESTBALL_STACK: 'bestball-stack',

@@ -48,12 +48,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { sport, category, limit = 3, userContext } = body;
+    const { sport, category, limit = 3, userContext, draftGroupId } = body;
 
     const clampedLimit = Math.min(Math.max(Number(limit) || 3, 1), 15);
-    // Include userContext in dedupeKey — different queries must not coalesce
+    // Include userContext and draftGroupId in dedupeKey — different queries must not coalesce
     // into one in-flight promise even if category/sport/limit match.
-    const dedupeKey = `${category ?? ''}::${sport ?? ''}::${clampedLimit}::${userContext ?? ''}`;
+    const dedupeKey = `${category ?? ''}::${sport ?? ''}::${clampedLimit}::${userContext ?? ''}::${draftGroupId ?? ''}`;
 
     // Return the in-flight promise if an identical request is already running
     if (inflight.has(dedupeKey)) {
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     // 20s hard timeout — prevents this route from hanging until Vercel's 60s wall clock
     // if an upstream API (odds, weather, kalshi) is slow or unresponsive.
     const cardPromise = Promise.race([
-      generateContextualCards(category ?? undefined, sport ?? undefined, clampedLimit, undefined, undefined, { userContext: userContext ?? undefined }),
+      generateContextualCards(category ?? undefined, sport ?? undefined, clampedLimit, undefined, undefined, { userContext: userContext ?? undefined, draftGroupId: typeof draftGroupId === 'number' ? draftGroupId : undefined }),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('card generation timed out')), 20_000),
       ),

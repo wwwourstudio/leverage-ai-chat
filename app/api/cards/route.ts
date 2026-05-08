@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateContextualCards } from '@/lib/cards-generator';
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/lib/constants';
 import { validateBenford } from '@/lib/benford-validator';
+import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
 
 // In-memory inflight map: coalesces concurrent requests with identical params
 // into a single generateContextualCards call. Auto-cleaned on promise settle.
@@ -37,6 +38,15 @@ function buildCardsResponse(cards: any[], category?: string): NextResponse {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 30 req/min per IP — cards generation calls multiple external APIs
+    const rl = checkRateLimit('cards-post', getRateLimitId(request), { limit: 30, windowMs: 60_000 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { success: false, cards: [], error: 'Too many requests — try again in a minute' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+      );
+    }
+
     const body = await request.json();
     const { sport, category, limit = 3, userContext } = body;
 

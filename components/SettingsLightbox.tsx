@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import {
@@ -144,6 +144,7 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
   const [saving, setSaving]                 = useState(false);
   const [saved, setSaved]                   = useState(false);
   const [saveError, setSaveError]           = useState<string | null>(null);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isGuest, setIsGuest]               = useState(false);
 
   const [name, setName]                     = useState(user?.name ?? '');
@@ -204,6 +205,9 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
     }
   }, [isOpen, loadSettings]);
 
+  // Clear the "saved" banner timer on unmount to prevent setState on unmounted component
+  useEffect(() => () => { if (savedTimerRef.current) clearTimeout(savedTimerRef.current); }, []);
+
   // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     setSaving(true);
@@ -214,7 +218,8 @@ export function SettingsLightbox({ isOpen, onClose, user, onUserUpdate, onOpenSt
         onUserUpdate?.({ name, email: user?.email ?? '', avatar: user?.avatar });
         setSaved(true);
         toast.success('Settings saved');
-        setTimeout(() => setSaved(false), 2000);
+        if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+        savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
         setSaving(false);
         return;
       }

@@ -557,9 +557,13 @@ export function verifyCronSecret(req: { headers: { get(name: string): string | n
   const stored = process.env.CRON_SECRET?.trim();
   if (!stored) {
     if (process.env.NODE_ENV === 'production') {
-      console.error('[SECURITY] CRON_SECRET is not set — all cron endpoints are publicly accessible');
+      // Fail-closed in production: a missing CRON_SECRET means the caller cannot
+      // be authenticated, so we must reject rather than open all cron endpoints.
+      console.error('[SECURITY] CRON_SECRET is not set — rejecting cron request (fail-closed)');
+      return false;
     }
-    return true; // no secret configured → allow all (useful for dev)
+    // Dev/test only: allow unauthenticated access when no secret is configured
+    return true;
   }
 
   // Extract token from Authorization header (case-insensitive Bearer prefix)

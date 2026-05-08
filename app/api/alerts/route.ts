@@ -76,16 +76,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'Invalid alert_type' }, { status: 400 });
   }
 
+  // Cap free-text string fields to prevent oversized payloads reaching the DB
+  const STR_MAX = 100;
+  const DESC_MAX = 500;
+  if (
+    title.trim().length > STR_MAX ||
+    (sport && String(sport).length > STR_MAX) ||
+    (team && String(team).length > STR_MAX) ||
+    (player && String(player).length > STR_MAX) ||
+    (description && String(description).length > DESC_MAX)
+  ) {
+    return NextResponse.json({ success: false, error: 'Field value too long' }, { status: 400 });
+  }
+
   const { data, error } = await supabase
     .from('user_alerts')
     .insert({
       user_id: user.id,
-      title: title.trim(),
+      title: title.trim().slice(0, STR_MAX),
       alert_type,
-      sport: sport || null,
-      team: team || null,
-      player: player || null,
-      description: description || null,
+      sport: sport ? String(sport).slice(0, STR_MAX) : null,
+      team: team ? String(team).slice(0, STR_MAX) : null,
+      player: player ? String(player).slice(0, STR_MAX) : null,
+      description: description ? String(description).slice(0, DESC_MAX) : null,
       threshold: threshold ?? null,
       max_triggers: max_triggers ?? 1,
       condition: {

@@ -57,9 +57,10 @@ export async function POST(request: NextRequest) {
     }
 
     const stripe = new Stripe(stripeSecretKey, { apiVersion: '2026-02-25.clover' });
-    const origin = request.headers.get('origin') || 'http://localhost:3000';
-    // After embedded checkout completes, Stripe redirects to return_url
-    const returnUrl = `${origin}?session_id={CHECKOUT_SESSION_ID}`;
+    // Build return_url from a trusted server-side source, not the client-controlled
+    // origin header (which can be forged to redirect users to an attacker domain).
+    const siteBase = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ?? 'https://leverageai.app';
+    const returnUrl = `${siteBase}?session_id={CHECKOUT_SESSION_ID}`;
 
     const sharedSessionFields = {
       ui_mode: 'embedded' as const,

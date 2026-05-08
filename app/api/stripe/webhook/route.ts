@@ -74,13 +74,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
     }
   } else {
-    // No webhook secret configured — parse raw body (dev/test only)
-    console.warn('[Stripe/Webhook] STRIPE_WEBHOOK_SECRET not set — skipping signature verification');
-    try {
-      event = JSON.parse(body);
-    } catch {
-      return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
-    }
+    // STRIPE_WEBHOOK_SECRET is not configured or no stripe-signature header.
+    // Fail closed — unsigned events are rejected in all environments to prevent
+    // forged webhook events from granting credits or changing subscription tiers.
+    console.error('[Stripe/Webhook] STRIPE_WEBHOOK_SECRET not set or missing stripe-signature header — rejecting request');
+    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 400 });
   }
 
   const supabaseUrl = getSupabaseUrl();

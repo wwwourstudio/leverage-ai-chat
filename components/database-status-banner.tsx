@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Database, AlertCircle, CheckCircle2, ExternalLink, X, Loader2 } from 'lucide-react';
 
 interface DatabaseStatusBannerProps {
@@ -11,9 +11,12 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
   const [status, setStatus] = useState<'checking' | 'connected' | 'missing-schema' | 'error'>('checking');
   const [dismissed, setDismissed] = useState(false);
   const [message, setMessage] = useState('');
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     checkDatabaseStatus();
+    return () => { if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const checkDatabaseStatus = async () => {
@@ -27,9 +30,8 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
         // API route doesn't exist or network error
         setStatus('connected');
         setMessage('Running in client-only mode');
-        setTimeout(() => {
-          setDismissed(true);
-        }, 2000);
+        if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = setTimeout(() => setDismissed(true), 2000);
         return;
       }
 
@@ -42,9 +44,8 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
         setStatus('connected');
         setMessage('Database connected and ready');
         // Auto-dismiss success message after 3 seconds
-        setTimeout(() => {
-          setDismissed(true);
-        }, 3000);
+        if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = setTimeout(() => setDismissed(true), 3000);
       } else {
         setStatus('error');
         setMessage(data.message || 'Unable to connect to database');

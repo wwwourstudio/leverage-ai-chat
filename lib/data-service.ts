@@ -103,6 +103,7 @@ export async function fetchDynamicCards(params: {
   category?: string;
   userContext?: any;
   limit?: number;
+  draftGroupId?: number;
 }): Promise<DynamicCard[]> {
   // Skip if running on server
   if (typeof window === 'undefined') {

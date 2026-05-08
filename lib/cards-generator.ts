@@ -1187,14 +1187,17 @@ async function _generateContextualCards(
   // 'all' has its own mixed-mode block below and must NOT trigger multiSport (betting-only).
   multiSport: boolean = !sport && (!category || category === 'betting'),
   kalshiSubcategory?: string,
-  options?: { playerName?: string; userContext?: string }
+  options?: { playerName?: string; userContext?: string; draftGroupId?: number }
 ): Promise<InsightCard[]> {
   const userContext = options?.userContext;
+  const draftGroupId = options?.draftGroupId;
   // Skip the card-level cache for props — the underlying prop data has its own
   // 15-minute TTL inside fetchPlayerProps, and we need to filter/prioritize
   // cards based on userContext (player name, stat type) on every request.
   const isPropsCategory = category === 'props' || category === 'player_props';
-  if (!isPropsCategory) {
+  // Also skip cache when a specific DK draft group is requested — each slate
+  // produces a different lineup and must not be served from the generic DFS cache.
+  if (!isPropsCategory && !draftGroupId) {
     const cached = getCachedCards(category, sport, count, userContext);
     if (cached && cached.length > 0) {
       logger.debug(LogCategory.CACHE, 'cards_cache_hit', { metadata: { count: cached.length, category, sport } });
@@ -2397,7 +2400,7 @@ async function _generateContextualCards(
         // Full DK MLB slate with Monte Carlo projections — multi-lineup
         const { buildDFSSlateMulti } = await import('@/lib/mlb-projections/slate-builder');
         const multi = await Promise.race([
-          buildDFSSlateMulti({ limit: 9 }),
+          buildDFSSlateMulti({ limit: 9, draftGroupId }),
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 18000)),
         ]);
 

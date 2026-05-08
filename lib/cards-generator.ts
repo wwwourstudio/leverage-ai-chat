@@ -2343,14 +2343,18 @@ async function _generateContextualCards(
               })
               .sort((a, b) => {
                 if (b.score !== a.score) return b.score - a.score;
-                // Stable shuffle for zero-score entries (Fisher-Yates seeded by request time)
-                return Math.random() - 0.5;
+                // Stable tie-break: sort by player name so SSR and client agree
+                return a.prop.playerName.localeCompare(b.prop.playerName);
               })
               .map(x => x.prop);
           } else {
-            // No specific context — shuffle so each request surfaces different props
+            // No specific context — rotate through the prop pool each 15-minute window
+            // using a deterministic seed so SSR and client render the same order.
+            const seed = Math.floor(Date.now() / (15 * 60 * 1000));
+            let s = seed;
+            const lcg = () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0x100000000; };
             for (let i = ranked.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
+              const j = Math.floor(lcg() * (i + 1));
               [ranked[i], ranked[j]] = [ranked[j], ranked[i]];
             }
           }

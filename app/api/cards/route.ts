@@ -7,7 +7,7 @@ import { validateBenford } from '@/lib/benford-validator';
 // into a single generateContextualCards call. Auto-cleaned on promise settle.
 const inflight = new Map<string, Promise<any[]>>();
 
-function buildCardsResponse(cards: any[]): NextResponse {
+function buildCardsResponse(cards: any[], category?: string): NextResponse {
   const allNums = cards.flatMap((c: any) =>
     Object.values(c.data ?? {}).filter((v): v is number => typeof v === 'number')
   );
@@ -17,9 +17,17 @@ function buildCardsResponse(cards: any[]): NextResponse {
     ...c,
     metadata: { ...c.metadata, benfordValid: benford.isValid, benfordScore: Math.round(benford.score * 100) / 100, benfordConfidence: benford.confidence, fetchedAt },
   }));
+  // Props and player-specific queries must not be shared across CDN cache entries —
+  // the CDN cache key is the URL only (not the POST body), so `public, s-maxage`
+  // would serve the same response for every user regardless of their query.
+  // Use `no-store` for props; allow short-lived CDN caching for generic card categories.
+  const isQuerySpecific = category === 'props' || category === 'player_props' || category === 'player';
+  const cacheControl = isQuerySpecific
+    ? 'no-store'
+    : 'public, s-maxage=30, stale-while-revalidate=60';
   return NextResponse.json(
     { success: true, cards: validatedCards, count: validatedCards.length, message: SUCCESS_MESSAGES.CARDS_GENERATED, benfordValidation: { isValid: benford.isValid, score: Math.round(benford.score * 100) / 100, confidence: benford.confidence } },
-    { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } },
+    { headers: { 'Cache-Control': cacheControl } },
   );
 }
 
@@ -33,7 +41,9 @@ export async function POST(request: NextRequest) {
     const { sport, category, limit = 3, userContext } = body;
 
     const clampedLimit = Math.min(Math.max(Number(limit) || 3, 1), 15);
-    const dedupeKey = `${category ?? ''}::${sport ?? ''}::${clampedLimit}`;
+    // Include userContext in dedupeKey — different queries must not coalesce
+    // into one in-flight promise even if category/sport/limit match.
+    const dedupeKey = `${category ?? ''}::${sport ?? ''}::${clampedLimit}::${userContext ?? ''}`;
 
     // Return the in-flight promise if an identical request is already running
     if (inflight.has(dedupeKey)) {
@@ -54,7 +64,7 @@ export async function POST(request: NextRequest) {
     cardPromise.finally(() => inflight.delete(dedupeKey));
 
     const cards = await cardPromise;
-    return buildCardsResponse(cards);
+    return buildCardsResponse(cards, category ?? undefined);
   } catch (error) {
     console.error('[API/cards] Error:', error);
     const msg = error instanceof Error ? error.message : 'Unknown error';

@@ -86,7 +86,13 @@ export class SupabaseOddsService {
 
     if (!client) return false;
 
-    const { error } = await client.rpc('process_odds_batch', { p_payload: games });
+    let error: any;
+    try {
+      ({ error } = await client.rpc('process_odds_batch', { p_payload: games }));
+    } catch (e) {
+      // Network-level failure (e.g. fetch failed) — treat as transient, don't log
+      return false;
+    }
 
     if (error) {
       const msg: string = (error as any).message ?? '';
@@ -94,11 +100,14 @@ export class SupabaseOddsService {
       //   - permission denied (42501) — service key absent
       //   - schema cache miss — process_odds_batch RPC not deployed to this DB
       //   - function not found — same as above, different pg error text
+      //   - fetch failed — transient network error, Supabase temporarily unreachable
       const isSilent = msg.includes('permission')
         || msg.includes('42501')
         || msg.includes('schema cache')
         || msg.includes('Could not find the function')
-        || msg.includes('function') && msg.includes('does not exist');
+        || msg.includes('fetch failed')
+        || msg.includes('network')
+        || (msg.includes('function') && msg.includes('does not exist'));
       if (!isSilent) {
         console.error('[Supabase] process_odds_batch error:', msg);
       }

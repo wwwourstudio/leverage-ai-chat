@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import Image from 'next/image';
-import { Plus, Search, Star, Trash2, MessageSquare, Edit3, CheckCircle, LayoutGrid, TrendingUp, Trophy, Award, BarChart3, UserCircle } from 'lucide-react';
+import { Plus, Search, Star, Trash2, MessageSquare, Edit3, CheckCircle, LayoutGrid, TrendingUp, Trophy, Award, BarChart3, UserCircle, Crosshair, LineChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/utils';
 
@@ -328,6 +328,14 @@ function IconRail({
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Quick-nav icons */}
+      <a href="/picks" title="Daily Picks" className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-[var(--bg-surface)] transition-colors mb-0.5">
+        <Crosshair className="w-4 h-4 text-[var(--text-faint)]" />
+      </a>
+      <a href="/trading" title="Quant Trading" className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-[var(--bg-surface)] transition-colors mb-1">
+        <LineChart className="w-4 h-4 text-[var(--text-faint)]" />
+      </a>
 
       {/* User avatar */}
       {user && (
@@ -716,6 +724,26 @@ export function Sidebar({
                 )}
               </div>
             )}
+          </div>
+
+          {/* ── Quick-nav footer ───────────────────────────────────────────── */}
+          <div className="flex-shrink-0 border-t border-[var(--border-subtle)] px-2 py-2 flex gap-1">
+            <a
+              href="/picks"
+              className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-[10px] font-semibold text-[var(--text-faint)] hover:text-[var(--text-body)] hover:bg-[var(--bg-surface)] transition-colors"
+              title="Daily MLB Picks"
+            >
+              <Crosshair className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>Daily Picks</span>
+            </a>
+            <a
+              href="/trading"
+              className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-[10px] font-semibold text-[var(--text-faint)] hover:text-[var(--text-body)] hover:bg-[var(--bg-surface)] transition-colors"
+              title="Quantitative Trading"
+            >
+              <LineChart className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>Quant Trading</span>
+            </a>
           </div>
         </div>
     </div>

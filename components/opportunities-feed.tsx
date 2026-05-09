@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Zap, Target, Clock, Filter, RefreshCw } from 'lucide-react';
+import { Zap, Target, Clock, Filter, RefreshCw, AlertCircle } from 'lucide-react';
 import { useRealtimeSubscription } from '@/lib/hooks/use-realtime';
 import { LineMovementChart } from './line-movement-chart';
 
@@ -25,6 +25,7 @@ interface Opportunity {
 export function OpportunitiesFeed() {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'arbitrage' | 'value_bet' | 'sharp_move' | 'player_prop'>('all');
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
 
@@ -158,8 +159,10 @@ export function OpportunitiesFeed() {
       // Sort by created_at
       allOpps.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setOpportunities(allOpps);
-    } catch (error) {
-      console.error('[OpportunitiesFeed] Error:', error);
+      setError(null);
+    } catch (err) {
+      console.error('[OpportunitiesFeed] Error:', err);
+      setError('Failed to load opportunities. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -238,8 +241,38 @@ export function OpportunitiesFeed() {
           {/* Feed Column */}
           <div className="lg:col-span-2 space-y-4">
             {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+              <div className="space-y-4" aria-busy="true" aria-label="Loading opportunities">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6 animate-pulse">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className="h-5 w-20 rounded-full bg-[var(--bg-elevated)]" />
+                          <div className="h-4 w-12 rounded-full bg-[var(--bg-elevated)]" />
+                        </div>
+                        <div className="h-5 w-48 rounded bg-[var(--bg-elevated)]" />
+                        <div className="h-4 w-64 rounded bg-[var(--bg-elevated)]" />
+                        <div className="flex gap-4">
+                          <div className="h-4 w-32 rounded bg-[var(--bg-elevated)]" />
+                          <div className="h-4 w-20 rounded bg-[var(--bg-elevated)]" />
+                        </div>
+                      </div>
+                      <div className="ml-4 h-16 w-16 rounded-lg bg-[var(--bg-elevated)]" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-12 text-center rounded-2xl border border-red-500/30 bg-red-500/10 p-8" role="alert">
+                <AlertCircle className="h-8 w-8 text-red-400" />
+                <p className="text-sm font-medium text-red-400">{error}</p>
+                <button
+                  onClick={fetchOpportunities}
+                  className="mt-1 inline-flex items-center gap-2 rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-500/30 transition-colors"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Try again
+                </button>
               </div>
             ) : filteredOpportunities.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -253,7 +286,7 @@ export function OpportunitiesFeed() {
               filteredOpportunities.map((opp: Opportunity, i: number) => (
                 <div
                   key={opp.id}
-                  className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6 transition-all hover:border-blue-500/40 cursor-pointer animate-fade-in-up"
+                  className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6 transition-all hover:border-blue-500/40 cursor-pointer animate-fade-in-up"
                   style={{ animationDelay: `${i * 60}ms` }}
                   onClick={() => setSelectedGame(opp.event)}
                 >
@@ -325,7 +358,7 @@ export function OpportunitiesFeed() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Stats Card */}
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6">
+            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6">
               <h3 className="text-lg font-semibold text-foreground">Today's Summary</h3>
               <div className="mt-4 space-y-4">
                 <div className="flex items-center justify-between">

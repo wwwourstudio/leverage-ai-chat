@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode, memo } from 'react';
-import { LucideIcon, AlertCircle, Loader2, ChevronRight, FlaskConical } from 'lucide-react';
+import { LucideIcon, AlertCircle, ChevronRight, FlaskConical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface StatusBadge {
@@ -45,11 +45,28 @@ function ErrorState({ error, className }: { error: string; className?: string })
 
 function LoadingState({ className }: { className?: string }) {
   return (
-    <div className={cn('relative rounded-2xl p-6 border bg-background border-[var(--border-subtle)]', className)} role="status" aria-live="polite">
-      <div className="flex items-center justify-center gap-3 text-[var(--text-muted)]">
-        <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
-        <span className="text-sm font-medium">Loading data...</span>
+    <div className={cn('relative rounded-2xl overflow-hidden border bg-background border-[var(--border-subtle)] animate-pulse', className)} role="status" aria-label="Loading card data">
+      {/* Accent bar */}
+      <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--bg-elevated)]" />
+      <div className="pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5 space-y-4">
+        {/* Header row */}
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[var(--bg-elevated)] shrink-0" />
+          <div className="flex-1 space-y-2">
+            <div className="h-2.5 w-24 rounded-full bg-[var(--bg-elevated)]" />
+            <div className="h-4 w-40 rounded bg-[var(--bg-elevated)]" />
+          </div>
+          <div className="h-5 w-16 rounded-full bg-[var(--bg-elevated)]" />
+        </div>
+        {/* Data rows */}
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="flex items-center justify-between py-1">
+            <div className="h-3 rounded-full bg-[var(--bg-elevated)]" style={{ width: `${45 + i * 10}%` }} />
+            <div className="h-3 w-12 rounded-full bg-[var(--bg-elevated)]" />
+          </div>
+        ))}
       </div>
+      <span className="sr-only">Loading...</span>
     </div>
   );
 }

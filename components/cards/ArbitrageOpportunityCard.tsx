@@ -1,5 +1,7 @@
 'use client';
 
+import { formatAmericanOdds } from '@/lib/utils';
+
 export interface ArbitrageOpportunity {
   event: string;
   sport?: string;
@@ -22,9 +24,6 @@ interface ArbitrageOpportunityCardProps {
   onAsk?: (query: string) => void;
 }
 
-function formatOdds(price: number): string {
-  return price >= 0 ? `+${price}` : `${price}`;
-}
 
 export function ArbitrageOpportunityCard({ opportunity: opp, onAsk }: ArbitrageOpportunityCardProps) {
   const edge = opp.profitPercentage ?? opp.edge ?? 0;
@@ -65,7 +64,7 @@ export function ArbitrageOpportunityCard({ opportunity: opp, onAsk }: ArbitrageO
             >
               <span className="text-[11px] text-white/70 truncate flex-1">{s.name}</span>
               <span className="text-[11px] font-bold text-violet-400 tabular-nums mx-3">
-                {formatOdds(s.price)}
+                {formatAmericanOdds(s.price)}
               </span>
               <span className="text-[10px] text-[var(--text-faint)]">{s.book}</span>
             </div>

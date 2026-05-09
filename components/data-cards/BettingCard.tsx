@@ -1,1183 +1,26 @@
 'use client';
 
-import { memo, useState, useCallback, useEffect } from 'react';
-import Image from 'next/image';
-import {
-  Clock, TrendingUp, TrendingDown, Minus,
-  ChevronRight, Zap, Shield, AlertTriangle, Wind, BookOpen,
-  Users, Eye, Bookmark,
-} from 'lucide-react';
+import { memo, useState, useEffect } from 'react';
+import { Clock, TrendingUp, TrendingDown, Minus, ChevronRight, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PlayerAvatar } from './PlayerAvatar';
-import { getPlayerHeadshotUrl, getTeamLogoUrl } from '@/lib/constants';
+import { getPlayerHeadshotUrl } from '@/lib/constants';
+
+import type { BettingCardProps } from './betting/betting-utils';
+import {
+  parseTeams, fmtML, parseSpread, parseOU, sportTheme,
+  calcVig, sportFromCategory, formatMarket, abbr, impliedProb,
+} from './betting/betting-utils';
+import { TeamLogo, SplitBar, TabBar } from './betting/betting-shared';
+import { TabOdds }     from './betting/TabOdds';
+import { TabProps }    from './betting/TabProps';
+import { TabTeams }    from './betting/TabTeams';
+import { TabHistory }  from './betting/TabHistory';
+import { TabInjuries } from './betting/TabInjuries';
+import { TabWatch }    from './betting/TabWatch';
+
+export type { BettingCardProps };
 
-function formatMarket(key: string): string {
-  const m: Record<string, string> = {
-    batter_home_runs: 'Home Runs', batter_hits: 'Hits', batter_rbis: 'RBIs',
-    batter_total_bases: 'Total Bases', batter_strikeouts: 'Strikeouts',
-    batter_runs_scored: 'Runs Scored', batter_stolen_bases: 'Stolen Bases',
-    pitcher_strikeouts: 'Ks (Pitcher)', pitcher_hits_allowed: 'Hits Allowed',
-    pitcher_earned_runs: 'Earned Runs', pitcher_walks: 'Walks (P)',
-    player_points: 'Points', player_rebounds: 'Rebounds', player_assists: 'Assists',
-    player_threes: '3-Pointers', player_blocks: 'Blocks', player_steals: 'Steals',
-    player_pass_tds: 'Pass TDs', player_pass_yds: 'Pass Yards',
-    player_rush_yds: 'Rush Yards', player_receptions: 'Receptions',
-    player_reception_yds: 'Rec Yards', player_anytime_td: 'Anytime TD',
-  };
-  return m[key] ?? key.replace(/^(batter_|pitcher_|player_)/, '').replace(/_/g, ' ');
-}
-
-function sportFromCategory(cat: string): string | null {
-  const c = cat.toLowerCase();
-  if (c.includes('mlb') || c.includes('baseball')) return 'baseball_mlb';
-  if (c.includes('nba') || c.includes('basketball')) return 'basketball_nba';
-  if (c.includes('nfl') || c.includes('football')) return 'americanfootball_nfl';
-  if (c.includes('nhl') || c.includes('hockey')) return 'icehockey_nhl';
-  return null;
-}
-
-interface BookEntry {
-  name: string;
-  homeOdds: string | null;
-  awayOdds: string | null;
-}
-
-interface BettingCardData {
-  matchup?: string;
-  game?: string;
-  team?: string;
-  finalScore?: string;
-  homeOdds?: string;
-  awayOdds?: string;
-  homeSpread?: string;
-  awaySpread?: string;
-  overUnder?: string;
-  bestLine?: string;
-  line?: string;
-  over?: string;
-  under?: string;
-  odds?: string;
-  book?: string;
-  bookmaker?: string;
-  bookmakerCount?: number | string;
-  /** Top 3 bookmakers with H2H ML odds for side-by-side comparison */
-  books?: BookEntry[];
-  /** Best available home moneyline across all books */
-  bestHomeOdds?: string;
-  /** Best available away moneyline across all books */
-  bestAwayOdds?: string;
-  edge?: string;
-  impliedWin?: string;
-  impliedProb?: string;
-  movement?: string;
-  confidence?: number | string;
-  marketEfficiency?: string;
-  recommendation?: string;
-  gameTime?: string;
-  player?: string;
-  stat?: string;
-  lineChange?: string;
-  lineMove?: string;
-  openLine?: string;
-  oldLine?: string;
-  newLine?: string;
-  direction?: string;
-  sharpMoney?: string;
-  sharpPct?: number | string;
-  timestamp?: string;
-  kellyFraction?: string;
-  recommendedStake?: string;
-  expectedValue?: string;
-  description?: string;
-  note?: string;
-  sport?: string;
-  status?: string;
-  realData?: boolean;
-  atsRecord?: string;
-  h2hRecord?: string;
-  homeRecord?: string;
-  awayRecord?: string;
-  injuryAlert?: string;
-  weatherNote?: string;
-  playerPhotoUrl?: string;
-  [key: string]: any;
-}
-
-interface BettingCardProps {
-  type: string;
-  title: string;
-  category: string;
-  subcategory: string;
-  gradient: string;
-  data: BettingCardData;
-  status: string;
-  onAnalyze?: () => void;
-  onAsk?: (query: string) => void;
-  isLoading?: boolean;
-  error?: string;
-  isHero?: boolean;
-}
-
-function parseTeams(matchup?: string): { away: string; home: string } | null {
-  if (!matchup) return null;
-  const atIdx = matchup.indexOf(' @ ');
-  if (atIdx >= 0) return { away: matchup.slice(0, atIdx).trim(), home: matchup.slice(atIdx + 3).trim() };
-  const vsMatch = matchup.match(/^(.+?)\s+vs\.?\s+(.+)$/i);
-  if (vsMatch) return { away: vsMatch[1].trim(), home: vsMatch[2].trim() };
-  return null;
-}
-
-function abbr(name: string): string {
-  const words = name.trim().split(/\s+/);
-  if (words.length === 1) return name.slice(0, 3).toUpperCase();
-  return words[words.length - 1].slice(0, 3).toUpperCase();
-}
-
-function fmtML(val?: string): { display: string; positive: boolean } | null {
-  if (!val || val === 'N/A' || val === '—') return null;
-  const n = Number(val);
-  if (isNaN(n)) return { display: val, positive: false };
-  return { display: n > 0 ? `+${n}` : String(n), positive: n > 0 };
-}
-
-function parseOU(raw?: string): { total: string; overJ?: string; underJ?: string } | null {
-  if (!raw || raw === 'N/A') return null;
-  const full = raw.match(/O\/U\s*([\d.]+)(?::\s*Over\s*([+-]?\d+)\s*\/\s*Under\s*([+-]?\d+))?/i);
-  if (full) return { total: full[1], overJ: full[2], underJ: full[3] };
-  const num = raw.match(/([\d.]+)/);
-  return num ? { total: num[1] } : null;
-}
-
-function parseSpread(raw?: string): { pts: string; juice?: string } | null {
-  if (!raw || raw === 'N/A') return null;
-  const m = raw.match(/([+-]?[\d.]+)\s*(?:\(([^)]+)\))?/);
-  return m ? { pts: m[1], juice: m[2] } : null;
-}
-
-function impliedProb(ml?: string): number | null {
-  const n = Number(ml);
-  if (!ml || isNaN(n)) return null;
-  return n < 0 ? Math.round((-n / (-n + 100)) * 100) : Math.round((100 / (n + 100)) * 100);
-}
-
-/** Calculate bookmaker overround (vig) as a percentage */
-function calcVig(homeML?: string, awayML?: string): number | null {
-  const h = impliedProb(homeML);
-  const a = impliedProb(awayML);
-  if (h === null || a === null) return null;
-  return Math.round((h + a - 100) * 10) / 10;
-}
-
-/** Maps sport strings to the CSS custom property holding that sport's accent color. */
-const SPORT_VAR: Record<string, string> = {
-  basketball: '--sport-basketball',
-  hockey:     '--sport-hockey',
-  baseball:   '--sport-baseball',
-  football:   '--sport-football',
-  soccer:     '--sport-soccer',
-};
-
-function getSportVar(sport?: string): string {
-  if (!sport) return '--sport-default';
-  const s = sport.toLowerCase();
-  for (const [key, val] of Object.entries(SPORT_VAR)) {
-    if (s.includes(key)) return val;
-  }
-  return '--sport-default';
-}
-
-/** Sport-specific gradient + accent colours, using CSS custom properties for colors. */
-function sportTheme(sport?: string): {
-  headerGrad: string;
-  accentColor: string;
-  avatarCls: string;
-  probBarColor: string;
-  sportVar: string;
-} {
-  const sportVar = getSportVar(sport);
-  if (sport?.includes('basketball')) return {
-    headerGrad: 'from-orange-600/80 via-amber-700/60 to-orange-900/40',
-    accentColor: `text-[color:var(${sportVar})]`,
-    avatarCls: `bg-[color:var(${sportVar})]/15 text-[color:var(${sportVar})] border-[color:var(${sportVar})]/30`,
-    probBarColor: 'from-orange-500 to-amber-400',
-    sportVar,
-  };
-  if (sport?.includes('hockey')) return {
-    headerGrad: 'from-sky-600/80 via-blue-700/60 to-sky-900/40',
-    accentColor: `text-[color:var(${sportVar})]`,
-    avatarCls: `bg-[color:var(${sportVar})]/15 text-[color:var(${sportVar})] border-[color:var(${sportVar})]/30`,
-    probBarColor: 'from-sky-500 to-blue-400',
-    sportVar,
-  };
-  if (sport?.includes('baseball')) return {
-    headerGrad: 'from-indigo-600/80 via-violet-700/60 to-indigo-900/40',
-    accentColor: `text-[color:var(${sportVar})]`,
-    avatarCls: `bg-[color:var(${sportVar})]/15 text-[color:var(${sportVar})] border-[color:var(${sportVar})]/30`,
-    probBarColor: 'from-indigo-500 to-violet-400',
-    sportVar,
-  };
-  // NFL / soccer / default → green
-  return {
-    headerGrad: 'from-green-600/80 via-emerald-700/60 to-green-900/40',
-    accentColor: `text-[color:var(${sportVar})]`,
-    avatarCls: `bg-[color:var(${sportVar})]/15 text-[color:var(${sportVar})] border-[color:var(${sportVar})]/30`,
-    probBarColor: 'from-green-500 to-emerald-400',
-    sportVar,
-  };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TeamLogo
-// ─────────────────────────────────────────────────────────────────────────────
-function TeamLogo({
-  name, sport, avatarCls, isLarge,
-}: {
-  name: string; sport?: string; avatarCls: string; isLarge?: boolean;
-}) {
-  const [imgFailed, setImgFailed] = useState(false);
-  const logoUrl = getTeamLogoUrl(name, sport);
-  const sz = isLarge ? 'w-14 h-14' : 'w-11 h-11';
-  const txtSz = isLarge ? 'text-sm' : 'text-[11px]';
-
-  if (logoUrl && !imgFailed) {
-    return (
-      <div className={cn('rounded-xl overflow-hidden flex items-center justify-center shrink-0 bg-[var(--bg-elevated)]', sz)}>
-        <Image src={logoUrl} alt={name} width={isLarge ? 56 : 44} height={isLarge ? 56 : 44} className="w-full h-full object-contain p-1 drop-shadow" onError={() => setImgFailed(true)} />
-      </div>
-    );
-  }
-  return (
-    <div className={cn('rounded-xl border flex items-center justify-center shrink-0 font-black', sz, txtSz, avatarCls)}>
-      {abbr(name)}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SplitBar — two-sided bar for win probability or sharp money split
-// ─────────────────────────────────────────────────────────────────────────────
-function SplitBar({ leftPct, leftLabel, rightLabel, leftColor, rightColor }: {
-  leftPct: number; leftLabel: string; rightLabel: string; leftColor: string; rightColor: string;
-}) {
-  return (
-    <div className="space-y-1">
-      <div className="relative h-2.5 rounded-full overflow-hidden bg-[var(--bg-elevated)] flex">
-        <div className={cn('h-full transition-all duration-700', leftColor)} style={{ width: `${leftPct}%` }} />
-        <div className={cn('h-full flex-1', rightColor)} />
-      </div>
-      <div className="flex justify-between text-[10px] font-semibold text-[var(--text-faint)]">
-        <span>{leftLabel} {leftPct}%</span>
-        <span>{100 - leftPct}% {rightLabel}</span>
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// OddsCell
-// ─────────────────────────────────────────────────────────────────────────────
-function OddsCell({ label, value, sub, positive, highlight, isBest }: {
-  label: string; value: string; sub?: string; positive?: boolean; highlight?: boolean; isBest?: boolean;
-}) {
-  return (
-    <div className={cn(
-      'flex flex-col items-center gap-0.5 px-2 py-2.5 rounded-xl border',
-      positive === true
-        ? 'bg-emerald-500/8 border-emerald-500/25'
-        : positive === false
-        ? 'bg-red-500/8 border-red-500/20'
-        : isBest
-        ? 'bg-emerald-500/8 border-emerald-500/25'
-        : highlight
-        ? 'bg-blue-500/10 border-blue-500/20'
-        : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)]',
-    )}>
-      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{label}</span>
-      <span className={cn('text-lg font-black tabular-nums',
-        positive === true ? 'text-emerald-400' :
-        positive === false ? 'text-red-400' :
-        'text-foreground'
-      )}>{value}</span>
-      {sub && <span className="text-[10px] text-[var(--text-muted)]">{sub}</span>}
-      {isBest && <span className="text-[7px] font-black text-emerald-500 uppercase tracking-wider">BEST</span>}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// BookComparisonRow — side-by-side ML odds from top 3 bookmakers
-// ─────────────────────────────────────────────────────────────────────────────
-function BookComparisonRow({
-  books,
-  homeTeam,
-  awayTeam,
-  bestHomeOdds,
-  bestAwayOdds,
-}: {
-  books: BookEntry[];
-  homeTeam?: string;
-  awayTeam?: string;
-  bestHomeOdds?: string;
-  bestAwayOdds?: string;
-}) {
-  if (!books || books.length < 2) return null;
-
-  // Shorten book names for compact display
-  const shortName = (name: string) =>
-    name
-      .replace(' Sportsbook', '')
-      .replace(' BET', '')
-      .replace('DraftKings', 'DK')
-      .replace('FanDuel', 'FD')
-      .replace('BetMGM', 'MGM')
-      .replace('Caesars', 'CZR')
-      .replace('PointsBet', 'PB')
-      .replace('BetRivers', 'BR')
-      .replace('ESPN BET', 'ESPN')
-      .replace('bet365', '365');
-
-  const cols = books.length;
-
-  return (
-    <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-1.5 px-3 pt-2 pb-1.5">
-        <BookOpen className="w-3 h-3 text-[var(--text-muted)]" />
-        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Odds Comparison</span>
-        <span className="ml-auto text-[10px] text-[var(--text-faint)]">ML</span>
-      </div>
-
-      {/* Column headers */}
-      <div
-        className="grid px-3 pb-1"
-        style={{ gridTemplateColumns: `1fr repeat(${cols}, minmax(0, 1fr))` }}
-      >
-        <span />
-        {books.map((b) => (
-          <span
-            key={b.name}
-            className="text-[10px] font-bold text-[var(--text-muted)] text-center truncate"
-          >
-            {shortName(b.name)}
-          </span>
-        ))}
-      </div>
-
-      {/* Away team row */}
-      {awayTeam && (
-        <div
-          className="grid px-3 py-1.5 border-t border-[var(--border-subtle)]"
-          style={{ gridTemplateColumns: `1fr repeat(${cols}, minmax(0, 1fr))` }}
-        >
-          <span className="text-[10px] font-semibold text-[var(--text-muted)] truncate self-center">
-            {awayTeam.split(' ').slice(-1)[0]}
-          </span>
-          {books.map((b) => {
-            const isBest = b.awayOdds !== null && b.awayOdds === bestAwayOdds;
-            const n = b.awayOdds ? parseFloat(b.awayOdds) : NaN;
-            return (
-              <span
-                key={b.name}
-                className={cn(
-                  'text-[11px] font-black tabular-nums text-center self-center',
-                  !b.awayOdds ? 'text-[var(--text-faint)]'
-                    : n > 0 ? 'text-emerald-400'
-                    : 'text-foreground',
-                  isBest && 'text-emerald-300',
-                )}
-              >
-                {b.awayOdds ?? '—'}
-                {isBest && <span className="text-[10px] ml-0.5 text-emerald-500">★</span>}
-              </span>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Home team row */}
-      {homeTeam && (
-        <div
-          className="grid px-3 py-1.5 border-t border-[var(--border-subtle)]"
-          style={{ gridTemplateColumns: `1fr repeat(${cols}, minmax(0, 1fr))` }}
-        >
-          <span className="text-[10px] font-semibold text-[var(--text-muted)] truncate self-center">
-            {homeTeam.split(' ').slice(-1)[0]}
-          </span>
-          {books.map((b) => {
-            const isBest = b.homeOdds !== null && b.homeOdds === bestHomeOdds;
-            const n = b.homeOdds ? parseFloat(b.homeOdds) : NaN;
-            return (
-              <span
-                key={b.name}
-                className={cn(
-                  'text-[11px] font-black tabular-nums text-center self-center',
-                  !b.homeOdds ? 'text-[var(--text-faint)]'
-                    : n > 0 ? 'text-emerald-400'
-                    : 'text-foreground',
-                  isBest && 'text-emerald-300',
-                )}
-              >
-                {b.homeOdds ?? '—'}
-                {isBest && <span className="text-[10px] ml-0.5 text-emerald-500">★</span>}
-              </span>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TabBar
-// ─────────────────────────────────────────────────────────────────────────────
-function TabBar({ activeTab, onSelect, accentCls }: {
-  activeTab: number; onSelect: (i: number) => void; accentCls: string;
-}) {
-  const tabs = ['Odds', 'Props', 'Teams', 'History', 'Injuries', 'Watch'];
-  return (
-    <div className="relative">
-      <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
-      <div className="flex overflow-x-auto gap-1 py-1 pr-8" style={{ scrollbarWidth: 'none' }}>
-        {tabs.map((tab, i) => (
-          <button
-            key={tab}
-            onClick={() => onSelect(i)}
-            className={cn(
-              'px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 border transition-all duration-150',
-              activeTab === i
-                ? accentCls
-                : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-muted)]',
-            )}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TabOdds — existing market data (Tab 1)
-// ─────────────────────────────────────────────────────────────────────────────
-function TabOdds({
-  data, teams, isFinal, isExtremeOdds, hasBookComparison, books,
-  spreadHome, spreadAway, ou, hasOdds,
-  isBestHome, isBestAway, awayML, homeML,
-  confPct, sharpPct, hasLineMove, moveDir, moveNum, rawMove, vigPct,
-  marketView, setMarketView, accentCls,
-}: {
-  data: BettingCardData;
-  teams: { away: string; home: string } | null;
-  isFinal: boolean;
-  isExtremeOdds: boolean;
-  hasBookComparison: boolean;
-  books: BookEntry[];
-  spreadHome: { pts: string; juice?: string } | null;
-  spreadAway: { pts: string; juice?: string } | null;
-  ou: { total: string; overJ?: string; underJ?: string } | null;
-  hasOdds: boolean;
-  isBestHome: boolean;
-  isBestAway: boolean;
-  awayML: { display: string; positive: boolean } | null;
-  homeML: { display: string; positive: boolean } | null;
-  confPct: number | null;
-  sharpPct: number | null;
-  hasLineMove: boolean;
-  moveDir: 'up' | 'down' | 'flat';
-  moveNum: number;
-  rawMove: string;
-  vigPct: number | null;
-  marketView: 'ml' | 'spread' | 'total';
-  setMarketView: (v: 'ml' | 'spread' | 'total') => void;
-  accentCls: string;
-}) {
-  const hasSpread = !!(spreadHome || spreadAway);
-  const hasTotal  = !!ou;
-
-  // Market view pills: show only when we have spread or total data to switch to
-  const showPills = !isFinal && (hasSpread || hasTotal);
-
-  return (
-    <div className="space-y-3">
-      {/* ── Market view pills: [Moneyline] [Spread] [Total] ─── */}
-      {showPills && (
-        <div className="flex gap-1">
-          {(['ml', 'spread', 'total'] as const)
-            .filter(v => v === 'ml' || (v === 'spread' && hasSpread) || (v === 'total' && hasTotal))
-            .map(v => (
-              <button
-                key={v}
-                onClick={() => setMarketView(v)}
-                className={cn(
-                  'px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border transition-all duration-150',
-                  marketView === v
-                    ? accentCls
-                    : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-muted)]',
-                )}
-              >
-                {v === 'ml' ? 'Moneyline' : v === 'spread' ? 'Spread' : 'Total'}
-              </button>
-            ))}
-        </div>
-      )}
-
-      {/* Book comparison — only in Moneyline view */}
-      {marketView === 'ml' && !isFinal && hasBookComparison && teams && (
-        <BookComparisonRow
-          books={books}
-          homeTeam={teams.home}
-          awayTeam={teams.away}
-          bestHomeOdds={data.bestHomeOdds}
-          bestAwayOdds={data.bestAwayOdds}
-        />
-      )}
-
-      {/* Value edge indicator — only in Moneyline view */}
-      {marketView === 'ml' && data.edge && (() => {
-        const edgeNum = parseFloat(String(data.edge).replace(/[^0-9.-]/g, ''));
-        if (isNaN(edgeNum) || edgeNum < 2) return null;
-        return (
-          <div className={cn(
-            'flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-bold',
-            edgeNum >= 5
-              ? 'bg-emerald-500/10 border border-emerald-500/25 text-emerald-300'
-              : 'bg-amber-500/10 border border-amber-500/25 text-amber-300',
-          )}>
-            <Zap className="w-3.5 h-3.5 shrink-0" />
-            <span className="flex-1">{edgeNum >= 5 ? 'Strong edge detected' : 'Potential value'} — {data.edge} edge vs market</span>
-          </div>
-        );
-      })()}
-
-      {/* Odds grid — filtered by market view */}
-      {hasOdds && !isFinal && !isExtremeOdds && (
-        <div className="grid grid-cols-2 gap-1.5">
-          {/* Moneyline view */}
-          {marketView === 'ml' && awayML && (
-            <OddsCell label={teams ? abbr(teams.away) : 'Away'} value={awayML.display} positive={awayML.positive} isBest={isBestAway} />
-          )}
-          {marketView === 'ml' && homeML && (
-            <OddsCell label={teams ? abbr(teams.home) : 'Home'} value={homeML.display} positive={homeML.positive} isBest={isBestHome} />
-          )}
-
-          {/* Spread view */}
-          {marketView === 'spread' && spreadAway && (
-            <OddsCell
-              label={teams ? `${abbr(teams.away)} SPREAD` : 'Away Spread'}
-              value={spreadAway.pts}
-              sub={spreadAway.juice ? `juice ${spreadAway.juice}` : undefined}
-              positive={spreadAway.pts?.startsWith('+') ? true : spreadAway.pts?.startsWith('-') ? false : undefined}
-            />
-          )}
-          {marketView === 'spread' && spreadHome && (
-            <OddsCell
-              label={teams ? `${abbr(teams.home)} SPREAD` : 'Home Spread'}
-              value={spreadHome.pts}
-              sub={spreadHome.juice ? `juice ${spreadHome.juice}` : undefined}
-              positive={spreadHome.pts?.startsWith('+') ? true : spreadHome.pts?.startsWith('-') ? false : undefined}
-            />
-          )}
-
-          {/* Total view — spans both columns */}
-          {marketView === 'total' && ou && (
-            <div className="col-span-2">
-              <OddsCell
-                label="TOTAL O/U"
-                value={ou.total}
-                sub={ou.overJ ? `O ${ou.overJ} · U ${ou.underJ ?? '—'}` : undefined}
-                highlight
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Market Intelligence panel — only in Moneyline view */}
-      {marketView === 'ml' && (confPct !== null || sharpPct !== null || hasLineMove || vigPct !== null) && (
-        <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] p-3 space-y-2.5">
-          <div className="flex items-center gap-1.5">
-            <Zap className="w-3 h-3 text-amber-400" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Market Intelligence</span>
-          </div>
-
-          {confPct !== null && (
-            <div className="space-y-1">
-              <div className="flex justify-between text-[10px] font-semibold text-[var(--text-muted)]">
-                <span>Model Confidence</span>
-                <span className={cn(
-                  confPct >= 70 ? 'text-emerald-400' : confPct >= 50 ? 'text-blue-400' : 'text-amber-400'
-                )}>{Math.round(confPct)}%</span>
-              </div>
-              <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-                <div
-                  className={cn('h-full rounded-full transition-all duration-700',
-                    confPct >= 70 ? 'bg-emerald-400' : confPct >= 50 ? 'bg-blue-400' : 'bg-amber-400'
-                  )}
-                  style={{ width: `${Math.min(100, confPct)}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {sharpPct !== null && (
-            <div className="space-y-1">
-              <div className="flex justify-between text-[10px] font-semibold text-[var(--text-muted)]">
-                <span>Sharp Money</span>
-                <span className={cn(sharpPct >= 60 ? 'text-purple-400' : 'text-[var(--text-faint)]')}>{Math.round(sharpPct)}%</span>
-              </div>
-              <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-purple-500 to-violet-400 transition-all duration-700"
-                  style={{ width: `${Math.min(100, sharpPct)}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {hasLineMove && (
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Line Movement</span>
-              <span className={cn(
-                'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border',
-                moveDir === 'up' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                : moveDir === 'down' ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                : 'bg-[var(--bg-elevated)] text-[var(--text-faint)] border-[var(--border-subtle)]',
-              )}>
-                {moveDir === 'up' ? <TrendingUp className="w-2.5 h-2.5" /> : moveDir === 'down' ? <TrendingDown className="w-2.5 h-2.5" /> : <Minus className="w-2.5 h-2.5" />}
-                {!isNaN(moveNum) && moveNum !== 0 ? (moveNum > 0 ? `+${moveNum}` : String(moveNum)) : String(rawMove)}
-              </span>
-            </div>
-          )}
-
-          {sharpPct !== null && sharpPct >= 60 && hasLineMove && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/8 border border-amber-500/20">
-              <Zap className="w-3 h-3 text-amber-400 shrink-0" />
-              <span className="text-[10px] font-bold text-amber-300">Reverse Line Movement</span>
-              <span className="text-[10px] text-amber-400/70 ml-0.5">— sharp action against public</span>
-            </div>
-          )}
-
-          {vigPct !== null && vigPct > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Book Vig</span>
-              <span className={cn(
-                'text-[10px] font-bold',
-                vigPct > 5 ? 'text-red-400' : vigPct > 3 ? 'text-amber-400' : 'text-emerald-400',
-              )}>
-                {vigPct}%
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Weather note */}
-      {data.weatherNote && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-sky-500/6 border border-sky-500/20">
-          <Wind className="w-3 h-3 text-sky-400 shrink-0" />
-          <span className="text-[10px] text-sky-300 leading-relaxed">{data.weatherNote}</span>
-        </div>
-      )}
-
-      {/* Recommendation */}
-      {data.recommendation && (
-        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
-          <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
-          <p className="text-xs text-[var(--text-muted)] leading-relaxed">{data.recommendation}</p>
-        </div>
-      )}
-
-      {/* Description / AI analysis */}
-      {data.description && (
-        <p className="text-[11px] text-[var(--text-faint)] leading-relaxed px-1">{data.description}</p>
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TabProps — player props (Tab 2)
-// ─────────────────────────────────────────────────────────────────────────────
-function TabProps({ data, onAnalyze, onAsk, loading = false }: { data: BettingCardData; onAnalyze?: () => void; onAsk?: (q: string) => void; loading?: boolean }) {
-  const props = Array.isArray(data.playerProps) ? data.playerProps : [];
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="w-5 h-5 rounded-full border-2 border-[var(--border-subtle)] border-t-white/60 animate-spin" />
-      </div>
-    );
-  }
-  if (props.length === 0) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-6 text-center">
-        <Users className="w-8 h-8 text-[var(--text-faint)]" />
-        <p className="text-[11px] text-[var(--text-muted)]">No prop data available for this game</p>
-        {onAnalyze && (
-          <button
-            onClick={onAnalyze}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)] hover:text-foreground hover:border-[var(--border-hover)] transition-all"
-          >
-            Ask AI about player props for this game →
-          </button>
-        )}
-      </div>
-    );
-  }
-  return (
-    <div className="space-y-1.5">
-      {props.map((p: any, i: number) => {
-        const oddsNum = parseFloat(p.odds);
-        const hitRate = parseFloat(p.hitRate);
-        const handleClick = onAsk
-          ? () => onAsk(`Show me the prop card for ${p.player} ${p.stat} ${p.line} — analysis, hit rate, and betting value`)
-          : undefined;
-        return (
-          <div
-            key={i}
-            onClick={handleClick}
-            className={cn(
-              'flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] transition-colors',
-              handleClick && 'cursor-pointer hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] active:scale-[0.99]',
-            )}
-          >
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-black text-foreground truncate">{p.player}</p>
-              <p className="text-[10px] text-[var(--text-muted)] truncate">{p.team} · {p.stat}</p>
-            </div>
-            <span className="text-[11px] font-bold text-[var(--text-faint)] tabular-nums shrink-0">{p.line}</span>
-            {p.odds && (
-              <span className={cn(
-                'px-2 py-0.5 rounded-full text-[10px] font-black border shrink-0',
-                !isNaN(oddsNum) && oddsNum > 0
-                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25'
-                  : 'bg-red-500/10 text-red-300 border-red-500/25',
-              )}>
-                {!isNaN(oddsNum) && oddsNum > 0 ? `+${p.odds}` : p.odds}
-              </span>
-            )}
-            {p.hitRate != null && (
-              <span className={cn(
-                'text-[10px] font-black tabular-nums shrink-0',
-                !isNaN(hitRate) && hitRate >= 65 ? 'text-emerald-400'
-                : !isNaN(hitRate) && hitRate <= 35 ? 'text-red-400'
-                : 'text-white/70',
-              )}>
-                {p.hitRate}%
-              </span>
-            )}
-            {handleClick && <ChevronRight className="w-3 h-3 text-[var(--text-faint)] shrink-0" />}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TabTeams — team comparison (Tab 3)
-// ─────────────────────────────────────────────────────────────────────────────
-function TabSpinner() {
-  return (
-    <div className="flex items-center justify-center py-8">
-      <div className="w-5 h-5 rounded-full border-2 border-[var(--border-subtle)] border-t-white/60 animate-spin" />
-    </div>
-  );
-}
-
-function TabTeams({ data, teams, theme, onAnalyze, onAsk, loading = false }: {
-  data: BettingCardData;
-  teams: { away: string; home: string } | null;
-  theme: { accentColor: string };
-  onAnalyze?: () => void;
-  onAsk?: (q: string) => void;
-  loading?: boolean;
-}) {
-  if (loading) return <TabSpinner />;
-  const tc = data.teamComparison as any;
-  const awayAbbr = teams ? abbr(teams.away) : 'AWY';
-  const homeAbbr = teams ? abbr(teams.home) : 'HME';
-
-  const rows = [
-    { label: 'Record', away: data.awayRecord ?? null, home: data.homeRecord ?? null },
-    { label: 'ATS',    away: data.atsRecord  ?? null, home: data.atsRecord  ?? null },
-    { label: 'H2H',    away: data.h2hRecord  ?? null, home: data.h2hRecord  ?? null },
-    ...(tc ? [
-      { label: 'Off. Rank', away: tc.away?.offenseRank != null ? `#${tc.away.offenseRank}` : null, home: tc.home?.offenseRank != null ? `#${tc.home.offenseRank}` : null },
-      { label: 'Def. Rank', away: tc.away?.defenseRank != null ? `#${tc.away.defenseRank}` : null, home: tc.home?.defenseRank != null ? `#${tc.home.defenseRank}` : null },
-      { label: 'Home/Away', away: tc.away?.pointsPerGame ?? null, home: tc.home?.pointsPerGame ?? null },
-      { label: 'Last 10',   away: tc.away?.last10        ?? null, home: tc.home?.last10        ?? null },
-      { label: 'Streak',    away: tc.away?.streak        ?? null, home: tc.home?.streak        ?? null },
-    ] : []),
-  ].filter(r => r.away != null || r.home != null);
-
-  if (rows.length === 0) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-6 text-center">
-        <Users className="w-8 h-8 text-[var(--text-faint)]" />
-        <p className="text-[11px] text-[var(--text-muted)]">No team stats available</p>
-        {onAnalyze && (
-          <button
-            onClick={onAnalyze}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)] hover:text-foreground hover:border-[var(--border-hover)] transition-all"
-          >
-            Ask AI to compare these teams →
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] overflow-hidden">
-      <div className="grid grid-cols-3 px-3 py-2 border-b border-[var(--border-subtle)]">
-        <span className="text-[10px] font-black uppercase tracking-wider text-[var(--text-muted)]">Stat</span>
-        {teams ? (
-          <button
-            onClick={onAsk ? () => onAsk(`Show me detailed team stats and analysis for the ${teams.away}`) : undefined}
-            className={cn('text-[10px] font-black uppercase text-center', theme.accentColor, onAsk && 'hover:underline cursor-pointer')}
-          >
-            {awayAbbr}
-          </button>
-        ) : (
-          <span className={cn('text-[10px] font-black uppercase text-center', theme.accentColor)}>{awayAbbr}</span>
-        )}
-        {teams ? (
-          <button
-            onClick={onAsk ? () => onAsk(`Show me detailed team stats and analysis for the ${teams.home}`) : undefined}
-            className={cn('text-[10px] font-black uppercase text-center', theme.accentColor, onAsk && 'hover:underline cursor-pointer')}
-          >
-            {homeAbbr}
-          </button>
-        ) : (
-          <span className={cn('text-[10px] font-black uppercase text-center', theme.accentColor)}>{homeAbbr}</span>
-        )}
-      </div>
-      {rows.map(({ label, away, home }) => (
-        <div
-          key={label}
-          onClick={onAsk && teams ? () => onAsk(`Compare ${teams.away} vs ${teams.home} — ${label} breakdown`) : undefined}
-          className={cn(
-            'grid grid-cols-3 px-3 py-2 border-b border-[var(--border-subtle)] last:border-0 transition-colors',
-            onAsk && teams && 'cursor-pointer hover:bg-[var(--bg-elevated)]',
-          )}
-        >
-          <span className="text-[10px] text-[var(--text-muted)] self-center">{label}</span>
-          <span className="text-[10px] font-bold text-foreground text-center self-center">{away ?? '—'}</span>
-          <span className="text-[10px] font-bold text-foreground text-center self-center">{home ?? '—'}</span>
-        </div>
-      ))}
-      {!tc && (
-        <p className="text-[10px] text-[var(--text-faint)] px-3 py-2">Full statistical comparison not available</p>
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TabHistory — head-to-head history (Tab 4)
-// ─────────────────────────────────────────────────────────────────────────────
-function TabHistory({ data, onAnalyze, onAsk, loading = false }: { data: BettingCardData; onAnalyze?: () => void; onAsk?: (q: string) => void; loading?: boolean }) {
-  if (loading) return <TabSpinner />;
-  const history = Array.isArray(data.h2hHistory) ? data.h2hHistory : [];
-  const matchup = data.matchup ?? data.game ?? '';
-  return (
-    <div className="space-y-3">
-      {(data.atsRecord || data.h2hRecord) && (
-        <div className="flex gap-2 flex-wrap">
-          {data.atsRecord && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-black text-[var(--text-muted)]">
-              ATS <span className="text-foreground">{data.atsRecord}</span>
-            </span>
-          )}
-          {data.h2hRecord && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-black text-[var(--text-muted)]">
-              H2H <span className="text-foreground">{data.h2hRecord}</span>
-            </span>
-          )}
-        </div>
-      )}
-      {history.length > 0 ? (
-        <div className="space-y-1.5">
-          {history.map((h: any, i: number) => {
-            const handleClick = onAsk
-              ? () => onAsk(`Analyze this ${matchup} H2H matchup — ${h.date} final score ${h.score ?? h.result}, winner: ${h.winner ?? 'unknown'}. What trends matter for today's game?`)
-              : undefined;
-            return (
-              <div
-                key={i}
-                onClick={handleClick}
-                className={cn(
-                  'flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)] transition-colors',
-                  handleClick && 'cursor-pointer hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] active:scale-[0.99]',
-                )}
-              >
-                <span className="text-[10px] text-[var(--text-muted)]">{h.date}</span>
-                <span className="text-[10px] font-bold text-foreground tabular-nums">{h.score ?? h.result}</span>
-                {h.betResult != null ? (
-                  <span className={cn(
-                    'px-2 py-0.5 rounded-full text-[10px] font-black border',
-                    h.betResult === 'hit'
-                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                      : 'bg-red-500/15 text-red-300 border-red-500/30',
-                  )}>
-                    {h.betResult === 'hit' ? 'HIT' : 'MISS'}
-                  </span>
-                ) : h.winner != null ? (
-                  <span className={cn(
-                    'px-2 py-0.5 rounded-full text-[10px] font-black border uppercase',
-                    h.won === true
-                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                      : h.won === false
-                      ? 'bg-red-500/15 text-red-300 border-red-500/30'
-                      : 'bg-white/10 text-white/60 border-white/15',
-                  )}>
-                    {String(h.winner).toUpperCase()}
-                  </span>
-                ) : null}
-                {handleClick && <ChevronRight className="w-3 h-3 text-[var(--text-faint)] shrink-0" />}
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="flex flex-col items-center gap-3 py-4 text-center">
-          <p className="text-[11px] text-[var(--text-muted)]">No detailed history available</p>
-          {onAnalyze && (
-            <button
-              onClick={onAnalyze}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)] hover:text-foreground hover:border-[var(--border-hover)] transition-all"
-            >
-              Ask AI for head-to-head history →
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
-// InjuryRow — single injury row with bookmark toggle
-// ─────────────────────────────────────────────────────────────────────────────
-function InjuryRow({ inj, statusCls, onAsk }: { inj: any; statusCls: (s: string) => string; onAsk?: (q: string) => void }) {
-  const key = `bookmark:player:${(inj.player ?? '').toLowerCase().replace(/\s+/g, '_')}`;
-  const [saved, setSaved] = useState(() => {
-    try { return !!localStorage.getItem(key); } catch { return false; }
-  });
-
-  const toggle = useCallback(() => {
-    setSaved(prev => {
-      const next = !prev;
-      try {
-        const WATCHLIST_KEY = 'leverage_watchlist';
-        if (next) {
-          localStorage.setItem(key, '1');
-          const list = JSON.parse(localStorage.getItem(WATCHLIST_KEY) ?? '[]');
-          if (!list.find((e: any) => e.name === inj.player)) {
-            list.unshift({ name: inj.player, position: inj.position ?? '', team: inj.team ?? '', addedAt: new Date().toISOString() });
-            localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list));
-          }
-          window.dispatchEvent(new CustomEvent('watchlist-update', { detail: { count: JSON.parse(localStorage.getItem(WATCHLIST_KEY) ?? '[]').length } }));
-        } else {
-          localStorage.removeItem(key);
-          const list = JSON.parse(localStorage.getItem(WATCHLIST_KEY) ?? '[]').filter((e: any) => e.name !== inj.player);
-          localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list));
-          window.dispatchEvent(new CustomEvent('watchlist-update', { detail: { count: list.length } }));
-        }
-      } catch {}
-      return next;
-    });
-  }, [key, inj.player, inj.position, inj.team]);
-
-  return (
-    <div
-      onClick={onAsk ? () => onAsk(`Show me the injury analysis and betting impact for ${inj.player} (${inj.status}) on the ${inj.team}`) : undefined}
-      className={cn(
-        'px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] transition-colors',
-        onAsk && 'cursor-pointer hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] active:scale-[0.99]',
-      )}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-black text-foreground truncate">{inj.player}</p>
-          <p className="text-[10px] text-[var(--text-muted)]">{inj.team}</p>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-black border', statusCls(inj.status))}>
-            {inj.status?.toUpperCase()}
-          </span>
-          <button
-            onClick={(e) => { e.stopPropagation(); toggle(); }}
-            title={saved ? 'Remove from bookmarks' : 'Bookmark player'}
-            className={cn(
-              'p-1.5 rounded-lg transition-all',
-              saved
-                ? 'text-blue-500 bg-blue-500/10 border border-blue-500/20'
-                : 'text-[var(--text-faint)] hover:text-blue-400 hover:bg-blue-500/10',
-            )}
-          >
-            <Bookmark className="w-3.5 h-3.5" fill={saved ? 'currentColor' : 'none'} />
-          </button>
-          {onAsk && <ChevronRight className="w-3 h-3 text-[var(--text-faint)]" />}
-        </div>
-      </div>
-      {inj.impact && (
-        <p className="text-[10px] text-[var(--text-muted)] mt-1.5 leading-relaxed">{inj.impact}</p>
-      )}
-    </div>
-  );
-}
-
-// TabInjuries — injury reports (Tab 5)
-// ─────────────────────────────────────────────────────────────────────────────
-function TabInjuries({ data, onAnalyze, onAsk, loading = false }: { data: BettingCardData; onAnalyze?: () => void; onAsk?: (q: string) => void; loading?: boolean }) {
-  if (loading) return <TabSpinner />;
-  const injuries = Array.isArray(data.injuries) ? data.injuries : [];
-
-  if (injuries.length > 0) {
-    const statusCls = (status: string) => {
-      const s = status?.toUpperCase();
-      if (s === 'OUT') return 'bg-red-500/15 text-red-300 border-red-500/30';
-      if (s === 'DOUBTFUL') return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
-      if (s === 'QUESTIONABLE') return 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30';
-      if (s === 'GTD') return 'bg-blue-500/15 text-blue-300 border-blue-500/30';
-      return 'bg-white/10 text-white/60 border-white/20';
-    };
-    return (
-      <div className="space-y-1.5">
-        {injuries.map((inj: any, i: number) => (
-          <InjuryRow key={i} inj={inj} statusCls={statusCls} onAsk={onAsk} />
-        ))}
-      </div>
-    );
-  }
-
-  if (data.injuryAlert) {
-    return (
-      <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/6 border border-red-500/20">
-        <Shield className="w-3 h-3 text-red-400 shrink-0" />
-        <span className="text-[10px] text-red-300 leading-relaxed">{data.injuryAlert}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col items-center gap-3 py-6 text-center">
-      <Shield className="w-8 h-8 text-[var(--text-faint)]" />
-      <p className="text-[11px] text-[var(--text-muted)]">No injury reports for this game</p>
-      {onAnalyze && (
-        <button
-          onClick={onAnalyze}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)] hover:text-foreground hover:border-[var(--border-hover)] transition-all"
-        >
-          Ask AI about injury updates →
-        </button>
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// WatchPlayerRow — single player row with bookmark toggle
-// ─────────────────────────────────────────────────────────────────────────────
-function WatchPlayerRow({ p, sport, onAsk }: { p: any; sport?: string; onAsk?: (q: string) => void }) {
-  const key = `bookmark:player:${(p.player ?? '').toLowerCase().replace(/\s+/g, '_')}`;
-  const [saved, setSaved] = useState(() => {
-    try { return !!localStorage.getItem(key); } catch { return false; }
-  });
-
-  const toggle = useCallback(() => {
-    setSaved(prev => {
-      const next = !prev;
-      try {
-        const WATCHLIST_KEY = 'leverage_watchlist';
-        if (next) {
-          localStorage.setItem(key, '1');
-          const list = JSON.parse(localStorage.getItem(WATCHLIST_KEY) ?? '[]');
-          if (!list.find((e: any) => e.name === p.player)) {
-            list.unshift({ name: p.player, position: p.position ?? '', team: p.team ?? '', addedAt: new Date().toISOString() });
-            localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list));
-          }
-          window.dispatchEvent(new CustomEvent('watchlist-update', { detail: { count: JSON.parse(localStorage.getItem(WATCHLIST_KEY) ?? '[]').length } }));
-        } else {
-          localStorage.removeItem(key);
-          const list = JSON.parse(localStorage.getItem(WATCHLIST_KEY) ?? '[]').filter((e: any) => e.name !== p.player);
-          localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list));
-          window.dispatchEvent(new CustomEvent('watchlist-update', { detail: { count: list.length } }));
-        }
-      } catch {}
-      return next;
-    });
-  }, [key, p.player, p.position, p.team]);
-
-  return (
-    <div
-      onClick={onAsk ? () => onAsk(`Show me stats and prop card for ${p.player} (${p.team}) — ${p.reason}`) : undefined}
-      className={cn(
-        'flex items-start gap-3 px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] transition-colors',
-        onAsk && 'cursor-pointer hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] active:scale-[0.99]',
-      )}
-    >
-      <PlayerAvatar playerName={p.player} photoUrl={p.photoUrl} sport={sport} size="md" />
-      <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-black text-foreground truncate">{p.player}</p>
-        <p className="text-[10px] text-[var(--text-muted)] mb-1">{p.team}</p>
-        <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">{p.reason}</p>
-      </div>
-      <button
-        onClick={(e) => { e.stopPropagation(); toggle(); }}
-        title={saved ? 'Remove from bookmarks' : 'Bookmark player'}
-        className={cn(
-          'flex-shrink-0 p-1.5 rounded-lg transition-all',
-          saved
-            ? 'text-blue-500 bg-blue-500/10 border border-blue-500/20'
-            : 'text-[var(--text-faint)] hover:text-blue-400 hover:bg-blue-500/10',
-        )}
-      >
-        <Bookmark className="w-3.5 h-3.5" fill={saved ? 'currentColor' : 'none'} />
-      </button>
-      {onAsk && <ChevronRight className="w-3 h-3 text-[var(--text-faint)] self-center shrink-0" />}
-    </div>
-  );
-}
-
-// TabWatch — players to watch (Tab 6)
-// ─────────────────────────────────────────────────────────────────────────────
-function TabWatch({ data, onAnalyze, onAsk }: { data: BettingCardData; onAnalyze?: () => void; onAsk?: (q: string) => void }) {
-  const players = Array.isArray(data.playersToWatch) ? data.playersToWatch : [];
-
-  if (players.length === 0) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-6 text-center">
-        <Eye className="w-8 h-8 text-[var(--text-faint)]" />
-        <p className="text-[11px] text-[var(--text-muted)]">No watch list available</p>
-        {onAnalyze && (
-          <button
-            onClick={onAnalyze}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)] hover:text-foreground hover:border-[var(--border-hover)] transition-all"
-          >
-            Ask AI who to watch in this game →
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      {players.map((p: any, i: number) => (
-        <WatchPlayerRow key={i} p={p} sport={data.sport} onAsk={onAsk} />
-      ))}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Main BettingCard
-// ─────────────────────────────────────────────────────────────────────────────
 export const BettingCard = memo(function BettingCard({
   title,
   category,
@@ -1222,8 +65,6 @@ export const BettingCard = memo(function BettingCard({
   const homeProb = impliedProb(data.homeOdds);
   const awayProb = impliedProb(data.awayOdds);
 
-  // Detect live/in-progress games via extreme odds: implied prob > 97% means the
-  // API is returning in-game lines (e.g. -20000), not pre-game bettable prices.
   const isExtremeOdds = (() => {
     const h = Number(data.homeOdds);
     const a = Number(data.awayOdds);
@@ -1233,20 +74,17 @@ export const BettingCard = memo(function BettingCard({
     return Math.max(hProb, aProb) > 0.97;
   })();
 
-  // Best-odds flags for highlighting in the matchup block
   const isBestHome = !!(data.bestHomeOdds && data.homeOdds && data.homeOdds === data.bestHomeOdds);
   const isBestAway = !!(data.bestAwayOdds && data.awayOdds && data.awayOdds === data.bestAwayOdds);
-
-  // Bookmaker vig (overround)
   const vigPct = calcVig(data.homeOdds, data.awayOdds);
 
-  const books: BookEntry[] = Array.isArray(data.books) ? data.books : [];
+  const books = Array.isArray(data.books) ? data.books : [];
   const hasBookComparison = books.length >= 2;
 
   const [activeTab, setActiveTab] = useState(0);
   const [marketView, setMarketView] = useState<'ml' | 'spread' | 'total'>('ml');
 
-  // ── Lazy-load player props when the Props tab is first activated ───────────
+  // Lazy-load player props when the Props tab is first activated
   const [propsLoading, setPropsLoading] = useState(false);
   const [lazyProps, setLazyProps] = useState<any[] | null>(null);
 
@@ -1281,7 +119,7 @@ export const BettingCard = memo(function BettingCard({
       .finally(() => setPropsLoading(false));
   }, [activeTab, lazyProps, data.sport, data.category, data.matchup, data.game]);
 
-  // ── Lazy-load Teams / History / Injuries context from MLB Stats API ────────
+  // Lazy-load Teams / History / Injuries context from MLB Stats API
   const [ctxLoading, setCtxLoading] = useState(false);
   const [ctx, setCtx] = useState<any | null>(null);
 
@@ -1306,25 +144,22 @@ export const BettingCard = memo(function BettingCard({
         : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.08)]',
     )}>
 
-      {/* ── Full-bleed gradient header ───────────────────────────────── */}
+      {/* Full-bleed gradient header */}
       <div className={cn('relative px-3 pt-2.5 pb-2 md:px-4 md:pt-3.5 md:pb-3 bg-gradient-to-br', theme.headerGrad)}>
         {/* Status badges top-right */}
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
-          {/* Game in progress — pulsing LIVE (marked LIVE or extreme in-game odds) */}
           {(isLiveGame || isExtremeOdds) && !isFinal && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-[10px] font-black text-emerald-300 uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               LIVE
             </span>
           )}
-          {/* Pre-game with live odds — static LIVE dot */}
           {data.realData && !isLiveGame && !isFinal && !isExtremeOdds && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-400/80">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/70" />
               LIVE
             </span>
           )}
-          {/* Game finished */}
           {isFinal && (
             <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-500/20 border border-slate-500/30 text-[10px] font-black text-slate-300 uppercase tracking-wider">
               FINAL
@@ -1376,7 +211,7 @@ export const BettingCard = memo(function BettingCard({
 
       <div className="px-3 pb-3 space-y-2 md:px-4 md:pb-4 md:space-y-3">
 
-        {/* ── Player prop header ──────────────────────────────────────── */}
+        {/* Player prop header */}
         {isPlayerProp && data.player && (
           <div className="flex items-center gap-3 mt-3 px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
             <PlayerAvatar playerName={data.player} photoUrl={playerPhotoUrl} sport={data.sport} size={isHero ? 'lg' : 'md'} />
@@ -1392,7 +227,7 @@ export const BettingCard = memo(function BettingCard({
           </div>
         )}
 
-        {/* ── Player prop data strip ────────────────────────────────── */}
+        {/* Player prop data strip */}
         {isPlayerProp && data.player && (data.line != null || data.hitRate != null || confPct !== null) && (
           <div className={cn('grid gap-1.5', [data.line != null, data.hitRate != null, confPct !== null].filter(Boolean).length === 3 ? 'grid-cols-3' : [data.line != null, data.hitRate != null, confPct !== null].filter(Boolean).length === 2 ? 'grid-cols-2' : 'grid-cols-1')}>
             {data.line != null && (
@@ -1404,23 +239,19 @@ export const BettingCard = memo(function BettingCard({
             {data.hitRate != null && (
               <div className="flex flex-col items-center rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Hit Rate</span>
-                <span className={cn('text-base font-black tabular-nums',
-                  Number(data.hitRate) >= 65 ? 'text-emerald-400' : Number(data.hitRate) <= 35 ? 'text-red-400' : 'text-foreground'
-                )}>{data.hitRate}%</span>
+                <span className={cn('text-base font-black tabular-nums', Number(data.hitRate) >= 65 ? 'text-emerald-400' : Number(data.hitRate) <= 35 ? 'text-red-400' : 'text-foreground')}>{data.hitRate}%</span>
               </div>
             )}
             {confPct !== null && (
               <div className="flex flex-col items-center rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Confidence</span>
-                <span className={cn('text-base font-black tabular-nums',
-                  confPct >= 70 ? 'text-emerald-400' : confPct >= 50 ? 'text-amber-400' : 'text-red-400'
-                )}>{confPct}%</span>
+                <span className={cn('text-base font-black tabular-nums', confPct >= 70 ? 'text-emerald-400' : confPct >= 50 ? 'text-amber-400' : 'text-red-400')}>{confPct}%</span>
               </div>
             )}
           </div>
         )}
 
-        {/* ── Team matchup block ─────────────────────────────────────── */}
+        {/* Team matchup block */}
         {!isPlayerProp && teams ? (
           <div className="mt-3 rounded-xl border border-[var(--border-subtle)] overflow-hidden bg-[var(--bg-overlay)]">
             <div className="flex items-center gap-2 px-4 py-3">
@@ -1429,23 +260,13 @@ export const BettingCard = memo(function BettingCard({
                 <TeamLogo name={teams.away} sport={data.sport} avatarCls={theme.avatarCls} isLarge={isHero} />
                 <span className={cn('font-black text-foreground text-center leading-tight truncate w-full', isHero ? 'text-sm' : 'text-xs')}>{teams.away}</span>
                 {awayML && (
-                  <span className={cn(
-                    'font-black tabular-nums',
-                    isHero ? 'text-xl' : 'text-lg',
-                    awayML.positive ? 'text-emerald-400' : 'text-foreground',
-                    isBestAway && 'ring-1 ring-emerald-400/40 rounded-md px-1 bg-emerald-500/8',
-                  )}>
+                  <span className={cn('font-black tabular-nums', isHero ? 'text-xl' : 'text-lg', awayML.positive ? 'text-emerald-400' : 'text-foreground', isBestAway && 'ring-1 ring-emerald-400/40 rounded-md px-1 bg-emerald-500/8')}>
                     {awayML.display}
                     {isBestAway && <span className="text-[10px] ml-0.5 text-emerald-500 font-black">★</span>}
                   </span>
                 )}
                 {awayProb !== null && (
-                  <span className={cn(
-                    'text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums',
-                    awayProb > 55 ? 'text-emerald-400 bg-emerald-500/12' :
-                    awayProb > 45 ? 'text-[var(--text-muted)] bg-[var(--bg-elevated)]' :
-                    'text-[var(--text-muted)] bg-[var(--bg-elevated)]',
-                  )}>{awayProb}%</span>
+                  <span className={cn('text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums', awayProb > 55 ? 'text-emerald-400 bg-emerald-500/12' : 'text-[var(--text-muted)] bg-[var(--bg-elevated)]')}>{awayProb}%</span>
                 )}
               </div>
 
@@ -1466,23 +287,13 @@ export const BettingCard = memo(function BettingCard({
                 <TeamLogo name={teams.home} sport={data.sport} avatarCls={theme.avatarCls} isLarge={isHero} />
                 <span className={cn('font-black text-foreground text-center leading-tight truncate w-full', isHero ? 'text-sm' : 'text-xs')}>{teams.home}</span>
                 {homeML && (
-                  <span className={cn(
-                    'font-black tabular-nums',
-                    isHero ? 'text-xl' : 'text-lg',
-                    homeML.positive ? 'text-emerald-400' : 'text-foreground',
-                    isBestHome && 'ring-1 ring-emerald-400/40 rounded-md px-1 bg-emerald-500/8',
-                  )}>
+                  <span className={cn('font-black tabular-nums', isHero ? 'text-xl' : 'text-lg', homeML.positive ? 'text-emerald-400' : 'text-foreground', isBestHome && 'ring-1 ring-emerald-400/40 rounded-md px-1 bg-emerald-500/8')}>
                     {homeML.display}
                     {isBestHome && <span className="text-[10px] ml-0.5 text-emerald-500 font-black">★</span>}
                   </span>
                 )}
                 {homeProb !== null && (
-                  <span className={cn(
-                    'text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums',
-                    homeProb > 55 ? 'text-emerald-400 bg-emerald-500/12' :
-                    homeProb > 45 ? 'text-[var(--text-muted)] bg-[var(--bg-elevated)]' :
-                    'text-[var(--text-muted)] bg-[var(--bg-elevated)]',
-                  )}>{homeProb}%</span>
+                  <span className={cn('text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums', homeProb > 55 ? 'text-emerald-400 bg-emerald-500/12' : 'text-[var(--text-muted)] bg-[var(--bg-elevated)]')}>{homeProb}%</span>
                 )}
               </div>
             </div>
@@ -1504,10 +315,10 @@ export const BettingCard = memo(function BettingCard({
           <p className="text-sm font-semibold text-foreground mt-3 truncate">{title}</p>
         )}
 
-        {/* ── Tab bar ───────────────────────────────────────────────── */}
+        {/* Tab bar */}
         <TabBar activeTab={activeTab} onSelect={setActiveTab} accentCls={theme.avatarCls} />
 
-        {/* ── Tab content ───────────────────────────────────────────── */}
+        {/* Tab content */}
         {activeTab === 0 && (
           <TabOdds
             data={data}
@@ -1583,7 +394,7 @@ export const BettingCard = memo(function BettingCard({
           />
         )}
 
-        {/* ── Footer ────────────────────────────────────────────────── */}
+        {/* Footer */}
         <div className="pt-2 border-t border-[var(--border-subtle)] space-y-2">
           <div className="flex items-center gap-2">
             {data.bookmaker && (

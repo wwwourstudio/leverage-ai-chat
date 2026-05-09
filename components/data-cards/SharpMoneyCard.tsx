@@ -1,7 +1,7 @@
 'use client';
 
 import { TrendingUp, TrendingDown, Zap, Activity, ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatAmericanOdds } from '@/lib/utils';
 
 export interface SharpMoneyData {
   matchup?: string;
@@ -32,11 +32,6 @@ interface SharpMoneyCardProps {
   isHero?: boolean;
 }
 
-function formatAmericanOdds(val: string | number | undefined): string {
-  if (val === undefined) return '—';
-  const n = Number(val);
-  return n > 0 ? `+${n}` : String(n);
-}
 
 export function SharpMoneyCard({
   title,

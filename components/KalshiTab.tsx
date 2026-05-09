@@ -357,7 +357,7 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
               <p className="text-xs font-bold text-white">Kalshi Prediction Markets</p>
               {lastFetch && (
                 <p className="text-[9px] text-[var(--text-faint)]">
-                  Updated {lastFetch.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  <span suppressHydrationWarning>Updated {lastFetch.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </p>
               )}
             </div>

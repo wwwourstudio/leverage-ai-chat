@@ -44,6 +44,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ChatHeader, ChatInput } from '@/components/chat';
 import { SuggestedPrompts } from '@/components/suggested-prompts';
+import { InsightCardItem, type InsightCard } from '@/components/InsightCard';
 
 import { createThread, updateThread, deleteThread, loadMessages, saveMessagesBatch } from '@/lib/chat-service';
 import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
@@ -56,6 +57,13 @@ import { CreditModals } from '@/components/index/CreditModals';
 import { DetailedAnalysisLayout, type DetailedAnalysisData } from '@/components/index/DetailedAnalysisLayout';
 import { FantasyLeagueSetup, type FantasyLeague as FantasyLeagueType } from '@/components/index/FantasyLeagueSetup';
 import { AddToHomeBanner } from '@/components/AddToHomeBanner';
+import {
+  getHardcodedQuickActions,
+  sportSelectionBettingPrompts,
+  sportSelectionFantasyPrompts,
+  sportSelectionDFSPrompts,
+  type PromptItem,
+} from '@/lib/prompt-data';
 import { useVoiceConversation } from '@/lib/hooks/use-voice-conversation';
 const VoiceConversationOverlay = dynamic(() => import('@/components/voice-conversation-overlay').then(m => ({ default: m.VoiceConversationOverlay })), { ssr: false });
 
@@ -135,27 +143,9 @@ interface Chat {
   tags: string[];
 }
 
-interface InsightCard {
-  type: string;
-  title: string;
-  icon: any;
-  category: string;
-  subcategory: string;
-  gradient: string;
-  data: Record<string, any>;
-  status: string;
-}
 
-export interface ServerDataProps {
-  initialCards: any[];
-  initialInsights: any;
-  userSession: any;
-  serverTime: string;
-  missingKeys: string[];
-  envErrors: string[];
-  dataSourcesUsed: string[];
-  fetchErrors: string[];
-}
+import type { ServerDataResult } from '@/lib/server-data-loader';
+export type ServerDataProps = ServerDataResult;
 
 interface UnifiedAIPlatformProps {
   serverData?: ServerDataProps;
@@ -307,8 +297,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   useEffect(() => {
     const data = getCreditData();
     setCreditsRemaining(data.credits);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // mount-only: getCreditData reads localStorage, setCreditsRemaining is a stable setter
 
   // Prevent body-level scrolling so that a secondary React render (produced by
   // the hydration mismatch recovery path) cannot be revealed by scrolling past
@@ -355,7 +344,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [user, setUser] = useState<{ name: string; email: string; avatar?: string } | null>(
     serverData?.userSession ? {
       name: serverData.userSession.user.name,
-      email: serverData.userSession.user.email,
+      email: serverData.userSession.user.email ?? '',
     } : null
   );
   // uploadedFiles state is managed by useFileHandling hook
@@ -366,7 +355,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [selectedSport, setSelectedSport] = useState<string>('');
   const [selectedKalshiTopic, setSelectedKalshiTopic] = useState<string>('');
   const [kalshiBettingBannerVisible, setKalshiBettingBannerVisible] = useState(false);
-  const [_cardsRefreshedAt, setCardsRefreshedAt] = useState<Date | null>(null);
   const cardsRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fetchedForQueryRef = useRef<string | null>(null);
   // Dedup guard — prevents double-fire when onPromptClick and handleSubmit both
@@ -377,10 +365,25 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const pendingThreadRef = useRef<Promise<import('@/lib/chat-service').ChatThread | null> | null>(null);
   const pendingQueryRef = useRef<string | null>(null);
 
-  const handleCategorySelect = (catId: string) => {
+  const handleCategorySelect = useCallback((catId: string) => {
     setSelectedCategory(catId);
     if (catId !== 'kalshi') setKalshiBettingBannerVisible(false);
-  };
+  }, []);
+
+  const handleToggleSidebar = useCallback(() => setSidebarOpen(v => !v), []);
+  const handleOpenUserLightbox = useCallback(() => setShowUserLightbox(true), []);
+  const handleOpenAlerts = useCallback(() => setShowAlertsLightbox(true), []);
+  const handleOpenSettings = useCallback(() => setShowSettingsLightbox(true), []);
+  const handleOpenWatchlist = useCallback(() => setShowWatchlistLightbox(true), []);
+  const handleOpenLogin = useCallback(() => setShowLoginModal(true), []);
+  const handleOpenSignup = useCallback(() => setShowSignupModal(true), []);
+  const handleOpenStripe = useCallback(() => setShowStripeLightbox(true), []);
+  const handleToggleDeepThink = useCallback(() => setDeepThink(v => !v), []);
+  const handleCloseSidebar = useCallback(() => setSidebarOpen(false), []);
+  const handleUserClick = useCallback(() => {
+    if (isLoggedIn) setShowUserLightbox(true);
+    else setShowLoginModal(true);
+  }, [isLoggedIn]);
 
   // Set to true by loadInitData() after seeding aiQuickActions from init.defaultPrompts.
   // The prompts useEffect checks this on its first fire to avoid clearing + re-fetching
@@ -766,6 +769,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         loadInitData();
       }
     }
+  // deps: authUser/authLoading are the only values that should trigger this effect.
+  // loadInitData/loadInstructionsFromLocalStorage are component-scoped helpers that
+  // reference many pieces of state; adding them would cause an infinite loop.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUser, authLoading]);
 
@@ -780,19 +786,20 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     window.history.replaceState({}, '', window.location.pathname);
 
     (async () => {
+      const isDev = getIsDev();
       try {
         const res = await fetch(`/api/stripe/verify?session_id=${encodeURIComponent(sessionId)}`);
         const data = await res.json();
         if (data.verified && data.credits > 0) {
           addCredits(data.credits);
-          console.log(`[Stripe] Verified and added ${data.credits} credits for session ${sessionId}`);
+          if (isDev) console.log(`[Stripe] Verified and added ${data.credits} credits for session ${sessionId}`);
         } else if (!data.verified) {
           // Stripe not configured (dev mode) — fall back to URL param
           const creditsPurchased = params.get('credits');
           const amount = creditsPurchased ? parseInt(creditsPurchased, 10) : 0;
           if (amount > 0) {
             addCredits(amount);
-            console.log(`[Stripe] Dev mode: added ${amount} credits from URL param`);
+            if (isDev) console.log(`[Stripe] Dev mode: added ${amount} credits from URL param`);
           }
         }
       } catch {
@@ -881,7 +888,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           }
           return updated;
         });
-        setCardsRefreshedAt(new Date());
       } catch {
         // Non-critical — silently skip on error
       }
@@ -943,11 +949,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     if (serverData?.fetchErrors?.length) {
       toast.info('Live data unavailable — showing AI estimates. Data will refresh shortly.');
     }
-  // Run once on mount — serverData is static SSR props
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // mount-only: serverData is immutable SSR props, toast is stable context ref
 
-  const handleStarChat = (chatId: string, e: React.MouseEvent) => {
+  const handleStarChat = useCallback((chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const chat = chats.find((c: Chat) => c.id === chatId);
     const wasStarred = chat?.starred;
@@ -962,7 +966,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       });
     }
     toast.success(wasStarred ? 'Removed from starred' : 'Analysis saved');
-  };
+  }, [chats, isLoggedIn, toast]);
 
   // Fetch AI-generated quick-action prompts from the /api/prompts endpoint.
   // Refreshes when the selected platform category or sport changes.
@@ -1018,8 +1022,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     const firstAway = teams[0] ?? '';
     const firstHome = teams[1] ?? '';
     const playerName = responseCards.find(c => c.data?.player)?.data?.player as string | undefined;
-    const _sport = responseCards[0]?.category ?? '';
-
     // Analyze card types in the response
     const cardTypes = responseCards.map(card => card.type);
     const hasLiveOdds = cardTypes.some(t => t.includes('odds') || t.includes('live'));
@@ -1248,19 +1250,22 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       suggestion.label.toLowerCase() !== userMessage.toLowerCase()
     );
 
-    console.log('[v0] Suggestions:', uniqueSuggestions.length, 'generated');
+    if (getIsDev()) console.log('[v0] Suggestions:', uniqueSuggestions.length, 'generated');
 
     // Return 5-7 unique suggestions for optimal UX
     return uniqueSuggestions.slice(0, 7);
+  // selectedCategory drives suggestion routing; suggestedPrompts is the early-return fallback.
+  // Other refs inside are stable (lastSuggestionQueryRef) or derived from the userMessage arg.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, suggestedPrompts]);
 
   const handleFollowUp = (action: 'correlated' | 'metrics', cardData?: any) => {
-    console.log('[v0] Generating follow-up response:', action);
+    const isDev = getIsDev();
+    if (isDev) console.log('[v0] Generating follow-up response:', action);
 
     // Check if user has credits
     if (!consumeCredit()) {
-      console.log('[v0] No credits remaining, showing purchase modal');
+      if (isDev) console.log('[v0] No credits remaining, showing purchase modal');
       return;
     }
 
@@ -1503,19 +1508,19 @@ No preamble. Start directly with section 1.`;
     generateCardAnalysis(card, cardKey);
   };
 
-  const stopGeneration = () => {
+  const stopGeneration = useCallback(() => {
     abortStream();
     setIsTyping(false);
-  };
+  }, [abortStream]);
 
-  const handleRetryMessage = (messageId: string) => {
+  const handleRetryMessage = useCallback((messageId: string) => {
     setMessages((prev: Message[]) =>
       prev.map(m => m.id === messageId
         ? { ...m, isPending: true, isError: false, isPartial: false, isStreaming: false, content: '', cards: [] }
         : m)
     );
-    generateRealResponse(lastUserQuery, undefined, messageId);
-  };
+    generateRealResponseRef.current?.(lastUserQuery, undefined, messageId);
+  }, [lastUserQuery]);
 
   // Tracks the last query for which suggestions were generated — prevents duplicate
   // runs when multiple response branches (success/partial/error) fire for the same message.
@@ -1541,11 +1546,12 @@ No preamble. Start directly with section 1.`;
   }, []);
 
   const generateRealResponse = async (userMessage: string, imageAttachments?: Array<{ name: string; base64: string; mimeType: string }>, optimisticAssistantId?: string) => {
+    const isDev = getIsDev();
     // Dedup guard: suppress duplicate calls for the same message (e.g. onPromptClick
     // and handleSubmit both firing within the same event loop tick).
     const msgKey = userMessage.trim().slice(0, 200);
     if (analyzingMessageRef.current === msgKey) {
-      console.log('[v0] Duplicate analyze suppressed for:', msgKey.slice(0, 60));
+      if (isDev) console.log('[v0] Duplicate analyze suppressed for:', msgKey.slice(0, 60));
       return;
     }
     analyzingMessageRef.current = msgKey;
@@ -1555,10 +1561,9 @@ No preamble. Start directly with section 1.`;
     setIsTyping(true);
     setLastUserQuery(userMessage);
     const startTime = Date.now();
-    const isDev = getIsDev();
 
     try {
-      console.log('[v0] Starting real AI analysis for:', userMessage);
+      if (isDev) console.log('[v0] Starting real AI analysis for:', userMessage);
       
       // Extract context from user message with strict detection flags
       const lowerMsg = userMessage.toLowerCase();
@@ -1793,7 +1798,7 @@ No preamble. Start directly with section 1.`;
       const allPreviousCards = messages
         .filter((m: Message) => !m.isWelcome && m.role === 'assistant')
         .flatMap((m: Message) => m.cards || []);
-      const realCards = allPreviousCards.filter((c: InsightCard) => c.data?.realData !== false);
+      const realCards = allPreviousCards.filter((c: InsightCard) => c.realData !== false);
       const availableCards = (realCards.length > 0 ? realCards : allPreviousCards).slice(0, 6);
 
       // Inject fantasy league context when in fantasy mode
@@ -1846,7 +1851,7 @@ No preamble. Start directly with section 1.`;
           serverCards: serverCardCount,
           responseCards: responseCards.length,
           fallbackCards: useFallbackCards ? availableCards.length : 0,
-          confidence: (assistantMsg.trustMetrics as any)?.finalConfidence,
+          confidence: assistantMsg.trustMetrics?.finalConfidence,
           fallback: useFallbackCards,
         }));
       }
@@ -2067,13 +2072,14 @@ No preamble. Start directly with section 1.`;
   // Sport detection helpers are imported from @/lib/sport-detection
 
   const selectRelevantCards = async (userMessage: string, context?: any): Promise<InsightCard[]> => {
+    const isDev = getIsDev();
     const msgLower = userMessage.toLowerCase();
-    
+
     // Extract sport and category from message - use conversation history from context if available
     const conversationHistory = context?.previousMessages || messages.slice(-5).map((m: any) => ({ role: m.role, content: m.content || '' }));
     const sport = extractSport(userMessage, conversationHistory);
     let category = 'all';
-    
+
     if (msgLower.includes('bet') || msgLower.includes('odds')) {
       category = 'betting';
     } else if (msgLower.includes('dfs') || msgLower.includes('lineup')) {
@@ -2091,11 +2097,10 @@ No preamble. Start directly with section 1.`;
     const draftGroupIdMatch = userMessage.match(/DraftKings #(\d+)/i);
     const draftGroupId = draftGroupIdMatch ? parseInt(draftGroupIdMatch[1], 10) : undefined;
 
-    console.log('[v0] Fetching dynamic cards for:', { sport, category, draftGroupId });
+    if (isDev) console.log('[v0] Fetching dynamic cards for:', { sport, category, draftGroupId });
 
     try {
-      // Fetch dynamic cards from API
-      console.log('[v0] Requesting dynamic cards with params:', { sport, category, context, limit: 3, draftGroupId });
+      if (isDev) console.log('[v0] Requesting dynamic cards with params:', { sport, category, context, limit: 3, draftGroupId });
 
       const dynamicCards = await fetchDynamicCards({
         sport: sport || undefined,
@@ -2104,37 +2109,33 @@ No preamble. Start directly with section 1.`;
         limit: 3,
         draftGroupId,
       });
-      
-      console.log('[v0] Received dynamic cards response:', dynamicCards.length, 'cards');
-      
+
+      if (isDev) console.log('[v0] Received dynamic cards response:', dynamicCards.length, 'cards');
+
       if (dynamicCards.length === 0) {
-        console.log('[v0] WARNING: Zero dynamic cards returned from API. Check:');
-        console.log('[v0] - Sport extracted:', sport);
-        console.log('[v0] - Category detected:', category);
-        console.log('[v0] - API endpoint configured:', API_ENDPOINTS?.CARDS || 'undefined');
-        console.log('[v0] - Context provided:', context);
-      } else if (dynamicCards.length > 0 && dynamicCards.every((c: any) => c.realData === false || c.data?.realData === false)) {
+        if (isDev) {
+          console.log('[v0] WARNING: Zero dynamic cards returned from API. Check:');
+          console.log('[v0] - Sport extracted:', sport);
+          console.log('[v0] - Category detected:', category);
+          console.log('[v0] - API endpoint configured:', API_ENDPOINTS?.CARDS || 'undefined');
+          console.log('[v0] - Context provided:', context);
+        }
+      } else if (dynamicCards.every((c: any) => c.realData === false || c.data?.realData === false)) {
         toast.info('Live data unavailable — showing AI estimates. Data will refresh shortly.');
       }
-      
+
       // Convert DynamicCard to InsightCard format
-      const convertedCards = dynamicCards.map(card => {
-        console.log('[v0] Converting card:', card.type, card.title);
-        return convertToInsightCard(card);
-      });
-      
-      console.log('[v0] Returning', convertedCards.length, 'converted insight cards');
+      const convertedCards = dynamicCards.map(card => convertToInsightCard(card));
+
+      if (isDev) console.log('[v0] Returning', convertedCards.length, 'converted insight cards');
       return convertedCards;
     } catch (error) {
-      console.error('[v0] Error fetching dynamic cards:', error);
-      console.error('[v0] Error details:', error instanceof Error ? error.message : String(error));
-      // Return empty array on error - the response will still be shown
+      console.error('[v0] Error fetching dynamic cards:', error instanceof Error ? error.message : String(error));
       return [];
     }
   };
 
   const convertToInsightCard = (dynamicCard: DynamicCard): InsightCard => {
-    console.log('[v0] Converting dynamic card:', dynamicCard.type, dynamicCard.title);
     
     // Validate required fields
     if (!dynamicCard || typeof dynamicCard !== 'object') {
@@ -2173,7 +2174,6 @@ No preamble. Start directly with section 1.`;
       status: String(dynamicCard.status || 'active')
     };
     
-    console.log('[v0] Validated card:', validatedCard.type, validatedCard.title);
     return validatedCard;
   };
 
@@ -2214,7 +2214,6 @@ No preamble. Start directly with section 1.`;
 
     // Check if user has credits
     if (!consumeCredit()) {
-      console.log('[v0] No credits remaining, showing purchase modal');
       return;
     }
 
@@ -2406,8 +2405,7 @@ No preamble. Start directly with section 1.`;
     }
 
     // Update rate limit count
-    const updated = updateRateLimitCount();
-    console.log('[v0] New', selectedCategory, 'analysis chat created. Chats remaining:', CHAT_LIMIT - updated.count);
+    updateRateLimitCount();
   };
 
   // ── Auto-query: fire pending query once the welcome message appears ───────────
@@ -2468,7 +2466,7 @@ No preamble. Start directly with section 1.`;
     openChatWithQuery(query, platform, sport || undefined);
   };
 
-  const handleSelectChat = (chatId: string) => {
+  const handleSelectChat = useCallback((chatId: string) => {
     setActiveChat(chatId);
 
     // Sync platform filter to match the selected chat's category
@@ -2482,7 +2480,6 @@ No preamble. Start directly with section 1.`;
     setSelectedSport(sportTag ?? '');
 
     if (isLoggedIn) {
-      // Load messages from Supabase for logged-in users
       loadMessages(chatId).then(msgs => {
         if (msgs.length > 0) {
           let storedCards: Record<string, any[]> = {};
@@ -2510,7 +2507,6 @@ No preamble. Start directly with section 1.`;
         }
       });
     } else {
-      // Not logged in — keep showing current in-memory welcome
       const chat = chats.find((c: Chat) => c.id === chatId);
       setMessages([{
         id: 'welcome',
@@ -2521,9 +2517,9 @@ No preamble. Start directly with section 1.`;
         isWelcome: true,
       }]);
     }
-  };
+  }, [chats, isLoggedIn]);
 
-  const handleDeleteChat = (chatId: string, e: React.MouseEvent) => {
+  const handleDeleteChat = useCallback((chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const snapshot = chats;
     const remaining = chats.filter((chat: Chat) => chat.id !== chatId);
@@ -2538,7 +2534,7 @@ No preamble. Start directly with section 1.`;
       });
     }
     toast.info('Chat deleted');
-  };
+  }, [chats, activeChat, isLoggedIn, toast]);
 
   const handleEditMessage = useCallback((index: number) => {
     const message = messages[index];
@@ -2584,7 +2580,6 @@ No preamble. Start directly with section 1.`;
   const handleCopyMessage = useCallback((content: string) => {
     navigator.clipboard.writeText(content);
     toast.success('Copied to clipboard');
-    console.log('[v0] Message copied to clipboard');
   }, []);
 
   const handleRegenerateResponse = useCallback((index: number) => {
@@ -2615,16 +2610,16 @@ No preamble. Start directly with section 1.`;
     }
   }, [messages, activeChat]);
 
-  const handleEditChatTitle = (chatId: string, currentTitle: string, e: React.MouseEvent) => {
+  const handleEditChatTitle = useCallback((chatId: string, currentTitle: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingChatId(chatId);
     setEditingChatTitle(currentTitle);
-  };
+  }, []);
 
-  const handleSaveChatTitle = (chatId: string) => {
+  const handleSaveChatTitle = useCallback((chatId: string) => {
     if (editingChatTitle.trim()) {
       const newTitle = editingChatTitle.trim();
-      setChats(chats.map((chat: any) =>
+      setChats(prev => prev.map((chat: any) =>
         chat.id === chatId ? { ...chat, title: newTitle } : chat
       ));
       if (isLoggedIn) updateThread(chatId, { title: newTitle });
@@ -2632,21 +2627,21 @@ No preamble. Start directly with section 1.`;
     }
     setEditingChatId(null);
     setEditingChatTitle('');
-  };
+  }, [editingChatTitle, isLoggedIn, toast]);
 
-  const handleCancelChatTitleEdit = () => {
+  const handleCancelChatTitleEdit = useCallback(() => {
     setEditingChatId(null);
     setEditingChatTitle('');
-  };
+  }, []);
 
-  const handleKeyDownChatTitle = (e: React.KeyboardEvent, chatId: string) => {
+  const handleKeyDownChatTitle = useCallback((e: React.KeyboardEvent, chatId: string) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSaveChatTitle(chatId);
     } else if (e.key === 'Escape') {
       handleCancelChatTitleEdit();
     }
-  };
+  }, [handleSaveChatTitle, handleCancelChatTitleEdit]);
 
   const adjustEditTextareaHeight = () => {
     if (editTextareaRef.current) {
@@ -2681,127 +2676,6 @@ No preamble. Start directly with section 1.`;
     return date.toLocaleDateString();
   };
 
-  const getStatusBadge = (status: string) => {
-    const badges: Record<string, any> = {
-      hot: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30', icon: Flame, label: 'HOT' },
-      value: { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/30', icon: DollarSign, label: 'VALUE' },
-      optimal: { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/30', icon: Award, label: 'OPTIMAL' },
-      strong: { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/30', icon: CheckCircle, label: 'STRONG' },
-      target: { bg: 'bg-violet-500/20', text: 'text-violet-400', border: 'border-violet-500/30', icon: Target, label: 'TARGET' },
-      elite: { bg: 'bg-purple-600/20', text: 'text-purple-300', border: 'border-purple-600/30', icon: Medal, label: 'ELITE' },
-      sleeper: { bg: 'bg-indigo-500/20', text: 'text-indigo-400', border: 'border-indigo-500/30', icon: Zap, label: 'SLEEPER' },
-      opportunity: { bg: 'bg-cyan-500/20', text: 'text-cyan-400', border: 'border-cyan-500/30', icon: BarChart3, label: 'OPPORTUNITY' },
-      edge: { bg: 'bg-orange-500/20', text: 'text-orange-400', border: 'border-orange-500/30', icon: TrendingUp, label: 'EDGE' },
-      synergy: { bg: 'bg-violet-500/20', text: 'text-violet-400', border: 'border-violet-500/30', icon: Sparkles, label: 'SYNERGY' }
-    };
-    return badges[status] || badges.value;
-  };
-
-  const _renderInsightCard = (card: InsightCard, index: number) => {
-    // Validate card data before rendering
-    if (!card || typeof card !== 'object') {
-      return null;
-    }
-    
-    // Ensure required fields exist with fallbacks
-    const safeCard = {
-      icon: card.icon || Zap,
-      status: card.status || 'active',
-      gradient: card.gradient || 'from-blue-500 to-purple-500',
-      category: card.category || 'General',
-      subcategory: card.subcategory || 'Info',
-      title: card.title || 'Untitled Card',
-      data: card.data && typeof card.data === 'object' ? card.data : {},
-      type: card.type || 'default'
-    };
-    
-    const Icon = safeCard.icon;
-    const badge = getStatusBadge(safeCard.status);
-    const BadgeIcon = badge.icon;
-    const dataEntries = Object.entries(safeCard.data);
-    
-    // Enhanced visual design with glassmorphism and better data presentation
-    return (
-      <div
-        key={`card-${index}-${safeCard.type}`}
-        className="group relative bg-gradient-to-br from-[var(--bg-overlay)] to-[var(--bg-overlay)] backdrop-blur-xl rounded-2xl p-6 border border-[var(--border-subtle)] hover:border-[var(--border-hover)] transition-all duration-500 shadow-2xl hover:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] hover:scale-[1.02] overflow-hidden"
-      >
-        {/* Animated gradient overlay */}
-        <div className={`absolute inset-0 bg-gradient-to-br ${safeCard.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-700`}></div>
-        
-        {/* Accent line on left */}
-        <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${safeCard.gradient} opacity-60 group-hover:opacity-100 transition-opacity`}></div>
-        
-        {/* Header section with icon and title */}
-        <div className="relative flex items-start justify-between mb-5">
-          <div className="flex items-start gap-4 flex-1">
-            <div className={`p-3 rounded-xl bg-gradient-to-br ${safeCard.gradient} shadow-lg ring-4 ring-gray-800/50 group-hover:ring-gray-700/50 transition-all`}>
-              <Icon className="w-6 h-6 text-white" />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">{safeCard.category}</span>
-                <span className="text-[var(--text-faint)]">•</span>
-                <span className="text-xs font-medium text-[var(--text-faint)]">{safeCard.subcategory}</span>
-              </div>
-              <h3 className="text-base font-bold text-white leading-tight mb-1">{safeCard.title}</h3>
-              <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${badge.bg} ${badge.border}`}>
-                <BadgeIcon className={`w-3.5 h-3.5 ${badge.text}`} />
-                <span className={`text-xs font-bold ${badge.text} uppercase tracking-wide`}>{badge.label}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Enhanced data grid with better visual hierarchy */}
-        <div className="relative space-y-2">
-          {dataEntries.length > 0 ? (
-            dataEntries.map(([key, value], i) => {
-              const formattedKey = key
-                .replace(/([A-Z])/g, ' $1')
-                .replace(/^./, str => str.toUpperCase())
-                .trim();
-              
-              // Enhanced metric detection
-              const valueStr = String(value);
-              const isPercentage = valueStr.includes('%');
-              const isDollar = valueStr.includes('$');
-              const isUpTrend = valueStr.includes('↑') || valueStr.toLowerCase().includes('up');
-              const isDownTrend = valueStr.includes('↓') || valueStr.toLowerCase().includes('down');
-              const isHighValue = valueStr.includes('elite') || valueStr.includes('optimal');
-              
-              // Assign colors based on context
-              let valueColor = 'text-foreground/80';
-              if (isUpTrend) valueColor = 'text-blue-400';
-              else if (isDownTrend) valueColor = 'text-red-400';
-              else if (isHighValue) valueColor = 'text-purple-400';
-              else if (isDollar || isPercentage) valueColor = 'text-blue-400';
-              
-              return (
-                <div key={i} className="group/item relative">
-                  <div className="flex items-center justify-between py-2.5 px-3.5 rounded-lg bg-gradient-to-r from-[var(--bg-elevated)]/40 to-[var(--bg-elevated)]/20 hover:from-[var(--bg-elevated)]/60 hover:to-[var(--bg-elevated)]/40 transition-all duration-200 border border-[var(--border-subtle)] hover:border-[var(--border-hover)]/50">
-                    <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex-shrink-0 mr-4">
-                      {formattedKey}
-                    </span>
-                    <span className={`text-sm font-extrabold text-right ${valueColor} group-hover/item:scale-105 transition-transform flex items-center gap-1.5`}>
-                      {isUpTrend && <TrendingUp className="w-3.5 h-3.5" />}
-                      {isDownTrend && <TrendingDown className="w-3.5 h-3.5" />}
-                      {valueStr || 'N/A'}
-                    </span>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="text-center py-6 text-[var(--text-faint)] text-sm font-medium">
-              No data available
-            </div>
-          )}
-        </div>
-
-      </div>
-    );
-  };
 
   const filteredChats = chats
     .filter((chat: Chat) => selectedCategory === 'all' || chat.category === selectedCategory)
@@ -2815,368 +2689,9 @@ No preamble. Start directly with section 1.`;
       return chat.title.toLowerCase().includes(q) || (chat.preview || '').toLowerCase().includes(q);
     });
   
-  // Platform-specific AI-powered prompt suggestions
-  const platformPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string; query?: string }>> = {
-    all: [
-      { label: 'Cross-platform arbitrage opportunities', icon: Sparkles, category: 'all' },
-      { label: 'Today\'s best value plays across all platforms', icon: TrendingUp, category: 'all' },
-      { label: 'Correlated bets: DFS + betting + Kalshi', icon: Layers, category: 'all' },
-      { label: 'AI model predictions for tonight\'s games', icon: Activity, category: 'all' }
-    ],
-    betting: [
-      { label: 'NBA picks with best odds tonight', icon: TrendingUp, category: 'betting' },
-      { label: 'Live arbitrage alerts across sportsbooks', icon: Zap, category: 'betting' },
-      { label: 'Player props with edge (MLB/NBA/NFL)', icon: Target, category: 'betting' },
-      { label: 'Sharp money movement analysis', icon: Activity, category: 'betting' },
-      { label: 'Parlay builder with EV+ legs', icon: Medal, category: 'betting' }
-    ],
-    fantasy: [
-      { label: 'NFBC draft strategy for my pick position', icon: Trophy, category: 'fantasy' },
-      { label: 'Auction value targets and sleepers', icon: ShoppingCart, category: 'fantasy' },
-      { label: 'Best ball stacking strategy for NFFC', icon: Award, category: 'fantasy' },
-      { label: 'ADP risers and fallers this week', icon: TrendingUp, category: 'fantasy' },
-      { label: 'Salary cap week optimization', icon: DollarSign, category: 'fantasy' }
-    ],
-    dfs: [
-      { label: 'DFS NFL optimal lineups for DraftKings', icon: Award, category: 'dfs' },
-      { label: 'FanDuel NBA value plays under $5K', icon: DollarSign, category: 'dfs' },
-      { label: 'Showdown captain picks with leverage', icon: Medal, category: 'dfs' },
-      { label: 'Low ownership tournament stacks', icon: Users, category: 'dfs' },
-      { label: 'MLB pitcher-stacks correlation builder', icon: Layers, category: 'dfs' }
-    ],
-    kalshi: [
-      { label: 'Trending', icon: TrendingUp, category: 'kalshi', query: 'Show me trending Kalshi prediction markets right now' },
-      { label: 'Politics', icon: Activity, category: 'kalshi', query: 'Show me Politics prediction markets on Kalshi' },
-      { label: 'Sports', icon: Trophy, category: 'kalshi', query: 'Show me Sports prediction markets on Kalshi' },
-      { label: 'Culture', icon: Sparkles, category: 'kalshi', query: 'Show me Culture prediction markets on Kalshi' },
-      { label: 'Crypto', icon: BarChart3, category: 'kalshi', query: 'Show me Crypto prediction markets on Kalshi' },
-      { label: 'Climate', icon: Activity, category: 'kalshi', query: 'Show me Climate prediction markets on Kalshi' },
-      { label: 'Economics', icon: DollarSign, category: 'kalshi', query: 'Show me Economics prediction markets on Kalshi' },
-      { label: 'Mentions', icon: MessageSquare, category: 'kalshi', query: 'Show me top Mentions markets on Kalshi' },
-      { label: 'Companies', icon: Layers, category: 'kalshi', query: 'Show me Companies prediction markets on Kalshi' },
-      { label: 'Financials', icon: PieChart, category: 'kalshi', query: 'Show me Financials prediction markets on Kalshi' },
-      { label: 'Tech & Science', icon: Zap, category: 'kalshi', query: 'Show me Tech & Science prediction markets on Kalshi' },
-    ]
-  };
-
-  // Sport-specific prompt overrides — Betting
-  const sportBettingPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }>> = {
-    nfl: [
-      { label: 'NFL best lines and spreads this week', icon: TrendingUp, category: 'betting' },
-      { label: 'NFL player props with sharp edge', icon: Target, category: 'betting' },
-      { label: 'NFL sharp money movement & steam', icon: Activity, category: 'betting' },
-      { label: 'NFL arbitrage across sportsbooks', icon: Zap, category: 'betting' },
-      { label: 'NFL parlay builder with EV+ legs', icon: Medal, category: 'betting' },
-    ],
-    nba: [
-      { label: 'NBA picks with best odds tonight', icon: TrendingUp, category: 'betting' },
-      { label: 'NBA player props with edge tonight', icon: Target, category: 'betting' },
-      { label: 'NBA live arbitrage alerts', icon: Zap, category: 'betting' },
-      { label: 'NBA sharp money movement analysis', icon: Activity, category: 'betting' },
-      { label: 'NBA parlay builder with EV+ legs', icon: Medal, category: 'betting' },
-    ],
-    mlb: [
-      { label: 'MLB best run lines tonight', icon: TrendingUp, category: 'betting' },
-      { label: 'MLB pitcher props with edge', icon: Target, category: 'betting' },
-      { label: 'MLB first-5 innings sharp plays', icon: Activity, category: 'betting' },
-      { label: 'MLB arbitrage across sportsbooks', icon: Zap, category: 'betting' },
-      { label: 'MLB same-game parlay builder', icon: Medal, category: 'betting' },
-    ],
-    nhl: [
-      { label: 'NHL best moneylines tonight', icon: TrendingUp, category: 'betting' },
-      { label: 'NHL player props with edge', icon: Target, category: 'betting' },
-      { label: 'NHL puck line sharp plays', icon: Activity, category: 'betting' },
-      { label: 'NHL live arbitrage alerts', icon: Zap, category: 'betting' },
-      { label: 'NHL period-by-period betting angles', icon: Medal, category: 'betting' },
-    ],
-    'ncaa-football': [
-      { label: 'College football best lines this week', icon: TrendingUp, category: 'betting' },
-      { label: 'NCAAF player props with edge', icon: Target, category: 'betting' },
-      { label: 'College football sharp line moves', icon: Activity, category: 'betting' },
-      { label: 'NCAAF arbitrage opportunities', icon: Zap, category: 'betting' },
-      { label: 'College football totals with weather edge', icon: Medal, category: 'betting' },
-    ],
-    'ncaa-basketball': [
-      { label: "Men's college basketball best lines tonight", icon: TrendingUp, category: 'betting' },
-      { label: 'NCAAB player props with edge', icon: Target, category: 'betting' },
-      { label: 'College basketball sharp money plays', icon: Activity, category: 'betting' },
-      { label: 'NCAAB arbitrage across sportsbooks', icon: Zap, category: 'betting' },
-      { label: 'College basketball parlay builder', icon: Medal, category: 'betting' },
-    ],
-    'ncaa-basketball-w': [
-      { label: "Women's college basketball best lines tonight", icon: TrendingUp, category: 'betting' },
-      { label: 'NCAAW player props with edge', icon: Target, category: 'betting' },
-      { label: "Women's basketball sharp money plays", icon: Activity, category: 'betting' },
-      { label: 'NCAAW arbitrage across sportsbooks', icon: Zap, category: 'betting' },
-      { label: "Women's college basketball parlay builder", icon: Medal, category: 'betting' },
-    ],
-  };
-
-  // Sport-specific prompt overrides — Fantasy
-  const sportFantasyPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }>> = {
-    nfl: [
-      { label: 'NFL waiver wire priorities this week', icon: TrendingUp, category: 'fantasy' },
-      { label: 'NFL start/sit decisions this week', icon: Trophy, category: 'fantasy' },
-      { label: 'NFL trade value analysis', icon: ShoppingCart, category: 'fantasy' },
-      { label: 'NFL best ball stacking strategy', icon: Award, category: 'fantasy' },
-      { label: 'NFL ADP risers and fallers', icon: Activity, category: 'fantasy' },
-    ],
-    nba: [
-      { label: 'NBA fantasy pickups this week', icon: TrendingUp, category: 'fantasy' },
-      { label: 'NBA trade value analysis', icon: ShoppingCart, category: 'fantasy' },
-      { label: 'NBA streaming targets by category', icon: Trophy, category: 'fantasy' },
-      { label: 'NBA injury impact on roster', icon: Activity, category: 'fantasy' },
-      { label: 'NBA schedule analysis this week', icon: Award, category: 'fantasy' },
-    ],
-    mlb: [
-      { label: 'MLB waiver wire SP/RP targets', icon: TrendingUp, category: 'fantasy' },
-      { label: 'MLB hitter and pitcher streamers', icon: Trophy, category: 'fantasy' },
-      { label: 'MLB IL pickup opportunities', icon: Activity, category: 'fantasy' },
-      { label: 'MLB matchup-based start/sit', icon: Award, category: 'fantasy' },
-    ],
-    nhl: [
-      { label: 'NHL fantasy pickups this week', icon: TrendingUp, category: 'fantasy' },
-      { label: 'NHL power-play unit streaming targets', icon: Trophy, category: 'fantasy' },
-      { label: 'NHL trade value analysis', icon: ShoppingCart, category: 'fantasy' },
-      { label: 'NHL goalie start/sit decisions', icon: Award, category: 'fantasy' },
-      { label: 'NHL back-to-back schedule impact', icon: Activity, category: 'fantasy' },
-    ],
-    'ncaa-football': [
-      { label: 'NCAAF fantasy waiver wire targets', icon: TrendingUp, category: 'fantasy' },
-      { label: 'College football start/sit decisions', icon: Trophy, category: 'fantasy' },
-      { label: 'NCAAF trade value analysis', icon: ShoppingCart, category: 'fantasy' },
-      { label: 'College football ADP risers/fallers', icon: Activity, category: 'fantasy' },
-      { label: 'NCAAF breakout player targets', icon: Award, category: 'fantasy' },
-    ],
-    'ncaa-basketball': [
-      { label: "Men's college basketball fantasy pickups this week", icon: TrendingUp, category: 'fantasy' },
-      { label: 'NCAAB streaming targets and streaming options', icon: Trophy, category: 'fantasy' },
-      { label: 'NCAAB trade value analysis', icon: ShoppingCart, category: 'fantasy' },
-      { label: 'College basketball injury updates', icon: Activity, category: 'fantasy' },
-      { label: 'NCAAB matchup-based start/sit', icon: Award, category: 'fantasy' },
-    ],
-    'ncaa-basketball-w': [
-      { label: "Women's college basketball fantasy pickups this week", icon: TrendingUp, category: 'fantasy' },
-      { label: 'NCAAW streaming targets and options', icon: Trophy, category: 'fantasy' },
-      { label: 'NCAAW trade value analysis', icon: ShoppingCart, category: 'fantasy' },
-      { label: "Women's college basketball injury updates", icon: Activity, category: 'fantasy' },
-      { label: 'NCAAW matchup-based start/sit', icon: Award, category: 'fantasy' },
-    ],
-  };
-
-  // Sport-specific prompt overrides — DFS
-  const sportDFSPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }>> = {
-    nfl: [
-      { label: 'NFL DFS optimal lineups for DraftKings', icon: Award, category: 'dfs' },
-      { label: 'NFL FanDuel value plays this week', icon: DollarSign, category: 'dfs' },
-      { label: 'NFL showdown captain picks with leverage', icon: Medal, category: 'dfs' },
-      { label: 'NFL low-ownership GPP stacks', icon: Users, category: 'dfs' },
-      { label: 'NFL QB-receiver correlation stacks', icon: Layers, category: 'dfs' },
-    ],
-    nba: [
-      { label: 'NBA DFS optimal lineups for DraftKings', icon: Award, category: 'dfs' },
-      { label: 'NBA FanDuel value plays under $5K', icon: DollarSign, category: 'dfs' },
-      { label: 'NBA showdown captain picks', icon: Medal, category: 'dfs' },
-      { label: 'NBA pace-up game stacks', icon: Users, category: 'dfs' },
-      { label: 'NBA low-ownership tournament plays', icon: Layers, category: 'dfs' },
-    ],
-    mlb: [
-      { label: 'MLB DFS optimal lineups for DraftKings', icon: Award, category: 'dfs' },
-      { label: 'MLB pitcher stacks correlation builder', icon: Layers, category: 'dfs' },
-      { label: 'MLB FanDuel value plays tonight', icon: DollarSign, category: 'dfs' },
-      { label: 'MLB low-ownership GPP plays', icon: Users, category: 'dfs' },
-      { label: 'MLB weather-impacted lineup adjustments', icon: Medal, category: 'dfs' },
-    ],
-    nhl: [
-      { label: 'NHL DFS optimal lineups for DraftKings', icon: Award, category: 'dfs' },
-      { label: 'NHL power-play unit stacks', icon: Layers, category: 'dfs' },
-      { label: 'NHL FanDuel value plays tonight', icon: DollarSign, category: 'dfs' },
-      { label: 'NHL low-ownership GPP plays', icon: Users, category: 'dfs' },
-      { label: 'NHL goalie plays and fades', icon: Medal, category: 'dfs' },
-    ],
-    'ncaa-football': [
-      { label: 'NCAAF DFS optimal lineups for DraftKings', icon: Award, category: 'dfs' },
-      { label: 'College football FanDuel value plays', icon: DollarSign, category: 'dfs' },
-      { label: 'NCAAF showdown captain picks', icon: Medal, category: 'dfs' },
-      { label: 'College football low-ownership GPP stacks', icon: Users, category: 'dfs' },
-      { label: 'NCAAF QB-receiver correlation stacks', icon: Layers, category: 'dfs' },
-    ],
-    'ncaa-basketball': [
-      { label: "Men's college basketball DFS optimal lineups for DraftKings", icon: Award, category: 'dfs' },
-      { label: 'NCAAB FanDuel value plays', icon: DollarSign, category: 'dfs' },
-      { label: 'NCAAB showdown captain picks', icon: Medal, category: 'dfs' },
-      { label: 'College basketball low-ownership GPP plays', icon: Users, category: 'dfs' },
-      { label: 'NCAAB pace-up game stacks', icon: Layers, category: 'dfs' },
-    ],
-    'ncaa-basketball-w': [
-      { label: "Women's college basketball DFS optimal lineups for DraftKings", icon: Award, category: 'dfs' },
-      { label: 'NCAAW FanDuel value plays', icon: DollarSign, category: 'dfs' },
-      { label: 'NCAAW showdown captain picks', icon: Medal, category: 'dfs' },
-      { label: "Women's basketball low-ownership GPP plays", icon: Users, category: 'dfs' },
-      { label: 'NCAAW pace-up game stacks', icon: Layers, category: 'dfs' },
-    ],
-  };
-
-  // Kalshi subcategory-specific prompts — shown when a topic filter is selected
-  const kalshiTopicPrompts: Record<string, Array<{ label: string; icon: any; category: string }>> = {
-    Trending: [
-      { label: 'What trending Kalshi market has the best edge right now?', icon: TrendingUp, category: 'kalshi' },
-      { label: 'Biggest volume moves in the last 24 hours', icon: Activity, category: 'kalshi' },
-      { label: 'Highest liquidity trending contract today', icon: BarChart3, category: 'kalshi' },
-      { label: 'Cross-market arbitrage vs trending Kalshi markets', icon: Zap, category: 'kalshi' },
-    ],
-    Politics: [
-      { label: '2026 midterm election contracts with market inefficiencies', icon: Activity, category: 'kalshi' },
-      { label: 'Best value on Senate seat prediction markets', icon: TrendingUp, category: 'kalshi' },
-      { label: 'Governor race contract pricing analysis', icon: Target, category: 'kalshi' },
-      { label: 'Political market portfolio hedging strategy', icon: Layers, category: 'kalshi' },
-    ],
-    Sports: [
-      { label: 'Best value on sports Kalshi contracts vs sportsbooks', icon: TrendingUp, category: 'kalshi' },
-      { label: 'Championship winner contract pricing analysis', icon: Trophy, category: 'kalshi' },
-      { label: 'MVP award prediction market value', icon: Award, category: 'kalshi' },
-      { label: 'Sports Kalshi vs DraftKings arbitrage opportunities', icon: Zap, category: 'kalshi' },
-    ],
-    Culture: [
-      { label: 'Best value on awards season Kalshi contracts', icon: Sparkles, category: 'kalshi' },
-      { label: 'Oscars / Grammy contract pricing inefficiencies', icon: Award, category: 'kalshi' },
-      { label: 'Celebrity event market analysis right now', icon: Activity, category: 'kalshi' },
-      { label: 'Entertainment prediction market portfolio strategy', icon: Layers, category: 'kalshi' },
-    ],
-    Crypto: [
-      { label: 'Bitcoin price milestone contract analysis', icon: TrendingUp, category: 'kalshi' },
-      { label: 'ETF approval prediction market pricing', icon: BarChart3, category: 'kalshi' },
-      { label: 'Cross-market crypto vs Kalshi arbitrage', icon: Zap, category: 'kalshi' },
-      { label: 'Altcoin milestone contract value opportunities', icon: DollarSign, category: 'kalshi' },
-    ],
-    Climate: [
-      { label: 'Hurricane season contract analysis', icon: Activity, category: 'kalshi' },
-      { label: 'Temperature record market value vs NOAA forecasts', icon: TrendingUp, category: 'kalshi' },
-      { label: 'Climate event prediction market pricing', icon: BarChart3, category: 'kalshi' },
-      { label: 'Best value climate contracts this month', icon: Target, category: 'kalshi' },
-    ],
-    Economics: [
-      { label: 'Fed rate decision contract analysis', icon: DollarSign, category: 'kalshi' },
-      { label: 'CPI / inflation prediction market pricing', icon: TrendingUp, category: 'kalshi' },
-      { label: 'Jobs report contract value opportunities', icon: BarChart3, category: 'kalshi' },
-      { label: 'GDP prediction market edge vs consensus', icon: Activity, category: 'kalshi' },
-    ],
-    Mentions: [
-      { label: 'Top social media mention contract opportunities', icon: Activity, category: 'kalshi' },
-      { label: 'Celebrity brand mention market analysis', icon: Sparkles, category: 'kalshi' },
-      { label: 'News volume prediction market edge', icon: TrendingUp, category: 'kalshi' },
-      { label: 'Best value mentions markets right now', icon: Target, category: 'kalshi' },
-    ],
-    Companies: [
-      { label: 'Earnings announcement contract pricing', icon: DollarSign, category: 'kalshi' },
-      { label: 'M&A announcement prediction market analysis', icon: TrendingUp, category: 'kalshi' },
-      { label: 'CEO departure market probability assessment', icon: Activity, category: 'kalshi' },
-      { label: 'Company milestone contract value opportunities', icon: Target, category: 'kalshi' },
-    ],
-    Financials: [
-      { label: 'S&P 500 milestone prediction market analysis', icon: TrendingUp, category: 'kalshi' },
-      { label: 'Interest rate futures vs Kalshi contract pricing', icon: DollarSign, category: 'kalshi' },
-      { label: 'Treasury yield prediction market value', icon: BarChart3, category: 'kalshi' },
-      { label: 'Stock market milestone contract portfolio strategy', icon: Layers, category: 'kalshi' },
-    ],
-    'Tech & Science': [
-      { label: 'AI company milestone contract analysis', icon: Zap, category: 'kalshi' },
-      { label: 'Tech earnings prediction market value', icon: TrendingUp, category: 'kalshi' },
-      { label: 'Space launch success prediction market pricing', icon: Activity, category: 'kalshi' },
-      { label: 'Scientific breakthrough contract opportunities', icon: Sparkles, category: 'kalshi' },
-    ],
-  };
-
-  // Sport-specific cross-platform prompts for the "ALL" category when a sport is selected
-  const sportAllPrompts: Record<string, Array<{ label: string; icon: React.ComponentType<{ className?: string }>; category: string }>> = {
-    mlb: [
-      { label: 'MLB best bets and value plays today', icon: TrendingUp, category: 'all' },
-      { label: 'MLB player props with edge tonight',  icon: Target,     category: 'all' },
-      { label: 'MLB DFS optimal lineups for DraftKings', icon: Award,   category: 'all' },
-      { label: 'MLB arbitrage across sportsbooks',    icon: Zap,        category: 'all' },
-    ],
-    nba: [
-      { label: 'NBA best bets and spreads tonight',   icon: TrendingUp, category: 'all' },
-      { label: 'NBA player props with edge tonight',  icon: Target,     category: 'all' },
-      { label: 'NBA DFS optimal lineups for DraftKings', icon: Award,   category: 'all' },
-      { label: 'NBA arbitrage across sportsbooks',    icon: Zap,        category: 'all' },
-    ],
-    nfl: [
-      { label: 'NFL best bets and spreads this week', icon: TrendingUp, category: 'all' },
-      { label: 'NFL player props with sharp edge',    icon: Target,     category: 'all' },
-      { label: 'NFL DFS optimal lineups for DraftKings', icon: Award,   category: 'all' },
-      { label: 'NFL arbitrage across sportsbooks',    icon: Zap,        category: 'all' },
-    ],
-    nhl: [
-      { label: 'NHL best bets and puck lines tonight', icon: TrendingUp, category: 'all' },
-      { label: 'NHL player props with edge tonight',   icon: Target,     category: 'all' },
-      { label: 'NHL DFS optimal lineups for DraftKings', icon: Award,   category: 'all' },
-      { label: 'NHL arbitrage across sportsbooks',     icon: Zap,        category: 'all' },
-    ],
-    'ncaa-football': [
-      { label: 'NCAAF best bets and spreads this week', icon: TrendingUp, category: 'all' },
-      { label: 'NCAAF sharp money movement analysis',   icon: Activity,   category: 'all' },
-      { label: 'NCAAF DFS optimal lineups',             icon: Award,      category: 'all' },
-      { label: 'NCAAF arbitrage opportunities',         icon: Zap,        category: 'all' },
-    ],
-    'ncaa-basketball': [
-      { label: "Men's college basketball best bets tonight", icon: TrendingUp, category: 'all' },
-      { label: 'NCAAB sharp money movement analysis',        icon: Activity,   category: 'all' },
-      { label: 'NCAAB DFS optimal lineups',                  icon: Award,      category: 'all' },
-      { label: 'NCAAB arbitrage opportunities',              icon: Zap,        category: 'all' },
-    ],
-    'ncaa-basketball-w': [
-      { label: "Women's college basketball best bets tonight", icon: TrendingUp, category: 'all' },
-      { label: 'NCAAW sharp money movement analysis',          icon: Activity,   category: 'all' },
-      { label: 'NCAAW DFS optimal lineups',                    icon: Award,      category: 'all' },
-      { label: 'NCAAW arbitrage opportunities',                icon: Zap,        category: 'all' },
-    ],
-  };
-
-  // Sport-selection pills — shown when a category tab is active but no sport has been chosen.
-  // query strings start with the sport name so extractSport() reliably detects them.
-  const sportSelectionBettingPrompts = [
-    { label: 'NBA Odds Tonight', icon: TrendingUp, category: 'betting', query: 'NBA basketball betting odds and lines tonight' },
-    { label: 'NFL Odds',         icon: Activity,   category: 'betting', query: 'NFL football betting odds and best lines this week' },
-    { label: 'MLB Odds',         icon: Target,     category: 'betting', query: 'MLB baseball betting odds and run lines tonight' },
-    { label: 'NHL Odds',         icon: Zap,        category: 'betting', query: 'NHL hockey betting odds and puck lines tonight' },
-    { label: "Men's NCAAB Odds",   icon: Award,      category: 'betting', query: "NCAAB men's college basketball betting odds tonight" },
-    { label: "Women's NCAAW Odds", icon: Award,      category: 'betting', query: "NCAAW women's college basketball betting odds tonight" },
-    { label: 'UFC/MMA Odds',     icon: Medal,      category: 'betting', query: 'UFC MMA fight odds and best bets this weekend' },
-  ];
-  const sportSelectionFantasyPrompts = [
-    { label: 'NFL Fantasy', icon: Trophy,     category: 'fantasy', query: 'NFL fantasy football waiver wire and start sit advice this week' },
-    { label: 'NBA Fantasy', icon: TrendingUp, category: 'fantasy', query: 'NBA fantasy basketball pickups and trade value this week' },
-    { label: 'MLB Fantasy', icon: Target,     category: 'fantasy', query: 'MLB fantasy baseball waiver wire and streamer targets this week' },
-    { label: 'NHL Fantasy', icon: Medal,      category: 'fantasy', query: 'NHL fantasy hockey pickups and power-play targets this week' },
-  ];
-  const sportSelectionDFSPrompts = [
-    { label: 'NBA DFS Tonight', icon: Award,      category: 'dfs', query: 'NBA DFS optimal lineups and value plays for DraftKings tonight' },
-    { label: 'NFL DFS',         icon: Medal,      category: 'dfs', query: 'NFL DFS optimal lineups and GPP stacks for DraftKings this week' },
-    { label: 'MLB DFS',         icon: DollarSign, category: 'dfs', query: 'MLB DFS optimal lineups and pitcher stacks for DraftKings tonight' },
-  ];
-
-  // Get dynamic prompts based on selected platform AND sport/topic.
   // AI-generated prompts (aiQuickActions) take priority when available;
-  // fall back to hardcoded arrays on network failure or while loading.
-  const hardcodedQuickActions = (() => {
-    if (selectedCategory === 'kalshi' && selectedKalshiTopic && kalshiTopicPrompts[selectedKalshiTopic]) {
-      return kalshiTopicPrompts[selectedKalshiTopic];
-    }
-    if (selectedSport) {
-      if (selectedCategory === 'betting' && sportBettingPrompts[selectedSport]) return sportBettingPrompts[selectedSport];
-      if (selectedCategory === 'fantasy' && sportFantasyPrompts[selectedSport]) return sportFantasyPrompts[selectedSport];
-      if (selectedCategory === 'dfs'     && sportDFSPrompts[selectedSport])     return sportDFSPrompts[selectedSport];
-      if (selectedCategory === 'all'     && sportAllPrompts[selectedSport])     return sportAllPrompts[selectedSport];
-    }
-    // No sport selected but category requires one — show sport-selection pills
-    if (!selectedSport) {
-      if (selectedCategory === 'betting') return sportSelectionBettingPrompts;
-      if (selectedCategory === 'fantasy') return sportSelectionFantasyPrompts;
-      if (selectedCategory === 'dfs')     return sportSelectionDFSPrompts;
-    }
-    return platformPrompts[selectedCategory] || platformPrompts.all;
-  })();
+  // fall back to hardcoded arrays from lib/prompt-data.ts on network failure or while loading.
+  const hardcodedQuickActions = getHardcodedQuickActions(selectedCategory, selectedSport, selectedKalshiTopic);
   const quickActions = aiQuickActions ?? hardcodedQuickActions;
 
   return (
@@ -3236,9 +2751,9 @@ No preamble. Start directly with section 1.`;
           setSuggestedPrompts={setSuggestedPrompts}
           setLastUserQuery={setLastUserQuery}
           user={user}
-          onUserClick={() => isLoggedIn ? setShowUserLightbox(true) : setShowLoginModal(true)}
+          onUserClick={handleUserClick}
           isLoadingChats={isLoadingChats}
-          onClose={() => setSidebarOpen(false)}
+          onClose={handleCloseSidebar}
           onNavigate={(query, category, sport) => { openChatWithQuery(query, category, sport); setSidebarOpen(false); }}
         />
       </div>
@@ -3250,17 +2765,17 @@ No preamble. Start directly with section 1.`;
         {/* Header */}
         <ChatHeader
           sidebarOpen={sidebarOpen}
-          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          onToggleSidebar={handleToggleSidebar}
           isLoggedIn={isLoggedIn}
           user={user}
-          onOpenUserLightbox={() => setShowUserLightbox(true)}
-          onOpenAlerts={() => setShowAlertsLightbox(true)}
+          onOpenUserLightbox={handleOpenUserLightbox}
+          onOpenAlerts={handleOpenAlerts}
           alertCount={alertCount}
-          onOpenSettings={() => setShowSettingsLightbox(true)}
-          onOpenWatchlist={() => setShowWatchlistLightbox(true)}
+          onOpenSettings={handleOpenSettings}
+          onOpenWatchlist={handleOpenWatchlist}
           watchlistCount={savedPlayersCount + savedCardsCount}
-          onOpenLogin={() => setShowLoginModal(true)}
-          onOpenSignup={() => setShowSignupModal(true)}
+          onOpenLogin={handleOpenLogin}
+          onOpenSignup={handleOpenSignup}
           currentSport={selectedSport || undefined}
           currentCategory={selectedCategory !== 'all' ? selectedCategory : undefined}
         />
@@ -3490,7 +3005,7 @@ No preamble. Start directly with section 1.`;
                             {message.sources?.length ? (
                               <span className="text-[var(--text-faint)]">· {message.sources.length} sources</span>
                             ) : null}
-                            {(message.trustMetrics as any)?.hasLiveOdds && (
+                            {message.trustMetrics?.hasLiveOdds && (
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/10 text-blue-500/80">LIVE</span>
                             )}
                             <ChevronRight className="w-3 h-3 group-open/trust:rotate-90 transition-transform shrink-0" />
@@ -3515,9 +3030,9 @@ No preamble. Start directly with section 1.`;
                               <TrustMetricsDisplay
                                 metrics={{
                                   ...message.trustMetrics,
-                                  sources: (message.trustMetrics as any).sources || message.sources,
-                                  modelUsed: (message.trustMetrics as any).modelUsed || message.modelUsed || 'Grok 4',
-                                  processingTime: (message.trustMetrics as any).processingTime || message.processingTime,
+                                  sources: message.trustMetrics.sources || message.sources,
+                                  modelUsed: message.trustMetrics.modelUsed || message.modelUsed || 'Grok 4',
+                                  processingTime: message.trustMetrics.processingTime || message.processingTime,
                                 }}
                               />
                             )}
@@ -3768,11 +3283,11 @@ No preamble. Start directly with section 1.`;
               onFileDrop={processFiles}
               onFilesAdded={(files: any) => setUploadedFiles((prev: any) => [...prev, ...files])}
               creditsRemaining={creditsRemaining}
-              onOpenStripe={() => setShowStripeLightbox(true)}
+              onOpenStripe={handleOpenStripe}
               lastUserQuery={lastUserQuery}
               selectedCategory={selectedCategory}
               deepThink={deepThink}
-              onToggleDeepThink={() => setDeepThink((v) => !v)}
+              onToggleDeepThink={handleToggleDeepThink}
               systemStatus={systemStatus}
               voiceConvState={voiceConv.convState}
               voiceConvSupported={voiceConv.isSupported}
@@ -3822,7 +3337,7 @@ No preamble. Start directly with section 1.`;
         onClose={() => setShowSettingsLightbox(false)}
         user={user}
         onUserUpdate={setUser}
-        onOpenStripe={() => setShowStripeLightbox(true)}
+        onOpenStripe={handleOpenStripe}
         creditsRemaining={creditsRemaining}
       />
 

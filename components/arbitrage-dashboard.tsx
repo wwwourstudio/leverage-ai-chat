@@ -197,7 +197,7 @@ export function ArbitrageDashboard() {
                     </h3>
                     <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
                       <Clock className="h-4 w-4" />
-                      {new Date(opp.gameTime).toLocaleString()}
+                      <span suppressHydrationWarning>{new Date(opp.gameTime).toLocaleString()}</span>
                     </div>
                   </div>
 

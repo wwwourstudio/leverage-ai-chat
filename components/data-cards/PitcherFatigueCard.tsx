@@ -1,6 +1,6 @@
 'use client';
 
-import { Wind, ChevronRight } from 'lucide-react';
+import { Wind, ChevronRight, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface PitcherFatigueData {
@@ -30,10 +30,42 @@ interface PitcherFatigueCardProps {
 }
 
 const LABEL_STYLES = {
-  fresh:    { bar: 'bg-emerald-500', text: 'text-emerald-300', badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' },
-  normal:   { bar: 'bg-blue-500',    text: 'text-blue-300',    badge: 'bg-blue-500/15    border-blue-500/40    text-blue-300'    },
-  tired:    { bar: 'bg-amber-500',   text: 'text-amber-300',   badge: 'bg-amber-500/15   border-amber-500/40   text-amber-300'   },
-  'at-risk':{ bar: 'bg-red-500',     text: 'text-red-400',     badge: 'bg-red-500/15     border-red-500/40     text-red-400'     },
+  fresh:    {
+    bar: '#10b981',
+    badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300',
+    badgeGlow: 'shadow-[0_0_12px_rgba(16,185,129,0.25)]',
+    header: 'from-emerald-600/25 via-teal-900/10 to-transparent',
+    heroText: 'text-emerald-300',
+    heroGlow: 'drop-shadow(0 0 8px rgba(16,185,129,0.5))',
+    label: 'FRESH',
+  },
+  normal:   {
+    bar: '#3b82f6',
+    badge: 'bg-blue-500/15 border-blue-500/40 text-blue-300',
+    badgeGlow: 'shadow-[0_0_12px_rgba(59,130,246,0.25)]',
+    header: 'from-blue-600/25 via-indigo-900/10 to-transparent',
+    heroText: 'text-blue-300',
+    heroGlow: 'drop-shadow(0 0 8px rgba(59,130,246,0.5))',
+    label: 'NORMAL',
+  },
+  tired:    {
+    bar: '#f59e0b',
+    badge: 'bg-amber-500/15 border-amber-500/40 text-amber-300',
+    badgeGlow: 'shadow-[0_0_12px_rgba(245,158,11,0.25)]',
+    header: 'from-amber-600/25 via-orange-900/10 to-transparent',
+    heroText: 'text-amber-300',
+    heroGlow: 'drop-shadow(0 0 8px rgba(245,158,11,0.5))',
+    label: 'TIRED',
+  },
+  'at-risk': {
+    bar: '#ef4444',
+    badge: 'bg-red-500/15 border-red-500/40 text-red-300',
+    badgeGlow: 'shadow-[0_0_12px_rgba(239,68,68,0.25)]',
+    header: 'from-red-600/30 via-rose-900/15 to-transparent',
+    heroText: 'text-red-300',
+    heroGlow: 'drop-shadow(0 0 8px rgba(239,68,68,0.5))',
+    label: 'AT-RISK',
+  },
 };
 
 export function PitcherFatigueCard({
@@ -55,130 +87,193 @@ export function PitcherFatigueCard({
   const daysRest   = Number(data.daysRest ?? 4);
   const isHighCount  = pitchCount > 105;
   const isShortRest  = daysRest > 0 && daysRest <= 3;
+
   const recText =
     label === 'at-risk' ? 'Avoid in DFS — high fatigue, decline likely'
     : label === 'tired'  ? 'Fade K/IP overs — reduced velocity expected'
     : label === 'normal' ? 'Standard projection applies'
     : 'Favorable start — target in DFS & parlays';
-  const recColors =
+
+  const recStyle =
     label === 'at-risk' ? 'bg-red-500/10 border-red-500/20 text-red-300'
     : label === 'tired'  ? 'bg-amber-500/10 border-amber-500/20 text-amber-300'
     : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300';
 
+  // Pitch count bar vs typical 100-pitch start
+  const pitchCountPct = pitchCount > 0 ? Math.min(100, (pitchCount / 120) * 100) : 0;
+
+  // Days rest chip
+  const restChipStyle = daysRest >= 5 ? 'bg-emerald-500/15 border-emerald-500/25 text-emerald-300'
+    : daysRest >= 4 ? 'bg-blue-500/15 border-blue-500/25 text-blue-300'
+    : 'bg-red-500/15 border-red-500/25 text-red-300';
+
   return (
     <article
       className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-200 animate-fade-in-up',
-        'border-[var(--border-subtle)] hover:border-[var(--border-hover)]',
+        'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border transition-all duration-300',
+        'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_24px_rgba(59,130,246,0.08)]',
         isHero && 'sm:rounded-3xl',
       )}
     >
-      <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)} aria-hidden="true" />
-
-      <div className="pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2 min-w-0">
-            <Wind className="w-4 h-4 text-blue-400 shrink-0" aria-hidden="true" />
-            <div className="min-w-0">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{category}</span>
-              <span className="text-[var(--text-faint)] mx-1.5">/</span>
-              <span className="text-[10px] font-medium text-[var(--text-faint)]">{subcategory}</span>
-              <h3 className="text-sm font-black text-foreground mt-1 leading-snug">{title}</h3>
-            </div>
-          </div>
-
-          <span className={cn('text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg border shrink-0', styles.badge)}>
-            {label}
-          </span>
+      {/* ── Header ── */}
+      <div className={cn('relative px-4 pt-4 pb-3 bg-gradient-to-br border-b border-[var(--border-subtle)]', styles.header)}>
+        {/* Fatigue level badge — prominent top-right */}
+        <div className={cn('absolute top-3 right-3 text-[9px] font-black px-2.5 py-1.5 rounded-xl border uppercase tracking-widest', styles.badge, styles.badgeGlow)}>
+          {styles.label}
         </div>
 
-        {/* Fatigue bar */}
-        <div className="mb-4">
-          <div className="flex justify-between items-center mb-1.5 text-[10px]">
-            <span className="text-[var(--text-faint)]">Fatigue Level</span>
-            <span className={cn('font-black tabular-nums', styles.text)}>
+        {/* Sport chip */}
+        <div className="flex items-center gap-1.5 mb-2">
+          <Wind className="w-3 h-3 text-white/30" />
+          <span className="text-[9px] font-black uppercase tracking-widest text-white/40">{category} · {subcategory}</span>
+        </div>
+
+        {/* Pitcher name hero */}
+        {data.pitcherName && (
+          <h3 className="text-base font-black text-white truncate pr-20 mb-0.5">{data.pitcherName}</h3>
+        )}
+        <p className="text-[10px] text-white/40 truncate pr-20">{title}</p>
+      </div>
+
+      <div className="px-4 pb-4 pt-3 space-y-3">
+
+        {/* ── Fatigue multiplier meter ── */}
+        <div className="rounded-xl bg-white/3 border border-white/6 p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] font-black uppercase tracking-widest text-white/35">Fatigue Multiplier</span>
+            <span className={cn('text-xl font-black tabular-nums', styles.heroText)}>
               {multiplier.toFixed(2)}×
             </span>
           </div>
-          <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+          <div className="h-2 rounded-full bg-white/5 overflow-hidden">
             <div
-              className={cn('h-full rounded-full transition-all duration-500', styles.bar)}
-              style={{ width: `${barPct}%` }}
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${barPct}%`,
+                background: styles.bar,
+                boxShadow: `0 0 8px ${styles.bar}60`,
+              }}
               role="meter"
               aria-valuenow={barPct}
               aria-valuemin={0}
               aria-valuemax={100}
             />
           </div>
-          <div className="flex justify-between text-[8px] text-[var(--text-faint)] mt-1">
-            <span>Fresh</span>
-            <span>At Risk</span>
+          <div className="flex justify-between text-[8px] text-white/25">
+            <span>Fresh (0.80)</span>
+            <span>At Risk (1.50)</span>
           </div>
         </div>
 
-        {/* Stats grid */}
-        <div className="grid grid-cols-2 gap-2 mb-3">
+        {/* ── Stat grid ── */}
+        <div className="grid grid-cols-3 gap-2">
           {data.pitchCountLastStart !== undefined && (
-            <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5">
-              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Last Start</p>
-              <p className="text-base font-black tabular-nums text-foreground">{data.pitchCountLastStart} P</p>
+            <div className="flex flex-col items-center rounded-xl bg-white/3 border border-white/6 p-2.5 gap-1">
+              <span className="text-[8px] font-black uppercase tracking-widest text-white/30">Last Start</span>
+              <span className={cn('text-lg font-black tabular-nums', isHighCount ? 'text-amber-300' : 'text-white')}>
+                {data.pitchCountLastStart}
+              </span>
+              <span className="text-[8px] text-white/25">pitches</span>
             </div>
           )}
           {data.daysRest !== undefined && (
-            <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5">
-              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Days Rest</p>
-              <p className="text-base font-black tabular-nums text-foreground">{data.daysRest}d</p>
+            <div className="flex flex-col items-center rounded-xl bg-white/3 border border-white/6 p-2.5 gap-1">
+              <span className="text-[8px] font-black uppercase tracking-widest text-white/30">Days Rest</span>
+              <div className={cn('flex items-center gap-1 px-2 py-0.5 rounded-lg border', restChipStyle)}>
+                <Calendar className="w-2.5 h-2.5" />
+                <span className="text-sm font-black tabular-nums">{data.daysRest}d</span>
+              </div>
             </div>
           )}
           {data.inningsLastStart !== undefined && (
-            <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5">
-              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Innings</p>
-              <p className="text-base font-black tabular-nums text-foreground">{data.inningsLastStart} IP</p>
-            </div>
-          )}
-          {data.pitchCountLast7Days !== undefined && (
-            <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5">
-              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">7-Day Pitches</p>
-              <p className="text-base font-black tabular-nums text-foreground">{data.pitchCountLast7Days}</p>
+            <div className="flex flex-col items-center rounded-xl bg-white/3 border border-white/6 p-2.5 gap-1">
+              <span className="text-[8px] font-black uppercase tracking-widest text-white/30">Innings</span>
+              <span className="text-lg font-black tabular-nums text-white">{data.inningsLastStart}</span>
+              <span className="text-[8px] text-white/25">IP</span>
             </div>
           )}
         </div>
 
-        {/* Warning flags */}
+        {/* ── Pitch count bar vs typical 100-pitch start ── */}
+        {pitchCount > 0 && (
+          <div className="rounded-xl bg-white/3 border border-white/6 px-3 py-2.5 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-black uppercase tracking-widest text-white/35">Pitch Count vs Typical Start</span>
+              <span className="text-[9px] text-white/40 tabular-nums">{pitchCount} / 100</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${pitchCountPct}%`,
+                  background: isHighCount ? '#ef4444' : '#60a5fa',
+                  boxShadow: isHighCount ? '0 0 8px rgba(239,68,68,0.5)' : '0 0 8px rgba(96,165,250,0.4)',
+                }}
+              />
+            </div>
+            {/* 100-pitch marker */}
+            <div className="relative h-1">
+              <div
+                className="absolute top-0 bottom-0 w-px bg-white/20"
+                style={{ left: `${(100 / 120) * 100}%` }}
+              />
+              <span
+                className="absolute text-[7px] text-white/25"
+                style={{ left: `${(100 / 120) * 100}%`, transform: 'translateX(-50%)' }}
+              >
+                100
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* ── 7-day pitches ── */}
+        {data.pitchCountLast7Days !== undefined && (
+          <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-white/3 border border-white/6">
+            <span className="text-[9px] text-white/40 uppercase tracking-wide">7-Day Pitches</span>
+            <span className="text-sm font-black text-white tabular-nums">{data.pitchCountLast7Days}</span>
+          </div>
+        )}
+
+        {/* ── Warning flags ── */}
         {(isHighCount || isShortRest) && (
-          <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 mb-2 space-y-0.5">
+          <div className="rounded-xl bg-amber-500/8 border border-amber-500/20 px-3 py-2.5 space-y-1">
             {isHighCount && (
-              <p className="text-[10px] text-amber-300 font-semibold">⚠ High pitch count ({pitchCount}) — velocity/command risk</p>
+              <p className="text-[10px] text-amber-300 font-semibold flex items-start gap-1.5">
+                <span className="shrink-0 mt-0.5 font-black">!</span>
+                High pitch count ({pitchCount}) — velocity/command risk
+              </p>
             )}
             {isShortRest && (
-              <p className="text-[10px] text-amber-300 font-semibold">⚠ Short rest ({daysRest}d) — monitor lineup/scratch</p>
+              <p className="text-[10px] text-amber-300 font-semibold flex items-start gap-1.5">
+                <span className="shrink-0 mt-0.5 font-black">!</span>
+                Short rest ({daysRest}d) — monitor lineup/scratch
+              </p>
             )}
           </div>
         )}
 
-        {/* Action recommendation */}
-        <div className={cn('rounded-lg px-3 py-2 text-[10px] font-semibold mb-2 border', recColors)}>
+        {/* ── Action recommendation ── */}
+        <div className={cn('rounded-xl px-3 py-2.5 text-[10px] font-semibold border', recStyle)}>
           {recText}
         </div>
 
-        {/* Betting impact */}
+        {/* ── Betting impact ── */}
         {data.bettingImpact && (
-          <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{data.bettingImpact}</p>
+          <p className="text-[10px] text-white/50 leading-relaxed">{data.bettingImpact}</p>
         )}
 
-        {/* Description context */}
         {data.description && (
-          <p className="text-[10px] text-[var(--text-muted)] italic leading-relaxed mt-1">{data.description}</p>
+          <p className="text-[10px] text-white/35 italic leading-relaxed">{data.description}</p>
         )}
 
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/25 text-xs font-semibold text-blue-300 hover:bg-blue-500/20 hover:border-blue-400/40 transition-all duration-150"
           >
             Full Analysis
-            <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+            <ChevronRight className="w-3.5 h-3.5" />
           </button>
         )}
       </div>

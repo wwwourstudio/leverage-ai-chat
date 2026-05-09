@@ -14,10 +14,23 @@
 import { createClient } from '@/lib/supabase/server';
 import { validateServerEnv, getMissingAPIKeys } from '@/lib/config';
 
+export interface UserSession {
+  user: {
+    id: string;
+    email: string | undefined;
+    name: string;
+  };
+}
+
+export interface UserInsights {
+  stats: Record<string, unknown> | null;
+  preferences: Record<string, unknown> | null;
+}
+
 export interface ServerDataResult {
-  initialCards: any[];
-  initialInsights: any;
-  userSession: any;
+  initialCards: Record<string, unknown>[];
+  initialInsights: UserInsights | null;
+  userSession: UserSession | null;
   serverTime: string;
   missingKeys: string[];
   envErrors: string[];
@@ -37,7 +50,7 @@ interface FetchOptions {
  * Fetch user insights from database
  */
 async function fetchUserInsights(userId?: string): Promise<{
-  insights: any;
+  insights: UserInsights | null;
   errors: string[];
 }> {
   if (!userId) {
@@ -81,7 +94,7 @@ async function fetchUserInsights(userId?: string): Promise<{
  * Get authenticated user session
  */
 async function fetchUserSession(): Promise<{
-  session: any;
+  session: UserSession | null;
   errors: string[];
 }> {
   try {

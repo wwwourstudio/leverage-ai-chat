@@ -142,7 +142,7 @@ export function PitchMatchupCard({
           <div className="flex items-center justify-between text-xs mb-2">
             <span className="text-[var(--text-faint)]">Spin Rate</span>
             <span className={cn('font-semibold tabular-nums', spinColor)}>
-              {spinNum.toLocaleString()} rpm
+              {spinNum.toLocaleString('en-US')} rpm
               <span className="text-[var(--text-faint)] font-normal ml-1">({spinLabel})</span>
             </span>
           </div>

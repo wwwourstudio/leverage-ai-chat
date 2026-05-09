@@ -8,6 +8,7 @@
  */
 
 import type { TimelineEvent } from '@/lib/market-intelligence';
+import { formatTimeOfDay } from '@/lib/utils';
 
 interface Props {
   events: TimelineEvent[];
@@ -21,9 +22,6 @@ const TYPE_STYLES: Record<string, { icon: string; color: string }> = {
   snapshot: { icon: '📷', color: 'text-white/40' },
 };
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
 
 export function ExplainabilityTimeline({ events }: Props) {
   if (events.length === 0) {
@@ -55,7 +53,7 @@ export function ExplainabilityTimeline({ events }: Props) {
                   {event.description}
                 </span>
                 <span className="text-xs text-white/30 shrink-0 font-mono">
-                  {formatTime(event.timestamp)}
+                  <span suppressHydrationWarning>{formatTimeOfDay(event.timestamp)}</span>
                 </span>
               </div>
               <p className="text-xs text-white/40 leading-relaxed">{event.detail}</p>

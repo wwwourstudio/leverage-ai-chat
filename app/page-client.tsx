@@ -420,7 +420,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        setShowCommandPalette(v => !v);
+        setShowCommandPalette(prev => !prev);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -3246,6 +3246,7 @@ No preamble. Start directly with section 1.`;
           onUserClick={handleUserClick}
           isLoadingChats={isLoadingChats}
           onClose={handleCloseSidebar}
+          onNavigate={(query, category, sport) => { openChatWithQuery(query, category, sport); setSidebarOpen(false); }}
         />
       </div>
 

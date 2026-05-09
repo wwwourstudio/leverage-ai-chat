@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 
 export interface ModalState {
   showLoginModal: boolean;
@@ -14,17 +14,17 @@ export interface ModalState {
   showSubscriptionModal: boolean;
   showCommandPalette: boolean;
   showLimitNotification: boolean;
-  setShowLoginModal: (v: boolean) => void;
-  setShowSignupModal: (v: boolean) => void;
-  setShowUserLightbox: (v: boolean) => void;
-  setShowSettingsLightbox: (v: boolean) => void;
-  setShowAlertsLightbox: (v: boolean) => void;
-  setShowWatchlistLightbox: (v: boolean) => void;
-  setShowStripeLightbox: (v: boolean) => void;
-  setShowPurchaseModal: (v: boolean) => void;
-  setShowSubscriptionModal: (v: boolean) => void;
-  setShowCommandPalette: (v: boolean) => void;
-  setShowLimitNotification: (v: boolean) => void;
+  setShowLoginModal: Dispatch<SetStateAction<boolean>>;
+  setShowSignupModal: Dispatch<SetStateAction<boolean>>;
+  setShowUserLightbox: Dispatch<SetStateAction<boolean>>;
+  setShowSettingsLightbox: Dispatch<SetStateAction<boolean>>;
+  setShowAlertsLightbox: Dispatch<SetStateAction<boolean>>;
+  setShowWatchlistLightbox: Dispatch<SetStateAction<boolean>>;
+  setShowStripeLightbox: Dispatch<SetStateAction<boolean>>;
+  setShowPurchaseModal: Dispatch<SetStateAction<boolean>>;
+  setShowSubscriptionModal: Dispatch<SetStateAction<boolean>>;
+  setShowCommandPalette: Dispatch<SetStateAction<boolean>>;
+  setShowLimitNotification: Dispatch<SetStateAction<boolean>>;
 }
 
 export function useModalState(): ModalState {

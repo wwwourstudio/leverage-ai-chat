@@ -192,9 +192,9 @@ export function LineMovementChart({ gameId, homeTeam, awayTeam }: LineMovementCh
 
       {/* Timeline */}
       <div className="mt-4 flex justify-between text-xs text-muted-foreground">
-        <span>{new Date(movements[0].timestamp).toLocaleTimeString()}</span>
+        <span suppressHydrationWarning>{new Date(movements[0].timestamp).toLocaleTimeString()}</span>
         <span>Time</span>
-        <span>{new Date(movements[movements.length - 1].timestamp).toLocaleTimeString()}</span>
+        <span suppressHydrationWarning>{new Date(movements[movements.length - 1].timestamp).toLocaleTimeString()}</span>
       </div>
 
       {/* Sharp Money Indicator */}

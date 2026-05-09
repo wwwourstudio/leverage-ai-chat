@@ -55,6 +55,11 @@
   --text-muted: oklch(0.50 0.01 280);
   --text-faint: oklch(0.62 0.01 280);
 
+  /* Z-index scale */
+  --z-modal:   100;
+  --z-overlay: 200;
+  --z-toast:   300;
+
   /* Animation timing */
   --duration-fast: 150ms;
   --duration-normal: 250ms;

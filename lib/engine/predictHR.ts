@@ -108,10 +108,9 @@ interface OddsRow {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Derive a team power rank stub from team_id until we have a proper lookup. */
+/** Returns neutral team power rank (15 of 30). team_rankings table not yet provisioned. */
 function teamPowerRankFromId(_teamId: string | null | undefined): number {
-  // TODO: replace with a real lookup table or Supabase join once team_rankings is added
-  return 15; // neutral default
+  return 15;
 }
 
 const americanToImplied = americanToImpliedProb;
@@ -251,15 +250,15 @@ export async function predictHR({
   // platoon_advantage and opposing_bullpen_depth are removed from the interface.
   const lineupCtx: LineupContext = {
     // Positional
-    lineup_slot:               6,     // TODO: fetch from game_lineups table once added
+    lineup_slot:               6,     // Middle of order — game_lineups table not yet provisioned
     batter_hand:               batterHand,
     pitcher_hand:              pitcherHand,
     // Pitcher structural
     pitcher_flyball_pct:       pit.flyball_pct          ?? 40,
     pitcher_hr9_vs_hand:       pit.hr9_vs_hand          ?? 1.1,
-    protection_score:          0.5,   // TODO: derive from adjacent lineup slots
+    protection_score:          0.5,   // Neutral — adjacent lineup context not yet provisioned
     team_power_rank:           teamPowerRankFromId(ps.players?.team_id),
-    opposing_bullpen_hr9:      1.2,   // TODO: fetch from bullpen_stats table
+    opposing_bullpen_hr9:      1.2,   // League-average — bullpen_stats table not yet provisioned
     // Platoon split scores [-1, +1]
     batter_platoon_score:      ps.platoon_score          ?? 0,
     pitcher_platoon_score:     pit.platoon_score         ?? 0,

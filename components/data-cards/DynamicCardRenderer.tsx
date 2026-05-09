@@ -55,6 +55,34 @@ import { DFSGamesCard } from './DFSGamesCard';
 import { PropHitRateCard } from './PropHitRateCard';
 import { PlayerPropCard } from './PlayerPropCard';
 
+// ── Card registries ────────────────────────────────────────────────────────
+// Standard-props shape: { type, title, category, subcategory, gradient, data, status, onAnalyze, onAsk, error, isHero }
+// Exact-match wins before pattern-match.
+
+const EXACT_STD_REGISTRY: Record<string, React.ComponentType<any>> = {
+  line_movement:        LineMovementCard,
+  kelly_bet:            KellyBetCard,
+  portfolio:            PortfolioCard,
+  ev_bet_card:          EVBetCard,
+  sharp_money_card:     SharpMoneyCard,
+  pitcher_fatigue_card: PitcherFatigueCard,
+  bullpen_fatigue_card: BullpenFatigueCard,
+  pitch_matchup_card:   PitchMatchupCard,
+  umpire_impact_card:   UmpireImpactCard,
+  catcher_framing_card: CatcherFramingCard,
+  closing_line_card:    ClosingLineCard,
+};
+
+const PATTERN_STD_REGISTRY: Array<{ test: (t: string) => boolean; Component: React.ComponentType<any> }> = [
+  { test: t => t.includes('dfs') || t.includes('lineup'),                                                                              Component: DFSCard },
+  { test: t => t.includes('fantasy') || t.includes('draft') || t.includes('sleeper'),                                                 Component: FantasyCard },
+  { test: t => t.includes('kalshi') || t.includes('prediction'),                                                                      Component: KalshiCard },
+  { test: t => t.includes('weather') || t.includes('climate'),                                                                        Component: WeatherCard },
+  { test: t => t === 'adp-analysis' || t.includes('adp'),                                                                             Component: ADPCard },
+  { test: t => t.includes('arbitrage'),                                                                                               Component: ArbitrageCard },
+  { test: t => t.includes('odds') || t.includes('betting') || t.includes('moneyline') || t.includes('spread') || t.includes('totals'), Component: BettingCard },
+];
+
 interface CardData {
   id?: string;
   type: string;
@@ -247,19 +275,13 @@ export function DynamicCardRenderer({
     );
   }
 
-  // Determine card type and render appropriate component
+  // ── Card dispatch ─────────────────────────────────────────────────────────
   const cardType = safeCard.type.toLowerCase();
 
-  // Betting-related cards
-  if (
-    cardType.includes('odds') ||
-    cardType.includes('betting') ||
-    cardType.includes('moneyline') ||
-    cardType.includes('spread') ||
-    cardType.includes('totals')
-  ) {
+  // Renders a standard-props card (the majority share this prop shape).
+  function renderStd(Component: React.ComponentType<any>, skipBookmark = false): React.ReactElement {
     return withOverlays(
-      <BettingCard
+      <Component
         type={safeCard.type}
         title={safeCard.title}
         category={safeCard.category}
@@ -271,165 +293,35 @@ export function DynamicCardRenderer({
         onAsk={onAsk}
         error={error}
         isHero={isHero}
-      />
-    );
-  }
-
-  // DFS games / slate picker card
-  if (cardType === 'dfs-games') {
-    return withOverlays(
-      <DFSGamesCard
-        data={safeCard.data as any}
-        onAsk={onAsk}
       />,
-      true, // skip bookmark (interactive card)
+      skipBookmark,
     );
   }
 
-  // Full DFS slate card (9-player optimal lineup roster)
-  if (cardType === 'dfs-slate') {
-    return withOverlays(
-      <DFSSlateCard
-        title={safeCard.title}
-        data={safeCard.data}
-        onAnalyze={handleAnalyze}
-        isHero={isHero}
-      />
-    );
-  }
+  // ── Cards with unique prop shapes (handled before registry lookup) ────────
 
-  // DFS-related cards
-  if (cardType.includes('dfs') || cardType.includes('lineup')) {
-    return withOverlays(
-      <DFSCard
-        type={safeCard.type}
-        title={safeCard.title}
-        category={safeCard.category}
-        subcategory={safeCard.subcategory}
-        gradient={safeCard.gradient}
-        data={safeCard.data}
-        status={safeCard.status}
-        onAnalyze={handleAnalyze}
-        error={error}
-        isHero={isHero}
-      />
-    );
-  }
+  // HR Prediction: exact match before 'prediction' catch-all in pattern registry
+  if (cardType === 'hr_prediction_card')
+    return withOverlays(<HRPredictionCard data={card.data as any} />);
 
-  // Fantasy-related cards
-  if (
-    cardType.includes('fantasy') ||
-    cardType.includes('draft') ||
-    cardType.includes('sleeper')
-  ) {
-    return withOverlays(
-      <FantasyCard
-        type={safeCard.type}
-        title={safeCard.title}
-        category={safeCard.category}
-        subcategory={safeCard.subcategory}
-        gradient={safeCard.gradient}
-        data={safeCard.data}
-        status={safeCard.status}
-        onAnalyze={handleAnalyze}
-        error={error}
-        isHero={isHero}
-      />
-    );
-  }
+  // VPE 3.0 — merges safeCard + raw card for nested data fields
+  if (cardType === 'vpe_projection_card')
+    return withOverlays(<VPECard card={{ ...safeCard, ...(card as any) } as any} onAnalyze={handleAnalyze} />);
 
-  // LeverageMetrics v3 HR Prediction card (exact match — must come before 'prediction' catch-all)
-  if (cardType === 'hr_prediction_card') {
-    return withOverlays(
-      <HRPredictionCard data={card.data as any} />
-    );
-  }
+  // MLB Projections — same merge pattern as VPE
+  if (cardType === 'mlb_projection_card')
+    return withOverlays(<MLBProjectionCard data={{ ...safeCard, ...(card as any) } as any} onAnalyze={handleAnalyze} isHero={isHero} />);
 
-  // Kalshi-related cards
-  if (cardType.includes('kalshi') || cardType.includes('prediction')) {
-    return withOverlays(
-      <KalshiCard
-        type={safeCard.type}
-        title={safeCard.title}
-        category={safeCard.category}
-        subcategory={safeCard.subcategory}
-        gradient={safeCard.gradient}
-        data={safeCard.data}
-        status={safeCard.status}
-        onAnalyze={handleAnalyze}
-        error={error}
-        isHero={isHero}
-      />
-    );
-  }
+  // Statcast — skipBookmark only when type string contains 'statcast'
+  if (cardType.includes('statcast') || cardType === 'hr_prop_card' || cardType.includes('simulation') || cardType === 'leaderboard_card' || cardType === 'pitch_analysis_card')
+    return withOverlays(<StatcastCard data={{ ...safeCard, ...(card as any) } as any} onAnalyze={handleAnalyze} isHero={isHero} />, cardType.includes('statcast'));
 
-  // Weather-related cards
-  if (cardType.includes('weather') || cardType.includes('climate')) {
-    return withOverlays(
-      <WeatherCard
-        type={safeCard.type}
-        title={safeCard.title}
-        category={safeCard.category}
-        subcategory={safeCard.subcategory}
-        gradient={safeCard.gradient}
-        data={safeCard.data}
-        status={safeCard.status}
-        onAnalyze={handleAnalyze}
-        error={error}
-        isHero={isHero}
-      />
-    );
-  }
-
-  // Vortex Projection Engine (VPE 3.0) — Baseball only
-  if (cardType === 'vpe_projection_card') {
-    return withOverlays(
-      <VPECard
-        card={{ ...safeCard, ...(card as any) } as any}
-        onAnalyze={handleAnalyze}
-      />
-    );
-  }
-
-  // LeverageMetrics MLB Projection cards (HR/K/Breakout/Monte Carlo)
-  if (cardType === 'mlb_projection_card') {
-    return withOverlays(
-      <MLBProjectionCard
-        data={{ ...safeCard, ...(card as any) } as any}
-        onAnalyze={handleAnalyze}
-        isHero={isHero}
-      />
-    );
-  }
-
-  // MLB Statcast cards — statcast_summary_card, hr_prop_card, game_simulation_card,
-  // leaderboard_card, pitch_analysis_card
-  if (
-    cardType.includes('statcast') ||
-    cardType === 'hr_prop_card' ||
-    cardType.includes('simulation') ||
-    cardType === 'leaderboard_card' ||
-    cardType === 'pitch_analysis_card'
-  ) {
-    // StatcastCard has its own heart/watchlist button — skip the generic bookmark star
-    const isStatcastPitcher = cardType.includes('statcast');
-    return withOverlays(
-      <StatcastCard
-        data={{ ...safeCard, ...(card as any) } as any}
-        onAnalyze={handleAnalyze}
-        isHero={isHero}
-      />,
-      isStatcastPitcher, // skipBookmark
-    );
-  }
-
-  // AI Insight cards (off-season or no-live-data fallback)
+  // AI Insight cards (custom JSX — no component wrapper)
   if (cardType === 'betting-insight' || cardType.includes('insight')) {
     const sportEmojis: Record<string, string> = {
       nba: '🏀', nfl: '🏈', mlb: '⚾', nhl: '🏒', ncaab: '🏀', ncaaf: '🏈',
     };
-    const sportKey = safeCard.category?.toLowerCase() ?? '';
-    const emoji = sportEmojis[sportKey] ?? '📊';
+    const emoji = sportEmojis[safeCard.category?.toLowerCase() ?? ''] ?? '📊';
     return withOverlays(
       <div className={`group relative bg-gradient-to-br ${safeCard.gradient || 'from-blue-600/20 to-purple-900/10'} rounded-2xl p-5 border border-[var(--border-subtle)] hover:border-[var(--border-hover)] transition-all duration-300 shadow-lg hover:shadow-xl`}>
         <div className="flex items-start gap-3 mb-3">
@@ -452,44 +344,11 @@ export function DynamicCardRenderer({
     );
   }
 
-  // ADP upload card — shown when no TSV has been uploaded yet
-  if (cardType === 'adp-upload') {
-    const sport = (safeCard.data?.sport as 'mlb' | 'nfl' | undefined) ?? 'mlb';
-    return <ADPUploadModal sport={sport} />;
-  }
+  // ADP upload — no overlay wrapper (it is the trigger modal itself)
+  if (cardType === 'adp-upload')
+    return <ADPUploadModal sport={(safeCard.data?.sport as 'mlb' | 'nfl' | undefined) ?? 'mlb'} />;
 
-  // ADP leaderboard cards (NFBC ADP tool results)
-  if (cardType === 'adp-analysis' || cardType.includes('adp')) {
-    return withOverlays(
-      <ADPCard
-        type={safeCard.type}
-        title={safeCard.title}
-        category={safeCard.category}
-        subcategory={safeCard.subcategory}
-        gradient={safeCard.gradient}
-        data={safeCard.data}
-        status={safeCard.status}
-        onAnalyze={handleAnalyze}
-        error={error}
-        isHero={isHero}
-      />
-    );
-  }
-
-  // Player prop odds cards (from The Odds API via playerPropToCard())
-  if (cardType.includes('player_prop') || cardType === 'player-prop') {
-    return withOverlays(
-      <PlayerPropCard
-        data={safeCard.data}
-        category={safeCard.category}
-        gradient={safeCard.gradient}
-        onAnalyze={handleAnalyze}
-        isHero={isHero}
-      />
-    );
-  }
-
-  // Prop hit-rate cards (detailed historical analysis with grade rings + recent form)
+  // Prop hit-rate — unique destructured prop shape
   if (cardType === 'prop-hit-rate' || cardType === 'prop_hit_rate') {
     const d = safeCard.data;
     return withOverlays(
@@ -513,291 +372,44 @@ export function DynamicCardRenderer({
     );
   }
 
-  // Line movement cards
-  if (cardType === 'line_movement') {
-    return withOverlays(
-      <LineMovementCard
-        type={safeCard.type}
-        title={safeCard.title}
-        category={safeCard.category}
-        subcategory={safeCard.subcategory}
-        gradient={safeCard.gradient}
-        data={safeCard.data}
-        status={safeCard.status}
-        onAnalyze={handleAnalyze}
-        isHero={isHero}
-      />
-    );
-  }
+  // Player prop — different prop shape (data + category + gradient only)
+  if (cardType.includes('player_prop') || cardType === 'player-prop')
+    return withOverlays(<PlayerPropCard data={safeCard.data} category={safeCard.category} gradient={safeCard.gradient} onAnalyze={handleAnalyze} isHero={isHero} />);
 
-  // Kelly bet sizing cards
-  if (cardType === 'kelly_bet') {
-    return withOverlays(
-      <KellyBetCard
-        type={safeCard.type}
-        title={safeCard.title}
-        category={safeCard.category}
-        subcategory={safeCard.subcategory}
-        gradient={safeCard.gradient}
-        data={safeCard.data}
-        status={safeCard.status}
-        onAnalyze={handleAnalyze}
-        isHero={isHero}
-      />
-    );
-  }
+  // Standalone typed cards (direct API data, exact matches)
+  if (cardType === 'odds_event')      return withOverlays(<OddsCard event={safeCard.data as any} onAsk={onAsk} />);
+  if (cardType === 'kalshi_market')   return withOverlays(<KalshiMarketCard market={safeCard.data as any} onAsk={onAsk} />);
+  if (cardType === 'player_profile')  return withOverlays(<PlayerCard player={safeCard.data as any} onAsk={onAsk} />);
+  if (cardType === 'arbitrage_opp')   return withOverlays(<ArbitrageOpportunityCard opportunity={safeCard.data as any} onAsk={onAsk} />);
 
-  // Portfolio overview cards
-  if (cardType === 'portfolio') {
-    return withOverlays(
-      <PortfolioCard
-        type={safeCard.type}
-        title={safeCard.title}
-        category={safeCard.category}
-        subcategory={safeCard.subcategory}
-        gradient={safeCard.gradient}
-        data={safeCard.data}
-        status={safeCard.status}
-        onAnalyze={handleAnalyze}
-        isHero={isHero}
-      />
-    );
-  }
-
-  // ── Trading terminal analytics cards ──────────────────────────────────────
-
-  // Positive-EV bet cards
-  if (cardType === 'ev_bet_card') {
-    return withOverlays(
-      <EVBetCard
-        type={safeCard.type}
-        title={safeCard.title}
-        category={safeCard.category}
-        subcategory={safeCard.subcategory}
-        gradient={safeCard.gradient}
-        data={safeCard.data}
-        status={safeCard.status}
-        onAnalyze={handleAnalyze}
-        isHero={isHero}
-      />
-    );
-  }
-
-  // Sharp money / steam move cards (must come before 'insight' catch-all)
-  if (cardType === 'sharp_money_card') {
-    return withOverlays(
-      <SharpMoneyCard
-        type={safeCard.type}
-        title={safeCard.title}
-        category={safeCard.category}
-        subcategory={safeCard.subcategory}
-        gradient={safeCard.gradient}
-        data={safeCard.data}
-        status={safeCard.status}
-        onAnalyze={handleAnalyze}
-        isHero={isHero}
-      />
-    );
-  }
-
-  // Pitcher fatigue cards
-  if (cardType === 'pitcher_fatigue_card') {
-    return withOverlays(
-      <PitcherFatigueCard
-        type={safeCard.type}
-        title={safeCard.title}
-        category={safeCard.category}
-        subcategory={safeCard.subcategory}
-        gradient={safeCard.gradient}
-        data={safeCard.data}
-        status={safeCard.status}
-        onAnalyze={handleAnalyze}
-        isHero={isHero}
-      />
-    );
-  }
-
-  // Bullpen fatigue cards
-  if (cardType === 'bullpen_fatigue_card') {
-    return withOverlays(
-      <BullpenFatigueCard
-        type={safeCard.type}
-        title={safeCard.title}
-        category={safeCard.category}
-        subcategory={safeCard.subcategory}
-        gradient={safeCard.gradient}
-        data={safeCard.data}
-        status={safeCard.status}
-        onAnalyze={handleAnalyze}
-        isHero={isHero}
-      />
-    );
-  }
-
-  // Pitch type matchup cards
-  if (cardType === 'pitch_matchup_card') {
-    return withOverlays(
-      <PitchMatchupCard
-        type={safeCard.type}
-        title={safeCard.title}
-        category={safeCard.category}
-        subcategory={safeCard.subcategory}
-        gradient={safeCard.gradient}
-        data={safeCard.data}
-        status={safeCard.status}
-        onAnalyze={handleAnalyze}
-        isHero={isHero}
-      />
-    );
-  }
-
-  // Umpire strike zone impact cards
-  if (cardType === 'umpire_impact_card') {
-    return withOverlays(
-      <UmpireImpactCard
-        type={safeCard.type}
-        title={safeCard.title}
-        category={safeCard.category}
-        subcategory={safeCard.subcategory}
-        gradient={safeCard.gradient}
-        data={safeCard.data}
-        status={safeCard.status}
-        onAnalyze={handleAnalyze}
-        isHero={isHero}
-      />
-    );
-  }
-
-  // Catcher framing cards
-  if (cardType === 'catcher_framing_card') {
-    return withOverlays(
-      <CatcherFramingCard
-        type={safeCard.type}
-        title={safeCard.title}
-        category={safeCard.category}
-        subcategory={safeCard.subcategory}
-        gradient={safeCard.gradient}
-        data={safeCard.data}
-        status={safeCard.status}
-        onAnalyze={handleAnalyze}
-        isHero={isHero}
-      />
-    );
-  }
-
-  // Closing line value (CLV) tracking cards
-  if (cardType === 'closing_line_card') {
-    return withOverlays(
-      <ClosingLineCard
-        type={safeCard.type}
-        title={safeCard.title}
-        category={safeCard.category}
-        subcategory={safeCard.subcategory}
-        gradient={safeCard.gradient}
-        data={safeCard.data}
-        status={safeCard.status}
-        onAnalyze={handleAnalyze}
-        isHero={isHero}
-      />
-    );
-  }
-
-  // ── Standalone typed cards (direct API data, exact type matches) ──────────
-
-  // Enriched odds event (from /api/odds enriched response)
-  if (cardType === 'odds_event') {
-    return withOverlays(
-      <OddsCard
-        event={safeCard.data as any}
-        onAsk={onAsk}
-      />
-    );
-  }
-
-  // Kalshi market card (from /api/kalshi response)
-  if (cardType === 'kalshi_market') {
-    return withOverlays(
-      <KalshiMarketCard
-        market={safeCard.data as any}
-        onAsk={onAsk}
-      />
-    );
-  }
-
-  // Player profile card (from /api/players response)
-  if (cardType === 'player_profile') {
-    return withOverlays(
-      <PlayerCard
-        player={safeCard.data as any}
-        onAsk={onAsk}
-      />
-    );
-  }
-
-  // DFS lineup card (from /api/dfs response)
+  // DFS Lineup — requires field normalization before render
   if (cardType === 'dfs_lineup') {
     const rawLineup = safeCard.data.lineup;
-    const rosterArray: any[] = rawLineup?.roster
-      ?? (Array.isArray(rawLineup) ? rawLineup : null)
-      ?? safeCard.data.players
-      ?? [];
-    const totalProjected: number =
-      rawLineup?.totalProjected ?? safeCard.data.totalProjected ?? 0;
-    // Normalize field names: nfbc_adp enriched players use primaryPosition/projectedPoints
+    const rosterArray: any[] = rawLineup?.roster ?? (Array.isArray(rawLineup) ? rawLineup : null) ?? safeCard.data.players ?? [];
     const lineup = rosterArray.map((p: any) => ({
       ...p,
       player_name: p.player_name ?? p.display_name ?? p.name ?? '',
       player_type: p.player_type ?? p.primaryPosition ?? p.position ?? '',
       dk_pts_mean: p.dk_pts_mean ?? p.projectedPoints ?? 0,
     }));
-    return withOverlays(
-      <DFSLineupCard
-        lineup={lineup}
-        totalProjected={totalProjected}
-        site={safeCard.data.site ?? 'DK'}
-        onAsk={onAsk}
-      />
-    );
+    return withOverlays(<DFSLineupCard lineup={lineup} totalProjected={rawLineup?.totalProjected ?? safeCard.data.totalProjected ?? 0} site={safeCard.data.site ?? 'DK'} onAsk={onAsk} />);
   }
 
-  // Arbitrage opportunity card (standalone typed — exact match first)
-  if (cardType === 'arbitrage_opp') {
-    return withOverlays(
-      <ArbitrageOpportunityCard
-        opportunity={safeCard.data as any}
-        onAsk={onAsk}
-      />
-    );
-  }
+  // DFS Games: skipBookmark (interactive card with built-in controls)
+  if (cardType === 'dfs-games')  return withOverlays(<DFSGamesCard data={safeCard.data as any} onAsk={onAsk} />, true);
+  // DFS Slate: full lineup roster card
+  if (cardType === 'dfs-slate')  return withOverlays(<DFSSlateCard title={safeCard.title} data={safeCard.data} onAnalyze={handleAnalyze} isHero={isHero} />);
 
-  // ── Legacy arbitrage cards (existing data-cards pipeline) ────────────────
-  // Arbitrage cards
-  if (cardType.includes('arbitrage')) {
-    return withOverlays(
-      <ArbitrageCard
-        data={safeCard.data as any}
-        gradient={safeCard.gradient}
-        onAnalyze={handleAnalyze}
-        isHero={isHero}
-      />
-    );
-  }
+  // ArbitrageCard has different props from ArbitrageOpportunityCard (legacy pipeline)
+  if (cardType.includes('arbitrage'))
+    return withOverlays(<ArbitrageCard data={safeCard.data as any} gradient={safeCard.gradient} onAnalyze={handleAnalyze} isHero={isHero} />);
 
-  // Default fallback - use betting card as generic card
-  return withOverlays(
-    <BettingCard
-      type={safeCard.type}
-      title={safeCard.title}
-      category={safeCard.category}
-      subcategory={safeCard.subcategory}
-      gradient={safeCard.gradient}
-      data={safeCard.data}
-      status={safeCard.status}
-      onAnalyze={handleAnalyze}
-      error={error}
-      isHero={isHero}
-    />
-  );
+  // ── Standard registry lookup (exact → pattern → fallback) ─────────────────
+  if (cardType in EXACT_STD_REGISTRY) return renderStd(EXACT_STD_REGISTRY[cardType]);
+  for (const { test, Component } of PATTERN_STD_REGISTRY) {
+    if (test(cardType)) return renderStd(Component);
+  }
+  return renderStd(BettingCard);
 }
 
 interface CardListProps {

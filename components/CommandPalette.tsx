@@ -139,7 +139,7 @@ export function CommandPalette({
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-start justify-center pt-[15vh]"
+      className="fixed inset-0 z-[var(--z-overlay)] flex items-start justify-center pt-[15vh]"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       {/* Backdrop */}

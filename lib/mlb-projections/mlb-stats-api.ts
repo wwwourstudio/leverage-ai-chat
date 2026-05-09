@@ -155,7 +155,7 @@ export async function fetchTodaysGames(date?: string): Promise<MLBGame[]> {
     const now = Date.now();
     const THREE_HOURS = 3 * 60 * 60 * 1000;
     const needsBoxscore = games.filter(g => {
-      if (g.homeLineup.length > 0 || g.awayLineup.length > 0) return false;
+      if ((g.homeLineup?.length ?? 0) > 0 || (g.awayLineup?.length ?? 0) > 0) return false;
       const gameMsAgo = now - new Date(g.gameDate).getTime();
       // Within window: game started up to 3h ago OR starts within 3h
       return gameMsAgo > -THREE_HOURS && gameMsAgo < THREE_HOURS;
@@ -180,7 +180,7 @@ export async function fetchTodaysGames(date?: string): Promise<MLBGame[]> {
 
     // Use a shorter cache TTL when lineups are still missing so the next call
     // retries instead of serving stale empty-lineup data for 10 minutes.
-    const hasAnyLineups = games.some(g => g.homeLineup.length > 0 || g.awayLineup.length > 0);
+    const hasAnyLineups = games.some(g => (g.homeLineup?.length ?? 0) > 0 || (g.awayLineup?.length ?? 0) > 0);
     if (hasAnyLineups) {
       setCached(cacheKey, games);
     }

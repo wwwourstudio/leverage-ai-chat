@@ -45,11 +45,11 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
 
   return (
     <div
-      className={`flex items-start gap-3 pl-4 pr-4 py-3 rounded-xl bg-[oklch(0.16_0.02_280)] border border-[oklch(0.25_0.02_280)] border-l-4 ${borderColor} shadow-xl animate-fade-in-up min-w-[260px] max-w-[360px]`}
+      className={`flex items-start gap-3 pl-4 pr-4 py-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hover)] border-l-4 ${borderColor} shadow-xl animate-fade-in-up min-w-[260px] max-w-[360px]`}
       role="alert"
     >
       <span className={`text-sm font-bold mt-0.5 shrink-0 ${iconColor}`}>{iconChar}</span>
-      <p className="text-sm text-gray-200 leading-snug">{toast.message}</p>
+      <p className="text-sm text-foreground/90 leading-snug">{toast.message}</p>
       <button
         onClick={() => onRemove(toast.id)}
         className="ml-auto shrink-0 text-[var(--text-faint)] hover:text-foreground/80 transition-colors text-lg leading-none"

@@ -146,34 +146,34 @@ export function CommandPalette({
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative w-full max-w-xl mx-4 rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-[#0d0d0d]">
+      <div className="relative w-full max-w-xl mx-4 rounded-2xl overflow-hidden shadow-2xl border border-[var(--border-subtle)] bg-[var(--bg-overlay)]">
         {/* Search input */}
-        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/10">
-          <Search className="w-4 h-4 text-white/40 flex-shrink-0" />
+        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[var(--border-subtle)]">
+          <Search className="w-4 h-4 text-[var(--text-faint)] flex-shrink-0" />
           <input
             ref={inputRef}
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Search chats or run a command..."
-            className="flex-1 bg-transparent text-sm text-white placeholder:text-white/30 outline-none"
+            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-[var(--text-faint)] outline-none"
           />
           {query && (
-            <button onClick={() => setQuery('')} className="text-white/30 hover:text-white/60">
+            <button onClick={() => setQuery('')} className="text-[var(--text-faint)] hover:text-[var(--text-muted)]">
               <X className="w-3.5 h-3.5" />
             </button>
           )}
-          <kbd className="text-[10px] text-white/25 border border-white/15 rounded px-1.5 py-0.5">esc</kbd>
+          <kbd className="text-[10px] text-[var(--text-faint)] border border-[var(--border-subtle)] rounded px-1.5 py-0.5">esc</kbd>
         </div>
 
         {/* Results */}
         <div ref={listRef} className="max-h-[min(400px,60vh)] overflow-y-auto py-2">
           {items.length === 0 && (
-            <p className="text-center text-sm text-white/30 py-8">No results for &ldquo;{query}&rdquo;</p>
+            <p className="text-center text-sm text-[var(--text-faint)] py-8">No results for &ldquo;{query}&rdquo;</p>
           )}
 
           {matchedActions.length > 0 && (
             <div>
-              <p className="px-4 pt-1 pb-1.5 text-[10px] font-semibold tracking-wider text-white/25 uppercase">Commands</p>
+              <p className="px-4 pt-1 pb-1.5 text-[10px] font-semibold tracking-wider text-[var(--text-faint)] uppercase">Commands</p>
               {matchedActions.map((a, i) => {
                 const idx = i;
                 return (
@@ -184,12 +184,12 @@ export function CommandPalette({
                     onMouseEnter={() => setCursor(idx)}
                     className={cn(
                       'w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left',
-                      safeIdx === idx ? 'bg-white/8 text-white' : 'text-white/70 hover:text-white'
+                      safeIdx === idx ? 'bg-[var(--bg-elevated)] text-foreground' : 'text-[var(--text-muted)] hover:text-foreground'
                     )}
                   >
-                    <span className="text-white/50">{a.icon}</span>
+                    <span className="text-[var(--text-faint)]">{a.icon}</span>
                     <span>{a.label}</span>
-                    {a.description && <span className="ml-auto text-xs text-white/30">{a.description}</span>}
+                    {a.description && <span className="ml-auto text-xs text-[var(--text-faint)]">{a.description}</span>}
                   </button>
                 );
               })}
@@ -198,7 +198,7 @@ export function CommandPalette({
 
           {matchedChats.length > 0 && (
             <div className={matchedActions.length > 0 ? 'mt-1' : ''}>
-              <p className="px-4 pt-1 pb-1.5 text-[10px] font-semibold tracking-wider text-white/25 uppercase">Chats</p>
+              <p className="px-4 pt-1 pb-1.5 text-[10px] font-semibold tracking-wider text-[var(--text-faint)] uppercase">Chats</p>
               {matchedChats.map((chat, i) => {
                 const idx = matchedActions.length + i;
                 return (
@@ -209,15 +209,15 @@ export function CommandPalette({
                     onMouseEnter={() => setCursor(idx)}
                     className={cn(
                       'w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left',
-                      safeIdx === idx ? 'bg-white/8 text-white' : 'text-white/70 hover:text-white',
+                      safeIdx === idx ? 'bg-[var(--bg-elevated)] text-foreground' : 'text-[var(--text-muted)] hover:text-foreground',
                       chat.id === activeChat && 'opacity-60'
                     )}
                   >
-                    <span className="text-white/40 flex-shrink-0">
+                    <span className="text-[var(--text-faint)] flex-shrink-0">
                       {chat.starred ? <Star className="w-4 h-4 fill-yellow-400/60 text-yellow-400/60" /> : <MessageSquare className="w-4 h-4" />}
                     </span>
                     <span className="truncate flex-1">{chat.title}</span>
-                    <span className="text-xs text-white/25 flex-shrink-0">
+                    <span className="text-xs text-[var(--text-faint)] flex-shrink-0">
                       {chat.timestamp instanceof Date
                         ? chat.timestamp.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
                         : ''}
@@ -230,10 +230,10 @@ export function CommandPalette({
         </div>
 
         {/* Footer hint */}
-        <div className="px-4 py-2.5 border-t border-white/8 flex items-center gap-4 text-[11px] text-white/25">
-          <span><kbd className="border border-white/15 rounded px-1 py-0.5">↑↓</kbd> navigate</span>
-          <span><kbd className="border border-white/15 rounded px-1 py-0.5">↵</kbd> select</span>
-          <span><kbd className="border border-white/15 rounded px-1 py-0.5">esc</kbd> close</span>
+        <div className="px-4 py-2.5 border-t border-[var(--border-subtle)] flex items-center gap-4 text-[11px] text-[var(--text-faint)]">
+          <span><kbd className="border border-[var(--border-subtle)] rounded px-1 py-0.5">↑↓</kbd> navigate</span>
+          <span><kbd className="border border-[var(--border-subtle)] rounded px-1 py-0.5">↵</kbd> select</span>
+          <span><kbd className="border border-[var(--border-subtle)] rounded px-1 py-0.5">esc</kbd> close</span>
         </div>
       </div>
     </div>

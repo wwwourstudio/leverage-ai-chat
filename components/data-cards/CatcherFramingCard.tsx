@@ -29,85 +29,79 @@ interface CatcherFramingCardProps {
   isHero?: boolean;
 }
 
-const TIER_STYLES = {
-  'elite':     { badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', bar: 'bg-emerald-500', label: 'Elite Framer'    },
-  'above-avg': { badge: 'bg-blue-500/15    border-blue-500/40    text-blue-300',    bar: 'bg-blue-500',    label: 'Above Average'  },
-  'average':   { badge: 'bg-slate-500/10   border-slate-500/30   text-slate-400',   bar: 'bg-slate-500',   label: 'Average'        },
-  'below-avg': { badge: 'bg-red-500/15     border-red-500/40     text-red-400',     bar: 'bg-red-500',     label: 'Below Average'  },
+const TIER_CONFIG = {
+  'elite':     { badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', bar: 'bg-emerald-500', header: 'from-emerald-900/30 via-teal-900/15',   label: 'Elite Framer',   icon: 'text-emerald-400' },
+  'above-avg': { badge: 'bg-blue-500/15 border-blue-500/40 text-blue-300',          bar: 'bg-blue-500',    header: 'from-blue-900/30 via-cyan-900/15',      label: 'Above Average',  icon: 'text-blue-400'    },
+  'average':   { badge: 'bg-slate-500/10 border-slate-500/30 text-slate-400',       bar: 'bg-slate-500',   header: 'from-slate-800/30 via-slate-900/10',    label: 'Average',        icon: 'text-slate-400'   },
+  'below-avg': { badge: 'bg-red-500/15 border-red-500/40 text-red-400',             bar: 'bg-red-500',     header: 'from-red-900/30 via-rose-900/15',       label: 'Below Average',  icon: 'text-red-400'     },
 };
 
 export function CatcherFramingCard({
   title,
   category,
   subcategory,
-  gradient,
   data,
   onAnalyze,
   isHero,
 }: CatcherFramingCardProps) {
   const tier = data.framingTier ?? 'average';
-  const styles = TIER_STYLES[tier] ?? TIER_STYLES.average;
+  const cfg = TIER_CONFIG[tier] ?? TIER_CONFIG.average;
   const fRAA = Number(data.framingRunsAboveAverage ?? 0);
-  const kImpact  = Number(data.koPropImpact ?? 0);
-  const bbImpact = Number(data.walkPropImpact ?? 0);
+  const kImpact   = Number(data.koPropImpact ?? 0);
+  const bbImpact  = Number(data.walkPropImpact ?? 0);
   const eraImpact = Number(data.pitcherEraImpact ?? 0);
 
-  // Map fRAA -25..+25 to bar 0..100%
+  // Map fRAA -25..+25 to 0..100%
   const barPct = Math.min(100, Math.max(0, (fRAA + 25) / 50 * 100));
 
-  // Called strike conversion delta (typical range: -0.05 to +0.05)
   const cscd = Number(data.calledStrikeConversionDelta ?? 0);
   const hasCscd = data.calledStrikeConversionDelta !== undefined && Math.abs(cscd) > 0.001;
   const cscdBarPct = Math.min(100, Math.max(0, ((cscd + 0.05) / 0.10) * 100));
   const cscdBarColor = cscd > 0 ? 'bg-emerald-500' : cscd < 0 ? 'bg-red-500' : 'bg-slate-500';
-  const cscdColor = cscd > 0 ? 'text-emerald-400' : cscd < 0 ? 'text-red-400' : 'text-foreground/80';
+  const cscdColor = cscd > 0 ? 'text-emerald-400' : cscd < 0 ? 'text-red-400' : 'text-white/70';
 
   function fmtPct(v: number): string {
     return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(0)}%`;
   }
 
   return (
-    <article
-      className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-200 animate-fade-in-up',
-        'border-[var(--border-subtle)] hover:border-[var(--border-hover)]',
-        isHero && 'sm:rounded-3xl',
-      )}
-    >
-      <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)} aria-hidden="true" />
-
-      <div className="pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2 min-w-0">
-            <Shield className="w-4 h-4 text-teal-400 shrink-0" aria-hidden="true" />
-            <div className="min-w-0">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{category}</span>
-              <span className="text-[var(--text-faint)] mx-1.5">/</span>
-              <span className="text-[10px] font-medium text-[var(--text-faint)]">{subcategory}</span>
-              <h3 className="text-sm font-black text-foreground mt-1 leading-snug">{title}</h3>
-            </div>
-          </div>
-          <span className={cn('text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg border shrink-0', styles.badge)}>
-            {styles.label}
+    <article className={cn(
+      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border transition-all duration-300',
+      'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-glow)]',
+      isHero && 'sm:rounded-3xl',
+    )}>
+      {/* Gradient header */}
+      <div className={cn('relative px-4 pt-4 pb-3 bg-gradient-to-br to-transparent border-b border-[var(--border-subtle)]', cfg.header)}>
+        <div className="absolute top-3 right-3">
+          <span className={cn('inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border', cfg.badge)}>
+            <Shield className={cn('w-2.5 h-2.5', cfg.icon)} />
+            {cfg.label}
           </span>
         </div>
-
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <span className="text-[9px] font-black uppercase tracking-widest text-white/60">{category}</span>
+          <span className="text-white/25">·</span>
+          <span className="text-[9px] text-white/40">{subcategory}</span>
+        </div>
+        <h3 className="text-sm font-black text-white leading-snug pr-28">{title}</h3>
         {data.catcherName && (
-          <p className="text-[10px] font-semibold text-[var(--text-muted)] mb-2">Catcher: {data.catcherName}</p>
+          <p className="text-[10px] text-white/50 mt-0.5">Catcher: {data.catcherName}</p>
         )}
+      </div>
 
+      {/* Body */}
+      <div className="px-4 py-3 space-y-3">
         {/* fRAA bar */}
-        <div className="mb-4">
-          <div className="flex justify-between items-center mb-1.5 text-[10px]">
-            <span className="text-[var(--text-faint)]">Framing Runs Above Avg / 1k</span>
-            <span className="font-black tabular-nums text-foreground/80">
+        <div>
+          <div className="flex justify-between items-center mb-1.5">
+            <span className="text-[10px] text-[var(--text-faint)] uppercase tracking-wide">Framing Runs Above Avg / 1k</span>
+            <span className="text-sm font-black tabular-nums text-white/80">
               {fRAA >= 0 ? '+' : ''}{fRAA.toFixed(1)}
             </span>
           </div>
           <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
             <div
-              className={cn('h-full rounded-full transition-all duration-500', styles.bar)}
+              className={cn('h-full rounded-full transition-all duration-700', cfg.bar)}
               style={{ width: `${barPct}%` }}
               role="meter"
               aria-valuenow={barPct}
@@ -124,10 +118,10 @@ export function CatcherFramingCard({
 
         {/* Called strike conversion delta */}
         {hasCscd && (
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-1.5 text-[10px]">
-              <span className="text-[var(--text-faint)]">Called Strike Conversion Δ</span>
-              <span className={cn('font-black tabular-nums', cscdColor)}>
+          <div>
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-[10px] text-[var(--text-faint)] uppercase tracking-wide">Called Strike Conversion Δ</span>
+              <span className={cn('text-sm font-black tabular-nums', cscdColor)}>
                 {cscd > 0 ? '+' : ''}{(cscd * 100).toFixed(1)}pp
               </span>
             </div>
@@ -146,22 +140,22 @@ export function CatcherFramingCard({
         )}
 
         {/* Prop impact grid */}
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5 text-center">
-            <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">K Prop</p>
-            <p className={cn('text-sm font-black tabular-nums', kImpact > 0 ? 'text-emerald-400' : kImpact < 0 ? 'text-red-400' : 'text-foreground/80')}>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
+            <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">K Prop</p>
+            <p className={cn('text-sm font-black tabular-nums', kImpact > 0 ? 'text-emerald-400' : kImpact < 0 ? 'text-red-400' : 'text-white/70')}>
               {fmtPct(kImpact)}
             </p>
           </div>
-          <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5 text-center">
-            <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">BB Prop</p>
-            <p className={cn('text-sm font-black tabular-nums', bbImpact < 0 ? 'text-emerald-400' : bbImpact > 0 ? 'text-amber-400' : 'text-foreground/80')}>
+          <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
+            <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">BB Prop</p>
+            <p className={cn('text-sm font-black tabular-nums', bbImpact < 0 ? 'text-emerald-400' : bbImpact > 0 ? 'text-amber-400' : 'text-white/70')}>
               {fmtPct(bbImpact)}
             </p>
           </div>
-          <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5 text-center">
-            <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">ERA Δ</p>
-            <p className={cn('text-sm font-black tabular-nums', eraImpact < 0 ? 'text-emerald-400' : eraImpact > 0 ? 'text-red-400' : 'text-foreground/80')}>
+          <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
+            <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">ERA Δ</p>
+            <p className={cn('text-sm font-black tabular-nums', eraImpact < 0 ? 'text-emerald-400' : eraImpact > 0 ? 'text-red-400' : 'text-white/70')}>
               {eraImpact >= 0 ? '+' : ''}{eraImpact.toFixed(2)}
             </p>
           </div>
@@ -170,17 +164,19 @@ export function CatcherFramingCard({
         {data.signal && (
           <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{data.signal}</p>
         )}
+      </div>
 
-        {onAnalyze && (
+      {onAnalyze && (
+        <div className="px-4 pb-4 pt-1">
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-teal-400 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] text-[11px] font-semibold text-[var(--text-muted)] hover:text-teal-400 transition-all duration-150"
           >
             Full Framing Analysis
             <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </article>
   );
 }

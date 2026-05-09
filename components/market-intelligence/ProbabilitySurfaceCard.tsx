@@ -1,12 +1,5 @@
 'use client';
 
-/**
- * ProbabilitySurfaceCard
- *
- * Displays the Bayesian probability surface blend with a stacked bar
- * showing each component's weighted contribution.
- */
-
 interface SurfaceWeights {
   sportsbook: number;
   prediction_market: number;
@@ -25,9 +18,9 @@ interface Props {
 }
 
 const COMPONENT_STYLES = [
-  { key: 'sportsbook', label: 'Sportsbooks', color: 'bg-blue-500' },
-  { key: 'prediction_market', label: 'Kalshi', color: 'bg-purple-500' },
-  { key: 'historical', label: 'Historical', color: 'bg-blue-500' },
+  { key: 'sportsbook',         label: 'Sportsbooks', color: 'bg-blue-500',    dotColor: 'bg-blue-400'    },
+  { key: 'prediction_market',  label: 'Kalshi',      color: 'bg-fuchsia-500', dotColor: 'bg-fuchsia-400' },
+  { key: 'historical',         label: 'Historical',  color: 'bg-violet-500',  dotColor: 'bg-violet-400'  },
 ] as const;
 
 function pct(v: number): string {
@@ -35,13 +28,24 @@ function pct(v: number): string {
 }
 
 function probColor(prob: number): string {
-  if (prob >= 0.65) return 'text-blue-400';
+  if (prob >= 0.65) return 'text-emerald-400';
   if (prob >= 0.45) return 'text-amber-400';
   return 'text-red-400';
 }
 
+function confidenceLabel(c: number): string {
+  if (c >= 0.9) return 'HIGH';
+  if (c >= 0.6) return 'MED';
+  return 'LOW';
+}
+
+function confidenceColor(c: number): string {
+  if (c >= 0.9) return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25';
+  if (c >= 0.6) return 'text-amber-400 bg-amber-500/10 border-amber-500/25';
+  return 'text-red-400 bg-red-500/10 border-red-500/25';
+}
+
 export function ProbabilitySurfaceCard({ surfaceProbability, components, weights, confidence }: Props) {
-  // Compute the normalized effective weight for each visible component
   const availableComponents = COMPONENT_STYLES.filter(c => {
     if (c.key === 'sportsbook') return true;
     if (c.key === 'prediction_market') return components.kalshiProbability !== null;
@@ -61,47 +65,59 @@ export function ProbabilitySurfaceCard({ surfaceProbability, components, weights
     return { ...c, value, normalizedWeight };
   });
 
+  const surfacePct = Math.round(surfaceProbability * 100);
+
   return (
-    <div className="space-y-3">
-      {/* Final surface probability */}
+    <div className="rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-3 space-y-3">
+      {/* Hero probability */}
       <div className="flex items-center justify-between">
-        <span className="text-xs text-white/50">Bayesian Surface</span>
-        <span className={`text-lg font-bold font-mono ${probColor(surfaceProbability)}`}>
-          {pct(surfaceProbability)}
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-0.5">Bayesian Surface</p>
+          <p className={`text-2xl font-black tabular-nums ${probColor(surfaceProbability)}`}>
+            {surfacePct}%
+          </p>
+        </div>
+        <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border ${confidenceColor(confidence)}`}>
+          {confidenceLabel(confidence)} CONF
         </span>
       </div>
 
-      {/* Stacked contribution bar */}
-      <div className="space-y-1.5">
+      {/* Component bars */}
+      <div className="space-y-2">
         {bars.map(bar => (
           <div key={bar.key}>
-            <div className="flex justify-between text-xs text-white/50 mb-0.5">
-              <span>{bar.label}</span>
-              <span className="font-mono">{pct(bar.value)} × {pct(bar.normalizedWeight)}</span>
+            <div className="flex justify-between items-center mb-1">
+              <div className="flex items-center gap-1.5">
+                <div className={`w-1.5 h-1.5 rounded-full ${bar.dotColor}`} />
+                <span className="text-[10px] text-[var(--text-muted)]">{bar.label}</span>
+              </div>
+              <span className="text-[10px] font-semibold tabular-nums text-[var(--text-muted)]">
+                {pct(bar.value)} <span className="text-[var(--text-faint)]">× {Math.round(bar.normalizedWeight * 100)}%</span>
+              </span>
             </div>
-            <div className="relative h-1.5 bg-white/10 rounded-full overflow-hidden">
+            <div className="relative h-1.5 bg-[var(--bg-overlay)] rounded-full overflow-hidden">
               <div
-                className={`absolute left-0 top-0 h-full rounded-full ${bar.color} transition-all duration-500`}
-                style={{ width: `${bar.value * 100}%`, opacity: 0.7 + bar.normalizedWeight * 0.3 }}
+                className={`absolute left-0 top-0 h-full rounded-full ${bar.color} transition-all duration-700`}
+                style={{ width: `${bar.value * 100}%`, opacity: 0.6 + bar.normalizedWeight * 0.4 }}
               />
             </div>
           </div>
         ))}
       </div>
 
-      {/* Confidence indicator */}
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-white/40">Data confidence</span>
+      {/* Confidence dots */}
+      <div className="flex items-center justify-between pt-1 border-t border-[var(--border-subtle)]">
+        <span className="text-[9px] text-[var(--text-faint)] uppercase tracking-wide">Data sources</span>
         <div className="flex items-center gap-1.5">
-          <div className="flex gap-0.5">
+          <div className="flex gap-1">
             {[0.33, 0.66, 1.0].map(thresh => (
               <div
                 key={thresh}
-                className={`w-2 h-2 rounded-sm ${confidence >= thresh ? 'bg-blue-500' : 'bg-white/15'}`}
+                className={`w-2 h-2 rounded-sm transition-colors ${confidence >= thresh ? 'bg-blue-500' : 'bg-[var(--bg-overlay)]'}`}
               />
             ))}
           </div>
-          <span className="text-white/40">{Math.round(confidence * 3)}/3 sources</span>
+          <span className="text-[9px] text-[var(--text-faint)]">{Math.round(confidence * 3)}/3</span>
         </div>
       </div>
     </div>

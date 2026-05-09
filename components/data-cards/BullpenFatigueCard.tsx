@@ -29,68 +29,63 @@ interface BullpenFatigueCardProps {
   isHero?: boolean;
 }
 
-const RISK_STYLES = {
-  low:      { bar: 'bg-emerald-500', badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' },
-  moderate: { bar: 'bg-amber-500',   badge: 'bg-amber-500/15   border-amber-500/40   text-amber-300'   },
-  high:     { bar: 'bg-red-500',     badge: 'bg-red-500/15     border-red-500/40     text-red-400'     },
+const RISK_CONFIG = {
+  low:      { bar: 'bg-emerald-500', badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', header: 'from-emerald-900/30 via-green-900/10',    icon: 'text-emerald-400' },
+  moderate: { bar: 'bg-amber-500',   badge: 'bg-amber-500/15 border-amber-500/40 text-amber-300',       header: 'from-amber-900/30 via-orange-900/10',   icon: 'text-amber-400'   },
+  high:     { bar: 'bg-red-500',     badge: 'bg-red-500/15 border-red-500/40 text-red-400',             header: 'from-red-900/35 via-orange-900/15',     icon: 'text-red-400'     },
 };
 
 export function BullpenFatigueCard({
   title,
   category,
   subcategory,
-  gradient,
   data,
   onAnalyze,
   isHero,
 }: BullpenFatigueCardProps) {
   const risk = data.riskLevel ?? 'low';
-  const styles = RISK_STYLES[risk] ?? RISK_STYLES.low;
+  const cfg = RISK_CONFIG[risk] ?? RISK_CONFIG.low;
   const fatigueScore = Number(data.fatigueScore ?? 0);
   const impact = Number(data.scoringEnvImpact ?? 0);
   const eraNum  = Number(data.eraLast14Days ?? 0);
-  const eraColor = eraNum > 5.0 ? 'text-red-400' : eraNum > 4.0 ? 'text-amber-400' : eraNum > 0 ? 'text-emerald-400' : 'text-foreground';
+  const eraColor = eraNum > 5.0 ? 'text-red-400' : eraNum > 4.0 ? 'text-amber-400' : eraNum > 0 ? 'text-emerald-400' : 'text-white/70';
 
   return (
-    <article
-      className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-200 animate-fade-in-up',
-        'border-[var(--border-subtle)] hover:border-[var(--border-hover)]',
-        isHero && 'sm:rounded-3xl',
-      )}
-    >
-      <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)} aria-hidden="true" />
-
-      <div className="pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2 min-w-0">
-            <Flame className="w-4 h-4 text-orange-400 shrink-0" aria-hidden="true" />
-            <div className="min-w-0">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{category}</span>
-              <span className="text-[var(--text-faint)] mx-1.5">/</span>
-              <span className="text-[10px] font-medium text-[var(--text-faint)]">{subcategory}</span>
-              <h3 className="text-sm font-black text-foreground mt-1 leading-snug">{title}</h3>
-              {data.teamName && (
-                <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{data.teamName} Bullpen</p>
-              )}
-            </div>
-          </div>
-
-          <span className={cn('text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg border shrink-0', styles.badge)}>
+    <article className={cn(
+      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border transition-all duration-300',
+      'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-glow)]',
+      isHero && 'sm:rounded-3xl',
+    )}>
+      {/* Gradient header */}
+      <div className={cn('relative px-4 pt-4 pb-3 bg-gradient-to-br to-transparent border-b border-[var(--border-subtle)]', cfg.header)}>
+        <div className="absolute top-3 right-3">
+          <span className={cn('inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border', cfg.badge)}>
+            <Flame className={cn('w-2.5 h-2.5', cfg.icon)} />
             {risk} risk
           </span>
         </div>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <span className="text-[9px] font-black uppercase tracking-widest text-white/60">{category}</span>
+          <span className="text-white/25">·</span>
+          <span className="text-[9px] text-white/40">{subcategory}</span>
+        </div>
+        <h3 className="text-sm font-black text-white leading-snug pr-24">{title}</h3>
+        {data.teamName && (
+          <p className="text-[10px] text-white/50 mt-0.5">{data.teamName} Bullpen</p>
+        )}
+      </div>
 
-        {/* Score bar */}
-        <div className="mb-4">
-          <div className="flex justify-between items-center mb-1.5 text-[10px]">
-            <span className="text-[var(--text-faint)]">Fatigue Score</span>
-            <span className="font-black tabular-nums text-foreground/80">{fatigueScore}/100</span>
+      {/* Body */}
+      <div className="px-4 py-3 space-y-3">
+        {/* Fatigue score bar */}
+        <div>
+          <div className="flex justify-between items-center mb-1.5">
+            <span className="text-[10px] text-[var(--text-faint)] uppercase tracking-wide">Fatigue Score</span>
+            <span className="text-sm font-black tabular-nums text-white/80">{fatigueScore}<span className="text-[10px] text-[var(--text-faint)] font-normal">/100</span></span>
           </div>
           <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
             <div
-              className={cn('h-full rounded-full transition-all duration-500', styles.bar)}
+              className={cn('h-full rounded-full transition-all duration-700', cfg.bar)}
               style={{ width: `${fatigueScore}%` }}
               role="meter"
               aria-valuenow={fatigueScore}
@@ -100,30 +95,30 @@ export function BullpenFatigueCard({
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-2 mb-3">
+        {/* Stats grid */}
+        <div className="grid grid-cols-2 gap-2">
           {data.inningsLast3Days !== undefined && (
-            <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5 text-center">
-              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Inn / 3d</p>
-              <p className="text-sm font-black tabular-nums text-foreground">{data.inningsLast3Days}</p>
+            <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
+              <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Inn / 3d</p>
+              <p className="text-base font-black tabular-nums text-white">{data.inningsLast3Days}</p>
             </div>
           )}
           {data.pitchCountLast3Days !== undefined && (
-            <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5 text-center">
-              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Pitches / 3d</p>
-              <p className="text-sm font-black tabular-nums text-foreground">{data.pitchCountLast3Days}</p>
+            <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
+              <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Pitches / 3d</p>
+              <p className="text-base font-black tabular-nums text-white">{data.pitchCountLast3Days}</p>
             </div>
           )}
           {data.eraLast14Days !== undefined && (
-            <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5 text-center">
-              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">ERA L14</p>
-              <p className={cn('text-sm font-black tabular-nums', eraColor)}>{Number(data.eraLast14Days).toFixed(2)}</p>
+            <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
+              <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">ERA L14</p>
+              <p className={cn('text-base font-black tabular-nums', eraColor)}>{Number(data.eraLast14Days).toFixed(2)}</p>
             </div>
           )}
           {data.scoringEnvImpact !== undefined && (
-            <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5 text-center">
-              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">+Runs</p>
-              <p className={cn('text-sm font-black tabular-nums', impact > 0 ? 'text-amber-400' : 'text-emerald-400')}>
+            <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
+              <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Run Impact</p>
+              <p className={cn('text-base font-black tabular-nums', impact > 0 ? 'text-amber-400' : 'text-emerald-400')}>
                 {impact > 0 ? '+' : ''}{impact.toFixed(1)}
               </p>
             </div>
@@ -134,30 +129,31 @@ export function BullpenFatigueCard({
           <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{data.signal}</p>
         )}
 
-        {/* Run environment impact banner */}
         {impact !== 0 && (
           <div className={cn(
-            'rounded-lg px-3 py-2 text-[10px] font-semibold mt-2 border',
+            'rounded-xl px-3 py-2.5 text-[10px] font-semibold border',
             impact > 0.5
               ? 'bg-amber-500/10 border-amber-500/20 text-amber-300'
               : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300',
           )}>
             {impact > 0
-              ? `+${impact.toFixed(1)} runs added — lean over on totals`
-              : `${impact.toFixed(1)} runs suppressed — lean under on totals`}
+              ? `+${impact.toFixed(1)} runs added — lean OVER on totals`
+              : `${impact.toFixed(1)} runs suppressed — lean UNDER on totals`}
           </div>
         )}
+      </div>
 
-        {onAnalyze && (
+      {onAnalyze && (
+        <div className="px-4 pb-4 pt-1">
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] text-[11px] font-semibold text-[var(--text-muted)] hover:text-white transition-all duration-150"
           >
             Full Analysis
             <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </article>
   );
 }

@@ -31,7 +31,7 @@ interface BaseCardProps {
 
 function ErrorState({ error, className }: { error: string; className?: string }) {
   return (
-    <div className={cn('relative rounded-2xl p-6 border bg-red-500/20 border-red-500/40', className)} role="alert" aria-live="polite">
+    <div className={cn('relative rounded-2xl p-6 border bg-[var(--bg-surface)] border-red-500/40', className)} role="alert" aria-live="polite">
       <div className="flex items-center gap-3">
         <AlertCircle className="w-5 h-5 text-red-400 shrink-0" aria-hidden="true" />
         <div className="min-w-0">
@@ -45,7 +45,7 @@ function ErrorState({ error, className }: { error: string; className?: string })
 
 function LoadingState({ className }: { className?: string }) {
   return (
-    <div className={cn('relative rounded-2xl p-6 border bg-background border-[var(--border-subtle)]', className)} role="status" aria-live="polite">
+    <div className={cn('relative rounded-2xl p-6 border bg-[var(--bg-surface)] border-[var(--border-subtle)]', className)} role="status" aria-live="polite">
       <div className="flex items-center justify-center gap-3 text-[var(--text-muted)]">
         <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
         <span className="text-sm font-medium">Loading data...</span>
@@ -81,7 +81,7 @@ export const BaseCard = memo(function BaseCard({
 
   return (
     <article className={cn(
-      'group relative w-full rounded-2xl overflow-hidden bg-background border border-[var(--border-subtle)] cursor-pointer hover:border-[var(--border-hover)] hover:shadow-[0_0_40px_oklch(0.4_0.12_240/0.12)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sport-default)]/60 transition-all duration-200 animate-fade-in-up',
+      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] cursor-pointer hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-glow)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sport-default)]/60 transition-all duration-300 animate-fade-in-up',
       isHero && 'border-[var(--border-hover)] shadow-[0_0_24px_oklch(0.3_0.08_260/0.15)]',
       className,
     )}>

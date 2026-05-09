@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Trophy, Target, Zap, AlertTriangle, User, TrendingUp, ChevronRight } from 'lucide-react';
+import { Trophy, Target, Zap, AlertTriangle, User, TrendingUp, ChevronRight, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { STATUS_BADGE_CONFIG, type StatusBadgeKey } from '@/lib/constants';
 
@@ -56,7 +56,10 @@ export const POS_COLORS: Record<string, string> = {
 export function PosBadge({ pos }: { pos: string }) {
   const c = POS_COLORS[pos] ?? 'text-gray-400 bg-gray-400/20 border-gray-400/30';
   return (
-    <span className={cn('inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-black uppercase tracking-wider', c)}>
+    <span className={cn(
+      'inline-flex items-center px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider shrink-0',
+      c,
+    )}>
       {pos}
     </span>
   );
@@ -67,12 +70,14 @@ export function PosBadge({ pos }: { pos: string }) {
 export function TierBadge({ tier }: { tier: number }) {
   const labels = ['T1', 'T2', 'T3', 'T4'];
   const label = labels[Math.min(tier - 1, 3)] ?? 'T4';
-  const c = tier === 1 ? 'text-yellow-400 bg-yellow-400/20 border-yellow-400/30'
-    : tier === 2       ? 'text-emerald-400 bg-emerald-400/20 border-emerald-400/30'
-    : tier === 3       ? 'text-blue-400 bg-blue-400/20 border-blue-400/30'
-    : 'text-slate-400 bg-slate-400/20 border-slate-400/30';
+  const c = tier === 1 ? 'text-yellow-400 bg-yellow-400/15 border-yellow-400/30'
+    : tier === 2       ? 'text-emerald-400 bg-emerald-400/15 border-emerald-400/30'
+    : tier === 3       ? 'text-blue-400 bg-blue-400/15 border-blue-400/30'
+    : 'text-slate-400 bg-slate-400/15 border-slate-400/30';
   return (
-    <span className={cn('inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-black', c)}>{label}</span>
+    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full border text-[9px] font-black shrink-0', c)}>
+      {label}
+    </span>
   );
 }
 
@@ -120,40 +125,55 @@ export function Shell({ title, category, subcategory, status, Icon, children, on
 
   return (
     <article className={cn(
-      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-overlay)] border transition-all duration-300',
+      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border transition-all duration-300',
       isHero
-        ? 'border-[var(--border-hover)] shadow-[0_0_32px_oklch(0.3_0.06_260/0.15)]'
-        : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.08)]',
+        ? 'border-[var(--border-hover)] shadow-[var(--shadow-glow)]'
+        : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-glow)]',
     )}>
+      {/* Fantasy accent line at top */}
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-violet-500/60 via-purple-400/80 to-violet-500/60" />
+
       {/* Gradient header */}
-      <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', cfg.headerGrad)}>
-        {/* Status badge — top right */}
-        <div className="absolute top-3 right-3 flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: cfg.dot }} />
+      <div className={cn(
+        'relative px-4 pt-4 pb-3.5',
+        'bg-gradient-to-br from-violet-900/30 via-purple-900/15 to-transparent',
+      )}>
+        {/* Top-right status pill */}
+        <div className="absolute top-3.5 right-3.5 flex items-center gap-1.5 px-2 py-0.5 rounded-full border bg-[var(--bg-overlay)]/60 backdrop-blur-sm" style={{ borderColor: `${cfg.dot}40` }}>
+          <span className="w-1.5 h-1.5 rounded-full animate-pulse shrink-0" style={{ backgroundColor: cfg.dot }} />
           <span className={cn('text-[9px] font-black uppercase tracking-widest', cfg.text)}>{cfg.label}</span>
         </div>
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-1.5 mb-1.5">
-          <Icon className="w-3 h-3 text-white/60" />
-          <span className="text-[9px] font-black uppercase tracking-widest text-white/70">{category}</span>
-          <span className="text-white/30">·</span>
-          <span className="text-[9px] text-white/50 truncate">{subcategory}</span>
+
+        {/* Breadcrumb row */}
+        <div className="flex items-center gap-1.5 mb-2">
+          <div className="flex items-center justify-center w-4.5 h-4.5">
+            <Icon className="w-3.5 h-3.5 text-violet-400/80" />
+          </div>
+          <span className="text-[9px] font-black uppercase tracking-widest text-violet-300/80">{category}</span>
+          <span className="text-violet-400/30 text-[10px]">/</span>
+          <span className="text-[9px] text-purple-300/50 truncate">{subcategory}</span>
         </div>
-        <h3 className={cn('font-black text-white leading-snug text-balance pr-16', isHero ? 'text-lg' : 'text-sm')}>
+
+        {/* Title */}
+        <h3 className={cn(
+          'font-black text-white leading-snug text-balance pr-20',
+          isHero ? 'text-lg' : 'text-sm',
+        )}>
           {title}
         </h3>
       </div>
 
+      {/* Body */}
       <div className="px-4 pb-4 pt-3 space-y-3">
         {children}
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-white hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] transition-all duration-150"
+            className="group/btn flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-violet-500/8 border border-violet-500/20 text-xs font-semibold text-violet-300/70 hover:text-violet-200 hover:bg-violet-500/15 hover:border-violet-400/40 transition-all duration-200"
           >
-            <TrendingUp className="w-3.5 h-3.5" />
+            <Sparkles className="w-3.5 h-3.5" />
             Full Analysis
-            <ChevronRight className="w-3.5 h-3.5" />
+            <ChevronRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform duration-150" />
           </button>
         )}
       </div>

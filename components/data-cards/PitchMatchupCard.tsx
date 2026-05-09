@@ -31,40 +31,37 @@ interface PitchMatchupCardProps {
   isHero?: boolean;
 }
 
+const ADV_CONFIG = {
+  batter:  { badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', header: 'from-emerald-900/30 via-green-900/10',   label: 'Batter Edge',  icon: 'text-emerald-400' },
+  pitcher: { badge: 'bg-red-500/15 border-red-500/40 text-red-400',             header: 'from-red-900/30 via-rose-900/10',        label: 'Pitcher Edge', icon: 'text-red-400'     },
+  neutral: { badge: 'bg-slate-500/10 border-slate-500/30 text-slate-400',       header: 'from-purple-900/25 via-violet-900/10',   label: 'Neutral',      icon: 'text-purple-400'  },
+};
+
+const PITCH_COLORS: Record<string, string> = {
+  FF: 'bg-red-500/70', FT: 'bg-orange-500/70', SI: 'bg-orange-400/70',
+  FC: 'bg-amber-500/70', SL: 'bg-blue-500/70', ST: 'bg-sky-400/70',
+  CH: 'bg-emerald-500/70', FS: 'bg-teal-500/70', CB: 'bg-yellow-500/70',
+  CU: 'bg-yellow-500/70', KC: 'bg-yellow-400/70',
+};
+
 export function PitchMatchupCard({
   title,
   category,
   subcategory,
-  gradient,
   data,
   onAnalyze,
   isHero,
 }: PitchMatchupCardProps) {
   const advantage = data.advantageSide ?? 'neutral';
+  const cfg = ADV_CONFIG[advantage];
   const edge = Number(data.compositeEdge ?? 0);
   const edgeStr = edge >= 0 ? `+${edge.toFixed(1)}` : edge.toFixed(1);
+  const edgeColor = edge >= 1.5 ? 'text-emerald-400' : edge <= -1.5 ? 'text-red-400' : 'text-white/80';
 
-  const adv = {
-    batter:  { border: 'border-emerald-600/40', badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', label: 'Batter Edge' },
-    pitcher: { border: 'border-red-600/40',     badge: 'bg-red-500/15     border-red-500/40     text-red-400',     label: 'Pitcher Edge' },
-    neutral: { border: 'border-[var(--border-subtle)]', badge: 'bg-slate-500/10 border-slate-500/30 text-slate-400', label: 'Neutral' },
-  }[advantage];
-
-  // Pitch type colors
-  const PITCH_COLORS: Record<string, string> = {
-    FF: 'bg-red-500/70', FT: 'bg-orange-500/70', SI: 'bg-orange-400/70',
-    FC: 'bg-amber-500/70', SL: 'bg-blue-500/70', ST: 'bg-sky-400/70',
-    CH: 'bg-emerald-500/70', FS: 'bg-teal-500/70', CB: 'bg-yellow-500/70',
-    CU: 'bg-yellow-500/70', KC: 'bg-yellow-400/70',
-  };
-  const getPitchColor = (pt: string) => PITCH_COLORS[pt.toUpperCase()] ?? 'bg-purple-500/60';
-
-  // Spin rate context
   const spinNum = Number(data.pitcherSpinRate ?? 0);
   const spinLabel = spinNum > 2500 ? 'elite' : spinNum > 2200 ? 'avg' : 'low';
-  const spinColor = spinNum > 2500 ? 'text-emerald-400' : spinNum > 2200 ? 'text-foreground/80' : 'text-amber-400';
+  const spinColor = spinNum > 2500 ? 'text-emerald-400' : spinNum > 2200 ? 'text-white/70' : 'text-amber-400';
 
-  // Parse pitch mix if JSON string
   let mixEntries: [string, string][] = [];
   try {
     const raw = typeof data.pitchMix === 'string' ? JSON.parse(data.pitchMix) : data.pitchMix;
@@ -74,72 +71,67 @@ export function PitchMatchupCard({
   } catch { /* ignore */ }
 
   return (
-    <article
-      className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-200 animate-fade-in-up',
-        adv.border, 'hover:brightness-110',
-        isHero && 'sm:rounded-3xl',
-      )}
-    >
-      <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)} aria-hidden="true" />
-
-      <div className="pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2 min-w-0">
-            <Target className="w-4 h-4 text-purple-400 shrink-0" aria-hidden="true" />
-            <div className="min-w-0">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{category}</span>
-              <span className="text-[var(--text-faint)] mx-1.5">/</span>
-              <span className="text-[10px] font-medium text-[var(--text-faint)]">{subcategory}</span>
-              <h3 className="text-sm font-black text-foreground mt-1 leading-snug">{title}</h3>
-            </div>
-          </div>
-          <span className={cn('text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg border shrink-0', adv.badge)}>
-            {adv.label}
+    <article className={cn(
+      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border transition-all duration-300',
+      'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-glow)]',
+      isHero && 'sm:rounded-3xl',
+    )}>
+      {/* Gradient header */}
+      <div className={cn('relative px-4 pt-4 pb-3 bg-gradient-to-br to-transparent border-b border-[var(--border-subtle)]', cfg.header)}>
+        <div className="absolute top-3 right-3">
+          <span className={cn('inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border', cfg.badge)}>
+            <Target className={cn('w-2.5 h-2.5', cfg.icon)} />
+            {cfg.label}
           </span>
         </div>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <span className="text-[9px] font-black uppercase tracking-widest text-white/60">{category}</span>
+          <span className="text-white/25">·</span>
+          <span className="text-[9px] text-white/40">{subcategory}</span>
+        </div>
+        <h3 className="text-sm font-black text-white leading-snug pr-28">{title}</h3>
+      </div>
 
-        {/* Batter vs pitcher strip */}
+      {/* Body */}
+      <div className="px-4 py-3 space-y-3">
+        {/* Batter vs Pitcher matchup strip */}
         {(data.batterName || data.pitcherName) && (
-          <div className="flex items-center justify-between rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-1.5 mb-3 text-xs">
-            <div className="text-center min-w-0 flex-1">
-              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-0.5">Batter</p>
-              <p className="font-semibold text-foreground truncate">{data.batterName ?? '—'}</p>
+          <div className="flex items-center rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-3 py-2">
+            <div className="flex-1 text-center min-w-0">
+              <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-0.5">Batter</p>
+              <p className="text-xs font-bold text-white truncate">{data.batterName ?? '—'}</p>
             </div>
             <span className="text-[10px] font-black text-[var(--text-faint)] px-3 shrink-0">vs</span>
-            <div className="text-center min-w-0 flex-1">
-              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-0.5">Pitcher</p>
-              <p className="font-semibold text-foreground truncate">{data.pitcherName ?? '—'}</p>
+            <div className="flex-1 text-center min-w-0">
+              <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-0.5">Pitcher</p>
+              <p className="text-xs font-bold text-white truncate">{data.pitcherName ?? '—'}</p>
             </div>
           </div>
         )}
 
-        {/* Edge + velocity */}
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5 text-center">
-            <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">RV/100</p>
-            <p className={cn('text-base font-black tabular-nums', edge >= 1.5 ? 'text-emerald-400' : edge <= -1.5 ? 'text-red-400' : 'text-foreground/80')}>
-              {edgeStr}
-            </p>
+        {/* Edge + velocity + primary pitch tiles */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
+            <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">RV/100</p>
+            <p className={cn('text-base font-black tabular-nums', edgeColor)}>{edgeStr}</p>
           </div>
           {data.pitcherAvgVelocity !== undefined && (
-            <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5 text-center">
-              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Velo</p>
-              <p className="text-base font-black tabular-nums text-foreground">{data.pitcherAvgVelocity} mph</p>
+            <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
+              <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Velo</p>
+              <p className="text-base font-black tabular-nums text-white">{data.pitcherAvgVelocity} <span className="text-[10px] font-normal text-[var(--text-faint)]">mph</span></p>
             </div>
           )}
           {data.dominantPitchType && (
-            <div className="bg-[var(--bg-overlay)] rounded-lg border border-[var(--border-subtle)] p-2.5 text-center">
-              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Primary</p>
-              <p className="text-base font-black tabular-nums text-foreground">{data.dominantPitchType}</p>
+            <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
+              <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Primary</p>
+              <p className="text-base font-black text-white">{data.dominantPitchType}</p>
             </div>
           )}
         </div>
 
-        {/* Spin rate context */}
+        {/* Spin rate */}
         {spinNum > 0 && (
-          <div className="flex items-center justify-between text-xs mb-2">
+          <div className="flex items-center justify-between text-[11px]">
             <span className="text-[var(--text-faint)]">Spin Rate</span>
             <span className={cn('font-semibold tabular-nums', spinColor)}>
               {spinNum.toLocaleString('en-US')} rpm
@@ -148,19 +140,19 @@ export function PitchMatchupCard({
           </div>
         )}
 
-        {/* Pitch mix breakdown */}
+        {/* Pitch mix bars */}
         {mixEntries.length > 0 && (
-          <div className="space-y-1 mb-3">
-            {mixEntries.slice(0, 4).map(([pitch, pct]) => (
-              <div key={pitch} className="flex items-center gap-2 text-xs">
-                <span className="w-6 text-[var(--text-muted)] font-mono text-[10px]">{pitch}</span>
+          <div className="space-y-1.5">
+            {mixEntries.slice(0, 5).map(([pitch, pct]) => (
+              <div key={pitch} className="flex items-center gap-2 text-[10px]">
+                <span className="w-6 text-[var(--text-muted)] font-mono">{pitch}</span>
                 <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                   <div
-                    className={cn('h-full rounded-full', getPitchColor(pitch))}
+                    className={cn('h-full rounded-full', PITCH_COLORS[pitch.toUpperCase()] ?? 'bg-purple-500/60')}
                     style={{ width: pct.toString().replace('%', '') + '%' }}
                   />
                 </div>
-                <span className="text-[var(--text-muted)] w-8 text-right">{pct}</span>
+                <span className="text-[var(--text-muted)] w-8 text-right tabular-nums">{pct}</span>
               </div>
             ))}
           </div>
@@ -169,17 +161,19 @@ export function PitchMatchupCard({
         {data.signal && (
           <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{data.signal}</p>
         )}
+      </div>
 
-        {onAnalyze && (
+      {onAnalyze && (
+        <div className="px-4 pb-4 pt-1">
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-purple-400 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] text-[11px] font-semibold text-[var(--text-muted)] hover:text-purple-400 transition-all duration-150"
           >
             Full Matchup Analysis
             <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </article>
   );
 }

@@ -66,7 +66,7 @@ function StatsSkeletonBody() {
 
 export function CardSkeleton({ variant = 'betting' }: { variant?: SkeletonVariant }) {
   return (
-    <div className="relative w-full rounded-2xl overflow-hidden bg-background border border-[var(--border-subtle)]">
+    <div className="relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
       {/* Shimmer header */}
       <div className="relative px-4 pt-3.5 pb-3 bg-[var(--bg-surface)] overflow-hidden">
         <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/4 to-transparent animate-shimmer" />

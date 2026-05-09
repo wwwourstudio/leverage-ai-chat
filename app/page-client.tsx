@@ -307,8 +307,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   useEffect(() => {
     const data = getCreditData();
     setCreditsRemaining(data.credits);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // mount-only: getCreditData reads localStorage, setCreditsRemaining is a stable setter
 
   // Prevent body-level scrolling so that a secondary React render (produced by
   // the hydration mismatch recovery path) cannot be revealed by scrolling past
@@ -366,7 +365,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [selectedSport, setSelectedSport] = useState<string>('');
   const [selectedKalshiTopic, setSelectedKalshiTopic] = useState<string>('');
   const [kalshiBettingBannerVisible, setKalshiBettingBannerVisible] = useState(false);
-  const [_cardsRefreshedAt, setCardsRefreshedAt] = useState<Date | null>(null);
   const cardsRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fetchedForQueryRef = useRef<string | null>(null);
   // Dedup guard — prevents double-fire when onPromptClick and handleSubmit both
@@ -377,10 +375,25 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const pendingThreadRef = useRef<Promise<import('@/lib/chat-service').ChatThread | null> | null>(null);
   const pendingQueryRef = useRef<string | null>(null);
 
-  const handleCategorySelect = (catId: string) => {
+  const handleCategorySelect = useCallback((catId: string) => {
     setSelectedCategory(catId);
     if (catId !== 'kalshi') setKalshiBettingBannerVisible(false);
-  };
+  }, []);
+
+  const handleToggleSidebar = useCallback(() => setSidebarOpen(v => !v), []);
+  const handleOpenUserLightbox = useCallback(() => setShowUserLightbox(true), []);
+  const handleOpenAlerts = useCallback(() => setShowAlertsLightbox(true), []);
+  const handleOpenSettings = useCallback(() => setShowSettingsLightbox(true), []);
+  const handleOpenWatchlist = useCallback(() => setShowWatchlistLightbox(true), []);
+  const handleOpenLogin = useCallback(() => setShowLoginModal(true), []);
+  const handleOpenSignup = useCallback(() => setShowSignupModal(true), []);
+  const handleOpenStripe = useCallback(() => setShowStripeLightbox(true), []);
+  const handleToggleDeepThink = useCallback(() => setDeepThink(v => !v), []);
+  const handleCloseSidebar = useCallback(() => setSidebarOpen(false), []);
+  const handleUserClick = useCallback(() => {
+    if (isLoggedIn) setShowUserLightbox(true);
+    else setShowLoginModal(true);
+  }, [isLoggedIn]);
 
   // Set to true by loadInitData() after seeding aiQuickActions from init.defaultPrompts.
   // The prompts useEffect checks this on its first fire to avoid clearing + re-fetching
@@ -766,6 +779,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         loadInitData();
       }
     }
+  // deps: authUser/authLoading are the only values that should trigger this effect.
+  // loadInitData/loadInstructionsFromLocalStorage are component-scoped helpers that
+  // reference many pieces of state; adding them would cause an infinite loop.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUser, authLoading]);
 
@@ -780,19 +796,20 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     window.history.replaceState({}, '', window.location.pathname);
 
     (async () => {
+      const isDev = getIsDev();
       try {
         const res = await fetch(`/api/stripe/verify?session_id=${encodeURIComponent(sessionId)}`);
         const data = await res.json();
         if (data.verified && data.credits > 0) {
           addCredits(data.credits);
-          console.log(`[Stripe] Verified and added ${data.credits} credits for session ${sessionId}`);
+          if (isDev) console.log(`[Stripe] Verified and added ${data.credits} credits for session ${sessionId}`);
         } else if (!data.verified) {
           // Stripe not configured (dev mode) — fall back to URL param
           const creditsPurchased = params.get('credits');
           const amount = creditsPurchased ? parseInt(creditsPurchased, 10) : 0;
           if (amount > 0) {
             addCredits(amount);
-            console.log(`[Stripe] Dev mode: added ${amount} credits from URL param`);
+            if (isDev) console.log(`[Stripe] Dev mode: added ${amount} credits from URL param`);
           }
         }
       } catch {
@@ -881,7 +898,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           }
           return updated;
         });
-        setCardsRefreshedAt(new Date());
       } catch {
         // Non-critical — silently skip on error
       }
@@ -943,11 +959,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     if (serverData?.fetchErrors?.length) {
       toast.info('Live data unavailable — showing AI estimates. Data will refresh shortly.');
     }
-  // Run once on mount — serverData is static SSR props
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // mount-only: serverData is immutable SSR props, toast is stable context ref
 
-  const handleStarChat = (chatId: string, e: React.MouseEvent) => {
+  const handleStarChat = useCallback((chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const chat = chats.find((c: Chat) => c.id === chatId);
     const wasStarred = chat?.starred;
@@ -962,7 +976,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       });
     }
     toast.success(wasStarred ? 'Removed from starred' : 'Analysis saved');
-  };
+  }, [chats, isLoggedIn, toast]);
 
   // Fetch AI-generated quick-action prompts from the /api/prompts endpoint.
   // Refreshes when the selected platform category or sport changes.
@@ -1248,19 +1262,22 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       suggestion.label.toLowerCase() !== userMessage.toLowerCase()
     );
 
-    console.log('[v0] Suggestions:', uniqueSuggestions.length, 'generated');
+    if (getIsDev()) console.log('[v0] Suggestions:', uniqueSuggestions.length, 'generated');
 
     // Return 5-7 unique suggestions for optimal UX
     return uniqueSuggestions.slice(0, 7);
+  // selectedCategory drives suggestion routing; suggestedPrompts is the early-return fallback.
+  // Other refs inside are stable (lastSuggestionQueryRef) or derived from the userMessage arg.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, suggestedPrompts]);
 
   const handleFollowUp = (action: 'correlated' | 'metrics', cardData?: any) => {
-    console.log('[v0] Generating follow-up response:', action);
+    const isDev = getIsDev();
+    if (isDev) console.log('[v0] Generating follow-up response:', action);
 
     // Check if user has credits
     if (!consumeCredit()) {
-      console.log('[v0] No credits remaining, showing purchase modal');
+      if (isDev) console.log('[v0] No credits remaining, showing purchase modal');
       return;
     }
 
@@ -1503,19 +1520,19 @@ No preamble. Start directly with section 1.`;
     generateCardAnalysis(card, cardKey);
   };
 
-  const stopGeneration = () => {
+  const stopGeneration = useCallback(() => {
     abortStream();
     setIsTyping(false);
-  };
+  }, [abortStream]);
 
-  const handleRetryMessage = (messageId: string) => {
+  const handleRetryMessage = useCallback((messageId: string) => {
     setMessages((prev: Message[]) =>
       prev.map(m => m.id === messageId
         ? { ...m, isPending: true, isError: false, isPartial: false, isStreaming: false, content: '', cards: [] }
         : m)
     );
-    generateRealResponse(lastUserQuery, undefined, messageId);
-  };
+    generateRealResponseRef.current?.(lastUserQuery, undefined, messageId);
+  }, [lastUserQuery]);
 
   // Tracks the last query for which suggestions were generated — prevents duplicate
   // runs when multiple response branches (success/partial/error) fire for the same message.
@@ -1541,11 +1558,12 @@ No preamble. Start directly with section 1.`;
   }, []);
 
   const generateRealResponse = async (userMessage: string, imageAttachments?: Array<{ name: string; base64: string; mimeType: string }>, optimisticAssistantId?: string) => {
+    const isDev = getIsDev();
     // Dedup guard: suppress duplicate calls for the same message (e.g. onPromptClick
     // and handleSubmit both firing within the same event loop tick).
     const msgKey = userMessage.trim().slice(0, 200);
     if (analyzingMessageRef.current === msgKey) {
-      console.log('[v0] Duplicate analyze suppressed for:', msgKey.slice(0, 60));
+      if (isDev) console.log('[v0] Duplicate analyze suppressed for:', msgKey.slice(0, 60));
       return;
     }
     analyzingMessageRef.current = msgKey;
@@ -1555,10 +1573,9 @@ No preamble. Start directly with section 1.`;
     setIsTyping(true);
     setLastUserQuery(userMessage);
     const startTime = Date.now();
-    const isDev = getIsDev();
 
     try {
-      console.log('[v0] Starting real AI analysis for:', userMessage);
+      if (isDev) console.log('[v0] Starting real AI analysis for:', userMessage);
       
       // Extract context from user message with strict detection flags
       const lowerMsg = userMessage.toLowerCase();
@@ -2067,13 +2084,14 @@ No preamble. Start directly with section 1.`;
   // Sport detection helpers are imported from @/lib/sport-detection
 
   const selectRelevantCards = async (userMessage: string, context?: any): Promise<InsightCard[]> => {
+    const isDev = getIsDev();
     const msgLower = userMessage.toLowerCase();
-    
+
     // Extract sport and category from message - use conversation history from context if available
     const conversationHistory = context?.previousMessages || messages.slice(-5).map((m: any) => ({ role: m.role, content: m.content || '' }));
     const sport = extractSport(userMessage, conversationHistory);
     let category = 'all';
-    
+
     if (msgLower.includes('bet') || msgLower.includes('odds')) {
       category = 'betting';
     } else if (msgLower.includes('dfs') || msgLower.includes('lineup')) {
@@ -2091,11 +2109,10 @@ No preamble. Start directly with section 1.`;
     const draftGroupIdMatch = userMessage.match(/DraftKings #(\d+)/i);
     const draftGroupId = draftGroupIdMatch ? parseInt(draftGroupIdMatch[1], 10) : undefined;
 
-    console.log('[v0] Fetching dynamic cards for:', { sport, category, draftGroupId });
+    if (isDev) console.log('[v0] Fetching dynamic cards for:', { sport, category, draftGroupId });
 
     try {
-      // Fetch dynamic cards from API
-      console.log('[v0] Requesting dynamic cards with params:', { sport, category, context, limit: 3, draftGroupId });
+      if (isDev) console.log('[v0] Requesting dynamic cards with params:', { sport, category, context, limit: 3, draftGroupId });
 
       const dynamicCards = await fetchDynamicCards({
         sport: sport || undefined,
@@ -2104,37 +2121,33 @@ No preamble. Start directly with section 1.`;
         limit: 3,
         draftGroupId,
       });
-      
-      console.log('[v0] Received dynamic cards response:', dynamicCards.length, 'cards');
-      
+
+      if (isDev) console.log('[v0] Received dynamic cards response:', dynamicCards.length, 'cards');
+
       if (dynamicCards.length === 0) {
-        console.log('[v0] WARNING: Zero dynamic cards returned from API. Check:');
-        console.log('[v0] - Sport extracted:', sport);
-        console.log('[v0] - Category detected:', category);
-        console.log('[v0] - API endpoint configured:', API_ENDPOINTS?.CARDS || 'undefined');
-        console.log('[v0] - Context provided:', context);
-      } else if (dynamicCards.length > 0 && dynamicCards.every((c: any) => c.realData === false || c.data?.realData === false)) {
+        if (isDev) {
+          console.log('[v0] WARNING: Zero dynamic cards returned from API. Check:');
+          console.log('[v0] - Sport extracted:', sport);
+          console.log('[v0] - Category detected:', category);
+          console.log('[v0] - API endpoint configured:', API_ENDPOINTS?.CARDS || 'undefined');
+          console.log('[v0] - Context provided:', context);
+        }
+      } else if (dynamicCards.every((c: any) => c.realData === false || c.data?.realData === false)) {
         toast.info('Live data unavailable — showing AI estimates. Data will refresh shortly.');
       }
-      
+
       // Convert DynamicCard to InsightCard format
-      const convertedCards = dynamicCards.map(card => {
-        console.log('[v0] Converting card:', card.type, card.title);
-        return convertToInsightCard(card);
-      });
-      
-      console.log('[v0] Returning', convertedCards.length, 'converted insight cards');
+      const convertedCards = dynamicCards.map(card => convertToInsightCard(card));
+
+      if (isDev) console.log('[v0] Returning', convertedCards.length, 'converted insight cards');
       return convertedCards;
     } catch (error) {
-      console.error('[v0] Error fetching dynamic cards:', error);
-      console.error('[v0] Error details:', error instanceof Error ? error.message : String(error));
-      // Return empty array on error - the response will still be shown
+      console.error('[v0] Error fetching dynamic cards:', error instanceof Error ? error.message : String(error));
       return [];
     }
   };
 
   const convertToInsightCard = (dynamicCard: DynamicCard): InsightCard => {
-    console.log('[v0] Converting dynamic card:', dynamicCard.type, dynamicCard.title);
     
     // Validate required fields
     if (!dynamicCard || typeof dynamicCard !== 'object') {
@@ -2173,7 +2186,6 @@ No preamble. Start directly with section 1.`;
       status: String(dynamicCard.status || 'active')
     };
     
-    console.log('[v0] Validated card:', validatedCard.type, validatedCard.title);
     return validatedCard;
   };
 
@@ -2214,7 +2226,6 @@ No preamble. Start directly with section 1.`;
 
     // Check if user has credits
     if (!consumeCredit()) {
-      console.log('[v0] No credits remaining, showing purchase modal');
       return;
     }
 
@@ -2406,8 +2417,7 @@ No preamble. Start directly with section 1.`;
     }
 
     // Update rate limit count
-    const updated = updateRateLimitCount();
-    console.log('[v0] New', selectedCategory, 'analysis chat created. Chats remaining:', CHAT_LIMIT - updated.count);
+    updateRateLimitCount();
   };
 
   // ── Auto-query: fire pending query once the welcome message appears ───────────
@@ -2468,7 +2478,7 @@ No preamble. Start directly with section 1.`;
     openChatWithQuery(query, platform, sport || undefined);
   };
 
-  const handleSelectChat = (chatId: string) => {
+  const handleSelectChat = useCallback((chatId: string) => {
     setActiveChat(chatId);
 
     // Sync platform filter to match the selected chat's category
@@ -2482,7 +2492,6 @@ No preamble. Start directly with section 1.`;
     setSelectedSport(sportTag ?? '');
 
     if (isLoggedIn) {
-      // Load messages from Supabase for logged-in users
       loadMessages(chatId).then(msgs => {
         if (msgs.length > 0) {
           let storedCards: Record<string, any[]> = {};
@@ -2510,7 +2519,6 @@ No preamble. Start directly with section 1.`;
         }
       });
     } else {
-      // Not logged in — keep showing current in-memory welcome
       const chat = chats.find((c: Chat) => c.id === chatId);
       setMessages([{
         id: 'welcome',
@@ -2521,9 +2529,9 @@ No preamble. Start directly with section 1.`;
         isWelcome: true,
       }]);
     }
-  };
+  }, [chats, isLoggedIn]);
 
-  const handleDeleteChat = (chatId: string, e: React.MouseEvent) => {
+  const handleDeleteChat = useCallback((chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const snapshot = chats;
     const remaining = chats.filter((chat: Chat) => chat.id !== chatId);
@@ -2538,7 +2546,7 @@ No preamble. Start directly with section 1.`;
       });
     }
     toast.info('Chat deleted');
-  };
+  }, [chats, activeChat, isLoggedIn, toast]);
 
   const handleEditMessage = useCallback((index: number) => {
     const message = messages[index];
@@ -2584,7 +2592,6 @@ No preamble. Start directly with section 1.`;
   const handleCopyMessage = useCallback((content: string) => {
     navigator.clipboard.writeText(content);
     toast.success('Copied to clipboard');
-    console.log('[v0] Message copied to clipboard');
   }, []);
 
   const handleRegenerateResponse = useCallback((index: number) => {
@@ -2615,16 +2622,16 @@ No preamble. Start directly with section 1.`;
     }
   }, [messages, activeChat]);
 
-  const handleEditChatTitle = (chatId: string, currentTitle: string, e: React.MouseEvent) => {
+  const handleEditChatTitle = useCallback((chatId: string, currentTitle: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingChatId(chatId);
     setEditingChatTitle(currentTitle);
-  };
+  }, []);
 
-  const handleSaveChatTitle = (chatId: string) => {
+  const handleSaveChatTitle = useCallback((chatId: string) => {
     if (editingChatTitle.trim()) {
       const newTitle = editingChatTitle.trim();
-      setChats(chats.map((chat: any) =>
+      setChats(prev => prev.map((chat: any) =>
         chat.id === chatId ? { ...chat, title: newTitle } : chat
       ));
       if (isLoggedIn) updateThread(chatId, { title: newTitle });
@@ -2632,21 +2639,21 @@ No preamble. Start directly with section 1.`;
     }
     setEditingChatId(null);
     setEditingChatTitle('');
-  };
+  }, [editingChatTitle, isLoggedIn, toast]);
 
-  const handleCancelChatTitleEdit = () => {
+  const handleCancelChatTitleEdit = useCallback(() => {
     setEditingChatId(null);
     setEditingChatTitle('');
-  };
+  }, []);
 
-  const handleKeyDownChatTitle = (e: React.KeyboardEvent, chatId: string) => {
+  const handleKeyDownChatTitle = useCallback((e: React.KeyboardEvent, chatId: string) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSaveChatTitle(chatId);
     } else if (e.key === 'Escape') {
       handleCancelChatTitleEdit();
     }
-  };
+  }, [handleSaveChatTitle, handleCancelChatTitleEdit]);
 
   const adjustEditTextareaHeight = () => {
     if (editTextareaRef.current) {
@@ -3236,9 +3243,9 @@ No preamble. Start directly with section 1.`;
           setSuggestedPrompts={setSuggestedPrompts}
           setLastUserQuery={setLastUserQuery}
           user={user}
-          onUserClick={() => isLoggedIn ? setShowUserLightbox(true) : setShowLoginModal(true)}
+          onUserClick={handleUserClick}
           isLoadingChats={isLoadingChats}
-          onClose={() => setSidebarOpen(false)}
+          onClose={handleCloseSidebar}
         />
       </div>
 
@@ -3249,17 +3256,17 @@ No preamble. Start directly with section 1.`;
         {/* Header */}
         <ChatHeader
           sidebarOpen={sidebarOpen}
-          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          onToggleSidebar={handleToggleSidebar}
           isLoggedIn={isLoggedIn}
           user={user}
-          onOpenUserLightbox={() => setShowUserLightbox(true)}
-          onOpenAlerts={() => setShowAlertsLightbox(true)}
+          onOpenUserLightbox={handleOpenUserLightbox}
+          onOpenAlerts={handleOpenAlerts}
           alertCount={alertCount}
-          onOpenSettings={() => setShowSettingsLightbox(true)}
-          onOpenWatchlist={() => setShowWatchlistLightbox(true)}
+          onOpenSettings={handleOpenSettings}
+          onOpenWatchlist={handleOpenWatchlist}
           watchlistCount={savedPlayersCount + savedCardsCount}
-          onOpenLogin={() => setShowLoginModal(true)}
-          onOpenSignup={() => setShowSignupModal(true)}
+          onOpenLogin={handleOpenLogin}
+          onOpenSignup={handleOpenSignup}
           currentSport={selectedSport || undefined}
           currentCategory={selectedCategory !== 'all' ? selectedCategory : undefined}
         />
@@ -3767,11 +3774,11 @@ No preamble. Start directly with section 1.`;
               onFileDrop={processFiles}
               onFilesAdded={(files: any) => setUploadedFiles((prev: any) => [...prev, ...files])}
               creditsRemaining={creditsRemaining}
-              onOpenStripe={() => setShowStripeLightbox(true)}
+              onOpenStripe={handleOpenStripe}
               lastUserQuery={lastUserQuery}
               selectedCategory={selectedCategory}
               deepThink={deepThink}
-              onToggleDeepThink={() => setDeepThink((v) => !v)}
+              onToggleDeepThink={handleToggleDeepThink}
               systemStatus={systemStatus}
               voiceConvState={voiceConv.convState}
               voiceConvSupported={voiceConv.isSupported}
@@ -3821,7 +3828,7 @@ No preamble. Start directly with section 1.`;
         onClose={() => setShowSettingsLightbox(false)}
         user={user}
         onUserUpdate={setUser}
-        onOpenStripe={() => setShowStripeLightbox(true)}
+        onOpenStripe={handleOpenStripe}
         creditsRemaining={creditsRemaining}
       />
 

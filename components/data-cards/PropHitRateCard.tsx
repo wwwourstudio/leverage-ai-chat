@@ -32,8 +32,8 @@ function HitRateRing({ pct, isHero }: { pct: number; isHero?: boolean }) {
   const [animated, setAnimated] = useState(false);
   useEffect(() => { const t = setTimeout(() => setAnimated(true), 80); return () => clearTimeout(t); }, []);
 
-  const size = isHero ? 72 : 60;
-  const r = (size / 2) - 7;
+  const size = isHero ? 80 : 68;
+  const r = (size / 2) - 8;
   const circumference = 2 * Math.PI * r;
   const offset = animated ? circumference * (1 - Math.min(100, pct) / 100) : circumference;
   const color =
@@ -42,50 +42,43 @@ function HitRateRing({ pct, isHero }: { pct: number; isHero?: boolean }) {
     pct >= 50 ? '#f59e0b' :
     pct >= 35 ? '#f97316' : '#ef4444';
 
+  const grade = pct >= 80 ? 'A' : pct >= 65 ? 'B' : pct >= 50 ? 'C' : pct >= 35 ? 'D' : 'F';
+
   return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}
-           className="-rotate-90" aria-hidden="true">
-        <circle cx={size / 2} cy={size / 2} r={r}
-          stroke="currentColor" strokeWidth="5" fill="none"
-          className="text-[var(--bg-surface)]" />
-        <circle cx={size / 2} cy={size / 2} r={r}
-          stroke={color} strokeWidth="5" fill="none"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          style={{ transition: 'stroke-dashoffset 700ms cubic-bezier(0.4,0,0.2,1)' }} />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-black tabular-nums leading-none"
-              style={{ fontSize: isHero ? 14 : 12, color }}>
-          {pct.toFixed(0)}%
-        </span>
-        <span className="text-[7px] font-black uppercase tracking-wide text-[var(--text-faint)]">
-          hit
-        </span>
+    <div className="relative shrink-0 flex flex-col items-center gap-1" style={{ width: size }}>
+      <div style={{ width: size, height: size }} className="relative">
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}
+             className="-rotate-90" aria-hidden="true">
+          {/* Outer glow track */}
+          <circle cx={size / 2} cy={size / 2} r={r}
+            stroke="rgba(255,255,255,0.05)" strokeWidth="6" fill="none" />
+          {/* Progress ring */}
+          <circle cx={size / 2} cy={size / 2} r={r}
+            stroke={color} strokeWidth="6" fill="none"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            style={{
+              transition: 'stroke-dashoffset 700ms cubic-bezier(0.4,0,0.2,1)',
+              filter: `drop-shadow(0 0 4px ${color}80)`,
+            }} />
+        </svg>
+        {/* Center content */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="font-black tabular-nums leading-none text-white"
+                style={{ fontSize: isHero ? 15 : 13 }}>
+            {pct.toFixed(0)}%
+          </span>
+          <span className="text-[8px] font-black uppercase tracking-wider" style={{ color, marginTop: 1 }}>
+            {grade}
+          </span>
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Hit Rate Grade Badge ───────────────────────────────────────────────────────
-
-function HitRateGrade({ pct }: { pct: number }) {
-  const grade = pct >= 80 ? 'A' : pct >= 65 ? 'B' : pct >= 50 ? 'C' : pct >= 35 ? 'D' : 'F';
-  const cls = pct >= 80 ? 'bg-emerald-500/15 text-emerald-400 ring-emerald-500/30'
-    : pct >= 65 ? 'bg-blue-500/15 text-blue-400 ring-blue-500/30'
-    : pct >= 50 ? 'bg-amber-500/15 text-amber-400 ring-amber-500/30'
-    : pct >= 35 ? 'bg-orange-500/15 text-orange-400 ring-orange-500/30'
-    : 'bg-red-500/15 text-red-400 ring-red-500/30';
-  return (
-    <div className={cn('w-6 h-6 rounded-full ring-1 flex items-center justify-center shrink-0', cls)}>
-      <span className="text-[10px] font-black">{grade}</span>
-    </div>
-  );
-}
-
-// ── Recent Form Bar Sparkline ──────────────────────────────────────────────────
+// ── Recent Form Squares ───────────────────────────────────────────────────────
 
 function parseRecentForm(recentForm?: string): boolean[] {
   if (!recentForm) return [];
@@ -96,56 +89,69 @@ function parseRecentForm(recentForm?: string): boolean[] {
 }
 
 function rateChipClass(pct: number): string {
-  return pct >= 60 ? 'bg-emerald-500/15 text-emerald-400'
-    : pct >= 40 ? 'bg-amber-500/15 text-amber-400'
-    : 'bg-red-500/15 text-red-400';
+  return pct >= 60 ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
+    : pct >= 40 ? 'bg-amber-500/15 text-amber-400 border-amber-500/20'
+    : 'bg-red-500/15 text-red-400 border-red-500/20';
 }
 
-function FormBars({ dots }: { dots: boolean[] }) {
-  const [animated, setAnimated] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setAnimated(true), 150); return () => clearTimeout(t); }, []);
+function RecentFormSquares({ dots }: { dots: boolean[] }) {
+  const last5 = dots.slice(-5);
+  const last10 = dots.slice(-10);
+  const l5Rate  = last5.length  >= 3 ? Math.round((last5.filter(Boolean).length  / last5.length)  * 100) : null;
+  const l10Rate = last10.length > 0  ? Math.round((last10.filter(Boolean).length / last10.length) * 100) : null;
 
   if (dots.length === 0) return null;
-  const last10 = dots.slice(-10);
-  const last5  = dots.slice(-5);
-
-  const l10Rate = last10.length > 0 ? Math.round((last10.filter(Boolean).length / last10.length) * 100) : null;
-  const l5Rate  = last5.length  >= 3 ? Math.round((last5.filter(Boolean).length  / last5.length)  * 100) : null;
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-faint)]">
-          Recent form
-        </span>
+        <span className="text-[9px] font-black uppercase tracking-widest text-white/35">Recent Form</span>
         <div className="flex items-center gap-1">
           {l5Rate !== null && (
-            <span className={cn('text-[8px] font-black px-1.5 py-0.5 rounded', rateChipClass(l5Rate))}>
+            <span className={cn('text-[8px] font-black px-1.5 py-0.5 rounded-md border', rateChipClass(l5Rate))}>
               L5: {l5Rate}%
             </span>
           )}
           {l10Rate !== null && (
-            <span className={cn('text-[8px] font-black px-1.5 py-0.5 rounded', rateChipClass(l10Rate))}>
+            <span className={cn('text-[8px] font-black px-1.5 py-0.5 rounded-md border', rateChipClass(l10Rate))}>
               L10: {l10Rate}%
             </span>
           )}
         </div>
       </div>
-      <div className="flex items-end gap-0.5 h-6">
-        {last10.map((hit, i) => (
+      {/* Last 5 game squares */}
+      <div className="flex gap-1">
+        {last5.map((hit, i) => (
           <div
             key={i}
-            className="flex-1 rounded-sm min-w-[5px] transition-all duration-500"
-            style={{
-              height: animated ? (hit ? '100%' : '40%') : '0%',
-              transitionDelay: `${i * 40}ms`,
-              backgroundColor: hit ? '#10b981cc' : '#ef444466',
-            }}
+            className={cn(
+              'flex-1 h-6 rounded-md flex items-center justify-center text-[9px] font-black transition-all duration-300',
+              hit
+                ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-400'
+                : 'bg-red-500/15 border border-red-500/30 text-red-400',
+            )}
             title={hit ? 'Hit' : 'Miss'}
-          />
+          >
+            {hit ? 'H' : 'M'}
+          </div>
         ))}
       </div>
-      <div className="flex justify-between text-[7px] text-[var(--text-faint)]">
+      {/* Bar visualization for last 10 */}
+      {last10.length > 5 && (
+        <div className="flex items-end gap-0.5 h-4">
+          {last10.map((hit, i) => (
+            <div
+              key={i}
+              className="flex-1 rounded-sm"
+              style={{
+                height: hit ? '100%' : '40%',
+                backgroundColor: hit ? '#10b98180' : '#ef444450',
+              }}
+            />
+          ))}
+        </div>
+      )}
+      <div className="flex justify-between text-[8px] text-white/25">
         <span>{last10.filter(Boolean).length}H / {last10.filter(h => !h).length}M</span>
         <span>last {last10.length}</span>
       </div>
@@ -175,13 +181,22 @@ export const PropHitRateCard = memo(function PropHitRateCard({
 }: PropHitRateCardProps) {
   const isStrong = hitRatePercentage >= 65;
   const isWeak   = hitRatePercentage <= 35;
-  const accentGradient = isStrong ? 'from-emerald-600 to-green-700'
-    : isWeak ? 'from-red-600 to-rose-700'
-    : 'from-[var(--bg-surface)] to-[var(--bg-elevated)]';
+
+  const headerGrad = isStrong
+    ? 'from-emerald-600/25 via-teal-900/10 to-transparent'
+    : isWeak
+    ? 'from-red-600/25 via-rose-900/10 to-transparent'
+    : 'from-blue-600/25 via-indigo-900/10 to-transparent';
+
+  const barColor = isStrong ? '#10b981' : isWeak ? '#ef4444' : '#f59e0b';
 
   const TrendIcon = trend === 'improving' ? TrendingUp
     : trend === 'declining' ? TrendingDown
     : trend === 'insufficient_data' ? Activity : Minus;
+
+  const trendColor = trend === 'improving' ? 'text-emerald-400'
+    : trend === 'declining' ? 'text-red-400'
+    : 'text-white/40';
 
   const differential = avgActual - avgLine;
   const resolvedPhotoUrl = photoUrl ?? getPlayerHeadshotUrl(playerName);
@@ -189,22 +204,33 @@ export const PropHitRateCard = memo(function PropHitRateCard({
 
   return (
     <article className={cn(
-      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-overlay)] border transition-all duration-200 animate-fade-in-up',
+      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border transition-all duration-300',
       isHero
-        ? 'border-[var(--border-hover)] shadow-[0_0_20px_oklch(0.3_0.08_260/0.12)]'
-        : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)]',
+        ? 'border-blue-500/30 shadow-[0_0_24px_rgba(59,130,246,0.10)]'
+        : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_20px_rgba(59,130,246,0.08)]',
     )}>
-      {/* Left accent bar */}
-      <div className={cn(
-        'absolute left-0 top-0 bottom-0 bg-gradient-to-b',
-        isHero ? 'w-[3px]' : 'w-[2px]',
-        accentGradient,
-      )} />
 
-      <div className={cn('pl-5 pr-4 py-4', isHero && 'pl-6 pr-5 py-5')}>
+      {/* ── Header ── */}
+      <div className={cn('relative px-4 pt-4 pb-3 bg-gradient-to-br border-b border-[var(--border-subtle)]', headerGrad)}>
+        {/* Confidence badge */}
+        <div className="absolute top-3 right-3">
+          <span className={cn(
+            'text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-widest border',
+            confidence === 'high'   ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+            : confidence === 'medium' ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+            : 'bg-red-500/15 border-red-500/30 text-red-300',
+          )}>
+            {confidence.toUpperCase()} CONF
+          </span>
+        </div>
 
-        {/* Header: avatar + name/stat + ring gauge */}
-        <div className="flex items-center gap-3 mb-3">
+        {/* Sport chip */}
+        <span className="text-[9px] font-black uppercase tracking-widest text-white/40 block mb-2">
+          {sport ? sport.toUpperCase() : 'MLB'} · Prop Hit Rate
+        </span>
+
+        {/* Player + stat + ring */}
+        <div className="flex items-start gap-3 pr-20">
           <PlayerAvatar
             playerName={playerName}
             photoUrl={resolvedPhotoUrl}
@@ -212,108 +238,114 @@ export const PropHitRateCard = memo(function PropHitRateCard({
             size={isHero ? 'lg' : 'md'}
           />
           <div className="min-w-0 flex-1">
-            <p className={cn('font-black text-foreground truncate', isHero ? 'text-base' : 'text-sm')}>
+            <h3 className={cn('font-black text-white truncate', isHero ? 'text-lg' : 'text-sm')}>
               {playerName}
-            </p>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <p className="text-[11px] text-[var(--text-faint)] truncate">{statType}</p>
-              <HitRateGrade pct={hitRatePercentage} />
-              {(sport === 'mlb' || sport === 'baseball') && (
-                <Image src="/statcast-logo.png" alt="Statcast" width={60} height={12} className="h-3 w-auto opacity-50 flex-shrink-0" />
+            </h3>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-[10px] text-white/45 truncate">{statType}</p>
+              {totalGames < 10 && (
+                <span className="inline-flex text-[8px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 font-bold">
+                  Small ({totalGames}g)
+                </span>
               )}
             </div>
-            {/* Sample-size warning */}
-            {totalGames < 10 && (
-              <span className="inline-block mt-1 text-[8px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20">
-                Small sample ({totalGames} games)
+            {/* Line display */}
+            <div className="flex items-center gap-2 mt-1.5">
+              <span className="text-[9px] text-white/30">Line:</span>
+              <span className="text-[11px] font-black text-white tabular-nums">{avgLine.toFixed(1)}</span>
+              <span className="text-[9px] text-white/30">·</span>
+              <span className="text-[9px] text-white/30">Avg:</span>
+              <span className={cn('text-[11px] font-black tabular-nums', differential >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                {avgActual.toFixed(1)}
               </span>
-            )}
+            </div>
           </div>
-
-          {/* Ring gauge */}
+          {/* Hit rate ring */}
           <HitRateRing pct={hitRatePercentage} isHero={isHero} />
         </div>
+      </div>
 
-        {/* Hit rate progress bar */}
-        <div className="mb-3">
-          <div className="h-1.5 w-full rounded-full bg-[var(--bg-surface)] overflow-hidden">
+      <div className="px-4 pb-4 pt-3 space-y-3">
+
+        {/* ── Hit rate progress bar ── */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[9px] font-black uppercase tracking-widest text-white/35">Hit Rate</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-white tabular-nums">{hitRatePercentage.toFixed(0)}%</span>
+              {isStrong && <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/25 text-emerald-400">OVER LEAN</span>}
+              {isWeak   && <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-red-500/15 border border-red-500/25 text-red-400">UNDER LEAN</span>}
+            </div>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
             <div
-              className={cn('h-full rounded-full bg-gradient-to-r transition-all duration-500', accentGradient)}
-              style={{ width: `${Math.min(100, Math.max(0, hitRatePercentage))}%` }}
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${Math.min(100, Math.max(0, hitRatePercentage))}%`,
+                background: barColor,
+                boxShadow: `0 0 8px ${barColor}60`,
+              }}
             />
           </div>
-          <div className="flex justify-between text-[8px] mt-0.5 text-[var(--text-faint)]">
+          <div className="flex justify-between text-[8px] mt-1 text-white/25">
             <span>{hits} hits</span>
             <span>{totalGames} games</span>
             <span>{misses} misses</span>
           </div>
         </div>
 
-        {/* Avg Line vs Actual + Edge */}
-        <div className="grid grid-cols-3 gap-1.5 mb-3">
-          {[
-            { label: 'Avg Line',   val: avgLine.toFixed(1),   color: 'text-foreground' },
-            { label: 'Avg Actual', val: avgActual.toFixed(1), color: 'text-foreground' },
-            {
-              label: 'Edge',
-              val: `${differential >= 0 ? '+' : ''}${differential.toFixed(1)}`,
-              color: differential >= 0 ? 'text-emerald-400' : 'text-red-400',
-            },
-          ].map(s => (
-            <div key={s.label}
-                 className="flex flex-col items-center rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)] py-2">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-faint)]">
-                {s.label}
-              </span>
-              <span className={cn('text-sm font-black tabular-nums', s.color)}>{s.val}</span>
-            </div>
-          ))}
+        {/* ── Over / Under + Edge grid ── */}
+        <div className="grid grid-cols-3 gap-1.5">
+          <div className="flex flex-col items-center rounded-xl bg-emerald-500/8 border border-emerald-500/15 py-2.5 px-1">
+            <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400/50 mb-1">Over Hits</span>
+            <span className="text-sm font-black text-emerald-300 tabular-nums">{hits}</span>
+          </div>
+          <div className="flex flex-col items-center rounded-xl bg-red-500/8 border border-red-500/15 py-2.5 px-1">
+            <span className="text-[8px] font-black uppercase tracking-wider text-red-400/50 mb-1">Misses</span>
+            <span className="text-sm font-black text-red-300 tabular-nums">{misses}</span>
+          </div>
+          <div className={cn('flex flex-col items-center rounded-xl border py-2.5 px-1',
+            differential >= 0 ? 'bg-emerald-500/8 border-emerald-500/15' : 'bg-red-500/8 border-red-500/15')}>
+            <span className="text-[8px] font-black uppercase tracking-wider mb-1" style={{ color: differential >= 0 ? 'rgba(52,211,153,0.5)' : 'rgba(248,113,113,0.5)' }}>Edge</span>
+            <span className={cn('text-sm font-black tabular-nums', differential >= 0 ? 'text-emerald-300' : 'text-red-300')}>
+              {differential >= 0 ? '+' : ''}{differential.toFixed(1)}
+            </span>
+          </div>
         </div>
 
-        {/* Recent form bars */}
+        {/* ── Recent form squares ── */}
         {formDots.length > 0 && (
-          <div className="mb-3">
-            <FormBars dots={formDots} />
+          <div className="rounded-xl bg-white/3 border border-white/6 p-3">
+            <RecentFormSquares dots={formDots} />
           </div>
         )}
 
-        {/* Trend + Confidence */}
-        <div className="flex items-center gap-3 mb-3">
-          <div className="flex items-center gap-1.5">
-            <TrendIcon className={cn(
-              'shrink-0',
-              isHero ? 'w-4 h-4' : 'w-3.5 h-3.5',
-              trend === 'improving' ? 'text-emerald-400'
-              : trend === 'declining' ? 'text-red-400'
-              : 'text-[var(--text-faint)]',
-            )} />
-            <span className="text-[11px] text-[var(--text-muted)] capitalize">
+        {/* ── Trend + Confidence row ── */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-1">
+            <TrendIcon className={cn('shrink-0 w-3.5 h-3.5', trendColor)} />
+            <span className={cn('text-[10px] font-semibold capitalize', trendColor)}>
               {trend.replace('_', ' ')}
             </span>
           </div>
-          <span className={cn(
-            'text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ml-auto',
-            confidence === 'high'   ? 'bg-emerald-500/15 text-emerald-400'
-            : confidence === 'medium' ? 'bg-amber-500/15 text-amber-400'
-            : 'bg-red-500/15 text-red-400',
-          )}>
-            {confidence} conf
-          </span>
+          {(sport === 'mlb' || sport === 'baseball') && (
+            <Image src="/statcast-logo.png" alt="Statcast" width={60} height={12} className="h-3 w-auto opacity-30 shrink-0" />
+          )}
         </div>
 
-        {/* Recommendation */}
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-overlay)] px-3 py-2.5 mb-1">
-          <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-1 block">
-            Recommendation
+        {/* ── Recommendation ── */}
+        <div className="rounded-xl border border-white/8 bg-white/3 px-3 py-2.5">
+          <span className="text-[8px] font-black uppercase tracking-widest text-white/30 mb-1 block">
+            AI Recommendation
           </span>
-          <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{recommendation}</p>
+          <p className="text-[10px] text-white/60 leading-relaxed">{recommendation}</p>
         </div>
 
-        {/* AI Analysis CTA */}
+        {/* ── AI Analysis CTA ── */}
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-1 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] transition-all duration-150"
+            className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/25 text-xs font-semibold text-blue-300 hover:bg-blue-500/20 hover:border-blue-400/40 transition-all duration-150"
           >
             <BarChart2 className="w-3.5 h-3.5" />
             AI Analysis

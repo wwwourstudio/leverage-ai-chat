@@ -31,7 +31,7 @@ interface ADPPlayerRow {
   auctionValue?: number;
 }
 
-// ── Position badge (matches FantasyCard colours) ───────────────────────────────
+// ── Position badge (sport-colored) ────────────────────────────────────────────
 
 const POS_COLORS: Record<string, string> = {
   SP:  'text-cyan-400   bg-cyan-400/20   border-cyan-400/30',
@@ -44,6 +44,12 @@ const POS_COLORS: Record<string, string> = {
   OF:  'text-sky-400    bg-sky-400/20    border-sky-400/30',
   DH:  'text-orange-400 bg-orange-400/20 border-orange-400/30',
   P:   'text-indigo-400 bg-indigo-400/20 border-indigo-400/30',
+  QB:  'text-red-400    bg-red-400/20    border-red-400/30',
+  RB:  'text-orange-400 bg-orange-400/20 border-orange-400/30',
+  WR:  'text-indigo-400 bg-indigo-400/20 border-indigo-400/30',
+  TE:  'text-pink-400   bg-pink-400/20   border-pink-400/30',
+  K:   'text-gray-400   bg-gray-400/20   border-gray-400/30',
+  DST: 'text-slate-400  bg-slate-400/20  border-slate-400/30',
 };
 
 function PosBadge({ positions }: { positions: string }) {
@@ -52,7 +58,7 @@ function PosBadge({ positions }: { positions: string }) {
   const c = POS_COLORS[primary] ?? 'text-gray-400 bg-gray-400/12 border-gray-400/30';
   return (
     <span className={cn(
-      'inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-black uppercase tracking-wider shrink-0',
+      'inline-flex items-center px-1.5 py-0.5 rounded-lg border text-[9px] font-black uppercase tracking-wider shrink-0',
       c,
     )}>
       {primary}
@@ -64,7 +70,7 @@ function PosBadge({ positions }: { positions: string }) {
 
 function RankCircle({ rank }: { rank: number }) {
   const c = rank <= 12
-    ? 'bg-yellow-400/20 border-yellow-400/50 text-yellow-300'
+    ? 'bg-yellow-400/20 border-yellow-400/50 text-yellow-300 shadow-[0_0_8px_oklch(0.8_0.18_80/0.25)]'
     : rank <= 50
     ? 'bg-emerald-400/15 border-emerald-400/40 text-emerald-300'
     : rank <= 150
@@ -72,7 +78,7 @@ function RankCircle({ rank }: { rank: number }) {
     : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-faint)]';
   return (
     <span className={cn(
-      'inline-flex items-center justify-center w-6 h-6 rounded-full border text-[9px] font-black tabular-nums shrink-0',
+      'inline-flex items-center justify-center w-7 h-7 rounded-full border text-[9px] font-black tabular-nums shrink-0',
       c,
     )}>
       {rank}
@@ -82,12 +88,12 @@ function RankCircle({ rank }: { rank: number }) {
 
 // ── Status config ─────────────────────────────────────────────────────────────
 
-const STATUS_CFG: Record<string, { label: string; dot: string; text: string; headerGrad: string }> = {
-  optimal: { label: 'OPTIMAL',  dot: 'bg-emerald-400', text: 'text-emerald-400', headerGrad: 'from-emerald-600/75 via-teal-700/55 to-emerald-900/35' },
-  value:   { label: 'VALUE',    dot: 'bg-cyan-400',    text: 'text-cyan-400',    headerGrad: 'from-cyan-600/75 via-teal-700/55 to-cyan-900/35' },
-  target:  { label: 'TARGET',   dot: 'bg-teal-400',    text: 'text-teal-400',    headerGrad: 'from-teal-600/75 via-cyan-700/55 to-teal-900/35' },
-  hot:     { label: 'HOT',      dot: 'bg-red-400',     text: 'text-red-400',     headerGrad: 'from-red-600/75 via-rose-700/55 to-red-900/35' },
-  edge:    { label: 'EDGE',     dot: 'bg-indigo-400',  text: 'text-indigo-400',  headerGrad: 'from-indigo-600/75 via-violet-700/55 to-indigo-900/35' },
+const STATUS_CFG: Record<string, { label: string; dot: string; text: string; badgeCls: string; headerGrad: string }> = {
+  optimal: { label: 'OPTIMAL',  dot: 'bg-emerald-400', text: 'text-emerald-400', badgeCls: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400', headerGrad: 'from-emerald-600/25 via-teal-800/10' },
+  value:   { label: 'VALUE',    dot: 'bg-cyan-400',    text: 'text-cyan-400',    badgeCls: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400',           headerGrad: 'from-cyan-600/25 via-teal-800/10' },
+  target:  { label: 'TARGET',   dot: 'bg-teal-400',    text: 'text-teal-400',    badgeCls: 'bg-teal-500/15 border-teal-500/30 text-teal-400',           headerGrad: 'from-teal-600/25 via-cyan-800/10' },
+  hot:     { label: 'HOT',      dot: 'bg-red-400',     text: 'text-red-400',     badgeCls: 'bg-red-500/15 border-red-500/30 text-red-400',              headerGrad: 'from-red-600/25 via-rose-800/10' },
+  edge:    { label: 'EDGE',     dot: 'bg-indigo-400',  text: 'text-indigo-400',  badgeCls: 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400',     headerGrad: 'from-indigo-600/25 via-violet-800/10' },
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -125,42 +131,60 @@ export const ADPCard = memo(function ADPCard({
   return (
     <div className="animate-fade-in-up">
       <article className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-overlay)] border transition-all duration-300',
+        'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border transition-all duration-300',
         isHero
           ? 'border-[var(--border-hover)] shadow-[0_0_32px_oklch(0.3_0.06_260/0.15)]'
-          : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.08)]',
+          : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-glow,0_0_24px_oklch(0.3_0.06_280/0.12))]',
       )}>
-        {/* Gradient header */}
-        <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', s.headerGrad)}>
+
+        {/* ── Gradient header ──────────────────────────────────────────── */}
+        <div className={cn('relative px-4 pt-4 pb-3 bg-gradient-to-br to-transparent border-b border-[var(--border-subtle)]', s.headerGrad)}>
+          {/* Decorative glow */}
+          <div className="absolute top-0 right-0 w-32 h-16 bg-white/3 rounded-bl-full blur-2xl pointer-events-none" />
+
           {/* Status badge */}
-          <div className="absolute top-3 right-3 flex items-center gap-1">
-            <span className={cn('w-1.5 h-1.5 rounded-full animate-pulse', s.dot)} />
-            <span className={cn('text-[9px] font-black uppercase tracking-widest', s.text)}>{s.label}</span>
+          <div className="absolute top-3 right-3">
+            <span className={cn(
+              'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider',
+              s.badgeCls,
+            )}>
+              <span className={cn('w-1 h-1 rounded-full animate-pulse', s.dot)} />
+              {s.label}
+            </span>
           </div>
+
           {/* Breadcrumb */}
           <div className="flex items-center gap-1.5 mb-1.5">
-            <BarChart2 className="w-3 h-3 text-foreground/60" />
-            <span className="text-[9px] font-black uppercase tracking-widest text-foreground/70">{category}</span>
-            <span className="text-foreground/30">·</span>
-            <span className="text-[9px] text-foreground/50 truncate">{subcategory}</span>
+            <BarChart2 className="w-3 h-3 text-white/60" />
+            <span className="text-[9px] font-black uppercase tracking-widest text-white/60">{category}</span>
+            <span className="text-white/30">·</span>
+            <span className="text-[9px] text-white/50 truncate">{subcategory}</span>
           </div>
-          <h3 className={cn('font-black text-white leading-snug text-balance pr-16', isHero ? 'text-lg' : 'text-sm')}>
+          <h3 className={cn('font-black text-white leading-snug text-balance pr-20', isHero ? 'text-lg' : 'text-sm')}>
             {title}
           </h3>
+
+          {/* Source tag */}
+          <div className="mt-1.5 flex items-center gap-1.5">
+            <span className="text-[9px] text-white/40 font-bold">{source}</span>
+            {totalInDataset && (
+              <span className="text-[9px] text-white/30">· {totalInDataset} players ranked</span>
+            )}
+          </div>
         </div>
 
-        {/* Body */}
-        <div className="px-4 pb-4 pt-3 space-y-3">
+        {/* ── Body ─────────────────────────────────────────────────────── */}
+        <div className="px-3 pb-4 pt-3 space-y-3">
           {/* Column headers */}
           {players.length > 0 && (
             <div className="flex items-center gap-2 px-2">
-              <span className="w-6 shrink-0" />
-              <span className="flex-1 text-[9px] font-black uppercase tracking-wider text-[var(--text-faint)]">Player</span>
+              <span className="w-7 shrink-0" />
+              <span className="flex-1 text-[8px] font-black uppercase tracking-wider text-[var(--text-faint)]">Player</span>
               {hasAuctionValues && (
-                <span className="w-8 text-right text-[9px] font-black uppercase tracking-wider text-[var(--text-faint)] shrink-0">$Val</span>
+                <span className="w-10 text-right text-[8px] font-black uppercase tracking-wider text-[var(--text-faint)] shrink-0">$Val</span>
               )}
-              <span className="w-10 text-right text-[9px] font-black uppercase tracking-wider text-[var(--text-faint)] shrink-0">
-                {hasValuePicks ? 'ADP/Δ' : 'ADP'}
+              <span className="w-12 text-right text-[8px] font-black uppercase tracking-wider text-[var(--text-faint)] shrink-0">
+                {hasValuePicks ? 'ADP / Δ' : 'ADP'}
               </span>
             </div>
           )}
@@ -170,50 +194,70 @@ export const ADPCard = memo(function ADPCard({
             {players.slice(0, maxRows).map((p, idx) => {
               const isTopPick = p.rank <= 12;
               const rowBg = p.isValuePick
-                ? 'bg-emerald-500/10 border-emerald-500/25'
+                ? 'bg-emerald-500/8 border-emerald-500/20'
                 : idx === 0
-                ? 'bg-teal-500/8 border-teal-500/20'
+                ? 'bg-indigo-500/8 border-indigo-500/15'
                 : isTopPick
                 ? 'bg-yellow-400/5 border-yellow-400/15'
-                : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)]';
+                : idx % 2 === 0
+                ? 'bg-[var(--bg-elevated)]/60 border-[var(--border-subtle)]'
+                : 'bg-[var(--bg-surface)] border-[var(--border-subtle)]';
 
               return (
                 <div
                   key={`${p.displayName}-${p.rank}`}
                   className={cn(
-                    'flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-colors hover:bg-[var(--bg-surface)]',
+                    'flex items-center gap-2 px-2 py-2 rounded-xl border transition-colors hover:bg-[var(--bg-surface)]',
                     rowBg,
                   )}
                 >
+                  {/* Rank circle */}
                   <RankCircle rank={p.rank} />
-                  <span className="text-xs font-bold text-foreground flex-1 truncate min-w-0">
-                    {p.displayName}
+
+                  {/* Name + team */}
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-black text-white truncate block">
+                      {p.displayName}
+                    </span>
                     {p.team && (
-                      <span className="text-[10px] font-normal text-[var(--text-muted)] ml-1">{p.team}</span>
+                      <span className="text-[9px] font-bold text-[var(--text-muted)]">{p.team}</span>
                     )}
-                  </span>
+                  </div>
+
+                  {/* Sleeper badge */}
                   {p.isValuePick && (
-                    <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-400/12 border border-emerald-400/30 px-1 py-0.5 rounded shrink-0">
+                    <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-400/10 border border-emerald-400/25 px-1.5 py-0.5 rounded-full shrink-0">
                       SLEEPER
                     </span>
                   )}
+
+                  {/* Position badge */}
                   {p.positions && <PosBadge positions={p.positions} />}
+
+                  {/* Auction value chip */}
                   {hasAuctionValues && (
-                    <span className="text-[10px] font-bold tabular-nums text-amber-400 w-8 text-right shrink-0">
+                    <span className={cn(
+                      'inline-flex items-center justify-center w-10 text-right shrink-0',
+                      p.auctionValue != null
+                        ? 'text-[11px] font-black tabular-nums text-amber-400'
+                        : 'text-[10px] text-[var(--text-faint)]',
+                    )}>
                       {p.auctionValue != null ? `$${p.auctionValue}` : '—'}
                     </span>
                   )}
-                  <div className="w-10 text-right shrink-0">
-                    <span className="text-[11px] font-black tabular-nums text-cyan-400">
+
+                  {/* ADP + delta */}
+                  <div className="w-12 text-right shrink-0">
+                    <span className="text-[13px] font-black tabular-nums text-cyan-400 block leading-tight">
                       {p.adp.toFixed(1)}
                     </span>
                     {p.valueDelta != null && p.valueDelta > 0 && (
-                      <span className="block text-[8px] font-bold text-emerald-400 tabular-nums leading-none">
+                      <span className="text-[9px] font-black text-emerald-400 tabular-nums leading-none block">
                         +{p.valueDelta.toFixed(0)}
                       </span>
                     )}
                     {p.valueDelta != null && p.valueDelta < -5 && (
-                      <span className="block text-[8px] font-bold text-amber-400 tabular-nums leading-none">
+                      <span className="text-[9px] font-black text-red-400 tabular-nums leading-none block">
                         {p.valueDelta.toFixed(0)}
                       </span>
                     )}
@@ -224,12 +268,17 @@ export const ADPCard = memo(function ADPCard({
           </div>
 
           {players.length === 0 && (
-            <p className="text-xs text-[var(--text-muted)] text-center py-3">
-              No ADP data matched — try broadening your search.
-            </p>
+            <div className="py-6 text-center">
+              <div className="w-10 h-10 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center mx-auto mb-3">
+                <BarChart2 className="w-5 h-5 text-[var(--text-faint)]" />
+              </div>
+              <p className="text-xs text-[var(--text-muted)]">
+                No ADP data matched — try broadening your search.
+              </p>
+            </div>
           )}
 
-          {/* Footer: source + dataset size */}
+          {/* Footer: source info */}
           <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-1">
               <TrendingUp className="w-3 h-3 text-[var(--text-faint)]" />
@@ -242,7 +291,7 @@ export const ADPCard = memo(function ADPCard({
           {onAnalyze && (
             <button
               onClick={onAnalyze}
-              className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] transition-all duration-150"
+              className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600/20 to-violet-600/20 border border-indigo-500/30 text-xs font-bold text-indigo-300 hover:from-indigo-600/30 hover:to-violet-600/30 hover:text-white hover:border-indigo-500/50 transition-all duration-150"
             >
               <TrendingUp className="w-3.5 h-3.5" />
               Full Analysis

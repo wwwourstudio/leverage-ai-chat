@@ -46,28 +46,28 @@ const STATUS_CONFIG: Record<string, { label: string; dot: string; text: string; 
     dot: 'bg-red-400',
     text: 'text-red-400',
     bg: 'bg-red-500/15 border-red-500/30',
-    header: 'from-red-600/75 via-rose-900/55 to-slate-900/40',
+    header: 'from-red-600/30 via-rose-900/15 to-transparent',
   },
   edge: {
     label: 'EDGE',
     dot: 'bg-emerald-400',
     text: 'text-emerald-400',
     bg: 'bg-emerald-500/15 border-emerald-500/30',
-    header: 'from-emerald-600/75 via-teal-900/55 to-slate-900/40',
+    header: 'from-emerald-600/30 via-teal-900/15 to-transparent',
   },
   value: {
     label: 'VALUE',
     dot: 'bg-blue-400',
     text: 'text-blue-400',
     bg: 'bg-blue-500/15 border-blue-500/30',
-    header: 'from-blue-600/75 via-indigo-900/55 to-slate-900/40',
+    header: 'from-blue-600/30 via-indigo-900/15 to-transparent',
   },
   neutral: {
     label: 'PROJ',
     dot: 'bg-[var(--text-faint)]',
     text: 'text-[var(--text-muted)]',
     bg: 'bg-[var(--bg-surface)] border-[var(--border-subtle)]',
-    header: 'from-slate-600/75 via-gray-900/55 to-slate-900/40',
+    header: 'from-blue-600/25 via-indigo-800/10 to-transparent',
   },
 };
 
@@ -75,30 +75,29 @@ const STATUS_CONFIG: Record<string, { label: string; dot: string; text: string; 
 
 function PercentileBar({ p10, p50, p90, label }: { p10: number; p50: number; p90: number; label: string }) {
   const maxVal = Math.max(p90, 1);
-  const p10Pct  = (p10 / maxVal) * 100;
-  const p50Pct  = (p50 / maxVal) * 100;
+  const p10Pct = (p10 / maxVal) * 100;
+  const p50Pct = (p50 / maxVal) * 100;
 
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">{label} Range</span>
+      <div className="flex items-center justify-between">
+        <span className="text-[9px] font-black uppercase tracking-widest text-white/40">{label} Range</span>
+        <span className="text-[9px] text-white/50 tabular-nums">P10: {p10} · P50: {p50} · P90: {p90}</span>
       </div>
-      <div className="relative h-4 bg-[var(--bg-surface)] rounded-full overflow-hidden">
-        {/* P10–P90 range bar */}
+      <div className="relative h-2 bg-white/5 rounded-full overflow-hidden">
         <div
-          className="absolute top-0 bottom-0 bg-gradient-to-r from-slate-500/40 to-emerald-500/40 rounded-full"
+          className="absolute top-0 bottom-0 rounded-full bg-gradient-to-r from-blue-500/40 to-emerald-500/60"
           style={{ left: `${p10Pct}%`, right: `${100 - (p90 / maxVal * 100)}%` }}
         />
-        {/* P50 marker */}
         <div
-          className="absolute top-0 bottom-0 w-0.5 bg-emerald-400 rounded-full"
+          className="absolute top-0 bottom-0 w-0.5 bg-emerald-400 rounded-full shadow-[0_0_4px_#10b981]"
           style={{ left: `${p50Pct}%` }}
         />
       </div>
-      <div className="flex justify-between text-[10px] font-bold text-[var(--text-faint)]">
-        <span>P10: {p10}</span>
-        <span className="text-emerald-400">P50: {p50}</span>
-        <span>P90: {p90}</span>
+      <div className="flex justify-between text-[9px] text-white/40">
+        <span>Floor</span>
+        <span className="text-emerald-400 font-bold">Median</span>
+        <span>Ceiling</span>
       </div>
     </div>
   );
@@ -107,30 +106,31 @@ function PercentileBar({ p10, p50, p90, label }: { p10: number; p50: number; p90
 // ─── Breakout score ring ──────────────────────────────────────────────────────
 
 function BreakoutRing({ score }: { score: number }) {
-  const color = score >= 70 ? 'text-amber-400' : score >= 50 ? 'text-blue-400' : 'text-[var(--text-faint)]';
+  const color = score >= 70 ? '#fbbf24' : score >= 50 ? '#60a5fa' : '#6b7280';
   const label = score >= 70 ? 'BREAKOUT' : score >= 50 ? 'UPSIDE' : 'STABLE';
   const circumference = 2 * Math.PI * 20;
   const dashOffset = circumference * (1 - score / 100);
 
   return (
-    <div className="flex flex-col items-center gap-0.5">
-      <div className="relative w-12 h-12">
+    <div className="flex flex-col items-center gap-0.5 shrink-0">
+      <div className="relative w-14 h-14">
         <svg className="w-full h-full -rotate-90" viewBox="0 0 48 48">
-          <circle cx="24" cy="24" r="20" stroke="var(--border-subtle)" strokeWidth="4" fill="none" />
+          <circle cx="24" cy="24" r="20" stroke="rgba(255,255,255,0.08)" strokeWidth="4" fill="none" />
           <circle
             cx="24" cy="24" r="20"
-            stroke={score >= 70 ? '#fbbf24' : score >= 50 ? '#60a5fa' : '#6b7280'}
+            stroke={color}
             strokeWidth="4" fill="none"
             strokeDasharray={circumference}
             strokeDashoffset={dashOffset}
             strokeLinecap="round"
+            style={{ filter: `drop-shadow(0 0 4px ${color}60)` }}
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className={cn('text-[11px] font-black', color)}>{score}</span>
+          <span className="text-[11px] font-black text-white">{score}</span>
         </div>
       </div>
-      <span className={cn('text-[10px] font-black uppercase tracking-wider', color)}>{label}</span>
+      <span className="text-[9px] font-black uppercase tracking-wider" style={{ color }}>{label}</span>
     </div>
   );
 }
@@ -156,14 +156,14 @@ function DKSparkline({ data, height = 28 }: { data: Array<{ price: number }>; he
     d += ` C ${cpx},${y0} ${cpx},${y1} ${x1},${y1}`;
   }
   const area = `${d} L ${viewW},${height} L 0,${height} Z`;
-  const isUp  = prices[prices.length - 1] >= prices[0];
+  const isUp = prices[prices.length - 1] >= prices[0];
   const color = isUp ? '#10b981' : '#94a3b8';
-  const gid   = `dksp-${uid.replace(/:/g, '')}`;
+  const gid = `dksp-${uid.replace(/:/g, '')}`;
   return (
     <svg width="100%" height={height} viewBox={`0 0 ${viewW} ${height}`} preserveAspectRatio="none" className="overflow-visible" aria-hidden="true">
       <defs>
         <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor={color} stopOpacity="0.25" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.30" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
@@ -176,7 +176,7 @@ function DKSparkline({ data, height = 28 }: { data: Array<{ price: number }>; he
 
 function metricValueColor(label: string, value: string): string {
   const num = parseFloat(value);
-  if (isNaN(num)) return 'text-foreground';
+  if (isNaN(num)) return 'text-white';
   const lo = label.toLowerCase();
   if (lo.includes('barrel') || lo.includes(' ev') || lo.includes('hard') || lo.includes('k/9') || lo.includes('strikeout') || lo.includes('csw') || lo.includes('swstr') || lo.includes('stuff')) {
     return num >= 12 ? 'text-emerald-400' : num >= 7 ? 'text-amber-400' : 'text-red-400';
@@ -187,7 +187,7 @@ function metricValueColor(label: string, value: string): string {
   if (value.endsWith('%')) {
     return num >= 60 ? 'text-emerald-400' : num >= 40 ? 'text-amber-400' : 'text-red-400';
   }
-  return 'text-foreground';
+  return 'text-white';
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -196,76 +196,86 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
   const [showLightbox, setShowLightbox] = useState(false);
 
   // Normalize data (handles both flat and nested formats)
-  const playerName   = data.player_name ?? data.data?.player ?? data.title ?? 'Player';
-  const team         = data.team ?? data.data?.team ?? '';
-  const position     = data.position ?? data.data?.position ?? '';
-  const projections  = data.projections ?? {
-    hr_proj:       parseFloat(data.data?.hrProb ?? '0') / 100,
-    k_proj:        parseFloat(data.data?.kProj ?? '0'),
-    breakout_score:parseInt(data.data?.breakoutScore ?? '0'),
+  const playerName  = data.player_name ?? data.data?.player ?? data.title ?? 'Player';
+  const team        = data.team ?? data.data?.team ?? '';
+  const position    = data.position ?? data.data?.position ?? '';
+  const projections = data.projections ?? {
+    hr_proj:        parseFloat(data.data?.hrProb ?? '0') / 100,
+    k_proj:         parseFloat(data.data?.kProj ?? '0'),
+    breakout_score: parseInt(data.data?.breakoutScore ?? '0'),
   };
-  const percentiles  = data.percentiles ?? { p10: 0, p50: projections.hr_proj > 0 ? 1 : 0, p90: 1 };
-  const metrics      = data.summary_metrics ?? [];
+  const percentiles = data.percentiles ?? { p10: 0, p50: projections.hr_proj > 0 ? 1 : 0, p90: 1 };
+  const metrics     = data.summary_metrics ?? [];
   const lightboxSections = data.lightbox?.sections ?? [];
   const matchupScore = data.matchup_score ?? 0;
-  const trendNote    = data.trend_note ?? '';
+  const trendNote   = data.trend_note ?? '';
 
-  // Recent form sparkline from flat data
   const recentDkPts  = data.data?.recentDKPts as string | undefined;
   const sparkData    = recentDkPts
     ? String(recentDkPts).split(',').map(v => ({ price: parseFloat(v.trim()) })).filter(d => !isNaN(d.price))
     : [];
   const recentAvgLabel = data.data?.recentGamesAvg as string | undefined;
 
-  // Home / road splits
-  const homeDkAvg   = data.data?.homeDKAvg   as string | undefined;
-  const roadDkAvg   = data.data?.roadDKAvg   as string | undefined;
-  const homeGames   = data.data?.homeSplitGames as string | undefined;
-  const roadGames   = data.data?.roadSplitGames as string | undefined;
+  const homeDkAvg = data.data?.homeDKAvg as string | undefined;
+  const roadDkAvg = data.data?.roadDKAvg as string | undefined;
+  const homeGames = data.data?.homeSplitGames as string | undefined;
+  const roadGames = data.data?.roadSplitGames as string | undefined;
 
-  const statusKey    = (data.status ?? 'neutral').toLowerCase();
-  const cfg          = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.neutral;
+  const statusKey = (data.status ?? 'neutral').toLowerCase();
+  const cfg       = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.neutral;
 
-  const isPitcher    = position === 'SP' || position === 'RP';
-  const hrPct        = +(projections.hr_proj * 100).toFixed(1);
-  const kProj        = +projections.k_proj.toFixed(1);
-  const breakout     = projections.breakout_score;
+  const isPitcher = position === 'SP' || position === 'RP';
+  const hrPct     = +(projections.hr_proj * 100).toFixed(1);
+  const kProj     = +projections.k_proj.toFixed(1);
+  const breakout  = projections.breakout_score;
 
-  // Primary hero metrics (3 shown)
   const hero1 = isPitcher
     ? { label: 'K/Game', value: `${kProj}` }
     : { label: 'HR Prob', value: `${hrPct}%` };
 
   const hero2 = { label: 'DFS Score', value: `${(matchupScore * 100).toFixed(0)}/100` };
-
   const dkPts = metrics.find(m => m.label === 'DK Proj Pts')?.value;
+
+  const breakoutColor = breakout >= 70 ? '#fbbf24' : breakout >= 50 ? '#60a5fa' : 'rgba(255,255,255,0.3)';
 
   return (
     <>
       <article className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-300',
+        'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border transition-all duration-300',
         isHero
-          ? 'border-[var(--border-subtle)] shadow-[0_0_32px_oklch(0.3_0.06_260/0.18)]'
-          : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.10)]',
+          ? 'border-blue-500/30 shadow-[0_0_32px_rgba(59,130,246,0.12)]'
+          : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_24px_rgba(59,130,246,0.10)]',
       )}>
+
         {/* ── Header ──────────────────────────────────────────────────── */}
-        <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', data.gradient || cfg.header)}>
-          <div className="absolute top-3 right-3 flex items-center gap-1">
+        <div className={cn('relative px-4 pt-4 pb-3 bg-gradient-to-br border-b border-[var(--border-subtle)]', cfg.header)}>
+          {/* Status badge */}
+          <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/30 backdrop-blur-sm border border-white/10">
             <span className={cn('w-1.5 h-1.5 rounded-full animate-pulse', cfg.dot)} />
-            <span className={cn('text-[10px] font-black uppercase tracking-widest', cfg.text)}>{cfg.label}</span>
+            <span className={cn('text-[9px] font-black uppercase tracking-widest', cfg.text)}>{cfg.label}</span>
           </div>
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <Activity className="w-3 h-3 text-white/60" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/70">MLB · LeverageMetrics</span>
-            <span className="text-white/40">·</span>
-            <span className="text-[10px] text-white/50 truncate">{data.subcategory}</span>
+
+          {/* Sport chip */}
+          <div className="flex items-center gap-1.5 mb-2">
+            <Activity className="w-3 h-3 text-white/40" />
+            <span className="text-[9px] font-black uppercase tracking-widest text-white/40">MLB · LeverageMetrics</span>
+            <span className="text-white/20">·</span>
+            <span className="text-[9px] text-white/30 truncate">{data.subcategory}</span>
           </div>
-          <div className="flex items-start justify-between gap-2 pr-16">
-            <div>
+
+          {/* Hero player section */}
+          <div className="flex items-start justify-between gap-3 pr-16">
+            <div className="min-w-0">
+              {/* Team badge */}
+              {team && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-500/20 border border-blue-400/30 text-[9px] font-black text-blue-300 uppercase tracking-wider mb-1.5">
+                  {team}{position ? ` · ${position}` : ''}
+                </span>
+              )}
               <h3
                 className={cn(
-                  'font-black text-foreground leading-tight',
-                  isHero ? 'text-lg' : 'text-sm',
+                  'font-black text-white leading-tight',
+                  isHero ? 'text-xl' : 'text-base',
                   onAnalyze && 'cursor-pointer hover:text-blue-300 transition-colors',
                 )}
                 onClick={onAnalyze}
@@ -273,29 +283,43 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
               >
                 {playerName}
               </h3>
-              {(team || position) && (
-                <p className="text-[10px] font-bold text-[var(--text-muted)] mt-0.5">
-                  {team}{team && position ? ' · ' : ''}{position}
-                </p>
+              {!team && position && (
+                <p className="text-[10px] font-bold text-white/40 mt-0.5">{position}</p>
               )}
             </div>
-            {isPitcher && breakout > 0 && (
-              <BreakoutRing score={breakout} />
-            )}
+            {breakout > 0 && <BreakoutRing score={breakout} />}
           </div>
         </div>
 
-        <div className="px-4 pb-4 space-y-3">
-          {/* ── Hero metrics strip ─────────────────────────────────────── */}
-          <div className="grid grid-cols-3 gap-1.5 mt-3">
-            <MetricBox label={hero1.label} value={hero1.value} highlight />
-            <MetricBox label={hero2.label} value={hero2.value} />
-            {dkPts && <MetricBox label="DK Pts" value={dkPts} />}
+        <div className="px-4 pb-4 space-y-3 pt-3">
+
+          {/* ── Hero metrics 2×2 tile grid ──────────────────────────── */}
+          <div className="grid grid-cols-2 gap-2">
+            <StatTile label={hero1.label} value={hero1.value} accent="blue" large />
+            <StatTile label={hero2.label} value={hero2.value} accent="indigo" large />
+            {dkPts && <StatTile label="DK Pts" value={dkPts} accent="emerald" />}
+            {kProj > 0 && !isPitcher && <StatTile label="K Proj" value={`${kProj}`} accent="slate" />}
           </div>
 
-          {/* ── Percentile bar ──────────────────────────────────────────── */}
+          {/* ── Breakout score bar ──────────────────────────────────── */}
+          {breakout > 0 && (
+            <div className="rounded-xl bg-white/3 border border-white/8 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/40">Breakout Score</span>
+                <span className="text-[11px] font-black tabular-nums" style={{ color: breakoutColor }}>{breakout}/100</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{ width: `${breakout}%`, background: breakout >= 70 ? 'linear-gradient(90deg, #f59e0b, #fbbf24)' : breakout >= 50 ? 'linear-gradient(90deg, #3b82f6, #60a5fa)' : 'rgba(100,116,139,0.6)' }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ── Percentile bar ──────────────────────────────────────── */}
           {(percentiles.p10 !== undefined || percentiles.p90 > 0) && (
-            <div className="px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
+            <div className="rounded-xl bg-white/3 border border-white/8 p-3">
               <PercentileBar
                 p10={percentiles.p10}
                 p50={percentiles.p50}
@@ -305,58 +329,61 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
             </div>
           )}
 
-          {/* ── Recent form sparkline ─────────────────────────────────── */}
+          {/* ── Recent form sparkline with dots ─────────────────────── */}
           {sparkData.length >= 3 && (
-            <div className="px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
-              <div className="flex justify-between items-center mb-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Recent Form</span>
+            <div className="rounded-xl bg-white/3 border border-white/8 p-3">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/40">Recent Form</span>
                 {recentAvgLabel && (
-                  <span className="text-[10px] text-[var(--text-faint)]">{recentAvgLabel}</span>
+                  <span className="text-[9px] font-bold text-white/50">{recentAvgLabel}</span>
                 )}
               </div>
               <DKSparkline data={sparkData} height={28} />
             </div>
           )}
 
-          {/* ── Home / road splits ─────────────────────────────────────── */}
+          {/* ── Home / road splits ─────────────────────────────────── */}
           {(homeDkAvg || roadDkAvg) && (
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-2 gap-2">
               {homeDkAvg && (
-                <div className="flex flex-col items-center gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2">
-                  <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Home</span>
-                  <span className="text-sm font-black text-foreground tabular-nums">{homeDkAvg}</span>
-                  {homeGames && <span className="text-[10px] text-[var(--text-faint)]">{homeGames}</span>}
+                <div className="flex flex-col items-center gap-0.5 rounded-xl bg-emerald-500/8 border border-emerald-500/20 px-3 py-2.5">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-emerald-400/60">Home</span>
+                  <span className="text-base font-black text-white tabular-nums">{homeDkAvg}</span>
+                  {homeGames && <span className="text-[9px] text-white/30">{homeGames}</span>}
                 </div>
               )}
               {roadDkAvg && (
-                <div className="flex flex-col items-center gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2">
-                  <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Road</span>
-                  <span className="text-sm font-black text-foreground tabular-nums">{roadDkAvg}</span>
-                  {roadGames && <span className="text-[10px] text-[var(--text-faint)]">{roadGames}</span>}
+                <div className="flex flex-col items-center gap-0.5 rounded-xl bg-slate-500/8 border border-slate-500/20 px-3 py-2.5">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-slate-400/60">Road</span>
+                  <span className="text-base font-black text-white tabular-nums">{roadDkAvg}</span>
+                  {roadGames && <span className="text-[9px] text-white/30">{roadGames}</span>}
                 </div>
               )}
             </div>
           )}
 
-          {/* ── Summary metrics ────────────────────────────────────────── */}
+          {/* ── Percentile rank bars for summary metrics ──────────── */}
           {metrics.length > 0 && (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {metrics.slice(0, isHero ? 6 : 4).map((m, i) => {
                 const isPercent = String(m.value).endsWith('%');
                 const numVal = parseFloat(String(m.value));
                 return (
-                  <div key={i} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-[var(--bg-overlay)]">
-                    <span className="text-[10px] text-[var(--text-faint)] uppercase tracking-wide">{m.label}</span>
-                    <div className="flex flex-col items-end gap-0.5 min-w-[3rem]">
-                      <span className={cn('text-[10px] font-black tabular-nums', metricValueColor(m.label, String(m.value)))}>{m.value}</span>
+                  <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/3 border border-white/5">
+                    <span className="text-[9px] text-white/40 uppercase tracking-wide">{m.label}</span>
+                    <div className="flex items-center gap-2">
                       {isPercent && !isNaN(numVal) && (
-                        <div className="h-0.5 w-10 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                        <div className="h-1 w-16 rounded-full bg-white/5 overflow-hidden">
                           <div
-                            className={cn('h-full rounded-full', numVal >= 60 ? 'bg-emerald-500' : numVal >= 40 ? 'bg-amber-500' : 'bg-red-500')}
-                            style={{ width: `${Math.min(100, numVal)}%` }}
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${Math.min(100, numVal)}%`,
+                              background: numVal >= 60 ? '#10b981' : numVal >= 40 ? '#f59e0b' : '#ef4444',
+                            }}
                           />
                         </div>
                       )}
+                      <span className={cn('text-[10px] font-black tabular-nums', metricValueColor(m.label, String(m.value)))}>{m.value}</span>
                     </div>
                   </div>
                 );
@@ -364,20 +391,20 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
             </div>
           )}
 
-          {/* ── Trend note ─────────────────────────────────────────────── */}
+          {/* ── Trend note ─────────────────────────────────────────── */}
           {trendNote && (
-            <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-500/5 border border-amber-500/20">
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-500/8 border border-amber-500/20">
               <Zap className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
-              <p className="text-[10px] text-[var(--text-muted)] leading-relaxed line-clamp-2">{trendNote}</p>
+              <p className="text-[10px] text-amber-300/80 leading-relaxed line-clamp-2">{trendNote}</p>
             </div>
           )}
 
-          {/* ── CTA row ────────────────────────────────────────────────── */}
-          <div className="flex gap-2">
+          {/* ── CTA row ────────────────────────────────────────────── */}
+          <div className="flex gap-2 pt-1">
             {lightboxSections.length > 0 && (
               <button
                 onClick={() => setShowLightbox(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-faint)] hover:text-foreground hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] transition-all duration-150"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-white/40 hover:text-white hover:bg-white/8 hover:border-white/20 transition-all duration-150"
               >
                 <BarChart3 className="w-3.5 h-3.5" />
                 Full Breakdown
@@ -386,7 +413,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
             {onAnalyze && (
               <button
                 onClick={onAnalyze}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-faint)] hover:text-foreground hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] transition-all duration-150"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-blue-500/15 border border-blue-500/30 text-xs font-semibold text-blue-300 hover:bg-blue-500/25 hover:border-blue-400/50 transition-all duration-150"
               >
                 <TrendingUp className="w-3.5 h-3.5" />
                 Analyze
@@ -395,17 +422,17 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
             )}
           </div>
 
-          {/* ── Data source badge ─────────────────────────────────────── */}
-          <div className="flex items-center justify-between pt-1 border-t border-[var(--border-subtle)]">
+          {/* ── Data source badge ─────────────────────────────────── */}
+          <div className="flex items-center justify-between pt-2 border-t border-white/5">
             <div className="flex items-center gap-1">
-              <Target className="w-2.5 h-2.5 text-[var(--border-subtle)]" />
-              <span className="text-[10px] font-bold text-[var(--text-faint)] uppercase tracking-wider">LeverageMetrics Engine</span>
+              <Target className="w-2.5 h-2.5 text-white/20" />
+              <span className="text-[9px] font-bold text-white/20 uppercase tracking-wider">LeverageMetrics Engine</span>
             </div>
             <div className="flex items-center gap-2">
               {data.last_updated && (
-                <span className="text-[10px] text-[var(--text-faint)]">{data.last_updated}</span>
+                <span className="text-[9px] text-white/20">{data.last_updated}</span>
               )}
-              <span className="text-[10px] text-[var(--text-faint)]">Monte Carlo N=1,000</span>
+              <span className="text-[9px] text-white/20">Monte Carlo N=1,000</span>
             </div>
           </div>
         </div>
@@ -427,11 +454,18 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
 
 // ─── Sub-component ────────────────────────────────────────────────────────────
 
-function MetricBox({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
+function StatTile({ label, value, accent = 'blue', large = false }: { label: string; value: string; accent?: 'blue' | 'indigo' | 'emerald' | 'slate'; large?: boolean }) {
+  const accentMap = {
+    blue:   { bg: 'bg-blue-500/10',   border: 'border-blue-500/20',   text: 'text-blue-300'   },
+    indigo: { bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', text: 'text-indigo-300' },
+    emerald:{ bg: 'bg-emerald-500/10',border: 'border-emerald-500/20',text: 'text-emerald-300' },
+    slate:  { bg: 'bg-white/4',       border: 'border-white/8',       text: 'text-white/70'   },
+  };
+  const a = accentMap[accent];
   return (
-    <div className="flex flex-col items-center gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2.5">
-      <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-faint)]">{label}</span>
-      <span className={cn('text-sm font-black tabular-nums', highlight ? 'text-emerald-400' : 'text-foreground')}>
+    <div className={cn('flex flex-col items-center rounded-xl border px-2 py-3', a.bg, a.border)}>
+      <span className="text-[8px] font-black uppercase tracking-widest text-white/35 mb-1">{label}</span>
+      <span className={cn('font-black tabular-nums', large ? 'text-xl' : 'text-base', a.text)}>
         {value}
       </span>
     </div>

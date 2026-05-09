@@ -206,7 +206,9 @@ Return a JSON array of 5 objects: [{"label": "Short label (3-5 words)", "query":
   const staticPrompts = getStaticFallback(category, sport);
   aiPromise.then(result => {
     if (result) setCached(cacheKey, result);
-  }).catch(() => {});
+  }).catch((e: unknown) => {
+    console.warn('[v0] [prompts] background cache warm failed:', e instanceof Error ? e.message : e);
+  });
 
   console.log(`[v0] [prompts] AI timeout (>${AI_TIMEOUT_MS}ms) — serving static fallback for ${cacheKey}`);
   return NextResponse.json({ success: true, prompts: staticPrompts, cached: false, source: 'static' });

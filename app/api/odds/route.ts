@@ -37,9 +37,11 @@ function enrichEvents(events: any[]): any[] {
       for (const market of bk.markets ?? []) {
         if (market.key !== 'h2h') continue;
         for (const outcome of market.outcomes ?? []) {
-          const name: string = outcome.name;
-          if (!bestH2H[name] || outcome.price > bestH2H[name].price) {
-            bestH2H[name] = { price: outcome.price, book: bk.title };
+          const name: string | undefined = outcome.name;
+          const price: number | undefined = outcome.price;
+          if (!name || price == null) continue;
+          if (!bestH2H[name] || price > bestH2H[name].price) {
+            bestH2H[name] = { price, book: bk.title ?? 'Unknown' };
           }
         }
       }

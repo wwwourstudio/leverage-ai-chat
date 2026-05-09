@@ -48,32 +48,50 @@ export function EVBetCard({
   };
 
   const evRaw = parseFloat(String(data.evPercent ?? '0'));
-  const evColor =
+  const isPositiveEV = evRaw > 0;
+  const evColorClass =
     evRaw >= 10 ? 'text-emerald-300'
     : evRaw >= 5  ? 'text-amber-300'
-    : 'text-[var(--text-muted)]';
+    : evRaw > 0   ? 'text-sky-300'
+    : 'text-red-400';
+
+  const evBgClass =
+    evRaw >= 5  ? 'from-emerald-600/25 via-cyan-800/10 to-transparent'
+    : evRaw > 0 ? 'from-sky-600/20 via-cyan-800/8 to-transparent'
+    : 'from-red-600/15 via-slate-800/5 to-transparent';
 
   const modelPct   = data.modelProbability   !== undefined ? Number(data.modelProbability)   * 100 : null;
   const impliedPct = data.impliedProbability !== undefined ? Number(data.impliedProbability) * 100 : null;
+  const edgePct    = modelPct !== null && impliedPct !== null ? modelPct - impliedPct : null;
   const kellyDollar = data.quarterKelly !== undefined ? (Number(data.quarterKelly) * 1000).toFixed(0) : null;
 
   return (
     <article
       className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-200 animate-fade-in-up',
-        'border-emerald-600/30 hover:border-emerald-500/50 hover:shadow-[0_0_30px_oklch(0.4_0.12_145/0.10)]',
+        'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-glow)] transition-all duration-300 animate-fade-in-up',
         isHero && 'sm:rounded-3xl',
       )}
     >
+      {/* Gradient header band */}
+      <div className={cn('absolute inset-x-0 top-0 h-36 bg-gradient-to-b pointer-events-none', evBgClass)} />
+
+      {/* Left accent stripe */}
       <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)} aria-hidden="true" />
 
       {/* EV banner */}
-      <div className="flex items-center gap-2 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest bg-emerald-900/20 border-b border-emerald-700/20 text-emerald-400">
-        <TrendingUp className="w-3 h-3 shrink-0" aria-hidden="true" />
-        Positive Expected Value Bet
+      <div className="relative flex items-center justify-between px-4 py-2 border-b border-emerald-700/20 bg-emerald-900/10">
+        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-400">
+          <TrendingUp className="w-3 h-3 shrink-0" aria-hidden="true" />
+          Positive Expected Value Bet
+        </div>
+        {isPositiveEV && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase tracking-wide">
+            EDGE
+          </span>
+        )}
       </div>
 
-      <div className="pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5">
+      <div className="relative pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="min-w-0">
@@ -87,71 +105,87 @@ export function EVBetCard({
               <p className="text-[10px] text-[var(--text-muted)] mt-0.5 truncate">{data.matchup}</p>
             )}
           </div>
-
-          {/* Confidence badge */}
           <span className={cn('text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg border shrink-0', confColors[conf])}>
             {conf} conf
           </span>
         </div>
 
-        {/* EV + Odds row */}
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <div className="bg-[var(--bg-overlay)] rounded-xl border border-[var(--border-subtle)] p-3 text-center">
-            <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">EV Edge</p>
-            <p className={cn('text-lg font-black tabular-nums', evColor)}>{data.evPercent ?? '—'}</p>
-          </div>
-          <div className="bg-[var(--bg-overlay)] rounded-xl border border-[var(--border-subtle)] p-3 text-center">
-            <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Odds</p>
-            <p className="text-lg font-black tabular-nums text-foreground">
-              {data.americanOdds !== undefined
-                ? (Number(data.americanOdds) > 0 ? `+${data.americanOdds}` : String(data.americanOdds))
-                : '—'}
+        {/* Hero EV number + Odds */}
+        <div className="mb-4 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-4 text-center">
+          <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">EV Edge</p>
+          <p className={cn('text-5xl font-black tabular-nums leading-none', evColorClass)}>
+            {data.evPercent ?? '—'}
+          </p>
+          {edgePct !== null && (
+            <p className={cn('text-sm font-bold mt-1.5 tabular-nums', edgePct > 0 ? 'text-emerald-400' : 'text-red-400')}>
+              {edgePct > 0 ? '+' : ''}{edgePct.toFixed(1)}% edge
             </p>
+          )}
+          {data.americanOdds !== undefined && (
+            <div className="mt-2 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+              <span className="text-[9px] uppercase tracking-widest text-[var(--text-faint)]">Odds</span>
+              <span className="text-sm font-black text-white tabular-nums ml-1">
+                {Number(data.americanOdds) > 0 ? `+${data.americanOdds}` : String(data.americanOdds)}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Model vs Market probability comparison */}
+        {modelPct !== null && impliedPct !== null && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 py-2">
+              <div className="flex-1 text-center rounded-xl bg-[var(--bg-elevated)] p-2.5 border border-[var(--border-subtle)]">
+                <div className="text-xl font-black text-emerald-300 tabular-nums">{modelPct.toFixed(1)}%</div>
+                <div className="text-[10px] text-[var(--text-muted)] mt-0.5">Model Prob</div>
+              </div>
+              <div className="text-[var(--text-faint)] text-xs font-bold">vs</div>
+              <div className="flex-1 text-center rounded-xl bg-[var(--bg-elevated)] p-2.5 border border-[var(--border-subtle)]">
+                <div className="text-xl font-black text-[var(--text-muted)] tabular-nums">{impliedPct.toFixed(1)}%</div>
+                <div className="text-[10px] text-[var(--text-muted)] mt-0.5">Market Implied</div>
+              </div>
+            </div>
+            {/* Confidence meter */}
+            <div className="mt-2">
+              <div className="flex justify-between text-[9px] text-[var(--text-faint)] mb-1">
+                <span className="uppercase tracking-wide">Model confidence</span>
+                <span className="font-bold">{Math.round(modelPct)}%</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all duration-700"
+                  style={{ width: `${Math.min(100, modelPct)}%` }}
+                />
+              </div>
+            </div>
           </div>
-          <div className="bg-[var(--bg-overlay)] rounded-xl border border-[var(--border-subtle)] p-3 text-center">
+        )}
+
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
             <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">¼ Kelly</p>
-            <p className="text-lg font-black tabular-nums text-foreground">
+            <p className="text-sm font-black tabular-nums text-foreground">
               {data.quarterKelly !== undefined ? `${(Number(data.quarterKelly) * 100).toFixed(1)}%` : '—'}
             </p>
           </div>
+          {data.market && (
+            <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center col-span-2">
+              <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Market</p>
+              <p className="text-sm font-black tabular-nums text-foreground truncate">{data.market}</p>
+            </div>
+          )}
         </div>
 
         {/* Bankroll context */}
         {kellyDollar !== null && (
-          <p className="text-[10px] text-[var(--text-muted)] mb-3">
+          <p className="text-[10px] text-[var(--text-muted)] mb-3 bg-[var(--bg-elevated)] rounded-lg px-3 py-1.5 border border-[var(--border-subtle)]">
             ¼ Kelly on $1,000 bankroll ≈ <span className="font-bold text-foreground">${kellyDollar}</span>
           </p>
         )}
 
-        {/* Model vs Market probability comparison */}
-        {modelPct !== null && impliedPct !== null && (
-          <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5 mb-3 space-y-2">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Probability Edge</p>
-            <div className="flex items-center gap-2 text-[10px]">
-              <span className="text-[var(--text-muted)] w-14 shrink-0">Model</span>
-              <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-                <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${Math.min(100, modelPct)}%` }} />
-              </div>
-              <span className="text-emerald-400 font-black w-9 text-right tabular-nums">{modelPct.toFixed(1)}%</span>
-            </div>
-            <div className="flex items-center gap-2 text-[10px]">
-              <span className="text-[var(--text-muted)] w-14 shrink-0">Market</span>
-              <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-                <div className="h-full rounded-full bg-slate-500 transition-all duration-500" style={{ width: `${Math.min(100, impliedPct)}%` }} />
-              </div>
-              <span className="text-[var(--text-muted)] font-black w-9 text-right tabular-nums">{impliedPct.toFixed(1)}%</span>
-            </div>
-          </div>
-        )}
-
         {/* Details */}
         <div className="space-y-1.5 text-xs">
-          {data.market && (
-            <div className="flex justify-between">
-              <span className="text-[var(--text-muted)]">Market</span>
-              <span className="font-semibold text-foreground">{data.market}</span>
-            </div>
-          )}
           {data.outcome && (
             <div className="flex justify-between">
               <span className="text-[var(--text-muted)]">Outcome</span>

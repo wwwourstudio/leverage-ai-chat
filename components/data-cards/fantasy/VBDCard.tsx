@@ -7,13 +7,13 @@ import { getPlayerHeadshotUrl } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Shell, PosBadge, TierBadge, RankCircle, type FantasyCardProps } from './shared';
 
-/** Thin relative-value bar under each player row */
+/** Relative-value bar under each player row */
 function VBDBar({ vbd, maxVbd }: { vbd: number; maxVbd: number }) {
   const pct = maxVbd > 0 ? Math.min(100, (vbd / maxVbd) * 100) : 0;
   return (
-    <div className="h-[2px] mx-2 mb-0.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+    <div className="h-1.5 mx-2 mb-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
       <div
-        className="h-full rounded-full bg-gradient-to-r from-teal-500 to-emerald-400 transition-all duration-700"
+        className="h-full rounded-full bg-gradient-to-r from-violet-500 via-purple-400 to-emerald-400 transition-all duration-700"
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -34,13 +34,13 @@ export const VBDCard = memo(function VBDCard({ data, isHero, ...p }: FantasyCard
           const photoUrl = pl.photoUrl ?? getPlayerHeadshotUrl(pl.name);
           const isTop = idx === 0;
           const rowBg = isTop
-            ? 'bg-teal-500/8 border-teal-500/20 shadow-[inset_0_0_0_1px_oklch(0.5_0.15_170/0.08)]'
+            ? 'bg-violet-500/10 border-violet-500/25 shadow-[inset_0_0_0_1px_oklch(0.5_0.15_280/0.08)]'
             : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)]';
           return (
             <div key={pl.name}>
               <div
                 className={cn(
-                  'flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-colors hover:bg-[var(--bg-elevated)] cursor-pointer',
+                  'flex items-center gap-2 px-2.5 py-1.5 rounded-xl border transition-colors hover:bg-[var(--bg-elevated)] cursor-pointer',
                   rowBg,
                 )}
                 onClick={() => {
@@ -63,16 +63,24 @@ export const VBDCard = memo(function VBDCard({ data, isHero, ...p }: FantasyCard
                 </div>
                 <PosBadge pos={pl.pos} />
                 <TierBadge tier={pl.tier} />
-                <span className="text-[11px] font-black tabular-nums text-emerald-400 w-10 text-right shrink-0">
+                {/* VBD value as colored +/- chip */}
+                <span className={cn(
+                  'text-[11px] font-black tabular-nums w-10 text-right shrink-0 rounded-full px-1.5 py-0.5',
+                  (pl.vbd ?? 0) >= 20
+                    ? 'text-emerald-300 bg-emerald-500/15'
+                    : (pl.vbd ?? 0) >= 10
+                    ? 'text-teal-300 bg-teal-500/12'
+                    : 'text-emerald-400',
+                )}>
                   +{pl.vbd}
                 </span>
               </div>
               {/* VBD relative-value bar */}
               <VBDBar vbd={pl.vbd ?? 0} maxVbd={maxVbd} />
               {isCliff && (
-                <div className="flex items-center gap-2 py-1 px-2">
+                <div className="flex items-center gap-2 py-1.5 px-2">
                   <div className="flex-1 h-[1.5px] bg-gradient-to-r from-transparent via-amber-500/60 to-transparent" />
-                  <span className="text-[9px] font-black text-amber-400 whitespace-nowrap">
+                  <span className="text-[9px] font-black text-amber-400 whitespace-nowrap tracking-wide">
                     ▼ TIER CLIFF — {tierCliff.dropPct?.toFixed(1)}% DROP
                   </span>
                   <div className="flex-1 h-[1.5px] bg-gradient-to-r from-transparent via-amber-500/60 to-transparent" />
@@ -82,7 +90,7 @@ export const VBDCard = memo(function VBDCard({ data, isHero, ...p }: FantasyCard
           );
         })}
       </div>
-      <p className="text-[9px] text-[var(--text-faint)] pt-0.5">
+      <p className="text-[9px] text-[var(--text-faint)] pt-0.5 border-t border-[var(--border-subtle)]">
         VBD = pts above replacement · {scoringFormat ?? 'PPR'} · {leagueSize ?? 12}-team
       </p>
     </Shell>

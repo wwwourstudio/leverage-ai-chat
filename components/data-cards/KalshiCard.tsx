@@ -375,7 +375,7 @@ function OrderBookMini({
               <div className="absolute inset-0 rounded"
                    style={{ backgroundColor: YES_COLOR + '0f', width: `${(row.quantity / maxQty) * 100}%`, transition: 'width 600ms' }} />
               <span className="relative font-bold z-10" style={{ color: YES_COLOR + 'cc' }}>{row.price}¢</span>
-              <span className="relative text-[10px] z-10 text-[var(--text-muted)]">{row.quantity.toLocaleString()}</span>
+              <span className="relative text-[10px] z-10 text-[var(--text-muted)]">{row.quantity.toLocaleString('en-US')}</span>
             </div>
           ))}
         </div>
@@ -387,7 +387,7 @@ function OrderBookMini({
               <div className="absolute right-0 inset-y-0 rounded"
                    style={{ backgroundColor: NO_COLOR + '0f', width: `${(row.quantity / maxQty) * 100}%`, transition: 'width 600ms' }} />
               <span className="relative font-bold z-10" style={{ color: NO_COLOR + 'cc' }}>{row.price}¢</span>
-              <span className="relative text-[10px] z-10 text-[var(--text-muted)]">{row.quantity.toLocaleString()}</span>
+              <span className="relative text-[10px] z-10 text-[var(--text-muted)]">{row.quantity.toLocaleString('en-US')}</span>
             </div>
           ))}
         </div>
@@ -505,7 +505,7 @@ function TimeBar({ closeTimeIso }: { closeTimeIso?: string | null }) {
     return (
       <div className="flex items-center justify-between text-[10px]">
         <span className="font-black uppercase tracking-widest text-[var(--text-faint)]">Settled</span>
-        {closeDateStr && <span className="text-[var(--text-faint)]">{closeDateStr}</span>}
+        {closeDateStr && <span suppressHydrationWarning className="text-[var(--text-faint)]">{closeDateStr}</span>}
       </div>
     );
   }
@@ -530,7 +530,7 @@ function TimeBar({ closeTimeIso }: { closeTimeIso?: string | null }) {
             {label}
           </span>
           {closeDateStr && (
-            <span className="text-[10px] text-[var(--text-faint)]">· {closeDateStr}</span>
+            <span suppressHydrationWarning className="text-[10px] text-[var(--text-faint)]">· {closeDateStr}</span>
           )}
         </div>
       </div>
@@ -945,7 +945,7 @@ function TabWatch({
       <div className="px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] space-y-2">
         <TimeBar closeTimeIso={closeTimeIso} />
         {closeTimeIso && (
-          <p className="text-[10px] text-[var(--text-faint)]">
+          <p suppressHydrationWarning className="text-[10px] text-[var(--text-faint)]">
             {new Date(closeTimeIso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
           </p>
         )}

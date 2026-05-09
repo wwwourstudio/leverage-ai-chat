@@ -115,7 +115,7 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
                 <SlateLabelBadge label={slate.slateLabel} contestType={slate.contestType} selected={isSelected} />
                 <span className="text-[10px] text-[var(--text-muted)] tabular-nums flex items-center gap-1">
                   <Clock className="w-2.5 h-2.5 opacity-60" />
-                  {formatGameTime(slate.startDate)}
+                  <span suppressHydrationWarning>{formatGameTime(slate.startDate)}</span>
                 </span>
                 <span className="text-[9px] text-[var(--text-faint)] ml-auto">{slate.gameCount}G</span>
               </div>
@@ -133,7 +133,7 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
                         <span className="text-[9px] text-[var(--text-faint)]">@</span>
                         <span className="font-black text-[11px] text-white">{g.homeTeamAbbr}</span>
                         {g.startTime && (
-                          <span className="text-[9px] text-[var(--text-faint)] tabular-nums ml-1">
+                          <span suppressHydrationWarning className="text-[9px] text-[var(--text-faint)] tabular-nums ml-1">
                             {formatGameTime(g.startTime)}
                           </span>
                         )}

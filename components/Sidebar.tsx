@@ -62,6 +62,7 @@ export interface SidebarProps {
   onUserClick?: () => void;
   isLoadingChats?: boolean;
   onClose?: () => void;
+  onNavigate?: (query: string, category?: string, sport?: string) => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -281,6 +282,7 @@ function IconRail({
   onNewChat,
   user,
   onUserClick,
+  onNavigate,
 }: {
   categories: CategoryDef[];
   selectedCategory: string;
@@ -288,6 +290,7 @@ function IconRail({
   onNewChat: () => void;
   user: { name: string; email?: string; avatar?: string } | null;
   onUserClick?: () => void;
+  onNavigate?: (query: string, category?: string, sport?: string) => void;
 }) {
   return (
     <div className="w-14 flex flex-col items-center py-3 gap-1 h-full">
@@ -330,12 +333,12 @@ function IconRail({
       <div className="flex-1" />
 
       {/* Quick-nav icons */}
-      <a href="/picks" title="Daily Picks" className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-[var(--bg-surface)] transition-colors mb-0.5">
+      <button onClick={() => onNavigate?.("Show me today's MLB daily picks — ELITE and STRONG tier players with the best betting edges", 'betting', 'baseball_mlb')} title="Daily Picks" className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-[var(--bg-surface)] transition-colors mb-0.5">
         <Crosshair className="w-4 h-4 text-[var(--text-faint)]" />
-      </a>
-      <a href="/trading" title="Quant Trading" className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-[var(--bg-surface)] transition-colors mb-1">
+      </button>
+      <button onClick={() => onNavigate?.('Show me the quantitative trading opportunities and arbitrage analysis right now', 'betting')} title="Quant Trading" className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-[var(--bg-surface)] transition-colors mb-1">
         <LineChart className="w-4 h-4 text-[var(--text-faint)]" />
-      </a>
+      </button>
 
       {/* User avatar */}
       {user && (
@@ -387,6 +390,7 @@ export function Sidebar({
   onUserClick,
   isLoadingChats = false,
   onClose,
+  onNavigate,
 }: SidebarProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -481,6 +485,7 @@ export function Sidebar({
             onNewChat={onNewChat}
             user={user}
             onUserClick={onUserClick}
+            onNavigate={onNavigate}
           />
         </div>
       )}
@@ -728,22 +733,22 @@ export function Sidebar({
 
           {/* ── Quick-nav footer ───────────────────────────────────────────── */}
           <div className="flex-shrink-0 border-t border-[var(--border-subtle)] px-2 py-2 flex gap-1">
-            <a
-              href="/picks"
+            <button
+              onClick={() => onNavigate?.("Show me today's MLB daily picks — ELITE and STRONG tier players with the best betting edges", 'betting', 'baseball_mlb')}
               className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-[10px] font-semibold text-[var(--text-faint)] hover:text-[var(--text-body)] hover:bg-[var(--bg-surface)] transition-colors"
               title="Daily MLB Picks"
             >
               <Crosshair className="w-3.5 h-3.5 flex-shrink-0" />
               <span>Daily Picks</span>
-            </a>
-            <a
-              href="/trading"
+            </button>
+            <button
+              onClick={() => onNavigate?.('Show me the quantitative trading opportunities and arbitrage analysis right now', 'betting')}
               className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-[10px] font-semibold text-[var(--text-faint)] hover:text-[var(--text-body)] hover:bg-[var(--bg-surface)] transition-colors"
               title="Quantitative Trading"
             >
               <LineChart className="w-3.5 h-3.5 flex-shrink-0" />
               <span>Quant Trading</span>
-            </a>
+            </button>
           </div>
         </div>
     </div>

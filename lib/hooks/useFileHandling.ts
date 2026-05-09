@@ -69,7 +69,7 @@ function parseDelimitedFile(text: string, delimiter: string = ','): { headers: s
 
 export interface UseFileHandlingResult {
   uploadedFiles: FileAttachment[];
-  fileInputRef: React.RefObject<HTMLInputElement>;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
   processFiles: (fileList: FileList | File[]) => Promise<FileAttachment[]>;
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   removeAttachment: (id: string) => void;

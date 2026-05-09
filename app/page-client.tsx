@@ -3239,6 +3239,7 @@ No preamble. Start directly with section 1.`;
           onUserClick={() => isLoggedIn ? setShowUserLightbox(true) : setShowLoginModal(true)}
           isLoadingChats={isLoadingChats}
           onClose={() => setSidebarOpen(false)}
+          onNavigate={(query, category, sport) => { openChatWithQuery(query, category, sport); setSidebarOpen(false); }}
         />
       </div>
 

@@ -122,7 +122,7 @@ export const DFSSlateCard = memo(function DFSSlateCard({
             {slateStart && (
               <>
                 <span className="text-white/30 text-[9px]">·</span>
-                <span className="text-[9px] text-white/70">First pitch {slateStart}</span>
+                <span suppressHydrationWarning className="text-[9px] text-white/70">First pitch {slateStart}</span>
               </>
             )}
             {draftGroupId != null && (
@@ -178,7 +178,7 @@ export const DFSSlateCard = memo(function DFSSlateCard({
                   <span className="text-white/30 text-[8px]">@</span>
                   <span>{g.homeTeamAbbr}</span>
                   {g.startTime && (
-                    <span className="ml-auto text-[8px] font-semibold text-white/40 tabular-nums">
+                    <span suppressHydrationWarning className="ml-auto text-[8px] font-semibold text-white/40 tabular-nums">
                       {new Date(g.startTime).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })}
                     </span>
                   )}

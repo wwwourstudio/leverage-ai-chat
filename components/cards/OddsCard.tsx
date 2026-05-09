@@ -1,6 +1,6 @@
 'use client';
 
-import { cn } from '@/lib/utils';
+import { cn, formatAmericanOdds, formatGameDateTime } from '@/lib/utils';
 
 export interface EnrichedOddsEvent {
   id: string;
@@ -21,25 +21,6 @@ interface OddsCardProps {
   onAsk?: (query: string) => void;
 }
 
-function formatOdds(price: number): string {
-  return price >= 0 ? `+${price}` : `${price}`;
-}
-
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  const time = d.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZoneName: 'short',
-  });
-  if (isToday) return `Today • ${time}`;
-  return (
-    d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) +
-    ` • ${time}`
-  );
-}
 
 export function OddsCard({ event, onAsk }: OddsCardProps) {
   const homeImpl = event.impliedWinPct?.home ?? 50;
@@ -52,8 +33,8 @@ export function OddsCard({ event, onAsk }: OddsCardProps) {
         <span className="text-[10px] font-semibold tracking-widest uppercase text-[var(--text-muted)]">
           {event.sport_key?.replace(/_/g, ' ').toUpperCase()}
         </span>
-        <span className="text-[10px] text-[var(--text-faint)]">
-          {formatTime(event.commence_time)}
+        <span className="text-[10px] text-[var(--text-faint)]" suppressHydrationWarning>
+          {formatGameDateTime(event.commence_time)}
         </span>
       </div>
 
@@ -78,7 +59,7 @@ export function OddsCard({ event, onAsk }: OddsCardProps) {
                   : 'text-violet-400',
               )}
             >
-              {odds ? formatOdds(odds.price) : '—'}
+              {odds ? formatAmericanOdds(odds.price) : '—'}
             </span>
             {odds?.book && (
               <span className="text-[9px] text-[var(--text-faint)] uppercase tracking-wide">

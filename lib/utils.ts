@@ -23,3 +23,25 @@ export function fmtVol(n?: number | null): string | null {
   if (n >= 1_000)         return `${(n / 1_000).toFixed(1)}K`;
   return String(n);
 }
+
+/** Format American odds: -110 → "-110", 150 → "+150" */
+export function formatAmericanOdds(val: string | number | undefined | null): string {
+  if (val === undefined || val === null) return '—';
+  const n = Number(val);
+  return n > 0 ? `+${n}` : String(n);
+}
+
+/** Format a game time ISO string as "Today • 7:05 PM ET" or "Sat, May 9 • 7:05 PM ET" */
+export function formatGameDateTime(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+  if (isToday) return `Today • ${time}`;
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ` • ${time}`;
+}
+
+/** Format ISO as HH:MM:SS for timeline/audit-log displays */
+export function formatTimeOfDay(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}

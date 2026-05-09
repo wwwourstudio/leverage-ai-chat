@@ -213,7 +213,7 @@ function OddsScanner({
                     Live
                   </span>
                 ) : (
-                  <span className="text-[9px] text-[var(--text-faint)]">
+                  <span className="text-[9px] text-[var(--text-faint)]" suppressHydrationWarning>
                     {gameTime.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · {gameTime.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
                   </span>
                 )}
@@ -831,7 +831,7 @@ export default function TradingPage() {
             {lastUpdated && (
               <div className="hidden md:flex items-center gap-1.5 text-[9px] text-[var(--text-faint)]">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Live · {lastUpdated.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span>
+                <span suppressHydrationWarning>Live · {lastUpdated.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span>
               </div>
             )}
 

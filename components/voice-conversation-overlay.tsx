@@ -144,7 +144,7 @@ export function VoiceConversationOverlay({
 
   return (
     <div
-      className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[9999] w-[360px] max-w-[calc(100vw-32px)]"
+      className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[var(--z-toast)] w-[360px] max-w-[calc(100vw-32px)]"
       role="dialog"
       aria-label="Grok Voice"
     >

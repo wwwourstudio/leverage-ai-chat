@@ -11,6 +11,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { useVisibilityInterval } from '@/lib/hooks/use-visibility-interval';
+import { formatRelativeTime } from '@/lib/utils';
 
 interface Anomaly {
   id: string;
@@ -46,14 +47,6 @@ function formatScore(score: number): string {
   return score.toFixed(2);
 }
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins === 1) return '1m ago';
-  if (mins < 60) return `${mins}m ago`;
-  return `${Math.floor(mins / 60)}h ago`;
-}
 
 export function AnomalyFeed({ sport, limit = 10 }: Props) {
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
@@ -118,7 +111,7 @@ export function AnomalyFeed({ sport, limit = 10 }: Props) {
               </span>
             </div>
             <span className="text-xs text-white/30 shrink-0">
-              {timeAgo(anomaly.detected_at)}
+              {formatRelativeTime(anomaly.detected_at)}
             </span>
           </div>
 
@@ -149,7 +142,7 @@ export function AnomalyFeed({ sport, limit = 10 }: Props) {
 
       {lastUpdated && (
         <div className="text-center text-xs text-white/25 pt-1">
-          Updated {timeAgo(lastUpdated.toISOString())} · Auto-refresh 30s
+          Updated {formatRelativeTime(lastUpdated.toISOString())} · Auto-refresh 30s
         </div>
       )}
     </div>

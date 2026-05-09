@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { Zap, Flame, TrendingUp, Activity } from 'lucide-react';
+import { Zap, Flame, TrendingUp, Activity, PlusCircle, MinusCircle } from 'lucide-react';
 import { PlayerAvatar } from '../PlayerAvatar';
 import { getPlayerHeadshotUrl } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -24,7 +24,7 @@ function BreakoutBar({ score }: { score: number }) {
         </div>
         <span className={cn('text-[10px] font-black tabular-nums', textCls)}>{score.toFixed(1)}σ</span>
       </div>
-      <div className="h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+      <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
         <div className={cn('h-full rounded-full transition-all duration-700', barCls)} style={{ width: `${pct}%` }} />
       </div>
     </div>
@@ -41,6 +41,23 @@ function RankBadge({ rank }: { rank: number }) {
   return (
     <span className={cn('w-5 h-5 rounded-full border flex items-center justify-center text-[9px] font-black shrink-0', cls)}>
       {rank}
+    </span>
+  );
+}
+
+/** ADD / DROP colored badge */
+function ActionBadge({ action }: { action?: string }) {
+  if (!action) return null;
+  const isAdd = action.toUpperCase().includes('ADD');
+  return (
+    <span className={cn(
+      'flex items-center gap-1 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full border',
+      isAdd
+        ? 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30'
+        : 'text-red-300 bg-red-500/15 border-red-500/30',
+    )}>
+      {isAdd ? <PlusCircle className="w-2.5 h-2.5" /> : <MinusCircle className="w-2.5 h-2.5" />}
+      {action}
     </span>
   );
 }
@@ -129,9 +146,9 @@ export const WaiverCard = memo(function WaiverCard({ data, isHero, ...p }: Fanta
             const isHot    = t.breakoutScore >= 2;
             const isMedium = t.breakoutScore >= 1.5;
             const urgencyBorder = isHot
-              ? 'border-red-500/30 bg-red-500/5'
+              ? 'border-red-500/30 bg-gradient-to-br from-red-500/8 to-transparent'
               : isMedium
-              ? 'border-amber-500/30 bg-amber-500/5'
+              ? 'border-amber-500/30 bg-gradient-to-br from-amber-500/8 to-transparent'
               : 'border-[var(--border-subtle)] bg-[var(--bg-overlay)]';
             return (
               <div key={i} className={cn('px-3 py-2.5 rounded-xl border', urgencyBorder)}>
@@ -141,22 +158,32 @@ export const WaiverCard = memo(function WaiverCard({ data, isHero, ...p }: Fanta
                   <span className="text-xs font-black text-white leading-tight">{t.name}</span>
                   <span className="text-[10px] text-[var(--text-faint)]">{t.team}</span>
                   <div className="ml-auto flex items-center gap-1.5 shrink-0">
-                    {isHot && (
-                      <span className="flex items-center gap-0.5 text-[8px] font-black uppercase text-red-400 bg-red-500/10 border border-red-500/30 px-1.5 py-0.5 rounded-full">
+                    {/* ADD/DROP action badge */}
+                    {t.action && <ActionBadge action={t.action} />}
+                    {isHot && !t.action && (
+                      <span className="flex items-center gap-0.5 text-[8px] font-black uppercase text-red-300 bg-red-500/12 border border-red-500/30 px-1.5 py-0.5 rounded-full">
                         <Flame className="w-2.5 h-2.5" /> ADD NOW
                       </span>
                     )}
                     {t.rostered != null && (
-                      <span className="text-[9px] text-[var(--text-faint)]">{t.rostered}% owned</span>
+                      <span className="text-[9px] text-[var(--text-faint)] px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+                        {t.rostered}% owned
+                      </span>
                     )}
                   </div>
                 </div>
                 {t.faabBid != null && t.faabBid > 0 && (
-                  <div className="flex items-center gap-1 mb-1.5">
-                    <span className="text-[9px] font-bold text-[var(--text-faint)]">FAAB</span>
-                    <span className="text-base font-black text-teal-400 tabular-nums">${t.faabBid}</span>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">FAAB</span>
+                    <span className="text-xl font-black text-violet-300 tabular-nums leading-none">${t.faabBid}</span>
                     {t.faabPct != null && (
-                      <span className="text-[9px] text-[var(--text-faint)]">({t.faabPct}%)</span>
+                      <span className="text-[9px] text-[var(--text-faint)] mt-1">({t.faabPct}%)</span>
+                    )}
+                    {/* Matchup favorable indicator */}
+                    {t.matchupFavorable && (
+                      <span className="ml-auto text-[8px] font-black uppercase text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded-full">
+                        ✓ Favorable Matchup
+                      </span>
                     )}
                   </div>
                 )}
@@ -175,7 +202,7 @@ export const WaiverCard = memo(function WaiverCard({ data, isHero, ...p }: Fanta
       )}
 
       {budgetNote && (
-        <p className="text-[9px] text-[var(--text-faint)] pt-0.5">{budgetNote}</p>
+        <p className="text-[9px] text-[var(--text-faint)] pt-0.5 border-t border-[var(--border-subtle)]">{budgetNote}</p>
       )}
     </Shell>
   );

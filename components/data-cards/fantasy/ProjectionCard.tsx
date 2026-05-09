@@ -11,12 +11,16 @@ export const ProjectionCard = memo(function ProjectionCard({ data, ...p }: Fanta
   const { name, pos, team, pts, vbd, adp, tier, analysis, sport } = data;
   const avatarSport = sport?.toLowerCase() || p.category?.toLowerCase();
   const vbdNum = typeof vbd === 'number' ? vbd : parseFloat(String(vbd ?? 0));
+  const ptsNum = typeof pts === 'number' ? pts : parseFloat(String(pts ?? 0));
 
   const stats = [
     pts  != null && { label: 'Proj Pts', val: pts,  color: 'text-white' },
     vbd  != null && { label: 'VBD',      val: `${vbdNum >= 0 ? '+' : ''}${vbdNum}`, color: vbdNum >= 0 ? 'text-emerald-400' : 'text-red-400' },
     adp  != null && { label: 'ADP',      val: adp,  color: 'text-white' },
   ].filter(Boolean) as { label: string; val: string | number; color: string }[];
+
+  // Confidence: derive from VBD as proxy (0-100)
+  const confidence = vbdNum != null ? Math.min(100, Math.max(0, 50 + vbdNum * 2)) : null;
 
   return (
     <Shell {...p} status={data.status ?? 'value'} Icon={TrendingUp}>
@@ -39,14 +43,37 @@ export const ProjectionCard = memo(function ProjectionCard({ data, ...p }: Fanta
               {team && <span className="text-[10px] text-[var(--text-muted)] font-medium">{team}</span>}
             </div>
           </div>
+          {/* Points projection as large hero number */}
+          {pts != null && (
+            <div className="flex flex-col items-center shrink-0 px-3 py-2 rounded-xl bg-gradient-to-b from-violet-500/12 to-purple-500/6 border border-violet-500/25">
+              <span className="text-[9px] font-black uppercase tracking-widest text-violet-400/70">Pts</span>
+              <span className="text-2xl font-black text-white tabular-nums leading-tight">{ptsNum}</span>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Stat grid */}
+      {/* Confidence bar */}
+      {confidence !== null && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[8px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Confidence</span>
+            <span className="text-[9px] font-black text-violet-300 tabular-nums">{confidence.toFixed(0)}%</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-violet-500 to-purple-400 transition-all duration-700"
+              style={{ width: `${confidence}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Stat grid tiles */}
       {stats.length > 0 && (
         <div className={cn('grid gap-1.5', stats.length === 3 ? 'grid-cols-3' : stats.length === 2 ? 'grid-cols-2' : 'grid-cols-1')}>
           {stats.map(s => (
-            <div key={s.label} className="flex flex-col items-center gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] py-2.5">
+            <div key={s.label} className="flex flex-col items-center gap-0.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-2.5 text-center">
               <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)]">{s.label}</span>
               <span className={cn('text-lg font-black tabular-nums', s.color)}>{String(s.val)}</span>
             </div>

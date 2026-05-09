@@ -12,6 +12,9 @@ const nextConfig = {
     // which improve Core Web Vitals (LCP). If external image domains are needed,
     // add them to `remotePatterns` here.
     formats: ['image/webp', 'image/avif'],
+    remotePatterns: [
+      { protocol: 'https', hostname: 'a.espncdn.com' },
+    ],
   },
   experimental: {
     cpus: 2,

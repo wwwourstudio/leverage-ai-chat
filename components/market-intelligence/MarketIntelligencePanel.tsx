@@ -278,7 +278,7 @@ export function MarketIntelligencePanel({
         {/* Footer */}
         {lastFetch && (
           <div className="shrink-0 px-4 py-2 border-t border-white/10 text-xs text-white/25 text-center">
-            Last updated {lastFetch.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })} · 30s interval
+            Last updated <span suppressHydrationWarning>{lastFetch.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span> · 30s interval
           </div>
         )}
       </aside>

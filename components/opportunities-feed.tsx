@@ -293,7 +293,7 @@ export function OpportunitiesFeed() {
                       <div className="mt-3 flex items-center gap-4 text-sm">
                         <div className="flex items-center gap-1 text-[var(--text-faint)]">
                           <Clock className="h-4 w-4" />
-                          {new Date(opp.gameTime).toLocaleString()}
+                          <span suppressHydrationWarning>{new Date(opp.gameTime).toLocaleString()}</span>
                         </div>
                         {opp.bookmaker && (
                           <div className="rounded bg-[var(--bg-elevated)] px-2 py-1 text-xs font-medium text-[var(--text-muted)]">

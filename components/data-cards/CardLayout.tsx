@@ -56,10 +56,7 @@ export const CardLayout = memo(function CardLayout({
   if (!cards || cards.length === 0) return null;
 
   const heroCard = cards[0];
-  // Enforce even count (2, 4, or 6) — drop the last card if odd
-  const rawSuggested = cards.slice(1, 7);
-  const evenCount = Math.floor(rawSuggested.length / 2) * 2;
-  const suggestedCards = rawSuggested.slice(0, evenCount);
+  const suggestedCards = cards.slice(1, 7);
   const COLS = 2;
   const totalPages = Math.ceil(suggestedCards.length / COLS);
   const insight = aiInsight ? extractInsightBlurb(aiInsight) : null;
@@ -125,7 +122,10 @@ export const CardLayout = memo(function CardLayout({
                 return (
                   <div
                     key={pageIdx}
-                    className="w-full flex-shrink-0 grid grid-cols-2 gap-2.5 items-start"
+                    className={cn(
+                      'w-full flex-shrink-0 grid gap-2.5 items-start',
+                      pCards.length === 1 ? 'grid-cols-1' : 'grid-cols-2',
+                    )}
                   >
                     {pCards.map((card, i) => {
                       const absIdx = pageIdx * COLS + i;

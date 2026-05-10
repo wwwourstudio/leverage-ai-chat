@@ -12,11 +12,9 @@
 // client-side via /api/init so the page shell stays cacheable.
 export const revalidate = 60;
 
-import { Suspense } from 'react';
 import { loadServerData, type ServerDataResult } from '@/lib/server-data-loader';
 import { logEnvValidation, validateServerEnv } from '@/lib/config';
 import UnifiedAIPlatform from './page-client';
-import { PageSkeleton } from '@/components/index/PageSkeleton';
 
 export type ServerDataProps = ServerDataResult;
 
@@ -63,10 +61,6 @@ export default async function Page() {
     });
   }
 
-  return (
-    <Suspense fallback={<PageSkeleton />}>
-      <UnifiedAIPlatform serverData={serverData} />
-    </Suspense>
-  );
+  return <UnifiedAIPlatform serverData={serverData} />;
 }
 

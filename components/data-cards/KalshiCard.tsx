@@ -6,7 +6,7 @@ import {
   Cpu, Film, Globe, Clock,
   Bitcoin, ArrowUp, ArrowDown, ExternalLink,
   Flame, BarChart3, ChevronRight, Layers,
-  Activity, Zap, TrendingDown, Bookmark,
+  Activity, Zap, TrendingDown, Bookmark, Eye,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { fmtVol } from '@/lib/utils';
@@ -96,7 +96,6 @@ function shortenTitle(title: string, maxLen = 72): string {
   }
   return title.slice(0, maxLen - 1) + '…';
 }
-
 
 function timeRemaining(iso?: string | null): {
   label: string; pctElapsed: number;
@@ -261,71 +260,75 @@ function ProbabilityHero({
 
   return (
     <div className="w-full space-y-3">
-      {/* YES / NO price row — no sparkline in the middle */}
-      <div className="flex items-end justify-between gap-3">
+      {/* YES / NO hero price row */}
+      <div className="flex items-stretch gap-2.5">
 
         {/* YES block */}
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <span className="text-[10px] font-black uppercase tracking-[0.14em]"
-                style={{ color: YES_COLOR + '99' }}>Yes</span>
-          <div className="flex items-baseline gap-1.5">
+        <div className={cn(
+          'flex-1 flex flex-col items-center justify-center gap-1 py-3.5 px-3 rounded-xl border transition-all duration-300',
+          yesLeads
+            ? 'bg-emerald-500/10 border-emerald-500/25 shadow-[0_0_16px_rgba(0,209,93,0.08)]'
+            : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)]',
+        )}>
+          <span className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-400/60">Yes</span>
+          <div className="flex items-baseline gap-1">
             <span
               className={cn('tabular-nums font-black leading-none tracking-tight',
-                isHero ? 'text-[44px]' : 'text-[32px]')}
+                isHero ? 'text-[38px]' : 'text-[30px]')}
               style={{ color: yesLeads ? YES_COLOR : 'var(--text-muted)' }}
             >
               {yesPct}
             </span>
-            <span className="text-sm font-bold mb-0.5"
-                  style={{ color: yesLeads ? YES_COLOR + 'aa' : 'var(--text-faint)' }}>¢</span>
+            <span className="text-xs font-bold mb-0.5 text-emerald-400/50">¢</span>
           </div>
-          <span className="text-[10px] font-medium tabular-nums"
-                style={{ color: yesLeads ? YES_COLOR + '70' : 'var(--text-faint)' }}>
+          <span className="text-[9px] font-semibold tabular-nums text-emerald-400/40">
             {yesPct}% implied
           </span>
           {lastPrice != null && lastPrice > 0 && lastPrice !== yesPct && (
-            <span className="text-[10px] text-[var(--text-faint)] tabular-nums">
+            <span className="text-[9px] text-[var(--text-faint)] tabular-nums">
               last {lastPrice}¢
             </span>
           )}
         </div>
 
         {/* Center: donut gauge */}
-        <ProbabilityDonut yesPct={yesPct} size={isHero ? 72 : 60} />
+        <div className="flex items-center justify-center shrink-0">
+          <ProbabilityDonut yesPct={yesPct} size={isHero ? 72 : 60} />
+        </div>
 
         {/* NO block */}
-        <div className="flex flex-col items-end gap-0.5 min-w-0">
-          <span className="text-[10px] font-black uppercase tracking-[0.14em]"
-                style={{ color: NO_COLOR + '99' }}>No</span>
-          <div className="flex items-baseline gap-1.5">
+        <div className={cn(
+          'flex-1 flex flex-col items-center justify-center gap-1 py-3.5 px-3 rounded-xl border transition-all duration-300',
+          !yesLeads
+            ? 'bg-rose-500/10 border-rose-500/25 shadow-[0_0_16px_rgba(246,61,88,0.08)]'
+            : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)]',
+        )}>
+          <span className="text-[9px] font-black uppercase tracking-[0.18em] text-rose-400/60">No</span>
+          <div className="flex items-baseline gap-1">
             <span
               className={cn('tabular-nums font-black leading-none tracking-tight',
-                isHero ? 'text-[44px]' : 'text-[32px]')}
+                isHero ? 'text-[38px]' : 'text-[30px]')}
               style={{ color: !yesLeads ? NO_COLOR : 'var(--text-muted)' }}
             >
               {noPct}
             </span>
-            <span className="text-sm font-bold mb-0.5"
-                  style={{ color: !yesLeads ? NO_COLOR + 'aa' : 'var(--text-faint)' }}>¢</span>
+            <span className="text-xs font-bold mb-0.5 text-rose-400/50">¢</span>
           </div>
-          <span className="text-[10px] font-medium tabular-nums"
-                style={{ color: !yesLeads ? NO_COLOR + '70' : 'var(--text-faint)' }}>
+          <span className="text-[9px] font-semibold tabular-nums text-rose-400/40">
             {noPct}% implied
           </span>
         </div>
       </div>
 
-      {/* Sparkline moved to Trade tab */}
-
       {/* Probability bar */}
       <div className="space-y-1">
-        <div className="relative h-2.5 rounded-full overflow-hidden bg-[var(--bg-surface)]">
+        <div className="relative h-2 rounded-full overflow-hidden bg-[var(--bg-overlay)]">
           {/* YES fill */}
           <div
             className="absolute left-0 top-0 h-full rounded-full"
             style={{
               width: animated ? `${yesPct}%` : '0%',
-              background: `linear-gradient(90deg, ${YES_COLOR}dd, ${YES_COLOR}88)`,
+              background: `linear-gradient(90deg, ${YES_COLOR}ee, ${YES_COLOR}77)`,
               transition: animated ? 'width 900ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
             }}
           />
@@ -334,17 +337,17 @@ function ProbabilityHero({
             className="absolute right-0 top-0 h-full rounded-full"
             style={{
               width: animated ? `${noPct}%` : '0%',
-              background: `linear-gradient(270deg, ${NO_COLOR}cc, ${NO_COLOR}55)`,
+              background: `linear-gradient(270deg, ${NO_COLOR}dd, ${NO_COLOR}55)`,
               transition: animated ? 'width 900ms cubic-bezier(0.4, 0, 0.2, 1) 80ms' : 'none',
             }}
           />
           {/* 50¢ center notch */}
-          <div className="absolute left-1/2 -translate-x-px top-0 h-full w-0.5 bg-[var(--bg-overlay)]" />
+          <div className="absolute left-1/2 -translate-x-px top-0 h-full w-0.5 bg-[var(--bg-elevated)]" />
         </div>
-        <div className="flex justify-between text-[10px] font-semibold">
-          <span style={{ color: YES_COLOR + '66' }}>0¢</span>
+        <div className="flex justify-between text-[9px] font-semibold">
+          <span className="text-emerald-500/50">0¢</span>
           <span className="text-[var(--text-faint)]">50¢</span>
-          <span style={{ color: NO_COLOR + '66' }}>100¢</span>
+          <span className="text-rose-500/50">100¢</span>
         </div>
       </div>
     </div>
@@ -365,29 +368,50 @@ function OrderBookMini({
   const maxQty   = Math.max(...[...top3Bids, ...top3Asks].map(r => r.quantity), 1);
 
   return (
-    <div className="rounded-xl overflow-hidden bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
-      <div className="grid grid-cols-2">
+    <div className="rounded-xl overflow-hidden border border-[var(--border-subtle)]">
+      {/* Header row */}
+      <div className="grid grid-cols-2 border-b border-[var(--border-subtle)]">
+        <div className="px-3 py-1.5 flex items-center gap-1.5 border-r border-[var(--border-subtle)] bg-emerald-500/5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" />
+          <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400/70">Bids (YES)</span>
+        </div>
+        <div className="px-3 py-1.5 flex items-center gap-1.5 bg-rose-500/5">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500/60" />
+          <span className="text-[9px] font-black uppercase tracking-widest text-rose-400/70">Asks (NO)</span>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 bg-[var(--bg-overlay)]">
         {/* Bids (YES) */}
-        <div className="p-2.5 space-y-1 border-r border-r-[var(--border-subtle)]">
-          <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: YES_COLOR + '88' }}>Bids</span>
+        <div className="p-2 space-y-0.5 border-r border-[var(--border-subtle)]">
           {top3Bids.map((row, i) => (
-            <div key={i} className="relative flex items-center justify-between text-[10px] tabular-nums rounded overflow-hidden px-1.5 py-0.5">
-              <div className="absolute inset-0 rounded"
-                   style={{ backgroundColor: YES_COLOR + '0f', width: `${(row.quantity / maxQty) * 100}%`, transition: 'width 600ms' }} />
-              <span className="relative font-bold z-10" style={{ color: YES_COLOR + 'cc' }}>{row.price}¢</span>
-              <span className="relative text-[10px] z-10 text-[var(--text-muted)]">{row.quantity.toLocaleString('en-US')}</span>
+            <div
+              key={i}
+              className={cn(
+                'relative flex items-center justify-between text-[10px] tabular-nums rounded-md overflow-hidden px-2 py-1',
+                i % 2 === 0 ? 'bg-emerald-500/4' : '',
+              )}
+            >
+              <div className="absolute inset-0 rounded-md"
+                   style={{ backgroundColor: YES_COLOR + '0a', width: `${(row.quantity / maxQty) * 100}%`, transition: 'width 600ms' }} />
+              <span className="relative font-bold z-10 text-emerald-400">{row.price}¢</span>
+              <span className="relative text-[9px] z-10 text-[var(--text-faint)]">{row.quantity.toLocaleString('en-US')}</span>
             </div>
           ))}
         </div>
         {/* Asks (NO) */}
-        <div className="p-2.5 space-y-1">
-          <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: NO_COLOR + '88' }}>Asks</span>
+        <div className="p-2 space-y-0.5">
           {top3Asks.map((row, i) => (
-            <div key={i} className="relative flex items-center justify-between text-[10px] tabular-nums rounded overflow-hidden px-1.5 py-0.5">
-              <div className="absolute right-0 inset-y-0 rounded"
-                   style={{ backgroundColor: NO_COLOR + '0f', width: `${(row.quantity / maxQty) * 100}%`, transition: 'width 600ms' }} />
-              <span className="relative font-bold z-10" style={{ color: NO_COLOR + 'cc' }}>{row.price}¢</span>
-              <span className="relative text-[10px] z-10 text-[var(--text-muted)]">{row.quantity.toLocaleString('en-US')}</span>
+            <div
+              key={i}
+              className={cn(
+                'relative flex items-center justify-between text-[10px] tabular-nums rounded-md overflow-hidden px-2 py-1',
+                i % 2 === 0 ? 'bg-rose-500/4' : '',
+              )}
+            >
+              <div className="absolute right-0 inset-y-0 rounded-md"
+                   style={{ backgroundColor: NO_COLOR + '0a', width: `${(row.quantity / maxQty) * 100}%`, transition: 'width 600ms' }} />
+              <span className="relative font-bold z-10 text-rose-400">{row.price}¢</span>
+              <span className="relative text-[9px] z-10 text-[var(--text-faint)]">{row.quantity.toLocaleString('en-US')}</span>
             </div>
           ))}
         </div>
@@ -418,26 +442,24 @@ function PriceChips({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-faint)]">Best price to buy</span>
+        <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">Best price to buy</span>
         {spreadConf && (
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={spreadConf.style}>
+          <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={spreadConf.style}>
             {spreadConf.text}
           </span>
         )}
       </div>
       <div className="grid grid-cols-2 gap-2">
         {yesBuy != null && yesBuy > 0 && (
-          <div className="flex flex-col items-center py-2.5 px-2 rounded-xl text-[13px] font-black tabular-nums"
-               style={{ color: YES_COLOR, backgroundColor: YES_COLOR + '10', border: `1px solid ${YES_COLOR}28` }}>
-            <span className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: YES_COLOR + '88' }}>Yes ask</span>
-            {yesBuy}¢
+          <div className="flex flex-col items-center py-3 px-2 rounded-xl text-[14px] font-black tabular-nums bg-emerald-500/10 border border-emerald-500/20">
+            <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-emerald-400/60">Yes ask</span>
+            <span className="text-emerald-400">{yesBuy}¢</span>
           </div>
         )}
         {noBuy != null && noBuy > 0 && (
-          <div className="flex flex-col items-center py-2.5 px-2 rounded-xl text-[13px] font-black tabular-nums"
-               style={{ color: NO_COLOR, backgroundColor: NO_COLOR + '0d', border: `1px solid ${NO_COLOR}25` }}>
-            <span className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: NO_COLOR + '88' }}>No ask</span>
-            {noBuy}¢
+          <div className="flex flex-col items-center py-3 px-2 rounded-xl text-[14px] font-black tabular-nums bg-rose-500/10 border border-rose-500/20">
+            <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-rose-400/60">No ask</span>
+            <span className="text-rose-400">{noBuy}¢</span>
           </div>
         )}
       </div>
@@ -457,38 +479,39 @@ function StatsRow({
   const oi     = fmtVol(openInterestRaw);
   if (!vol24h && !volAll && !oi) return null;
 
-
   const tierColor =
     volumeTier === 'Deep'     ? YES_COLOR    :
     volumeTier === 'Active'   ? '#f59e0b'    :
     volumeTier === 'Moderate' ? '#6366f1'    : 'var(--text-faint)';
 
   return (
-    <div className="rounded-xl px-3 py-2.5 space-y-2 bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-faint)]">Market Depth</span>
+    <div className="rounded-xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-overlay)]">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-subtle)]">
+        <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">Market Depth</span>
         {volumeTier && (
-          <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full"
+          <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full"
                 style={{ color: tierColor, backgroundColor: tierColor + '15', border: `1px solid ${tierColor}28` }}>
             {volumeTier}
           </span>
         )}
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">24h Vol</span>
+      <div className="grid grid-cols-3 divide-x divide-[var(--border-subtle)]">
+        <div className="flex flex-col items-center gap-0.5 py-2.5 px-2 text-center rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+          <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-faint)]">24h Vol</span>
           <span className="text-[12px] font-black tabular-nums text-foreground/80">{vol24h ?? '—'}</span>
         </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Total</span>
+        <div className="flex flex-col items-center gap-0.5 py-2.5 px-2 text-center rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+          <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Total</span>
           <span className="text-[12px] font-black tabular-nums text-foreground/80">{volAll ?? '—'}</span>
         </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Open Int</span>
-          <span className="text-[12px] font-black tabular-nums" style={{ color: '#6366f1' }}>{oi ?? '—'}</span>
+        <div className="flex flex-col items-center gap-0.5 py-2.5 px-2 text-center rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+          <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Open Int</span>
+          <span className="text-[12px] font-black tabular-nums text-fuchsia-400">{oi ?? '—'}</span>
         </div>
       </div>
-      <VolumeBar volume24hRaw={volume24hRaw} volumeRaw={volumeRaw} />
+      <div className="px-3 pb-2.5 pt-2">
+        <VolumeBar volume24hRaw={volume24hRaw} volumeRaw={volumeRaw} />
+      </div>
     </div>
   );
 }
@@ -513,7 +536,7 @@ function TimeBar({ closeTimeIso }: { closeTimeIso?: string | null }) {
   const barColor  =
     urgency === 'critical' ? NO_COLOR  :
     urgency === 'urgent'   ? '#f97316' :
-    urgency === 'soon'     ? '#f59e0b' : '#6366f1';
+    urgency === 'soon'     ? '#f59e0b' : '#a855f7';
   const textStyle: React.CSSProperties =
     urgency === 'critical' ? { color: NO_COLOR }   :
     urgency === 'urgent'   ? { color: '#fb923c' }  :
@@ -523,21 +546,45 @@ function TimeBar({ closeTimeIso }: { closeTimeIso?: string | null }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-faint)]">Closes in</span>
+        <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">Closes in</span>
         <div className="flex items-center gap-1.5">
           <span className={cn('flex items-center gap-1 text-[10px] font-bold', !textStyle.color && 'text-[var(--text-muted)]')} style={textStyle}>
             <Clock className={cn('w-3 h-3', urgency === 'critical' && 'animate-pulse')} />
             {label}
           </span>
           {closeDateStr && (
-            <span suppressHydrationWarning className="text-[10px] text-[var(--text-faint)]">· {closeDateStr}</span>
+            <span suppressHydrationWarning className="text-[9px] text-[var(--text-faint)]">· {closeDateStr}</span>
           )}
         </div>
       </div>
-      <div className="relative h-1.5 rounded-full overflow-hidden bg-[var(--bg-surface)]">
+      <div className="relative h-1.5 rounded-full overflow-hidden bg-[var(--bg-elevated)]">
         <div className="absolute left-0 top-0 h-full rounded-full transition-all duration-1000"
-             style={{ width: `${pctElapsed}%`, backgroundColor: barColor, opacity: 0.8 }} />
+             style={{ width: `${pctElapsed}%`, backgroundColor: barColor, opacity: 0.75 }} />
       </div>
+    </div>
+  );
+}
+
+// ── Countdown Chip ─────────────────────────────────────────────────────────────
+
+function CountdownChip({ closeTimeIso }: { closeTimeIso?: string | null }) {
+  if (!closeTimeIso) return null;
+  const { label, urgency } = timeRemaining(closeTimeIso);
+  if (urgency === 'closed') return null;
+
+  const chipColor =
+    urgency === 'critical' ? { bg: 'bg-rose-500/15', border: 'border-rose-500/30', text: 'text-rose-300', icon: 'text-rose-400' } :
+    urgency === 'urgent'   ? { bg: 'bg-orange-500/15', border: 'border-orange-500/30', text: 'text-orange-300', icon: 'text-orange-400' } :
+    urgency === 'soon'     ? { bg: 'bg-amber-500/15', border: 'border-amber-500/30', text: 'text-amber-300', icon: 'text-amber-400' } :
+    { bg: 'bg-fuchsia-500/10', border: 'border-fuchsia-500/20', text: 'text-fuchsia-300/70', icon: 'text-fuchsia-400/60' };
+
+  return (
+    <div className={cn(
+      'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-bold shrink-0',
+      chipColor.bg, chipColor.border, chipColor.text,
+    )}>
+      <Clock className={cn('w-2.5 h-2.5 shrink-0', chipColor.icon, urgency === 'critical' && 'animate-pulse')} />
+      {label}
     </div>
   );
 }
@@ -582,7 +629,7 @@ function ProbabilityDonut({ yesPct, size = 72 }: { yesPct: number; size?: number
       >
         {/* NO arc — background ring */}
         <circle cx={cx} cy={cy} r={r}
-          stroke={NO_COLOR + '30'} strokeWidth="6" fill="none" />
+          stroke={NO_COLOR + '28'} strokeWidth="6" fill="none" />
         {/* YES arc */}
         <circle cx={cx} cy={cy} r={r}
           stroke={yesLeads ? YES_COLOR : YES_COLOR + '55'}
@@ -633,16 +680,16 @@ function VolumeBar({ volume24hRaw, volumeRaw }: { volume24hRaw?: number; volumeR
   const pct = Math.min(100, Math.round((volume24hRaw / volumeRaw) * 100));
   return (
     <div className="space-y-1 pt-1">
-      <div className="flex justify-between text-[10px] font-semibold text-[var(--text-faint)]">
+      <div className="flex justify-between text-[9px] font-semibold text-[var(--text-faint)]">
         <span>24h Activity</span>
         <span>{pct}% of total vol</span>
       </div>
-      <div className="h-1 rounded-full overflow-hidden bg-[var(--bg-surface)]">
+      <div className="h-1 rounded-full overflow-hidden bg-[var(--bg-elevated)]">
         <div
           className="h-full rounded-full transition-all duration-700"
           style={{
             width: `${pct}%`,
-            backgroundColor: pct > 30 ? YES_COLOR + '99' : '#6366f188',
+            backgroundColor: pct > 30 ? YES_COLOR + '99' : '#a855f788',
           }}
         />
       </div>
@@ -653,7 +700,7 @@ function VolumeBar({ volume24hRaw, volumeRaw }: { volume24hRaw?: number; volumeR
 // ── Divider ────────────────────────────────────────────────────────────────────
 
 function Divider() {
-  return <div className="h-px bg-[var(--border-subtle)]" />;
+  return <div className="h-px bg-[var(--border-subtle)] my-3" />;
 }
 
 // ── Watchlist hook ─────────────────────────────────────────────────────────────
@@ -696,22 +743,31 @@ function KalshiTabBar({ activeTab, onSelect, accentColor }: {
   activeTab: number; onSelect: (i: number) => void; accentColor: string;
 }) {
   return (
-    <div className="flex overflow-x-auto gap-1 px-4 pt-3 pb-0" style={{ scrollbarWidth: 'none' }}>
+    <div
+      className="flex overflow-x-auto px-4 pt-2 pb-0 border-b border-[var(--border-subtle)] gap-0"
+      style={{ scrollbarWidth: 'none' }}
+    >
       {KALSHI_TABS.map((tab, i) => (
         <button
           key={tab}
           onClick={() => onSelect(i)}
           className={cn(
-            'px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 border transition-all duration-150',
-            activeTab !== i && 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-muted)]',
+            'relative px-3.5 py-2 text-[10px] font-black uppercase tracking-wider shrink-0 transition-all duration-200',
+            activeTab === i
+              ? 'text-fuchsia-300'
+              : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]',
           )}
-          style={activeTab === i ? {
-            color: accentColor,
-            backgroundColor: accentColor + '18',
-            border: `1px solid ${accentColor}35`,
-          } : undefined}
         >
-          {tab}
+          {tab === 'Watch'
+            ? <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{tab}</span>
+            : tab}
+          {/* Active underline indicator */}
+          {activeTab === i && (
+            <span
+              className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+              style={{ backgroundColor: '#d946ef' }}
+            />
+          )}
         </button>
       ))}
     </div>
@@ -796,10 +852,10 @@ function TabDepth({
       {typeof spread === 'number' && (
         <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5 space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-faint)]">Spread Quality</span>
+            <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">Spread Quality</span>
             {spreadLabel && spreadConf && (
               <span
-                className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                className="text-[9px] font-bold px-2 py-0.5 rounded-full"
                 style={{ color: spreadConf.color, backgroundColor: spreadConf.color + '15', border: `1px solid ${spreadConf.color}28` }}
               >
                 {spreadLabel}
@@ -809,10 +865,10 @@ function TabDepth({
           <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${spreadBarPct}%`, backgroundColor: spreadConf?.color ?? '#6366f1' }}
+              style={{ width: `${spreadBarPct}%`, backgroundColor: spreadConf?.color ?? '#a855f7' }}
             />
           </div>
-          <div className="flex justify-between text-[10px] text-[var(--text-faint)]">
+          <div className="flex justify-between text-[9px] text-[var(--text-faint)]">
             <span>Tight (1¢)</span>
             <span>Wide (10¢+)</span>
           </div>
@@ -849,8 +905,8 @@ function TabTrade({
         <div className="w-full rounded-xl overflow-hidden bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 pt-2 pb-1.5">
           <Sparkline trades={trades} fullWidth height={isHero ? 96 : 80} />
           <div className="flex items-center justify-between mt-1 px-1">
-            <span className="text-[10px] font-semibold text-[var(--text-faint)]">Entry price history</span>
-            <span className="text-[10px] font-semibold text-[var(--text-faint)]">24h</span>
+            <span className="text-[9px] font-semibold text-[var(--text-faint)]">Entry price history</span>
+            <span className="text-[9px] font-semibold text-[var(--text-faint)]">24h</span>
           </div>
         </div>
       ) : (
@@ -866,7 +922,7 @@ function TabTrade({
       )}
 
       {lastPrice != null && lastPrice > 0 && (
-        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
+        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
           <span className="text-[10px] font-semibold text-[var(--text-faint)]">Last trade</span>
           <div className="flex items-center gap-1.5">
             {priceDir === 'up'
@@ -883,13 +939,13 @@ function TabTrade({
         <div className="grid grid-cols-2 gap-2">
           {volume24h && (
             <div className="flex flex-col gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">24h Volume</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-faint)]">24h Volume</span>
               <span className="text-[13px] font-black tabular-nums text-foreground/80">{volume24h}</span>
             </div>
           )}
           {volumeTier && (
             <div className="flex flex-col gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Tier</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Tier</span>
               <span className="text-[13px] font-black" style={{ color: tierColor }}>{volumeTier}</span>
             </div>
           )}
@@ -911,20 +967,17 @@ function TabWatch({
 }) {
   return (
     <div className="space-y-3 pt-3">
-      {/* Bookmark toggle */}
+      {/* Watch toggle — eye icon style */}
       <button
         onClick={toggleWatch}
         className={cn(
-          'flex items-center justify-center gap-2 w-full py-3 rounded-xl text-[12px] font-black tracking-wide transition-all duration-150',
-          !watched && 'bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-foreground',
+          'flex items-center justify-center gap-2 w-full py-3 rounded-xl text-[12px] font-black tracking-wide transition-all duration-200',
+          watched
+            ? 'bg-fuchsia-500/15 border border-fuchsia-500/30 text-fuchsia-300 shadow-[0_0_16px_rgba(217,70,239,0.12)]'
+            : 'bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-fuchsia-300 hover:border-fuchsia-500/20 hover:bg-fuchsia-500/5',
         )}
-        style={watched ? {
-          color: accentColor,
-          backgroundColor: accentColor + '18',
-          border: `1px solid ${accentColor}35`,
-        } : undefined}
       >
-        <Bookmark className={cn('w-4 h-4', watched && 'fill-current')} />
+        <Eye className={cn('w-4 h-4', watched && 'fill-current')} />
         {watched ? 'Watching this market' : 'Watch this market'}
       </button>
 
@@ -934,10 +987,10 @@ function TabWatch({
           href={tradeBase}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] transition-colors duration-150 group/ticker"
+          className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] hover:border-fuchsia-500/20 hover:bg-fuchsia-500/5 transition-all duration-150 group/ticker"
         >
-          <span className="font-mono text-[11px] text-[var(--text-muted)] group-hover/ticker:text-foreground transition-colors">{ticker}</span>
-          <ExternalLink className="w-3.5 h-3.5 text-[var(--text-faint)] group-hover/ticker:text-[var(--text-muted)]" />
+          <span className="font-mono text-[11px] text-[var(--text-muted)] group-hover/ticker:text-fuchsia-300 transition-colors">{ticker}</span>
+          <ExternalLink className="w-3.5 h-3.5 text-[var(--text-faint)] group-hover/ticker:text-fuchsia-400/70" />
         </a>
       )}
 
@@ -945,7 +998,7 @@ function TabWatch({
       <div className="px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] space-y-2">
         <TimeBar closeTimeIso={closeTimeIso} />
         {closeTimeIso && (
-          <p suppressHydrationWarning className="text-[10px] text-[var(--text-faint)]">
+          <p suppressHydrationWarning className="text-[9px] text-[var(--text-faint)]">
             {new Date(closeTimeIso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
           </p>
         )}
@@ -959,7 +1012,7 @@ function TabWatch({
         href={tradeBase}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground hover:border-[var(--border-hover)] transition-all duration-150"
+        className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-fuchsia-300 hover:border-fuchsia-500/20 hover:bg-fuchsia-500/5 transition-all duration-150"
       >
         <Globe className="w-3.5 h-3.5" />
         Open on Kalshi
@@ -1092,11 +1145,11 @@ export const KalshiCard = memo(function KalshiCard({
   // ── Unavailable state — renders before the full card when Kalshi API is down ──
   if (d.status === 'API_UNAVAILABLE' || d.ticker === 'UNAVAILABLE') {
     return (
-      <article className="group relative w-full rounded-2xl overflow-hidden bg-background border border-[var(--border-subtle)] transition-all duration-300">
-        <div className="px-4 pt-3.5 pb-3 bg-gradient-to-br from-indigo-600/80 via-indigo-700/60 to-indigo-900/40">
+      <article className="group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] transition-all duration-300">
+        <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-fuchsia-900/30 via-pink-900/15 to-transparent border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-1.5 mb-2">
-            <div className="flex items-center justify-center w-4 h-4 rounded shrink-0 bg-indigo-500/20">
-              <TrendingUp className="w-2.5 h-2.5 text-indigo-400" />
+            <div className="flex items-center justify-center w-4 h-4 rounded shrink-0 bg-fuchsia-500/20">
+              <TrendingUp className="w-2.5 h-2.5 text-fuchsia-400" />
             </div>
             <span className="text-[10px] font-black uppercase tracking-widest text-white/70">Kalshi</span>
             <span className="text-white/30">·</span>
@@ -1120,7 +1173,7 @@ export const KalshiCard = memo(function KalshiCard({
             href="https://kalshi.com/markets"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground hover:border-[var(--border-hover)] transition-all duration-150"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-fuchsia-300 hover:border-fuchsia-500/20 transition-all duration-150"
           >
             <Globe className="w-3.5 h-3.5" />
             Browse Kalshi Markets
@@ -1134,80 +1187,102 @@ export const KalshiCard = memo(function KalshiCard({
   return (
     <article
       className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-300',
+        'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border transition-all duration-300',
         isHero
-          ? 'border-[var(--border-hover)] shadow-[0_0_32px_oklch(0.3_0.06_260/0.12)]'
-          : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.08)]',
+          ? 'border-fuchsia-500/30 shadow-[0_0_40px_rgba(217,70,239,0.12)]'
+          : 'border-[var(--border-subtle)] hover:border-fuchsia-500/20 hover:shadow-[0_0_24px_rgba(217,70,239,0.08)]',
       )}
-      style={{ borderTopColor: accentColor, borderTopWidth: '2px' }}
     >
+      {/* Fuchsia glow strip at top */}
+      <div
+        className="absolute top-0 left-0 right-0 h-0.5"
+        style={{ background: 'linear-gradient(90deg, transparent, #d946ef60, #c026d360, transparent)' }}
+      />
 
       {/* ── Gradient header ─────────────────────────────────────────────────── */}
-      <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', headerGrad)}>
+      <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-fuchsia-900/30 via-pink-900/15 to-transparent border-b border-[var(--border-subtle)]">
 
         {/* Status badge — top right */}
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
           {!isActive ? (
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/40">
+            <span className="text-[9px] font-black uppercase tracking-widest text-white/40 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
               Closed
             </span>
           ) : !d.priceIsReal ? (
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
               <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/50">
+              <span className="text-[9px] font-black uppercase tracking-widest text-white/50">
                 Pending
               </span>
             </div>
           ) : (
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full"
-                 style={{ backgroundColor: YES_COLOR + '0d', border: `1px solid ${livePrice ? YES_COLOR + '55' : YES_COLOR + '22'}` }}>
-              <span className={cn('w-1.5 h-1.5 rounded-full', livePrice ? 'animate-pulse' : '')}
-                    style={{ backgroundColor: YES_COLOR }} />
-              <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: YES_COLOR }}>
-                {livePrice ? 'WS Live' : 'Live'}
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-fuchsia-500/10 border border-fuchsia-500/25">
+              <span className={cn('w-1.5 h-1.5 rounded-full bg-fuchsia-400', livePrice ? 'animate-pulse' : '')} />
+              <span className="text-[9px] font-black uppercase tracking-widest text-fuchsia-300">
+                {livePrice ? 'Live' : 'Live'}
               </span>
             </div>
           )}
         </div>
 
         {/* Breadcrumb */}
-        <div className="flex items-center gap-1.5 mb-1.5">
+        <div className="flex items-center gap-1.5 mb-2">
           <div
-            className="flex items-center justify-center w-4 h-4 rounded shrink-0"
-            style={{ backgroundColor: accentColor + '28' }}
+            className="flex items-center justify-center w-4 h-4 rounded shrink-0 bg-fuchsia-500/20"
           >
-            <CategoryIcon label={d.iconLabel} size={10} style={{ color: accentColor }} />
+            <CategoryIcon label={d.iconLabel} size={10} style={{ color: '#e879f9' }} />
           </div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-white/70">Kalshi</span>
-          <span className="text-white/30">·</span>
-          <span className="text-[10px] text-white/50 truncate">{marketCat}</span>
+          <span className="text-[9px] font-black uppercase tracking-widest text-fuchsia-300/70">Kalshi</span>
+          <span className="text-white/20">·</span>
+          <span className="text-[9px] text-white/40 truncate">{marketCat}</span>
           {d.isHot && (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 text-orange-400 bg-orange-500/10 border border-orange-500/20">
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 text-orange-400 bg-orange-500/10 border border-orange-500/20">
               <Flame className="w-2.5 h-2.5" /> Hot
             </span>
           )}
         </div>
 
-        {/* Title — shortened for composite/multi-leg markets */}
-        <h3
-          className={cn('font-black text-white leading-snug pr-20', isHero ? 'text-base' : 'text-sm', 'line-clamp-3')}
-          title={title}
-        >
-          {shortenTitle(title)}
-        </h3>
+        {/* Title row with countdown chip */}
+        <div className="flex items-start justify-between gap-2 pr-16">
+          <h3
+            className={cn('font-black text-white leading-snug flex-1', isHero ? 'text-base' : 'text-sm', 'line-clamp-2')}
+            title={title}
+          >
+            {shortenTitle(title)}
+          </h3>
+          <CountdownChip closeTimeIso={d.closeTimeIso as string | undefined} />
+        </div>
 
         {/* Subtitle */}
         {d.subtitle && d.subtitle !== title && d.subtitle.length > 0 && (
-          <p className="text-[11px] mt-1 line-clamp-2 leading-relaxed text-white/50">
+          <p className="text-[10px] mt-1 line-clamp-1 leading-relaxed text-white/40">
             {d.subtitle}
           </p>
         )}
 
-        {/* Ticker badge — exact Kalshi market ID */}
+        {/* Ticker badge */}
         {d.ticker && (
-          <span className="inline-block mt-1.5 font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-white/30 select-all tracking-wider">
+          <span className="inline-block mt-1.5 font-mono text-[9px] px-1.5 py-0.5 rounded bg-fuchsia-500/8 border border-fuchsia-500/15 text-fuchsia-400/50 select-all tracking-wider">
             {d.ticker}
           </span>
+        )}
+
+        {/* Volume/OI metric chips */}
+        {(d.volume24h || d.openInterest) && (
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+            {d.volume24h && (
+              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-[9px] font-semibold text-[var(--text-faint)]">
+                <BarChart3 className="w-2.5 h-2.5 text-fuchsia-400/50" />
+                {d.volume24h} vol
+              </div>
+            )}
+            {d.openInterest && (
+              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-[9px] font-semibold text-[var(--text-faint)]">
+                <Layers className="w-2.5 h-2.5 text-fuchsia-400/50" />
+                {d.openInterest} OI
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -1281,30 +1356,32 @@ export const KalshiCard = memo(function KalshiCard({
         {/* ── CTAs — always visible ──────────────────────────────────────────── */}
         <div className="space-y-2">
 
-          {/* Primary CTA — "Place Bet" for known markets, "Browse" for generic fallback */}
+          {/* Primary CTA */}
           <a
             href={tradeBase}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-black tracking-wide transition-all duration-150"
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-black tracking-wide transition-all duration-200"
             style={{
               background: hasSpecificMarket
-                ? `linear-gradient(135deg, ${accentColor}22, ${accentColor}12)`
+                ? 'linear-gradient(135deg, rgba(217,70,239,0.18), rgba(192,38,211,0.10))'
                 : 'oklch(0.22 0.01 260 / 0.6)',
-              border: hasSpecificMarket ? `1px solid ${accentColor}40` : '1px solid oklch(0.35 0.01 260)',
-              color: hasSpecificMarket ? accentColor : 'oklch(0.65 0.02 260)',
+              border: hasSpecificMarket
+                ? '1px solid rgba(217,70,239,0.30)'
+                : '1px solid oklch(0.35 0.01 260)',
+              color: hasSpecificMarket ? '#e879f9' : 'oklch(0.65 0.02 260)',
             }}
             onMouseEnter={e => {
               if (hasSpecificMarket) {
-                e.currentTarget.style.background = `linear-gradient(135deg, ${accentColor}35, ${accentColor}22)`;
-                e.currentTarget.style.boxShadow = `0 4px 20px ${accentColor}20`;
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(217,70,239,0.28), rgba(192,38,211,0.18))';
+                e.currentTarget.style.boxShadow = '0 4px 20px rgba(217,70,239,0.18)';
               } else {
                 e.currentTarget.style.background = 'oklch(0.26 0.01 260 / 0.8)';
               }
             }}
             onMouseLeave={e => {
               if (hasSpecificMarket) {
-                e.currentTarget.style.background = `linear-gradient(135deg, ${accentColor}22, ${accentColor}12)`;
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(217,70,239,0.18), rgba(192,38,211,0.10))';
                 e.currentTarget.style.boxShadow = 'none';
               } else {
                 e.currentTarget.style.background = 'oklch(0.22 0.01 260 / 0.6)';
@@ -1324,20 +1401,15 @@ export const KalshiCard = memo(function KalshiCard({
                 href={tradeBase}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group/yes flex flex-col items-center justify-center gap-0.5 py-2.5 rounded-xl text-[11px] font-black tracking-wide transition-all duration-150"
-                style={{
-                  color: YES_COLOR,
-                  backgroundColor: YES_COLOR + '12',
-                  border: `1px solid ${YES_COLOR}28`,
-                }}
+                className="group/yes flex flex-col items-center justify-center gap-0.5 py-2.5 rounded-xl text-[11px] font-black tracking-wide transition-all duration-150 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
                 onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = YES_COLOR + '24';
-                  e.currentTarget.style.borderColor = YES_COLOR + '50';
-                  e.currentTarget.style.boxShadow = `0 4px 16px ${YES_COLOR}18`;
+                  e.currentTarget.style.backgroundColor = 'rgba(0,209,93,0.18)';
+                  e.currentTarget.style.borderColor = 'rgba(0,209,93,0.40)';
+                  e.currentTarget.style.boxShadow = `0 4px 16px rgba(0,209,93,0.14)`;
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = YES_COLOR + '12';
-                  e.currentTarget.style.borderColor = YES_COLOR + '28';
+                  e.currentTarget.style.backgroundColor = '';
+                  e.currentTarget.style.borderColor = '';
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               >
@@ -1350,20 +1422,15 @@ export const KalshiCard = memo(function KalshiCard({
                 href={tradeBase}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group/no flex flex-col items-center justify-center gap-0.5 py-2.5 rounded-xl text-[11px] font-black tracking-wide transition-all duration-150"
-                style={{
-                  color: NO_COLOR,
-                  backgroundColor: NO_COLOR + '0e',
-                  border: `1px solid ${NO_COLOR}25`,
-                }}
+                className="group/no flex flex-col items-center justify-center gap-0.5 py-2.5 rounded-xl text-[11px] font-black tracking-wide transition-all duration-150 bg-rose-500/10 border border-rose-500/20 text-rose-400"
                 onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = NO_COLOR + '20';
-                  e.currentTarget.style.borderColor = NO_COLOR + '48';
-                  e.currentTarget.style.boxShadow = `0 4px 16px ${NO_COLOR}14`;
+                  e.currentTarget.style.backgroundColor = 'rgba(246,61,88,0.18)';
+                  e.currentTarget.style.borderColor = 'rgba(246,61,88,0.40)';
+                  e.currentTarget.style.boxShadow = `0 4px 16px rgba(246,61,88,0.12)`;
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = NO_COLOR + '0e';
-                  e.currentTarget.style.borderColor = NO_COLOR + '25';
+                  e.currentTarget.style.backgroundColor = '';
+                  e.currentTarget.style.borderColor = '';
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               >
@@ -1377,7 +1444,7 @@ export const KalshiCard = memo(function KalshiCard({
           {onAnalyze && (
             <button
               onClick={onAnalyze}
-              className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground hover:bg-[var(--bg-surface)] hover:border-[var(--border-hover)] transition-all duration-150"
+              className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-fuchsia-300 hover:bg-fuchsia-500/5 hover:border-fuchsia-500/20 transition-all duration-150"
               aria-label={`AI analysis for ${title}`}
             >
               <BarChart3 className="w-3.5 h-3.5" />

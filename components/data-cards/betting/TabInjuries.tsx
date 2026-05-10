@@ -1,14 +1,37 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Bookmark, ChevronRight, Shield } from 'lucide-react';
+import { Bookmark, ChevronRight, Shield, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BettingCardData } from './betting-utils';
 import { TabSpinner } from './betting-shared';
 
 const WATCHLIST_KEY = 'leverage_watchlist';
 
-function InjuryRow({ inj, statusCls, onAsk }: { inj: any; statusCls: (s: string) => string; onAsk?: (q: string) => void }) {
+// Severity order for sorting: worst → best
+const SEVERITY_ORDER: Record<string, number> = {
+  OUT: 0, DOUBTFUL: 1, QUESTIONABLE: 2, GTD: 3, PROBABLE: 4,
+};
+
+interface StatusStyle {
+  bg: string;
+  border: string;
+  text: string;
+  dot: string;
+  label: string;
+}
+
+function getStatusStyle(status: string): StatusStyle {
+  const s = (status ?? '').toUpperCase();
+  if (s === 'OUT')          return { bg: 'bg-red-950/60',    border: 'border-red-600/30',    text: 'text-red-300',    dot: 'bg-red-400',    label: 'OUT' };
+  if (s === 'DOUBTFUL')     return { bg: 'bg-red-900/30',    border: 'border-red-500/25',    text: 'text-red-300',    dot: 'bg-red-400',    label: 'DOUBTFUL' };
+  if (s === 'QUESTIONABLE') return { bg: 'bg-amber-900/30',  border: 'border-amber-500/25',  text: 'text-amber-300',  dot: 'bg-amber-400',  label: 'QUESTIONABLE' };
+  if (s === 'GTD')          return { bg: 'bg-blue-900/25',   border: 'border-blue-500/20',   text: 'text-blue-300',   dot: 'bg-blue-400',   label: 'GTD' };
+  if (s === 'PROBABLE')     return { bg: 'bg-yellow-900/20', border: 'border-yellow-500/20', text: 'text-yellow-300', dot: 'bg-yellow-400', label: 'PROBABLE' };
+  return { bg: 'bg-white/5', border: 'border-white/10', text: 'text-white/60', dot: 'bg-white/40', label: s || 'UNKNOWN' };
+}
+
+function InjuryRow({ inj, onAsk }: { inj: any; onAsk?: (q: string) => void }) {
   const key = `bookmark:player:${(inj.player ?? '').toLowerCase().replace(/\s+/g, '_')}`;
   const [saved, setSaved] = useState(() => { try { return !!localStorage.getItem(key); } catch { return false; } });
 
@@ -35,31 +58,60 @@ function InjuryRow({ inj, statusCls, onAsk }: { inj: any; statusCls: (s: string)
     });
   }, [key, inj.player, inj.position, inj.team]);
 
+  const ss = getStatusStyle(inj.status);
+
   return (
     <div
       onClick={onAsk ? () => onAsk(`Show me the injury analysis and betting impact for ${inj.player} (${inj.status}) on the ${inj.team}`) : undefined}
-      className={cn('px-3 py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] transition-colors', onAsk && 'cursor-pointer hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] active:scale-[0.99]')}
+      className={cn(
+        'px-3.5 py-3 rounded-2xl border transition-all',
+        ss.bg, ss.border,
+        onAsk && 'cursor-pointer hover:brightness-110 active:scale-[0.99]',
+      )}
     >
       <div className="flex items-center justify-between gap-2">
+        {/* Player info */}
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-black text-foreground truncate">{inj.player}</p>
-          <p className="text-[10px] text-[var(--text-muted)]">{inj.team}</p>
+          <div className="flex items-center gap-2 mb-0.5">
+            {/* Status dot */}
+            <span className={cn('w-2 h-2 rounded-full shrink-0 shadow-sm', ss.dot)} />
+            <p className="text-[12px] font-black text-foreground truncate">{inj.player}</p>
+          </div>
+          <div className="flex items-center gap-2 pl-4">
+            {inj.position && (
+              <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-white/8 border border-white/10 text-white/50">
+                {inj.position}
+              </span>
+            )}
+            <span className="text-[10px] text-[var(--text-faint)]">{inj.team}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-black border', statusCls(inj.status))}>
-            {inj.status?.toUpperCase()}
+
+        {/* Right side: status badge + bookmark */}
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={cn('px-2.5 py-1 rounded-xl text-[10px] font-black border', ss.text, ss.border, 'bg-black/20')}>
+            {ss.label}
           </span>
           <button
             onClick={(e) => { e.stopPropagation(); toggle(); }}
             title={saved ? 'Remove from bookmarks' : 'Bookmark player'}
-            className={cn('p-1.5 rounded-lg transition-all', saved ? 'text-blue-500 bg-blue-500/10 border border-blue-500/20' : 'text-[var(--text-faint)] hover:text-blue-400 hover:bg-blue-500/10')}
+            className={cn(
+              'w-7 h-7 flex items-center justify-center rounded-xl transition-all border',
+              saved
+                ? 'text-blue-400 bg-blue-500/15 border-blue-500/25'
+                : 'text-[var(--text-faint)] hover:text-blue-400 hover:bg-blue-500/10 border-transparent',
+            )}
           >
             <Bookmark className="w-3.5 h-3.5" fill={saved ? 'currentColor' : 'none'} />
           </button>
-          {onAsk && <ChevronRight className="w-3 h-3 text-[var(--text-faint)]" />}
+          {onAsk && <ChevronRight className="w-3.5 h-3.5 text-[var(--text-faint)]" />}
         </div>
       </div>
-      {inj.impact && <p className="text-[10px] text-[var(--text-muted)] mt-1.5 leading-relaxed">{inj.impact}</p>}
+
+      {/* Impact note */}
+      {inj.impact && (
+        <p className="text-[10px] text-[var(--text-muted)] mt-2 pl-4 leading-relaxed border-l border-white/10">{inj.impact}</p>
+      )}
     </div>
   );
 }
@@ -72,18 +124,17 @@ export function TabInjuries({ data, onAnalyze, onAsk, loading = false }: {
   const injuries = Array.isArray(data.injuries) ? data.injuries : [];
 
   if (injuries.length > 0) {
-    const statusCls = (status: string) => {
-      const s = status?.toUpperCase();
-      if (s === 'OUT')          return 'bg-red-500/15 text-red-300 border-red-500/30';
-      if (s === 'DOUBTFUL')     return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
-      if (s === 'QUESTIONABLE') return 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30';
-      if (s === 'GTD')          return 'bg-blue-500/15 text-blue-300 border-blue-500/30';
-      return 'bg-white/10 text-white/60 border-white/20';
-    };
+    // Sort by severity (worst first)
+    const sorted = [...injuries].sort((a: any, b: any) => {
+      const as = SEVERITY_ORDER[String(a.status ?? '').toUpperCase()] ?? 99;
+      const bs = SEVERITY_ORDER[String(b.status ?? '').toUpperCase()] ?? 99;
+      return as - bs;
+    });
+
     return (
-      <div className="space-y-1.5">
-        {injuries.map((inj: any, i: number) => (
-          <InjuryRow key={i} inj={inj} statusCls={statusCls} onAsk={onAsk} />
+      <div className="space-y-2">
+        {sorted.map((inj: any, i: number) => (
+          <InjuryRow key={i} inj={inj} onAsk={onAsk} />
         ))}
       </div>
     );
@@ -91,19 +142,27 @@ export function TabInjuries({ data, onAnalyze, onAsk, loading = false }: {
 
   if (data.injuryAlert) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/6 border border-red-500/20">
-        <Shield className="w-3 h-3 text-red-400 shrink-0" />
-        <span className="text-[10px] text-red-300 leading-relaxed">{data.injuryAlert}</span>
+      <div className="flex items-start gap-3 px-3.5 py-3 rounded-2xl bg-red-950/40 border border-red-600/25 border-l-2 border-l-red-500">
+        <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+        <span className="text-[11px] text-red-300 leading-relaxed">{data.injuryAlert}</span>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center gap-3 py-6 text-center">
-      <Shield className="w-8 h-8 text-[var(--text-faint)]" />
-      <p className="text-[11px] text-[var(--text-muted)]">No injury reports for this game</p>
+    <div className="flex flex-col items-center gap-3 py-8 text-center">
+      <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+        <Shield className="w-6 h-6 text-emerald-400" />
+      </div>
+      <div>
+        <p className="text-[11px] font-bold text-emerald-400">No injury reports</p>
+        <p className="text-[10px] text-[var(--text-faint)] mt-0.5">All players healthy for this game</p>
+      </div>
       {onAnalyze && (
-        <button onClick={onAnalyze} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)] hover:text-foreground hover:border-[var(--border-hover)] transition-all">
+        <button
+          onClick={onAnalyze}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)] hover:text-foreground hover:border-[var(--border-hover)] transition-all"
+        >
           Ask AI about injury updates →
         </button>
       )}

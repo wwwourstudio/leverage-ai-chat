@@ -76,6 +76,20 @@ function getConditionIcon(condition?: string): React.ComponentType<{ className?:
   return Cloud;
 }
 
+// Condition emoji for visual flair
+function getConditionEmoji(condition?: string): string {
+  if (!condition) return '🌤';
+  const lower = condition.toLowerCase();
+  if (lower.includes('thunder') || lower.includes('lightning')) return '⛈️';
+  if (lower.includes('rain') || lower.includes('storm') || lower.includes('shower')) return '🌧️';
+  if (lower.includes('snow') || lower.includes('blizzard')) return '❄️';
+  if (lower.includes('wind') || lower.includes('gust')) return '🌬️';
+  if (lower.includes('sun') || lower.includes('clear') || lower.includes('sunny')) return '☀️';
+  if (lower.includes('fog') || lower.includes('mist')) return '🌫️';
+  if (lower.includes('cloud') || lower.includes('overcast')) return '☁️';
+  return '🌤️';
+}
+
 function parseNum(val?: string | number): number {
   if (val == null) return NaN;
   const m = String(val).match(/([\d.]+)/);
@@ -98,36 +112,23 @@ function computeImpactScore(data: WeatherCardProps['data']): number | null {
   return Math.min(10, Math.max(1, Math.round(score)));
 }
 
-function ImpactMeter({ score }: { score: number }) {
-  const pct = (score / 10) * 100;
-  const isHigh = score >= 7;
-  const isMid = score >= 4;
-  const color = isHigh ? 'from-red-500 to-rose-400' : isMid ? 'from-amber-500 to-yellow-400' : 'from-emerald-500 to-green-400';
-  const label = isHigh ? 'HIGH IMPACT' : isMid ? 'MODERATE' : 'LOW IMPACT';
-  const textCls = isHigh ? 'text-red-400' : isMid ? 'text-amber-400' : 'text-emerald-400';
-  const ringCls = isHigh ? 'ring-red-500/40 bg-red-500/10' : isMid ? 'ring-amber-500/40 bg-amber-500/10' : 'ring-emerald-500/40 bg-emerald-500/10';
+// Map wind direction text to an arrow character
+function getWindArrow(direction?: string): string {
+  if (!direction) return '';
+  const d = direction.toUpperCase();
+  const arrowMap: Record<string, string> = {
+    N: '↑', NE: '↗', E: '→', SE: '↘',
+    S: '↓', SW: '↙', W: '←', NW: '↖',
+  };
+  return arrowMap[d] ?? '';
+}
 
-  return (
-    <div className="space-y-2.5">
-      {/* Hero score row */}
-      <div className="flex items-center gap-3">
-        <div className={cn('w-11 h-11 rounded-full ring-2 flex items-center justify-center shrink-0', ringCls)}>
-          <span className={cn('text-base font-black tabular-nums leading-none', textCls)}>{score}</span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className={cn('text-xs font-black uppercase tracking-widest', textCls)}>{label}</div>
-          <div className="text-[9px] text-[var(--text-faint)] font-semibold mt-0.5">Game Impact · {score}/10</div>
-        </div>
-      </div>
-      {/* Impact bar */}
-      <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-        <div
-          className={cn('h-full rounded-full bg-gradient-to-r transition-all duration-700', color)}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
-  );
+function parseWindDirection(wind?: string): string | null {
+  if (!wind) return null;
+  const match = String(wind).match(/\b(N|NE|E|SE|S|SW|W|NW|north|south|east|west|northeast|northwest|southeast|southwest)\b/i);
+  if (!match) return null;
+  const dir = match[1].toUpperCase();
+  return dir.length > 2 ? dir.slice(0, 2) : dir;
 }
 
 function WindBar({ wind }: { wind: number }) {
@@ -153,15 +154,6 @@ function WindBar({ wind }: { wind: number }) {
       </div>
     </div>
   );
-}
-
-// Parse wind direction from strings like "15mph NW" or "NW 15mph"
-function parseWindDirection(wind?: string): string | null {
-  if (!wind) return null;
-  const match = String(wind).match(/\b(N|NE|E|SE|S|SW|W|NW|north|south|east|west|northeast|northwest|southeast|southwest)\b/i);
-  if (!match) return null;
-  const dir = match[1].toUpperCase();
-  return dir.length > 2 ? dir.slice(0, 2) : dir;
 }
 
 // Wind compass showing 8-direction rose with active direction highlighted
@@ -224,6 +216,7 @@ export function WeatherCard({
 }: WeatherCardProps) {
   const cfg = statusConfig[status] || statusConfig.neutral;
   const ConditionIcon = getConditionIcon(data.condition);
+  const conditionEmoji = getConditionEmoji(data.condition);
 
   const impactScore = data.impactScore !== undefined
     ? Number(data.impactScore)
@@ -233,43 +226,68 @@ export function WeatherCard({
   const tempNum = parseNum(data.temperature ?? '70');
   const precipNum = parseNum(data.precipitation);
   const windDirection = parseWindDirection(data.wind);
+  const windArrow = getWindArrow(windDirection ?? undefined);
   const sportContext = getSportContext(
     String(data.sport ?? category ?? ''),
     isNaN(windNum) ? 0 : windNum,
     isNaN(precipNum) ? 0 : precipNum,
     isNaN(tempNum) ? 70 : tempNum,
   );
+
   // Parse precipitation probability (e.g. "30% chance of rain")
   const precipProbMatch = String(data.precipitation ?? '').match(/(\d+)%/);
   const precipPct = precipProbMatch ? parseInt(precipProbMatch[1]) : null;
+
+  // Impact badge config
+  const impactBadge = impactScore !== null
+    ? impactScore >= 7
+      ? { label: 'HIGH IMPACT', cls: 'bg-red-500/15 border-red-500/30 text-red-300' }
+      : impactScore >= 4
+      ? { label: 'MEDIUM', cls: 'bg-amber-500/15 border-amber-500/30 text-amber-300' }
+      : { label: 'LOW', cls: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' }
+    : null;
+
+  // Condition-based background tint for the header
+  const conditionGrad = (() => {
+    const c = (data.condition ?? '').toLowerCase();
+    if (c.includes('sun') || c.includes('clear') || c.includes('sunny')) return 'from-amber-700/60 via-yellow-800/40 to-amber-950/30';
+    if (c.includes('rain') || c.includes('storm') || c.includes('shower')) return 'from-blue-700/60 via-blue-800/40 to-blue-950/30';
+    if (c.includes('wind') || c.includes('gust')) return 'from-slate-600/60 via-gray-700/40 to-slate-900/30';
+    if (c.includes('snow') || c.includes('blizzard')) return 'from-sky-600/60 via-cyan-700/40 to-sky-950/30';
+    if (c.includes('thunder') || c.includes('lightning')) return 'from-purple-700/60 via-violet-800/40 to-purple-950/30';
+    return cfg.headerGrad;
+  })();
 
   const extraKeys = Object.keys(data).filter(k => !KNOWN_KEYS.has(k) && data[k] != null);
 
   return (
     <article className={cn(
-      'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-300',
-      isHero
-        ? 'border-[var(--border-hover)] shadow-[0_0_32px_oklch(0.3_0.06_260/0.15)]'
-        : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.08)]',
+      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-glow,0_0_40px_rgb(0_0_0/0.3))] transition-all duration-300',
+      isHero && 'sm:rounded-3xl border-[var(--border-hover)]',
     )}>
 
-      {/* ── Gradient header ──────────────────────────────────────────── */}
-      <div className={cn('relative px-4 pt-3.5 pb-3 bg-gradient-to-br', cfg.headerGrad)}>
-        {/* Status badge */}
-        <div className="absolute top-3 right-3 flex items-center gap-1">
-          <span className={cn('w-1.5 h-1.5 rounded-full animate-pulse', cfg.dotCls)} />
+      {/* Condition-tinted gradient header */}
+      <div className={cn('relative px-4 pt-4 pb-5 bg-gradient-to-br', conditionGrad)}>
+        {/* Status + impact badges */}
+        <div className="flex items-center gap-2 mb-3">
+          <span className={cn('w-1.5 h-1.5 rounded-full animate-pulse shrink-0', cfg.dotCls)} />
           <span className={cn('text-[9px] font-black uppercase tracking-widest', cfg.textCls)}>{cfg.label}</span>
+          {impactBadge && (
+            <span className={cn('ml-auto text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg border', impactBadge.cls)}>
+              {impactBadge.label}
+            </span>
+          )}
         </div>
 
         {/* Breadcrumb */}
-        <div className="flex items-center gap-1.5 mb-1.5">
+        <div className="flex items-center gap-1.5 mb-2">
           <ConditionIcon className="w-3 h-3 text-white/60" />
           <span className="text-[9px] font-black uppercase tracking-widest text-white/70">{category}</span>
           <span className="text-white/30">·</span>
           <span className="text-[9px] text-white/50 truncate">{subcategory}</span>
         </div>
 
-        <h3 className={cn('font-black text-white leading-snug text-balance pr-16', isHero ? 'text-lg' : 'text-sm')}>
+        <h3 className={cn('font-black text-white leading-snug text-balance', isHero ? 'text-lg' : 'text-sm')}>
           {title}
         </h3>
 
@@ -277,30 +295,38 @@ export function WeatherCard({
           <p className="text-[11px] text-white/60 mt-1 line-clamp-1">{data.location}</p>
         )}
 
-        {/* Temperature hero display */}
-        {!isNaN(tempNum) && (
-          <div className="flex items-end gap-2 mt-2">
-            <span className="text-3xl font-black text-white tabular-nums leading-none">{Math.round(tempNum)}°F</span>
-            {data.condition && (
-              <span className="text-sm text-white/70 mb-0.5">{data.condition}</span>
-            )}
-          </div>
-        )}
+        {/* Temperature hero + emoji */}
+        <div className="flex items-end gap-3 mt-3">
+          <span className="text-4xl" role="img" aria-label={data.condition ?? 'weather'}>
+            {conditionEmoji}
+          </span>
+          {!isNaN(tempNum) && (
+            <div>
+              <span className="text-4xl font-black text-white tabular-nums leading-none">
+                {Math.round(tempNum)}°F
+              </span>
+              {data.condition && (
+                <p className="text-sm text-white/70 mt-0.5">{data.condition}</p>
+              )}
+            </div>
+          )}
+          {isNaN(tempNum) && data.condition && (
+            <span className="text-base text-white/70 mb-1">{data.condition}</span>
+          )}
+        </div>
       </div>
 
       <div className="px-4 pb-4 space-y-3">
 
-        {/* ── Impact meter ─────────────────────────────────────────── */}
-        {impactScore !== null && (
-          <div className="mt-3 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5">
-            <ImpactMeter score={impactScore} />
-          </div>
-        )}
-
-        {/* ── Wind bar + direction compass ──────────────────────────── */}
+        {/* Wind: arrow + speed + compass */}
         {!isNaN(windNum) && windNum > 0 && (
-          <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5">
-            <div className={cn('flex gap-3 items-center', windDirection ? 'mb-2' : '')}>
+          <div className="mt-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-3 py-3">
+            <div className="flex items-center gap-3 mb-2">
+              {windArrow && (
+                <span className="text-2xl font-black text-sky-300 leading-none select-none">
+                  {windArrow}
+                </span>
+              )}
               <div className="flex-1">
                 <WindBar wind={windNum} />
               </div>
@@ -309,51 +335,64 @@ export function WeatherCard({
           </div>
         )}
 
-        {/* ── Humidity + precipitation stats ───────────────────────── */}
+        {/* Humidity + Precip 2×2 grid */}
         {(data.humidity || (!isNaN(precipNum) && precipNum >= 0)) && (
-          <div className={cn('grid gap-1.5', data.humidity && !isNaN(precipNum) ? 'grid-cols-2' : 'grid-cols-1')}>
+          <div className={cn('grid gap-2', data.humidity && !isNaN(precipNum) ? 'grid-cols-2' : 'grid-cols-1')}>
             {data.humidity && (
-              <div className="flex flex-col items-center gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2.5">
-                <Droplets className="w-3.5 h-3.5 text-sky-400 mb-0.5" />
-                <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Humidity</span>
-                <span className="text-sm font-black text-foreground tabular-nums">{String(data.humidity)}</span>
+              <div className="rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-2.5 text-center">
+                <Droplets className="w-4 h-4 text-sky-400 mx-auto mb-1" />
+                <div className="text-lg font-black tabular-nums text-foreground">{String(data.humidity)}</div>
+                <div className="text-[10px] text-[var(--text-muted)] mt-0.5 uppercase tracking-wide">Humidity</div>
               </div>
             )}
             {!isNaN(precipNum) && precipNum >= 0 && (
-              <div className="flex flex-col items-center gap-0.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2.5">
-                <CloudRain className="w-3.5 h-3.5 text-blue-400 mb-0.5" />
-                <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Precip</span>
-                <span className="text-sm font-black text-foreground tabular-nums">{String(data.precipitation)}</span>
+              <div className={cn(
+                'rounded-xl border p-2.5 text-center',
+                precipNum > 0.1
+                  ? 'bg-blue-500/10 border-blue-500/20'
+                  : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)]',
+              )}>
+                <CloudRain className={cn('w-4 h-4 mx-auto mb-1', precipNum > 0.1 ? 'text-blue-400' : 'text-[var(--text-muted)]')} />
+                <div className="text-lg font-black tabular-nums text-foreground">{String(data.precipitation)}</div>
+                <div className="text-[10px] text-[var(--text-muted)] mt-0.5 uppercase tracking-wide">Precip</div>
               </div>
             )}
           </div>
         )}
 
-        {/* ── Precipitation probability bar ────────────────────────── */}
+        {/* Precipitation probability bar */}
         {precipPct !== null && (
-          <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5 space-y-1">
-            <div className="flex justify-between text-[9px] font-bold uppercase tracking-wide text-[var(--text-faint)]">
-              <span>Precip. Probability</span>
-              <span className={precipPct >= 60 ? 'text-blue-400' : precipPct >= 30 ? 'text-sky-400' : 'text-[var(--text-muted)]'}>{precipPct}%</span>
+          <div className={cn(
+            'rounded-xl border px-3 py-2.5 space-y-1',
+            precipPct >= 60 ? 'bg-blue-500/8 border-blue-500/20' : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)]',
+          )}>
+            <div className="flex justify-between text-[9px] font-bold uppercase tracking-wide">
+              <span className="text-[var(--text-faint)]">Precip. Probability</span>
+              <span className={precipPct >= 60 ? 'text-blue-400 font-black' : precipPct >= 30 ? 'text-sky-400' : 'text-[var(--text-muted)]'}>
+                {precipPct}%
+              </span>
             </div>
-            <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+            <div className="h-2 rounded-full bg-[var(--bg-overlay)] overflow-hidden">
               <div
                 className={cn('h-full rounded-full', precipPct >= 60 ? 'bg-blue-500' : precipPct >= 30 ? 'bg-sky-500' : 'bg-sky-400/50')}
                 style={{ width: `${precipPct}%` }}
               />
             </div>
+            {precipPct >= 60 && (
+              <p className="text-[9px] text-blue-300/70 font-semibold">⚠ High precipitation probability</p>
+            )}
           </div>
         )}
 
-        {/* ── Sport-specific impact context ─────────────────────────── */}
+        {/* Sport-specific impact context */}
         {sportContext && (
-          <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
+          <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
             <Wind className="w-3 h-3 text-sky-400/70 shrink-0 mt-0.5" />
             <p className="text-[10px] text-[var(--text-muted)] leading-relaxed">{sportContext}</p>
           </div>
         )}
 
-        {/* ── Game impact alert ─────────────────────────────────────── */}
+        {/* Game impact alert */}
         {data.gameImpact && (
           <div className={cn('flex items-start gap-2 px-3 py-2.5 rounded-xl border', cfg.alertBg)}>
             <cfg.AlertIcon className={cn('w-3.5 h-3.5 shrink-0 mt-0.5', cfg.textCls)} />
@@ -363,11 +402,11 @@ export function WeatherCard({
           </div>
         )}
 
-        {/* ── Extra key-value data ──────────────────────────────────── */}
+        {/* Extra key-value data */}
         {extraKeys.length > 0 && (
           <div className="space-y-1">
             {extraKeys.map(k => (
-              <div key={k} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-[var(--bg-overlay)]">
+              <div key={k} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-[var(--bg-elevated)]">
                 <span className="text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-wide">
                   {k.replace(/([A-Z])/g, ' $1').trim()}
                 </span>
@@ -377,16 +416,16 @@ export function WeatherCard({
           </div>
         )}
 
-        {/* ── CTA ──────────────────────────────────────────────────── */}
+        {/* CTA */}
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] transition-all duration-150"
+            className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-sky-400 hover:bg-[var(--bg-overlay)] hover:border-sky-500/30 transition-all duration-150"
             aria-label={`Analyze ${title}`}
           >
             <ConditionIcon className="w-3.5 h-3.5" />
             View Weather Analysis
-            <ChevronRight className="w-3.5 h-3.5" />
+            <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
           </button>
         )}
       </div>

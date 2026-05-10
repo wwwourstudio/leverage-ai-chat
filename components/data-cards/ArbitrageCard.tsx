@@ -50,7 +50,7 @@ function ROIBar({ roiPct }: { roiPct: string }) {
         <span className="text-[var(--text-faint)] uppercase tracking-wider">ROI</span>
         <span className="text-emerald-400 tabular-nums">+{roiPct}%</span>
       </div>
-      <div className="h-1.5 rounded-full overflow-hidden bg-[var(--bg-surface)]">
+      <div className="h-1.5 rounded-full overflow-hidden bg-[var(--bg-elevated)]">
         <div
           className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-green-400 transition-all duration-700"
           style={{ width: animated ? `${barWidth}%` : '0%' }}
@@ -69,34 +69,40 @@ function BetLeg({
   leg: number;
 }) {
   const isLeg1 = leg === 1;
-  const borderCls = isLeg1 ? 'border-emerald-500/30' : 'border-sky-500/30';
+  const borderCls = isLeg1 ? 'border-emerald-500/30' : 'border-teal-500/30';
   const oddsPositive = bet.odds && (bet.odds.startsWith('+') || parseFloat(bet.odds) > 0);
-  const oddsCls = oddsPositive ? 'text-emerald-400' : 'text-foreground/90';
+  const oddsCls = oddsPositive ? 'text-emerald-300' : 'text-foreground/90';
+  const prob = impliedProb(bet.odds);
 
   return (
-    <div className={cn('rounded-xl bg-[var(--bg-overlay)] border overflow-hidden', borderCls)}>
+    <div className={cn('rounded-xl bg-[var(--bg-elevated)] border overflow-hidden', borderCls)}>
       {/* Leg header */}
       <div className={cn(
         'flex items-center justify-between px-3 py-2 border-b',
-        isLeg1 ? 'bg-emerald-500/8 border-emerald-500/20' : 'bg-sky-500/8 border-sky-500/20',
+        isLeg1 ? 'bg-emerald-500/8 border-emerald-500/20' : 'bg-teal-500/8 border-teal-500/20',
       )}>
         <div className="flex items-center gap-2">
-          <CheckCircle className={cn('w-3.5 h-3.5 shrink-0', isLeg1 ? 'text-emerald-400' : 'text-sky-400')}
+          <CheckCircle className={cn('w-3.5 h-3.5 shrink-0', isLeg1 ? 'text-emerald-400' : 'text-teal-400')}
                        aria-hidden="true" />
           <span className={cn('text-[9px] font-black uppercase tracking-widest',
-            isLeg1 ? 'text-emerald-500' : 'text-sky-500')}>
+            isLeg1 ? 'text-emerald-500' : 'text-teal-500')}>
             LEG {leg}
           </span>
           <span className="text-sm font-black text-foreground/90">{bet.team}</span>
         </div>
-        <span className={cn('text-base font-black tabular-nums', oddsCls)}>{bet.odds}</span>
+        <div className="text-right">
+          <span className={cn('text-base font-black tabular-nums', oddsCls)}>{bet.odds}</span>
+          {prob !== null && (
+            <div className="text-[8px] text-[var(--text-faint)] tabular-nums">{prob}% impl.</div>
+          )}
+        </div>
       </div>
       {/* Leg details */}
       <div className="grid grid-cols-3 gap-2 px-3 py-2.5 text-xs">
         {[
           { label: 'Book',   val: bet.book,  cls: 'text-foreground/80' },
           { label: 'Stake',  val: bet.stake, cls: 'text-foreground/80' },
-          { label: 'To Win', val: bet.toWin, cls: 'text-emerald-400 font-black' },
+          { label: 'To Win', val: bet.toWin, cls: 'text-emerald-300 font-black' },
         ].map(({ label, val, cls }) => (
           <div key={label}>
             <span className="text-[var(--text-faint)] text-[9px] uppercase tracking-wide font-bold">{label}</span>
@@ -158,13 +164,16 @@ export function ArbitrageCard({
 
   return (
     <article className={cn(
-      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-overlay)] border transition-all duration-200 animate-fade-in-up',
+      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border transition-all duration-300 animate-fade-in-up',
       isExpired
         ? 'border-[var(--border-subtle)] opacity-50 grayscale'
         : isWarning
-          ? 'border-amber-600/40 hover:border-amber-500/60'
-          : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)]',
+          ? 'border-amber-600/40 hover:border-amber-500/60 hover:shadow-[0_0_24px_oklch(0.6_0.15_80/0.12)]'
+          : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-glow)]',
     )}>
+      {/* Gradient header */}
+      <div className="absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-emerald-600/25 via-teal-800/10 to-transparent pointer-events-none" />
+
       <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)}
            aria-hidden="true" />
 
@@ -183,19 +192,19 @@ export function ArbitrageCard({
         </div>
       )}
 
-      <div className="pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5">
+      <div className="relative pl-5 pr-4 py-4 sm:pl-6 sm:pr-5 sm:py-5">
 
         {/* Header */}
-        <div className="flex items-center justify-between gap-3 mb-2.5">
+        <div className="flex items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-2 min-w-0">
             <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" aria-hidden="true" />
             <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-faint)]">
               ARBITRAGE
             </span>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0" role="status">
+          <div className="flex items-center gap-2 shrink-0" role="status">
             {data.generatedAt && ageMin > 0 && (
-              <span className="text-[9px] text-[var(--text-faint)] mr-1">{ageMin}m ago</span>
+              <span className="text-[9px] text-[var(--text-faint)]">{ageMin}m ago</span>
             )}
             <span className={cn('w-1.5 h-1.5 rounded-full animate-pulse',
               isExpired ? 'bg-red-400 animate-none' : confDot)} />
@@ -206,90 +215,80 @@ export function ArbitrageCard({
           </div>
         </div>
 
-        {/* Profit display */}
+        {/* Event name + game time */}
         <div className="mb-3">
-          <div className="flex items-end gap-3">
-            <div className="text-2xl sm:text-3xl font-black tabular-nums text-emerald-400 leading-none">
+          <h3 className="text-sm font-black text-foreground/90 leading-snug">{data.event}</h3>
+          {data.gameTime && (
+            <div className="flex items-center gap-1 mt-1 text-[10px] text-[var(--text-muted)]">
+              <Clock className="w-3 h-3" aria-hidden="true" />
+              {data.gameTime}
+            </div>
+          )}
+        </div>
+
+        {/* Profit hero + ROI */}
+        <div className="rounded-2xl bg-[var(--bg-elevated)] border border-emerald-500/20 p-4 mb-4 text-center">
+          <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Guaranteed Profit</p>
+          <div className="flex items-end justify-center gap-3">
+            <div className="text-4xl font-black tabular-nums text-emerald-300 leading-none">
               {data.profit}
             </div>
             {roiPct !== null && (
-              <span className="text-sm font-black text-emerald-300 mb-0.5">+{roiPct}% ROI</span>
+              <span className="text-base font-black text-emerald-400 mb-0.5">+{roiPct}% ROI</span>
             )}
           </div>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
-            Guaranteed: <span className="font-semibold text-foreground/80">{data.profitAmount}</span>
-            <span className="mx-2 text-[var(--border-subtle)]">|</span>
-            Stake: <span className="font-semibold text-foreground/80">{data.totalStake}</span>
-          </p>
+          {/* Investment vs profit comparison */}
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
+            <div className="flex-1 text-center">
+              <div className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-0.5">Total Investment</div>
+              <div className="text-sm font-black text-white tabular-nums">{data.totalStake}</div>
+            </div>
+            <div className="text-[var(--text-faint)] text-xs">→</div>
+            <div className="flex-1 text-center">
+              <div className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-0.5">Guaranteed Return</div>
+              <div className="text-sm font-black text-emerald-300 tabular-nums">{data.profitAmount}</div>
+            </div>
+          </div>
           {/* ROI progress bar */}
           {roiPct !== null && <ROIBar roiPct={roiPct} />}
         </div>
 
-        {/* Implied probabilities */}
-        {(impl1 !== null || impl2 !== null) && (
-          <div className="mb-3 space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { label: data.bet1?.book ?? 'Leg 1', prob: impl1, accent: 'text-emerald-400' },
-                { label: data.bet2?.book ?? 'Leg 2', prob: impl2, accent: 'text-sky-400'     },
-              ].map(({ label, prob, accent }) => prob !== null ? (
-                <div key={label}
-                     className="bg-[var(--bg-overlay)] rounded-xl border border-[var(--border-subtle)] px-2.5 py-2 text-center">
-                  <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-0.5 truncate">
-                    {label}
-                  </p>
-                  <p className={cn('text-sm font-black tabular-nums', accent)}>{prob}%</p>
-                  <p className="text-[8px] text-[var(--text-faint)]">impl. prob</p>
-                </div>
-              ) : null)}
-            </div>
-            {/* Combined implied + edge confirmation */}
-            {combinedImpl !== null && (
-              <div className="text-[9px] text-center text-[var(--text-faint)]">
-                Combined implied: <span className="font-bold tabular-nums">{combinedImpl.toFixed(1)}%</span>
-                {edgeConfirmed && (
-                  <span className="ml-1.5 text-emerald-400 font-bold">← edge confirmed</span>
-                )}
-              </div>
+        {/* Implied probabilities + edge confirmation */}
+        {combinedImpl !== null && (
+          <div className="mb-3 text-[9px] text-center text-[var(--text-faint)] bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] px-3 py-2">
+            Combined implied: <span className="font-bold tabular-nums">{combinedImpl.toFixed(1)}%</span>
+            {edgeConfirmed && (
+              <span className="ml-1.5 text-emerald-400 font-bold">← edge confirmed</span>
             )}
           </div>
         )}
 
-        {/* Event info */}
-        <div className="flex items-center gap-2 mb-3 text-xs text-[var(--text-muted)]">
-          <span className="font-semibold text-foreground/80">{data.event}</span>
-          {data.gameTime && (
-            <span className="inline-flex items-center gap-1 ml-auto">
-              <Clock className="w-3 h-3" aria-hidden="true" />
-              {data.gameTime}
-            </span>
-          )}
-        </div>
-
         {/* Bet legs */}
-        <div className="space-y-2">
+        <div className="space-y-2 mb-3">
           <BetLeg bet={data.bet1} leg={1} />
           <BetLeg bet={data.bet2} leg={2} />
         </div>
 
         {/* Market info */}
-        <div className="flex items-center gap-x-4 gap-y-1 flex-wrap mt-3 text-xs text-[var(--text-muted)]">
+        <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-[var(--text-muted)]">
           <span>Efficiency: <span className="font-semibold text-foreground/80">{data.efficiency}</span></span>
           <span>Books: <span className="font-semibold text-foreground/80">{data.books}</span></span>
         </div>
 
-        <p className="mt-3 text-[10px] text-[var(--text-faint)] text-center italic">
+        <p className="mt-2 text-[10px] text-[var(--text-faint)] text-center italic">
           Execute both bets quickly. Odds may change.
         </p>
 
+        {/* LOCK IN button */}
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
-            aria-label="Analyze arbitrage opportunity"
+            className="flex items-center justify-center gap-2 w-full mt-4 px-4 py-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 hover:bg-emerald-500/25 hover:border-emerald-500/55 text-sm font-black text-emerald-300 hover:text-emerald-200 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+            aria-label="Lock in arbitrage opportunity"
           >
-            View Full Analysis
-            <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+            <CheckCircle className="w-4 h-4" aria-hidden="true" />
+            LOCK IN — View Full Analysis
+            <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
           </button>
         )}
       </div>

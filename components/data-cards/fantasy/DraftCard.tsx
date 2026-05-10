@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { Target, ArrowUpRight, Zap } from 'lucide-react';
+import { Target, ArrowUpRight, Zap, Lightbulb } from 'lucide-react';
 import { PlayerAvatar } from '../PlayerAvatar';
 import { getPlayerHeadshotUrl } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -22,12 +22,17 @@ export const DraftCard = memo(function DraftCard({ data, ...p }: FantasyCardProp
     <Shell {...p} status="target" Icon={Target}>
       {/* Best Pick — hero highlight */}
       {bestPick && (
-        <div className="rounded-xl border border-teal-500/30 bg-teal-500/6 px-3 py-2.5">
-          <div className="flex items-center gap-1.5 mb-2">
-            <span className="text-[9px] font-black uppercase tracking-wider text-teal-400">Best Pick Now</span>
-            <ArrowUpRight className="w-3 h-3 text-teal-400" />
+        <div className="rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 to-purple-500/5 px-3 py-3">
+          {/* Header row */}
+          <div className="flex items-center gap-1.5 mb-3">
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-500/15 border border-violet-500/30">
+              <ArrowUpRight className="w-2.5 h-2.5 text-violet-400" />
+              <span className="text-[9px] font-black uppercase tracking-wider text-violet-300">Best Pick Now</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2.5">
+
+          {/* Player row */}
+          <div className="flex items-center gap-3">
             <PlayerAvatar
               playerName={bestPick.name}
               photoUrl={bestPick.photoUrl ?? getPlayerHeadshotUrl(bestPick.name)}
@@ -35,11 +40,11 @@ export const DraftCard = memo(function DraftCard({ data, ...p }: FantasyCardProp
               size="md"
             />
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap mb-1">
                 <PosBadge pos={bestPick.pos} />
                 <TierBadge tier={bestPick.tier} />
                 <button
-                  className="text-sm font-black text-white hover:text-teal-300 transition-colors text-left"
+                  className="text-sm font-black text-white hover:text-violet-300 transition-colors text-left"
                   onClick={() => dispatchPlayerClick(bestPick.name, bestPick.pos, bestPick.team, bestPick.adp)}
                   title={`Analyze ${bestPick.name}`}
                 >
@@ -48,12 +53,17 @@ export const DraftCard = memo(function DraftCard({ data, ...p }: FantasyCardProp
                 <span className="text-xs text-[var(--text-muted)]">{bestPick.team}</span>
               </div>
               {bestPick.reason && (
-                <p className="text-[11px] text-[var(--text-muted)] mt-1 leading-relaxed">{bestPick.reason}</p>
+                <div className="flex items-start gap-1.5 mt-1.5 px-2 py-1.5 rounded-lg bg-[var(--bg-overlay)]/60 border border-violet-500/15">
+                  <Lightbulb className="w-3 h-3 text-violet-400/70 mt-0.5 shrink-0" />
+                  <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{bestPick.reason}</p>
+                </div>
               )}
             </div>
-            <div className="flex flex-col items-end shrink-0 gap-0.5">
-              <span className="text-base font-black text-teal-400 tabular-nums">+{bestPick.vbd}</span>
-              <span className="text-[8px] text-[var(--text-faint)]">VBD</span>
+
+            {/* VBD hero number */}
+            <div className="flex flex-col items-center shrink-0 gap-0.5 px-2.5 py-2 rounded-xl bg-[var(--bg-overlay)]/60 border border-violet-500/20">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-faint)]">VBD</span>
+              <span className="text-xl font-black text-violet-300 tabular-nums leading-none">+{bestPick.vbd}</span>
               {bestPick.adp != null && (
                 <span className="text-[9px] font-bold text-[var(--text-faint)] tabular-nums">ADP {bestPick.adp}</span>
               )}
@@ -76,7 +86,7 @@ export const DraftCard = memo(function DraftCard({ data, ...p }: FantasyCardProp
                 className={cn(
                   'flex items-center gap-2 px-2.5 py-1.5 rounded-xl border transition-colors',
                   i === 0
-                    ? 'bg-amber-500/6 border-amber-500/20'
+                    ? 'bg-amber-500/8 border-amber-500/25'
                     : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)]',
                 )}
               >
@@ -110,12 +120,12 @@ export const DraftCard = memo(function DraftCard({ data, ...p }: FantasyCardProp
         </>
       )}
 
-      {/* Tier cliff alerts */}
+      {/* Tier cliff alerts — pill chips */}
       {tierCliffAlerts.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {tierCliffAlerts.map((a: string, i: number) => (
-            <span key={i} className="text-[9px] px-2 py-0.5 rounded-full border border-amber-500/30 text-amber-400 bg-amber-500/6">
-              ⚠ {a}
+            <span key={i} className="text-[9px] px-2 py-0.5 rounded-full border border-amber-500/30 text-amber-400 bg-amber-500/8 flex items-center gap-1">
+              <span>⚠</span> {a}
             </span>
           ))}
         </div>

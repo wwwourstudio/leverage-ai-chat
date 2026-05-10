@@ -49,15 +49,23 @@ function fmtEdge(edge: number): string {
 }
 
 function impliedFromProb(prob: number): number {
-  // Approximate American odds from probability (no vig)
   if (prob >= 0.5) return -Math.round((prob / (1 - prob)) * 100);
   return Math.round(((1 - prob) / prob) * 100);
 }
 
 const CONFIDENCE_CONFIG = {
-  high:   { label: 'High',   color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/30' },
-  medium: { label: 'Medium', color: 'text-amber-400',   bg: 'bg-amber-500/15',   border: 'border-amber-500/30'   },
-  low:    { label: 'Low',    color: 'text-rose-400',    bg: 'bg-rose-500/15',     border: 'border-rose-500/30'   },
+  high:   { label: 'HIGH',   color: 'text-emerald-300', bg: 'bg-emerald-500/15', border: 'border-emerald-500/30' },
+  medium: { label: 'MEDIUM', color: 'text-amber-300',   bg: 'bg-amber-500/15',   border: 'border-amber-500/30'   },
+  low:    { label: 'LOW',    color: 'text-rose-300',    bg: 'bg-rose-500/15',     border: 'border-rose-500/30'   },
+};
+
+// Pitch type colors for component bars
+const FACTOR_COLORS: Record<string, { bar: string; label: string }> = {
+  'Base Rate':   { bar: '#f43f5e', label: 'BASE RATE'   },
+  'Park Factor': { bar: '#f59e0b', label: 'PARK FACTOR' },
+  'Weather':     { bar: '#60a5fa', label: 'WEATHER'     },
+  'Matchup':     { bar: '#a78bfa', label: 'MATCHUP'     },
+  'ML Adjusted': { bar: '#10b981', label: 'ML ADJ'      },
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -66,8 +74,8 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
   // Error state
   if (!data.success && data.error) {
     return (
-      <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-300">
-        <p className="font-semibold mb-1">⚠ HR Prediction unavailable</p>
+      <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-300">
+        <p className="font-semibold mb-1">HR Prediction unavailable</p>
         <p className="text-rose-400/80">{data.error}</p>
       </div>
     );
@@ -78,9 +86,11 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
   const hasEdge      = data.impliedOdds != null && Math.abs(data.edge) > 0.005;
   const edgePositive = data.edge > 0;
 
+  const probPct = data.probability * 100;
+  const heroColor = probPct >= 15 ? '#10b981' : probPct >= 8 ? '#f59e0b' : '#f43f5e';
+
   // Circular gauge
-  const CIRC = 2 * Math.PI * 40; // r=40
-  const gaugeStroke = edgePositive ? '#10b981' : data.edge < -0.02 ? '#f43f5e' : '#94a3b8';
+  const CIRC = 2 * Math.PI * 40;
   const gaugeDashOffset = CIRC * (1 - data.probability);
 
   // Quarter-Kelly stake recommendation
@@ -95,112 +105,121 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
     return Math.max(0, full * 0.25);
   })();
 
-  // Component breakdown bars (relative to each factor's typical range)
   const factors: Array<{ label: string; value: number; range: [number, number]; fmt?: (v: number) => string }> = [
-    { label: 'Base Rate',      value: data.components.baseRate,      range: [0, 0.20],       fmt: fmtPct  },
-    { label: 'Park Factor',    value: data.components.parkFactor,    range: [0.85, 1.35],    fmt: v => v.toFixed(2) },
-    { label: 'Weather',        value: data.components.weatherFactor, range: [0.85, 1.25],    fmt: v => v.toFixed(2) },
-    { label: 'Matchup',        value: data.components.matchupFactor, range: [0.70, 1.80],    fmt: v => v.toFixed(2) },
+    { label: 'Base Rate',   value: data.components.baseRate,      range: [0, 0.20],    fmt: fmtPct  },
+    { label: 'Park Factor', value: data.components.parkFactor,    range: [0.85, 1.35], fmt: v => v.toFixed(2) },
+    { label: 'Weather',     value: data.components.weatherFactor, range: [0.85, 1.25], fmt: v => v.toFixed(2) },
+    { label: 'Matchup',     value: data.components.matchupFactor, range: [0.70, 1.80], fmt: v => v.toFixed(2) },
     ...(data.components.mlAdjusted !== undefined
       ? [{ label: 'ML Adjusted', value: data.components.mlAdjusted, range: [0.80, 1.20] as [number, number], fmt: (v: number) => v.toFixed(2) }]
       : []),
   ];
 
-  // Confidence interval
   const ciHalf = data.confidence === 'high' ? 0.03 : data.confidence === 'medium' ? 0.07 : 0.12;
   const ciLo   = Math.max(0, data.probability - ciHalf);
   const ciHi   = Math.min(1, data.probability + ciHalf);
-  const CI_MAX = 0.30; // track represents 0–30% probability range
+  const CI_MAX = 0.30;
 
   return (
-    <div className="rounded-2xl border border-rose-500/25 bg-gradient-to-br from-rose-600/20 via-red-900/15 to-slate-900/40 overflow-hidden shadow-lg">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">💣</span>
-          <div>
-            <p className="text-xs font-semibold text-rose-400 uppercase tracking-wider">HR Prop — v3 Engine</p>
-            <p className="text-white font-bold text-base leading-tight">{data.player}</p>
-          </div>
+    <div className="group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_24px_rgba(244,63,94,0.10)] transition-all duration-300">
+
+      {/* ── Header ── */}
+      <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-rose-600/25 via-red-900/10 to-transparent border-b border-[var(--border-subtle)]">
+        {/* Confidence badge top-right */}
+        <div className={`absolute top-3 right-3 text-[9px] font-black px-2 py-1 rounded-lg border ${confCfg.bg} ${confCfg.border} ${confCfg.color} uppercase tracking-widest`}>
+          {confCfg.label} CONF
         </div>
-        <div className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${confCfg.bg} ${confCfg.border} ${confCfg.color}`}>
-          {confCfg.label} confidence
-        </div>
+
+        {/* Sport chip */}
+        <span className="text-[9px] font-black uppercase tracking-widest text-white/40 block mb-2">
+          MLB · HR Prediction · v3 Engine
+        </span>
+
+        {/* Player name hero */}
+        <h3 className="text-base font-black text-white leading-tight pr-20">{data.player}</h3>
+
+        {/* Venue / pitcher strip */}
+        {(data.pitcherName || data.venue || data.gameTime) && (
+          <p className="text-[10px] text-white/40 mt-1 flex items-center gap-2 flex-wrap">
+            {data.pitcherName && <span>vs {data.pitcherName}</span>}
+            {data.venue && <span>· {data.venue}</span>}
+            {data.gameTime && <span>· {data.gameTime}</span>}
+            {data.dataSource === 'mlb_api_fallback' && <span className="text-amber-400/70">· estimated</span>}
+          </p>
+        )}
       </div>
 
-      {/* Venue / pitcher strip */}
-      {(data.pitcherName || data.venue || data.gameTime) && (
-        <div className="px-4 pb-2 text-xs text-[var(--text-faint)] flex items-center gap-3 flex-wrap">
-          {data.pitcherName && <span>vs {data.pitcherName}</span>}
-          {data.venue && <span>· {data.venue}</span>}
-          {data.gameTime && <span>· {data.gameTime}</span>}
-          {data.dataSource === 'mlb_api_fallback' && (
-            <span className="text-amber-500/70">· estimated</span>
-          )}
+      {/* ── HERO probability section ── */}
+      <div className="px-4 py-4 flex items-center gap-5 border-b border-[var(--border-subtle)]">
+        {/* Large circular gauge */}
+        <div className="relative shrink-0">
+          <svg viewBox="0 0 100 100" className="w-24 h-24" aria-hidden="true">
+            {/* Track */}
+            <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
+            {/* Progress */}
+            <circle
+              cx="50" cy="50" r="40" fill="none"
+              stroke={heroColor}
+              strokeWidth="8"
+              strokeLinecap="round"
+              strokeDasharray={CIRC}
+              strokeDashoffset={gaugeDashOffset}
+              transform="rotate(-90 50 50)"
+              style={{ transition: 'stroke-dashoffset 1s ease', filter: `drop-shadow(0 0 6px ${heroColor}60)` }}
+            />
+            {/* Center text */}
+            <text x="50" y="44" textAnchor="middle" style={{ fontSize: '20px', fill: 'white', fontWeight: 900, fontFamily: 'monospace' }}>
+              {probPct.toFixed(0)}%
+            </text>
+            <text x="50" y="60" textAnchor="middle" style={{ fontSize: '8px', fill: 'rgba(255,255,255,0.35)', letterSpacing: '0.1em' }}>
+              HR PROB
+            </text>
+          </svg>
         </div>
-      )}
 
-      {/* Primary probability */}
-      <div className="px-4 py-3 flex items-center gap-4 border-t border-rose-500/10">
-        {/* Circular gauge */}
-        <svg viewBox="0 0 100 100" className="w-20 h-20 shrink-0" aria-hidden="true">
-          <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="8" />
-          <circle
-            cx="50" cy="50" r="40" fill="none"
-            stroke={gaugeStroke}
-            strokeWidth="8"
-            strokeLinecap="round"
-            strokeDasharray={CIRC}
-            strokeDashoffset={gaugeDashOffset}
-            transform="rotate(-90 50 50)"
-            style={{ transition: 'stroke-dashoffset 1s ease' }}
-          />
-          <text x="50" y="47" textAnchor="middle" style={{ fontSize: '18px', fill: 'white', fontWeight: 900 }}>
-            {(data.probability * 100).toFixed(0)}%
-          </text>
-          <text x="50" y="62" textAnchor="middle" style={{ fontSize: '8px', fill: 'rgba(148,163,184,0.7)' }}>
-            HR PROB
-          </text>
-        </svg>
-
-        <div className="flex-1">
-          <p className="text-xs text-[var(--text-faint)] mb-0.5">Fair odds</p>
-          <p className="text-2xl font-black text-white tabular-nums">{fmtOdds(modelOdds)}</p>
+        {/* Odds column */}
+        <div className="flex-1 space-y-2">
+          <div>
+            <p className="text-[9px] uppercase tracking-widest text-white/35 mb-0.5">Fair Value Odds</p>
+            <p className="text-3xl font-black text-white tabular-nums" style={{ color: heroColor }}>{fmtOdds(modelOdds)}</p>
+          </div>
           {kellyRec !== null && (
-            <p className="text-[10px] text-emerald-400/80 mt-1">
-              ¼ Kelly: {(kellyRec * 100).toFixed(1)}% stake
-            </p>
+            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/25">
+              <span className="text-[9px] font-black text-emerald-400">1/4 Kelly: {(kellyRec * 100).toFixed(1)}% stake</span>
+            </div>
           )}
         </div>
 
         {/* Edge vs market */}
-        {hasEdge && (
-          <div className={`ml-auto text-right px-3 py-2 rounded-lg border ${
+        {hasEdge ? (
+          <div className={`shrink-0 text-center px-3 py-2.5 rounded-xl border ${
             edgePositive
-              ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
-              : 'bg-rose-500/10   border-rose-500/25   text-rose-400'
+              ? 'bg-emerald-500/10 border-emerald-500/25'
+              : 'bg-rose-500/10 border-rose-500/25'
           }`}>
-            <p className="text-xs font-medium opacity-70 mb-0.5">Edge vs market</p>
-            <p className="text-lg font-bold tabular-nums">{fmtEdge(data.edge)}</p>
-            <p className="text-xs opacity-60">mkt: {fmtOdds(data.impliedOdds)}</p>
+            <p className="text-[8px] font-black uppercase tracking-wider mb-0.5" style={{ color: edgePositive ? '#6ee7b7' : '#fda4af' }}>
+              {edgePositive ? 'EDGE' : 'FADE'}
+            </p>
+            <p className={`text-lg font-black tabular-nums ${edgePositive ? 'text-emerald-300' : 'text-rose-300'}`}>
+              {fmtEdge(data.edge)}
+            </p>
+            <p className="text-[8px] text-white/30 mt-0.5">mkt: {fmtOdds(data.impliedOdds)}</p>
           </div>
-        )}
-
-        {!hasEdge && (
-          <div className="ml-auto text-right px-3 py-2 rounded-lg border border-[var(--border-subtle)]/40 bg-[var(--bg-overlay)]/20 text-[var(--text-faint)]">
-            <p className="text-xs font-medium mb-0.5">Market odds</p>
-            <p className="text-lg font-bold tabular-nums">{fmtOdds(data.impliedOdds ?? null)}</p>
+        ) : (
+          <div className="shrink-0 text-center px-3 py-2.5 rounded-xl border border-white/8 bg-white/3">
+            <p className="text-[8px] font-black uppercase tracking-wider text-white/30 mb-0.5">MARKET</p>
+            <p className="text-lg font-black tabular-nums text-white/60">{fmtOdds(data.impliedOdds ?? null)}</p>
           </div>
         )}
       </div>
 
-      {/* Confidence interval range */}
-      <div className="px-4 py-2.5 border-t border-rose-500/10">
-        <div className="flex justify-between items-center mb-1 text-[9px]">
-          <span className="text-[var(--text-faint)] uppercase tracking-wider">Probability Range ({data.confidence} confidence)</span>
-          <span className="text-[var(--text-faint)] font-bold">{(ciLo * 100).toFixed(1)}% – {(ciHi * 100).toFixed(1)}%</span>
+      {/* ── Confidence interval range ── */}
+      <div className="px-4 py-3 border-b border-white/5">
+        <div className="flex justify-between items-center mb-1.5">
+          <span className="text-[9px] font-black uppercase tracking-widest text-white/35">Probability Range</span>
+          <span className="text-[9px] font-bold text-white/50 tabular-nums">{(ciLo * 100).toFixed(1)}% – {(ciHi * 100).toFixed(1)}%</span>
         </div>
-        <div className="relative h-1.5 rounded-full bg-[var(--bg-elevated)]/50 overflow-hidden">
+        <div className="relative h-1.5 rounded-full bg-white/5 overflow-hidden">
           <div
             className="absolute top-0 bottom-0 rounded-full bg-rose-500/50"
             style={{
@@ -209,54 +228,51 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
             }}
           />
           <div
-            className="absolute top-0 bottom-0 w-0.5 bg-white/70"
+            className="absolute top-0 bottom-0 w-0.5 bg-white/70 rounded-full"
             style={{ left: `${Math.min(100, (data.probability / CI_MAX) * 100)}%` }}
           />
         </div>
-        <div className="flex justify-between text-[8px] text-[var(--text-faint)] mt-0.5">
+        <div className="flex justify-between text-[8px] text-white/25 mt-1">
           <span>0%</span>
           <span>15%</span>
           <span>30%</span>
         </div>
       </div>
 
-      {/* Component breakdown */}
-      <div className="px-4 py-3 border-t border-rose-500/10 space-y-2">
-        <p className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">Factor breakdown</p>
+      {/* ── Component factor bars ── */}
+      <div className="px-4 py-3 space-y-2">
+        <p className="text-[9px] font-black uppercase tracking-widest text-white/35 mb-3">Factor Breakdown</p>
         {factors.map(f => {
           const [lo, hi] = f.range;
           const pct = Math.max(0, Math.min(100, ((f.value - lo) / (hi - lo)) * 100));
-          const isNeutral = Math.abs(f.value - 1.0) < 0.02 && f.label !== 'Base Rate';
-          const barColor = isNeutral
-            ? 'bg-[var(--bg-elevated)]'
-            : f.value >= 1.0 || f.label === 'Base Rate'
-            ? 'bg-rose-500'
-            : 'bg-[var(--bg-elevated)]';
-
+          const fc = FACTOR_COLORS[f.label];
+          const barColor = fc?.bar ?? '#94a3b8';
           return (
             <div key={f.label} className="flex items-center gap-3">
-              <p className="text-xs text-[var(--text-faint)] w-24 flex-shrink-0">{f.label}</p>
-              <div className="flex-1 h-1.5 bg-[var(--bg-elevated)]/50 rounded-full overflow-hidden">
+              <span className="text-[9px] font-black uppercase tracking-wider text-white/35 w-20 shrink-0">
+                {fc?.label ?? f.label}
+              </span>
+              <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${barColor}`}
-                  style={{ width: `${pct}%` }}
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{ width: `${pct}%`, background: barColor, boxShadow: `0 0 6px ${barColor}60` }}
                 />
               </div>
-              <p className="text-xs font-mono text-white/70 w-12 text-right flex-shrink-0">
+              <span className="text-[10px] font-black text-white/60 w-12 text-right tabular-nums shrink-0">
                 {f.fmt ? f.fmt(f.value) : f.value.toFixed(3)}
-              </p>
+              </span>
             </div>
           );
         })}
       </div>
 
-      {/* Warnings */}
+      {/* ── Warnings ── */}
       {data.warnings && data.warnings.length > 0 && (
-        <div className="px-4 pb-4 pt-1">
-          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5 space-y-1">
+        <div className="px-4 pb-3">
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 p-3 space-y-1">
             {data.warnings.map((w, i) => (
-              <p key={i} className="text-xs text-amber-400/80 flex items-start gap-1.5">
-                <span className="mt-0.5 flex-shrink-0">⚠</span>
+              <p key={i} className="text-[10px] text-amber-300/80 flex items-start gap-1.5">
+                <span className="mt-0.5 shrink-0 text-amber-400">!</span>
                 <span>{w}</span>
               </p>
             ))}
@@ -264,11 +280,11 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
         </div>
       )}
 
-      {/* Footer */}
-      <div className="px-4 pb-3 pt-1 flex items-center justify-between text-xs text-[var(--text-faint)]">
-        <span>LeverageMetrics v3 · platoon ±1 · pitch mix vuln</span>
+      {/* ── Footer ── */}
+      <div className="px-4 pb-3 pt-1 flex items-center justify-between border-t border-white/5">
+        <span className="text-[9px] text-white/20">LeverageMetrics v3 · platoon ±1 · pitch mix vuln</span>
         {data.dataSource && (
-          <span>{data.dataSource === 'statcast_db' ? '⚾ Statcast' : '🌐 MLB API'}</span>
+          <span className="text-[9px] text-white/20">{data.dataSource === 'statcast_db' ? 'Statcast' : 'MLB API'}</span>
         )}
       </div>
     </div>

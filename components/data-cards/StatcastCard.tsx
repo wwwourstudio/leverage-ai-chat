@@ -2,7 +2,7 @@
 
 import { useState, useCallback, memo } from 'react';
 import Image from 'next/image';
-import { TrendingUp, Activity, BarChart3, Bookmark, Zap, Wind } from 'lucide-react';
+import { TrendingUp, Activity, BarChart3, Bookmark, Zap, Wind, ChevronRight } from 'lucide-react';
 import { AnalysisLightbox, type LightboxSection } from './AnalysisLightbox';
 import { getPlayerHeadshotUrl } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -52,42 +52,42 @@ interface TypeConf {
 const TYPE_CONFIG: Record<string, TypeConf> = {
   statcast_summary_card: {
     emoji: '⚾', label: 'Statcast',
-    gradient: 'from-blue-600/75 via-blue-900/55 to-slate-900/40',
-    accentBorder: 'border-blue-500/30', accentText: 'text-blue-400',
-    accentBg: 'bg-blue-500/15', iconBg: 'bg-blue-500/20',
+    gradient: 'from-cyan-600/25 via-blue-800/10 to-slate-900/5',
+    accentBorder: 'border-cyan-500/30', accentText: 'text-cyan-400',
+    accentBg: 'bg-cyan-500/10', iconBg: 'bg-cyan-500/15',
   },
   hr_prop_card: {
     emoji: '💣', label: 'HR Prop',
-    gradient: 'from-rose-600/75 via-red-900/55 to-slate-900/40',
+    gradient: 'from-rose-600/25 via-red-900/10 to-slate-900/5',
     accentBorder: 'border-rose-500/30', accentText: 'text-rose-400',
-    accentBg: 'bg-rose-500/15', iconBg: 'bg-rose-500/20',
+    accentBg: 'bg-rose-500/10', iconBg: 'bg-rose-500/15',
   },
   game_simulation_card: {
     emoji: '🎲', label: 'Simulation',
-    gradient: 'from-violet-600/75 via-purple-900/55 to-slate-900/40',
+    gradient: 'from-violet-600/25 via-purple-900/10 to-slate-900/5',
     accentBorder: 'border-violet-500/30', accentText: 'text-violet-400',
-    accentBg: 'bg-violet-500/15', iconBg: 'bg-violet-500/20',
+    accentBg: 'bg-violet-500/10', iconBg: 'bg-violet-500/15',
   },
   leaderboard_card: {
     emoji: '🏆', label: 'Leaderboard',
-    gradient: 'from-amber-600/75 via-yellow-900/55 to-slate-900/40',
+    gradient: 'from-amber-600/25 via-yellow-900/10 to-slate-900/5',
     accentBorder: 'border-amber-500/30', accentText: 'text-amber-400',
-    accentBg: 'bg-amber-500/15', iconBg: 'bg-amber-500/20',
+    accentBg: 'bg-amber-500/10', iconBg: 'bg-amber-500/15',
   },
   pitch_analysis_card: {
     emoji: '🌀', label: 'Pitch Mix',
-    gradient: 'from-teal-600/75 via-cyan-900/55 to-slate-900/40',
+    gradient: 'from-teal-600/25 via-cyan-900/10 to-slate-900/5',
     accentBorder: 'border-teal-500/30', accentText: 'text-teal-400',
-    accentBg: 'bg-teal-500/15', iconBg: 'bg-teal-500/20',
+    accentBg: 'bg-teal-500/10', iconBg: 'bg-teal-500/15',
   },
 };
 const DEFAULT_CONF: TypeConf = TYPE_CONFIG.statcast_summary_card;
 
-const STATUS_CONFIG: Record<string, { label: string; dotCls: string; textCls: string }> = {
-  hot:     { label: 'HOT',     dotCls: 'bg-red-400',     textCls: 'text-red-400' },
-  edge:    { label: 'EDGE',    dotCls: 'bg-amber-400',   textCls: 'text-amber-400' },
-  value:   { label: 'VALUE',   dotCls: 'bg-emerald-400', textCls: 'text-emerald-400' },
-  optimal: { label: 'OPTIMAL', dotCls: 'bg-sky-400',     textCls: 'text-sky-400' },
+const STATUS_CONFIG: Record<string, { label: string; dotCls: string; textCls: string; bgCls: string; borderCls: string }> = {
+  hot:     { label: 'HOT',     dotCls: 'bg-red-400',     textCls: 'text-red-400',     bgCls: 'bg-red-500/10',     borderCls: 'border-red-500/25' },
+  edge:    { label: 'EDGE',    dotCls: 'bg-amber-400',   textCls: 'text-amber-400',   bgCls: 'bg-amber-500/10',   borderCls: 'border-amber-500/25' },
+  value:   { label: 'VALUE',   dotCls: 'bg-emerald-400', textCls: 'text-emerald-400', bgCls: 'bg-emerald-500/10', borderCls: 'border-emerald-500/25' },
+  optimal: { label: 'OPTIMAL', dotCls: 'bg-sky-400',     textCls: 'text-sky-400',     bgCls: 'bg-sky-500/10',     borderCls: 'border-sky-500/25' },
 };
 
 // ── Pitcher Gauge constants & helpers ─────────────────────────────────────────
@@ -149,7 +149,6 @@ function useWatchlist(playerName: string) {
           ? [...list, { name: playerName, position: 'SP', addedAt: new Date().toISOString() }]
           : list.filter(e => e.name !== playerName);
         localStorage.setItem(WATCHLIST_KEY, JSON.stringify(updated));
-        // Notify app-level badge counter
         window.dispatchEvent(new CustomEvent('watchlist-update', { detail: { count: updated.length } }));
       } catch {}
       return next;
@@ -187,14 +186,32 @@ function getValueStyle(value: string): { textCls: string; barWidth?: number } {
 function HeroMetrics({ metrics, conf }: { metrics: Metric[]; conf: TypeConf }) {
   const top = metrics.slice(0, 3);
   if (!top.length) return null;
+  const gridCols = top.length === 1 ? 'grid-cols-1' : top.length === 2 ? 'grid-cols-2' : 'grid-cols-3';
   return (
-    <div className={`grid gap-2 mb-3 grid-cols-${top.length === 1 ? '1' : top.length === 2 ? '2' : '3'}`}>
+    <div className={cn('grid gap-2 mb-4', gridCols)}>
       {top.map((m, i) => {
-        const { textCls } = getValueStyle(m.value);
+        const { textCls, barWidth } = getValueStyle(m.value);
         return (
-          <div key={i} className={`flex flex-col items-center rounded-xl ${conf.accentBg} border ${conf.accentBorder} py-2.5 px-1.5 text-center`}>
-            <span className={`text-base font-black tabular-nums leading-none ${textCls}`}>{m.value}</span>
-            <span className={`mt-1 text-[9px] font-bold uppercase tracking-wider ${conf.accentText} opacity-80 leading-tight`}>{m.label}</span>
+          <div key={i} className={cn(
+            'flex flex-col items-center rounded-2xl border py-3 px-2 text-center',
+            conf.accentBg, conf.accentBorder,
+            'shadow-sm',
+          )}>
+            <span className={cn('text-xl font-black tabular-nums leading-none', textCls)}>{m.value}</span>
+            <span className={cn('mt-1.5 text-[9px] font-black uppercase tracking-widest opacity-70 leading-tight', conf.accentText)}>
+              {m.label}
+            </span>
+            {barWidth !== undefined && (
+              <div className="w-full h-1 rounded-full bg-black/20 overflow-hidden mt-2">
+                <div
+                  className={cn(
+                    'h-full rounded-full transition-all duration-700',
+                    barWidth >= 60 ? 'bg-emerald-400' : barWidth >= 35 ? 'bg-amber-400' : 'bg-rose-400',
+                  )}
+                  style={{ width: `${barWidth}%` }}
+                />
+              </div>
+            )}
           </div>
         );
       })}
@@ -226,7 +243,7 @@ function GaugeArc({ percentile, color }: { percentile: number; color: string }) 
       {percentile > 0 && (
         <path d={arcPath(filled)} fill="none"
           stroke={color} strokeWidth="7" strokeLinecap="round"
-          style={{ filter: `drop-shadow(0 0 5px ${color}66)` }} />
+          style={{ filter: `drop-shadow(0 0 6px ${color}88)` }} />
       )}
     </svg>
   );
@@ -236,31 +253,32 @@ function PitcherGauges({ metrics }: { metrics: Metric[] }) {
   const top = metrics.slice(0, 3);
   if (!top.length) return null;
   return (
-    <div className="flex justify-around items-start gap-1 mb-3">
+    <div className="flex justify-around items-start gap-1 mb-4">
       {top.map((m, i) => {
         const pct   = getPitcherPercentile(m.label, m.value);
         const color = pct !== null ? gaugeColor(pct) : '#6b7280';
         return (
-          <div key={i} className="flex flex-col items-center gap-0.5 flex-1 min-w-0">
+          <div key={i} className="flex flex-col items-center gap-1 flex-1 min-w-0">
+            {/* Gauge ring */}
             <div className="relative w-20 h-20">
               <GaugeArc percentile={pct ?? 50} color={color} />
               <div className="absolute inset-0 flex flex-col items-center justify-center pt-1">
-                <span className="text-[13px] font-black tabular-nums text-white leading-none">
+                <span className="text-[14px] font-black tabular-nums text-white leading-none">
                   {m.value}
                 </span>
                 {pct !== null && (
-                  <span className="text-[9px] font-bold mt-0.5" style={{ color }}>
-                    {pct}th
+                  <span className="text-[9px] font-black mt-0.5" style={{ color }}>
+                    {pct}<span className="text-[7px]">th</span>
                   </span>
                 )}
               </div>
             </div>
-            <span className="text-[9px] font-bold uppercase tracking-wider text-white/35 text-center leading-tight px-0.5">
+            <span className="text-[9px] font-black uppercase tracking-wider text-white/40 text-center leading-tight px-0.5">
               {PITCH_LABEL_SHORT[m.label] ?? m.label}
             </span>
             {PITCHER_LEAGUE_AVG[m.label] && (
               <span className="text-[8px] text-white/20">
-                avg {PITCHER_LEAGUE_AVG[m.label].avg}
+                lg avg {PITCHER_LEAGUE_AVG[m.label].avg}
               </span>
             )}
           </div>
@@ -273,14 +291,37 @@ function PitcherGauges({ metrics }: { metrics: Metric[] }) {
 function MetricRow({ label, value }: Metric) {
   const { textCls, barWidth } = getValueStyle(value);
   return (
-    <div className="py-1.5 border-b border-[var(--border-subtle)] last:border-0">
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-[var(--text-muted)]">{label}</span>
-        <span className={`text-xs font-bold tabular-nums ${textCls}`}>{value}</span>
+    <div className="py-2 border-b border-[var(--border-subtle)] last:border-0">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] text-[var(--text-faint)] font-medium">{label}</span>
+        <span className={cn('text-[11px] font-black tabular-nums', textCls)}>{value}</span>
       </div>
       {barWidth !== undefined && (
-        <div className="mt-1 h-0.5 w-full rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-          <div className={`h-full rounded-full transition-all duration-500 ${barWidth >= 60 ? 'bg-emerald-500/60' : barWidth >= 35 ? 'bg-amber-500/60' : 'bg-rose-500/60'}`} style={{ width: `${barWidth}%` }} />
+        <div className="mt-1.5 h-1 w-full rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+          <div
+            className={cn(
+              'h-full rounded-full transition-all duration-500',
+              barWidth >= 60 ? 'bg-emerald-500/70' : barWidth >= 35 ? 'bg-amber-500/70' : 'bg-rose-500/70',
+            )}
+            style={{ width: `${barWidth}%` }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Stat tile (grid) ──────────────────────────────────────────────────────────
+
+function StatTile({ label, value, pct, accentText }: { label: string; value: string; pct?: number; accentText: string }) {
+  const { textCls } = getValueStyle(value);
+  return (
+    <div className="rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-2.5">
+      <div className="text-[9px] text-[var(--text-faint)] uppercase tracking-wide mb-1 font-bold">{label}</div>
+      <div className={cn('text-base font-black tabular-nums', textCls)}>{value}</div>
+      {pct !== undefined && (
+        <div className="h-1 rounded-full bg-[var(--bg-overlay)] overflow-hidden mt-1.5">
+          <div className="h-full rounded-full bg-blue-500 transition-all duration-500" style={{ width: `${pct}%` }} />
         </div>
       )}
     </div>
@@ -296,19 +337,16 @@ function PitcherTabBar({ active, onSelect, accentBg, accentBorder, accentText }:
   accentBg: string; accentBorder: string; accentText: string;
 }) {
   return (
-    <div
-      className="flex gap-1 mb-3 overflow-x-auto"
-      style={{ scrollbarWidth: 'none' }}
-    >
+    <div className="flex gap-1 mb-4 p-0.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
       {PITCHER_TABS.map((label, i) => (
         <button
           key={i}
           onClick={() => onSelect(i)}
           className={cn(
-            'flex-shrink-0 px-3 py-1 rounded-full text-[10px] font-bold border transition-all duration-150',
+            'flex-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-150',
             active === i
-              ? `${accentBg} ${accentBorder} ${accentText}`
-              : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]',
+              ? cn(accentBg, accentBorder, accentText, 'border shadow-sm')
+              : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]',
           )}
         >
           {label}
@@ -319,7 +357,6 @@ function PitcherTabBar({ active, onSelect, accentBg, accentBorder, accentText }:
 }
 
 // ── Tab 0: Stats ──────────────────────────────────────────────────────────────
-// Shows the top 3 hero metrics only + trend note (clean summary view)
 
 function TabStats({ metrics, trendNote, conf }: {
   metrics: Metric[]; trendNote?: string; conf: TypeConf;
@@ -328,8 +365,15 @@ function TabStats({ metrics, trendNote, conf }: {
     <div>
       <PitcherGauges metrics={metrics} />
       {trendNote && (
-        <div className={`mt-3 px-3 py-2 rounded-xl ${conf.accentBg} border ${conf.accentBorder}`}>
-          <p className="text-[11px] text-[var(--text-muted)] leading-relaxed italic">{trendNote}</p>
+        <div className={cn(
+          'mt-3 px-3.5 py-3 rounded-2xl border-l-2',
+          conf.accentBg, conf.accentBorder,
+          'border-l-cyan-400',
+        )}>
+          <div className="flex items-start gap-2">
+            <Activity className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{trendNote}</p>
+          </div>
         </div>
       )}
     </div>
@@ -337,8 +381,6 @@ function TabStats({ metrics, trendNote, conf }: {
 }
 
 // ── Tab 1: Advanced ───────────────────────────────────────────────────────────
-// Always shows the remaining summary_metrics (index 3+) so it's never empty,
-// plus pitch arsenal / spin-rate / season stats / game log when available.
 
 function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
   metrics: Metric[];
@@ -347,20 +389,24 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
   gameLog: GameLogEntry[];
   conf: TypeConf;
 }) {
-  const extraMetrics = metrics.slice(3);           // Whiff%, K%, FB Velo, Barrel%, BB%…
+  const extraMetrics = metrics.slice(3);
   const hasPitchMix  = data.pitchMixFB || data.pitchMixBrk || data.pitchMixOff;
   const hasRelease   = data.spinRate || data.extension || data.hBreak || data.vBreak;
   const hasSeason    = !!seasonStats;
   const hasLog       = gameLog.length > 0;
 
   return (
-    <div className="space-y-3">
-      {/* Core rate stats — always present (Whiff%, K%, FB Velo, Barrel%, BB%, …) */}
+    <div className="space-y-4">
+      {/* Core rate stats */}
       {extraMetrics.length > 0 && (
         <div>
-          <p className="text-[9px] font-extrabold uppercase tracking-widest text-[var(--text-faint)] mb-1.5">Rate Stats</p>
-          <div className="space-y-0">
-            {extraMetrics.map((m, i) => <MetricRow key={i} label={m.label} value={m.value} />)}
+          <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-2">Rate Stats</p>
+          <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] overflow-hidden divide-y divide-[var(--border-subtle)]">
+            {extraMetrics.map((m, i) => (
+              <div key={i} className={cn('px-3 py-2', i % 2 === 1 && 'bg-white/[0.015]')}>
+                <MetricRow label={m.label} value={m.value} />
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -368,8 +414,8 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
       {/* Pitch Arsenal */}
       {hasPitchMix && (
         <div>
-          <p className="text-[9px] font-extrabold uppercase tracking-widest text-[var(--text-faint)] mb-2">Pitch Arsenal</p>
-          <div className="space-y-2">
+          <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-2">Pitch Arsenal</p>
+          <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] p-3 space-y-2.5">
             {[
               { label: 'Fastball',  val: data.pitchMixFB,  color: '#60a5fa' },
               { label: 'Breaking',  val: data.pitchMixBrk, color: '#a78bfa' },
@@ -378,18 +424,21 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
               const pct = parseFloat(p.val ?? '0') || 0;
               return (
                 <div key={i}>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider"
-                      style={{ color: p.color }}>{p.label}</span>
-                    <span className="text-[10px] font-black text-white tabular-nums">{p.val}</span>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: p.color }}>
+                      {p.label}
+                    </span>
+                    <span className="text-[11px] font-black text-white tabular-nums">{p.val}</span>
                   </div>
-                  <div className="h-2 rounded-full bg-white/5 overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-700"
+                  <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
                       style={{
                         width: `${Math.min(100, pct)}%`,
-                        background: `linear-gradient(90deg, ${p.color}99, ${p.color})`,
+                        background: `linear-gradient(90deg, ${p.color}80, ${p.color})`,
                         boxShadow: `0 0 8px ${p.color}44`,
-                      }} />
+                      }}
+                    />
                   </div>
                 </div>
               );
@@ -401,18 +450,15 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
       {/* Spin & Release */}
       {hasRelease && (
         <div>
-          <p className="text-[9px] font-extrabold uppercase tracking-widest text-[var(--text-faint)] mb-2">Spin & Release</p>
-          <div className="grid grid-cols-2 gap-1.5">
+          <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-2">Spin & Release</p>
+          <div className="grid grid-cols-2 gap-2">
             {[
               { label: 'Spin Rate', val: data.spinRate },
               { label: 'Extension', val: data.extension },
               { label: 'H-Break',   val: data.hBreak },
               { label: 'V-Break',   val: data.vBreak },
             ].filter(r => r.val).map((r, i) => (
-              <div key={i} className="bg-[var(--bg-elevated)] rounded-xl p-2.5 text-center">
-                <p className={`text-sm font-black tabular-nums ${conf.accentText}`}>{r.val}</p>
-                <p className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-faint)] mt-0.5">{r.label}</p>
-              </div>
+              <StatTile key={i} label={r.label} value={r.val} accentText={conf.accentText} />
             ))}
           </div>
         </div>
@@ -421,18 +467,15 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
       {/* Season Stats */}
       {hasSeason && seasonStats && (
         <div>
-          <p className="text-[9px] font-extrabold uppercase tracking-widest text-[var(--text-faint)] mb-2">Season Stats</p>
-          <div className="grid grid-cols-4 gap-1">
+          <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-2">Season Stats</p>
+          <div className="grid grid-cols-4 gap-1.5">
             {[
-              { label: 'ERA', val: seasonStats.era ?? '--' },
-              { label: 'K',   val: String(seasonStats.k ?? 0) },
-              { label: 'BB',  val: String(seasonStats.bb ?? 0) },
-              { label: 'G',   val: String(seasonStats.gamesPlayed) },
+              { label: 'ERA', val: seasonStats.era ?? '--', hi: true },
+              { label: 'K',   val: String(seasonStats.k ?? 0), hi: true },
+              { label: 'BB',  val: String(seasonStats.bb ?? 0), hi: false },
+              { label: 'G',   val: String(seasonStats.gamesPlayed), hi: false },
             ].map((s, i) => (
-              <div key={i} className="bg-[var(--bg-elevated)] rounded-xl p-2 text-center">
-                <p className={`text-sm font-black tabular-nums ${i < 2 ? conf.accentText : 'text-foreground/70'}`}>{s.val}</p>
-                <p className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-faint)] mt-0.5">{s.label}</p>
-              </div>
+              <StatTile key={i} label={s.label} value={s.val} accentText={conf.accentText} />
             ))}
           </div>
         </div>
@@ -441,62 +484,70 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
       {/* Recent Form */}
       {hasLog && (
         <div>
-          <p className="text-[9px] font-extrabold uppercase tracking-widest text-[var(--text-faint)] mb-2">Recent Form</p>
-          {/* Mini dot sparkline */}
-          <div className="flex items-center gap-1 mb-2">
-            <span className="text-[8px] text-white/25 uppercase tracking-widest mr-1">Form</span>
+          <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-2">Recent Form</p>
+          {/* Dot sparkline */}
+          <div className="flex items-center gap-1.5 mb-3">
+            <span className="text-[8px] text-white/25 uppercase tracking-widest">Form</span>
             {gameLog.slice(0, 5).map((g, i) => {
               const er = g.er ?? 0;
               const ip = parseFloat(g.ip ?? '0');
               const isQS = ip >= 6 && er <= 3;
               const isBad = er >= 4;
               return (
-                <div key={i}
-                  className="w-3 h-3 rounded-full flex-shrink-0"
+                <div
+                  key={i}
+                  className="w-4 h-4 rounded-md flex-shrink-0 flex items-center justify-center text-[8px] font-black"
                   title={`${g.date} vs ${g.opp}: ${g.ip ?? '?'} IP, ${g.k ?? 0} K, ${er} ER`}
                   style={{
-                    background: isQS ? '#4ade80' : isBad ? '#f87171' : '#fbbf24',
-                    boxShadow: isQS ? '0 0 4px #4ade8066' : isBad ? '0 0 4px #f8717166' : 'none',
+                    background: isQS ? 'rgba(74,222,128,0.2)' : isBad ? 'rgba(248,113,113,0.2)' : 'rgba(251,191,36,0.2)',
+                    border: `1px solid ${isQS ? 'rgba(74,222,128,0.4)' : isBad ? 'rgba(248,113,113,0.4)' : 'rgba(251,191,36,0.3)'}`,
+                    color: isQS ? '#4ade80' : isBad ? '#f87171' : '#fbbf24',
                   }}
-                />
+                >
+                  {isQS ? 'Q' : isBad ? '✗' : '·'}
+                </div>
               );
             })}
-            <span className="text-[8px] text-white/20 ml-1">← most recent</span>
+            <span className="text-[8px] text-white/20 ml-1">← recent</span>
           </div>
-          <div className="overflow-x-auto -mx-1 px-1">
-            <table className="w-full text-[11px] border-collapse">
-              <thead>
-                <tr className="border-b border-[var(--border-subtle)]">
-                  <th className="text-left text-[var(--text-faint)] font-semibold pb-1.5 pr-2">Date</th>
-                  <th className="text-left text-[var(--text-faint)] font-semibold pb-1.5 pr-2">Opp</th>
-                  <th className="text-right text-[var(--text-faint)] font-semibold pb-1.5 pr-2">IP</th>
-                  <th className="text-right text-[var(--text-faint)] font-semibold pb-1.5 pr-2">K</th>
-                  <th className="text-right text-[var(--text-faint)] font-semibold pb-1.5 pr-2">ER</th>
-                  <th className="text-right text-[var(--text-faint)] font-semibold pb-1.5">BB</th>
-                </tr>
-              </thead>
-              <tbody>
-                {gameLog.map((g, i) => {
-                  const ip = parseFloat(g.ip ?? '0');
-                  const isQS = ip >= 6 && (g.er ?? 0) <= 3;
-                  return (
-                    <tr key={i} className="border-b border-[var(--border-subtle)] last:border-0">
-                      <td className="py-1.5 pr-2 text-[var(--text-muted)] whitespace-nowrap">
-                        {g.date}
-                        {isQS && <span className="ml-1 text-[7px] font-black text-emerald-400">QS</span>}
-                      </td>
-                      <td className="py-1.5 pr-2 text-[var(--text-muted)] font-medium whitespace-nowrap">{g.opp}</td>
-                      <td className="py-1.5 pr-2 text-right text-foreground font-medium">{g.ip ?? '—'}</td>
-                      <td className="py-1.5 pr-2 text-right font-bold text-emerald-400">{g.k ?? '—'}</td>
-                      <td className={cn('py-1.5 pr-2 text-right font-bold',
-                        (g.er ?? 0) === 0 ? 'text-emerald-400' : (g.er ?? 0) <= 2 ? 'text-amber-400' : 'text-rose-400'
-                      )}>{g.er ?? '—'}</td>
-                      <td className="py-1.5 text-right text-[var(--text-muted)]">{g.bb ?? '—'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+
+          {/* Game log table */}
+          <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] overflow-hidden">
+            <div className="grid px-3 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)]"
+              style={{ gridTemplateColumns: '1fr 40px 32px 28px 28px 28px' }}>
+              {['Date', 'Opp', 'IP', 'K', 'ER', 'BB'].map(h => (
+                <span key={h} className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] text-right first:text-left">{h}</span>
+              ))}
+            </div>
+            {gameLog.map((g, i) => {
+              const ip = parseFloat(g.ip ?? '0');
+              const isQS = ip >= 6 && (g.er ?? 0) <= 3;
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    'grid px-3 py-2 border-b border-[var(--border-subtle)] last:border-0',
+                    i % 2 === 1 && 'bg-white/[0.015]',
+                  )}
+                  style={{ gridTemplateColumns: '1fr 40px 32px 28px 28px 28px' }}
+                >
+                  <span className="text-[10px] text-[var(--text-faint)] whitespace-nowrap">
+                    {g.date}
+                    {isQS && <span className="ml-1 text-[7px] font-black text-emerald-400">QS</span>}
+                  </span>
+                  <span className="text-[10px] text-[var(--text-muted)] font-bold text-right truncate">{g.opp}</span>
+                  <span className="text-[10px] text-white/70 font-bold text-right">{g.ip ?? '—'}</span>
+                  <span className="text-[10px] font-black text-emerald-400 text-right">{g.k ?? '—'}</span>
+                  <span className={cn(
+                    'text-[10px] font-black text-right',
+                    (g.er ?? 0) === 0 ? 'text-emerald-400' : (g.er ?? 0) <= 2 ? 'text-amber-400' : 'text-rose-400',
+                  )}>
+                    {g.er ?? '—'}
+                  </span>
+                  <span className="text-[10px] text-[var(--text-faint)] text-right">{g.bb ?? '—'}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -516,35 +567,58 @@ function TabProps({ data, propLines, onAnalyze }: {
 
   if (propLines.length > 0) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         {propLines.map((prop, i) => (
-          <div key={i}>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] font-bold text-foreground">{prop.label} O{prop.line}</span>
-              <span className={cn('text-[11px] font-black tabular-nums',
-                prop.overOdds > 0 ? 'text-emerald-400' : 'text-amber-300'
-              )}>{fmtOdds(prop.overOdds)}</span>
+          <div key={i} className="rounded-2xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] overflow-hidden">
+            {/* Header row */}
+            <div className="flex items-center justify-between px-3.5 py-2.5 bg-[var(--bg-elevated)] border-b border-[var(--border-subtle)]">
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  'text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border',
+                  prop.trend === 'hot' ? 'bg-orange-500/15 text-orange-300 border-orange-500/25'
+                  : prop.trend === 'cold' ? 'bg-sky-500/15 text-sky-300 border-sky-500/25'
+                  : 'bg-[var(--bg-overlay)] text-[var(--text-faint)] border-[var(--border-subtle)]',
+                )}>
+                  {prop.trend === 'hot' ? '🔥 HOT' : prop.trend === 'cold' ? '❄ COLD' : 'NEUTRAL'}
+                </span>
+                <span className="text-[11px] font-black text-foreground">{prop.label}</span>
+                <span className="text-[10px] text-[var(--text-faint)]">O{prop.line}</span>
+              </div>
+              <span className={cn(
+                'text-[12px] font-black tabular-nums px-2.5 py-1 rounded-xl border',
+                prop.overOdds > 0
+                  ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/25'
+                  : 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+              )}>
+                {fmtOdds(prop.overOdds)}
+              </span>
             </div>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+
+            {/* Implied probability bar */}
+            <div className="px-3.5 py-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Implied Probability</span>
+                <span className={cn(
+                  'text-[10px] font-black',
+                  prop.impliedPct >= 60 ? 'text-emerald-400' : prop.impliedPct >= 45 ? 'text-amber-400' : 'text-rose-400',
+                )}>
+                  {prop.impliedPct}%
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                 <div
-                  className={cn('h-full rounded-full transition-all duration-500',
-                    prop.impliedPct >= 60 ? 'bg-emerald-500/70'
-                    : prop.impliedPct >= 45 ? 'bg-amber-500/70'
-                    : 'bg-rose-500/60'
+                  className={cn(
+                    'h-full rounded-full transition-all duration-500',
+                    prop.impliedPct >= 60 ? 'bg-emerald-500'
+                    : prop.impliedPct >= 45 ? 'bg-amber-500'
+                    : 'bg-rose-500',
                   )}
                   style={{ width: `${barWidth(prop.impliedPct)}%` }}
                 />
               </div>
-              <span className="text-[10px] text-[var(--text-muted)] tabular-nums w-9 text-right">{prop.impliedPct}% imp</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className={cn('text-[10px]',
-                prop.trend === 'hot' ? 'text-orange-400' : prop.trend === 'cold' ? 'text-sky-400' : 'text-[var(--text-faint)]'
-              )}>{prop.trend === 'hot' ? '🔥' : prop.trend === 'cold' ? '❄' : '→'}</span>
-              <span className="text-[10px] text-[var(--text-faint)]">
-                {prop.hitRate !== '—' ? `Hit in ${prop.hitRate} games` : 'No recent game data'}
-              </span>
+              <p className="text-[10px] text-[var(--text-faint)]">
+                {prop.hitRate !== '—' ? `Hit in ${prop.hitRate} recent games` : 'No recent game data available'}
+              </p>
             </div>
           </div>
         ))}
@@ -560,32 +634,35 @@ function TabProps({ data, propLines, onAnalyze }: {
     <div className="space-y-3">
       {(kPctRaw != null || fbVeloRaw != null) && (
         <div>
-          <p className="text-[9px] font-extrabold uppercase tracking-widest text-[var(--text-faint)] mb-2">K Projection Estimate</p>
-          <div className="grid grid-cols-2 gap-1.5">
+          <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-2">K Projection Estimate</p>
+          <div className="grid grid-cols-2 gap-2">
             {kPctRaw != null && (
-              <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-2.5 text-center">
-                <p className="text-sm font-black text-emerald-300 tabular-nums">{kPctRaw.toFixed(1)}%</p>
-                <p className="text-[9px] font-bold uppercase text-emerald-400/70 mt-0.5">Season K%</p>
+              <div className="rounded-2xl bg-emerald-500/8 border border-emerald-500/20 p-3 text-center">
+                <p className="text-xl font-black text-emerald-300 tabular-nums">{kPctRaw.toFixed(1)}%</p>
+                <p className="text-[9px] font-black uppercase tracking-wider text-emerald-400/70 mt-1">Season K%</p>
               </div>
             )}
             {fbVeloRaw != null && (
-              <div className="bg-blue-500/10 border border-blue-500/25 rounded-xl p-2.5 text-center">
-                <p className="text-sm font-black text-blue-300 tabular-nums">{fbVeloRaw.toFixed(1)} mph</p>
-                <p className="text-[9px] font-bold uppercase text-blue-400/70 mt-0.5">FB Velocity</p>
+              <div className="rounded-2xl bg-blue-500/8 border border-blue-500/20 p-3 text-center">
+                <p className="text-xl font-black text-blue-300 tabular-nums">{fbVeloRaw.toFixed(1)} <span className="text-sm">mph</span></p>
+                <p className="text-[9px] font-black uppercase tracking-wider text-blue-400/70 mt-1">FB Velocity</p>
               </div>
             )}
           </div>
         </div>
       )}
 
-      <div className="flex flex-col items-center gap-2 py-4">
-        <Zap className="w-5 h-5 text-[var(--text-faint)]" />
-        <p className="text-[11px] text-[var(--text-faint)] text-center">Live prop lines load when game is scheduled</p>
+      <div className="flex flex-col items-center gap-2 py-6 text-center">
+        <div className="w-10 h-10 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center">
+          <Zap className="w-5 h-5 text-[var(--text-faint)]" />
+        </div>
+        <p className="text-[11px] text-[var(--text-faint)]">Live prop lines load when game is scheduled</p>
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="mt-1 px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[10px] font-bold hover:bg-blue-500/25 transition-colors"
+            className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/25 text-blue-400 text-[10px] font-black hover:bg-blue-500/20 transition-colors"
           >
+            <Zap className="w-3 h-3" />
             Ask AI for K Prop Analysis
           </button>
         )}
@@ -618,30 +695,59 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
 
   const { watched, toggle: toggleWatch } = useWatchlist(playerName);
 
-  // Only show tabs for pitcher analysis cards; other statcast types keep the original flat layout
   const isPitcherCard = cardType === 'statcast_summary_card';
 
   return (
     <>
-      {/* ── Main hero card ── */}
-      <div className={`group relative bg-gradient-to-br ${conf.gradient} rounded-2xl border ${conf.accentBorder} hover:brightness-110 transition-all duration-300 shadow-lg ${isHero ? 'p-6' : 'p-4'}`}>
+      {/* ── Main card ── */}
+      <div className={cn(
+        'group relative rounded-2xl border transition-all duration-300',
+        // Glassmorphism base
+        'bg-gradient-to-br',
+        conf.gradient,
+        'backdrop-blur-sm',
+        conf.accentBorder,
+        // Shadow
+        'shadow-xl shadow-black/20',
+        'hover:shadow-2xl hover:shadow-black/30 hover:scale-[1.01]',
+        isHero ? 'p-6' : 'p-4',
+      )}>
+        {/* Subtle inner glow */}
+        <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-white/[0.03] to-transparent pointer-events-none" />
 
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`flex items-center justify-center flex-shrink-0 rounded-xl ${conf.iconBg} border ${conf.accentBorder} overflow-hidden ${isHero ? 'w-11 h-11 text-xl' : 'w-9 h-9 text-lg'}`}>
+        <div className="flex items-start justify-between gap-3 mb-4 relative">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Player avatar */}
+            <div className={cn(
+              'flex items-center justify-center flex-shrink-0 rounded-2xl overflow-hidden',
+              conf.iconBg, 'border', conf.accentBorder,
+              'shadow-lg',
+              isHero ? 'w-12 h-12 text-xl' : 'w-10 h-10 text-lg',
+            )}>
               {headshotUrl && !imgError ? (
-                <Image src={headshotUrl} alt={playerName} width={isHero ? 44 : 36} height={isHero ? 44 : 36} className="w-full h-full object-cover" onError={() => setImgError(true)} />
+                <Image
+                  src={headshotUrl} alt={playerName}
+                  width={isHero ? 48 : 40} height={isHero ? 48 : 40}
+                  className="w-full h-full object-cover"
+                  onError={() => setImgError(true)}
+                />
               ) : conf.emoji}
             </div>
+
+            {/* Title block */}
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 mb-0.5">
-                <span className={`text-[9px] font-extrabold uppercase tracking-widest ${conf.accentText}`}>{data.category ?? 'MLB'}</span>
+                <span className={cn('text-[9px] font-black uppercase tracking-widest', conf.accentText)}>{data.category ?? 'MLB'}</span>
                 <span className="text-[9px] text-[var(--border-subtle)]">·</span>
                 <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-faint)]">{data.subcategory ?? conf.label}</span>
               </div>
               <h3
-                className={`font-black text-foreground leading-tight truncate ${isHero ? 'text-base' : 'text-sm'}${onAnalyze ? ' cursor-pointer hover:text-blue-300 transition-colors' : ''}`}
+                className={cn(
+                  'font-black text-foreground leading-tight truncate',
+                  isHero ? 'text-base' : 'text-sm',
+                  onAnalyze && 'cursor-pointer hover:text-cyan-300 transition-colors',
+                )}
                 onClick={onAnalyze}
               >
                 {data.title}
@@ -650,25 +756,29 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
           </div>
 
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {/* Watchlist heart */}
+            {/* Watchlist bookmark */}
             {isPitcherCard && (
               <button
                 onClick={toggleWatch}
                 title={watched ? 'Remove bookmark' : 'Bookmark player'}
                 className={cn(
-                  'w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150',
+                  'w-7 h-7 flex items-center justify-center rounded-xl transition-all duration-150 border',
                   watched
-                    ? 'text-blue-500 bg-blue-500/20 border border-blue-500/30'
-                    : 'text-[var(--text-faint)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:text-blue-500 hover:bg-blue-500/10',
+                    ? 'text-cyan-400 bg-cyan-500/15 border-cyan-500/25 shadow-sm'
+                    : 'text-[var(--text-faint)] bg-[var(--bg-elevated)] border-[var(--border-subtle)] hover:text-cyan-400 hover:bg-cyan-500/10',
                 )}
               >
                 <Bookmark className="w-3.5 h-3.5" fill={watched ? 'currentColor' : 'none'} />
               </button>
             )}
+
             {/* Status badge */}
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[var(--bg-overlay)]/20 border border-[var(--border-subtle)]">
-              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusConf.dotCls}`} />
-              <span className={`text-[9px] font-extrabold tracking-widest ${statusConf.textCls}`}>{statusConf.label}</span>
+            <div className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1 rounded-xl border',
+              statusConf.bgCls, statusConf.borderCls,
+            )}>
+              <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0 shadow-sm', statusConf.dotCls)} />
+              <span className={cn('text-[9px] font-black tracking-widest', statusConf.textCls)}>{statusConf.label}</span>
             </div>
           </div>
         </div>
@@ -698,36 +808,50 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
             )}
           </>
         ) : (
-          /* Non-pitcher statcast cards: original flat layout */
+          /* Non-pitcher statcast cards: flat layout with enhanced tiles */
           <>
             {hasSummaryMetrics && <HeroMetrics metrics={data.summary_metrics} conf={conf} />}
-            <div className="space-y-0">
-              {hasSummaryMetrics
-                ? data.summary_metrics.slice(3).map((m: Metric, i: number) => <MetricRow key={i} label={m.label} value={m.value} />)
-                : data.data ? (
-                    <div className="space-y-0">
-                      {Object.entries(data.data)
-                        .filter(([k]) => !['playerName','realData','headshotUrl','seasonStats','gameLog','propLines'].includes(k))
-                        .map(([k, v], i) => (
-                          <MetricRow key={i} label={k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} value={String(v)} />
-                        ))
-                      }
-                    </div>
-                  ) : null
-              }
-            </div>
+            {/* Remaining metrics as tiled grid */}
+            {hasSummaryMetrics && data.summary_metrics.slice(3).length > 0 && (
+              <div className="grid grid-cols-2 gap-1.5 mb-3">
+                {data.summary_metrics.slice(3).map((m: Metric, i: number) => (
+                  <StatTile key={i} label={m.label} value={m.value} accentText={conf.accentText} />
+                ))}
+              </div>
+            )}
+            {!hasSummaryMetrics && data.data && (
+              <div className="grid grid-cols-2 gap-1.5 mb-3">
+                {Object.entries(data.data)
+                  .filter(([k]) => !['playerName','realData','headshotUrl','seasonStats','gameLog','propLines'].includes(k))
+                  .map(([k, v], i) => (
+                    <StatTile
+                      key={i}
+                      label={k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                      value={String(v)}
+                      accentText={conf.accentText}
+                    />
+                  ))
+                }
+              </div>
+            )}
             {data.trend_note && (
-              <div className={`mt-3 px-3 py-2 rounded-xl ${conf.accentBg} border ${conf.accentBorder}`}>
-                <p className="text-[11px] text-[var(--text-muted)] leading-relaxed italic">{data.trend_note}</p>
+              <div className={cn(
+                'mt-3 px-3.5 py-3 rounded-2xl border-l-2',
+                conf.accentBg, conf.accentBorder,
+              )}>
+                <div className="flex items-start gap-2">
+                  <Activity className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{data.trend_note}</p>
+                </div>
               </div>
             )}
           </>
         )}
 
         {/* Footer */}
-        <div className="mt-4 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between gap-2">
+        <div className="mt-4 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between gap-2 relative">
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-faint)] border border-[var(--border-subtle)] rounded px-1.5 py-0.5">
+            <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] border border-[var(--border-subtle)] rounded-lg px-2 py-0.5">
               {data.data?.sport === 'NFL' ? 'NFL Stats'
                : data.data?.sport === 'NBA' ? 'NBA Stats'
                : data.data?.sport === 'NHL' ? 'NHL Stats'
@@ -739,12 +863,23 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
           </div>
           <div className="flex items-center gap-2">
             {onAnalyze && (
-              <button onClick={onAnalyze} className="px-2.5 py-1 rounded-lg bg-[var(--bg-elevated)] hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-foreground text-[10px] font-bold transition-colors border border-[var(--border-subtle)]">
+              <button
+                onClick={onAnalyze}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--bg-elevated)] hover:bg-white/8 text-[var(--text-muted)] hover:text-foreground text-[10px] font-black transition-colors border border-[var(--border-subtle)]"
+              >
+                <BarChart3 className="w-3 h-3" />
                 AI Analysis
               </button>
             )}
             {hasLightbox && (
-              <button onClick={() => setLightboxOpen(true)} className={`px-2.5 py-1 rounded-lg ${conf.accentBg} hover:opacity-90 ${conf.accentText} text-[10px] font-bold transition-opacity border ${conf.accentBorder}`}>
+              <button
+                onClick={() => setLightboxOpen(true)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-black transition-all border shadow-sm',
+                  conf.accentBg, 'hover:opacity-90', conf.accentText, conf.accentBorder,
+                )}
+              >
+                <ChevronRight className="w-3 h-3" />
                 Full Breakdown
               </button>
             )}

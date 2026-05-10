@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, TrendingUp } from 'lucide-react';
 
 interface PlayerPropCardProps {
   data: Record<string, any>;
@@ -16,22 +16,22 @@ export function PlayerPropCard({ data, category, gradient, onAnalyze, isHero }: 
   if (!data.player) {
     return (
       <article className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-background border border-[var(--border-subtle)] hover:border-[var(--border-hover)] transition-all duration-300 shadow-lg',
+        'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_20px_rgba(59,130,246,0.08)] transition-all duration-300',
         isHero && 'sm:rounded-3xl',
       )}>
-        <div className="px-4 pt-3.5 pb-4 space-y-3">
-          <div className="min-w-0 space-y-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">{category} · Player Props</span>
-            {data.description && (
-              <p className="text-sm font-semibold text-foreground leading-snug">{data.description}</p>
-            )}
-            {data.note && (
-              <p className="text-xs text-[var(--text-muted)] leading-relaxed">{data.note}</p>
-            )}
-            {data.tip && (
-              <p className="text-xs text-[var(--text-faint)] italic">{data.tip}</p>
-            )}
-          </div>
+        <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-blue-600/20 via-indigo-800/8 to-transparent border-b border-[var(--border-subtle)]">
+          <span className="text-[9px] font-black uppercase tracking-widest text-white/40 block mb-2">{category} · Player Props</span>
+          {data.description && (
+            <p className="text-sm font-bold text-white leading-snug">{data.description}</p>
+          )}
+        </div>
+        <div className="px-4 py-3 space-y-2">
+          {data.note && (
+            <p className="text-[11px] text-white/50 leading-relaxed">{data.note}</p>
+          )}
+          {data.tip && (
+            <p className="text-[10px] text-white/30 italic">{data.tip}</p>
+          )}
         </div>
       </article>
     );
@@ -46,89 +46,123 @@ export function PlayerPropCard({ data, category, gradient, onAnalyze, isHero }: 
 
   const hitRate  = parseFloat(String(data.hitRate ?? '').replace('%', ''));
   const hasHitRate = !isNaN(hitRate) && hitRate > 0;
-  const hitColor = hasHitRate
-    ? hitRate >= 60 ? 'text-emerald-400' : hitRate >= 45 ? 'text-amber-400' : 'text-red-400'
-    : '';
   const hitBarColor = hasHitRate
-    ? hitRate >= 60 ? 'bg-emerald-500' : hitRate >= 45 ? 'bg-amber-500' : 'bg-red-500'
-    : 'bg-blue-500';
+    ? hitRate >= 60 ? '#10b981' : hitRate >= 45 ? '#f59e0b' : '#ef4444'
+    : '#3b82f6';
   const hitLabel = hasHitRate
     ? hitRate >= 60 ? 'OVER LEAN' : hitRate >= 45 ? 'NEUTRAL' : 'UNDER LEAN'
     : '';
+  const hitLabelStyle = hasHitRate
+    ? hitRate >= 60 ? 'bg-emerald-500/15 border-emerald-500/25 text-emerald-300'
+    : hitRate >= 45 ? 'bg-amber-500/15 border-amber-500/25 text-amber-300'
+    : 'bg-red-500/15 border-red-500/25 text-red-300'
+    : '';
+
+  // Odds pill styling: positive = value (green), negative = chalk (slate)
+  const overStyle  = !isNaN(overNum)  && overNum  > 0 ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-white/5 border-white/10 text-white/70';
+  const underStyle = !isNaN(underNum) && underNum > 0 ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-white/5 border-white/10 text-white/70';
 
   return (
     <article className={cn(
-      'group relative w-full rounded-2xl overflow-hidden bg-background border border-[var(--border-subtle)] hover:border-[var(--border-hover)] transition-all duration-300 shadow-lg',
+      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_20px_rgba(59,130,246,0.08)] transition-all duration-300',
       isHero && 'sm:rounded-3xl',
     )}>
-      <div className="px-4 pt-3.5 pb-4 space-y-3">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">{category} · Player Props</span>
-            <h3 className="text-sm font-black text-foreground mt-0.5 truncate">{data.player}</h3>
-            <p className="text-xs text-[var(--text-muted)] mt-0.5">
-              {data.stat}
-              {data.line !== undefined && (
-                <> — Line: <span className="text-foreground font-semibold">{data.line}</span></>
-              )}
-            </p>
-          </div>
-          <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-blue-500/15 text-blue-400 border border-blue-500/20 uppercase tracking-wider shrink-0">LIVE</span>
+
+      {/* ── Header ── */}
+      <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-blue-600/25 via-indigo-800/10 to-transparent border-b border-[var(--border-subtle)]">
+        {/* Live badge top-right */}
+        <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-blue-500/20 border border-blue-500/30">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+          <span className="text-[9px] font-black uppercase tracking-widest text-blue-300">LIVE</span>
         </div>
 
-        {/* Over / Under odds */}
+        {/* Sport chip */}
+        <span className="text-[9px] font-black uppercase tracking-widest text-white/40 block mb-2">
+          {category} · Player Props
+        </span>
+
+        {/* Player name hero */}
+        <h3 className="text-base font-black text-white truncate pr-20">{data.player}</h3>
+
+        {/* Stat + line */}
+        <p className="text-[10px] text-white/45 mt-0.5">
+          {data.stat}
+          {data.line !== undefined && (
+            <> · Line: <span className="text-white font-bold">{data.line}</span></>
+          )}
+        </p>
+      </div>
+
+      <div className="px-4 pb-4 pt-3 space-y-3">
+
+        {/* ── Over / Under odds pill buttons ── */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="bg-[var(--bg-overlay)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
-            <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Over {data.line}</p>
-            <p className={cn('text-lg font-black tabular-nums', !isNaN(overNum) && overNum > 0 ? 'text-emerald-400' : 'text-red-400')}>{overStr}</p>
+          <div className={cn('rounded-xl border p-3 text-center', overStyle)}>
+            <p className="text-[9px] font-black uppercase tracking-widest mb-1.5 opacity-60">
+              Over {data.line}
+            </p>
+            <p className="text-2xl font-black tabular-nums">{overStr}</p>
           </div>
-          <div className="bg-[var(--bg-overlay)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
-            <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Under {data.line}</p>
-            <p className={cn('text-lg font-black tabular-nums', !isNaN(underNum) && underNum > 0 ? 'text-emerald-400' : 'text-red-400')}>{underStr}</p>
+          <div className={cn('rounded-xl border p-3 text-center', underStyle)}>
+            <p className="text-[9px] font-black uppercase tracking-widest mb-1.5 opacity-60">
+              Under {data.line}
+            </p>
+            <p className="text-2xl font-black tabular-nums">{underStr}</p>
           </div>
         </div>
 
-        {/* Hit rate bar */}
+        {/* ── Hit rate meter bar ── */}
         {hasHitRate && (
-          <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-3 py-2.5 space-y-1.5">
-            <div className="flex justify-between text-[9px] font-bold uppercase tracking-wide">
-              <span className="text-[var(--text-faint)]">Historical Hit Rate</span>
-              <span className="flex items-center gap-1.5">
-                <span className={cn('font-black tabular-nums', hitColor)}>{hitRate.toFixed(0)}%</span>
+          <div className="rounded-xl bg-white/3 border border-white/6 px-3 py-2.5 space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-[9px] font-black uppercase tracking-widest text-white/35">Historical Hit Rate</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-black tabular-nums text-white">{hitRate.toFixed(0)}%</span>
                 {hitLabel && (
-                  <span className={cn(
-                    'px-1.5 py-0.5 rounded text-[8px] font-black border',
-                    hitRate >= 60 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                    : hitRate >= 45 ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-                    : 'bg-red-500/10 border-red-500/20 text-red-400',
-                  )}>{hitLabel}</span>
+                  <span className={cn('text-[8px] font-black px-1.5 py-0.5 rounded-md border', hitLabelStyle)}>
+                    {hitLabel}
+                  </span>
                 )}
-              </span>
+              </div>
             </div>
-            <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
               <div
-                className={cn('h-full rounded-full transition-all duration-700', hitBarColor)}
-                style={{ width: `${Math.min(100, hitRate)}%` }}
+                className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${Math.min(100, hitRate)}%`,
+                  background: hitBarColor,
+                  boxShadow: `0 0 8px ${hitBarColor}50`,
+                }}
               />
+            </div>
+            <div className="flex justify-between text-[8px] text-white/25">
+              <span>0%</span>
+              <span>50%</span>
+              <span>100%</span>
             </div>
           </div>
         )}
 
-        {/* Game context footer */}
-        <div className="border-t border-[var(--border-subtle)] pt-2.5 space-y-1">
-          {data.game && <p className="text-[11px] text-[var(--text-muted)] truncate">{data.game}</p>}
+        {/* ── Game context footer ── */}
+        <div className="rounded-xl bg-white/3 border border-white/6 px-3 py-2.5 space-y-1">
+          {data.game && <p className="text-[10px] text-white/50 truncate font-medium">{data.game}</p>}
           <div className="flex items-center justify-between">
-            {data.gameTime && <p className="text-[10px] text-[var(--text-faint)]">{data.gameTime}</p>}
-            {data.bookmaker && <span className="text-[9px] text-[var(--text-faint)] uppercase tracking-wider">{data.bookmaker}</span>}
+            {data.gameTime && (
+              <span className="text-[9px] text-white/30">{data.gameTime}</span>
+            )}
+            {data.bookmaker && (
+              <span className="text-[8px] text-white/25 uppercase tracking-wider font-bold">{data.bookmaker}</span>
+            )}
           </div>
         </div>
 
+        {/* ── Analyze CTA ── */}
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-foreground hover:bg-[var(--bg-elevated)] transition-all duration-150"
+            className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/25 text-xs font-semibold text-blue-300 hover:bg-blue-500/20 hover:border-blue-400/40 transition-all duration-150"
           >
+            <TrendingUp className="w-3.5 h-3.5" />
             Analyze Prop
             <ChevronRight className="w-3.5 h-3.5" />
           </button>

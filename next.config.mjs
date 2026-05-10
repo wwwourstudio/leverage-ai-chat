@@ -14,6 +14,7 @@ const nextConfig = {
     formats: ['image/webp', 'image/avif'],
     remotePatterns: [
       { protocol: 'https', hostname: 'a.espncdn.com' },
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
     ],
   },
   experimental: {

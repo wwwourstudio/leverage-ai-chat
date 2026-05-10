@@ -3158,7 +3158,10 @@ async function _generateContextualCards(
         status: CARD_STATUS.NEUTRAL,
         data: {
           stackTeam: displaySport,
-          tip: 'Target confirmed starters and high-usage players. Check for late lineup news.',
+          targetGame: 'Ask me about a specific slate or matchup',
+          projection: '—',
+          ownership: '—',
+          tips: 'Target confirmed starters and high-usage players. Check for late lineup news.',
           isStack: true,
           realData: false,
         },

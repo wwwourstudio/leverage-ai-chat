@@ -116,7 +116,7 @@
   --muted:            oklch(0.16 0.022 255);
   --muted-foreground: oklch(0.55 0.018 265);
   --text-muted:       oklch(0.55 0.018 265);
-  --text-faint:       oklch(0.42 0.012 265);
+  --text-faint:       oklch(0.50 0.015 265);
 
   /* ── Brand / primary ────────────────────────────────────────────── */
   --primary:            oklch(0.62 0.22 255);   /* bright blue */

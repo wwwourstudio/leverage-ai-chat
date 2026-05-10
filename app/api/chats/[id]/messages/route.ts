@@ -82,10 +82,10 @@ export async function POST(
 
     // Normalize to array: batch mode uses `{ messages: [...] }`, single uses `{ role, content, ... }`
     type MsgInput = { role: string; content: string; model_used?: string; confidence?: number; is_welcome?: boolean; cards?: unknown[] };
-    const isBatch = Array.isArray((body as any).messages);
+    const isBatch = Array.isArray(body.messages);
     const msgs: MsgInput[] = isBatch
-      ? (body as any).messages
-      : [{ role: (body as any).role, content: (body as any).content, model_used: (body as any).model_used, confidence: (body as any).confidence, is_welcome: (body as any).is_welcome ?? false, cards: (body as any).cards }];
+      ? (body.messages as MsgInput[])
+      : [{ role: body.role as string, content: body.content as string, model_used: body.model_used as string | undefined, confidence: body.confidence as number | undefined, is_welcome: (body.is_welcome as boolean | undefined) ?? false, cards: body.cards as unknown[] | undefined }];
 
     if (!msgs.length || msgs.some(m => !m.role || !m.content)) {
       return NextResponse.json(

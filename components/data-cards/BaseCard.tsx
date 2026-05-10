@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode, memo } from 'react';
-import { LucideIcon, AlertCircle, Loader2, ChevronRight, FlaskConical } from 'lucide-react';
+import { LucideIcon, AlertCircle, ChevronRight, FlaskConical, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface StatusBadge {
@@ -50,6 +50,7 @@ function LoadingState({ className }: { className?: string }) {
         <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
         <span className="text-sm font-medium">Loading data...</span>
       </div>
+      <span className="sr-only">Loading...</span>
     </div>
   );
 }

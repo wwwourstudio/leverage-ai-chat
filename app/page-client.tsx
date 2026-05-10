@@ -26,6 +26,11 @@ import { isDev as getIsDev } from '@/lib/config';
 import { createClient } from '@/lib/supabase/client';
 import { detectSportFromText, extractSport, extractSportFromText, extractMarketType, extractPlatform } from '@/lib/sport-detection';
 import { useModalState } from '@/lib/hooks/useModalState';
+import { useCredits } from '@/lib/hooks/useCredits';
+import { useMessageEditor } from '@/lib/hooks/useMessageEditor';
+import { useChatList, type Chat } from '@/lib/hooks/useChatList';
+import { useCardAnalysis } from '@/lib/hooks/useCardAnalysis';
+import { useSuggestedPrompts } from '@/lib/hooks/useSuggestedPrompts';
 import { useFileHandling, type FileAttachment } from '@/lib/hooks/useFileHandling';
 import { useKalshiStore } from '@/lib/store/kalshi-store';
 const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ default: m.AuthModals })), { ssr: false });
@@ -46,7 +51,7 @@ import { ChatHeader, ChatInput } from '@/components/chat';
 import { SuggestedPrompts } from '@/components/suggested-prompts';
 import { InsightCardItem, type InsightCard } from '@/components/InsightCard';
 
-import { createThread, updateThread, deleteThread, loadMessages, saveMessagesBatch } from '@/lib/chat-service';
+import { createThread, updateThread, loadMessages, saveMessagesBatch } from '@/lib/chat-service';
 import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
 import { useChat, type ChatMessage as HookChatMessage } from '@/lib/hooks/useChat';
 import { useTheme } from 'next-themes';
@@ -132,17 +137,6 @@ interface Message extends HookChatMessage {
   // isWelcome, isEditing, editHistory, insights, clarificationOptions, useFallback
   // are inherited from HookChatMessage as optional fields
 }
-
-interface Chat {
-  id: string;
-  title: string;
-  preview: string;
-  timestamp: Date;
-  starred: boolean;
-  category: string;
-  tags: string[];
-}
-
 
 import type { ServerDataResult } from '@/lib/server-data-loader';
 export type ServerDataProps = ServerDataResult;
@@ -263,16 +257,10 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // Client-side odds cache: key = sportKey, TTL = 5 minutes
   const oddsCacheRef = useRef<Map<string, { data: unknown; ts: number }>>(new Map());
 
-  const [verifyStage, setVerifyStage] = useState<'analyzing' | 'reverifying'>('analyzing');
-  const [cardAnalysisMap, setCardAnalysisMap] = useState<Record<string, { loading: boolean; content: string | null; error: string | null }>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false); // corrected to desktop-open by useEffect below
   const [chatSearch, setChatSearch] = useState('');
-  const [activeChat, setActiveChat] = useState('chat-1');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
-  const [editingContent, setEditingContent] = useState('');
-  const [editingChatId, setEditingChatId] = useState<string | null>(null);
-  const [editingChatTitle, setEditingChatTitle] = useState('');
+  // Editing state + handlers are provided by useMessageEditor (wired below after chats state)
 
   const {
     showLoginModal, setShowLoginModal,
@@ -288,16 +276,15 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     showLimitNotification, setShowLimitNotification,
   } = useModalState();
 
-  const [creditsRemaining, setCreditsRemaining] = useState(15);
-  const [systemStatus, setSystemStatus] = useState<'ok' | 'degraded' | 'down'>('ok');
+  const {
+    creditsRemaining, setCreditsRemaining,
+    supabaseProfileId, setSupabaseProfileId,
+    getCreditData,
+    consumeCredit, addCredits,
+    getRateLimitData, canCreateNewChat, updateRateLimitCount,
+  } = useCredits();
 
-  // Sync creditsRemaining from localStorage on mount so visitors see their real
-  // remaining balance immediately, not the hardcoded default of 15.
-  // Runs once client-side — safe because localStorage is browser-only.
-  useEffect(() => {
-    const data = getCreditData();
-    setCreditsRemaining(data.credits);
-  }, []); // mount-only: getCreditData reads localStorage, setCreditsRemaining is a stable setter
+  const [systemStatus, setSystemStatus] = useState<'ok' | 'degraded' | 'down'>('ok');
 
   // Prevent body-level scrolling so that a secondary React render (produced by
   // the hydration mismatch recovery path) cannot be revealed by scrolling past
@@ -340,7 +327,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(!!serverData?.userSession);
-  const [isLoadingChats, setIsLoadingChats] = useState(false);
   const [user, setUser] = useState<{ name: string; email: string; avatar?: string } | null>(
     serverData?.userSession ? {
       name: serverData.userSession.user.name,
@@ -348,10 +334,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     } : null
   );
   // uploadedFiles state is managed by useFileHandling hook
-  const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string; query?: string }>>([]);
-  const [isClarificationPills, setIsClarificationPills] = useState(false);
-  const [aiQuickActions, setAiQuickActions] = useState<Array<{ label: string; icon: any; category: string; query: string }> | null>(null);
-  const [lastUserQuery, setLastUserQuery] = useState<string>('');
   const [selectedSport, setSelectedSport] = useState<string>('');
   const [selectedKalshiTopic, setSelectedKalshiTopic] = useState<string>('');
   const [kalshiBettingBannerVisible, setKalshiBettingBannerVisible] = useState(false);
@@ -360,10 +342,34 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // Dedup guard — prevents double-fire when onPromptClick and handleSubmit both
   // call generateRealResponse for the same message within the same tick.
   const analyzingMessageRef = useRef<string | null>(null);
-  // Tracks an in-flight createThread() call so saveMessage can await it instead of
-  // firing against a placeholder ID ('chat-1' or 'chat-{timestamp}').
-  const pendingThreadRef = useRef<Promise<import('@/lib/chat-service').ChatThread | null> | null>(null);
-  const pendingQueryRef = useRef<string | null>(null);
+
+  const {
+    chats, setChats,
+    activeChat, setActiveChat,
+    isLoadingChats, setIsLoadingChats,
+    pendingThreadRef,
+    pendingQueryRef,
+    handleStarChat,
+    handleNewChat,
+    openChatWithQuery,
+    handleSavedPlayerClick,
+    handleSavedCardClick,
+    handleSelectChat,
+    handleDeleteChat,
+  } = useChatList({
+    serverTime: serverData?.serverTime,
+    selectedCategory,
+    setSelectedCategory,
+    selectedSport,
+    setSelectedSport,
+    setMessages,
+    isLoggedIn,
+    canCreateNewChat,
+    updateRateLimitCount,
+    setShowLimitNotification,
+    setShowWatchlistLightbox,
+    toast,
+  });
 
   const handleCategorySelect = useCallback((catId: string) => {
     setSelectedCategory(catId);
@@ -390,6 +396,15 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // prompts that were already seeded on page load.
   const initPromptsLoadedRef = useRef(false);
 
+  const { verifyStage, setVerifyStage, cardAnalysisMap, generateDetailedAnalysis } = useCardAnalysis();
+  const {
+    suggestedPrompts, setSuggestedPrompts,
+    isClarificationPills, setIsClarificationPills,
+    aiQuickActions, setAiQuickActions,
+    lastUserQuery, setLastUserQuery,
+    generateContextualSuggestions,
+  } = useSuggestedPrompts({ selectedCategory, selectedSport, initPromptsLoadedRef });
+
   // Fantasy league setup state — must NOT read localStorage here (causes SSR hydration mismatch #418)
   const [fantasyLeague, setFantasyLeague] = useState<FantasyLeague | null>(null);
   const [fantasySetupStep, setFantasySetupStep] = useState(0);
@@ -398,8 +413,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const handleSaveFile = useCallback((file: FileAttachment) => {
     saveFileToProfile(file, (msg) => toast.success(msg), (msg) => toast.error(msg));
   }, [saveFileToProfile, toast]);
-  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
-  
   // Open sidebar by default on desktop (lg breakpoint = 1024px). Mobile/tablet stay closed.
   useEffect(() => {
     if (window.innerWidth >= 1024) setSidebarOpen(true);
@@ -469,54 +482,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     });
   }, [selectedCategory, selectedSport]);
 
-
-  
-  // Credit system utilities — syncs with Supabase user_profiles when logged in,
-  // falls back to localStorage for anonymous users.
-  const MESSAGE_LIMIT = FREE_TIER.MESSAGE_LIMIT;
-  const CHAT_LIMIT = FREE_TIER.CHAT_LIMIT;
-  const LIMIT_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-  const [supabaseProfileId, setSupabaseProfileId] = useState<string | null>(null);
-
-  const getCreditData = () => {
-    if (typeof window === 'undefined') return { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
-    const data = localStorage.getItem('userCredits');
-    if (!data) {
-      const initial = { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
-      localStorage.setItem('userCredits', JSON.stringify(initial));
-      return initial;
-    }
-    let parsed: { credits: number; resetTime: number };
-    try {
-      parsed = JSON.parse(data);
-    } catch {
-      // Corrupted localStorage — reset to defaults
-      localStorage.removeItem('userCredits');
-      const initial = { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
-      localStorage.setItem('userCredits', JSON.stringify(initial));
-      return initial;
-    }
-    if (Date.now() > parsed.resetTime) {
-      const reset = { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
-      localStorage.setItem('userCredits', JSON.stringify(reset));
-      return reset;
-    }
-    return parsed;
-  };
-
-  // Sync credits to Supabase (fire-and-forget)
-  const syncCreditsToSupabase = async (newCredits: number, _transactionType: string, _amount: number) => {
-    if (!supabaseProfileId) return;
-    try {
-      const supabase = createClient();
-      await supabase
-        .from('user_profiles')
-        .update({ credits_remaining: newCredits, updated_at: new Date().toISOString() })
-        .eq('id', supabaseProfileId);
-    } catch (err) {
-      console.error('[Credits] Supabase sync failed:', err);
-    }
-  };
 
   // Load instructions from localStorage fallback only (server instructions come via /api/init)
   const loadInstructionsFromLocalStorage = () => {
@@ -629,67 +594,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     } catch {
       loadInstructionsFromLocalStorage();
     }
-  };
-
-  const consumeCredit = () => {
-    const data = getCreditData();
-    if (data.credits <= 0) {
-      setShowStripeLightbox(true);
-      return false;
-    }
-    const newCredits = data.credits - 1;
-    const updated = { ...data, credits: newCredits };
-    localStorage.setItem('userCredits', JSON.stringify(updated));
-    setCreditsRemaining(newCredits);
-    syncCreditsToSupabase(newCredits, 'consume', -1);
-    return true;
-  };
-
-  const addCredits = (amount: number): void => {
-    const data = getCreditData();
-    const newCredits = data.credits + amount;
-    const updated = { ...data, credits: newCredits };
-    localStorage.setItem('userCredits', JSON.stringify(updated));
-    setCreditsRemaining(newCredits);
-    syncCreditsToSupabase(newCredits, 'purchase', amount);
-  };
-
-  const getRateLimitData = () => {
-    if (typeof window === 'undefined') return { count: 0, resetTime: Date.now() + LIMIT_DURATION };
-    const data = localStorage.getItem('chatRateLimit');
-    if (!data) {
-      const initial = { count: 0, resetTime: Date.now() + LIMIT_DURATION };
-      localStorage.setItem('chatRateLimit', JSON.stringify(initial));
-      return initial;
-    }
-    let parsed: { count: number; resetTime: number };
-    try {
-      parsed = JSON.parse(data);
-    } catch {
-      // Corrupted localStorage — reset to defaults
-      localStorage.removeItem('chatRateLimit');
-      const initial = { count: 0, resetTime: Date.now() + LIMIT_DURATION };
-      localStorage.setItem('chatRateLimit', JSON.stringify(initial));
-      return initial;
-    }
-    if (Date.now() > parsed.resetTime) {
-      const reset = { count: 0, resetTime: Date.now() + LIMIT_DURATION };
-      localStorage.setItem('chatRateLimit', JSON.stringify(reset));
-      return reset;
-    }
-    return parsed;
-  };
-
-  const canCreateNewChat = () => {
-    const data = getRateLimitData();
-    return data.count < CHAT_LIMIT;
-  };
-
-  const updateRateLimitCount = () => {
-    const data = getRateLimitData();
-    const updated = { ...data, count: data.count + 1 };
-    localStorage.setItem('chatRateLimit', JSON.stringify(updated));
-    return updated;
   };
 
   // Restore fantasy league from Supabase (called on login / auth change)
@@ -898,20 +802,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     return () => { if (cardsRefreshIntervalRef.current) clearTimeout(cardsRefreshIntervalRef.current); };
   }, [lastUserQuery]);
 
-  // Start with empty chat history - user creates real chats
-  // Use serverData.serverTime for the initial timestamp to avoid SSR/client hydration mismatch (#418).
-  const [chats, setChats] = useState<Chat[]>([
-    {
-      id: 'chat-1',
-      title: 'New Chat',
-      preview: 'Start a conversation to get real-time sports betting insights...',
-      timestamp: new Date(serverData?.serverTime ?? 0),
-      starred: false,
-      category: 'all',
-      tags: []
-    }
-  ]);
-
   const categories = [
     { id: 'all', name: 'All', icon: Layers, color: 'text-blue-400', desc: 'Everything' },
     { id: 'betting', name: 'Sports Betting', icon: TrendingUp, color: 'text-orange-400', desc: 'Live Odds & Props' },
@@ -951,313 +841,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     }
   }, []); // mount-only: serverData is immutable SSR props, toast is stable context ref
 
-  const handleStarChat = useCallback((chatId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const chat = chats.find((c: Chat) => c.id === chatId);
-    const wasStarred = chat?.starred;
-    const snapshot = chats;
-    setChats(chats.map((c: Chat) =>
-      c.id === chatId ? { ...c, starred: !c.starred } : c
-    ));
-    if (isLoggedIn) {
-      updateThread(chatId, { starred: !wasStarred }).catch(() => {
-        setChats(snapshot);
-        toast.error('Failed to update — please try again');
-      });
-    }
-    toast.success(wasStarred ? 'Removed from starred' : 'Analysis saved');
-  }, [chats, isLoggedIn, toast]);
-
-  // Fetch AI-generated quick-action prompts from the /api/prompts endpoint.
-  // Refreshes when the selected platform category or sport changes.
-  // On first mount, loadInitData() already seeded aiQuickActions from init.defaultPrompts,
-  // so we skip the initial fetch to avoid clearing then re-fetching identical data.
-  useEffect(() => {
-    if (initPromptsLoadedRef.current) {
-      // Init already seeded prompts — consume the guard and skip this first fire.
-      initPromptsLoadedRef.current = false;
-      return;
-    }
-    let cancelled = false;
-    setAiQuickActions(null); // reset so fallback shows until new prompts arrive
-    fetch(`/api/prompts?category=${encodeURIComponent(selectedCategory)}&sport=${encodeURIComponent(selectedSport ?? '')}`)
-      .then(r => r.json())
-      .then(data => {
-        if (cancelled) return;
-        if (data.success && Array.isArray(data.prompts) && data.prompts.length > 0) {
-          setAiQuickActions(
-            data.prompts.map((p: { label: string; query: string }) => ({
-              label: p.label,
-              icon: Sparkles,
-              category: selectedCategory,
-              query: p.query,
-            }))
-          );
-        }
-      })
-      .catch(() => { /* network failure — fall back to hardcoded */ });
-    return () => { cancelled = true; };
-  }, [selectedCategory, selectedSport]);
-
-  const generateContextualSuggestions = useCallback((userMessage: string, responseCards: InsightCard[]) => {
-    // Deduplicate: if this exact message has already produced suggestions and the current
-    // call carries no new card data (e.g. error/partial branch firing after success branch),
-    // skip regeneration and return the existing suggestions unchanged.
-    if (userMessage === lastSuggestionQueryRef.current && responseCards.length === 0) {
-      return suggestedPrompts;
-    }
-    lastSuggestionQueryRef.current = userMessage;
-
-    const msgLower = userMessage.toLowerCase();
-    const suggestions: Array<{ label: string; icon: any; category: string }> = [];
-
-    // Extract named entities from response cards for hyper-specific follow-ups
-    const matchups = responseCards
-      .map(c => c.data?.matchup as string | undefined)
-      .filter(Boolean) as string[];
-    const firstMatchup = matchups[0]; // e.g. "Los Angeles Lakers @ Golden State Warriors"
-    const teams = firstMatchup
-      ? firstMatchup.split(' @ ').map(t => t.split(' ').slice(-1)[0]) // last word = team name
-      : [];
-    const firstAway = teams[0] ?? '';
-    const firstHome = teams[1] ?? '';
-    const playerName = responseCards.find(c => c.data?.player)?.data?.player as string | undefined;
-    // Analyze card types in the response
-    const cardTypes = responseCards.map(card => card.type);
-    const hasLiveOdds = cardTypes.some(t => t.includes('odds') || t.includes('live'));
-    const hasDFSLineup = cardTypes.some(t => t.includes('dfs'));
-    const hasFantasy = cardTypes.some(t => t.includes('fantasy') || t.includes('draft') || t.includes('waiver'));
-    const hasKalshi = cardTypes.some(t => t.includes('kalshi') || t.includes('prediction'));
-    const hasPlayerProps = cardTypes.some(t => t.includes('prop'));
-
-    // Analyze user message for topic
-    const isLineMovement = msgLower.includes('line move') || msgLower.includes('movement') || msgLower.includes('steam');
-    const isFantasyQ = msgLower.includes('draft') || msgLower.includes('fantasy') || msgLower.includes('adp') || selectedCategory === 'fantasy';
-    const isDFS = msgLower.includes('dfs') || msgLower.includes('lineup') || selectedCategory === 'dfs';
-    const isKalshi = msgLower.includes('kalshi') || msgLower.includes('prediction') || selectedCategory === 'kalshi';
-    const isArbitrage = msgLower.includes('arbitrage') || msgLower.includes('arb');
-    const isParlay = msgLower.includes('parlay') || msgLower.includes('same-game') || msgLower.includes('sgp');
-    const isPlayerProp = msgLower.includes('prop') || !!playerName;
-
-    // PRIORITY 0: Highly specific follow-ups for line movement questions
-    if (isLineMovement) {
-      suggestions.push(
-        { label: 'Where is the sharp money going on this game?', icon: Target, category: 'betting' },
-        { label: 'Show me opening line vs current line comparison', icon: BarChart, category: 'betting' },
-        { label: 'What does this movement say about public vs sharp action?', icon: Activity, category: 'betting' },
-        { label: 'Set an alert if this line moves another half point', icon: Bell, category: 'betting' },
-        { label: 'Find correlated player props based on this line move', icon: Layers, category: 'betting' }
-      );
-    }
-
-    // PRIORITY 0: Specific follow-ups for player prop questions
-    if (isPlayerProp && !isLineMovement) {
-      suggestions.push(
-        { label: 'Show me the historical hit rate for this player prop', icon: BarChart, category: 'betting' },
-        { label: 'Stack this prop into a same-game parlay', icon: Layers, category: 'betting' },
-        { label: 'Find correlated props for the same game', icon: Target, category: 'betting' },
-        { label: 'Compare this line across all sportsbooks', icon: Activity, category: 'betting' }
-      );
-    }
-
-    // PRIORITY 0: Specific follow-ups for arbitrage questions
-    if (isArbitrage) {
-      suggestions.push(
-        { label: 'Calculate optimal Kelly sizing for this arb', icon: DollarSign, category: 'betting' },
-        { label: 'Show me more live arbitrage opportunities', icon: Zap, category: 'betting' },
-        { label: 'Alert me when new arbs appear on these books', icon: Bell, category: 'betting' }
-      );
-    }
-
-    // PRIORITY 0: Specific follow-ups for parlay questions
-    if (isParlay) {
-      suggestions.push(
-        { label: 'What legs have the best correlation in this parlay?', icon: Layers, category: 'betting' },
-        { label: 'Show me the EV calculation for each leg', icon: BarChart, category: 'betting' },
-        { label: 'Find the best sportsbook for this exact parlay', icon: Target, category: 'betting' }
-      );
-    }
-
-    // PRIORITY 1: Hyper-specific prompts using actual teams/players from cards
-    if (hasLiveOdds && !isLineMovement) {
-      const gameCtx = firstMatchup ? `for ${firstAway} vs ${firstHome}` : 'on these games';
-      suggestions.push(
-        { label: `Show player props ${gameCtx}`, icon: Target, category: 'betting' },
-        { label: `How has the line moved ${gameCtx}?`, icon: TrendingUp, category: 'betting' },
-        { label: `Sharp vs public money split ${gameCtx}`, icon: Activity, category: 'betting' },
-      );
-    }
-
-    if (hasDFSLineup) {
-      suggestions.push(
-        { label: 'What is the leverage score for this lineup?', icon: Award, category: 'dfs' },
-        { label: 'Build a contrarian GPP lineup', icon: Users, category: 'dfs' },
-        { label: 'Show me the betting lines supporting these picks', icon: TrendingUp, category: 'all' }
-      );
-    }
-
-    if (hasPlayerProps) {
-      const propName = playerName ? `${playerName}'s prop` : 'this player prop';
-      suggestions.push(
-        { label: `Historical hit rate for ${propName}`, icon: BarChart, category: 'betting' },
-        { label: `Stack ${propName} into a same-game parlay`, icon: Layers, category: 'betting' },
-        { label: 'Find correlated props in the same game', icon: Target, category: 'betting' }
-      );
-    }
-
-    if (hasFantasy) {
-      suggestions.push(
-        { label: 'Show me waiver wire targets this week', icon: Star, category: 'fantasy' },
-        { label: 'VBD rankings for this position', icon: Trophy, category: 'fantasy' }
-      );
-    }
-
-    if (hasKalshi) {
-      const topTitle = responseCards.find(c => c.type?.includes('kalshi'))?.title;
-      suggestions.push(
-        { label: topTitle ? `Deeper analysis on: ${topTitle.slice(0, 45)}` : 'Which Kalshi markets have the best edge?', icon: Sparkles, category: 'kalshi' },
-        { label: 'Cross-market arbitrage: Kalshi vs sportsbooks', icon: DollarSign, category: 'kalshi' },
-        { label: 'Show me weather markets affecting game totals', icon: Activity, category: 'kalshi' }
-      );
-    }
-
-    // PRIORITY 2: Sport-specific follow-ups based on card categories
-    const cardCategories = [...new Set(responseCards.map(c => c.category?.toUpperCase()))];
-    if (cardCategories.includes('NBA')) {
-      suggestions.push(
-        { label: firstMatchup ? `Rest advantage analysis: ${firstAway} vs ${firstHome}` : 'NBA rest-advantage games tonight', icon: AlertCircle, category: 'betting' },
-        { label: 'NBA pace-up games for totals', icon: Zap, category: 'dfs' }
-      );
-    }
-    if (cardCategories.includes('NFL') || cardCategories.includes('NFC') || cardCategories.includes('NFC')) {
-      suggestions.push(
-        { label: 'Weather impact on these NFL games', icon: Activity, category: 'betting' },
-        { label: 'Correlated TD scorer + game total parlays', icon: Medal, category: 'betting' }
-      );
-    }
-    if (cardCategories.includes('NHL')) {
-      suggestions.push(
-        { label: firstMatchup ? `Goalie matchup analysis: ${firstAway} vs ${firstHome}` : 'NHL goalie matchup edges tonight', icon: Target, category: 'betting' },
-      );
-    }
-    if (cardCategories.includes('MLB')) {
-      suggestions.push(
-        { label: 'Starting pitcher edges for today', icon: Target, category: 'betting' },
-        { label: 'Wind and weather impact on totals', icon: Activity, category: 'betting' }
-      );
-    }
-
-    // PRIORITY 3: Category fallbacks — selectedCategory wins over message-derived signals
-    // so that e.g. "Fantasy + MLB" selected + message mentioning DFS still shows fantasy prompts.
-    const p3Category =
-      selectedCategory !== 'all'
-        ? selectedCategory
-        : isDFS      ? 'dfs'
-        : isFantasyQ ? 'fantasy'
-        : isKalshi   ? 'kalshi'
-        : 'betting';
-
-    if (p3Category === 'dfs' && suggestions.length < 5) {
-      suggestions.push(
-        { label: 'Build a low-ownership tournament stack', icon: Users, category: 'dfs' },
-        { label: 'Find value plays under $5K salary', icon: DollarSign, category: 'dfs' },
-        { label: 'Showdown slate captain picks with leverage', icon: Medal, category: 'dfs' }
-      );
-    } else if (p3Category === 'fantasy' && suggestions.length < 5) {
-      suggestions.push(
-        { label: 'Show me ADP risers this week', icon: TrendingUp, category: 'fantasy' },
-        { label: 'Best ball stacking strategy', icon: Medal, category: 'fantasy' },
-        { label: 'Auction value targets this week', icon: ShoppingCart, category: 'fantasy' }
-      );
-    } else if (p3Category === 'kalshi' && suggestions.length < 5) {
-      suggestions.push(
-        { label: 'Show trending Kalshi markets', icon: TrendingUp, category: 'kalshi' },
-        { label: 'Political markets with market inefficiency', icon: Activity, category: 'kalshi' },
-        { label: 'Weather + climate prediction markets', icon: Sparkles, category: 'kalshi' }
-      );
-    }
-    
-    // PRIORITY 4: Predictive next-step suggestions based on card data
-    responseCards.forEach(card => {
-      if (suggestions.length >= 7) return;
-      
-      // Generate specific suggestions based on card type and data
-      if (card.type === 'live-odds' && card.data.movement) {
-        suggestions.push({ 
-          label: `Track ${card.data.matchup} live until game time`, 
-          icon: Clock, 
-          category: 'betting' 
-        });
-      }
-      
-      if (card.type === 'dfs-lineup' && card.data.topPlay) {
-        suggestions.push({ 
-          label: `Build alternate lineup fading ${card.data.topPlay}`, 
-          icon: Users, 
-          category: 'dfs' 
-        });
-      }
-      
-      if (card.type === 'player-prop' && card.data.player) {
-        suggestions.push({ 
-          label: `Find correlated ${card.data.player} same-game parlays`, 
-          icon: Medal, 
-          category: 'betting' 
-        });
-      }
-      
-      if (card.type === 'adp-analysis' && card.data.player) {
-        suggestions.push({ 
-          label: `Show similar value picks in this ADP range`, 
-          icon: Search, 
-          category: 'fantasy' 
-        });
-      }
-      
-      if (card.type === 'kalshi-market' && card.data.event) {
-        suggestions.push({ 
-          label: `Alert me on ${card.data.market} price movements`, 
-          icon: Bell, 
-          category: 'kalshi' 
-        });
-      }
-    });
-    
-    // PRIORITY 5: Intelligent universal suggestions based on what wasn't covered
-    const universalSuggestions = [
-      { label: 'What are tonight\'s best value opportunities?', icon: Sparkles, category: 'all' },
-      { label: 'Show me high-confidence plays across platforms', icon: CheckCircle, category: 'all' },
-      { label: 'Compare live odds across all sportsbooks', icon: BarChart, category: 'betting' },
-      { label: 'Find contrarian tournament plays', icon: Users, category: 'dfs' },
-      { label: 'Track sharp money movements in real-time', icon: TrendingUp, category: 'betting' },
-      { label: 'Optimize my overall portfolio allocation', icon: PieChart, category: 'all' },
-      { label: 'Breaking news and injury updates', icon: AlertCircle, category: 'all' },
-      { label: 'Show me arbitrage opportunities', icon: DollarSign, category: 'all' }
-    ];
-    
-    // Add contextual universal suggestions
-    for (const suggestion of universalSuggestions) {
-      if (suggestions.length >= 7) break;
-      if (!suggestions.some(s => s.label === suggestion.label)) {
-        suggestions.push(suggestion);
-      }
-    }
-    
-    // PRIORITY 6: Ensure we have exactly 5-7 suggestions with intelligent deduplication
-    // Also filter out the exact user message to avoid showing what was just asked
-    const uniqueSuggestions = suggestions.filter((suggestion, index, self) =>
-      index === self.findIndex((s) => s.label === suggestion.label) &&
-      suggestion.label.toLowerCase() !== userMessage.toLowerCase()
-    );
-
-    if (getIsDev()) console.log('[v0] Suggestions:', uniqueSuggestions.length, 'generated');
-
-    // Return 5-7 unique suggestions for optimal UX
-    return uniqueSuggestions.slice(0, 7);
-  // selectedCategory drives suggestion routing; suggestedPrompts is the early-return fallback.
-  // Other refs inside are stable (lastSuggestionQueryRef) or derived from the userMessage arg.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, suggestedPrompts]);
 
   const handleFollowUp = (action: 'correlated' | 'metrics', cardData?: any) => {
     const isDev = getIsDev();
@@ -1266,6 +849,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     // Check if user has credits
     if (!consumeCredit()) {
       if (isDev) console.log('[v0] No credits remaining, showing purchase modal');
+      setShowStripeLightbox(true);
       return;
     }
 
@@ -1288,226 +872,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     generateRealResponse(query);
   };
 
-  // Generate inline card-type-specific analysis without adding a new chat message
-  const generateCardAnalysis = async (card: InsightCard, cardKey: string) => {
-    // Toggle: collapse if already open
-    if (cardAnalysisMap[cardKey]?.content || cardAnalysisMap[cardKey]?.error) {
-      setCardAnalysisMap((prev: any) => { const n = { ...prev }; delete n[cardKey]; return n; });
-      return;
-    }
-
-    setCardAnalysisMap((prev: any) => ({ ...prev, [cardKey]: { loading: true, content: null, error: null } }));
-
-    const d = card.data as any;
-    const cardType = (card.type ?? '').toLowerCase();
-
-    // Card-type-specific prompts
-    let prompt = '';
-    if (cardType === 'kalshi' || cardType === 'prediction') {
-      const yesPct = d.yesPct ?? 50;
-      const noPct  = d.noPct  ?? (100 - yesPct);
-      prompt = `Analyze this Kalshi prediction market contract. Be concise and actionable.
-
-Market: "${card.title}"
-Category: ${card.subcategory || card.category}
-YES price: ${yesPct}¢ (${yesPct}% implied probability)
-NO price: ${noPct}¢${d.volume ? `\nVolume: ${d.volume}` : ''}${d.expiresLabel ? `\nExpires: ${d.expiresLabel}` : ''}${d.ticker ? `\nTicker: ${d.ticker}` : ''}
-
-Provide exactly these 5 sections:
-**1. Market Assessment** – Is this price efficient or mispriced? What does ${yesPct}% imply about the event?
-**2. Key Drivers** – 3 bullet points of the most important factors influencing this market
-**3. Edge Analysis** – Where does edge exist (if any)? Lean YES or NO and why?
-**4. Risk Factors** – What could move this market significantly?
-**5. Recommendation** – Clear YES / NO / PASS with confidence level (Low/Medium/High)
-
-No preamble. Start directly with section 1.`;
-    } else if (['betting', 'odds', 'moneyline', 'spread', 'totals'].includes(cardType)) {
-      // Parse teams from matchup string if homeTeam/awayTeam not directly set
-      const matchupStr = d.matchup ?? card.title ?? '';
-      const matchupParts = matchupStr.includes('@') ? matchupStr.split('@').map((s: string) => s.trim()) : ['', ''];
-      const awayTeamName = d.awayTeam ?? matchupParts[0] ?? '';
-      const homeTeamName = d.homeTeam ?? matchupParts[1] ?? '';
-      prompt = `Analyze this sports betting opportunity as a sharp bettor. Be concise.
-
-Market: "${card.title}"
-Sport: ${card.category}${awayTeamName ? `\nAway: ${awayTeamName}${d.awayOdds ? ` (ML: ${d.awayOdds})` : ''}` : ''}${homeTeamName ? `\nHome: ${homeTeamName}${d.homeOdds ? ` (ML: ${d.homeOdds})` : ''}` : ''}${(d.awaySpread || d.homeSpread) ? `\nSpread: ${awayTeamName} ${d.awaySpread ?? '—'} / ${homeTeamName} ${d.homeSpread ?? '—'}` : d.spread ? `\nSpread: ${d.spread}` : ''}${d.overUnder ? `\nTotal: ${d.overUnder}` : d.total ? `\nTotal: ${d.total}` : ''}${d.bookmakerCount ? `\nBooks covering: ${d.bookmakerCount}` : ''}${d.bestHomeOdds && d.bestHomeOdds !== d.homeOdds ? `\nBest home ML: ${d.bestHomeOdds}` : ''}${d.bestAwayOdds && d.bestAwayOdds !== d.awayOdds ? `\nBest away ML: ${d.bestAwayOdds}` : ''}${d.edge ? `\nDetected edge: ${d.edge}` : ''}${d.sharpMoney ? `\nSharp money signal: ${d.sharpMoney}` : ''}${d.sharpPct ? `\nSharp %: ${d.sharpPct}%` : ''}${d.confidence ? `\nModel confidence: ${d.confidence}` : ''}${d.lineMove ?? d.movement ?? d.lineChange ? `\nLine movement: ${d.lineMove ?? d.movement ?? d.lineChange}` : ''}${d.injuryAlert ? `\nInjury alert: ${d.injuryAlert}` : ''}${d.weatherNote ? `\nWeather: ${d.weatherNote}` : ''}${d.marketEfficiency ? `\nMarket efficiency: ${d.marketEfficiency}` : ''}
-
-Provide exactly these 5 sections:
-**1. Line Analysis** – Is this line sharp or public? Any steam, key numbers, or reverse line movement?
-**2. Key Angles** – 3 bullet points of the strongest betting factors for this specific matchup
-**3. Kelly Sizing** – Suggested bet size as % of bankroll based on edge and confidence
-**4. Sharp Signal** – Where is sharp money leaning and why?
-**5. Pick** – Clear recommendation (side/total) with one-line reasoning and confidence level
-
-No preamble. Start directly with section 1.`;
-    } else if (cardType === 'arbitrage') {
-      prompt = `Analyze this sports betting arbitrage opportunity. Be precise.
-
-Opportunity: "${card.title}"${d.profit ? `\nProfit margin: ${d.profit}` : ''}${d.bookmaker1 ? `\nBook 1: ${d.bookmaker1}` : ''}${d.bookmaker2 ? `\nBook 2: ${d.bookmaker2}` : ''}
-
-Provide exactly these 5 sections:
-**1. Opportunity Assessment** – Is this a genuine arb or key-number variance play?
-**2. Execution Risk** – Account limits, line movement risk, timing window
-**3. Profit Calculation** – Example stakes and profit with a $1,000 bankroll
-**4. Execution Steps** – Step-by-step to lock in the profit
-**5. Verdict** – Execute immediately / Proceed with caution / Avoid
-
-No preamble. Start directly with section 1.`;
-    } else if (cardType === 'dfs' || cardType === 'lineup') {
-      prompt = `Analyze this DFS opportunity as a lineup optimizer. Be concise.
-
-Player/Stack: "${card.title}"
-Contest type: ${card.subcategory || card.category}${d.salary ? `\nSalary: ${d.salary}` : ''}${d.projection ? `\nProjection: ${d.projection}` : ''}${d.ownership ? `\nProjected ownership: ${d.ownership}` : ''}
-
-Provide exactly these 5 sections:
-**1. Value Assessment** – Is this good value at the salary? Salary efficiency score
-**2. Ceiling Scenario** – What does a top-score game look like?
-**3. Correlation Stacks** – Best teammates to pair for maximum upside
-**4. Ownership Leverage** – GPP leverage potential (low/medium/high ownership)
-**5. Recommendation** – Use in Cash / GPP / Both / Fade
-
-No preamble. Start directly with section 1.`;
-    } else if (cardType === 'prop-hit-rate' || cardType === 'player-prop' || cardType === 'prop') {
-      const pct = d.hitRatePercentage ?? d.hitRate ?? '—';
-      const propTrend = d.trend ?? '—';
-      const diff = (typeof d.avgActual === 'number' && typeof d.avgLine === 'number')
-        ? `${(d.avgActual - d.avgLine) >= 0 ? '+' : ''}${(d.avgActual - d.avgLine).toFixed(1)}`
-        : d.edge ?? '—';
-      prompt = `Analyze this player prop bet. Be concise and actionable.
-
-Player: "${card.title}"
-Stat/Line: ${d.statType ?? card.subcategory ?? '—'}
-Hit rate: ${pct}% (${d.hits ?? '—'}/${d.totalGames ?? '—'} games)
-Trend: ${propTrend}
-Avg line: ${d.avgLine ?? '—'} | Avg actual: ${d.avgActual ?? '—'} | Edge: ${diff}
-Recent form (last 7): ${d.recentForm ?? '—'}
-Confidence: ${d.confidence ?? '—'}
-Recommendation: ${d.recommendation ?? '—'}
-
-Provide exactly these 5 sections:
-**1. Hit Rate Assessment** – Is ${pct}% a significant edge or noise? Evaluate the sample size.
-**2. Trend Analysis** – What does the ${propTrend} trend indicate going forward?
-**3. Line Value** – Is the current line set correctly given recent performance?
-**4. Risk Factors** – What could cause the trend to reverse or the prop to miss?
-**5. Pick** – Over / Under / Pass with confidence level (Low/Medium/High)
-
-No preamble. Start directly with section 1.`;
-    } else if (cardType === 'fantasy' || cardType === 'draft') {
-      prompt = `Analyze this fantasy sports opportunity. Be concise and actionable.
-
-Player: "${card.title}"
-Context: ${card.subcategory || card.category}${d.adp ? `\nADP: ${d.adp}` : ''}${d.value ? `\nValue: ${d.value}` : ''}
-
-Provide exactly these 5 sections:
-**1. Upside/Floor** – Best and worst realistic outcomes this season/week
-**2. Key Factors** – 3 most important things to know right now
-**3. Roster Decision** – Start / Sit / Trade for / Trade away / Waiver pickup
-**4. Matchup Context** – Injury news, usage, schedule notes
-**5. Verdict** – Clear action with confidence level
-
-No preamble. Start directly with section 1.`;
-    } else if (cardType === 'weather' || cardType === 'climate') {
-      prompt = `Analyze this weather prediction market or weather-impacted game. Be concise.
-
-Event: "${card.title}"${card.subcategory ? `\nType: ${card.subcategory}` : ''}
-
-Provide exactly these 5 sections:
-**1. Forecast Confidence** – How reliable is the current forecast for this event?
-**2. Betting Implications** – How does weather impact totals, spreads, and specific props?
-**3. Historical Context** – What typically happens to lines in these conditions?
-**4. Key Thresholds** – Weather metrics that would trigger significant line movement
-**5. Recommendation** – Actionable play (e.g., Under / Over / Fade game total)
-
-No preamble. Start directly with section 1.`;
-    } else {
-      prompt = `Provide a focused analysis for this opportunity. Be concise and actionable.
-
-Opportunity: "${card.title}"
-Category: ${card.subcategory || card.category}
-
-Provide exactly these 4 sections:
-**1. Key Data Points** – Most important metrics supporting this opportunity
-**2. Risk Assessment** – Potential downsides and how to mitigate them
-**3. Recommended Action** – Clear action with one-line reasoning
-**4. Position Sizing** – How much to allocate (% of bankroll)
-
-No preamble. Start directly with section 1.`;
-    }
-
-    const context: any = {
-      isPoliticalMarket: cardType === 'kalshi' || cardType === 'prediction',
-      hasBettingIntent: ['betting', 'odds', 'moneyline', 'spread', 'totals', 'arbitrage'].includes(cardType),
-    };
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-    try {
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userMessage: prompt, context }),
-        signal: controller.signal,
-      });
-      let result: APIResponse;
-      if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        result = { success: false, error: `Server error ${res.status}: ${text.slice(0, 150)}` };
-      } else {
-        // /api/analyze returns text/event-stream — must parse SSE events, not JSON
-        const reader = res.body!.getReader();
-        const decoder = new TextDecoder();
-        let buf = '';
-        let donePayload: APIResponse | null = null;
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buf += decoder.decode(value, { stream: true });
-            const parts = buf.split('\n\n');
-            buf = parts.pop() ?? '';
-            for (const part of parts) {
-              if (!part.startsWith('data: ')) continue;
-              try {
-                const ev = JSON.parse(part.slice(6));
-                if (ev.type === 'done') donePayload = ev as APIResponse;
-              } catch { /* ignore malformed chunks */ }
-            }
-          }
-          // Flush any trailing frame left in buf if stream closed without trailing \n\n
-          if (buf.startsWith('data: ')) {
-            try {
-              const ev = JSON.parse(buf.slice(6));
-              if (ev.type === 'done') donePayload = ev as APIResponse;
-            } catch { /* ignore */ }
-          }
-        } finally {
-          reader.releaseLock();
-        }
-        result = donePayload ?? { success: false, error: 'No response from server' } as APIResponse;
-      }
-      if (!result.success) {
-        setCardAnalysisMap((prev: any) => ({ ...prev, [cardKey]: { loading: false, content: null, error: result.error ?? 'Analysis failed' } }));
-        return;
-      }
-      setCardAnalysisMap((prev: any) => ({ ...prev, [cardKey]: { loading: false, content: result.text ?? null, error: null } }));
-    } catch (err: unknown) {
-      const isAbort = err instanceof Error && err.name === 'AbortError';
-      setCardAnalysisMap((prev: any) => ({
-        ...prev,
-        [cardKey]: { loading: false, content: null, error: isAbort ? 'Request timed out — please try again' : 'Network error — please try again' },
-      }));
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  };
-
-  // Wrapper for "View Full Analysis" buttons rendered outside the message-card loop
-  // (e.g. _renderInsightCard). Derives a stable key from the card itself.
-  const generateDetailedAnalysis = (card: InsightCard) => {
-    const cardKey = `insight-${card.type}-${(card.title || '').replace(/\s+/g, '-').toLowerCase().slice(0, 40)}`;
-    generateCardAnalysis(card, cardKey);
-  };
-
   const stopGeneration = useCallback(() => {
     abortStream();
     setIsTyping(false);
@@ -1522,13 +886,33 @@ No preamble. Start directly with section 1.`;
     generateRealResponseRef.current?.(lastUserQuery, undefined, messageId);
   }, [lastUserQuery]);
 
-  // Tracks the last query for which suggestions were generated — prevents duplicate
-  // runs when multiple response branches (success/partial/error) fire for the same message.
-  const lastSuggestionQueryRef = useRef<string>('');
-
   // Listen for player-name clicks dispatched from fantasy/DFS cards.
   // Using a ref so the effect doesn't need generateRealResponse as a dependency.
   const generateRealResponseRef = useRef<typeof generateRealResponse | null>(null);
+  // Stable wrapper used by useMessageEditor — always calls the latest generateRealResponse
+  const generateResponseStable = useCallback((msg: string) => {
+    generateRealResponseRef.current?.(msg);
+  }, []);
+
+  const {
+    editingMessageIndex, setEditingMessageIndex,
+    editingContent, setEditingContent,
+    editingChatId, editingChatTitle, setEditingChatTitle,
+    editTextareaRef,
+    handleEditMessage, handleSaveEdit, handleCancelEdit,
+    handleCopyMessage, handleRegenerateResponse, handleVote,
+    handleEditChatTitle, handleSaveChatTitle,
+    handleCancelChatTitleEdit, handleKeyDownChatTitle,
+    adjustEditTextareaHeight,
+  } = useMessageEditor({
+    messages,
+    setMessages,
+    activeChat,
+    isLoggedIn,
+    generateResponse: generateResponseStable,
+    toast,
+    setChats,
+  });
   useEffect(() => {
     const handler = (e: Event) => {
       const { query, category } = (e as CustomEvent<{ query: string; category?: string }>).detail;
@@ -2214,6 +1598,7 @@ No preamble. Start directly with section 1.`;
 
     // Check if user has credits
     if (!consumeCredit()) {
+      setShowStripeLightbox(true);
       return;
     }
 
@@ -2337,77 +1722,6 @@ No preamble. Start directly with section 1.`;
     generateRealResponse(promptForAI, visionAttachments.length > 0 ? visionAttachments : undefined, optimisticId);
   };
 
-  const handleNewChat = () => {
-    // Check rate limit before creating new chat
-    if (!canCreateNewChat()) {
-      setShowLimitNotification(true);
-      return;
-    }
-
-    // Generate dynamic welcome message based on selected category
-    const welcomeMessage = getWelcomeMessage(selectedCategory);
-
-    // Category-specific titles
-    const categoryTitles = {
-      all: 'New Analysis',
-      betting: 'New Sports Betting Analysis',
-      fantasy: 'New Fantasy Analysis',
-      dfs: 'New DFS Lineup Analysis',
-      kalshi: 'New Kalshi Market Analysis'
-    };
-    const chatTitle = categoryTitles[selectedCategory as keyof typeof categoryTitles] || 'New Analysis';
-    const chatCategory = selectedCategory === 'all' ? 'betting' : selectedCategory;
-
-    const newChatId = `chat-${Date.now()}`;
-    const newChat: Chat = {
-      id: newChatId,
-      title: chatTitle,
-      preview: welcomeMessage.slice(0, 50) + '...',
-      timestamp: new Date(),
-      starred: false,
-      category: chatCategory,
-      tags: [
-        selectedCategory === 'all' ? 'multi-platform' : selectedCategory,
-        ...(selectedSport ? [selectedSport] : []),
-      ],
-    };
-    setChats([newChat, ...chats]);
-    setActiveChat(newChatId);
-    setMessages([
-      {
-        id: 'welcome',
-        role: 'assistant',
-        content: welcomeMessage,
-        timestamp: new Date(),
-        cards: [],
-        modelUsed: 'Grok AI',
-        isWelcome: true
-      }
-    ]);
-
-    // For logged-in users, persist the new thread to Supabase and swap in the real UUID.
-    // Store the promise so saveMessage can await it rather than firing against a temp ID.
-    if (isLoggedIn) {
-      const threadTags = [
-        selectedCategory === 'all' ? 'multi-platform' : selectedCategory,
-        ...(selectedSport ? [selectedSport] : []),
-      ];
-      const threadPromise = createThread(chatCategory, chatTitle, threadTags);
-      pendingThreadRef.current = threadPromise;
-      threadPromise.then(created => {
-        pendingThreadRef.current = null;
-        if (created) {
-          // Swap the temp ID for the real Supabase UUID
-          setChats((prev: any) => prev.map((c: any) => c.id === newChatId ? { ...c, id: created.id } : c));
-          setActiveChat(created.id);
-        }
-      });
-    }
-
-    // Update rate limit count
-    updateRateLimitCount();
-  };
-
   // ── Auto-query: fire pending query once the welcome message appears ───────────
   // When openChatWithQuery sets pendingQueryRef and calls handleNewChat, messages
   // resets to [welcomeMsg]. This effect detects that and submits the pending query.
@@ -2421,239 +1735,6 @@ No preamble. Start directly with section 1.`;
       generateRealResponseRef.current?.(q);
     }
   }, [messages]);
-
-  // ── Sport/category inference helpers ─────────────────────────────────────────
-
-  function inferSportFromPosition(position: string): string {
-    const p = position.toUpperCase();
-    if (['SP','RP','CL','C','1B','2B','3B','SS','LF','CF','RF','DH','OF','P'].includes(p)) return 'baseball_mlb';
-    if (['QB','RB','WR','TE','K','DEF','PK','FB'].includes(p)) return 'americanfootball_nfl';
-    if (['PG','SG','SF','PF','F','G','F-C','G-F'].includes(p)) return 'basketball_nba';
-    return '';
-  }
-
-  const CARD_SPORT_MAP: Record<string, string> = {
-    MLB: 'baseball_mlb', NBA: 'basketball_nba', NFL: 'americanfootball_nfl',
-    NHL: 'icehockey_nhl', NCAAB: 'basketball_ncaab', NCAAF: 'americanfootball_ncaaf',
-    EPL: 'soccer_epl', MLS: 'soccer_usa_mls',
-  };
-  const CARD_PLATFORM_MAP: Record<string, string> = {
-    DFS: 'dfs', Kalshi: 'kalshi', Fantasy: 'fantasy',
-  };
-
-  // ── Open a new chat and immediately submit a query ────────────────────────────
-  const openChatWithQuery = (query: string, category?: string, sport?: string) => {
-    if (category) setSelectedCategory(category);
-    if (sport !== undefined) setSelectedSport(sport);
-    pendingQueryRef.current = query;
-    handleNewChat();
-  };
-
-  // ── Bookmark click handlers passed to WatchlistLightbox ──────────────────────
-
-  const handleSavedPlayerClick = (name: string, position: string, team?: string) => {
-    setShowWatchlistLightbox(false);
-    const sport = inferSportFromPosition(position);
-    const query = `Analyze ${name} — show me recent stats, props, and betting lines`;
-    openChatWithQuery(query, 'betting', sport || undefined);
-  };
-
-  const handleSavedCardClick = (entry: import('@/components/data-cards/DynamicCardRenderer').SavedCardEntry) => {
-    setShowWatchlistLightbox(false);
-    const sport = CARD_SPORT_MAP[entry.card.category] ?? '';
-    const platform = CARD_PLATFORM_MAP[entry.card.category] ?? 'betting';
-    const query = `Show me ${entry.card.subcategory || entry.card.type.replace(/_/g, ' ')} for ${entry.card.title}`;
-    openChatWithQuery(query, platform, sport || undefined);
-  };
-
-  const handleSelectChat = useCallback((chatId: string) => {
-    setActiveChat(chatId);
-
-    // Sync platform filter to match the selected chat's category
-    const selectedChat = chats.find((c: Chat) => c.id === chatId);
-    if (selectedChat?.category && selectedChat.category !== 'all') {
-      setSelectedCategory(selectedChat.category);
-    }
-    // Restore sport filter from thread tags
-    const SPORT_KEYS_LIST = ['basketball_nba', 'americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb', 'soccer_epl', 'soccer_mls'];
-    const sportTag = selectedChat?.tags?.find((t: string) => SPORT_KEYS_LIST.includes(t));
-    setSelectedSport(sportTag ?? '');
-
-    if (isLoggedIn) {
-      loadMessages(chatId).then(msgs => {
-        if (msgs.length > 0) {
-          let storedCards: Record<string, any[]> = {};
-          try { storedCards = JSON.parse(localStorage.getItem(`lev:cards:${chatId}`) ?? '{}'); } catch { /* ignore */ }
-          setMessages(msgs.map(m => ({
-            id: m.id || crypto.randomUUID(),
-            role: m.role,
-            content: m.content,
-            timestamp: m.timestamp,
-            cards: m.cards?.length ? m.cards : (storedCards[m.id ?? ''] ?? []),
-            modelUsed: m.modelUsed,
-            confidence: m.confidence,
-            isWelcome: m.isWelcome,
-          })));
-        } else {
-          const chat = chats.find((c: Chat) => c.id === chatId);
-          setMessages([{
-            id: 'welcome',
-            role: 'assistant',
-            content: `**${chat?.title || 'Chat'}**\n\nNo saved messages found. Start a new message to continue.`,
-            timestamp: new Date(),
-            cards: [],
-            isWelcome: true,
-          }]);
-        }
-      });
-    } else {
-      const chat = chats.find((c: Chat) => c.id === chatId);
-      setMessages([{
-        id: 'welcome',
-        role: 'assistant',
-        content: `**${chat?.title || 'Analysis Restored'}**\n\nSign in to save and restore your conversation history.\n\n**Ready to continue optimizing your strategy.**`,
-        timestamp: new Date(),
-        cards: [],
-        isWelcome: true,
-      }]);
-    }
-  }, [chats, isLoggedIn]);
-
-  const handleDeleteChat = useCallback((chatId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const snapshot = chats;
-    const remaining = chats.filter((chat: Chat) => chat.id !== chatId);
-    setChats(remaining);
-    if (activeChat === chatId && remaining.length > 0) {
-      setActiveChat(remaining[0].id);
-    }
-    if (isLoggedIn) {
-      deleteThread(chatId).catch(() => {
-        setChats(snapshot);
-        toast.error('Failed to delete — please try again');
-      });
-    }
-    toast.info('Chat deleted');
-  }, [chats, activeChat, isLoggedIn, toast]);
-
-  const handleEditMessage = useCallback((index: number) => {
-    const message = messages[index];
-    if (message.role === 'user') {
-      setEditingMessageIndex(index);
-      setEditingContent(message.content);
-    }
-  }, [messages]);
-
-  const handleSaveEdit = useCallback((index: number) => {
-    if (editingContent.trim()) {
-      setMessages((prev: Message[]) => prev.map((msg, i) => {
-        if (i === index) {
-          return {
-            ...msg,
-            content: editingContent,
-            editHistory: [
-              ...(msg.editHistory || []),
-              { content: msg.content, timestamp: msg.timestamp }
-            ],
-            timestamp: new Date()
-          };
-        }
-        return msg;
-      }));
-      setEditingMessageIndex(null);
-      setEditingContent('');
-
-  // Re-generate response after editing user message
-  if (messages[index].role === 'user') {
-    const newMessages = messages.slice(0, index + 1);
-    setMessages(newMessages);
-    generateRealResponse(editingContent);
-  }
-  }
-  }, [editingContent, messages, generateRealResponse]);
-
-  const handleCancelEdit = useCallback(() => {
-    setEditingMessageIndex(null);
-    setEditingContent('');
-  }, []);
-
-  const handleCopyMessage = useCallback((content: string) => {
-    navigator.clipboard.writeText(content);
-    toast.success('Copied to clipboard');
-  }, []);
-
-  const handleRegenerateResponse = useCallback((index: number) => {
-    if (index > 0 && messages[index - 1].role === 'user') {
-      const userMessage = messages[index - 1].content;
-      const newMessages = messages.slice(0, index);
-      setMessages(newMessages);
-      generateRealResponse(userMessage);
-    }
-  }, [messages, generateRealResponse]);
-
-  const handleVote = useCallback(async (index: number, direction: 'up' | 'down') => {
-    // Optimistic UI update
-    setMessages((prev: any) => prev.map((m: any, i: any) => i === index ? { ...m, voted: direction } : m));
-    toast.success(direction === 'up' ? 'Marked helpful — thanks!' : "Got it, we'll improve this");
-    try {
-      await fetch('/api/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          vote: direction === 'up' ? 'helpful' : 'improve',
-          messageExcerpt: messages[index]?.content?.slice(0, 500),
-          sessionId: activeChat,
-        }),
-      });
-    } catch {
-      // Non-blocking — feedback is best-effort
-    }
-  }, [messages, activeChat]);
-
-  const handleEditChatTitle = useCallback((chatId: string, currentTitle: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingChatId(chatId);
-    setEditingChatTitle(currentTitle);
-  }, []);
-
-  const handleSaveChatTitle = useCallback((chatId: string) => {
-    if (editingChatTitle.trim()) {
-      const newTitle = editingChatTitle.trim();
-      setChats(prev => prev.map((chat: any) =>
-        chat.id === chatId ? { ...chat, title: newTitle } : chat
-      ));
-      if (isLoggedIn) updateThread(chatId, { title: newTitle });
-      toast.success('Chat renamed');
-    }
-    setEditingChatId(null);
-    setEditingChatTitle('');
-  }, [editingChatTitle, isLoggedIn, toast]);
-
-  const handleCancelChatTitleEdit = useCallback(() => {
-    setEditingChatId(null);
-    setEditingChatTitle('');
-  }, []);
-
-  const handleKeyDownChatTitle = useCallback((e: React.KeyboardEvent, chatId: string) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSaveChatTitle(chatId);
-    } else if (e.key === 'Escape') {
-      handleCancelChatTitleEdit();
-    }
-  }, [handleSaveChatTitle, handleCancelChatTitleEdit]);
-
-  const adjustEditTextareaHeight = () => {
-    if (editTextareaRef.current) {
-      requestAnimationFrame(() => {
-        if (editTextareaRef.current) {
-          editTextareaRef.current.style.height = 'auto';
-          const newHeight = editTextareaRef.current.scrollHeight;
-          editTextareaRef.current.style.height = `${newHeight}px`;
-        }
-      });
-    }
-  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -3185,7 +2266,7 @@ No preamble. Start directly with section 1.`;
                         Chat Limit Reached
                       </h3>
                       <p className="text-xs text-[var(--text-muted)] leading-relaxed" suppressHydrationWarning>
-                        You've reached your limit of {CHAT_LIMIT} chats per 24 hours. Your limit will reset in{' '}
+                        You've reached your limit of {FREE_TIER.CHAT_LIMIT} chats per 24 hours. Your limit will reset in{' '}
                         {Math.ceil((getRateLimitData().resetTime - Date.now()) / (1000 * 60 * 60))} hours.
                       </p>
                     </div>

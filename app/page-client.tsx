@@ -777,7 +777,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           ? 'betting'
           : selectedCategory;
         const refreshSport = extractSportFromText(lastUserQuery) || selectedSport || undefined;
-        const freshCards = await fetchDynamicCards({ sport: refreshSport, userContext: lastUserQuery, category: detectedCategory, limit: 4 });
+        const freshCards = await fetchDynamicCards({ sport: refreshSport, userContext: lastUserQuery, category: detectedCategory, limit: 7 });
         if (freshCards.length === 0) return;
 
         const converted = freshCards.map(convertToInsightCard);
@@ -1484,13 +1484,13 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     if (isDev) console.log('[v0] Fetching dynamic cards for:', { sport, category, draftGroupId });
 
     try {
-      if (isDev) console.log('[v0] Requesting dynamic cards with params:', { sport, category, context, limit: 3, draftGroupId });
+      if (isDev) console.log('[v0] Requesting dynamic cards with params:', { sport, category, context, limit: 7, draftGroupId });
 
       const dynamicCards = await fetchDynamicCards({
         sport: sport || undefined,
         category,
         userContext: context,
-        limit: 3,
+        limit: 7,
         draftGroupId,
       });
 

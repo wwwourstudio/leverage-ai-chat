@@ -27,6 +27,8 @@ import { createClient } from '@/lib/supabase/client';
 import { detectSportFromText, extractSport, extractSportFromText, extractMarketType, extractPlatform } from '@/lib/sport-detection';
 import { useModalState } from '@/lib/hooks/useModalState';
 import { useCredits } from '@/lib/hooks/useCredits';
+import { useMessageEditor } from '@/lib/hooks/useMessageEditor';
+import { useChatList, type Chat } from '@/lib/hooks/useChatList';
 import { useFileHandling, type FileAttachment } from '@/lib/hooks/useFileHandling';
 import { useKalshiStore } from '@/lib/store/kalshi-store';
 const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ default: m.AuthModals })), { ssr: false });
@@ -47,7 +49,7 @@ import { ChatHeader, ChatInput } from '@/components/chat';
 import { SuggestedPrompts } from '@/components/suggested-prompts';
 import { InsightCardItem, type InsightCard } from '@/components/InsightCard';
 
-import { createThread, updateThread, deleteThread, loadMessages, saveMessagesBatch } from '@/lib/chat-service';
+import { createThread, updateThread, loadMessages, saveMessagesBatch } from '@/lib/chat-service';
 import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
 import { useChat, type ChatMessage as HookChatMessage } from '@/lib/hooks/useChat';
 import { useTheme } from 'next-themes';
@@ -133,17 +135,6 @@ interface Message extends HookChatMessage {
   // isWelcome, isEditing, editHistory, insights, clarificationOptions, useFallback
   // are inherited from HookChatMessage as optional fields
 }
-
-interface Chat {
-  id: string;
-  title: string;
-  preview: string;
-  timestamp: Date;
-  starred: boolean;
-  category: string;
-  tags: string[];
-}
-
 
 import type { ServerDataResult } from '@/lib/server-data-loader';
 export type ServerDataProps = ServerDataResult;
@@ -268,12 +259,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [cardAnalysisMap, setCardAnalysisMap] = useState<Record<string, { loading: boolean; content: string | null; error: string | null }>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false); // corrected to desktop-open by useEffect below
   const [chatSearch, setChatSearch] = useState('');
-  const [activeChat, setActiveChat] = useState('chat-1');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
-  const [editingContent, setEditingContent] = useState('');
-  const [editingChatId, setEditingChatId] = useState<string | null>(null);
-  const [editingChatTitle, setEditingChatTitle] = useState('');
+  // Editing state + handlers are provided by useMessageEditor (wired below after chats state)
 
   const {
     showLoginModal, setShowLoginModal,
@@ -340,7 +327,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(!!serverData?.userSession);
-  const [isLoadingChats, setIsLoadingChats] = useState(false);
   const [user, setUser] = useState<{ name: string; email: string; avatar?: string } | null>(
     serverData?.userSession ? {
       name: serverData.userSession.user.name,
@@ -360,10 +346,34 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // Dedup guard — prevents double-fire when onPromptClick and handleSubmit both
   // call generateRealResponse for the same message within the same tick.
   const analyzingMessageRef = useRef<string | null>(null);
-  // Tracks an in-flight createThread() call so saveMessage can await it instead of
-  // firing against a placeholder ID ('chat-1' or 'chat-{timestamp}').
-  const pendingThreadRef = useRef<Promise<import('@/lib/chat-service').ChatThread | null> | null>(null);
-  const pendingQueryRef = useRef<string | null>(null);
+
+  const {
+    chats, setChats,
+    activeChat, setActiveChat,
+    isLoadingChats, setIsLoadingChats,
+    pendingThreadRef,
+    pendingQueryRef,
+    handleStarChat,
+    handleNewChat,
+    openChatWithQuery,
+    handleSavedPlayerClick,
+    handleSavedCardClick,
+    handleSelectChat,
+    handleDeleteChat,
+  } = useChatList({
+    serverTime: serverData?.serverTime,
+    selectedCategory,
+    setSelectedCategory,
+    selectedSport,
+    setSelectedSport,
+    setMessages,
+    isLoggedIn,
+    canCreateNewChat,
+    updateRateLimitCount,
+    setShowLimitNotification,
+    setShowWatchlistLightbox,
+    toast,
+  });
 
   const handleCategorySelect = useCallback((catId: string) => {
     setSelectedCategory(catId);
@@ -398,8 +408,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const handleSaveFile = useCallback((file: FileAttachment) => {
     saveFileToProfile(file, (msg) => toast.success(msg), (msg) => toast.error(msg));
   }, [saveFileToProfile, toast]);
-  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
-  
   // Open sidebar by default on desktop (lg breakpoint = 1024px). Mobile/tablet stay closed.
   useEffect(() => {
     if (window.innerWidth >= 1024) setSidebarOpen(true);
@@ -789,20 +797,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     return () => { if (cardsRefreshIntervalRef.current) clearTimeout(cardsRefreshIntervalRef.current); };
   }, [lastUserQuery]);
 
-  // Start with empty chat history - user creates real chats
-  // Use serverData.serverTime for the initial timestamp to avoid SSR/client hydration mismatch (#418).
-  const [chats, setChats] = useState<Chat[]>([
-    {
-      id: 'chat-1',
-      title: 'New Chat',
-      preview: 'Start a conversation to get real-time sports betting insights...',
-      timestamp: new Date(serverData?.serverTime ?? 0),
-      starred: false,
-      category: 'all',
-      tags: []
-    }
-  ]);
-
   const categories = [
     { id: 'all', name: 'All', icon: Layers, color: 'text-blue-400', desc: 'Everything' },
     { id: 'betting', name: 'Sports Betting', icon: TrendingUp, color: 'text-orange-400', desc: 'Live Odds & Props' },
@@ -841,23 +835,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       toast.info('Live data unavailable — showing AI estimates. Data will refresh shortly.');
     }
   }, []); // mount-only: serverData is immutable SSR props, toast is stable context ref
-
-  const handleStarChat = useCallback((chatId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const chat = chats.find((c: Chat) => c.id === chatId);
-    const wasStarred = chat?.starred;
-    const snapshot = chats;
-    setChats(chats.map((c: Chat) =>
-      c.id === chatId ? { ...c, starred: !c.starred } : c
-    ));
-    if (isLoggedIn) {
-      updateThread(chatId, { starred: !wasStarred }).catch(() => {
-        setChats(snapshot);
-        toast.error('Failed to update — please try again');
-      });
-    }
-    toast.success(wasStarred ? 'Removed from starred' : 'Analysis saved');
-  }, [chats, isLoggedIn, toast]);
 
   // Fetch AI-generated quick-action prompts from the /api/prompts endpoint.
   // Refreshes when the selected platform category or sport changes.
@@ -1421,6 +1398,30 @@ No preamble. Start directly with section 1.`;
   // Listen for player-name clicks dispatched from fantasy/DFS cards.
   // Using a ref so the effect doesn't need generateRealResponse as a dependency.
   const generateRealResponseRef = useRef<typeof generateRealResponse | null>(null);
+  // Stable wrapper used by useMessageEditor — always calls the latest generateRealResponse
+  const generateResponseStable = useCallback((msg: string) => {
+    generateRealResponseRef.current?.(msg);
+  }, []);
+
+  const {
+    editingMessageIndex, setEditingMessageIndex,
+    editingContent, setEditingContent,
+    editingChatId, editingChatTitle, setEditingChatTitle,
+    editTextareaRef,
+    handleEditMessage, handleSaveEdit, handleCancelEdit,
+    handleCopyMessage, handleRegenerateResponse, handleVote,
+    handleEditChatTitle, handleSaveChatTitle,
+    handleCancelChatTitleEdit, handleKeyDownChatTitle,
+    adjustEditTextareaHeight,
+  } = useMessageEditor({
+    messages,
+    setMessages,
+    activeChat,
+    isLoggedIn,
+    generateResponse: generateResponseStable,
+    toast,
+    setChats,
+  });
   useEffect(() => {
     const handler = (e: Event) => {
       const { query, category } = (e as CustomEvent<{ query: string; category?: string }>).detail;
@@ -2230,77 +2231,6 @@ No preamble. Start directly with section 1.`;
     generateRealResponse(promptForAI, visionAttachments.length > 0 ? visionAttachments : undefined, optimisticId);
   };
 
-  const handleNewChat = () => {
-    // Check rate limit before creating new chat
-    if (!canCreateNewChat()) {
-      setShowLimitNotification(true);
-      return;
-    }
-
-    // Generate dynamic welcome message based on selected category
-    const welcomeMessage = getWelcomeMessage(selectedCategory);
-
-    // Category-specific titles
-    const categoryTitles = {
-      all: 'New Analysis',
-      betting: 'New Sports Betting Analysis',
-      fantasy: 'New Fantasy Analysis',
-      dfs: 'New DFS Lineup Analysis',
-      kalshi: 'New Kalshi Market Analysis'
-    };
-    const chatTitle = categoryTitles[selectedCategory as keyof typeof categoryTitles] || 'New Analysis';
-    const chatCategory = selectedCategory === 'all' ? 'betting' : selectedCategory;
-
-    const newChatId = `chat-${Date.now()}`;
-    const newChat: Chat = {
-      id: newChatId,
-      title: chatTitle,
-      preview: welcomeMessage.slice(0, 50) + '...',
-      timestamp: new Date(),
-      starred: false,
-      category: chatCategory,
-      tags: [
-        selectedCategory === 'all' ? 'multi-platform' : selectedCategory,
-        ...(selectedSport ? [selectedSport] : []),
-      ],
-    };
-    setChats([newChat, ...chats]);
-    setActiveChat(newChatId);
-    setMessages([
-      {
-        id: 'welcome',
-        role: 'assistant',
-        content: welcomeMessage,
-        timestamp: new Date(),
-        cards: [],
-        modelUsed: 'Grok AI',
-        isWelcome: true
-      }
-    ]);
-
-    // For logged-in users, persist the new thread to Supabase and swap in the real UUID.
-    // Store the promise so saveMessage can await it rather than firing against a temp ID.
-    if (isLoggedIn) {
-      const threadTags = [
-        selectedCategory === 'all' ? 'multi-platform' : selectedCategory,
-        ...(selectedSport ? [selectedSport] : []),
-      ];
-      const threadPromise = createThread(chatCategory, chatTitle, threadTags);
-      pendingThreadRef.current = threadPromise;
-      threadPromise.then(created => {
-        pendingThreadRef.current = null;
-        if (created) {
-          // Swap the temp ID for the real Supabase UUID
-          setChats((prev: any) => prev.map((c: any) => c.id === newChatId ? { ...c, id: created.id } : c));
-          setActiveChat(created.id);
-        }
-      });
-    }
-
-    // Update rate limit count
-    updateRateLimitCount();
-  };
-
   // ── Auto-query: fire pending query once the welcome message appears ───────────
   // When openChatWithQuery sets pendingQueryRef and calls handleNewChat, messages
   // resets to [welcomeMsg]. This effect detects that and submits the pending query.
@@ -2314,239 +2244,6 @@ No preamble. Start directly with section 1.`;
       generateRealResponseRef.current?.(q);
     }
   }, [messages]);
-
-  // ── Sport/category inference helpers ─────────────────────────────────────────
-
-  function inferSportFromPosition(position: string): string {
-    const p = position.toUpperCase();
-    if (['SP','RP','CL','C','1B','2B','3B','SS','LF','CF','RF','DH','OF','P'].includes(p)) return 'baseball_mlb';
-    if (['QB','RB','WR','TE','K','DEF','PK','FB'].includes(p)) return 'americanfootball_nfl';
-    if (['PG','SG','SF','PF','F','G','F-C','G-F'].includes(p)) return 'basketball_nba';
-    return '';
-  }
-
-  const CARD_SPORT_MAP: Record<string, string> = {
-    MLB: 'baseball_mlb', NBA: 'basketball_nba', NFL: 'americanfootball_nfl',
-    NHL: 'icehockey_nhl', NCAAB: 'basketball_ncaab', NCAAF: 'americanfootball_ncaaf',
-    EPL: 'soccer_epl', MLS: 'soccer_usa_mls',
-  };
-  const CARD_PLATFORM_MAP: Record<string, string> = {
-    DFS: 'dfs', Kalshi: 'kalshi', Fantasy: 'fantasy',
-  };
-
-  // ── Open a new chat and immediately submit a query ────────────────────────────
-  const openChatWithQuery = (query: string, category?: string, sport?: string) => {
-    if (category) setSelectedCategory(category);
-    if (sport !== undefined) setSelectedSport(sport);
-    pendingQueryRef.current = query;
-    handleNewChat();
-  };
-
-  // ── Bookmark click handlers passed to WatchlistLightbox ──────────────────────
-
-  const handleSavedPlayerClick = (name: string, position: string, team?: string) => {
-    setShowWatchlistLightbox(false);
-    const sport = inferSportFromPosition(position);
-    const query = `Analyze ${name} — show me recent stats, props, and betting lines`;
-    openChatWithQuery(query, 'betting', sport || undefined);
-  };
-
-  const handleSavedCardClick = (entry: import('@/components/data-cards/DynamicCardRenderer').SavedCardEntry) => {
-    setShowWatchlistLightbox(false);
-    const sport = CARD_SPORT_MAP[entry.card.category] ?? '';
-    const platform = CARD_PLATFORM_MAP[entry.card.category] ?? 'betting';
-    const query = `Show me ${entry.card.subcategory || entry.card.type.replace(/_/g, ' ')} for ${entry.card.title}`;
-    openChatWithQuery(query, platform, sport || undefined);
-  };
-
-  const handleSelectChat = useCallback((chatId: string) => {
-    setActiveChat(chatId);
-
-    // Sync platform filter to match the selected chat's category
-    const selectedChat = chats.find((c: Chat) => c.id === chatId);
-    if (selectedChat?.category && selectedChat.category !== 'all') {
-      setSelectedCategory(selectedChat.category);
-    }
-    // Restore sport filter from thread tags
-    const SPORT_KEYS_LIST = ['basketball_nba', 'americanfootball_nfl', 'icehockey_nhl', 'baseball_mlb', 'soccer_epl', 'soccer_mls'];
-    const sportTag = selectedChat?.tags?.find((t: string) => SPORT_KEYS_LIST.includes(t));
-    setSelectedSport(sportTag ?? '');
-
-    if (isLoggedIn) {
-      loadMessages(chatId).then(msgs => {
-        if (msgs.length > 0) {
-          let storedCards: Record<string, any[]> = {};
-          try { storedCards = JSON.parse(localStorage.getItem(`lev:cards:${chatId}`) ?? '{}'); } catch { /* ignore */ }
-          setMessages(msgs.map(m => ({
-            id: m.id || crypto.randomUUID(),
-            role: m.role,
-            content: m.content,
-            timestamp: m.timestamp,
-            cards: m.cards?.length ? m.cards : (storedCards[m.id ?? ''] ?? []),
-            modelUsed: m.modelUsed,
-            confidence: m.confidence,
-            isWelcome: m.isWelcome,
-          })));
-        } else {
-          const chat = chats.find((c: Chat) => c.id === chatId);
-          setMessages([{
-            id: 'welcome',
-            role: 'assistant',
-            content: `**${chat?.title || 'Chat'}**\n\nNo saved messages found. Start a new message to continue.`,
-            timestamp: new Date(),
-            cards: [],
-            isWelcome: true,
-          }]);
-        }
-      });
-    } else {
-      const chat = chats.find((c: Chat) => c.id === chatId);
-      setMessages([{
-        id: 'welcome',
-        role: 'assistant',
-        content: `**${chat?.title || 'Analysis Restored'}**\n\nSign in to save and restore your conversation history.\n\n**Ready to continue optimizing your strategy.**`,
-        timestamp: new Date(),
-        cards: [],
-        isWelcome: true,
-      }]);
-    }
-  }, [chats, isLoggedIn]);
-
-  const handleDeleteChat = useCallback((chatId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const snapshot = chats;
-    const remaining = chats.filter((chat: Chat) => chat.id !== chatId);
-    setChats(remaining);
-    if (activeChat === chatId && remaining.length > 0) {
-      setActiveChat(remaining[0].id);
-    }
-    if (isLoggedIn) {
-      deleteThread(chatId).catch(() => {
-        setChats(snapshot);
-        toast.error('Failed to delete — please try again');
-      });
-    }
-    toast.info('Chat deleted');
-  }, [chats, activeChat, isLoggedIn, toast]);
-
-  const handleEditMessage = useCallback((index: number) => {
-    const message = messages[index];
-    if (message.role === 'user') {
-      setEditingMessageIndex(index);
-      setEditingContent(message.content);
-    }
-  }, [messages]);
-
-  const handleSaveEdit = useCallback((index: number) => {
-    if (editingContent.trim()) {
-      setMessages((prev: Message[]) => prev.map((msg, i) => {
-        if (i === index) {
-          return {
-            ...msg,
-            content: editingContent,
-            editHistory: [
-              ...(msg.editHistory || []),
-              { content: msg.content, timestamp: msg.timestamp }
-            ],
-            timestamp: new Date()
-          };
-        }
-        return msg;
-      }));
-      setEditingMessageIndex(null);
-      setEditingContent('');
-
-  // Re-generate response after editing user message
-  if (messages[index].role === 'user') {
-    const newMessages = messages.slice(0, index + 1);
-    setMessages(newMessages);
-    generateRealResponse(editingContent);
-  }
-  }
-  }, [editingContent, messages, generateRealResponse]);
-
-  const handleCancelEdit = useCallback(() => {
-    setEditingMessageIndex(null);
-    setEditingContent('');
-  }, []);
-
-  const handleCopyMessage = useCallback((content: string) => {
-    navigator.clipboard.writeText(content);
-    toast.success('Copied to clipboard');
-  }, []);
-
-  const handleRegenerateResponse = useCallback((index: number) => {
-    if (index > 0 && messages[index - 1].role === 'user') {
-      const userMessage = messages[index - 1].content;
-      const newMessages = messages.slice(0, index);
-      setMessages(newMessages);
-      generateRealResponse(userMessage);
-    }
-  }, [messages, generateRealResponse]);
-
-  const handleVote = useCallback(async (index: number, direction: 'up' | 'down') => {
-    // Optimistic UI update
-    setMessages((prev: any) => prev.map((m: any, i: any) => i === index ? { ...m, voted: direction } : m));
-    toast.success(direction === 'up' ? 'Marked helpful — thanks!' : "Got it, we'll improve this");
-    try {
-      await fetch('/api/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          vote: direction === 'up' ? 'helpful' : 'improve',
-          messageExcerpt: messages[index]?.content?.slice(0, 500),
-          sessionId: activeChat,
-        }),
-      });
-    } catch {
-      // Non-blocking — feedback is best-effort
-    }
-  }, [messages, activeChat]);
-
-  const handleEditChatTitle = useCallback((chatId: string, currentTitle: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingChatId(chatId);
-    setEditingChatTitle(currentTitle);
-  }, []);
-
-  const handleSaveChatTitle = useCallback((chatId: string) => {
-    if (editingChatTitle.trim()) {
-      const newTitle = editingChatTitle.trim();
-      setChats(prev => prev.map((chat: any) =>
-        chat.id === chatId ? { ...chat, title: newTitle } : chat
-      ));
-      if (isLoggedIn) updateThread(chatId, { title: newTitle });
-      toast.success('Chat renamed');
-    }
-    setEditingChatId(null);
-    setEditingChatTitle('');
-  }, [editingChatTitle, isLoggedIn, toast]);
-
-  const handleCancelChatTitleEdit = useCallback(() => {
-    setEditingChatId(null);
-    setEditingChatTitle('');
-  }, []);
-
-  const handleKeyDownChatTitle = useCallback((e: React.KeyboardEvent, chatId: string) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSaveChatTitle(chatId);
-    } else if (e.key === 'Escape') {
-      handleCancelChatTitleEdit();
-    }
-  }, [handleSaveChatTitle, handleCancelChatTitleEdit]);
-
-  const adjustEditTextareaHeight = () => {
-    if (editTextareaRef.current) {
-      requestAnimationFrame(() => {
-        if (editTextareaRef.current) {
-          editTextareaRef.current.style.height = 'auto';
-          const newHeight = editTextareaRef.current.scrollHeight;
-          editTextareaRef.current.style.height = `${newHeight}px`;
-        }
-      });
-    }
-  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {

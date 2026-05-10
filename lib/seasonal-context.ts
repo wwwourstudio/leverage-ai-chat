@@ -254,3 +254,14 @@ export function generateNoDataMessage(sportKey: string, reason?: string): {
     suggestion: seasonInfo.nextGameEstimate || 'Check back later today',
   };
 }
+
+export function getWelcomeMessage(category: string): string {
+  const messages: Record<string, string> = {
+    betting: '**Leverage AI** is scanning live odds across all major sportsbooks. Ask me about today\'s lines, player props, sharp money movement, or arbitrage opportunities.',
+    fantasy: '**Leverage AI** is ready for fantasy analysis. Ask about waiver pickups, start/sit decisions, trade values, or draft strategy.',
+    dfs: '**Leverage AI** is optimizing DFS lineups. Ask about optimal builds, ownership leverage, captain picks, or correlation stacks for DraftKings and FanDuel.',
+    kalshi: '**Leverage AI** is monitoring Kalshi prediction markets in real-time. Ask about contract pricing, market inefficiencies, or best-value plays.',
+    all: '**Leverage AI** - Powered by Grok AI\n\nI\'m connected to live odds feeds, Kalshi prediction markets, and real-time sports data. Ask me about betting odds, player props, DFS lineups, fantasy strategy, or prediction markets.',
+  };
+  return messages[category] ?? messages.all;
+}

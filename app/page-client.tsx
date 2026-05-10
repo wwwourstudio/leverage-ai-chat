@@ -29,6 +29,8 @@ import { useModalState } from '@/lib/hooks/useModalState';
 import { useCredits } from '@/lib/hooks/useCredits';
 import { useMessageEditor } from '@/lib/hooks/useMessageEditor';
 import { useChatList, type Chat } from '@/lib/hooks/useChatList';
+import { useCardAnalysis } from '@/lib/hooks/useCardAnalysis';
+import { useSuggestedPrompts } from '@/lib/hooks/useSuggestedPrompts';
 import { useFileHandling, type FileAttachment } from '@/lib/hooks/useFileHandling';
 import { useKalshiStore } from '@/lib/store/kalshi-store';
 const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ default: m.AuthModals })), { ssr: false });
@@ -255,8 +257,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // Client-side odds cache: key = sportKey, TTL = 5 minutes
   const oddsCacheRef = useRef<Map<string, { data: unknown; ts: number }>>(new Map());
 
-  const [verifyStage, setVerifyStage] = useState<'analyzing' | 'reverifying'>('analyzing');
-  const [cardAnalysisMap, setCardAnalysisMap] = useState<Record<string, { loading: boolean; content: string | null; error: string | null }>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false); // corrected to desktop-open by useEffect below
   const [chatSearch, setChatSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -334,10 +334,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     } : null
   );
   // uploadedFiles state is managed by useFileHandling hook
-  const [suggestedPrompts, setSuggestedPrompts] = useState<Array<{ label: string; icon: any; category: string; query?: string }>>([]);
-  const [isClarificationPills, setIsClarificationPills] = useState(false);
-  const [aiQuickActions, setAiQuickActions] = useState<Array<{ label: string; icon: any; category: string; query: string }> | null>(null);
-  const [lastUserQuery, setLastUserQuery] = useState<string>('');
   const [selectedSport, setSelectedSport] = useState<string>('');
   const [selectedKalshiTopic, setSelectedKalshiTopic] = useState<string>('');
   const [kalshiBettingBannerVisible, setKalshiBettingBannerVisible] = useState(false);
@@ -399,6 +395,15 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // The prompts useEffect checks this on its first fire to avoid clearing + re-fetching
   // prompts that were already seeded on page load.
   const initPromptsLoadedRef = useRef(false);
+
+  const { verifyStage, setVerifyStage, cardAnalysisMap, generateDetailedAnalysis } = useCardAnalysis();
+  const {
+    suggestedPrompts, setSuggestedPrompts,
+    isClarificationPills, setIsClarificationPills,
+    aiQuickActions, setAiQuickActions,
+    lastUserQuery, setLastUserQuery,
+    generateContextualSuggestions,
+  } = useSuggestedPrompts({ selectedCategory, selectedSport, initPromptsLoadedRef });
 
   // Fantasy league setup state — must NOT read localStorage here (causes SSR hydration mismatch #418)
   const [fantasyLeague, setFantasyLeague] = useState<FantasyLeague | null>(null);
@@ -836,296 +841,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     }
   }, []); // mount-only: serverData is immutable SSR props, toast is stable context ref
 
-  // Fetch AI-generated quick-action prompts from the /api/prompts endpoint.
-  // Refreshes when the selected platform category or sport changes.
-  // On first mount, loadInitData() already seeded aiQuickActions from init.defaultPrompts,
-  // so we skip the initial fetch to avoid clearing then re-fetching identical data.
-  useEffect(() => {
-    if (initPromptsLoadedRef.current) {
-      // Init already seeded prompts — consume the guard and skip this first fire.
-      initPromptsLoadedRef.current = false;
-      return;
-    }
-    let cancelled = false;
-    setAiQuickActions(null); // reset so fallback shows until new prompts arrive
-    fetch(`/api/prompts?category=${encodeURIComponent(selectedCategory)}&sport=${encodeURIComponent(selectedSport ?? '')}`)
-      .then(r => r.json())
-      .then(data => {
-        if (cancelled) return;
-        if (data.success && Array.isArray(data.prompts) && data.prompts.length > 0) {
-          setAiQuickActions(
-            data.prompts.map((p: { label: string; query: string }) => ({
-              label: p.label,
-              icon: Sparkles,
-              category: selectedCategory,
-              query: p.query,
-            }))
-          );
-        }
-      })
-      .catch(() => { /* network failure — fall back to hardcoded */ });
-    return () => { cancelled = true; };
-  }, [selectedCategory, selectedSport]);
-
-  const generateContextualSuggestions = useCallback((userMessage: string, responseCards: InsightCard[]) => {
-    // Deduplicate: if this exact message has already produced suggestions and the current
-    // call carries no new card data (e.g. error/partial branch firing after success branch),
-    // skip regeneration and return the existing suggestions unchanged.
-    if (userMessage === lastSuggestionQueryRef.current && responseCards.length === 0) {
-      return suggestedPrompts;
-    }
-    lastSuggestionQueryRef.current = userMessage;
-
-    const msgLower = userMessage.toLowerCase();
-    const suggestions: Array<{ label: string; icon: any; category: string }> = [];
-
-    // Extract named entities from response cards for hyper-specific follow-ups
-    const matchups = responseCards
-      .map(c => c.data?.matchup as string | undefined)
-      .filter(Boolean) as string[];
-    const firstMatchup = matchups[0]; // e.g. "Los Angeles Lakers @ Golden State Warriors"
-    const teams = firstMatchup
-      ? firstMatchup.split(' @ ').map(t => t.split(' ').slice(-1)[0]) // last word = team name
-      : [];
-    const firstAway = teams[0] ?? '';
-    const firstHome = teams[1] ?? '';
-    const playerName = responseCards.find(c => c.data?.player)?.data?.player as string | undefined;
-    // Analyze card types in the response
-    const cardTypes = responseCards.map(card => card.type);
-    const hasLiveOdds = cardTypes.some(t => t.includes('odds') || t.includes('live'));
-    const hasDFSLineup = cardTypes.some(t => t.includes('dfs'));
-    const hasFantasy = cardTypes.some(t => t.includes('fantasy') || t.includes('draft') || t.includes('waiver'));
-    const hasKalshi = cardTypes.some(t => t.includes('kalshi') || t.includes('prediction'));
-    const hasPlayerProps = cardTypes.some(t => t.includes('prop'));
-
-    // Analyze user message for topic
-    const isLineMovement = msgLower.includes('line move') || msgLower.includes('movement') || msgLower.includes('steam');
-    const isFantasyQ = msgLower.includes('draft') || msgLower.includes('fantasy') || msgLower.includes('adp') || selectedCategory === 'fantasy';
-    const isDFS = msgLower.includes('dfs') || msgLower.includes('lineup') || selectedCategory === 'dfs';
-    const isKalshi = msgLower.includes('kalshi') || msgLower.includes('prediction') || selectedCategory === 'kalshi';
-    const isArbitrage = msgLower.includes('arbitrage') || msgLower.includes('arb');
-    const isParlay = msgLower.includes('parlay') || msgLower.includes('same-game') || msgLower.includes('sgp');
-    const isPlayerProp = msgLower.includes('prop') || !!playerName;
-
-    // PRIORITY 0: Highly specific follow-ups for line movement questions
-    if (isLineMovement) {
-      suggestions.push(
-        { label: 'Where is the sharp money going on this game?', icon: Target, category: 'betting' },
-        { label: 'Show me opening line vs current line comparison', icon: BarChart, category: 'betting' },
-        { label: 'What does this movement say about public vs sharp action?', icon: Activity, category: 'betting' },
-        { label: 'Set an alert if this line moves another half point', icon: Bell, category: 'betting' },
-        { label: 'Find correlated player props based on this line move', icon: Layers, category: 'betting' }
-      );
-    }
-
-    // PRIORITY 0: Specific follow-ups for player prop questions
-    if (isPlayerProp && !isLineMovement) {
-      suggestions.push(
-        { label: 'Show me the historical hit rate for this player prop', icon: BarChart, category: 'betting' },
-        { label: 'Stack this prop into a same-game parlay', icon: Layers, category: 'betting' },
-        { label: 'Find correlated props for the same game', icon: Target, category: 'betting' },
-        { label: 'Compare this line across all sportsbooks', icon: Activity, category: 'betting' }
-      );
-    }
-
-    // PRIORITY 0: Specific follow-ups for arbitrage questions
-    if (isArbitrage) {
-      suggestions.push(
-        { label: 'Calculate optimal Kelly sizing for this arb', icon: DollarSign, category: 'betting' },
-        { label: 'Show me more live arbitrage opportunities', icon: Zap, category: 'betting' },
-        { label: 'Alert me when new arbs appear on these books', icon: Bell, category: 'betting' }
-      );
-    }
-
-    // PRIORITY 0: Specific follow-ups for parlay questions
-    if (isParlay) {
-      suggestions.push(
-        { label: 'What legs have the best correlation in this parlay?', icon: Layers, category: 'betting' },
-        { label: 'Show me the EV calculation for each leg', icon: BarChart, category: 'betting' },
-        { label: 'Find the best sportsbook for this exact parlay', icon: Target, category: 'betting' }
-      );
-    }
-
-    // PRIORITY 1: Hyper-specific prompts using actual teams/players from cards
-    if (hasLiveOdds && !isLineMovement) {
-      const gameCtx = firstMatchup ? `for ${firstAway} vs ${firstHome}` : 'on these games';
-      suggestions.push(
-        { label: `Show player props ${gameCtx}`, icon: Target, category: 'betting' },
-        { label: `How has the line moved ${gameCtx}?`, icon: TrendingUp, category: 'betting' },
-        { label: `Sharp vs public money split ${gameCtx}`, icon: Activity, category: 'betting' },
-      );
-    }
-
-    if (hasDFSLineup) {
-      suggestions.push(
-        { label: 'What is the leverage score for this lineup?', icon: Award, category: 'dfs' },
-        { label: 'Build a contrarian GPP lineup', icon: Users, category: 'dfs' },
-        { label: 'Show me the betting lines supporting these picks', icon: TrendingUp, category: 'all' }
-      );
-    }
-
-    if (hasPlayerProps) {
-      const propName = playerName ? `${playerName}'s prop` : 'this player prop';
-      suggestions.push(
-        { label: `Historical hit rate for ${propName}`, icon: BarChart, category: 'betting' },
-        { label: `Stack ${propName} into a same-game parlay`, icon: Layers, category: 'betting' },
-        { label: 'Find correlated props in the same game', icon: Target, category: 'betting' }
-      );
-    }
-
-    if (hasFantasy) {
-      suggestions.push(
-        { label: 'Show me waiver wire targets this week', icon: Star, category: 'fantasy' },
-        { label: 'VBD rankings for this position', icon: Trophy, category: 'fantasy' }
-      );
-    }
-
-    if (hasKalshi) {
-      const topTitle = responseCards.find(c => c.type?.includes('kalshi'))?.title;
-      suggestions.push(
-        { label: topTitle ? `Deeper analysis on: ${topTitle.slice(0, 45)}` : 'Which Kalshi markets have the best edge?', icon: Sparkles, category: 'kalshi' },
-        { label: 'Cross-market arbitrage: Kalshi vs sportsbooks', icon: DollarSign, category: 'kalshi' },
-        { label: 'Show me weather markets affecting game totals', icon: Activity, category: 'kalshi' }
-      );
-    }
-
-    // PRIORITY 2: Sport-specific follow-ups based on card categories
-    const cardCategories = [...new Set(responseCards.map(c => c.category?.toUpperCase()))];
-    if (cardCategories.includes('NBA')) {
-      suggestions.push(
-        { label: firstMatchup ? `Rest advantage analysis: ${firstAway} vs ${firstHome}` : 'NBA rest-advantage games tonight', icon: AlertCircle, category: 'betting' },
-        { label: 'NBA pace-up games for totals', icon: Zap, category: 'dfs' }
-      );
-    }
-    if (cardCategories.includes('NFL') || cardCategories.includes('NFC') || cardCategories.includes('NFC')) {
-      suggestions.push(
-        { label: 'Weather impact on these NFL games', icon: Activity, category: 'betting' },
-        { label: 'Correlated TD scorer + game total parlays', icon: Medal, category: 'betting' }
-      );
-    }
-    if (cardCategories.includes('NHL')) {
-      suggestions.push(
-        { label: firstMatchup ? `Goalie matchup analysis: ${firstAway} vs ${firstHome}` : 'NHL goalie matchup edges tonight', icon: Target, category: 'betting' },
-      );
-    }
-    if (cardCategories.includes('MLB')) {
-      suggestions.push(
-        { label: 'Starting pitcher edges for today', icon: Target, category: 'betting' },
-        { label: 'Wind and weather impact on totals', icon: Activity, category: 'betting' }
-      );
-    }
-
-    // PRIORITY 3: Category fallbacks — selectedCategory wins over message-derived signals
-    // so that e.g. "Fantasy + MLB" selected + message mentioning DFS still shows fantasy prompts.
-    const p3Category =
-      selectedCategory !== 'all'
-        ? selectedCategory
-        : isDFS      ? 'dfs'
-        : isFantasyQ ? 'fantasy'
-        : isKalshi   ? 'kalshi'
-        : 'betting';
-
-    if (p3Category === 'dfs' && suggestions.length < 5) {
-      suggestions.push(
-        { label: 'Build a low-ownership tournament stack', icon: Users, category: 'dfs' },
-        { label: 'Find value plays under $5K salary', icon: DollarSign, category: 'dfs' },
-        { label: 'Showdown slate captain picks with leverage', icon: Medal, category: 'dfs' }
-      );
-    } else if (p3Category === 'fantasy' && suggestions.length < 5) {
-      suggestions.push(
-        { label: 'Show me ADP risers this week', icon: TrendingUp, category: 'fantasy' },
-        { label: 'Best ball stacking strategy', icon: Medal, category: 'fantasy' },
-        { label: 'Auction value targets this week', icon: ShoppingCart, category: 'fantasy' }
-      );
-    } else if (p3Category === 'kalshi' && suggestions.length < 5) {
-      suggestions.push(
-        { label: 'Show trending Kalshi markets', icon: TrendingUp, category: 'kalshi' },
-        { label: 'Political markets with market inefficiency', icon: Activity, category: 'kalshi' },
-        { label: 'Weather + climate prediction markets', icon: Sparkles, category: 'kalshi' }
-      );
-    }
-    
-    // PRIORITY 4: Predictive next-step suggestions based on card data
-    responseCards.forEach(card => {
-      if (suggestions.length >= 7) return;
-      
-      // Generate specific suggestions based on card type and data
-      if (card.type === 'live-odds' && card.data.movement) {
-        suggestions.push({ 
-          label: `Track ${card.data.matchup} live until game time`, 
-          icon: Clock, 
-          category: 'betting' 
-        });
-      }
-      
-      if (card.type === 'dfs-lineup' && card.data.topPlay) {
-        suggestions.push({ 
-          label: `Build alternate lineup fading ${card.data.topPlay}`, 
-          icon: Users, 
-          category: 'dfs' 
-        });
-      }
-      
-      if (card.type === 'player-prop' && card.data.player) {
-        suggestions.push({ 
-          label: `Find correlated ${card.data.player} same-game parlays`, 
-          icon: Medal, 
-          category: 'betting' 
-        });
-      }
-      
-      if (card.type === 'adp-analysis' && card.data.player) {
-        suggestions.push({ 
-          label: `Show similar value picks in this ADP range`, 
-          icon: Search, 
-          category: 'fantasy' 
-        });
-      }
-      
-      if (card.type === 'kalshi-market' && card.data.event) {
-        suggestions.push({ 
-          label: `Alert me on ${card.data.market} price movements`, 
-          icon: Bell, 
-          category: 'kalshi' 
-        });
-      }
-    });
-    
-    // PRIORITY 5: Intelligent universal suggestions based on what wasn't covered
-    const universalSuggestions = [
-      { label: 'What are tonight\'s best value opportunities?', icon: Sparkles, category: 'all' },
-      { label: 'Show me high-confidence plays across platforms', icon: CheckCircle, category: 'all' },
-      { label: 'Compare live odds across all sportsbooks', icon: BarChart, category: 'betting' },
-      { label: 'Find contrarian tournament plays', icon: Users, category: 'dfs' },
-      { label: 'Track sharp money movements in real-time', icon: TrendingUp, category: 'betting' },
-      { label: 'Optimize my overall portfolio allocation', icon: PieChart, category: 'all' },
-      { label: 'Breaking news and injury updates', icon: AlertCircle, category: 'all' },
-      { label: 'Show me arbitrage opportunities', icon: DollarSign, category: 'all' }
-    ];
-    
-    // Add contextual universal suggestions
-    for (const suggestion of universalSuggestions) {
-      if (suggestions.length >= 7) break;
-      if (!suggestions.some(s => s.label === suggestion.label)) {
-        suggestions.push(suggestion);
-      }
-    }
-    
-    // PRIORITY 6: Ensure we have exactly 5-7 suggestions with intelligent deduplication
-    // Also filter out the exact user message to avoid showing what was just asked
-    const uniqueSuggestions = suggestions.filter((suggestion, index, self) =>
-      index === self.findIndex((s) => s.label === suggestion.label) &&
-      suggestion.label.toLowerCase() !== userMessage.toLowerCase()
-    );
-
-    if (getIsDev()) console.log('[v0] Suggestions:', uniqueSuggestions.length, 'generated');
-
-    // Return 5-7 unique suggestions for optimal UX
-    return uniqueSuggestions.slice(0, 7);
-  // selectedCategory drives suggestion routing; suggestedPrompts is the early-return fallback.
-  // Other refs inside are stable (lastSuggestionQueryRef) or derived from the userMessage arg.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, suggestedPrompts]);
 
   const handleFollowUp = (action: 'correlated' | 'metrics', cardData?: any) => {
     const isDev = getIsDev();
@@ -1157,226 +872,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     generateRealResponse(query);
   };
 
-  // Generate inline card-type-specific analysis without adding a new chat message
-  const generateCardAnalysis = async (card: InsightCard, cardKey: string) => {
-    // Toggle: collapse if already open
-    if (cardAnalysisMap[cardKey]?.content || cardAnalysisMap[cardKey]?.error) {
-      setCardAnalysisMap((prev: any) => { const n = { ...prev }; delete n[cardKey]; return n; });
-      return;
-    }
-
-    setCardAnalysisMap((prev: any) => ({ ...prev, [cardKey]: { loading: true, content: null, error: null } }));
-
-    const d = card.data as any;
-    const cardType = (card.type ?? '').toLowerCase();
-
-    // Card-type-specific prompts
-    let prompt = '';
-    if (cardType === 'kalshi' || cardType === 'prediction') {
-      const yesPct = d.yesPct ?? 50;
-      const noPct  = d.noPct  ?? (100 - yesPct);
-      prompt = `Analyze this Kalshi prediction market contract. Be concise and actionable.
-
-Market: "${card.title}"
-Category: ${card.subcategory || card.category}
-YES price: ${yesPct}¢ (${yesPct}% implied probability)
-NO price: ${noPct}¢${d.volume ? `\nVolume: ${d.volume}` : ''}${d.expiresLabel ? `\nExpires: ${d.expiresLabel}` : ''}${d.ticker ? `\nTicker: ${d.ticker}` : ''}
-
-Provide exactly these 5 sections:
-**1. Market Assessment** – Is this price efficient or mispriced? What does ${yesPct}% imply about the event?
-**2. Key Drivers** – 3 bullet points of the most important factors influencing this market
-**3. Edge Analysis** – Where does edge exist (if any)? Lean YES or NO and why?
-**4. Risk Factors** – What could move this market significantly?
-**5. Recommendation** – Clear YES / NO / PASS with confidence level (Low/Medium/High)
-
-No preamble. Start directly with section 1.`;
-    } else if (['betting', 'odds', 'moneyline', 'spread', 'totals'].includes(cardType)) {
-      // Parse teams from matchup string if homeTeam/awayTeam not directly set
-      const matchupStr = d.matchup ?? card.title ?? '';
-      const matchupParts = matchupStr.includes('@') ? matchupStr.split('@').map((s: string) => s.trim()) : ['', ''];
-      const awayTeamName = d.awayTeam ?? matchupParts[0] ?? '';
-      const homeTeamName = d.homeTeam ?? matchupParts[1] ?? '';
-      prompt = `Analyze this sports betting opportunity as a sharp bettor. Be concise.
-
-Market: "${card.title}"
-Sport: ${card.category}${awayTeamName ? `\nAway: ${awayTeamName}${d.awayOdds ? ` (ML: ${d.awayOdds})` : ''}` : ''}${homeTeamName ? `\nHome: ${homeTeamName}${d.homeOdds ? ` (ML: ${d.homeOdds})` : ''}` : ''}${(d.awaySpread || d.homeSpread) ? `\nSpread: ${awayTeamName} ${d.awaySpread ?? '—'} / ${homeTeamName} ${d.homeSpread ?? '—'}` : d.spread ? `\nSpread: ${d.spread}` : ''}${d.overUnder ? `\nTotal: ${d.overUnder}` : d.total ? `\nTotal: ${d.total}` : ''}${d.bookmakerCount ? `\nBooks covering: ${d.bookmakerCount}` : ''}${d.bestHomeOdds && d.bestHomeOdds !== d.homeOdds ? `\nBest home ML: ${d.bestHomeOdds}` : ''}${d.bestAwayOdds && d.bestAwayOdds !== d.awayOdds ? `\nBest away ML: ${d.bestAwayOdds}` : ''}${d.edge ? `\nDetected edge: ${d.edge}` : ''}${d.sharpMoney ? `\nSharp money signal: ${d.sharpMoney}` : ''}${d.sharpPct ? `\nSharp %: ${d.sharpPct}%` : ''}${d.confidence ? `\nModel confidence: ${d.confidence}` : ''}${d.lineMove ?? d.movement ?? d.lineChange ? `\nLine movement: ${d.lineMove ?? d.movement ?? d.lineChange}` : ''}${d.injuryAlert ? `\nInjury alert: ${d.injuryAlert}` : ''}${d.weatherNote ? `\nWeather: ${d.weatherNote}` : ''}${d.marketEfficiency ? `\nMarket efficiency: ${d.marketEfficiency}` : ''}
-
-Provide exactly these 5 sections:
-**1. Line Analysis** – Is this line sharp or public? Any steam, key numbers, or reverse line movement?
-**2. Key Angles** – 3 bullet points of the strongest betting factors for this specific matchup
-**3. Kelly Sizing** – Suggested bet size as % of bankroll based on edge and confidence
-**4. Sharp Signal** – Where is sharp money leaning and why?
-**5. Pick** – Clear recommendation (side/total) with one-line reasoning and confidence level
-
-No preamble. Start directly with section 1.`;
-    } else if (cardType === 'arbitrage') {
-      prompt = `Analyze this sports betting arbitrage opportunity. Be precise.
-
-Opportunity: "${card.title}"${d.profit ? `\nProfit margin: ${d.profit}` : ''}${d.bookmaker1 ? `\nBook 1: ${d.bookmaker1}` : ''}${d.bookmaker2 ? `\nBook 2: ${d.bookmaker2}` : ''}
-
-Provide exactly these 5 sections:
-**1. Opportunity Assessment** – Is this a genuine arb or key-number variance play?
-**2. Execution Risk** – Account limits, line movement risk, timing window
-**3. Profit Calculation** – Example stakes and profit with a $1,000 bankroll
-**4. Execution Steps** – Step-by-step to lock in the profit
-**5. Verdict** – Execute immediately / Proceed with caution / Avoid
-
-No preamble. Start directly with section 1.`;
-    } else if (cardType === 'dfs' || cardType === 'lineup') {
-      prompt = `Analyze this DFS opportunity as a lineup optimizer. Be concise.
-
-Player/Stack: "${card.title}"
-Contest type: ${card.subcategory || card.category}${d.salary ? `\nSalary: ${d.salary}` : ''}${d.projection ? `\nProjection: ${d.projection}` : ''}${d.ownership ? `\nProjected ownership: ${d.ownership}` : ''}
-
-Provide exactly these 5 sections:
-**1. Value Assessment** – Is this good value at the salary? Salary efficiency score
-**2. Ceiling Scenario** – What does a top-score game look like?
-**3. Correlation Stacks** – Best teammates to pair for maximum upside
-**4. Ownership Leverage** – GPP leverage potential (low/medium/high ownership)
-**5. Recommendation** – Use in Cash / GPP / Both / Fade
-
-No preamble. Start directly with section 1.`;
-    } else if (cardType === 'prop-hit-rate' || cardType === 'player-prop' || cardType === 'prop') {
-      const pct = d.hitRatePercentage ?? d.hitRate ?? '—';
-      const propTrend = d.trend ?? '—';
-      const diff = (typeof d.avgActual === 'number' && typeof d.avgLine === 'number')
-        ? `${(d.avgActual - d.avgLine) >= 0 ? '+' : ''}${(d.avgActual - d.avgLine).toFixed(1)}`
-        : d.edge ?? '—';
-      prompt = `Analyze this player prop bet. Be concise and actionable.
-
-Player: "${card.title}"
-Stat/Line: ${d.statType ?? card.subcategory ?? '—'}
-Hit rate: ${pct}% (${d.hits ?? '—'}/${d.totalGames ?? '—'} games)
-Trend: ${propTrend}
-Avg line: ${d.avgLine ?? '—'} | Avg actual: ${d.avgActual ?? '—'} | Edge: ${diff}
-Recent form (last 7): ${d.recentForm ?? '—'}
-Confidence: ${d.confidence ?? '—'}
-Recommendation: ${d.recommendation ?? '—'}
-
-Provide exactly these 5 sections:
-**1. Hit Rate Assessment** – Is ${pct}% a significant edge or noise? Evaluate the sample size.
-**2. Trend Analysis** – What does the ${propTrend} trend indicate going forward?
-**3. Line Value** – Is the current line set correctly given recent performance?
-**4. Risk Factors** – What could cause the trend to reverse or the prop to miss?
-**5. Pick** – Over / Under / Pass with confidence level (Low/Medium/High)
-
-No preamble. Start directly with section 1.`;
-    } else if (cardType === 'fantasy' || cardType === 'draft') {
-      prompt = `Analyze this fantasy sports opportunity. Be concise and actionable.
-
-Player: "${card.title}"
-Context: ${card.subcategory || card.category}${d.adp ? `\nADP: ${d.adp}` : ''}${d.value ? `\nValue: ${d.value}` : ''}
-
-Provide exactly these 5 sections:
-**1. Upside/Floor** – Best and worst realistic outcomes this season/week
-**2. Key Factors** – 3 most important things to know right now
-**3. Roster Decision** – Start / Sit / Trade for / Trade away / Waiver pickup
-**4. Matchup Context** – Injury news, usage, schedule notes
-**5. Verdict** – Clear action with confidence level
-
-No preamble. Start directly with section 1.`;
-    } else if (cardType === 'weather' || cardType === 'climate') {
-      prompt = `Analyze this weather prediction market or weather-impacted game. Be concise.
-
-Event: "${card.title}"${card.subcategory ? `\nType: ${card.subcategory}` : ''}
-
-Provide exactly these 5 sections:
-**1. Forecast Confidence** – How reliable is the current forecast for this event?
-**2. Betting Implications** – How does weather impact totals, spreads, and specific props?
-**3. Historical Context** – What typically happens to lines in these conditions?
-**4. Key Thresholds** – Weather metrics that would trigger significant line movement
-**5. Recommendation** – Actionable play (e.g., Under / Over / Fade game total)
-
-No preamble. Start directly with section 1.`;
-    } else {
-      prompt = `Provide a focused analysis for this opportunity. Be concise and actionable.
-
-Opportunity: "${card.title}"
-Category: ${card.subcategory || card.category}
-
-Provide exactly these 4 sections:
-**1. Key Data Points** – Most important metrics supporting this opportunity
-**2. Risk Assessment** – Potential downsides and how to mitigate them
-**3. Recommended Action** – Clear action with one-line reasoning
-**4. Position Sizing** – How much to allocate (% of bankroll)
-
-No preamble. Start directly with section 1.`;
-    }
-
-    const context: any = {
-      isPoliticalMarket: cardType === 'kalshi' || cardType === 'prediction',
-      hasBettingIntent: ['betting', 'odds', 'moneyline', 'spread', 'totals', 'arbitrage'].includes(cardType),
-    };
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-    try {
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userMessage: prompt, context }),
-        signal: controller.signal,
-      });
-      let result: APIResponse;
-      if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        result = { success: false, error: `Server error ${res.status}: ${text.slice(0, 150)}` };
-      } else {
-        // /api/analyze returns text/event-stream — must parse SSE events, not JSON
-        const reader = res.body!.getReader();
-        const decoder = new TextDecoder();
-        let buf = '';
-        let donePayload: APIResponse | null = null;
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buf += decoder.decode(value, { stream: true });
-            const parts = buf.split('\n\n');
-            buf = parts.pop() ?? '';
-            for (const part of parts) {
-              if (!part.startsWith('data: ')) continue;
-              try {
-                const ev = JSON.parse(part.slice(6));
-                if (ev.type === 'done') donePayload = ev as APIResponse;
-              } catch { /* ignore malformed chunks */ }
-            }
-          }
-          // Flush any trailing frame left in buf if stream closed without trailing \n\n
-          if (buf.startsWith('data: ')) {
-            try {
-              const ev = JSON.parse(buf.slice(6));
-              if (ev.type === 'done') donePayload = ev as APIResponse;
-            } catch { /* ignore */ }
-          }
-        } finally {
-          reader.releaseLock();
-        }
-        result = donePayload ?? { success: false, error: 'No response from server' } as APIResponse;
-      }
-      if (!result.success) {
-        setCardAnalysisMap((prev: any) => ({ ...prev, [cardKey]: { loading: false, content: null, error: result.error ?? 'Analysis failed' } }));
-        return;
-      }
-      setCardAnalysisMap((prev: any) => ({ ...prev, [cardKey]: { loading: false, content: result.text ?? null, error: null } }));
-    } catch (err: unknown) {
-      const isAbort = err instanceof Error && err.name === 'AbortError';
-      setCardAnalysisMap((prev: any) => ({
-        ...prev,
-        [cardKey]: { loading: false, content: null, error: isAbort ? 'Request timed out — please try again' : 'Network error — please try again' },
-      }));
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  };
-
-  // Wrapper for "View Full Analysis" buttons rendered outside the message-card loop
-  // (e.g. _renderInsightCard). Derives a stable key from the card itself.
-  const generateDetailedAnalysis = (card: InsightCard) => {
-    const cardKey = `insight-${card.type}-${(card.title || '').replace(/\s+/g, '-').toLowerCase().slice(0, 40)}`;
-    generateCardAnalysis(card, cardKey);
-  };
-
   const stopGeneration = useCallback(() => {
     abortStream();
     setIsTyping(false);
@@ -1390,10 +885,6 @@ No preamble. Start directly with section 1.`;
     );
     generateRealResponseRef.current?.(lastUserQuery, undefined, messageId);
   }, [lastUserQuery]);
-
-  // Tracks the last query for which suggestions were generated — prevents duplicate
-  // runs when multiple response branches (success/partial/error) fire for the same message.
-  const lastSuggestionQueryRef = useRef<string>('');
 
   // Listen for player-name clicks dispatched from fantasy/DFS cards.
   // Using a ref so the effect doesn't need generateRealResponse as a dependency.

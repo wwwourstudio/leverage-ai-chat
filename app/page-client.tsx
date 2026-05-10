@@ -26,6 +26,7 @@ import { isDev as getIsDev } from '@/lib/config';
 import { createClient } from '@/lib/supabase/client';
 import { detectSportFromText, extractSport, extractSportFromText, extractMarketType, extractPlatform } from '@/lib/sport-detection';
 import { useModalState } from '@/lib/hooks/useModalState';
+import { useCredits } from '@/lib/hooks/useCredits';
 import { useFileHandling, type FileAttachment } from '@/lib/hooks/useFileHandling';
 import { useKalshiStore } from '@/lib/store/kalshi-store';
 const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ default: m.AuthModals })), { ssr: false });
@@ -288,16 +289,15 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     showLimitNotification, setShowLimitNotification,
   } = useModalState();
 
-  const [creditsRemaining, setCreditsRemaining] = useState(15);
-  const [systemStatus, setSystemStatus] = useState<'ok' | 'degraded' | 'down'>('ok');
+  const {
+    creditsRemaining, setCreditsRemaining,
+    supabaseProfileId, setSupabaseProfileId,
+    getCreditData,
+    consumeCredit, addCredits,
+    getRateLimitData, canCreateNewChat, updateRateLimitCount,
+  } = useCredits();
 
-  // Sync creditsRemaining from localStorage on mount so visitors see their real
-  // remaining balance immediately, not the hardcoded default of 15.
-  // Runs once client-side — safe because localStorage is browser-only.
-  useEffect(() => {
-    const data = getCreditData();
-    setCreditsRemaining(data.credits);
-  }, []); // mount-only: getCreditData reads localStorage, setCreditsRemaining is a stable setter
+  const [systemStatus, setSystemStatus] = useState<'ok' | 'degraded' | 'down'>('ok');
 
   // Prevent body-level scrolling so that a secondary React render (produced by
   // the hydration mismatch recovery path) cannot be revealed by scrolling past
@@ -470,54 +470,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   }, [selectedCategory, selectedSport]);
 
 
-  
-  // Credit system utilities — syncs with Supabase user_profiles when logged in,
-  // falls back to localStorage for anonymous users.
-  const MESSAGE_LIMIT = FREE_TIER.MESSAGE_LIMIT;
-  const CHAT_LIMIT = FREE_TIER.CHAT_LIMIT;
-  const LIMIT_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-  const [supabaseProfileId, setSupabaseProfileId] = useState<string | null>(null);
-
-  const getCreditData = () => {
-    if (typeof window === 'undefined') return { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
-    const data = localStorage.getItem('userCredits');
-    if (!data) {
-      const initial = { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
-      localStorage.setItem('userCredits', JSON.stringify(initial));
-      return initial;
-    }
-    let parsed: { credits: number; resetTime: number };
-    try {
-      parsed = JSON.parse(data);
-    } catch {
-      // Corrupted localStorage — reset to defaults
-      localStorage.removeItem('userCredits');
-      const initial = { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
-      localStorage.setItem('userCredits', JSON.stringify(initial));
-      return initial;
-    }
-    if (Date.now() > parsed.resetTime) {
-      const reset = { credits: MESSAGE_LIMIT, resetTime: Date.now() + LIMIT_DURATION };
-      localStorage.setItem('userCredits', JSON.stringify(reset));
-      return reset;
-    }
-    return parsed;
-  };
-
-  // Sync credits to Supabase (fire-and-forget)
-  const syncCreditsToSupabase = async (newCredits: number, _transactionType: string, _amount: number) => {
-    if (!supabaseProfileId) return;
-    try {
-      const supabase = createClient();
-      await supabase
-        .from('user_profiles')
-        .update({ credits_remaining: newCredits, updated_at: new Date().toISOString() })
-        .eq('id', supabaseProfileId);
-    } catch (err) {
-      console.error('[Credits] Supabase sync failed:', err);
-    }
-  };
-
   // Load instructions from localStorage fallback only (server instructions come via /api/init)
   const loadInstructionsFromLocalStorage = () => {
     const stored = localStorage.getItem('leverage_custom_instructions') || '';
@@ -629,67 +581,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     } catch {
       loadInstructionsFromLocalStorage();
     }
-  };
-
-  const consumeCredit = () => {
-    const data = getCreditData();
-    if (data.credits <= 0) {
-      setShowStripeLightbox(true);
-      return false;
-    }
-    const newCredits = data.credits - 1;
-    const updated = { ...data, credits: newCredits };
-    localStorage.setItem('userCredits', JSON.stringify(updated));
-    setCreditsRemaining(newCredits);
-    syncCreditsToSupabase(newCredits, 'consume', -1);
-    return true;
-  };
-
-  const addCredits = (amount: number): void => {
-    const data = getCreditData();
-    const newCredits = data.credits + amount;
-    const updated = { ...data, credits: newCredits };
-    localStorage.setItem('userCredits', JSON.stringify(updated));
-    setCreditsRemaining(newCredits);
-    syncCreditsToSupabase(newCredits, 'purchase', amount);
-  };
-
-  const getRateLimitData = () => {
-    if (typeof window === 'undefined') return { count: 0, resetTime: Date.now() + LIMIT_DURATION };
-    const data = localStorage.getItem('chatRateLimit');
-    if (!data) {
-      const initial = { count: 0, resetTime: Date.now() + LIMIT_DURATION };
-      localStorage.setItem('chatRateLimit', JSON.stringify(initial));
-      return initial;
-    }
-    let parsed: { count: number; resetTime: number };
-    try {
-      parsed = JSON.parse(data);
-    } catch {
-      // Corrupted localStorage — reset to defaults
-      localStorage.removeItem('chatRateLimit');
-      const initial = { count: 0, resetTime: Date.now() + LIMIT_DURATION };
-      localStorage.setItem('chatRateLimit', JSON.stringify(initial));
-      return initial;
-    }
-    if (Date.now() > parsed.resetTime) {
-      const reset = { count: 0, resetTime: Date.now() + LIMIT_DURATION };
-      localStorage.setItem('chatRateLimit', JSON.stringify(reset));
-      return reset;
-    }
-    return parsed;
-  };
-
-  const canCreateNewChat = () => {
-    const data = getRateLimitData();
-    return data.count < CHAT_LIMIT;
-  };
-
-  const updateRateLimitCount = () => {
-    const data = getRateLimitData();
-    const updated = { ...data, count: data.count + 1 };
-    localStorage.setItem('chatRateLimit', JSON.stringify(updated));
-    return updated;
   };
 
   // Restore fantasy league from Supabase (called on login / auth change)
@@ -1266,6 +1157,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     // Check if user has credits
     if (!consumeCredit()) {
       if (isDev) console.log('[v0] No credits remaining, showing purchase modal');
+      setShowStripeLightbox(true);
       return;
     }
 
@@ -2214,6 +2106,7 @@ No preamble. Start directly with section 1.`;
 
     // Check if user has credits
     if (!consumeCredit()) {
+      setShowStripeLightbox(true);
       return;
     }
 
@@ -3185,7 +3078,7 @@ No preamble. Start directly with section 1.`;
                         Chat Limit Reached
                       </h3>
                       <p className="text-xs text-[var(--text-muted)] leading-relaxed" suppressHydrationWarning>
-                        You've reached your limit of {CHAT_LIMIT} chats per 24 hours. Your limit will reset in{' '}
+                        You've reached your limit of {FREE_TIER.CHAT_LIMIT} chats per 24 hours. Your limit will reset in{' '}
                         {Math.ceil((getRateLimitData().resetTime - Date.now()) / (1000 * 60 * 60))} hours.
                       </p>
                     </div>

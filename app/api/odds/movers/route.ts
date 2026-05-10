@@ -18,8 +18,8 @@ export const maxDuration = 15;
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const hours = Math.min(parseInt(searchParams.get('hours') ?? '24', 10) || 24, 168);
-  const limit = Math.min(parseInt(searchParams.get('limit') ?? '20', 10) || 20, 100);
+  const hours = Math.max(1, Math.min(parseInt(searchParams.get('hours') ?? '24', 10) || 24, 168));
+  const limit = Math.max(1, Math.min(parseInt(searchParams.get('limit') ?? '20', 10) || 20, 100));
 
   try {
     const supabase = await createClient();

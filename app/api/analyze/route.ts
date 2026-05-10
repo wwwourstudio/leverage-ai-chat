@@ -1135,7 +1135,9 @@ export async function POST(request: NextRequest) {
             // Warm the DB so subsequent cold-starts skip this fetch (fire-and-forget)
             void import('@/lib/services/statcast-ingest').then(({ persistStatcastLeaders }) =>
               persistStatcastLeaders(statcastPlayers)
-            ).catch(() => {/* non-critical */});
+            ).catch((e: unknown) => {
+              console.warn('[v0] [ANALYZE] statcast DB warm failed (non-critical):', e instanceof Error ? e.message : e);
+            });
           }
         }
       } catch {
@@ -2094,7 +2096,9 @@ export async function POST(request: NextRequest) {
               for (const c of earlyCards) {
                 safeEnqueue(controller, sseChunk({ type: 'card', card: c }));
               }
-            }).catch(() => {});
+            }).catch((e: unknown) => {
+              console.warn('[v0] [ANALYZE] card SSE emit failed:', e instanceof Error ? e.message : e);
+            });
 
             // Abort if the first token doesn't arrive within the timeout budget.
             // Declared with `let` so onStepFinish can reset it after tool calls.

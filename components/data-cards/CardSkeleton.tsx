@@ -1,6 +1,6 @@
 'use client';
 
-export type SkeletonVariant = 'betting' | 'minimal' | 'stats';
+export type SkeletonVariant = 'betting' | 'minimal' | 'stats' | 'arbitrage';
 
 function BettingSkeletonBody() {
   return (
@@ -64,6 +64,53 @@ function StatsSkeletonBody() {
   );
 }
 
+function ArbitrageSkeletonBody() {
+  return (
+    <div className="px-4 pb-4 pt-3 space-y-3">
+      {/* Countdown strip */}
+      <div className="h-6 w-full rounded-lg bg-[var(--bg-overlay)] border border-[var(--border-subtle)] animate-pulse" />
+      {/* Profit hero block */}
+      <div className="rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-4 space-y-2 text-center">
+        <div className="h-2 w-24 bg-[var(--bg-surface)] rounded mx-auto animate-pulse" />
+        <div className="h-10 w-28 bg-[var(--bg-surface)] rounded-lg mx-auto animate-pulse" />
+        <div className="flex gap-3 pt-3 border-t border-[var(--border-subtle)]">
+          <div className="flex-1 space-y-1">
+            <div className="h-2 w-16 bg-[var(--bg-surface)] rounded mx-auto animate-pulse" />
+            <div className="h-4 w-20 bg-[var(--bg-elevated)] rounded mx-auto animate-pulse" />
+          </div>
+          <div className="flex-1 space-y-1">
+            <div className="h-2 w-16 bg-[var(--bg-source)] rounded mx-auto animate-pulse" />
+            <div className="h-4 w-20 bg-[var(--bg-elevated)] rounded mx-auto animate-pulse" style={{ animationDelay: '80ms' }} />
+          </div>
+        </div>
+      </div>
+      {/* Two bet legs */}
+      {[0, 1].map(i => (
+        <div key={i} className="rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] overflow-hidden" style={{ animationDelay: `${i * 60}ms` }}>
+          <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg-overlay)]">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[var(--bg-surface)] animate-pulse" />
+              <div className="h-2 w-10 bg-[var(--bg-surface)] rounded animate-pulse" />
+              <div className="h-3 w-20 bg-[var(--bg-elevated)] rounded animate-pulse" />
+            </div>
+            <div className="h-5 w-12 bg-[var(--bg-surface)] rounded animate-pulse" />
+          </div>
+          <div className="grid grid-cols-3 gap-2 px-3 py-2.5">
+            {[0, 1, 2].map(j => (
+              <div key={j} className="space-y-1">
+                <div className="h-2 w-8 bg-[var(--bg-surface)] rounded animate-pulse" />
+                <div className="h-3 w-14 bg-[var(--bg-elevated)] rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      {/* CTA */}
+      <div className="h-10 w-full rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] animate-pulse" />
+    </div>
+  );
+}
+
 export function CardSkeleton({ variant = 'betting' }: { variant?: SkeletonVariant }) {
   return (
     <div className="relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
@@ -84,6 +131,7 @@ export function CardSkeleton({ variant = 'betting' }: { variant?: SkeletonVarian
       {variant === 'betting' && <BettingSkeletonBody />}
       {variant === 'minimal' && <MinimalSkeletonBody />}
       {variant === 'stats' && <StatsSkeletonBody />}
+      {variant === 'arbitrage' && <ArbitrageSkeletonBody />}
     </div>
   );
 }

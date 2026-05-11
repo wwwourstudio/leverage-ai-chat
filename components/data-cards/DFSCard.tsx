@@ -451,7 +451,11 @@ export const DFSCard = memo(function DFSCard({
         {!isStackPlay && !hasCorePlay && !salary && !projection && !ownership && (
           <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-3 py-4 text-center">
             <span className="text-[10px] text-[var(--text-faint)]">
-              Player projections loading · Lineups typically post by 11am ET
+              {data.sport
+                ? `${String(data.sport).toUpperCase()} player projections loading`
+                : category
+                  ? `${category} player projections loading`
+                  : 'Player projections loading'}
             </span>
           </div>
         )}

@@ -47,7 +47,7 @@ const WatchlistLightbox = dynamic(() => import('@/components/WatchlistLightbox')
 import { useToast } from '@/components/toast-provider';
 import { Sidebar } from '@/components/Sidebar';
 import { CommandPalette } from '@/components/CommandPalette';
-import { ChatHeader, ChatInput } from '@/components/chat';
+import { ChatHeader, ChatInput, EnvironmentWarningBanner, KalshiBettingBanner, RateLimitNotification, FantasyLeagueContextBar, MessageActionsToolbar, SourcesPanel } from '@/components/chat';
 import { SuggestedPrompts } from '@/components/suggested-prompts';
 import { InsightCardItem, type InsightCard } from '@/components/InsightCard';
 
@@ -1764,20 +1764,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   return (
     <div className="flex h-screen bg-black text-white overflow-hidden font-sans">
       {/* Environment Variable Warning Banner */}
-      {serverData?.missingKeys && serverData.missingKeys.length > 0 && (
-        <div className="absolute top-0 left-0 right-0 bg-amber-600/90 backdrop-blur-sm border-b border-amber-500/50 px-4 py-2 z-50 flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-white flex-shrink-0" />
-          <div className="flex-1 text-sm">
-            <span className="font-semibold">Missing API Keys:</span> {serverData.missingKeys.join(', ')}. Some features may not work properly.
-          </div>
-          <a 
-            href="/admin/setup" 
-            className="text-xs font-semibold bg-white/20 hover:bg-white/30 px-3 py-1 rounded-md transition-colors whitespace-nowrap"
-          >
-            Configure →
-          </a>
-        </div>
-      )}
+      <EnvironmentWarningBanner missingKeys={serverData?.missingKeys ?? []} />
       
       {/* Mobile backdrop — closes sidebar when tapping outside */}
       {sidebarOpen && (
@@ -1862,13 +1849,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             {/* Database Status Banner */}
             <DatabaseStatusBanner />
             {/* Kalshi sports-query banner */}
-            {kalshiBettingBannerVisible && (
-              <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-amber-500/8 border border-amber-500/25 text-amber-300 text-[11px] font-semibold">
-                <span className="shrink-0">⚠️</span>
-                <span>Showing Kalshi prediction markets. For live sportsbook odds, switch to the <strong>Betting</strong> tab.</span>
-                <button onClick={() => setKalshiBettingBannerVisible(false)} className="ml-auto text-amber-400/60 hover:text-amber-300 text-xs">✕</button>
-              </div>
-            )}
+            <KalshiBettingBanner visible={kalshiBettingBannerVisible} onDismiss={() => setKalshiBettingBannerVisible(false)} />
             {messages.length === 0 ? (
               <WelcomeScreen onPromptSelect={(q) => generateRealResponse(q)} />
             ) : (
@@ -2032,186 +2013,37 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
                   )}
 
                   {/* Combined Metadata: Source Credibility & AI Trust - Hidden for welcome message */}
-                  {message.role === 'assistant' && !message.isWelcome && (message.sources || message.trustMetrics) && (
-                    <div className="mt-3 md:ml-11">
-                      {/* Compact Metadata Summary */}
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--text-faint)]">
-                        {message.modelUsed && (
-                          <span className="flex items-center gap-1">
-                            <BookOpen className="w-3 h-3 text-purple-500/60 shrink-0" />
-                            <span>Model: <span className="text-[var(--text-faint)] font-semibold">{message.modelUsed.replace('grok-3-fast', 'Grok 3 Fast').replace('grok-4', 'Grok 3 Fast').replace('Grok 4', 'Grok 3 Fast')}</span></span>
-                          </span>
-                        )}
-                        {message.processingTime && (
-                          <span className="flex items-center gap-1">
-                            <Zap className="w-3 h-3 text-yellow-500/60 shrink-0" />
-                            <span>Processed in: <span className="text-[var(--text-faint)] font-semibold tabular-nums">{message.processingTime}ms</span></span>
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Single collapsible: Sources & Trust combined */}
-                      {(message.sources?.length || message.trustMetrics) && (
-                        <details className="mt-2 group/trust">
-                          <summary className="cursor-pointer list-none flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors">
-                            <Shield className={`w-3.5 h-3.5 shrink-0 ${
-                              message.trustMetrics?.trustLevel === 'high' ? 'text-blue-500/70' :
-                              message.trustMetrics?.trustLevel === 'medium' ? 'text-yellow-500/70' :
-                              'text-blue-500/60'
-                            }`} />
-                            <span className="font-semibold uppercase tracking-wide">Sources & Trust</span>
-                            {message.trustMetrics && (
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                message.trustMetrics.trustLevel === 'high' ? 'bg-blue-600/20 text-blue-400' :
-                                message.trustMetrics.trustLevel === 'medium' ? 'bg-yellow-600/20 text-yellow-400' :
-                                'bg-red-600/20 text-red-400'
-                              }`}>
-                                {message.trustMetrics.finalConfidence}%
-                              </span>
-                            )}
-                            {message.sources?.length ? (
-                              <span className="text-[var(--text-faint)]">· {message.sources.length} sources</span>
-                            ) : null}
-                            {message.trustMetrics?.hasLiveOdds && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/10 text-blue-500/80">LIVE</span>
-                            )}
-                            <ChevronRight className="w-3 h-3 group-open/trust:rotate-90 transition-transform shrink-0" />
-                          </summary>
-                          <div className="mt-2 space-y-2">
-                            {message.sources && message.sources.length > 0 && (
-                              <div className="flex flex-wrap gap-1.5">
-                                {message.sources.map((source: any, idx: any) => {
-                                  const reliabilityColor = source.reliability >= 90 ? 'text-blue-500 border-blue-600/20' : 'text-yellow-500 border-yellow-600/20';
-                                  const Icon = source.type === 'database' ? Database : source.type === 'api' ? Activity : source.type === 'model' ? Sparkles : RefreshCw;
-                                  return (
-                                    <div key={source.name ?? `src-${idx}`} className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border bg-[var(--bg-overlay)] ${reliabilityColor} text-[11px]`} title={`${source.name} - ${source.reliability}% reliability`}>
-                                      <Icon className="w-3 h-3" />
-                                      <span className="font-semibold">{source.name}</span>
-                                      <span className="font-bold tabular-nums">{source.reliability}%</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                            {message.trustMetrics && (
-                              <TrustMetricsDisplay
-                                metrics={{
-                                  ...message.trustMetrics,
-                                  sources: message.trustMetrics.sources || message.sources,
-                                  modelUsed: message.trustMetrics.modelUsed || message.modelUsed || 'Grok 4',
-                                  processingTime: message.trustMetrics.processingTime || message.processingTime,
-                                }}
-                              />
-                            )}
-                          </div>
-                        </details>
-                      )}
-                    </div>
-                  )}
+                  <SourcesPanel
+                    role={message.role}
+                    isWelcome={message.isWelcome}
+                    sources={message.sources}
+                    trustMetrics={message.trustMetrics}
+                    modelUsed={message.modelUsed}
+                    processingTime={message.processingTime}
+                  />
 
 
                   {/* Message Actions - Hidden for welcome message */}
-                  {!message.isWelcome && (
-                    <div className={`flex items-center flex-nowrap gap-0.5 mt-2 ${message.role === 'assistant' ? 'ml-11' : ''}`}>
-                      {message.role === 'user' && editingMessageIndex !== index && (
-                        <button
-                          onClick={() => handleEditMessage(index)}
-                          className={`p-1.5 rounded-lg transition-all group/action border border-transparent hover:bg-[var(--bg-elevated)] active:bg-[var(--bg-elevated)] hover:border-[var(--border-subtle)]`}
-                          title="Edit this message"
-                          aria-label="Edit message"
-                        >
-                          <Edit3 className="w-3.5 h-3.5 text-[var(--text-faint)] group-hover/action:text-blue-400 transition-colors" />
-                        </button>
-                      )}
-                      {message.role === 'assistant' && (
-                        <>
-                          <button
-                            onClick={() => message.voted !== 'up' && handleVote(index, 'up')}
-                            className={`p-1.5 rounded-lg transition-all group/action border ${
-                              message.voted === 'up'
-                                ? 'bg-blue-500/15 border-blue-500/40 cursor-default'
-                                : 'hover:bg-blue-500/10 active:bg-blue-500/20 border-transparent hover:border-blue-500/30'
-                            }`}
-                            title="This response was helpful"
-                            aria-label="Mark as helpful"
-                          >
-                            <ThumbsUp className={`w-3.5 h-3.5 transition-colors ${message.voted === 'up' ? 'text-blue-400 fill-blue-400/30' : 'text-[var(--text-faint)] group-hover/action:text-blue-400'}`} />
-                          </button>
-                          <button
-                            onClick={() => message.voted !== 'down' && handleVote(index, 'down')}
-                            className={`p-1.5 rounded-lg transition-all group/action border ${
-                              message.voted === 'down'
-                                ? 'bg-red-500/15 border-red-500/40 cursor-default'
-                                : 'hover:bg-red-500/10 active:bg-red-500/20 border-transparent hover:border-red-500/30'
-                            }`}
-                            title="This response needs improvement"
-                            aria-label="Mark as needing improvement"
-                          >
-                            <ThumbsDown className={`w-3.5 h-3.5 transition-colors ${message.voted === 'down' ? 'text-red-400 fill-red-400/30' : 'text-[var(--text-faint)] group-hover/action:text-red-400'}`} />
-                          </button>
-                          <button
-                            onClick={() => handleRegenerateResponse(index)}
-                            className={`flex items-center gap-1 p-1.5 rounded-lg transition-all group/action border ${
-                              message.isError
-                                ? 'text-red-400 bg-red-950/30 border-red-800/40 hover:bg-red-900/40'
-                                : message.isPartial
-                                  ? 'text-amber-400 bg-amber-950/30 border-amber-800/40 hover:bg-amber-900/40'
-                                  : 'hover:bg-purple-500/10 active:bg-purple-500/20 border-transparent hover:border-purple-500/30'
-                            }`}
-                            title="Regenerate this response"
-                            aria-label="Regenerate response"
-                          >
-                            <RotateCcw className={`w-3.5 h-3.5 transition-colors ${
-                              message.isError ? 'text-red-400' : message.isPartial ? 'text-amber-400' : 'text-[var(--text-faint)] group-hover/action:text-purple-400'
-                            }`} />
-                            {(message.isError || message.isPartial) && (
-                              <span className="text-[11px] font-medium">Retry</span>
-                            )}
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (speakingMessageId === message.id) {
-                                stopVoice();
-                                setSpeakingMessageId(null);
-                              } else {
-                                const cards = (message as any).cards;
-                                const text = message.content + (cards?.length ? '\n\n' + cardsToSpeech(cards) : '');
-                                const voice_id = typeof window !== 'undefined'
-                                  ? (localStorage.getItem(GROK_VOICE_STORAGE_KEY) ?? GROK_VOICE_DEFAULT)
-                                  : GROK_VOICE_DEFAULT;
-                                setSpeakingMessageId(message.id);
-                                speakText(text, {
-                                  voice_id,
-                                  onEnd: () => setSpeakingMessageId(null),
-                                });
-                              }
-                            }}
-                            className={`p-1.5 rounded-lg transition-all group/action border ${
-                              speakingMessageId === message.id
-                                ? 'bg-blue-500/15 border-blue-500/40 text-blue-400 animate-pulse'
-                                : 'hover:bg-blue-500/10 active:bg-blue-500/20 border-transparent hover:border-blue-500/30'
-                            }`}
-                            title={speakingMessageId === message.id ? 'Stop speaking' : 'Read aloud'}
-                            aria-label={speakingMessageId === message.id ? 'Stop speaking' : 'Read aloud'}
-                          >
-                            <Volume2 className={`w-3.5 h-3.5 transition-colors ${speakingMessageId === message.id ? 'text-blue-400' : 'text-[var(--text-faint)] group-hover/action:text-blue-400'}`} />
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => handleCopyMessage(message.content)}
-                        className="p-1.5 rounded-lg hover:bg-cyan-500/10 active:bg-cyan-500/20 transition-all group/action border border-transparent hover:border-cyan-500/30"
-                        title="Copy message to clipboard"
-                        aria-label="Copy message"
-                      >
-                        <Copy className="w-3.5 h-3.5 text-[var(--text-faint)] group-hover/action:text-cyan-400 transition-colors" />
-                      </button>
-                      <div className="ml-auto flex items-center gap-1 px-2 py-1 bg-[var(--bg-overlay)] rounded-md border border-[var(--border-subtle)]">
-                        <Clock className="w-3 h-3 text-[var(--text-faint)]" />
-                        <span suppressHydrationWarning className="text-[10px] font-medium text-[var(--text-faint)] tabular-nums">{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      </div>
-                    </div>
-                  )}
+                  <MessageActionsToolbar
+                    message={message}
+                    index={index}
+                    editingMessageIndex={editingMessageIndex}
+                    speakingMessageId={speakingMessageId}
+                    onEdit={handleEditMessage}
+                    onVote={handleVote}
+                    onRegenerate={handleRegenerateResponse}
+                    onSpeak={(id, msgContent) => {
+                      const cards = (message as any).cards;
+                      const text = msgContent + (cards?.length ? '\n\n' + cardsToSpeech(cards) : '');
+                      const voice_id = typeof window !== 'undefined'
+                        ? (localStorage.getItem(GROK_VOICE_STORAGE_KEY) ?? GROK_VOICE_DEFAULT)
+                        : GROK_VOICE_DEFAULT;
+                      setSpeakingMessageId(id);
+                      speakText(text, { voice_id, onEnd: () => setSpeakingMessageId(null) });
+                    }}
+                    onStopSpeak={() => { stopVoice(); setSpeakingMessageId(null); }}
+                    onCopy={handleCopyMessage}
+                  />
                     </div>
                   </div>
                 );
@@ -2239,35 +2071,11 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           <div className="absolute inset-0 bg-gradient-to-t from-blue-600/5 via-transparent to-transparent pointer-events-none"></div>
           
           {/* Rate Limit Notification */}
-          {showLimitNotification && (
-            <div className="relative max-w-5xl xl:max-w-6xl mx-auto mb-4">
-              <div className="bg-gradient-to-r from-orange-500/10 via-red-500/10 to-orange-500/10 border border-orange-500/30 rounded-2xl p-4 backdrop-blur-sm shadow-xl">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3 flex-1">
-                    <div className="p-2 bg-orange-500/20 rounded-xl">
-                      <AlertCircle className="w-5 h-5 text-orange-400" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-sm font-bold text-white mb-1">
-                        Chat Limit Reached
-                      </h3>
-                      <p className="text-xs text-[var(--text-muted)] leading-relaxed" suppressHydrationWarning>
-                        You've reached your limit of {FREE_TIER.CHAT_LIMIT} chats per 24 hours. Your limit will reset in{' '}
-                        {Math.ceil((getRateLimitData().resetTime - Date.now()) / (1000 * 60 * 60))} hours.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowLimitNotification(false)}
-                    className="p-2 hover:bg-[var(--bg-elevated)] rounded-lg transition-all"
-                    aria-label="Close notification"
-                  >
-                    <X className="w-4 h-4 text-[var(--text-faint)] hover:text-foreground/80" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          <RateLimitNotification
+            visible={showLimitNotification}
+            resetTimeMs={getRateLimitData().resetTime}
+            onDismiss={() => setShowLimitNotification(false)}
+          />
 
           <div className="relative max-w-5xl xl:max-w-6xl mx-auto">
             {/* Fantasy League Setup Flow — shown when Fantasy is selected and no league is configured */}
@@ -2286,16 +2094,16 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
               />
             )}
             {/* Show configured league context + reset button */}
-            {selectedCategory === 'fantasy' && fantasyLeague?.setupComplete && isLoggedIn && (
-              <div className="mb-3 flex items-center gap-2 px-1">
-                <Trophy className="w-3.5 h-3.5 text-violet-500" />
-                <span className="text-[11px] font-bold text-violet-400">{fantasyLeague.teamName}</span>
-                <span className="text-[10px] text-[var(--text-faint)]">
-                  {fantasyLeague.sport?.toUpperCase()} · {fantasyLeague.platform?.toUpperCase()} · {fantasyLeague.teams} teams · {fantasyLeague.leagueType ?? fantasyLeague.scoring}
-                </span>
-                <button onClick={() => { setFantasyLeague(null); localStorage.removeItem('leverage_fantasy_league'); }} className="ml-auto text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors">Edit league</button>
-              </div>
-            )}
+            <FantasyLeagueContextBar
+              visible={selectedCategory === 'fantasy' && !!fantasyLeague?.setupComplete && isLoggedIn}
+              teamName={fantasyLeague?.teamName}
+              sport={fantasyLeague?.sport}
+              platform={fantasyLeague?.platform}
+              teams={fantasyLeague?.teams}
+              leagueType={fantasyLeague?.leagueType}
+              scoring={fantasyLeague?.scoring}
+              onReset={() => { setFantasyLeague(null); localStorage.removeItem('leverage_fantasy_league'); }}
+            />
             {/* Suggested Prompts — welcome grid + scrollable pills */}
             <SuggestedPrompts
               showWelcomeGrid={messages.length === 1 && !!messages[0]?.isWelcome && suggestedPrompts.length === 0 && selectedCategory === 'all'}
@@ -2459,40 +2267,6 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         />
       )}
 
-      <style>
-        {`
-          @keyframes fadeIn {
-            from { opacity: 0; }
-            to   { opacity: 1; }
-          }
-          .animate-fadeIn {
-            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-          }
-          .animate-pulse-slow {
-            animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-          }
-          .scrollbar-hide::-webkit-scrollbar {
-            display: none;
-          }
-          .scrollbar-hide {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-          }
-          .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-track {
-            background: rgba(17, 24, 39, 0.3);
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: rgba(75, 85, 99, 0.5);
-            border-radius: 3px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: rgba(107, 114, 128, 0.7);
-          }
-        `}
-      </style>
     </div>
   );
 }

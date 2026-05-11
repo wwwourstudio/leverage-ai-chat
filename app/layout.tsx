@@ -6,7 +6,6 @@ import { GeistMono } from 'geist/font/mono'
 import { ToastProvider } from '@/components/toast-provider'
 import { AuthProvider } from '@/components/AuthProvider'
 import { PWARegister } from '@/components/pwa-register'
-import { GlobalErrorSuppressor } from '@/components/global-error-suppressor'
 import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
@@ -102,7 +101,6 @@ export default function RootLayout({
         <Analytics />
         <SpeedInsights />
         <PWARegister />
-        <GlobalErrorSuppressor />
       </body>
     </html>
   )

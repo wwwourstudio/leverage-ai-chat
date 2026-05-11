@@ -232,7 +232,7 @@ export const ChatInput = memo(function ChatInput({
             onKeyDown={handleKeyDown}
             placeholder={defaultPlaceholder}
             disabled={isTyping}
-            className="flex-1 bg-transparent resize-none pl-4 pr-2 pt-3 pb-2 text-[13px] sm:text-sm leading-tight sm:leading-relaxed font-medium text-foreground placeholder-[var(--text-faint)] focus:outline-none disabled:opacity-50"
+            className="flex-1 bg-transparent resize-none pl-4 pr-2 py-3 text-[13px] sm:text-sm leading-tight sm:leading-relaxed font-medium text-foreground placeholder-[var(--text-faint)] focus:outline-none disabled:opacity-50"
             style={{ minHeight: '52px', maxHeight: '180px' }}
           />
           {/* Attach — floats right of textarea, vertically centered */}

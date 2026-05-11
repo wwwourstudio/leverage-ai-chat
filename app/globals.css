@@ -84,9 +84,24 @@
   --status-edge:  oklch(0.65 0.18 85);
   --status-cold:  oklch(0.50 0.08 250);
 
+  /* Category accent colors */
+  --cat-betting:   oklch(0.55 0.18 240);
+  --cat-fantasy:   oklch(0.55 0.20 290);
+  --cat-dfs:       oklch(0.60 0.18 80);
+  --cat-kalshi:    oklch(0.55 0.18 195);
+  --cat-arbitrage: oklch(0.55 0.20 145);
+
+  /* Component-level tokens */
+  --card-border:       var(--border-subtle);
+  --card-border-hover: var(--border-hover);
+  --chip-bg:           var(--bg-elevated);
+  --chip-border:       var(--border-subtle);
+
   /* Typography scale */
+  --text-nano:  9px;
+  --text-micro: 10px;
+  --text-tiny:  11px;
   --text-label: 0.6875rem;
-  --text-micro: 0.5625rem;
 }
 
 .dark {
@@ -178,6 +193,19 @@
   --status-value: oklch(0.65 0.22 145);
   --status-edge:  oklch(0.75 0.20 85);
   --status-cold:  oklch(0.58 0.10 250);
+
+  /* ── Category accent colors (dark) ──────────────────────────────── */
+  --cat-betting:   oklch(0.65 0.20 240);
+  --cat-fantasy:   oklch(0.65 0.22 290);
+  --cat-dfs:       oklch(0.72 0.20 80);
+  --cat-kalshi:    oklch(0.65 0.20 195);
+  --cat-arbitrage: oklch(0.70 0.22 145);
+
+  /* ── Component-level tokens ──────────────────────────────────────── */
+  --card-border:       var(--border-subtle);
+  --card-border-hover: var(--border-hover);
+  --chip-bg:           var(--bg-elevated);
+  --chip-border:       var(--border-subtle);
 }
 
 @theme inline {
@@ -402,4 +430,36 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ── Extracted from page-client.tsx <style> block ─────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.animate-pulse-slow {
+  animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(17, 24, 39, 0.3);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.5);
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.7);
 }

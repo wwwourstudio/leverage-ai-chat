@@ -3,6 +3,7 @@
 import {
   Cloud, CloudRain, Sun, Wind, Droplets, CloudLightning,
   Snowflake, Eye, ChevronRight, AlertTriangle, CheckCircle,
+  MapPin, Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SPORT_KEYS } from '@/lib/constants';
@@ -22,6 +23,19 @@ interface WeatherCardProps {
     precipitation?: string;
     gameImpact?: string;
     impactScore?: string | number;
+    gameTime?: string;
+    venue?: string;
+    weatherCode?: string | number;
+    // Impact category overrides
+    windImpact?: string;        // 'favorable' | 'neutral' | 'adverse'
+    precipImpact?: string;
+    tempImpact?: string;
+    visibilityImpact?: string;
+    // NFL-specific position impacts
+    offenseImpact?: string;
+    defenseImpact?: string;
+    kickerImpact?: string;
+    // Flexible additional fields
     [key: string]: any;
   };
   status: string;
@@ -73,13 +87,35 @@ interface ConditionEntry {
 
 const CONDITION_MAP: ConditionEntry[] = [
   { keywords: ['thunder', 'lightning'],                      Icon: CloudLightning, emoji: '⛈️'  },
-  { keywords: ['rain', 'storm', 'shower'],                   Icon: CloudRain,      emoji: '🌧️' },
-  { keywords: ['snow', 'blizzard', 'flurr'],                 Icon: Snowflake,      emoji: '❄️'  },
+  { keywords: ['rain', 'storm', 'shower', 'heavy rain'],     Icon: CloudRain,      emoji: '🌧️' },
+  { keywords: ['snow', 'blizzard', 'flurr', 'heavy snow'],   Icon: Snowflake,      emoji: '❄️'  },
   { keywords: ['wind', 'gust'],                              Icon: Wind,           emoji: '🌬️' },
   { keywords: ['sun', 'clear', 'fair', 'sunny'],             Icon: Sun,            emoji: '☀️'  },
   { keywords: ['fog', 'mist', 'haze'],                       Icon: Eye,            emoji: '🌫️' },
-  { keywords: ['cloud', 'overcast'],                         Icon: Cloud,          emoji: '☁️'  },
+  { keywords: ['cloud', 'overcast', 'partly cloudy'],        Icon: Cloud,          emoji: '☁️'  },
 ];
+
+// WMO weather code → condition string (mirrors lib/weather/index.ts)
+function conditionFromCode(code: number): string {
+  if (code === 0) return 'Clear';
+  if (code <= 3) return 'Partly Cloudy';
+  if (code <= 48) return 'Fog';
+  if (code <= 67) return 'Rain';
+  if (code <= 77) return 'Snow';
+  if (code <= 82) return 'Heavy Rain';
+  if (code <= 86) return 'Heavy Snow';
+  if (code <= 99) return 'Thunderstorm';
+  return '';
+}
+
+function resolveCondition(data: WeatherCardProps['data']): string | undefined {
+  if (data.condition) return data.condition;
+  if (data.weatherCode !== undefined) {
+    const code = Number(data.weatherCode);
+    if (!isNaN(code)) return conditionFromCode(code);
+  }
+  return undefined;
+}
 
 function matchCondition(condition?: string): ConditionEntry | undefined {
   if (!condition) return undefined;
@@ -211,9 +247,93 @@ function getSportContext(category: string, wind: number, precip: number, temp: n
   return matched?.text ?? null;
 }
 
+// ─── Impact category badges ───────────────────────────────────────────────────
+
+type ImpactLevel = 'favorable' | 'neutral' | 'adverse';
+
+const IMPACT_BADGE_CLS: Record<ImpactLevel, string> = {
+  favorable: 'bg-emerald-500/15 border-emerald-500/25 text-emerald-300',
+  neutral:   'bg-slate-500/10 border-slate-500/20 text-slate-400',
+  adverse:   'bg-red-500/15 border-red-500/25 text-red-300',
+};
+
+/** Derive impact level for wind from mph value */
+function windImpactLevel(mph: number): ImpactLevel {
+  if (mph > 20) return 'adverse';
+  if (mph > 10) return 'neutral';
+  return 'favorable';
+}
+
+/** Derive impact level for precip from mm/inch value */
+function precipImpactLevel(val: number): ImpactLevel {
+  if (val > 0.1) return 'adverse';
+  if (val > 0) return 'neutral';
+  return 'favorable';
+}
+
+/** Derive impact level for temperature */
+function tempImpactLevel(f: number): ImpactLevel {
+  if (f < 32 || f > 95) return 'adverse';
+  if (f < 45 || f > 85) return 'neutral';
+  return 'favorable';
+}
+
+/** Parse an override string like "favorable"/"adverse"/"neutral" or "good"/"bad" */
+function parseImpactOverride(val?: string): ImpactLevel | null {
+  if (!val) return null;
+  const l = val.toLowerCase();
+  if (l.includes('favorable') || l.includes('good') || l.includes('ideal') || l.includes('low')) return 'favorable';
+  if (l.includes('adverse') || l.includes('bad') || l.includes('high') || l.includes('severe')) return 'adverse';
+  if (l.includes('neutral') || l.includes('moderate') || l.includes('medium')) return 'neutral';
+  return null;
+}
+
+interface ImpactBadgeProps {
+  label: string;
+  level: ImpactLevel;
+}
+
+function ImpactBadge({ label, level }: ImpactBadgeProps) {
+  const dot = level === 'favorable' ? 'bg-emerald-400' : level === 'adverse' ? 'bg-red-400' : 'bg-slate-400';
+  return (
+    <div className={cn(
+      'flex flex-col items-center gap-1 px-2 py-2 rounded-xl border text-center',
+      IMPACT_BADGE_CLS[level],
+    )}>
+      <span className={cn('w-1.5 h-1.5 rounded-full', dot)} />
+      <span className="text-[9px] font-black uppercase tracking-wide leading-none">{label}</span>
+    </div>
+  );
+}
+
+// ─── NFL position impact grid ─────────────────────────────────────────────────
+
+type PositionImpact = { label: string; value: string; level: ImpactLevel };
+
+function parsePositionImpact(val?: string): PositionImpact['level'] {
+  if (!val) return 'neutral';
+  const l = val.toLowerCase();
+  if (l.includes('minimal') || l.includes('good') || l.includes('low') || l.includes('favorable')) return 'favorable';
+  if (l.includes('severe') || l.includes('high') || l.includes('bad') || l.includes('adverse')) return 'adverse';
+  return 'neutral';
+}
+
+const POSITION_LEVEL_CLS: Record<ImpactLevel, string> = {
+  favorable: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300',
+  neutral:   'bg-slate-500/8 border-slate-500/15 text-slate-400',
+  adverse:   'bg-red-500/10 border-red-500/20 text-red-300',
+};
+
+// ─── Known keys (don't render in extraKeys fallback) ─────────────────────────
+
 const KNOWN_KEYS = new Set([
   'location', 'temperature', 'condition', 'wind', 'humidity',
   'precipitation', 'gameImpact', 'impactScore', 'realData', 'status', 'sport', 'source',
+  'gameTime', 'venue', 'weatherCode',
+  'windImpact', 'precipImpact', 'tempImpact', 'visibilityImpact',
+  'offenseImpact', 'defenseImpact', 'kickerImpact',
+  // fields from cards-generator "game-time" variant that are rendered explicitly
+  'matchup', 'Temperature', 'Condition', 'Wind Speed', 'Rain Chance', 'Impact', 'Trend', 'Recommendation',
 ]);
 
 export function WeatherCard({
@@ -226,17 +346,20 @@ export function WeatherCard({
   isHero = false,
 }: WeatherCardProps) {
   const cfg = statusConfig[status] || statusConfig.neutral;
-  const ConditionIcon = getConditionIcon(data.condition);
-  const conditionEmoji = getConditionEmoji(data.condition);
+
+  // Resolve condition from explicit field or weatherCode
+  const condition = resolveCondition(data);
+  const ConditionIcon = getConditionIcon(condition);
+  const conditionEmoji = getConditionEmoji(condition);
 
   const impactScore = data.impactScore !== undefined
     ? Number(data.impactScore)
     : computeImpactScore(data);
 
-  const windNum = parseNum(data.wind);
-  const tempNum = parseNum(data.temperature ?? '70');
-  const precipNum = parseNum(data.precipitation);
-  const windDirection = parseWindDirection(data.wind);
+  const windNum = parseNum(data.wind ?? data['Wind Speed']);
+  const tempNum = parseNum(data.temperature ?? data['Temperature'] ?? '70');
+  const precipNum = parseNum(data.precipitation ?? data['Rain Chance']);
+  const windDirection = parseWindDirection(data.wind ?? data['Wind Speed']);
   const windArrow = getWindArrow(windDirection ?? undefined);
   const sportContext = getSportContext(
     String(data.sport ?? category ?? ''),
@@ -245,11 +368,11 @@ export function WeatherCard({
     isNaN(tempNum) ? 70 : tempNum,
   );
 
-  // Parse precipitation probability (e.g. "30% chance of rain")
-  const precipProbMatch = String(data.precipitation ?? '').match(/(\d+)%/);
+  // Parse precipitation probability (e.g. "30% chance of rain" or "30%")
+  const precipProbMatch = String(data.precipitation ?? data['Rain Chance'] ?? '').match(/(\d+)%/);
   const precipPct = precipProbMatch ? parseInt(precipProbMatch[1]) : null;
 
-  // Impact badge config
+  // ── Impact badge config (overall) ──────────────────────────────────────────
   const impactBadge = impactScore !== null
     ? impactScore >= 7
       ? { label: 'HIGH IMPACT', cls: 'bg-red-500/15 border-red-500/30 text-red-300' }
@@ -258,18 +381,42 @@ export function WeatherCard({
       : { label: 'LOW', cls: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' }
     : null;
 
-  // Condition-based background tint for the header
+  // ── Condition-based background tint for the header ──────────────────────────
   const conditionGrad = (() => {
-    const c = (data.condition ?? '').toLowerCase();
+    const c = (condition ?? '').toLowerCase();
     if (c.includes('sun') || c.includes('clear') || c.includes('sunny')) return 'from-amber-700/60 via-yellow-800/40 to-amber-950/30';
-    if (c.includes('rain') || c.includes('storm') || c.includes('shower')) return 'from-blue-700/60 via-blue-800/40 to-blue-950/30';
-    if (c.includes('wind') || c.includes('gust')) return 'from-slate-600/60 via-gray-700/40 to-slate-900/30';
-    if (c.includes('snow') || c.includes('blizzard')) return 'from-sky-600/60 via-cyan-700/40 to-sky-950/30';
     if (c.includes('thunder') || c.includes('lightning')) return 'from-purple-700/60 via-violet-800/40 to-purple-950/30';
+    if (c.includes('rain') || c.includes('storm') || c.includes('shower')) return 'from-blue-700/60 via-blue-800/40 to-blue-950/30';
+    if (c.includes('snow') || c.includes('blizzard')) return 'from-sky-600/60 via-cyan-700/40 to-sky-950/30';
+    if (c.includes('wind') || c.includes('gust')) return 'from-slate-600/60 via-gray-700/40 to-slate-900/30';
+    if (c.includes('fog') || c.includes('mist')) return 'from-gray-600/60 via-slate-700/40 to-gray-950/30';
     return cfg.headerGrad;
   })();
 
+  // ── Impact category badges ──────────────────────────────────────────────────
+  const windLevel: ImpactLevel = parseImpactOverride(data.windImpact) ?? (isNaN(windNum) ? 'neutral' : windImpactLevel(windNum));
+  const precipLevel: ImpactLevel = parseImpactOverride(data.precipImpact) ?? (isNaN(precipNum) ? 'favorable' : precipImpactLevel(precipNum));
+  const tempLevel: ImpactLevel = parseImpactOverride(data.tempImpact) ?? (isNaN(tempNum) ? 'neutral' : tempImpactLevel(tempNum));
+  const visLevel: ImpactLevel = parseImpactOverride(data.visibilityImpact) ?? 'neutral';
+
+  const hasImpactBadges = !isNaN(windNum) || !isNaN(precipNum) || !isNaN(tempNum) || data.windImpact || data.precipImpact || data.tempImpact || data.visibilityImpact;
+
+  // ── NFL position impacts ────────────────────────────────────────────────────
+  const hasNflPositionImpacts = data.offenseImpact || data.defenseImpact || data.kickerImpact;
+  const positionImpacts: PositionImpact[] = hasNflPositionImpacts
+    ? [
+        { label: 'Offense', value: data.offenseImpact ?? 'Neutral', level: parsePositionImpact(data.offenseImpact) },
+        { label: 'Defense', value: data.defenseImpact ?? 'Neutral', level: parsePositionImpact(data.defenseImpact) },
+        { label: 'Kicker',  value: data.kickerImpact  ?? 'Neutral', level: parsePositionImpact(data.kickerImpact) },
+      ]
+    : [];
+
+  // ── Extra key-value data (anything not covered above) ──────────────────────
   const extraKeys = Object.keys(data).filter(k => !KNOWN_KEYS.has(k) && data[k] != null);
+
+  // ── Game time display ───────────────────────────────────────────────────────
+  const gameTimeDisplay = data.gameTime ? String(data.gameTime) : null;
+  const venueDisplay = data.venue ? String(data.venue) : null;
 
   return (
     <article className={cn(
@@ -302,13 +449,27 @@ export function WeatherCard({
           {title}
         </h3>
 
-        {data.location && (
-          <p className="text-[11px] text-white/60 mt-1 line-clamp-1">{data.location}</p>
+        {/* Venue + game time */}
+        {(venueDisplay || data.location || gameTimeDisplay) && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5">
+            {(venueDisplay ?? data.location) && (
+              <span className="flex items-center gap-1 text-[10px] text-white/60">
+                <MapPin className="w-2.5 h-2.5 shrink-0" />
+                <span className="line-clamp-1">{venueDisplay ?? data.location}</span>
+              </span>
+            )}
+            {gameTimeDisplay && (
+              <span className="flex items-center gap-1 text-[10px] text-white/60">
+                <Clock className="w-2.5 h-2.5 shrink-0" />
+                <span>{gameTimeDisplay}</span>
+              </span>
+            )}
+          </div>
         )}
 
         {/* Temperature hero + emoji */}
         <div className="flex items-end gap-3 mt-3">
-          <span className="text-4xl" role="img" aria-label={data.condition ?? 'weather'}>
+          <span className="text-4xl" role="img" aria-label={condition ?? 'weather'}>
             {conditionEmoji}
           </span>
           {!isNaN(tempNum) && (
@@ -316,25 +477,35 @@ export function WeatherCard({
               <span className="text-4xl font-black text-white tabular-nums leading-none">
                 {Math.round(tempNum)}°F
               </span>
-              {data.condition && (
-                <p className="text-sm text-white/70 mt-0.5">{data.condition}</p>
+              {condition && (
+                <p className="text-sm text-white/70 mt-0.5">{condition}</p>
               )}
             </div>
           )}
-          {isNaN(tempNum) && data.condition && (
-            <span className="text-base text-white/70 mb-1">{data.condition}</span>
+          {isNaN(tempNum) && condition && (
+            <span className="text-base text-white/70 mb-1">{condition}</span>
           )}
         </div>
       </div>
 
       <div className="px-4 pb-4 space-y-3">
 
-        {/* Wind: arrow + speed + compass */}
+        {/* ── Impact category badges: Wind · Precip · Temp · Visibility ── */}
+        {hasImpactBadges && (
+          <div className="mt-3 grid grid-cols-4 gap-1.5">
+            <ImpactBadge label="Wind"    level={windLevel}   />
+            <ImpactBadge label="Precip"  level={precipLevel} />
+            <ImpactBadge label="Temp"    level={tempLevel}   />
+            <ImpactBadge label="Visibility" level={visLevel} />
+          </div>
+        )}
+
+        {/* Wind: arrow + speed bar + compass */}
         {!isNaN(windNum) && windNum > 0 && (
-          <div className="mt-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-3 py-3">
+          <div className="rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-3 py-3">
             <div className="flex items-center gap-3 mb-2">
               {windArrow && (
-                <span className="text-2xl font-black text-sky-300 leading-none select-none">
+                <span className="text-2xl font-black text-sky-300 leading-none select-none" title={windDirection ?? undefined}>
                   {windArrow}
                 </span>
               )}
@@ -347,7 +518,7 @@ export function WeatherCard({
         )}
 
         {/* Humidity + Precip 2×2 grid */}
-        {(data.humidity || (!isNaN(precipNum) && precipNum >= 0)) && (
+        {(data.humidity || (!isNaN(precipNum) && precipNum >= 0 && precipPct === null)) && (
           <div className={cn('grid gap-2', data.humidity && !isNaN(precipNum) ? 'grid-cols-2' : 'grid-cols-1')}>
             {data.humidity && (
               <div className="rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-2.5 text-center">
@@ -390,8 +561,22 @@ export function WeatherCard({
               />
             </div>
             {precipPct >= 60 && (
-              <p className="text-[9px] text-blue-300/70 font-semibold">⚠ High precipitation probability</p>
+              <p className="text-[9px] text-blue-300/70 font-semibold">High precipitation probability</p>
             )}
+          </div>
+        )}
+
+        {/* NFL position impact mini 3-col grid */}
+        {positionImpacts.length > 0 && (
+          <div className="rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+            <div className="grid grid-cols-3 divide-x divide-[var(--border-subtle)]">
+              {positionImpacts.map(({ label, value, level }) => (
+                <div key={label} className={cn('px-2 py-2.5 text-center', POSITION_LEVEL_CLS[level])}>
+                  <div className="text-[9px] font-black uppercase tracking-wider mb-1 opacity-70">{label}</div>
+                  <div className="text-[10px] font-bold leading-snug">{value}</div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

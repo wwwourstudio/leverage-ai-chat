@@ -35,36 +35,27 @@ const NO_COLOR  = '#f63d58';
 
 // ── Category config ────────────────────────────────────────────────────────────
 
-const CATEGORY_ACCENT: Record<string, string> = {
-  election:     '#3b82f6',
-  politics:     '#3b82f6',
-  sports:       '#10b981',
-  weather:      '#22d3ee',
-  finance:      '#f59e0b',
-  crypto:       '#8b5cf6',
-  tech:         '#7c3aed',
-  entertainment:'#ec4899',
-  market:       '#6366f1',
+interface CategoryConfig { accent: string; headerGrad: string; }
+
+const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
+  election:      { accent: '#3b82f6', headerGrad: 'from-blue-600/80 via-blue-700/60 to-blue-900/40' },
+  politics:      { accent: '#3b82f6', headerGrad: 'from-blue-600/80 via-blue-700/60 to-blue-900/40' },
+  sports:        { accent: '#10b981', headerGrad: 'from-emerald-600/80 via-emerald-700/60 to-emerald-900/40' },
+  weather:       { accent: '#22d3ee', headerGrad: 'from-cyan-600/80 via-cyan-700/60 to-cyan-900/40' },
+  finance:       { accent: '#f59e0b', headerGrad: 'from-amber-600/80 via-amber-700/60 to-amber-900/40' },
+  crypto:        { accent: '#8b5cf6', headerGrad: 'from-violet-600/80 via-violet-700/60 to-violet-900/40' },
+  tech:          { accent: '#7c3aed', headerGrad: 'from-violet-600/80 via-violet-700/60 to-violet-900/40' },
+  entertainment: { accent: '#ec4899', headerGrad: 'from-pink-600/80 via-pink-700/60 to-pink-900/40' },
+  market:        { accent: '#6366f1', headerGrad: 'from-indigo-600/80 via-indigo-700/60 to-indigo-900/40' },
 };
 
-function getCategoryAccent(label?: string): string {
-  return CATEGORY_ACCENT[(label || '').toLowerCase()] ?? '#6366f1';
-}
-
-const CATEGORY_HEADER_GRAD: Record<string, string> = {
-  election:      'from-blue-600/80 via-blue-700/60 to-blue-900/40',
-  politics:      'from-blue-600/80 via-blue-700/60 to-blue-900/40',
-  sports:        'from-emerald-600/80 via-emerald-700/60 to-emerald-900/40',
-  weather:       'from-cyan-600/80 via-cyan-700/60 to-cyan-900/40',
-  finance:       'from-amber-600/80 via-amber-700/60 to-amber-900/40',
-  crypto:        'from-violet-600/80 via-violet-700/60 to-violet-900/40',
-  tech:          'from-violet-600/80 via-violet-700/60 to-violet-900/40',
-  entertainment: 'from-pink-600/80 via-pink-700/60 to-pink-900/40',
-  market:        'from-indigo-600/80 via-indigo-700/60 to-indigo-900/40',
+const CATEGORY_CONFIG_DEFAULT: CategoryConfig = {
+  accent: '#6366f1',
+  headerGrad: 'from-indigo-600/80 via-indigo-700/60 to-indigo-900/40',
 };
 
-function getCategoryHeaderGrad(label?: string): string {
-  return CATEGORY_HEADER_GRAD[(label || '').toLowerCase()] ?? 'from-indigo-600/80 via-indigo-700/60 to-indigo-900/40';
+function getCategoryConfig(label?: string): CategoryConfig {
+  return CATEGORY_CONFIG[(label || '').toLowerCase()] ?? CATEGORY_CONFIG_DEFAULT;
 }
 
 function CategoryIcon({ label, size = 14, style }: { label?: string; size?: number; style?: React.CSSProperties }) {
@@ -123,6 +114,24 @@ const isPublicTicker = (t?: string) =>
   (t as string).length <= 35 &&
   !/-[0-9a-f]{8,}/i.test(t as string) &&
   !/CROSS.*CATEGORY/i.test(t as string);
+
+/**
+ * Build the Kalshi deep-link URL from the most-specific identifiers available.
+ * Returns the full markets browse URL when no valid public tickers are found.
+ */
+function buildTradeUrl(
+  eventTicker?: unknown,
+  ticker?: unknown,
+  seriesTicker?: unknown,
+): string {
+  const evtLower    = isPublicTicker(eventTicker  as string) ? (eventTicker  as string).toLowerCase() : '';
+  const mktLower    = isPublicTicker(ticker        as string) ? (ticker        as string).toLowerCase() : '';
+  const seriesLower = isPublicTicker(seriesTicker  as string) ? (seriesTicker  as string).toLowerCase() : '';
+  if (evtLower && mktLower)  return `https://kalshi.com/markets/${evtLower}/${mktLower}`;
+  if (seriesLower)           return `https://kalshi.com/markets/${seriesLower}`;
+  if (evtLower)              return `https://kalshi.com/markets/${evtLower}`;
+  return `https://kalshi.com/markets`;
+}
 
 // ── Sparkline ──────────────────────────────────────────────────────────────────
 
@@ -1103,8 +1112,7 @@ export const KalshiCard = memo(function KalshiCard({
 
   const isActive    = status === 'active' || status === 'open' || status === 'live';
   const marketCat   = (d.subcategory || subcategory || category || 'Prediction').toUpperCase();
-  const accentColor = getCategoryAccent(d.iconLabel);
-  const headerGrad  = getCategoryHeaderGrad(d.iconLabel);
+  const { accent: accentColor, headerGrad } = getCategoryConfig(d.iconLabel);
 
   const { watched, toggle: toggleWatch } = useKalshiWatchlist(title, d.ticker as string | undefined);
 
@@ -1129,18 +1137,11 @@ export const KalshiCard = memo(function KalshiCard({
 
   // ── Deep link construction ─────────────────────────────────────────────────
 
-  const evtLower    = isPublicTicker(d.eventTicker)  ? (d.eventTicker as string).toLowerCase()  : '';
-  const mktLower    = isPublicTicker(d.ticker)        ? (d.ticker as string).toLowerCase()        : '';
-  const seriesLower = isPublicTicker(d.seriesTicker) ? (d.seriesTicker as string).toLowerCase() : '';
-
-  const hasSpecificMarket = evtLower || mktLower || seriesLower;
-  const tradeBase = evtLower && mktLower
-    ? `https://kalshi.com/markets/${evtLower}/${mktLower}`
-    : seriesLower
-    ? `https://kalshi.com/markets/${seriesLower}`
-    : evtLower
-    ? `https://kalshi.com/markets/${evtLower}`
-    : `https://kalshi.com/markets`;
+  const tradeBase         = buildTradeUrl(d.eventTicker, d.ticker, d.seriesTicker);
+  const hasSpecificMarket =
+    isPublicTicker(d.eventTicker as string) ||
+    isPublicTicker(d.ticker      as string) ||
+    isPublicTicker(d.seriesTicker as string);
 
   // ── Unavailable state — renders before the full card when Kalshi API is down ──
   if (d.status === 'API_UNAVAILABLE' || d.ticker === 'UNAVAILABLE') {

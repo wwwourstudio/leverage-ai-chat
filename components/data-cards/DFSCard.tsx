@@ -1,8 +1,37 @@
 'use client';
 
 import { memo } from 'react';
+import Image from 'next/image';
 import { Award, Users, Gamepad2, ChevronRight, TrendingUp, Star, Zap, Link2, BarChart2, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ESPN_TEAM_ABBR } from '@/lib/constants';
+
+/** Resolve ESPN CDN team logo URL from team name + optional sport slug. Returns null if not found. */
+function getTeamLogoAbbr(teamName: string): string | null {
+  if (!teamName) return null;
+  return ESPN_TEAM_ABBR[teamName.trim()] ?? null;
+}
+
+function TeamLogo({ team, sport, size = 24 }: { team: string; sport?: string; size?: number }) {
+  const abbr = getTeamLogoAbbr(team);
+  if (!abbr) return null;
+  // Derive sport slug for ESPN CDN
+  const slug = sport?.includes('basketball') ? 'nba'
+    : sport?.includes('baseball') ? 'mlb'
+    : sport?.includes('hockey') ? 'nhl'
+    : 'nfl';
+  const src = `https://a.espncdn.com/i/teamlogos/${slug}/500/${abbr}.png`;
+  return (
+    <Image
+      src={src}
+      alt={team}
+      width={size}
+      height={size}
+      className="rounded-full object-contain shrink-0"
+      unoptimized
+    />
+  );
+}
 
 interface DFSCardProps {
   type: string;
@@ -229,7 +258,7 @@ export const DFSCard = memo(function DFSCard({
   const cfg = statusConfig[status] || statusConfig.value;
 
   const {
-    player, team, position,
+    player, team, position, sport,
     targetGame, targetPlayers, description,
     platforms, tips, salary, projection, ownership,
     boomCeiling, bustFloor, realData,
@@ -272,7 +301,7 @@ export const DFSCard = memo(function DFSCard({
     )}>
 
       {/* ══ ZONE 1: PLAYER HEADER (gradient) ════════════════════════════ */}
-      <div className={cn('relative px-4 pt-4 pb-3 bg-gradient-to-br to-transparent border-b border-[var(--border-subtle)]', headerGrad)}>
+      <div className={cn('relative px-4 pr-10 pt-4 pb-3 bg-gradient-to-br to-transparent border-b border-[var(--border-subtle)]', headerGrad)}>
         {/* Decorative glow orb */}
         <div className="absolute top-0 right-0 w-40 h-20 bg-white/3 rounded-bl-full blur-3xl pointer-events-none" />
 
@@ -335,9 +364,14 @@ export const DFSCard = memo(function DFSCard({
                   <span className="text-[10px] font-bold text-white/50">{team}</span>
                 )}
               </div>
-              <span className={cn('font-black text-white leading-tight', isHero ? 'text-2xl' : 'text-xl')}>
-                {player}
-              </span>
+              <div className="flex items-center gap-2">
+                {team && (
+                  <TeamLogo team={team} sport={sport} size={28} />
+                )}
+                <span className={cn('font-black text-white leading-tight', isHero ? 'text-2xl' : 'text-xl')}>
+                  {player}
+                </span>
+              </div>
             </div>
             {valueScore !== null && <ValueGrade score={valueScore} />}
           </div>
@@ -449,14 +483,15 @@ export const DFSCard = memo(function DFSCard({
 
         {/* Empty state */}
         {!isStackPlay && !hasCorePlay && !salary && !projection && !ownership && (
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-3 py-4 text-center">
-            <span className="text-[10px] text-[var(--text-faint)]">
-              {data.sport
-                ? `${String(data.sport).toUpperCase()} player projections loading`
-                : category
-                  ? `${category} player projections loading`
-                  : 'Player projections loading'}
-            </span>
+          <div className="grid grid-cols-2 gap-1.5">
+            <div className="flex flex-col items-center gap-1 rounded-xl bg-violet-500/8 border border-violet-500/20 px-2 py-2.5">
+              <span className="text-[8px] font-black uppercase tracking-wider text-violet-400/70">Salary Cap</span>
+              <span className="text-[11px] font-bold text-[var(--text-faint)]">Ask about a slate</span>
+            </div>
+            <div className="flex flex-col items-center gap-1 rounded-xl bg-emerald-500/8 border border-emerald-500/20 px-2 py-2.5">
+              <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400/70">Target</span>
+              <span className="text-[11px] font-bold text-[var(--text-faint)]">or matchup</span>
+            </div>
           </div>
         )}
 
@@ -578,11 +613,18 @@ export const DFSCard = memo(function DFSCard({
               )}
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {stackPlayers.map((sp: string, i: number) => (
-                <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/25 text-[10px] font-bold text-indigo-300">
-                  {sp}
-                </span>
-              ))}
+              {stackPlayers.map((sp: string | { name?: string; team?: string; [k: string]: unknown }, i: number) => {
+                const spName  = typeof sp === 'string' ? sp : (sp.name ?? String(sp));
+                const spTeam  = typeof sp === 'string' ? null : sp.team ?? null;
+                return (
+                  <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/25 text-[10px] font-bold text-indigo-300">
+                    {spTeam && (
+                      <TeamLogo team={spTeam as string} sport={sport} size={22} />
+                    )}
+                    {spName}
+                  </span>
+                );
+              })}
             </div>
           </div>
         )}

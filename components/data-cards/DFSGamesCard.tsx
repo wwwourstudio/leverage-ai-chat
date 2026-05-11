@@ -1,8 +1,56 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useState } from 'react';
+import Image from 'next/image';
 import { Calendar, ChevronRight, Clock, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+/* ─── TeamLogoByAbbr ─────────────────────────────────────────────────────── */
+
+interface TeamLogoProps {
+  abbr: string;
+  sport?: string;
+  size?: number;
+}
+
+function TeamLogoByAbbr({ abbr, sport = 'mlb', size = 28 }: TeamLogoProps) {
+  const [errored, setErrored] = useState(false);
+  const src = `https://a.espncdn.com/i/teamlogos/${sport.toLowerCase()}/${size >= 40 ? '500' : '500'}/${abbr.toLowerCase()}.png`;
+
+  if (errored) {
+    return (
+      <span
+        className="inline-flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white font-black shrink-0"
+        style={{
+          width: size,
+          height: size,
+          fontSize: Math.max(8, Math.round(size * 0.36)),
+        } as React.CSSProperties}
+      >
+        {abbr.slice(0, 3)}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="inline-flex items-center justify-center rounded-full overflow-hidden shrink-0 bg-white/5 border border-white/10"
+      style={{ width: size, height: size }}
+    >
+      <Image
+        src={src}
+        alt={abbr}
+        width={size}
+        height={size}
+        className="object-contain"
+        onError={() => setErrored(true)}
+        unoptimized
+      />
+    </span>
+  );
+}
+
+/* ─── Types ──────────────────────────────────────────────────────────────── */
 
 interface EnrichedGameRef {
   gameId: number;
@@ -26,9 +74,12 @@ interface DFSGamesCardProps {
   data: {
     slates: EnrichedSlate[];
     selectedDraftGroupId: number | null;
+    sport?: string;
   };
   onAsk?: (query: string) => void;
 }
+
+/* ─── Helpers ────────────────────────────────────────────────────────────── */
 
 function formatGameTime(iso: string): string {
   const d = new Date(iso);
@@ -39,6 +90,10 @@ function formatGameTime(iso: string): string {
     timeZone: 'America/New_York',
   });
 }
+
+const MAX_GAMES_SHOWN = 6;
+
+/* ─── SlateLabelBadge ────────────────────────────────────────────────────── */
 
 function SlateLabelBadge({ label, contestType, selected }: { label: string; contestType: string; selected: boolean }) {
   const isMain = label.toLowerCase().includes('main');
@@ -60,9 +115,58 @@ function SlateLabelBadge({ label, contestType, selected }: { label: string; cont
   );
 }
 
+/* ─── GameRow ─────────────────────────────────────────────────────────────── */
+
+function GameRow({ g, sport }: { g: EnrichedGameRef; sport: string }) {
+  const awayLastName = g.awayPitcher?.split(' ').pop();
+  const homeLastName = g.homePitcher?.split(' ').pop();
+  const hasPitchers = Boolean(g.awayPitcher || g.homePitcher);
+
+  return (
+    <div className="flex items-center gap-2 py-2 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]/60">
+      {/* Away team */}
+      <div className="flex items-center gap-1.5 min-w-0">
+        <TeamLogoByAbbr abbr={g.awayTeamAbbr} sport={sport} size={28} />
+        <span className="font-black text-[11px] text-white tracking-wide leading-none">{g.awayTeamAbbr}</span>
+      </div>
+
+      {/* VS divider */}
+      <span className="text-[9px] text-[var(--text-faint)] font-bold shrink-0">@</span>
+
+      {/* Home team */}
+      <div className="flex items-center gap-1.5 min-w-0">
+        <TeamLogoByAbbr abbr={g.homeTeamAbbr} sport={sport} size={28} />
+        <span className="font-black text-[11px] text-white tracking-wide leading-none">{g.homeTeamAbbr}</span>
+      </div>
+
+      {/* Right side: time + optional pitchers */}
+      <div className="ml-auto flex flex-col items-end gap-0.5 shrink-0">
+        {g.startTime && (
+          <span
+            suppressHydrationWarning
+            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[9px] text-[var(--text-faint)] tabular-nums"
+          >
+            <Clock className="w-2 h-2 opacity-50" />
+            {formatGameTime(g.startTime)}
+          </span>
+        )}
+        {hasPitchers && (
+          <span className="text-[9px] text-[var(--text-muted)] tabular-nums">
+            {awayLastName ?? 'TBD'} vs {homeLastName ?? 'TBD'}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── DFSGamesCard ───────────────────────────────────────────────────────── */
+
 export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGamesCardProps) {
   const slates: EnrichedSlate[] = Array.isArray(data.slates) ? data.slates : [];
   const selectedId: number | null = data.selectedDraftGroupId ?? null;
+  const sport: string = data.sport ?? 'mlb';
+  const sportLabel = sport.toUpperCase();
 
   function handleSlateClick(slate: EnrichedSlate) {
     if (!onAsk) return;
@@ -91,7 +195,7 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
         </div>
 
         <div className="flex items-center gap-1.5 mb-1.5">
-          <span className="text-[9px] font-black uppercase tracking-widest text-white/60">MLB</span>
+          <span className="text-[9px] font-black uppercase tracking-widest text-white/60">{sportLabel}</span>
           <span className="text-white/30">·</span>
           <span className="text-[9px] text-white/50">DraftKings</span>
         </div>
@@ -126,6 +230,10 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
             ? 'border-l-2 border-l-indigo-400'
             : 'border-l-2 border-l-[var(--border-subtle)]';
 
+          // Cap visible games at MAX_GAMES_SHOWN
+          const visibleGames = slate.games.slice(0, MAX_GAMES_SHOWN);
+          const hiddenCount = slate.games.length - visibleGames.length;
+
           return (
             <div
               key={slate.draftGroupId}
@@ -149,33 +257,18 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
 
               {/* Games in this slate */}
               <div className="space-y-1.5">
-                {slate.games.map(g => (
-                  <div
-                    key={g.gameId}
-                    className="flex items-center gap-2 py-1.5 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]/60"
-                  >
-                    <div className="flex-1 min-w-0">
-                      {/* Game matchup — large team abbrs */}
-                      <div className="flex items-center gap-2">
-                        <span className="font-black text-sm text-white tracking-wide">{g.awayTeamAbbr}</span>
-                        <span className="text-[9px] text-[var(--text-faint)] font-bold">@</span>
-                        <span className="font-black text-sm text-white tracking-wide">{g.homeTeamAbbr}</span>
-                        {g.startTime && (
-                          <span suppressHydrationWarning className="ml-auto inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[9px] text-[var(--text-faint)] tabular-nums">
-                            <Clock className="w-2 h-2 opacity-50" />
-                            {formatGameTime(g.startTime)}
-                          </span>
-                        )}
-                      </div>
-                      {/* Pitcher matchup */}
-                      {(g.awayPitcher || g.homePitcher) && (
-                        <div className="text-[9px] text-[var(--text-muted)] mt-0.5 truncate">
-                          {g.awayPitcher?.split(' ').pop() ?? 'TBD'} vs. {g.homePitcher?.split(' ').pop() ?? 'TBD'}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                {visibleGames.map(g => (
+                  <GameRow key={g.gameId} g={g} sport={sport} />
                 ))}
+
+                {/* "+N more" overflow label */}
+                {hiddenCount > 0 && (
+                  <div className="flex items-center justify-center py-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]/40">
+                    <span className="text-[9px] font-bold text-[var(--text-faint)] uppercase tracking-wide">
+                      +{hiddenCount} more game{hiddenCount !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Build Lineup button */}

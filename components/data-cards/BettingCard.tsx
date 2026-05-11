@@ -145,34 +145,59 @@ export const BettingCard = memo(function BettingCard({
     )}>
 
       {/* Full-bleed gradient header */}
-      <div className={cn('relative px-3 pt-2.5 pb-2 md:px-4 md:pt-3.5 md:pb-3 bg-gradient-to-br', theme.headerGrad)}>
-        {/* Status badges top-right */}
-        <div className="absolute top-3 right-3 flex items-center gap-1.5">
-          {(isLiveGame || isExtremeOdds) && !isFinal && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-[10px] font-black text-emerald-300 uppercase tracking-wider">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              LIVE
-            </span>
-          )}
-          {data.realData && !isLiveGame && !isFinal && !isExtremeOdds && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-400/80">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/70" />
-              LIVE
-            </span>
-          )}
-          {isFinal && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-500/20 border border-slate-500/30 text-[10px] font-black text-slate-300 uppercase tracking-wider">
-              FINAL
-            </span>
-          )}
+      <div className={cn('relative px-3 pt-2.5 pb-2 pr-10 md:px-4 md:pt-3.5 md:pb-3 md:pr-10 bg-gradient-to-br', theme.headerGrad)}>
+        {/* Category breadcrumb + status badge — inline, no absolute, clears bookmark overlay */}
+        <div className="flex items-center justify-between gap-2 mb-1.5">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/70">{category}</span>
+            <span className="text-white/30">·</span>
+            <span className="text-[10px] text-white/50 truncate">{subcategory}</span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {(isLiveGame || isExtremeOdds) && !isFinal && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-[10px] font-black text-emerald-300 uppercase tracking-wider">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                LIVE
+              </span>
+            )}
+            {data.realData && !isLiveGame && !isFinal && !isExtremeOdds && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-400/80">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/70" />
+                LIVE
+              </span>
+            )}
+            {isFinal && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-500/20 border border-slate-500/30 text-[10px] font-black text-slate-300 uppercase tracking-wider">
+                FINAL
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Category breadcrumb */}
-        <div className="flex items-center gap-1.5 mb-1.5">
-          <span className="text-[10px] font-black uppercase tracking-widest text-white/70">{category}</span>
-          <span className="text-white/30">·</span>
-          <span className="text-[10px] text-white/50 truncate">{subcategory}</span>
-        </div>
+        {/* Mini matchup hero — team logos + moneylines visible immediately in header */}
+        {!isPlayerProp && teams && (
+          <div className="flex items-center gap-2 mb-1.5">
+            <div className="flex items-center gap-1.5">
+              <TeamLogo name={teams.away} sport={data.sport} avatarCls={theme.avatarCls} isLarge={false} />
+              <span className="font-black text-white text-xs tracking-wide">{abbr(teams.away)}</span>
+            </div>
+            {awayML && (
+              <span className={cn('text-sm font-black tabular-nums', awayML.positive ? 'text-emerald-400' : 'text-white/90')}>
+                {awayML.display}
+              </span>
+            )}
+            <span className="text-[9px] font-black text-white/40 mx-0.5">@</span>
+            {homeML && (
+              <span className={cn('text-sm font-black tabular-nums', homeML.positive ? 'text-emerald-400' : 'text-white/90')}>
+                {homeML.display}
+              </span>
+            )}
+            <div className="flex items-center gap-1.5">
+              <span className="font-black text-white text-xs tracking-wide">{abbr(teams.home)}</span>
+              <TeamLogo name={teams.home} sport={data.sport} avatarCls={theme.avatarCls} isLarge={false} />
+            </div>
+          </div>
+        )}
 
         {/* Bottom row: game time + edge badge + line move pill */}
         <div className="flex items-center gap-2 flex-wrap mt-1">

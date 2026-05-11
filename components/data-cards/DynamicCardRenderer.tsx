@@ -120,6 +120,7 @@ const MINIMAL_CARD_TYPES = new Set([
 
 function getSkeletonVariant(type: string): SkeletonVariant {
   const t = type.toLowerCase();
+  if (t.includes('arbitrage')) return 'arbitrage';
   if (STATS_CARD_TYPES.has(t) || t.includes('statcast') || t.includes('simulation')) return 'stats';
   if (MINIMAL_CARD_TYPES.has(t) || t.includes('insight')) return 'minimal';
   return 'betting';
@@ -175,19 +176,22 @@ export function DynamicCardRenderer({
     k => k !== 'realData' && k !== 'status' && safeCard.data[k] != null && safeCard.data[k] !== '',
   );
   if (meaningfulKeys.length === 0) {
-    if (safeCard.realData !== false) {
-      console.warn(
-        '[v0] [DynamicCardRenderer] Card has realData≠false but data payload is empty — suppressing render:',
-        safeCard.type, '/', safeCard.title,
-      );
+    if (safeCard.realData === false) {
+      // Simulated/fallback card with no data — safe to suppress
+      return null;
     }
-    return null;
+    // Live card (realData true/undefined) with empty payload — let the card component
+    // render its own empty/error state rather than silently hiding it
+    console.warn(
+      '[v0] [DynamicCardRenderer] Live card has empty data payload:',
+      safeCard.type, '/', safeCard.title,
+    );
   }
 
-  // Hide cards with no live game data — "No Games Available" placeholders and offseason stubs
+  // Hide explicit no-games placeholders and offseason stubs
   const isNoGamesCard =
     safeCard.subcategory === 'No Games Available' ||
-    safeCard.subcategory.toLowerCase().includes('no games') ||
+    (typeof safeCard.data.noGames === 'boolean' && safeCard.data.noGames) ||
     (typeof safeCard.data.status === 'string' && safeCard.data.status === 'NO_DATA') ||
     (safeCard.title.toLowerCase().includes('offseason') && safeCard.realData === false);
 

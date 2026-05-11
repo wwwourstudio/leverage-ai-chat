@@ -125,24 +125,34 @@ export function ArbitrageCard({
   const [ageMs, setAgeMs] = useState(0);
 
   useEffect(() => {
-    if (!data.generatedAt) return;
-    const created = new Date(data.generatedAt).getTime();
-    const tick = () => setAgeMs(Date.now() - created);
-    tick();
-    const interval = ageMs >= ARB_WARN_MS ? 1_000 : 15_000;
-    const id = setInterval(tick, interval);
-    return () => clearInterval(id);
-  }, [data.generatedAt, ageMs >= ARB_WARN_MS]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Bug fixes: (1) use recursive setTimeout so the delay adjusts dynamically
+    // without putting ageMs in the dependency array; (2) fall back to Date.now()
+    // when generatedAt is absent so the card still tracks time correctly.
+    const created = data.generatedAt
+      ? new Date(data.generatedAt).getTime()
+      : Date.now();
 
-  const ageMin      = Math.floor(ageMs / 60_000);
+    let id: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      const elapsed = Date.now() - created;
+      setAgeMs(elapsed);
+      const nextDelay = elapsed >= ARB_WARN_MS ? 1_000 : 15_000;
+      id = setTimeout(schedule, nextDelay);
+    };
+    schedule();
+    return () => clearTimeout(id);
+  }, [data.generatedAt]);
+
   const isExpired   = ageMs >= ARB_EXPIRE_MS;
   const isWarning   = ageMs >= ARB_WARN_MS && !isExpired;
   const remainingMs = Math.max(0, ARB_EXPIRE_MS - ageMs);
   const remainMins  = Math.floor(remainingMs / 60_000);
   const remainSecs  = Math.floor((remainingMs % 60_000) / 1_000);
+  // Bug fix: use remainMins (time left) instead of 10 - ageMin (which was off by up to 1 min)
   const countdownStr = isWarning
     ? remainMins > 0 ? `${remainMins}m ${remainSecs}s` : `${remainSecs}s`
-    : `${10 - ageMin}m`;
+    : `${remainMins}m`;
+  const ageMin = Math.floor(ageMs / 60_000);
 
   const profitAmtNum  = parseFloat(String(data.profitAmount  ?? '').replace(/[$,]/g, ''));
   const totalStakeNum = parseFloat(String(data.totalStake    ?? '').replace(/[$,]/g, ''));

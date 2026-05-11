@@ -170,7 +170,7 @@ export function WelcomeScreen({ onPromptSelect }: Props) {
     async function fetchLive() {
       try {
         const [oddsRes, kalshiRes] = await Promise.allSettled([
-          fetch('/api/odds?sport=baseball_mlb&markets=h2h&limit=3'),
+          fetch('/api/odds?sport=upcoming&markets=h2h&limit=3'),
           fetch('/api/kalshi?limit=3'),
         ]);
 

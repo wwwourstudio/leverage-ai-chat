@@ -124,7 +124,7 @@ export const CardLayout = memo(function CardLayout({
                     key={pageIdx}
                     className={cn(
                       'w-full flex-shrink-0 grid gap-2.5 items-start',
-                      pCards.length === 1 ? 'grid-cols-1' : 'grid-cols-2',
+                      pCards.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2',
                     )}
                   >
                     {pCards.map((card, i) => {
@@ -177,7 +177,7 @@ export const CardLayout = memo(function CardLayout({
                       className={cn(
                         'rounded-full transition-all duration-250 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-400',
                         i === page
-                          ? 'w-5 h-1.5 bg-[var(--border-hover)]'
+                          ? 'w-6 h-1.5 bg-[var(--border-hover)]'
                           : 'w-1.5 h-1.5 bg-[var(--bg-elevated)] hover:bg-[var(--bg-surface)]',
                       )}
                     />

@@ -77,10 +77,11 @@ const SHORT_CAT_NAMES: Record<string, string> = {
 
 /** Returns active sport pill color classes by category */
 function activeSportColor(category: string): string {
-  if (category === 'fantasy') return 'bg-emerald-600/20 text-emerald-300 border-emerald-500/30';
-  if (category === 'dfs')     return 'bg-amber-600/20 text-amber-300 border-amber-500/30';
-  if (category === 'kalshi')  return 'bg-cyan-600/20 text-cyan-300 border-cyan-500/30';
-  return 'bg-blue-600/20 text-blue-300 border-blue-500/30';
+  if (category === 'fantasy')   return 'bg-[var(--chip-bg)] text-[var(--cat-fantasy)] border-[var(--cat-fantasy)]/40';
+  if (category === 'dfs')       return 'bg-[var(--chip-bg)] text-[var(--cat-dfs)] border-[var(--cat-dfs)]/40';
+  if (category === 'kalshi')    return 'bg-[var(--chip-bg)] text-[var(--cat-kalshi)] border-[var(--cat-kalshi)]/40';
+  if (category === 'arbitrage') return 'bg-[var(--chip-bg)] text-[var(--cat-arbitrage)] border-[var(--cat-arbitrage)]/40';
+  return 'bg-[var(--chip-bg)] text-[var(--cat-betting)] border-[var(--cat-betting)]/40';
 }
 
 /** Returns a Tailwind left-border accent class based on the chat's first tag */

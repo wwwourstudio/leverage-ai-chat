@@ -88,14 +88,14 @@ export const ChatHeader = memo(function ChatHeader({
   }, [activeChat, shareState]);
 
   return (
-    <div className="relative bg-[var(--bg-overlay)] border-b border-[var(--border-subtle)] px-3 py-2 md:px-6 md:py-4 shadow-2xl backdrop-blur-xl">
+    <div className="relative bg-[var(--bg-overlay)] border-b border-[var(--border-subtle)] px-4 py-3 shadow-2xl backdrop-blur-xl">
       <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-transparent to-transparent pointer-events-none"></div>
       <div className="relative flex items-center justify-between max-w-6xl mx-auto">
         {/* Left: hamburger + logo */}
         <div className="flex items-center gap-2 md:gap-4">
           <button
             onClick={onToggleSidebar}
-            className="group p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 active:scale-95 bg-transparent"
+            className="group p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 active:scale-95 bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             {sidebarOpen
               ? <X className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
@@ -107,7 +107,7 @@ export const ChatHeader = memo(function ChatHeader({
             <div className="relative">
               <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 blur-md opacity-40" />
               <div className="relative w-8 h-8 md:w-9 md:h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                <TrendingUp className="w-4 h-4 text-white" />
+                <TrendingUp className="w-5 h-5 text-white" />
               </div>
             </div>
             <div className="flex flex-col leading-none gap-0.5">
@@ -149,7 +149,7 @@ export const ChatHeader = memo(function ChatHeader({
                 className="p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
                 title="Export chat" aria-label="Export chat"
               >
-                <Download className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
+                <Download className="w-4 h-4 text-[var(--text-muted)] group-hover:text-white transition-colors" />
               </button>
               {showExportMenu && (
                 <>
@@ -183,11 +183,11 @@ export const ChatHeader = memo(function ChatHeader({
               aria-label={shareState === 'copied' ? 'Link copied' : 'Share chat'}
             >
               {shareState === 'copied' ? (
-                <Check className="w-5 h-5 text-blue-400 transition-colors" />
+                <Check className="w-4 h-4 text-blue-400 transition-colors" />
               ) : shareState === 'loading' ? (
-                <Copy className="w-5 h-5 text-[var(--text-muted)] animate-pulse" />
+                <Copy className="w-4 h-4 text-[var(--text-muted)] animate-pulse" />
               ) : (
-                <Share2 className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
+                <Share2 className="w-4 h-4 text-[var(--text-muted)] group-hover:text-white transition-colors" />
               )}
             </button>
           )}
@@ -224,7 +224,7 @@ export const ChatHeader = memo(function ChatHeader({
                   className="relative p-1.5 md:p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
                   title="Saved Bookmarks" aria-label="Open saved bookmarks"
                 >
-                  <Bookmark className={`w-5 h-5 transition-colors ${watchlistCount > 0 ? 'text-blue-500 fill-blue-500' : 'text-[var(--text-muted)] group-hover:text-blue-500'}`} fill={watchlistCount > 0 ? 'currentColor' : 'none'} />
+                  <Bookmark className={`w-4 h-4 transition-colors ${watchlistCount > 0 ? 'text-blue-500 fill-blue-500' : 'text-[var(--text-muted)] group-hover:text-blue-500'}`} fill={watchlistCount > 0 ? 'currentColor' : 'none'} />
                   {watchlistCount > 0 && (
                     <div className="absolute top-1.5 right-1.5 min-w-[14px] h-[14px] px-0.5 bg-blue-500 rounded-full border border-[var(--bg-overlay)] flex items-center justify-center">
                       <span className="text-[8px] font-black text-white tabular-nums">{watchlistCount}</span>
@@ -236,7 +236,7 @@ export const ChatHeader = memo(function ChatHeader({
                 onClick={onOpenAlerts}
                 className="relative p-1.5 md:p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
               >
-                <Bell className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
+                <Bell className="w-4 h-4 text-[var(--text-muted)] group-hover:text-white transition-colors" />
                 {alertCount > 0 && (
                   <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-[var(--bg-overlay)] shadow-lg shadow-red-500/50 animate-pulse"></div>
                 )}
@@ -245,7 +245,7 @@ export const ChatHeader = memo(function ChatHeader({
                 onClick={onOpenSettings}
                 className="p-1.5 md:p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-300 group active:scale-95 bg-transparent"
               >
-                <Settings className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
+                <Settings className="w-4 h-4 text-[var(--text-muted)] group-hover:text-white transition-colors" />
               </button>
             </>
           ) : (

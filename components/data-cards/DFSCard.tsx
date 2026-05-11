@@ -276,48 +276,48 @@ export const DFSCard = memo(function DFSCard({
         {/* Decorative glow orb */}
         <div className="absolute top-0 right-0 w-40 h-20 bg-white/3 rounded-bl-full blur-3xl pointer-events-none" />
 
-        {/* Top-right status area */}
-        <div className="absolute top-3 right-3 flex items-center gap-1.5">
-          {realData && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[9px] font-bold uppercase tracking-wide">
-              <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
-              LIVE
-            </span>
-          )}
-          {cardCategory && (
+        {/* Breadcrumb + status badges inline — no absolute positioning to avoid conflict with outer overlay badges */}
+        <div className="flex items-center justify-between gap-2 mb-1.5">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Gamepad2 className="w-3 h-3 text-white/60 shrink-0" />
+            <span className="text-[9px] font-black uppercase tracking-widest text-white/60">{category}</span>
+            <span className="text-white/30">·</span>
+            <span className="text-[9px] text-white/50 truncate">{subcategory}</span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {realData && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[9px] font-bold uppercase tracking-wide">
+                <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                LIVE
+              </span>
+            )}
+            {cardCategory && (
+              <span className={cn(
+                'inline-flex items-center px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider',
+                cardCategory === 'value'      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' :
+                cardCategory === 'matchup'    ? 'bg-blue-500/15 border-blue-500/30 text-blue-400' :
+                cardCategory === 'contrarian' ? 'bg-violet-500/15 border-violet-500/30 text-violet-400' :
+                cardCategory === 'chalk'      ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' :
+                'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-faint)]'
+              )}>
+                {cardCategory === 'value'      ? 'VALUE' :
+                 cardCategory === 'matchup'    ? 'MATCHUP' :
+                 cardCategory === 'contrarian' ? 'CONTRARIAN' :
+                 cardCategory === 'chalk'      ? 'CHALK' : 'OPTIMAL'}
+              </span>
+            )}
             <span className={cn(
-              'inline-flex items-center px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider',
-              cardCategory === 'value'      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' :
-              cardCategory === 'matchup'    ? 'bg-blue-500/15 border-blue-500/30 text-blue-400' :
-              cardCategory === 'contrarian' ? 'bg-violet-500/15 border-violet-500/30 text-violet-400' :
-              cardCategory === 'chalk'      ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' :
-              'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-faint)]'
+              'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider',
+              cfg.badgeCls,
             )}>
-              {cardCategory === 'value'      ? 'VALUE' :
-               cardCategory === 'matchup'    ? 'MATCHUP' :
-               cardCategory === 'contrarian' ? 'CONTRARIAN' :
-               cardCategory === 'chalk'      ? 'CHALK' : 'OPTIMAL'}
+              <span className={cn('w-1 h-1 rounded-full animate-pulse', cfg.dotCls)} />
+              {cfg.label}
             </span>
-          )}
-          <span className={cn(
-            'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider',
-            cfg.badgeCls,
-          )}>
-            <span className={cn('w-1 h-1 rounded-full animate-pulse', cfg.dotCls)} />
-            {cfg.label}
-          </span>
-        </div>
-
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-1.5 mb-1.5">
-          <Gamepad2 className="w-3 h-3 text-white/60" />
-          <span className="text-[9px] font-black uppercase tracking-widest text-white/60">{category}</span>
-          <span className="text-white/30">·</span>
-          <span className="text-[9px] text-white/50 truncate">{subcategory}</span>
+          </div>
         </div>
 
         {/* Title */}
-        <h3 className={cn('font-black text-white leading-snug text-balance pr-20', isHero ? 'text-lg' : 'text-sm')}>
+        <h3 className={cn('font-black text-white leading-snug text-balance', isHero ? 'text-lg' : 'text-sm')}>
           {title}
         </h3>
 

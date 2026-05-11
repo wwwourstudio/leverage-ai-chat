@@ -244,22 +244,24 @@ export function DynamicCardRenderer({
     return (
       <div className="relative group/card">
         {el}
-        {/* Bookmark button — top-right corner, visible on hover. Skipped for cards with built-in watchlist. */}
-        {!skipBookmark && (
-          <button
-            onClick={toggleBookmark}
-            className={`absolute top-2 right-2 z-10 p-1 rounded-md transition-all duration-150 hover:bg-[var(--bg-elevated)] ${isBookmarked ? 'opacity-100' : 'opacity-40 group-hover/card:opacity-100'}`}
-            aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark card'}
-          >
-            <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-blue-500 text-blue-500' : 'text-[var(--text-faint)]'}`} />
-          </button>
-        )}
-        {isEstimated && (
-          <span className="absolute top-2 right-10 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold backdrop-blur-sm pointer-events-none" role="note" aria-label="Estimated data">
-            <FlaskConical className="w-3 h-3" aria-hidden="true" />
-            Estimated
-          </span>
-        )}
+        {/* Top-right overlay column — stacked vertically so card's own header badges never collide horizontally */}
+        <div className="absolute top-2 right-2 z-10 flex flex-col items-end gap-1 pointer-events-none">
+          {!skipBookmark && (
+            <button
+              onClick={toggleBookmark}
+              className={`pointer-events-auto p-1 rounded-md transition-all duration-150 hover:bg-[var(--bg-elevated)] ${isBookmarked ? 'opacity-100' : 'opacity-40 group-hover/card:opacity-100'}`}
+              aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark card'}
+            >
+              <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-blue-500 text-blue-500' : 'text-[var(--text-faint)]'}`} />
+            </button>
+          )}
+          {isEstimated && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold backdrop-blur-sm" role="note" aria-label="Estimated data">
+              <FlaskConical className="w-3 h-3" aria-hidden="true" />
+              Estimated
+            </span>
+          )}
+        </div>
         {dataAgeLabel && !isEstimated && (
           <span className="absolute bottom-2 right-2 z-10 px-1.5 py-0.5 rounded text-[8px] font-semibold tabular-nums bg-[var(--bg-overlay)]/80 text-[var(--text-faint)] border border-[var(--border-subtle)] backdrop-blur-sm pointer-events-none">
             {dataAgeLabel}

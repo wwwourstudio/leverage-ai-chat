@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, memo, useId } from 'react';
+import Image from 'next/image';
 import { TrendingUp, ChevronRight, Zap, Target, Activity, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getPlayerHeadshotUrl } from '@/lib/constants';
 import { AnalysisLightbox } from './AnalysisLightbox';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -248,27 +250,43 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
       )}>
 
         {/* ── Header ──────────────────────────────────────────────────── */}
-        <div className={cn('relative px-4 pt-4 pb-3 bg-gradient-to-br border-b border-[var(--border-subtle)]', cfg.header)}>
-          {/* Status badge */}
-          <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/30 backdrop-blur-sm border border-white/10">
-            <span className={cn('w-1.5 h-1.5 rounded-full animate-pulse', cfg.dot)} />
-            <span className={cn('text-[9px] font-black uppercase tracking-widest', cfg.text)}>{cfg.label}</span>
+        <div className={cn('relative px-4 pr-10 pt-4 pb-3 bg-gradient-to-br border-b border-[var(--border-subtle)]', cfg.header)}>
+          {/* Sport chip + status badge — inline, no absolute, clears bookmark overlay */}
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Activity className="w-3 h-3 text-white/40 shrink-0" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-white/40">MLB · LeverageMetrics</span>
+              {data.subcategory && <><span className="text-white/20">·</span><span className="text-[9px] text-white/30 truncate">{data.subcategory}</span></>}
+            </div>
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/30 backdrop-blur-sm border border-white/10 shrink-0">
+              <span className={cn('w-1.5 h-1.5 rounded-full animate-pulse', cfg.dot)} />
+              <span className={cn('text-[9px] font-black uppercase tracking-widest', cfg.text)}>{cfg.label}</span>
+            </div>
           </div>
 
-          {/* Sport chip */}
-          <div className="flex items-center gap-1.5 mb-2">
-            <Activity className="w-3 h-3 text-white/40" />
-            <span className="text-[9px] font-black uppercase tracking-widest text-white/40">MLB · LeverageMetrics</span>
-            <span className="text-white/20">·</span>
-            <span className="text-[9px] text-white/30 truncate">{data.subcategory}</span>
-          </div>
-
-          {/* Hero player section */}
-          <div className="flex items-start justify-between gap-3 pr-16">
-            <div className="min-w-0">
-              {/* Team badge */}
+          {/* Hero player section — headshot + name */}
+          <div className="flex items-center gap-3">
+            {(() => {
+              const headshotUrl = getPlayerHeadshotUrl(playerName);
+              if (!headshotUrl) return null;
+              return (
+                <div className="relative shrink-0">
+                  <Image
+                    src={headshotUrl} alt={playerName}
+                    width={isHero ? 56 : 44} height={isHero ? 56 : 44}
+                    className={cn(
+                      'rounded-2xl object-cover bg-white/5 border border-white/10',
+                      isHero ? 'w-14 h-14' : 'w-11 h-11',
+                    )}
+                    onError={() => {}}
+                    unoptimized
+                  />
+                </div>
+              );
+            })()}
+            <div className="min-w-0 flex-1">
               {team && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-500/20 border border-blue-400/30 text-[9px] font-black text-blue-300 uppercase tracking-wider mb-1.5">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-500/20 border border-blue-400/30 text-[9px] font-black text-blue-300 uppercase tracking-wider mb-1">
                   {team}{position ? ` · ${position}` : ''}
                 </span>
               )}

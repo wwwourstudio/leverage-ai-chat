@@ -5,6 +5,7 @@ import {
   Snowflake, Eye, ChevronRight, AlertTriangle, CheckCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SPORT_KEYS } from '@/lib/constants';
 
 interface WeatherCardProps {
   type: string;
@@ -64,30 +65,34 @@ const statusConfig: Record<string, {
   },
 };
 
-function getConditionIcon(condition?: string): React.ComponentType<{ className?: string }> {
-  if (!condition) return Cloud;
-  const lower = condition.toLowerCase();
-  if (lower.includes('thunder') || lower.includes('lightning')) return CloudLightning;
-  if (lower.includes('rain') || lower.includes('storm') || lower.includes('shower')) return CloudRain;
-  if (lower.includes('snow') || lower.includes('blizzard') || lower.includes('flurr')) return Snowflake;
-  if (lower.includes('wind') || lower.includes('gust')) return Wind;
-  if (lower.includes('sun') || lower.includes('clear') || lower.includes('fair') || lower.includes('sunny')) return Sun;
-  if (lower.includes('fog') || lower.includes('mist') || lower.includes('haze')) return Eye;
-  return Cloud;
+interface ConditionEntry {
+  keywords: string[];
+  Icon: React.ComponentType<{ className?: string }>;
+  emoji: string;
 }
 
-// Condition emoji for visual flair
-function getConditionEmoji(condition?: string): string {
-  if (!condition) return '🌤';
+const CONDITION_MAP: ConditionEntry[] = [
+  { keywords: ['thunder', 'lightning'],                      Icon: CloudLightning, emoji: '⛈️'  },
+  { keywords: ['rain', 'storm', 'shower'],                   Icon: CloudRain,      emoji: '🌧️' },
+  { keywords: ['snow', 'blizzard', 'flurr'],                 Icon: Snowflake,      emoji: '❄️'  },
+  { keywords: ['wind', 'gust'],                              Icon: Wind,           emoji: '🌬️' },
+  { keywords: ['sun', 'clear', 'fair', 'sunny'],             Icon: Sun,            emoji: '☀️'  },
+  { keywords: ['fog', 'mist', 'haze'],                       Icon: Eye,            emoji: '🌫️' },
+  { keywords: ['cloud', 'overcast'],                         Icon: Cloud,          emoji: '☁️'  },
+];
+
+function matchCondition(condition?: string): ConditionEntry | undefined {
+  if (!condition) return undefined;
   const lower = condition.toLowerCase();
-  if (lower.includes('thunder') || lower.includes('lightning')) return '⛈️';
-  if (lower.includes('rain') || lower.includes('storm') || lower.includes('shower')) return '🌧️';
-  if (lower.includes('snow') || lower.includes('blizzard')) return '❄️';
-  if (lower.includes('wind') || lower.includes('gust')) return '🌬️';
-  if (lower.includes('sun') || lower.includes('clear') || lower.includes('sunny')) return '☀️';
-  if (lower.includes('fog') || lower.includes('mist')) return '🌫️';
-  if (lower.includes('cloud') || lower.includes('overcast')) return '☁️';
-  return '🌤️';
+  return CONDITION_MAP.find(e => e.keywords.some(k => lower.includes(k)));
+}
+
+function getConditionIcon(condition?: string): React.ComponentType<{ className?: string }> {
+  return matchCondition(condition)?.Icon ?? Cloud;
+}
+
+function getConditionEmoji(condition?: string): string {
+  return matchCondition(condition)?.emoji ?? '🌤️';
 }
 
 function parseNum(val?: string | number): number {
@@ -112,15 +117,14 @@ function computeImpactScore(data: WeatherCardProps['data']): number | null {
   return Math.min(10, Math.max(1, Math.round(score)));
 }
 
-// Map wind direction text to an arrow character
+const WIND_ARROW_MAP: Record<string, string> = {
+  N: '↑', NE: '↗', E: '→', SE: '↘',
+  S: '↓', SW: '↙', W: '←', NW: '↖',
+};
+
 function getWindArrow(direction?: string): string {
   if (!direction) return '';
-  const d = direction.toUpperCase();
-  const arrowMap: Record<string, string> = {
-    N: '↑', NE: '↗', E: '→', SE: '↘',
-    S: '↓', SW: '↙', W: '←', NW: '↖',
-  };
-  return arrowMap[d] ?? '';
+  return WIND_ARROW_MAP[direction.toUpperCase()] ?? '';
 }
 
 function parseWindDirection(wind?: string): string | null {
@@ -173,14 +177,23 @@ function WindCompass({ direction }: { direction: string }) {
   );
 }
 
+function getSportKey(category: string): string {
+  const lower = category.toLowerCase();
+  if (lower.includes(SPORT_KEYS.NFL.SHORT) || lower.includes('football')) return SPORT_KEYS.NFL.SHORT;
+  if (lower.includes(SPORT_KEYS.MLB.SHORT) || lower.includes('baseball'))  return SPORT_KEYS.MLB.SHORT;
+  if (lower.includes(SPORT_KEYS.NBA.SHORT) || lower.includes('basketball')) return SPORT_KEYS.NBA.SHORT;
+  if (lower.includes(SPORT_KEYS.NHL.SHORT) || lower.includes('hockey'))    return SPORT_KEYS.NHL.SHORT;
+  return 'default';
+}
+
 // Sport-specific impact context lookup
 const SPORT_WEATHER_CONTEXT: Record<string, Array<{ condition: (w: number, p: number, t: number) => boolean; text: string }>> = {
-  nfl: [
+  [SPORT_KEYS.NFL.SHORT]: [
     { condition: (w) => w >= 15, text: '≥15mph crosswind reduces passing efficiency' },
     { condition: (_, p) => p > 0.1, text: 'Rain increases fumble risk and reduces passing yards' },
     { condition: (__, ___, t) => t < 32, text: 'Freezing temps favor running game over pass-heavy offenses' },
   ],
-  mlb: [
+  [SPORT_KEYS.MLB.SHORT]: [
     { condition: (_, __, t) => t > 75, text: 'Warm temps carry balls further — HR-friendly conditions' },
     { condition: (w) => w >= 10, text: 'Wind out boosts HR probability; wind in suppresses scoring' },
     { condition: (_, p) => p > 0.05, text: 'Wet ball complicates pitcher grip — expect more walks' },
@@ -192,9 +205,7 @@ const SPORT_WEATHER_CONTEXT: Record<string, Array<{ condition: (w: number, p: nu
 };
 
 function getSportContext(category: string, wind: number, precip: number, temp: number): string | null {
-  const sport = category.toLowerCase().includes('nfl') || category.toLowerCase().includes('football') ? 'nfl'
-    : category.toLowerCase().includes('mlb') || category.toLowerCase().includes('baseball') ? 'mlb'
-    : 'default';
+  const sport = getSportKey(category);
   const rules = SPORT_WEATHER_CONTEXT[sport] ?? SPORT_WEATHER_CONTEXT.default;
   const matched = rules.find(r => r.condition(wind, precip, temp));
   return matched?.text ?? null;

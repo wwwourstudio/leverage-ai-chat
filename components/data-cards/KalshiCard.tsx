@@ -1031,6 +1031,15 @@ function TabWatch({
   );
 }
 
+function computeYesPct(d: Record<string, unknown>): number {
+  if (typeof d.yesPct === 'number') return Math.min(100, Math.max(0, d.yesPct));
+  if (typeof d.yesPrice === 'string') {
+    const p = parseFloat(d.yesPrice);
+    return Number.isFinite(p) ? Math.min(100, Math.max(0, p)) : 50;
+  }
+  return 50;
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export const KalshiCard = memo(function KalshiCard({
@@ -1099,14 +1108,7 @@ export const KalshiCard = memo(function KalshiCard({
 
   // ── Derived values ─────────────────────────────────────────────────────────
 
-  const yesPct: number = (() => {
-    if (typeof d.yesPct === 'number') return Math.min(100, Math.max(0, d.yesPct));
-    if (typeof d.yesPrice === 'string') {
-      const p = parseFloat(d.yesPrice);
-      return Number.isFinite(p) ? Math.min(100, Math.max(0, p)) : 50;
-    }
-    return 50;
-  })();
+  const yesPct: number = computeYesPct(d as Record<string, unknown>);
 
   const [activeTab, setActiveTab] = useState(0);
 

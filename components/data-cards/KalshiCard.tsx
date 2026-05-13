@@ -127,10 +127,10 @@ function buildTradeUrl(
   const evtLower    = isPublicTicker(eventTicker  as string) ? (eventTicker  as string).toLowerCase() : '';
   const mktLower    = isPublicTicker(ticker        as string) ? (ticker        as string).toLowerCase() : '';
   const seriesLower = isPublicTicker(seriesTicker  as string) ? (seriesTicker  as string).toLowerCase() : '';
-  if (evtLower && mktLower)  return `https://kalshi.com/markets/${evtLower}/${mktLower}`;
-  if (seriesLower)           return `https://kalshi.com/markets/${seriesLower}`;
-  if (evtLower)              return `https://kalshi.com/markets/${evtLower}`;
-  return `https://kalshi.com/markets`;
+  if (evtLower && mktLower)  return `https://kalshi.com/event/${evtLower}/${mktLower}`;
+  if (evtLower)              return `https://kalshi.com/event/${evtLower}`;
+  if (seriesLower)           return `https://kalshi.com/events?search=${encodeURIComponent(seriesLower)}`;
+  return `https://kalshi.com/events`;
 }
 
 // ── Sparkline ──────────────────────────────────────────────────────────────────
@@ -607,7 +607,7 @@ function RelatedMarketsLink({ seriesTicker, eventTicker }: { seriesTicker?: stri
   if (!linkTarget) return null;
   return (
     <a
-      href={`https://kalshi.com/markets/${linkTarget.toLowerCase()}`}
+      href={`https://kalshi.com/events?search=${encodeURIComponent(linkTarget.toLowerCase())}`}
       target="_blank"
       rel="noopener noreferrer"
       className="flex items-center gap-1.5 text-[10px] font-medium transition-colors duration-150 group/rel text-[var(--text-muted)] hover:text-foreground"
@@ -1075,7 +1075,7 @@ export const KalshiCard = memo(function KalshiCard({
       return () => clearTimeout(t);
     }
     prevMid.current = livePrice.yesMid;
-  }, [livePrice?.yesMid]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [livePrice?.yesMid]); 
 
   // Mount animation
   useEffect(() => {

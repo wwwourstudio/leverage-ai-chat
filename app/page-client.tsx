@@ -662,8 +662,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   // deps: authUser/authLoading are the only values that should trigger this effect.
   // loadInitData/loadInstructionsFromLocalStorage are component-scoped helpers that
   // reference many pieces of state; adding them would cause an infinite loop.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authUser, authLoading]);
+    }, [authUser, authLoading]);
 
   // Handle Stripe checkout success: verify session server-side before adding credits
   useEffect(() => {
@@ -1349,7 +1348,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             try {
               const oldKey = `lev:cards:${capturedChat}`;
               const newKey = `lev:cards:${threadId}`;
-              let stored: Record<string, any[]> = JSON.parse(localStorage.getItem(oldKey) ?? '{}');
+              const stored: Record<string, any[]> = JSON.parse(localStorage.getItem(oldKey) ?? '{}');
               if (oldKey !== newKey) {
                 localStorage.removeItem(oldKey);
               }

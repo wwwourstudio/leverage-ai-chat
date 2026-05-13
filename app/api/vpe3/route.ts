@@ -48,7 +48,7 @@ const PLAYER_META: Record<number, PlayerMeta> = {
 // ── Pitcher metadata for enrichment (velocity/movement — not in Savant leaderboard) ──
 // These stats are based on Statcast pitch velocity/movement from 2024.
 
-interface KnownPitcherData extends PitcherStats {}
+type KnownPitcherData = PitcherStats
 
 function buildKnownPitchers(season: number): KnownPitcherData[] {
   return [

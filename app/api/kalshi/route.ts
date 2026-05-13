@@ -311,7 +311,9 @@ export async function POST(request: Request) {
         };
         finalCategory = sportMap[(sport as string).toLowerCase()] || sport;
       }
-      markets = await fetchKalshiMarkets({ category: finalCategory, limit });
+      markets = finalCategory
+        ? await fetchKalshiMarkets({ category: finalCategory, limit })
+        : await fetchAllKalshiMarkets({ status: 'open', maxMarkets: Math.max(limit * 10, 200) });
     }
 
     // Sort by activity score (real price signal > active order book > recent volume > total volume)

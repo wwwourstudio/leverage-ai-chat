@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo, type Dispatch, type SetStateAction } from 'react';
 import {
   Target, BarChart, Activity, Bell, Layers, TrendingUp, DollarSign, Zap,
   Trophy, Star, Users, Sparkles, AlertCircle, Medal, ShoppingCart,
@@ -19,6 +19,17 @@ export interface UseSuggestedPromptsOptions {
 type PromptItem = { label: string; icon: LucideIcon; category: string; query?: string };
 type QuickAction = { label: string; icon: LucideIcon; category: string; query: string };
 
+const UNIVERSAL_SUGGESTIONS: PromptItem[] = [
+  { label: "What are tonight's best value opportunities?", icon: Sparkles, category: 'all' },
+  { label: 'Show me high-confidence plays across platforms', icon: CheckCircle, category: 'all' },
+  { label: 'Compare live odds across all sportsbooks', icon: BarChart, category: 'betting' },
+  { label: 'Find contrarian tournament plays', icon: Users, category: 'dfs' },
+  { label: 'Track sharp money movements in real-time', icon: TrendingUp, category: 'betting' },
+  { label: 'Optimize my overall portfolio allocation', icon: PieChart, category: 'all' },
+  { label: 'Breaking news and injury updates', icon: AlertCircle, category: 'all' },
+  { label: 'Show me arbitrage opportunities', icon: DollarSign, category: 'all' },
+];
+
 export function useSuggestedPrompts({
   selectedCategory,
   selectedSport,
@@ -29,6 +40,7 @@ export function useSuggestedPrompts({
   const [aiQuickActions, setAiQuickActions] = useState<QuickAction[] | null>(null);
   const [lastUserQuery, setLastUserQuery] = useState<string>('');
   const lastSuggestionQueryRef = useRef<string>('');
+  const normalizedCategory = useMemo(() => selectedCategory.toLowerCase(), [selectedCategory]);
 
   // Fetch AI-generated quick-action prompts when category or sport changes.
   // Skips the first mount if loadInitData already seeded prompts (initPromptsLoadedRef guard).
@@ -85,9 +97,9 @@ export function useSuggestedPrompts({
     const hasPlayerProps = cardTypes.some(t => t.includes('prop'));
 
     const isLineMovement = msgLower.includes('line move') || msgLower.includes('movement') || msgLower.includes('steam');
-    const isFantasyQ = msgLower.includes('draft') || msgLower.includes('fantasy') || msgLower.includes('adp') || selectedCategory === 'fantasy';
-    const isDFS = msgLower.includes('dfs') || msgLower.includes('lineup') || selectedCategory === 'dfs';
-    const isKalshi = msgLower.includes('kalshi') || msgLower.includes('prediction') || selectedCategory === 'kalshi';
+    const isFantasyQ = msgLower.includes('draft') || msgLower.includes('fantasy') || msgLower.includes('adp') || normalizedCategory === 'fantasy';
+    const isDFS = msgLower.includes('dfs') || msgLower.includes('lineup') || normalizedCategory === 'dfs';
+    const isKalshi = msgLower.includes('kalshi') || msgLower.includes('prediction') || normalizedCategory === 'kalshi';
     const isArbitrage = msgLower.includes('arbitrage') || msgLower.includes('arb');
     const isParlay = msgLower.includes('parlay') || msgLower.includes('same-game') || msgLower.includes('sgp');
     const isPlayerProp = msgLower.includes('prop') || !!playerName;
@@ -195,8 +207,8 @@ export function useSuggestedPrompts({
     }
 
     const p3Category =
-      selectedCategory !== 'all'
-        ? selectedCategory
+      normalizedCategory !== 'all'
+        ? normalizedCategory
         : isDFS      ? 'dfs'
         : isFantasyQ ? 'fantasy'
         : isKalshi   ? 'kalshi'
@@ -241,35 +253,28 @@ export function useSuggestedPrompts({
       }
     });
 
-    const universalSuggestions = [
-      { label: "What are tonight's best value opportunities?", icon: Sparkles, category: 'all' },
-      { label: 'Show me high-confidence plays across platforms', icon: CheckCircle, category: 'all' },
-      { label: 'Compare live odds across all sportsbooks', icon: BarChart, category: 'betting' },
-      { label: 'Find contrarian tournament plays', icon: Users, category: 'dfs' },
-      { label: 'Track sharp money movements in real-time', icon: TrendingUp, category: 'betting' },
-      { label: 'Optimize my overall portfolio allocation', icon: PieChart, category: 'all' },
-      { label: 'Breaking news and injury updates', icon: AlertCircle, category: 'all' },
-      { label: 'Show me arbitrage opportunities', icon: DollarSign, category: 'all' }
-    ];
-
-    for (const suggestion of universalSuggestions) {
+    const existingLabels = new Set(suggestions.map(s => s.label));
+    for (const suggestion of UNIVERSAL_SUGGESTIONS) {
       if (suggestions.length >= 7) break;
-      if (!suggestions.some(s => s.label === suggestion.label)) {
+      if (!existingLabels.has(suggestion.label)) {
         suggestions.push(suggestion);
+        existingLabels.add(suggestion.label);
       }
     }
-
-    const uniqueSuggestions = suggestions.filter((suggestion, index, self) =>
-      index === self.findIndex((s) => s.label === suggestion.label) &&
-      suggestion.label.toLowerCase() !== userMessage.toLowerCase()
-    );
+    const seen = new Set<string>();
+    const lowerMessage = userMessage.toLowerCase();
+    const uniqueSuggestions = suggestions.filter((suggestion) => {
+      if (suggestion.label.toLowerCase() === lowerMessage) return false;
+      if (seen.has(suggestion.label)) return false;
+      seen.add(suggestion.label);
+      return true;
+    });
 
     if (isDev()) console.log('[v0] Suggestions:', uniqueSuggestions.length, 'generated');
 
     return uniqueSuggestions.slice(0, 7);
   // selectedCategory drives suggestion routing; suggestedPrompts is the early-return fallback.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, suggestedPrompts]);
+  }, [normalizedCategory, suggestedPrompts]);
 
   return {
     suggestedPrompts,

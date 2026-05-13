@@ -141,6 +141,5 @@ export function useOddsRealtime({
         console.log(`[v0] [use-odds-realtime] Unsubscribed (${channelName})`);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, gameIdsKey]);
+      }, [enabled, gameIdsKey]);
 }

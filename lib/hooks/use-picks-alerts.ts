@@ -138,6 +138,5 @@ export function usePicksAlerts(options: PicksAlertOptions = {}): void {
     return () => {
       supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [minTier, requireSharp, cooldownMs]);
+      }, [minTier, requireSharp, cooldownMs]);
 }

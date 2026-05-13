@@ -3,6 +3,8 @@
 import { memo, useState, useRef, useCallback } from 'react';
 import { Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DynamicCardRenderer } from './DynamicCardRenderer';
+import { CardsEmptyState } from './CardStates';
+import { UnifiedCardShell } from './UnifiedCardShell';
 import { cn } from '@/lib/utils';
 
 interface CardData {
@@ -53,7 +55,7 @@ export const CardLayout = memo(function CardLayout({
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
-  if (!cards || cards.length === 0) return null;
+  if (!cards || cards.length === 0) return <CardsEmptyState />;
 
   const heroCard = cards[0];
   const suggestedCards = cards.slice(1, 7);
@@ -96,10 +98,10 @@ export const CardLayout = memo(function CardLayout({
           trustLevel={trustLevel}
         />
         {insight && (
-          <div className="flex items-start gap-2 mt-2 px-3 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)]">
+          <UnifiedCardShell className="mt-2 px-3 py-2 bg-[var(--bg-overlay)] flex items-start gap-2">
             <Sparkles className="w-3 h-3 text-blue-400 mt-0.5 shrink-0" aria-hidden="true" />
             <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{insight}</p>
-          </div>
+          </UnifiedCardShell>
         )}
       </div>
 

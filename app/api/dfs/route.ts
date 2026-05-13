@@ -43,6 +43,16 @@ const MLB_ROSTER_SPOTS: Record<string, Record<string, number>> = {
   yahoo: { SP: 2, C: 1, '1B': 1, '2B': 1, '3B': 1, SS: 1, OF: 3, UTIL: 1 },
 };
 const SALARY_CAPS: Record<string, number> = { dk: 50000, fd: 35000, yahoo: 200 };
+const SPORT_ALIASES: Record<string, string> = {
+  mlb: 'mlb',
+  baseball_mlb: 'mlb',
+  nba: 'nba',
+  basketball_nba: 'nba',
+  nfl: 'nfl',
+  americanfootball_nfl: 'nfl',
+  nhl: 'nhl',
+  icehockey_nhl: 'nhl',
+};
 
 function buildGreedyLineup(
   players: EnrichedPlayer[],
@@ -148,7 +158,8 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const sport    = searchParams.get('sport')?.trim() ?? 'mlb';
+    const sportRaw = searchParams.get('sport')?.trim().toLowerCase() ?? 'mlb';
+    const sport = SPORT_ALIASES[sportRaw] ?? sportRaw;
     const slate    = searchParams.get('slate')?.trim() ?? 'main';
     const site     = searchParams.get('site')?.trim() ?? 'dk';
     const position = searchParams.get('position')?.trim() ?? '';
@@ -177,8 +188,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const sourceRows = rawPlayers ?? [];
+    // Retry without sport filter when no rows are found, which can happen when
+    // odds-api style sport keys (e.g. basketball_nba) are provided but ADP rows
+    // are stored under short keys only.
+    if (sourceRows.length === 0 && sportRaw !== sport) {
+      const { data: fallbackPlayers } = await supabase
+        .from('nfbc_adp')
+        .select('id, player_name, display_name, team, positions, adp, rank, value_delta, is_value_pick, auction_value')
+        .order('rank', { ascending: true })
+        .limit(limit);
+      if (fallbackPlayers?.length) {
+        console.warn(`[API/dfs] no rows for sport=${sportRaw}; using fallback ADP dataset (${fallbackPlayers.length} rows)`);
+      }
+      sourceRows.push(...(fallbackPlayers ?? []));
+    }
+
     // Enrich each player with salary, projectedPoints, value metrics
-    const enriched: EnrichedPlayer[] = (rawPlayers ?? []).map(p => {
+    const enriched: EnrichedPlayer[] = sourceRows.map(p => {
       const rank = p.rank ?? 200;
       const salary = rankToSalary(rank);
       const projectedPoints = estimateProjectedPoints(p);

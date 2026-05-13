@@ -25,7 +25,7 @@
  *     (run: ALTER PUBLICATION supabase_realtime ADD TABLE api.daily_picks;)
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/toast-provider';
 

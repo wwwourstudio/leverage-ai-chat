@@ -18,7 +18,7 @@
 
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
@@ -69,6 +69,7 @@ export function useOddsRealtime({
   enabled = true,
 }: UseOddsRealtimeOptions = {}): void {
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const supabase = useMemo(() => createClient(), []);
   // Stable serialised key to detect meaningful gameIds changes
   const gameIdsKey = gameIds.slice().sort().join(',');
 

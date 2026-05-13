@@ -217,6 +217,8 @@ export async function GET(request: Request) {
       markets = await fetchWeatherMarkets(limit);
     } else if (type === 'finance') {
       markets = await fetchFinanceMarkets(limit);
+    } else if (type === 'entertainment') {
+      markets = await fetchEntertainmentMarkets(limit);
     } else if (type === 'trending') {
       markets = await fetchTopMarketsByVolume(limit);
     } else if (search) {

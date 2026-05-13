@@ -97,11 +97,19 @@
   --chip-bg:           var(--bg-elevated);
   --chip-border:       var(--border-subtle);
 
+  --ui-radius-card: 1rem;
+  --ui-card-bg: var(--bg-surface);
+  --ui-card-border: var(--card-border);
+  --ui-card-border-hover: var(--card-border-hover);
+  --ui-shadow-card: var(--shadow-card);
+  --ui-shadow-elevated: var(--shadow-elevated);
+
   /* Typography scale */
   --text-nano:  9px;
   --text-micro: 10px;
   --text-tiny:  11px;
   --text-label: 0.6875rem;
+
 }
 
 .dark {
@@ -206,6 +214,13 @@
   --card-border-hover: var(--border-hover);
   --chip-bg:           var(--bg-elevated);
   --chip-border:       var(--border-subtle);
+
+  --ui-radius-card: 1rem;
+  --ui-card-bg: var(--bg-surface);
+  --ui-card-border: var(--card-border);
+  --ui-card-border-hover: var(--card-border-hover);
+  --ui-shadow-card: var(--shadow-card);
+  --ui-shadow-elevated: var(--shadow-elevated);
 }
 
 @theme inline {

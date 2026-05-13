@@ -2010,7 +2010,16 @@ async function _generateContextualCards(
   
   // Kalshi/Prediction Markets — route by subcategory pill when provided
   if (category === 'kalshi') {
-    const sub = (kalshiSubcategory || '').toLowerCase();
+    const rawCtx = String(userContext || '').toLowerCase();
+    const inferKalshiSub = (): string => {
+      if (/(culture|entertainment|movie|film|music|tv|awards|oscar|grammy|emmy|celebrity|pop culture|arts)/.test(rawCtx)) return 'culture';
+      if (/(politic|election|senate|house|president|governor|trump|biden)/.test(rawCtx)) return 'politics';
+      if (/(weather|climate|rain|snow|hurricane|temperature)/.test(rawCtx)) return 'weather';
+      if (/(finance|financial|economy|inflation|rate cut|fed|stocks|crypto|bitcoin|ethereum)/.test(rawCtx)) return 'finance';
+      if (/(sport|nfl|nba|mlb|nhl|soccer|football|basketball|baseball|hockey)/.test(rawCtx)) return 'sports';
+      return '';
+    };
+    const sub = (kalshiSubcategory || inferKalshiSub()).toLowerCase();
     console.log('[v0] [CARDS-GEN] Kalshi category, subcategory=' + (sub || 'none (trending)'));
     try {
       const {

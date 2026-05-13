@@ -245,6 +245,13 @@ function MatchupMeter({ score }: { score: number }) {
   );
 }
 
+
+function hasDisplayValue(v: unknown): boolean {
+  if (v == null) return false;
+  const str = String(v).trim();
+  return str !== '' && str !== '—' && str !== '-';
+}
+
 export const DFSCard = memo(function DFSCard({
   title,
   category,
@@ -397,7 +404,7 @@ export const DFSCard = memo(function DFSCard({
         {hasCorePlay && !isStackPlay && (
           <div className="grid grid-cols-3 gap-1.5">
             {/* Salary tile */}
-            {salary && salary !== '—' && salary !== '' && salary !== '$0' && (
+            {hasDisplayValue(salary) && salary !== '$0' && (
               <div className="flex flex-col items-center gap-1 rounded-xl bg-violet-500/8 border border-violet-500/20 px-2 py-2.5">
                 <span className="text-[8px] font-black uppercase tracking-wider text-violet-400/70">Salary</span>
                 <span className="text-base font-black text-violet-300 tabular-nums leading-tight">{String(salary)}</span>
@@ -415,7 +422,7 @@ export const DFSCard = memo(function DFSCard({
             )}
 
             {/* Projection tile */}
-            {projection && (
+            {hasDisplayValue(projection) && (
               <div className="flex flex-col items-center gap-1 rounded-xl bg-emerald-500/8 border border-emerald-500/20 px-2 py-2.5">
                 <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400/70">Proj Pts</span>
                 <span className="text-base font-black text-emerald-400 tabular-nums leading-tight">{String(projection)}</span>
@@ -434,7 +441,7 @@ export const DFSCard = memo(function DFSCard({
             )}
 
             {/* Ownership tile */}
-            {ownership && (
+            {hasDisplayValue(ownership) && (
               <div className="flex flex-col items-center gap-1 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-2 py-2.5">
                 <span className="text-[8px] font-black uppercase tracking-wider text-[var(--text-muted)]">Own%</span>
                 <span className="text-base font-black text-white tabular-nums leading-tight">{String(ownership)}</span>
@@ -465,19 +472,22 @@ export const DFSCard = memo(function DFSCard({
               <p className="text-sm font-bold text-white">{targetGame}</p>
             )}
             <div className="grid grid-cols-2 gap-1.5">
-              {projection && (
+              {hasDisplayValue(projection) && (
                 <div className="flex flex-col items-center gap-0.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-1.5 py-2">
                   <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Proj Pts</span>
                   <span className="text-sm font-black text-emerald-400 tabular-nums">{String(projection)}</span>
                 </div>
               )}
-              {ownership && (
+              {hasDisplayValue(ownership) && (
                 <div className="flex flex-col items-center gap-0.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-1.5 py-2">
                   <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Own %</span>
                   <span className="text-sm font-black text-white tabular-nums">{String(ownership)}</span>
                 </div>
               )}
             </div>
+            {!hasDisplayValue(projection) && !hasDisplayValue(ownership) && (
+              <div className="text-[11px] text-[var(--text-faint)]">Projection and ownership will populate when a specific slate is selected.</div>
+            )}
           </div>
         )}
 
@@ -492,6 +502,9 @@ export const DFSCard = memo(function DFSCard({
               <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400/70">Target</span>
               <span className="text-[11px] font-bold text-[var(--text-faint)]">or matchup</span>
             </div>
+            {!hasDisplayValue(projection) && !hasDisplayValue(ownership) && (
+              <div className="text-[11px] text-[var(--text-faint)]">Projection and ownership will populate when a specific slate is selected.</div>
+            )}
           </div>
         )}
 
@@ -597,6 +610,9 @@ export const DFSCard = memo(function DFSCard({
                 <span className="text-[9px] text-[var(--text-faint)]">DK</span>
               </div>
             </div>
+            {!hasDisplayValue(projection) && !hasDisplayValue(ownership) && (
+              <div className="text-[11px] text-[var(--text-faint)]">Projection and ownership will populate when a specific slate is selected.</div>
+            )}
           </div>
         )}
 
@@ -626,6 +642,9 @@ export const DFSCard = memo(function DFSCard({
                 );
               })}
             </div>
+            {!hasDisplayValue(projection) && !hasDisplayValue(ownership) && (
+              <div className="text-[11px] text-[var(--text-faint)]">Projection and ownership will populate when a specific slate is selected.</div>
+            )}
           </div>
         )}
 

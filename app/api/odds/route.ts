@@ -115,7 +115,8 @@ const MARKETS_MAP: Record<string, string[]> = {
 };
 
 async function fetchOddsForSport(sport: string, marketType = 'h2h') {
-  const validation = validateSportKey(sport);
+  const normalizedInput = sport.toLowerCase() === 'dfs' ? 'mlb' : sport;
+  const validation = validateSportKey(normalizedInput);
   if (!validation.isValid || !validation.normalizedKey) {
     return { success: false as const, error: validation.error || `Unknown sport: ${sport}`, events: [] };
   }

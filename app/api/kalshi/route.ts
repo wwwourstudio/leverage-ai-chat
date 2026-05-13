@@ -315,7 +315,7 @@ export async function POST(request: Request) {
       }
       markets = finalCategory
         ? await fetchKalshiMarkets({ category: finalCategory, limit })
-        : await fetchAllKalshiMarkets({ status: 'open', maxMarkets: Math.max(limit * 5, 200) });
+        : await fetchAllKalshiMarkets({ status: 'open', maxMarkets: Math.max(limit * 10, 200) });
     }
 
     // Sort by activity score (real price signal > active order book > recent volume > total volume)

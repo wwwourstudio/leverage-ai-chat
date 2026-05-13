@@ -48,9 +48,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { sport, category, limit = 6, userContext, draftGroupId } = body;
+    const { sport, category, limit = 6, userContext, draftGroupId, includeAllCards = false } = body;
 
-    const clampedLimit = Math.min(Math.max(Number(limit) || 6, 1), 30);
+    const maxCards = includeAllCards ? 50 : 25;
+    const clampedLimit = Math.min(Math.max(Number(limit) || 6, 1), maxCards);
     // Include userContext and draftGroupId in dedupeKey — different queries must not coalesce
     // into one in-flight promise even if category/sport/limit match.
     const dedupeKey = `${category ?? ''}::${sport ?? ''}::${clampedLimit}::${userContext ?? ''}::${draftGroupId ?? ''}`;

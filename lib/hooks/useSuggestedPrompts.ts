@@ -268,8 +268,7 @@ export function useSuggestedPrompts({
 
     return uniqueSuggestions.slice(0, 7);
   // selectedCategory drives suggestion routing; suggestedPrompts is the early-return fallback.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, suggestedPrompts]);
+    }, [selectedCategory, suggestedPrompts]);
 
   return {
     suggestedPrompts,

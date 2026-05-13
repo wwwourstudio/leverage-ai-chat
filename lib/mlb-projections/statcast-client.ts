@@ -1,3 +1,5 @@
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
 /**
  * Baseball Savant / Statcast Client
  * Fetches aggregated season-level Statcast metrics via the leaderboard API.
@@ -77,8 +79,7 @@ function getSupabaseCache() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
   try {
-    const { createClient } = require('@supabase/supabase-js');
-    return createClient(url, key, { db: { schema: 'api' } }) as import('@supabase/supabase-js').SupabaseClient;
+    return createClient(url, key, { db: { schema: 'api' } }) as SupabaseClient;
   } catch { return null; }
 }
 

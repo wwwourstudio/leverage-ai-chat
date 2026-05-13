@@ -1114,7 +1114,7 @@ export async function fetchEntertainmentMarkets(limit: number = 20): Promise<Kal
 
   // First: check top 1000 markets (uses shared in-memory cache — free if already warm)
   const topMarkets = await fetchKalshiMarkets({ limit: 1000 });
-  let entertainment = topMarkets.filter(isEntertainmentMarket);
+  const entertainment = topMarkets.filter(isEntertainmentMarket);
 
   // Second: if thin results, do a full paginated fetch (up to 2000 markets)
   if (entertainment.length < 3) {

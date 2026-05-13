@@ -1075,7 +1075,7 @@ export const KalshiCard = memo(function KalshiCard({
       return () => clearTimeout(t);
     }
     prevMid.current = livePrice.yesMid;
-  }, [livePrice?.yesMid]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [livePrice?.yesMid]); 
 
   // Mount animation
   useEffect(() => {

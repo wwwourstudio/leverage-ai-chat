@@ -25,7 +25,7 @@
  *     (run: ALTER PUBLICATION supabase_realtime ADD TABLE api.daily_picks;)
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/toast-provider';
 
@@ -81,7 +81,7 @@ export function usePicksAlerts(options: PicksAlertOptions = {}): void {
 
   const toast     = useToast();
   const alertedAt = useRef<Map<number, number>>(new Map());
-  const supabase  = createClient();
+  const supabase  = useMemo(() => createClient(), []);
 
   useEffect(() => {
     const channel = supabase
@@ -138,5 +138,5 @@ export function usePicksAlerts(options: PicksAlertOptions = {}): void {
     return () => {
       supabase.removeChannel(channel);
     };
-      }, [minTier, requireSharp, cooldownMs]);
+  }, [cooldownMs, minTier, requireSharp, supabase, toast]);
 }

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { Database, AlertCircle, CheckCircle2, ExternalLink, X, Loader2 } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Database, AlertCircle, ExternalLink, X, Loader2 } from 'lucide-react';
 
 interface DatabaseStatusBannerProps {
   onDismiss?: () => void;
@@ -13,12 +13,18 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
   const [message, setMessage] = useState('');
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    checkDatabaseStatus();
-    return () => { if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current); };
-    }, []);
+  const clearDismissTimer = useCallback(() => {
+    if (!dismissTimerRef.current) return;
+    clearTimeout(dismissTimerRef.current);
+    dismissTimerRef.current = null;
+  }, []);
 
-  const checkDatabaseStatus = async () => {
+  const scheduleDismiss = useCallback((ms: number) => {
+    clearDismissTimer();
+    dismissTimerRef.current = setTimeout(() => setDismissed(true), ms);
+  }, [clearDismissTimer]);
+
+  const checkDatabaseStatus = useCallback(async () => {
     try {
       const response = await fetch('/api/insights').catch(err => {
         console.warn('[v0] Database status check failed:', err);
@@ -29,8 +35,7 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
         // API route doesn't exist or network error
         setStatus('connected');
         setMessage('Running in client-only mode');
-        if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
-        dismissTimerRef.current = setTimeout(() => setDismissed(true), 2000);
+        scheduleDismiss(2000);
         return;
       }
 
@@ -43,8 +48,7 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
         setStatus('connected');
         setMessage('Database connected and ready');
         // Auto-dismiss success message after 3 seconds
-        if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
-        dismissTimerRef.current = setTimeout(() => setDismissed(true), 3000);
+        scheduleDismiss(3000);
       } else {
         setStatus('error');
         setMessage(data.message || 'Unable to connect to database');
@@ -54,11 +58,14 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
       // Gracefully handle missing API routes
       setStatus('connected');
       setMessage('Running in client-only mode');
-      setTimeout(() => {
-        setDismissed(true);
-      }, 2000);
+      scheduleDismiss(2000);
     }
-  };
+  }, [scheduleDismiss]);
+
+  useEffect(() => {
+    checkDatabaseStatus();
+    return clearDismissTimer;
+  }, [checkDatabaseStatus, clearDismissTimer]);
 
   const handleDismiss = () => {
     setDismissed(true);
@@ -71,7 +78,7 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
     return null;
   }
 
-  const getBannerStyles = () => {
+  const bannerStyles = useMemo(() => {
     switch (status) {
       case 'checking':
         return 'bg-blue-500/10 border-blue-500/20 text-blue-400';
@@ -82,9 +89,9 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
       default:
         return 'bg-slate-500/10 border-slate-500/20 text-slate-400';
     }
-  };
+  }, [status]);
 
-  const getIcon = () => {
+  const icon = useMemo(() => {
     switch (status) {
       case 'checking':
         return <Loader2 className="w-5 h-5 animate-spin" />;
@@ -95,12 +102,12 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
       default:
         return <Database className="w-5 h-5" />;
     }
-  };
+  }, [status]);
 
   return (
-    <div className={`relative rounded-2xl border p-4 mb-6 ${getBannerStyles()}`}>
+    <div className={`relative rounded-2xl border p-4 mb-6 ${bannerStyles}`}>
       <div className="flex items-start gap-4">
-        <div className="flex-shrink-0 mt-0.5">{getIcon()}</div>
+        <div className="flex-shrink-0 mt-0.5">{icon}</div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-2">

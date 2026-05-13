@@ -81,9 +81,15 @@ export function usePicksAlerts(options: PicksAlertOptions = {}): void {
 
   const toast     = useToast();
   const alertedAt = useRef<Map<number, number>>(new Map());
-  const supabase  = useMemo(() => createClient(), []);
 
   useEffect(() => {
+    let supabase;
+    try {
+      supabase = createClient();
+    } catch (error) {
+      console.warn('[usePicksAlerts] Supabase client unavailable; alerts disabled.', error);
+      return;
+    }
     const channel = supabase
       .channel('daily_picks_alerts')
       .on(
@@ -138,5 +144,5 @@ export function usePicksAlerts(options: PicksAlertOptions = {}): void {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [cooldownMs, minTier, requireSharp, supabase, toast]);
+  }, [cooldownMs, minTier, requireSharp, toast]);
 }

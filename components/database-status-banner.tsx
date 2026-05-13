@@ -74,10 +74,6 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
     }
   };
 
-  if (dismissed || status === 'connected') {
-    return null;
-  }
-
   const bannerStyles = useMemo(() => {
     switch (status) {
       case 'checking':
@@ -103,6 +99,11 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
         return <Database className="w-5 h-5" />;
     }
   }, [status]);
+
+
+  if (dismissed || status === 'connected') {
+    return null;
+  }
 
   return (
     <div className={`relative rounded-2xl border p-4 mb-6 ${bannerStyles}`}>

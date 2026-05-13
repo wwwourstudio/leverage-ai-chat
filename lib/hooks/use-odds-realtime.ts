@@ -76,6 +76,13 @@ export function useOddsRealtime({
   useEffect(() => {
     if (!enabled) return;
     if (!onOddsUpdate && !onPredictionUpdate) return;
+    let supabase;
+    try {
+      supabase = createClient();
+    } catch (error) {
+      console.warn('[use-odds-realtime] Supabase client unavailable; realtime disabled.', error);
+      return;
+    }
     const channelName = `odds-realtime-${gameIdsKey || 'all'}`;
 
     const channel = supabase.channel(channelName);
@@ -140,5 +147,5 @@ export function useOddsRealtime({
         console.log(`[v0] [use-odds-realtime] Unsubscribed (${channelName})`);
       }
     };
-  }, [enabled, evThreshold, gameIds, gameIdsKey, onOddsUpdate, onPredictionUpdate, supabase]);
+  }, [enabled, evThreshold, gameIds, gameIdsKey, onOddsUpdate, onPredictionUpdate]);
 }

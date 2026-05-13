@@ -217,6 +217,8 @@ export async function GET(request: Request) {
       markets = await fetchWeatherMarkets(limit);
     } else if (type === 'finance') {
       markets = await fetchFinanceMarkets(limit);
+    } else if (type === 'entertainment') {
+      markets = await fetchEntertainmentMarkets(limit);
     } else if (type === 'trending') {
       markets = await fetchTopMarketsByVolume(limit);
     } else if (search) {
@@ -311,7 +313,9 @@ export async function POST(request: Request) {
         };
         finalCategory = sportMap[(sport as string).toLowerCase()] || sport;
       }
-      markets = await fetchKalshiMarkets({ category: finalCategory, limit });
+      markets = finalCategory
+        ? await fetchKalshiMarkets({ category: finalCategory, limit })
+        : await fetchAllKalshiMarkets({ status: 'open', maxMarkets: Math.max(limit * 5, 200) });
     }
 
     // Sort by activity score (real price signal > active order book > recent volume > total volume)

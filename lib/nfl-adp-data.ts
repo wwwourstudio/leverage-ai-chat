@@ -14,7 +14,7 @@ export type { NFBCPlayer, ADPQueryParams } from '@/lib/adp-data';
 export { queryADP } from '@/lib/adp-data';
 
 import type { NFBCPlayer } from '@/lib/adp-data';
-import { saveADPToSupabase, loadADPFromSupabase, clearADPCache as clearMLBCache } from '@/lib/adp-data';
+import { saveADPToSupabase, loadADPFromSupabase, clearADPCache as clearMLBCache, normalizeADPOrder } from '@/lib/adp-data';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -25,22 +25,6 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 // Used when the NFFC live endpoint is unreachable. Values are 2026 NFFC consensus
 // pre-season ADP. Update annually before each NFL draft season (July/August).
 // Covers top 120 picks across all positions: QB, RB, WR, TE, K, DEF.
-
-/**
- * Ensures the static fallback array has monotonically non-decreasing ADP values
- * when sorted by rank. Recalculates valueDelta and isValuePick automatically.
- * Eliminates all ADP backtracks that creep in when rows are edited by hand.
- */
-function normalizeADPOrder(players: NFBCPlayer[]): NFBCPlayer[] {
-  const sorted = [...players].sort((a, b) => a.rank - b.rank);
-  let prevAdp = 0;
-  return sorted.map(p => {
-    const adp = Math.max(p.adp, prevAdp + 0.5);
-    prevAdp = adp;
-    const valueDelta = Math.round((adp - p.rank) * 10) / 10;
-    return { ...p, adp, valueDelta, isValuePick: valueDelta > 15 };
-  });
-}
 
 const NFL_STATIC_FALLBACK: NFBCPlayer[] = normalizeADPOrder([
   // ── Round 1 (1–12) ──────────────────────────────────────────────────────────

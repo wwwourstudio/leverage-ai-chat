@@ -74,7 +74,7 @@ const MAX_LIMIT = 25;
  * Ensures the static fallback array has monotonically non-decreasing ADP values
  * when sorted by rank. Recalculates valueDelta and isValuePick automatically.
  */
-function normalizeADPOrder(players: NFBCPlayer[]): NFBCPlayer[] {
+export function normalizeADPOrder(players: NFBCPlayer[]): NFBCPlayer[] {
   const sorted = [...players].sort((a, b) => a.rank - b.rank);
   let prevAdp = 0;
   return sorted.map(p => {

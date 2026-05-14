@@ -18,13 +18,11 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import dynamic from 'next/dynamic';
-import { fetchDynamicCards, type DynamicCard } from '@/lib/data-service';
-import { API_ENDPOINTS, PLAYER_HEADSHOT_IDS, sportToApi, FREE_TIER, GROK_VOICE_STORAGE_KEY, GROK_VOICE_DEFAULT } from '@/lib/constants';
-import { speakText, stopVoice } from '@/lib/voice-player';
-import { cardsToSpeech } from '@/lib/card-speech';
+import { fetchDynamicCards } from '@/lib/data-service';
+import { FREE_TIER, GROK_VOICE_STORAGE_KEY, GROK_VOICE_DEFAULT } from '@/lib/constants';
 import { isDev as getIsDev } from '@/lib/config';
 import { createClient } from '@/lib/supabase/client';
-import { detectSportFromText, extractSport, extractSportFromText, extractMarketType, extractPlatform } from '@/lib/sport-detection';
+import { extractSportFromText } from '@/lib/sport-detection';
 import { useModalState } from '@/lib/hooks/useModalState';
 import { useCredits } from '@/lib/hooks/useCredits';
 import { useMessageEditor } from '@/lib/hooks/useMessageEditor';
@@ -33,128 +31,30 @@ import { useCardAnalysis } from '@/lib/hooks/useCardAnalysis';
 import { useSuggestedPrompts } from '@/lib/hooks/useSuggestedPrompts';
 import { useFileHandling, type FileAttachment } from '@/lib/hooks/useFileHandling';
 import { useKalshiStore } from '@/lib/store/kalshi-store';
-const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ default: m.AuthModals })), { ssr: false });
-import { TrendingUp, Trophy, Target, ThumbsUp, ThumbsDown, MessageSquare, Clock, Star, Zap, AlertCircle, CheckCircle, CheckCircle2, DollarSign, Activity, Award, ChevronRight, Bell, ShoppingCart, Medal, PieChart, Layers, BarChart3, Sparkles, TrendingDown, Flame, Users, RefreshCw, Search, Copy, Edit3, RotateCcw, Shield, Database, BookOpen, X, CheckCheck, AlertTriangle, BarChart, Info, FileText, ImageIcon, Loader2, Volume2 } from 'lucide-react';
-import { CardLayout } from '@/components/data-cards/CardLayout';
-import { DatabaseStatusBanner } from '@/components/database-status-banner';
-import { TrustMetricsDisplay } from '@/components/trust-metrics-display';
-import { AIProgressIndicator } from '@/components/ai-progress-indicator';
-const SettingsLightbox = dynamic(() => import('@/components/SettingsLightbox').then(m => ({ default: m.SettingsLightbox })), { ssr: false });
-const AlertsLightbox = dynamic(() => import('@/components/AlertsLightbox').then(m => ({ default: m.AlertsLightbox })), { ssr: false });
-const StripeLightbox = dynamic(() => import('@/components/StripeLightbox').then(m => ({ default: m.StripeLightbox })), { ssr: false });
-const UserLightbox = dynamic(() => import('@/components/UserLightbox').then(m => ({ default: m.UserLightbox })), { ssr: false });
-const WatchlistLightbox = dynamic(() => import('@/components/WatchlistLightbox').then(m => ({ default: m.WatchlistLightbox })), { ssr: false });
+import { useGenerateResponse } from '@/lib/hooks/useGenerateResponse';
+import { TrendingUp, Trophy, Award, Layers, BarChart3, Sparkles } from 'lucide-react';
 import { useToast } from '@/components/toast-provider';
 import { Sidebar } from '@/components/Sidebar';
-import { CommandPalette } from '@/components/CommandPalette';
-import { ChatHeader, ChatInput, EnvironmentWarningBanner, KalshiBettingBanner, RateLimitNotification, FantasyLeagueContextBar, MessageActionsToolbar, SourcesPanel } from '@/components/chat';
-import { SuggestedPrompts } from '@/components/suggested-prompts';
+import { ChatHeader, EnvironmentWarningBanner } from '@/components/chat';
 import type { InsightCard } from '@/lib/cards-generator';
-
-import { createThread, updateThread, loadMessages, saveMessagesBatch } from '@/lib/chat-service';
-import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
-import { useChat, type ChatMessage as HookChatMessage } from '@/lib/hooks/useChat';
+import { loadMessages, updateThread } from '@/lib/chat-service';
+import { getSeasonInfo } from '@/lib/seasonal-context';
+import { useChat } from '@/lib/hooks/useChat';
 import { useTheme } from 'next-themes';
-import { WelcomeScreen } from '@/components/index/WelcomeScreen';
-import { MessageContent } from '@/components/index/MessageContent';
-import { MessageAttachments } from '@/components/index/MessageAttachments';
-import { CreditModals } from '@/components/index/CreditModals';
-import { DetailedAnalysisLayout, type DetailedAnalysisData } from '@/components/index/DetailedAnalysisLayout';
-import { FantasyLeagueSetup, type FantasyLeague as FantasyLeagueType } from '@/components/index/FantasyLeagueSetup';
 import { AddToHomeBanner } from '@/components/AddToHomeBanner';
-import {
-  getHardcodedQuickActions,
-  sportSelectionBettingPrompts,
-  sportSelectionFantasyPrompts,
-  sportSelectionDFSPrompts,
-  type PromptItem,
-} from '@/lib/prompt-data';
+import { getHardcodedQuickActions, type PromptItem } from '@/lib/prompt-data';
 import { useVoiceConversation } from '@/lib/hooks/use-voice-conversation';
+import { ChatMessageList } from '@/components/index/ChatMessageList';
+import { ChatInputSection } from '@/components/index/ChatInputSection';
+import { ChatModals } from '@/components/index/ChatModals';
+import { FantasyLeagueSetup, type FantasyLeague as FantasyLeagueType } from '@/components/index/FantasyLeagueSetup';
+import type { Message, ServerDataProps, TrustMetrics } from '@/app/types/chat';
 const VoiceConversationOverlay = dynamic(() => import('@/components/voice-conversation-overlay').then(m => ({ default: m.VoiceConversationOverlay })), { ssr: false });
-
-// FileAttachment interface is imported from @/lib/hooks/useFileHandling
-
-interface APIResponse<T = any> {
-  success: boolean;
-  error?: string;
-  data?: T;
-  text?: string;
-  cards?: InsightCard[];
-  confidence?: number;
-  sources?: Array<{
-    name: string;
-    type: 'database' | 'api' | 'model' | 'cache';
-    reliability: number;
-    url?: string;
-  }>;
-  model?: string;
-  modelUsed?: string; // Model name used for generation (for display)
-  trustMetrics?: TrustMetrics;
-  useFallback?: boolean; // Flag to indicate fallback mode was used
-  details?: string; // Additional error or diagnostic details
-  errorType?: string; // Type of error that occurred
-  clarificationNeeded?: boolean;
-  clarificationOptions?: string[];
-  processingTime?: number;
-}
-
-interface OddsEvent {
-  sport_title: string;
-  bookmakers?: Array<{
-    key: string;
-    title: string;
-    markets: any[];
-  }>;
-}
-
-interface TrustMetrics {
-  benfordIntegrity: number;
-  oddsAlignment: number;
-  marketConsensus: number;
-  historicalAccuracy: number;
-  finalConfidence: number;
-  trustLevel: 'high' | 'medium' | 'low';
-  flags?: Array<{
-    type: string;
-    message: string;
-    severity: 'info' | 'warning' | 'error';
-  }>;
-  riskLevel: 'low' | 'medium' | 'high';
-  adjustedTone?: string;
-  modelUsed?: string;
-  sources?: Array<{ name: string; type: string; reliability: number }>;
-  processingTime?: number;
-  hasLiveOdds?: boolean;
-  hasKalshi?: boolean;
-}
-
-interface Message extends HookChatMessage {
-  // Specialised fields not in HookChatMessage
-  cards?: InsightCard[];        // narrower than unknown[] — typed for this app
-  trustMetrics?: TrustMetrics;  // narrower than unknown — typed for this app
-  attachments?: FileAttachment[];
-  voted?: 'up' | 'down';
-  // isWelcome, isEditing, editHistory, insights, clarificationOptions, useFallback
-  // are inherited from HookChatMessage as optional fields
-}
-
-interface ServerDataResult {
-  initialCards: Record<string, unknown>[];
-  initialInsights: { stats: Record<string, unknown> | null; preferences: Record<string, unknown> | null } | null;
-  userSession: { user: { id: string; email: string | undefined; name: string } } | null;
-  serverTime: string;
-  missingKeys: string[];
-  envErrors: string[];
-  dataSourcesUsed: string[];
-  fetchErrors: string[];
-}
-export type ServerDataProps = ServerDataResult;
 
 interface UnifiedAIPlatformProps {
   serverData?: ServerDataProps;
 }
 
-// FantasyLeague type is imported from @/components/index/FantasyLeagueSetup
 type FantasyLeague = FantasyLeagueType;
 
 export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps) {
@@ -923,610 +823,17 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     return () => window.removeEventListener('leveragePlayerClick', handler);
   }, []);
 
-  const generateRealResponse = async (userMessage: string, imageAttachments?: Array<{ name: string; base64: string; mimeType: string }>, optimisticAssistantId?: string) => {
-    const isDev = getIsDev();
-    // Dedup guard: suppress duplicate calls for the same message (e.g. onPromptClick
-    // and handleSubmit both firing within the same event loop tick).
-    const msgKey = userMessage.trim().slice(0, 200);
-    if (analyzingMessageRef.current === msgKey) {
-      if (isDev) console.log('[v0] Duplicate analyze suppressed for:', msgKey.slice(0, 60));
-      return;
-    }
-    analyzingMessageRef.current = msgKey;
+  const generateRealResponse = useGenerateResponse({
+    messages, setMessages, streamMessage, abortStream,
+    setIsTyping, selectedCategory, selectedSport, setKalshiBettingBannerVisible,
+    customInstructions, deepThink, fantasyLeague, setVerifyStage,
+    setSuggestedPrompts, setIsClarificationPills, generateContextualSuggestions, setLastUserQuery,
+    activeChat, setActiveChat, setChats, pendingThreadRef, isLoggedIn,
+    oddsCacheRef, analyzingMessageRef, toast,
+  });
 
-    // Cancel any in-flight request — hook manages the AbortController internally
-    abortStream();
-    setIsTyping(true);
-    setLastUserQuery(userMessage);
-    const startTime = Date.now();
-
-    try {
-      if (isDev) console.log('[v0] Starting real AI analysis for:', userMessage);
-      
-      // Extract context from user message with strict detection flags
-      const lowerMsg = userMessage.toLowerCase();
-      
-      // Political market keywords
-      const politicalKeywords = ['kalshi', 'election', 'politics', 'cpi', 'inflation', 'fed', 'approval rating', 'recession', 'polymarket', 'prediction market'];
-      const isPoliticalMarket = politicalKeywords.some(k => lowerMsg.includes(k));
-      
-      // Sports detection - pass conversation history for context, but not for Kalshi queries
-      const conversationHistory = messages.slice(-5).map((m: any) => ({ role: m.role, content: m.content || '' }));
-      const detectedSport = extractSport(
-        userMessage,
-        (selectedCategory === 'kalshi' || isPoliticalMarket) ? undefined : conversationHistory
-      );
-
-      // Normalize the UI-selected sport to the same format extractSport() returns
-      // (e.g. 'ncaa-football' → 'ncaaf', 'ncaa-basketball' → 'ncaab', 'ncaa-basketball-w' → 'ncaaw', others unchanged)
-      const selectedSportNormalized = selectedSport === 'ncaa-football' ? 'ncaaf'
-        : selectedSport === 'ncaa-basketball' ? 'ncaab'
-        : selectedSport === 'ncaa-basketball-w' ? 'ncaaw'
-        : selectedSport || null;
-
-      // Priority: direct message detection > explicit tab selection > history inheritance.
-      // This prevents conversation history from a different sport bleeding into the current
-      // query when the user has explicitly selected a sport tab (e.g. NCAAB tab + MLB history).
-      const directMessageSport = detectSportFromText(userMessage);
-      const effectiveSport = directMessageSport
-        || (selectedCategory !== 'kalshi' ? selectedSportNormalized : null)
-        || (!selectedSportNormalized ? detectedSport : null);
-
-      // Betting intent keywords — also activates on Betting tab
-      const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'arbitrage', 'arb', 'h2h', 'sportsbook', 'draftkings', 'fanduel', 'moneyline', 'prop', 'parlay'];
-      const hasBettingIntent = bettingKeywords.some(k => lowerMsg.includes(k)) || selectedCategory === 'betting';
-
-      // Sports query detection (not political, not Kalshi)
-      const sportsKeywords = ['nba', 'nfl', 'nhl', 'mlb', 'basketball', 'football', 'hockey', 'baseball', 'ncaa'];
-      const isSportsQuery = (sportsKeywords.some(k => lowerMsg.includes(k)) || !!effectiveSport) && !isPoliticalMarket && selectedCategory !== 'kalshi';
-
-      // Fantasy intent — also activates on Fantasy tab and DFS tab
-      const fantasyKeywords = ['fantasy', 'draft', 'waiver', 'faab', 'adp', 'vbd', 'tier cliff', 'bestball', 'best ball', 'start sit', 'trade', 'trade value', 'trade target', 'trade advice', 'who should i pick', 'who do i start', 'sleeper', 'rankings', 'projections', 'auction value', 'nfbc', 'nffc', 'tgfbi', 'draft strategy', 'draft slot', 'draft position', 'pick position', 'draft order', 'average draft'];
-      const hasFantasyIntent = (fantasyKeywords.some(k => lowerMsg.includes(k)) || selectedCategory === 'fantasy' || selectedCategory === 'dfs') && !isPoliticalMarket;
-
-      // Player-specific query detection — check message against known player roster
-      const detectedPlayerName = Object.keys(PLAYER_HEADSHOT_IDS).find(
-        name => lowerMsg.includes(name.toLowerCase())
-      );
-      const hasPlayerIntent = !!detectedPlayerName && !hasBettingIntent && !hasFantasyIntent;
-
-      const detectedPlatform = extractPlatform(userMessage);
-
-      // Political market guard — respects the UI platform selection:
-      // - Kalshi platform selected → always political (never fetch sports odds)
-      // - Betting platform selected → never political (don't let message keywords override)
-      // - Otherwise → use message-based detection
-      const finalIsPoliticalMarket = selectedCategory === 'kalshi' ||
-        ((isPoliticalMarket || detectedPlatform === 'kalshi') && selectedCategory !== 'betting');
-
-      // Show banner when user is on Kalshi tab but their query looks like a sports bet
-      if (selectedCategory === 'kalshi' && hasBettingIntent && !isPoliticalMarket) {
-        setKalshiBettingBannerVisible(true);
-      } else {
-        setKalshiBettingBannerVisible(false);
-      }
-
-      const context: any = {
-        sport: effectiveSport,
-        marketType: extractMarketType(userMessage),
-        platform: detectedPlatform,
-        isSportsQuery,
-        isPoliticalMarket: finalIsPoliticalMarket,
-        hasBettingIntent,
-        hasFantasyIntent,
-        hasPlayerIntent,
-        playerName: detectedPlayerName,
-        previousMessages: messages.slice(-5).map((m: any) => ({ role: m.role, content: m.content || '' })),
-        // Pass Kalshi sub-category pill value when in Kalshi mode.
-        // Only forward values that are actual Kalshi sub-categories — never sport
-        // slugs like 'nba' or 'nfl', which are sports-odds concepts, not Kalshi ones.
-        // Pill selection takes priority; if no pill is selected we detect from message text
-        // so typing "show me sports markets on Kalshi" still routes to sports markets.
-        kalshiSubcategory: (() => {
-          if (selectedCategory !== 'kalshi') return undefined;
-          const validSubs = ['politics', 'elections', 'election', 'sports', 'sport', 'weather', 'climate',
-            'finance', 'financials', 'economics', 'crypto', 'companies', 'trending',
-            'culture', 'entertainment', 'arts', 'pop culture', 'awards', 'tv', 'film',
-            'music', 'movies', 'celebrity', 'oscars', 'emmys', 'grammys'];
-          if (selectedSport && validSubs.includes(selectedSport.toLowerCase())) return selectedSport;
-          // Fallback: detect from message text when no pill is selected
-          const m = lowerMsg;
-          if (m.includes('sports') || m.includes('nfl') || m.includes('nba') || m.includes('mlb')
-            || m.includes('nhl') || m.includes('march madness') || m.includes('super bowl')
-            || m.includes('world series') || m.includes('stanley cup')
-            || m.includes('championship') || m.includes('game ')) return 'sports';
-          if (m.includes('polit') || m.includes('election')) return 'politics';
-          if (m.includes('weather') || m.includes('climate')) return 'weather';
-          if (m.includes('finance') || m.includes('crypto') || m.includes('econom') || m.includes('stock')) return 'finance';
-          if (m.includes('oscar') || m.includes('grammy') || m.includes('emmy')
-            || m.includes('award') || m.includes('entertainment') || m.includes('golden globe')
-            || m.includes('bafta') || m.includes('box office') || m.includes('academy award')
-            || m.includes('celebrity') || m.includes('billboard') || m.includes('netflix')
-            || m.includes('reality show') || m.includes('music video') || m.includes('film')
-            || m.includes('movie')) return 'entertainment';
-          return undefined;
-        })(),
-        // Pass selected tab so the API can route DFS vs fantasy correctly
-        selectedCategory,
-        // Pass league settings so server-side card generation uses the correct size/format
-        leagueSize: fantasyLeague?.setupComplete ? (fantasyLeague.teams ?? 12) : undefined,
-        leagueScoringFormat: fantasyLeague?.setupComplete ? (fantasyLeague.leagueType ?? undefined) : undefined,
-      };
-
-      if (isDev) {
-        console.log('[v0] Context:', { sport: detectedSport || 'none', betting: hasBettingIntent, sports: isSportsQuery, political: finalIsPoliticalMarket, fantasy: hasFantasyIntent });
-      }
-
-      // Inject sport-selection pills immediately (zero latency) when we know the intent
-      // but no sport has been provided — user sees choices before the AI responds.
-      if (!effectiveSport && selectedCategory !== 'kalshi' && selectedCategory !== 'all') {
-        if (selectedCategory === 'dfs') {
-          setSuggestedPrompts(sportSelectionDFSPrompts);
-          setIsClarificationPills(true);
-        } else if (hasFantasyIntent && selectedCategory === 'fantasy') {
-          setSuggestedPrompts(sportSelectionFantasyPrompts);
-          setIsClarificationPills(true);
-        } else if (hasBettingIntent || selectedCategory === 'betting') {
-          setSuggestedPrompts(sportSelectionBettingPrompts);
-          setIsClarificationPills(true);
-        }
-      }
-
-      // HARD STOP: Political markets NEVER fetch sports odds
-      if (context.isPoliticalMarket) {
-        if (isDev) console.log('[POLITICAL MARKET DETECTED] Skipping sports odds fetch');
-        // Route directly to Kalshi analysis without attempting sports odds
-        // Note: The /api/analyze endpoint will handle Kalshi market analysis
-      } else if (context.hasFantasyIntent && (!context.hasBettingIntent || selectedCategory === 'fantasy') && selectedCategory !== 'dfs') {
-        // Fantasy intent — card generation is handled server-side by /api/analyze
-        // (which has filesystem access to read the full ADP CSV). Client-side
-        // pre-generation is intentionally skipped to avoid the static 120-player fallback.
-        if (isDev) console.log('[FANTASY INTENT] Cards will be generated server-side');
-      } else if ((context.hasBettingIntent || context.isSportsQuery) && !context.hasPlayerIntent) {
-        // Fetch sports odds for any betting-related query OR explicit sports query
-        if (isDev) console.log('[ODDS FETCH ATTEMPT] Betting intent or sports query detected');
-        if (isDev) console.log('[v0] === ODDS FETCH STARTING ===');
-        
-        // Import SPORT_KEYS for consistent API format
-        const { SPORT_KEYS, sportToApi } = await import('@/lib/constants');
-        
-        // IF SPORT IS EXPLICITLY DETECTED: Fetch ONLY that sport, NO fallback
-        if (context.sport) {
-          const sportKey = sportToApi(context.sport);
-          
-          if (isDev) {
-            console.log('[v0] Fetching ONLY detected sport:', sportKey);
-            console.log('[NO FALLBACK] Explicit sport detected');
-          }
-          
-          try {
-            // Check 5-minute client-side cache before hitting the API
-            const ODDS_TTL = 5 * 60 * 1000;
-            const cached = oddsCacheRef.current.get(sportKey);
-            let oddsResult: any;
-            if (cached && Date.now() - cached.ts < ODDS_TTL) {
-              if (isDev) console.log(`[v0] Odds cache hit for ${sportKey}`);
-              oddsResult = cached.data;
-            } else {
-              const oddsResponse = await fetch('/api/odds', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sport: sportKey, marketType: context.marketType || 'h2h' })
-              });
-              if (!oddsResponse.ok) {
-                const errorBody = await oddsResponse.json().catch(() => ({ error: `HTTP ${oddsResponse.status}` }));
-                if (isDev) console.error(`[v0] Odds API error (${oddsResponse.status}):`, errorBody);
-                if (oddsResponse.status === 503) {
-                  context.oddsKeyMissing = true;
-                  context.oddsErrorMessage = 'ODDS_API_KEY is not configured. Live odds are unavailable.';
-                } else {
-                  context.oddsError = errorBody.error;
-                  context.oddsErrorMessage = errorBody.message || `Unable to fetch ${context.sport?.toUpperCase() || ''} odds (${oddsResponse.status}).`;
-                }
-                oddsResult = null;
-              } else {
-                oddsResult = await oddsResponse.json();
-                // Store in cache
-                oddsCacheRef.current.set(sportKey, { data: oddsResult, ts: Date.now() });
-              }
-            }
-
-            if (oddsResult) {
-              if (oddsResult?.events?.length > 0) {
-                const sportName = sportKey.replace('_', ' ').toUpperCase();
-                if (isDev) console.log(`[v0] ✅ Found ${oddsResult.events.length} live games in ${sportName}`);
-                context.oddsData = oddsResult;
-                context.oddsData.sport = sportKey;
-              } else {
-                if (isDev) console.log('[NO GAMES FOUND]', context.sport);
-                // NO fallback - return status indicating no games
-                context.noGamesAvailable = true;
-                const _noDataMsg = generateNoDataMessage(sportKey);
-                context.noGamesMessage = `${_noDataMsg.title}: ${_noDataMsg.description} ${_noDataMsg.suggestion}`;
-              }
-            }
-          } catch (err) {
-            if (isDev) console.error(`[v0] Exception fetching ${sportKey}:`, err);
-            context.oddsError = err;
-            context.oddsErrorMessage = `Unable to fetch ${context.sport.toUpperCase()} odds. This may be a temporary API issue.`;
-          }
-        } else {
-          // No specific sport detected. Don't burn API calls with fallback rotation --
-          // the client already has real cards from SSR/initial load. Those cards will be
-          // passed to /api/analyze via existingCards and displayed in the response.
-          if (isDev) console.log('[v0] No sport detected — using available cards instead of fallback rotation');
-        }
-        
-
-        
-        // HARD CROSS-SPORT CONTAMINATION GUARD
-        if (context.sport && context.oddsData?.sport && context.oddsData.sport !== sportToApi(context.sport)) {
-          if (isDev) console.error('[CROSS-SPORT BLOCKED] Attempted contamination prevented:', {
-            detected: context.sport,
-          fetched: context.oddsData.sport
-        });
-        // Clear contaminated data
-        context.oddsData = undefined as any;
-        context.crossSportError = true;
-        }
-      }
-      
-      // Collect cards from prior AI responses to pass as context — exclude the
-      // welcome/SSR message so its pre-fetched cards never pollute a fresh query.
-      const allPreviousCards = messages
-        .filter((m: Message) => !m.isWelcome && m.role === 'assistant')
-        .flatMap((m: Message) => m.cards || []);
-      const realCards = allPreviousCards.filter((c: InsightCard) => c.realData !== false);
-      const availableCards = (realCards.length > 0 ? realCards : allPreviousCards).slice(0, 6);
-
-      // Inject fantasy league context when in fantasy mode
-      let contextualUserMessage = userMessage;
-      if (selectedCategory === 'fantasy' && fantasyLeague?.setupComplete) {
-        const leagueCtx = [
-          `Sport: ${fantasyLeague.sport?.toUpperCase() ?? 'NFL'}`,
-          `Platform: ${fantasyLeague.platform?.toUpperCase() ?? 'ESPN'}`,
-          `${fantasyLeague.teams ?? 12} teams`,
-          `Format: ${fantasyLeague.leagueType ?? fantasyLeague.scoring ?? 'PPR'}`,
-          `Team: "${fantasyLeague.teamName}"`,
-          fantasyLeague.leagueName ? `League: "${fantasyLeague.leagueName}"` : '',
-        ].filter(Boolean).join(', ');
-        contextualUserMessage = `[Fantasy League Context: ${leagueCtx}]\n\n${userMessage}`;
-      }
-
-      // Stream the response via the useChat hook — handles SSE parsing, rAF batching,
-      // AbortController lifecycle, and streaming message state internally.
-      setVerifyStage('analyzing');
-      const assistantMsg = await streamMessage(userMessage, {
-        userMessage: contextualUserMessage,
-        existingCards: availableCards,
-        context,
-        customInstructions: customInstructions || undefined,
-        imageAttachments: imageAttachments?.length ? imageAttachments : undefined,
-        deepThink,
-        optimisticAssistantId,
-      });
-
-      // Hook handled the error (abort, non-OK response, stream failure) — clean up and exit.
-      if (!assistantMsg) {
-        setSuggestedPrompts(generateContextualSuggestions(userMessage, []));
-        setIsClarificationPills(false);
-        return;
-      }
-
-      // Post-process the streamed response: enrich cards and trust metrics.
-      const processingTime = Date.now() - startTime;
-
-      // Card selection: use server cards when present; fall back to pre-loaded cards
-      // only when the server returned none (undefined vs explicit []).
-      const serverCardCount = (assistantMsg.cards as unknown[])?.length ?? 0;
-      const useFallbackCards = serverCardCount === 0 && availableCards.length > 0;
-      const responseCards = serverCardCount > 0
-        ? (assistantMsg.cards as InsightCard[])
-        : (useFallbackCards ? availableCards : []);
-
-      if (isDev) {
-        console.log('[v0] Analysis:', JSON.stringify({
-          serverCards: serverCardCount,
-          responseCards: responseCards.length,
-          fallbackCards: useFallbackCards ? availableCards.length : 0,
-          confidence: assistantMsg.trustMetrics?.finalConfidence,
-          fallback: useFallbackCards,
-        }));
-      }
-
-      // Enrich trust metrics with real metadata so TrustMetricsDisplay can show
-      // sources, model name, processing time, and live-data badges.
-      const hasLiveOdds = !!(context?.oddsData?.events?.length > 0);
-      const hasKalshi = context?.isPoliticalMarket === true;
-      const enrichedTrustMetrics = assistantMsg.trustMetrics
-        ? {
-            ...(assistantMsg.trustMetrics as object),
-            modelUsed: assistantMsg.modelUsed || 'Grok 4',
-            sources: assistantMsg.sources || [],
-            processingTime,
-            hasLiveOdds,
-            hasKalshi,
-          }
-        : {
-            benfordIntegrity: 85,
-            oddsAlignment: hasLiveOdds ? 90 : 80,
-            marketConsensus: hasLiveOdds ? 88 : 78,
-            historicalAccuracy: 87,
-            finalConfidence: hasLiveOdds ? 88 : 82,
-            trustLevel: 'high' as const,
-            riskLevel: 'low' as const,
-            adjustedTone: hasLiveOdds ? 'Strong signal — live data verified' : 'Knowledge-based analysis',
-            flags: [],
-            modelUsed: 'Grok 4',
-            sources: assistantMsg.sources || [],
-            processingTime,
-            hasLiveOdds,
-            hasKalshi,
-          };
-
-      // Build the finalised message shape (used for Supabase persistence below)
-      const newMessage: Message = {
-        ...assistantMsg,
-        cards: responseCards,
-        confidence: assistantMsg.confidence || 85,
-        sources: assistantMsg.sources || [],
-        modelUsed: assistantMsg.modelUsed || 'Grok 4',
-        processingTime,
-        trustMetrics: enrichedTrustMetrics as TrustMetrics,
-      };
-
-      // Update the already-streamed message in state with enriched metadata.
-      // The hook has already set isStreaming: false and basic cards/confidence from
-      // the done event — this pass adds enriched trust metrics and processed cards.
-      setMessages((prev: Message[]) => prev.map(m =>
-        m.id === assistantMsg.id
-          ? { ...m,
-              cards: newMessage.cards || [],
-              confidence: newMessage.confidence,
-              sources: newMessage.sources,
-              modelUsed: newMessage.modelUsed,
-              processingTime: newMessage.processingTime,
-              trustMetrics: newMessage.trustMetrics,
-            }
-          : m
-      ).slice(-30));
-
-      // Persist cards to localStorage so they survive page reloads.
-      if ((newMessage.cards as any[])?.length && assistantMsg.id && activeChat) {
-        try {
-          const lsKey = `lev:cards:${activeChat}`;
-          const stored: Record<string, any[]> = JSON.parse(localStorage.getItem(lsKey) ?? '{}');
-          stored[assistantMsg.id] = newMessage.cards as any[];
-          // Keep at most 50 message entries per chat to avoid storage bloat
-          const keys = Object.keys(stored);
-          if (keys.length > 50) delete stored[keys[0]];
-          localStorage.setItem(lsKey, JSON.stringify(stored));
-        } catch { /* quota / security errors — silently skip */ }
-      }
-
-      // Persist both messages to Supabase (fire-and-forget).
-      // Guard: only save when we have a real Supabase UUID — not a placeholder like
-      // 'chat-1' or 'chat-{timestamp}'. If a thread creation is in-flight (pendingThreadRef),
-      // await it; if there is no pending thread at all (first-ever message scenario),
-      // create one on the fly.
-      if (isLoggedIn) {
-        const capturedChat = activeChat;
-        const capturedMsg = newMessage;
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(capturedChat);
-        const resolveThreadId = async (): Promise<string | null> => {
-          if (isUuid) return capturedChat;
-          if (pendingThreadRef.current) {
-            const created = await pendingThreadRef.current;
-            return created?.id ?? null;
-          }
-          // First-ever message — no thread exists yet; create one now
-          const category = selectedCategory === 'all' ? 'betting' : selectedCategory;
-          const tags = [
-            selectedCategory === 'all' ? 'multi-platform' : selectedCategory,
-            ...(selectedSport ? [selectedSport] : []),
-          ];
-          const created = await createThread(category, userMessage.slice(0, 50), tags);
-          if (created) {
-            setChats((prev: any) => prev.map((c: any) => c.id === capturedChat ? { ...c, id: created.id, category, tags } : c));
-            setActiveChat(created.id);
-          }
-          return created?.id ?? null;
-        };
-        const finalCategory = selectedCategory === 'all' ? 'betting' : selectedCategory;
-        const finalTags = [
-          selectedCategory === 'all' ? 'multi-platform' : selectedCategory,
-          ...(selectedSport ? [selectedSport] : []),
-        ];
-        resolveThreadId().then(async (threadId) => {
-          if (!threadId) return;
-          const [, savedMsgId] = await saveMessagesBatch(threadId, [
-            { role: 'user', content: userMessage },
-            {
-              role: 'assistant',
-              content: capturedMsg.content,
-              model_used: capturedMsg.modelUsed,
-              confidence: capturedMsg.confidence,
-              cards: (capturedMsg.cards as unknown[])?.length ? capturedMsg.cards as unknown[] : undefined,
-            },
-          ]);
-          // Re-key cards in localStorage to use real DB IDs so they survive page reloads.
-          // The early save above used client-side UUIDs (temp thread ID + streaming message ID).
-          // Now we have the real Supabase-assigned IDs for both the thread and the message.
-          const clientMsgId = capturedMsg.id;
-          if (savedMsgId && (capturedMsg.cards as any[])?.length) {
-            try {
-              const oldKey = `lev:cards:${capturedChat}`;
-              const newKey = `lev:cards:${threadId}`;
-              const stored: Record<string, any[]> = JSON.parse(localStorage.getItem(oldKey) ?? '{}');
-              if (oldKey !== newKey) {
-                localStorage.removeItem(oldKey);
-              }
-              // Re-key message entry: client streaming UUID → server UUID
-              if (stored[clientMsgId]?.length && clientMsgId !== savedMsgId) {
-                stored[savedMsgId] = stored[clientMsgId];
-                delete stored[clientMsgId];
-              }
-              const keys = Object.keys(stored);
-              if (keys.length > 50) delete stored[keys[0]];
-              localStorage.setItem(newKey, JSON.stringify(stored));
-            } catch { /* quota / security errors — silently skip */ }
-          }
-          // Sync category + sport tags so sidebar always shows correct context
-          updateThread(threadId, { category: finalCategory, tags: finalTags });
-          setChats((prev: any) => prev.map((c: any) =>
-            c.id === threadId ? { ...c, category: finalCategory, tags: finalTags } : c
-          ));
-        });
-      }
-
-      // Generate contextual suggestions — use clarificationOptions from API if ambiguous
-      if (assistantMsg.clarificationOptions?.length) {
-        setSuggestedPrompts(assistantMsg.clarificationOptions.map((o: string) => ({
-          label: o,
-          icon: Target,
-          category: selectedCategory,
-        })));
-        setIsClarificationPills(true);
-      } else {
-        const contextualSuggestions = generateContextualSuggestions(userMessage, newMessage.cards || []);
-        setSuggestedPrompts(contextualSuggestions);
-        setIsClarificationPills(false);
-      }
-
-    } catch (error) {
-      // AbortError is handled by the hook — this catch covers errors in context
-      // building or odds fetching that occur before streamMessage() is called.
-      if (error instanceof Error && error.name === 'AbortError') return;
-
-      console.error('[v0] Error generating real response:', error);
-
-      // Update placeholder in-place if present; otherwise append a new error message
-      const errorContent = `I'm having trouble connecting to live data sources right now. Please try again in a moment.`;
-      const errorMetadata = {
-        cards: [],
-        confidence: 50,
-        sources: [{ name: 'Cached Data', type: 'cache' as const, reliability: 60 }],
-        modelUsed: 'Fallback Mode',
-        processingTime: Date.now() - startTime,
-        trustMetrics: {
-          benfordIntegrity: 50,
-          oddsAlignment: 50,
-          marketConsensus: 50,
-          historicalAccuracy: 50,
-          finalConfidence: 50,
-          trustLevel: 'low' as const,
-          riskLevel: 'high' as const,
-          adjustedTone: 'Connection error — please retry',
-          flags: [{ type: 'connectivity', message: 'Live data unavailable due to connectivity issue', severity: 'warning' as const }],
-        },
-      };
-      setMessages((prev: Message[]) => {
-        if (optimisticAssistantId && prev.some(m => m.id === optimisticAssistantId && (m.isPending || m.isStreaming))) {
-          return prev.map(m => m.id === optimisticAssistantId
-            ? { ...m, isPending: false, isStreaming: false, isError: true, content: errorContent, ...errorMetadata }
-            : m);
-        }
-        return [...prev, {
-          id: crypto.randomUUID(),
-          role: 'assistant' as const,
-          content: errorContent,
-          timestamp: new Date(),
-          isError: true,
-          ...errorMetadata,
-        } as Message].slice(-30);
-      });
-
-      setSuggestedPrompts(generateContextualSuggestions(userMessage, []));
-      setIsClarificationPills(false);
-    } finally {
-      setIsTyping(false);
-      // Clear in-flight guard so the same message can be re-sent after completion.
-      analyzingMessageRef.current = null;
-    }
-  };
-  // Keep the ref current so the player-click event handler always calls the latest version
+  // Keep the ref current so player-click and voice handlers always call the latest version
   generateRealResponseRef.current = generateRealResponse;
-
-  // Sport detection helpers are imported from @/lib/sport-detection
-
-  const selectRelevantCards = async (userMessage: string, context?: any): Promise<InsightCard[]> => {
-    const isDev = getIsDev();
-    const msgLower = userMessage.toLowerCase();
-
-    // Extract sport and category from message - use conversation history from context if available
-    const conversationHistory = context?.previousMessages || messages.slice(-5).map((m: any) => ({ role: m.role, content: m.content || '' }));
-    const sport = extractSport(userMessage, conversationHistory);
-    let category = 'all';
-
-    if (msgLower.includes('bet') || msgLower.includes('odds')) {
-      category = 'betting';
-    } else if (msgLower.includes('dfs') || msgLower.includes('lineup')) {
-      category = 'dfs';
-    } else if (msgLower.includes('draft') || msgLower.includes('fantasy')) {
-      category = 'fantasy';
-    } else if (msgLower.includes('kalshi') || msgLower.includes('market')) {
-      category = 'kalshi';
-    } else if (msgLower.includes('prop') || msgLower.includes('strikeout')
-            || msgLower.includes('player bet')) {
-      category = 'props';
-    }
-
-    // Extract DraftKings draft group ID from prompts like "DraftKings #12345"
-    const draftGroupIdMatch = userMessage.match(/DraftKings #(\d+)/i);
-    const draftGroupId = draftGroupIdMatch ? parseInt(draftGroupIdMatch[1], 10) : undefined;
-
-    if (isDev) console.log('[v0] Fetching dynamic cards for:', { sport, category, draftGroupId });
-
-    try {
-      if (isDev) console.log('[v0] Requesting dynamic cards with params:', { sport, category, context, limit: 7, draftGroupId });
-
-      const dynamicCards = await fetchDynamicCards({
-        sport: sport || undefined,
-        category,
-        userContext: context,
-        limit: 7,
-        draftGroupId,
-      });
-
-      if (isDev) console.log('[v0] Received dynamic cards response:', dynamicCards.length, 'cards');
-
-      if (dynamicCards.length === 0) {
-        if (isDev) {
-          console.log('[v0] WARNING: Zero dynamic cards returned from API. Check:');
-          console.log('[v0] - Sport extracted:', sport);
-          console.log('[v0] - Category detected:', category);
-          console.log('[v0] - API endpoint configured:', API_ENDPOINTS?.CARDS || 'undefined');
-          console.log('[v0] - Context provided:', context);
-        }
-      } else if (dynamicCards.every((c: any) => c.realData === false || c.data?.realData === false)) {
-        toast.info('Live data unavailable — showing AI estimates. Data will refresh shortly.');
-      }
-
-      if (isDev) console.log('[v0] Returning', dynamicCards.length, 'dynamic cards');
-      return dynamicCards;
-    } catch (error) {
-      console.error('[v0] Error fetching dynamic cards:', error instanceof Error ? error.message : String(error));
-      return [];
-    }
-  };
-
-  const buildSourcesList = (oddsData: APIResponse<OddsEvent[]> | null): Array<{ name: string; type: 'database' | 'api' | 'model' | 'cache'; reliability: number; url?: string }> => {
-    const sources: Array<{ name: string; type: 'database' | 'api' | 'model' | 'cache'; reliability: number; url?: string }> = [
-      { name: 'Grok AI Model', type: 'model' as const, reliability: 94 },
-      { name: 'Supabase Trust System', type: 'database' as const, reliability: 96 }
-    ];
-    
-    if (oddsData?.success && oddsData.data) {
-      sources.push({
-        name: 'The Odds API (Live)',
-        type: 'api' as const,
-        reliability: 98,
-        url: 'https://the-odds-api.com'
-      });
-    }
-    
-    return sources;
-  };
 
 
 
@@ -1797,439 +1104,155 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           currentCategory={selectedCategory !== 'all' ? selectedCategory : undefined}
         />
 
-        {/* Messages Container - Dynamic Data-Driven Interface */}
-        <div
-          className="flex-1 min-h-0 overflow-y-auto px-4 py-6 custom-scrollbar scroll-smooth"
-          aria-live="polite"
-          aria-label="Conversation"
-          role="log"
-          style={{
-            scrollBehavior: 'smooth',
-            WebkitOverflowScrolling: 'touch'
+        <ChatMessageList
+          messages={messages}
+          isTyping={isTyping}
+          verifyStage={verifyStage}
+          editingMessageIndex={editingMessageIndex}
+          editingContent={editingContent}
+          speakingMessageId={speakingMessageId}
+          setSpeakingMessageId={setSpeakingMessageId}
+          kalshiBettingBannerVisible={kalshiBettingBannerVisible}
+          setKalshiBettingBannerVisible={setKalshiBettingBannerVisible}
+          editTextareaRef={editTextareaRef}
+          onEditContentChange={setEditingContent}
+          adjustEditTextareaHeight={adjustEditTextareaHeight}
+          onKeyDown={handleKeyDown}
+          selectedCategory={selectedCategory}
+          onGenerateResponse={(q) => generateRealResponse(q)}
+          onFollowUp={handleFollowUp}
+          onEditMessage={handleEditMessage}
+          onSaveEdit={handleSaveEdit}
+          onCancelEdit={handleCancelEdit}
+          onCopyMessage={handleCopyMessage}
+          onRegenerateResponse={handleRegenerateResponse}
+          onVote={handleVote}
+        />
+        <ChatInputSection
+          input={input}
+          setInput={setInput}
+          onSubmit={handleSubmit}
+          isTyping={isTyping}
+          onStopGeneration={stopGeneration}
+          uploadedFiles={uploadedFiles}
+          onFileUpload={handleFileUpload}
+          onRemoveFile={removeAttachment}
+          onSaveFile={handleSaveFile}
+          onFileDrop={processFiles}
+          onFilesAdded={(files: any) => setUploadedFiles((prev: any) => [...prev, ...files])}
+          creditsRemaining={creditsRemaining}
+          onOpenStripe={handleOpenStripe}
+          lastUserQuery={lastUserQuery}
+          selectedCategory={selectedCategory}
+          selectedSport={selectedSport}
+          deepThink={deepThink}
+          onToggleDeepThink={handleToggleDeepThink}
+          systemStatus={systemStatus}
+          showLimitNotification={showLimitNotification}
+          setShowLimitNotification={setShowLimitNotification}
+          getRateLimitData={getRateLimitData}
+          fantasyLeague={fantasyLeague}
+          setFantasyLeague={setFantasyLeague}
+          fantasySetupData={fantasySetupData}
+          setFantasySetupData={setFantasySetupData as any}
+          fantasySetupStep={fantasySetupStep}
+          setFantasySetupStep={setFantasySetupStep}
+          isLoggedIn={isLoggedIn}
+          messages={messages}
+          suggestedPrompts={suggestedPrompts}
+          quickActions={quickActions}
+          isClarificationPills={isClarificationPills}
+          onCategorySelect={handleCategorySelect}
+          onPromptClick={(submitText) => {
+            const userMessage: Message = { id: crypto.randomUUID(), role: 'user', content: submitText, timestamp: new Date() };
+            setMessages((prev: Message[]) => [...prev, userMessage]);
+            setChats((prevChats: Chat[]) => prevChats.map((chat: Chat) => {
+              if (chat.id === activeChat) {
+                const updatedChat = { ...chat };
+                updatedChat.preview = submitText.slice(0, 50) + (submitText.length > 50 ? '...' : '');
+                updatedChat.timestamp = new Date();
+                if (chat.title === 'New Analysis') {
+                  const words = submitText.split(' ').slice(0, 5).join(' ');
+                  updatedChat.title = words + (submitText.split(' ').length > 5 ? '...' : '');
+                }
+                return updatedChat;
+              }
+              return chat;
+            }));
+            generateRealResponse(submitText);
           }}
-        >
-          <div className="max-w-5xl xl:max-w-6xl mx-auto space-y-6">
-            {/* Database Status Banner */}
-            <DatabaseStatusBanner />
-            {/* Kalshi sports-query banner */}
-            <KalshiBettingBanner visible={kalshiBettingBannerVisible} onDismiss={() => setKalshiBettingBannerVisible(false)} />
-            {messages.length === 0 ? (
-              <WelcomeScreen onPromptSelect={(q) => generateRealResponse(q)} />
-            ) : (
-              messages.map((message: any, index: any) => {
-                // Group messages: Check if this message is from same sender as previous
-                const prevMessage = index > 0 ? messages[index - 1] : null;
-                const isGrouped = prevMessage && prevMessage.role === message.role;
-                const _showTimestamp = !isGrouped || index === messages.length - 1;
-                
-                return (
-                  <div
-                    key={message.id ?? `msg-${index}`}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn ${isGrouped ? 'mt-1.5' : 'mt-5'}`}
-                  >
-                    <div className={message.role === 'user' ? 'max-w-[85%] md:max-w-[75%]' : 'w-full max-w-4xl lg:max-w-3xl'}>
-                  {message.role === 'assistant' && (
-                    <div className="flex items-center gap-2.5 mb-2.5 flex-wrap">
-                      {/* Logo mark */}
-                      <div className="relative w-7 h-7 shrink-0" role="img" aria-label="Leverage AI">
-                        <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 opacity-20 blur-sm" />
-                        <div className="relative w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-md shadow-blue-500/25">
-                          <TrendingUp className="w-3.5 h-3.5 text-white" aria-hidden="true" />
-                        </div>
-                      </div>
-                      <span className="text-xs font-black tracking-tight text-white">Leverage<span className="text-blue-400"> AI</span></span>
-
-                      {/* Verified badge */}
-                      {message.sources && message.sources.length > 0 && !message.isWelcome && (
-                        <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md">
-                          <CheckCheck className="w-2.5 h-2.5 text-blue-400" />
-                          <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider">Live Data</span>
-                        </div>
-                      )}
-
-                    </div>
-                  )}
-                  
-                  <div
-                    className={`relative group/message ${
-                      message.role === 'user'
-                        ? 'rounded-2xl rounded-tr-sm px-5 py-3.5 bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-lg shadow-blue-500/25 w-fit max-w-[85%] ml-auto'
-                        : message.isError
-                          ? 'rounded-2xl rounded-tl-sm px-5 py-4 bg-red-950/20 text-foreground border border-red-800/40 border-l-2 border-l-red-500/60 shadow-lg shadow-black/30'
-                          : message.isPartial
-                            ? 'rounded-2xl rounded-tl-sm px-5 py-4 bg-gradient-to-br from-[var(--bg-overlay)] via-[var(--bg-elevated)]/50 to-[var(--bg-overlay)] text-foreground border border-[var(--border-subtle)] border-l-2 border-l-amber-500/60 shadow-lg shadow-black/30'
-                            : 'rounded-2xl rounded-tl-sm px-5 py-4 bg-gradient-to-br from-[var(--bg-overlay)] via-[var(--bg-elevated)]/50 to-[var(--bg-overlay)] text-foreground border border-[var(--border-subtle)] shadow-lg shadow-black/30'
-                    }`}
-                  >
-                    {editingMessageIndex === index ? (
-                      <div className="space-y-3">
-              <textarea
-                ref={editTextareaRef}
-                value={editingContent}
-                onChange={(e: any) => {
-                  setEditingContent(e.target.value);
-                  adjustEditTextareaHeight();
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder={selectedCategory === 'all' ? "Ask about sports betting, fantasy, DFS, or prediction markets..." : 
-                             selectedCategory === 'betting' ? "e.g. 'Best value plays for tonight's games'" :
-                             selectedCategory === 'fantasy' ? "e.g. 'NFBC draft strategy for pick 3'" :
-                             selectedCategory === 'dfs' ? "e.g. 'Optimal GPP stack for tonight'" :
-                             "e.g. 'Weather-correlated Kalshi markets'"}
-                className="flex-1 bg-transparent text-white placeholder-gray-400 focus:outline-none text-[13px] leading-relaxed resize-none min-h-[44px] max-h-[200px] pr-2"
-                rows={1}
-                disabled={isTyping}
-              />
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleSaveEdit(index)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all"
-                          >
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            Save & Regenerate
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-surface)] hover:bg-[var(--bg-surface)] text-white rounded-lg text-xs font-bold transition-all"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        {/* Loading skeleton — shown while waiting for API response */}
-                        {message.role === 'assistant' && message.isPending && (
-                          <div className="space-y-2.5 py-1" aria-label="Loading response" aria-busy="true">
-                            <div className="h-2.5 w-48 rounded-full bg-white/10 animate-pulse" />
-                            <div className="h-2.5 w-64 rounded-full bg-white/10 animate-pulse [animation-delay:150ms]" />
-                            <div className="h-2.5 w-36 rounded-full bg-white/10 animate-pulse [animation-delay:300ms]" />
-                          </div>
-                        )}
-                        {/* Error / partial banners for assistant messages */}
-                        {message.role === 'assistant' && message.isError && (
-                          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-red-800/30">
-                            <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                            <span className="text-xs text-red-400 font-medium">Response failed</span>
-                          </div>
-                        )}
-                        {message.role === 'assistant' && message.isPartial && (
-                          <div className="flex items-center gap-2 mb-2">
-                            <Info className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                            <span className="text-xs text-amber-400">Partial response</span>
-                          </div>
-                        )}
-                        {/* Check if this is a detailed analysis with structured data */}
-                        {!message.isPending && (message.content.includes('__DETAILED_ANALYSIS__') ? (
-                          (() => {
-                            const match = message.content.match(/__DETAILED_ANALYSIS__([\s\S]+)__END_ANALYSIS__/);
-                            if (!match) return <p className="text-sm leading-relaxed font-medium">{message.content}</p>;
-                            let analysisData: DetailedAnalysisData;
-                            try {
-                              analysisData = JSON.parse(match[1]);
-                            } catch {
-                              return <p className="text-sm leading-relaxed font-medium">{message.content.replace(/__DETAILED_ANALYSIS__[\s\S]*?__END_ANALYSIS__/, '').trim()}</p>;
-                            }
-                            return (
-                              <DetailedAnalysisLayout
-                                data={analysisData}
-                                isTyping={isTyping}
-                                onFollowUp={handleFollowUp}
-                              />
-                            );
-                          })()
-                        ) : (
-                          <div className={(!message.isPending && message.isStreaming) ? 'content-streaming' : undefined}>
-                            <MessageContent content={message.content} />
-                          </div>
-                        ))}
-                        
-                        {/* File Attachments Display */}
-                        <MessageAttachments attachments={message.attachments} />
-                        
-                        {message.editHistory && message.editHistory.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
-                            <details className="text-xs text-[var(--text-faint)]">
-                              <summary className="cursor-pointer hover:text-[var(--text-muted)] flex items-center gap-1.5">
-                                <RotateCcw className="w-3 h-3" />
-                                Edited {message.editHistory.length} time{message.editHistory.length !== 1 ? 's' : ''}
-                              </summary>
-                            </details>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-
-
-                  {/* Dynamic Cards Section — Hero + Compact Suggestions layout */}
-                  {message.role === 'assistant' && message.cards && message.cards.length > 0 && (
-                    <CardLayout
-                      cards={message.cards}
-                      aiInsight={message.content}
-                      messageIndex={index}
-                      trustScore={message.trustMetrics?.finalConfidence}
-                      trustLevel={message.trustMetrics?.trustLevel}
-                      onAsk={(q: string) => generateRealResponse(q)}
-                    />
-                  )}
-
-                  {/* Combined Metadata: Source Credibility & AI Trust - Hidden for welcome message */}
-                  <SourcesPanel
-                    role={message.role}
-                    isWelcome={message.isWelcome}
-                    sources={message.sources}
-                    trustMetrics={message.trustMetrics}
-                    modelUsed={message.modelUsed}
-                    processingTime={message.processingTime}
-                  />
-
-
-                  {/* Message Actions - Hidden for welcome message */}
-                  <MessageActionsToolbar
-                    message={message}
-                    index={index}
-                    editingMessageIndex={editingMessageIndex}
-                    speakingMessageId={speakingMessageId}
-                    onEdit={handleEditMessage}
-                    onVote={handleVote}
-                    onRegenerate={handleRegenerateResponse}
-                    onSpeak={(id, msgContent) => {
-                      const cards = (message as any).cards;
-                      const text = msgContent + (cards?.length ? '\n\n' + cardsToSpeech(cards) : '');
-                      const voice_id = typeof window !== 'undefined'
-                        ? (localStorage.getItem(GROK_VOICE_STORAGE_KEY) ?? GROK_VOICE_DEFAULT)
-                        : GROK_VOICE_DEFAULT;
-                      setSpeakingMessageId(id);
-                      speakText(text, { voice_id, onEnd: () => setSpeakingMessageId(null) });
-                    }}
-                    onStopSpeak={() => { stopVoice(); setSpeakingMessageId(null); }}
-                    onCopy={handleCopyMessage}
-                  />
-                    </div>
-                  </div>
-                );
-          })
-        )}
-
-      {isTyping && !messages.some((m: Message) => m.isPending || m.isStreaming) && (
-        <div className="flex gap-3 animate-fade-in">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-500/50 animate-pulse">
-            <Sparkles className="w-4 h-4 text-white" />
-          </div>
-          <div className="flex-1 space-y-3">
-            <div className="bg-gradient-to-br from-[var(--bg-overlay)] to-[var(--bg-overlay)] backdrop-blur-xl rounded-2xl px-5 py-4 border border-[var(--border-subtle)] shadow-2xl">
-              <AIProgressIndicator stage={verifyStage} />
-            </div>
-          </div>
-        </div>
-      )}
-            
-          </div>
-        </div>
-
-        {/* Input Area */}
-        <div className="relative border-t border-[var(--border-subtle)] bg-gradient-to-b from-background to-black px-4 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl backdrop-blur-xl">
-          <div className="absolute inset-0 bg-gradient-to-t from-blue-600/5 via-transparent to-transparent pointer-events-none"></div>
-          
-          {/* Rate Limit Notification */}
-          <RateLimitNotification
-            visible={showLimitNotification}
-            resetTimeMs={getRateLimitData().resetTime}
-            onDismiss={() => setShowLimitNotification(false)}
-          />
-
-          <div className="relative max-w-5xl xl:max-w-6xl mx-auto">
-            {/* Fantasy League Setup Flow — shown when Fantasy is selected and no league is configured */}
-            {selectedCategory === 'fantasy' && !fantasyLeague?.setupComplete && (
-              <FantasyLeagueSetup
-                fantasySetupData={fantasySetupData}
-                fantasySetupStep={fantasySetupStep}
-                setFantasySetupData={setFantasySetupData as any}
-                setFantasySetupStep={setFantasySetupStep as any}
-                isLoggedIn={isLoggedIn}
-                onSave={(league) => {
-                  setFantasyLeague(league);
-                  setFantasySetupStep(0);
-                  setFantasySetupData({ sport: 'nfl', platform: 'espn', teams: 12, leagueType: 'ppr' });
-                }}
-              />
-            )}
-            {/* Show configured league context + reset button */}
-            <FantasyLeagueContextBar
-              visible={selectedCategory === 'fantasy' && !!fantasyLeague?.setupComplete && isLoggedIn}
-              teamName={fantasyLeague?.teamName}
-              sport={fantasyLeague?.sport}
-              platform={fantasyLeague?.platform}
-              teams={fantasyLeague?.teams}
-              leagueType={fantasyLeague?.leagueType}
-              scoring={fantasyLeague?.scoring}
-              onReset={() => { setFantasyLeague(null); localStorage.removeItem('leverage_fantasy_league'); }}
-            />
-            {/* Suggested Prompts — welcome grid + scrollable pills */}
-            <SuggestedPrompts
-              showWelcomeGrid={messages.length === 1 && !!messages[0]?.isWelcome && suggestedPrompts.length === 0 && selectedCategory === 'all'}
-              onWelcomeAction={(query) => {
-                const userMessage: Message = { id: crypto.randomUUID(), role: 'user', content: query, timestamp: new Date() };
-                setMessages((prev: Message[]) => [...prev, userMessage]);
-                setInput('');
-                generateRealResponse(query);
-              }}
-              onCategorySelect={handleCategorySelect}
-              suggestedPrompts={suggestedPrompts}
-              quickActions={quickActions}
-              hasMessages={messages.length > 1}
-              lastUserQuery={lastUserQuery}
-              selectedCategory={selectedCategory}
-              selectedSport={selectedSport}
-              clarificationMode={isClarificationPills}
-              onPromptClick={(submitText) => {
-                // Do NOT set input before the async path — it briefly populates the
-                // textarea and opens a race window where Enter or a double-click fires
-                // handleSubmit concurrently, adding the message twice.
-                const userMessage: Message = { id: crypto.randomUUID(), role: 'user', content: submitText, timestamp: new Date() };
-                setMessages((prev: Message[]) => [...prev, userMessage]);
-                setChats((prevChats: Chat[]) => prevChats.map((chat: Chat) => {
-                  if (chat.id === activeChat) {
-                    const updatedChat = { ...chat };
-                    updatedChat.preview = submitText.slice(0, 50) + (submitText.length > 50 ? '...' : '');
-                    updatedChat.timestamp = new Date();
-                    if (chat.title === 'New Analysis') {
-                      const words = submitText.split(' ').slice(0, 5).join(' ');
-                      updatedChat.title = words + (submitText.split(' ').length > 5 ? '...' : '');
-                    }
-                    return updatedChat;
-                  }
-                  return chat;
-                }));
-                generateRealResponse(submitText);
-              }}
-            />
-
-            {/* Desktop Chat Input */}
-            <ChatInput
-              input={input}
-              onInputChange={setInput}
-              onSubmit={handleSubmit}
-              isTyping={isTyping}
-              onStopGeneration={stopGeneration}
-              uploadedFiles={uploadedFiles}
-              onFileUpload={handleFileUpload}
-              onRemoveFile={removeAttachment}
-              onSaveFile={handleSaveFile}
-              onFileDrop={processFiles}
-              onFilesAdded={(files: any) => setUploadedFiles((prev: any) => [...prev, ...files])}
-              creditsRemaining={creditsRemaining}
-              onOpenStripe={handleOpenStripe}
-              lastUserQuery={lastUserQuery}
-              selectedCategory={selectedCategory}
-              deepThink={deepThink}
-              onToggleDeepThink={handleToggleDeepThink}
-              systemStatus={systemStatus}
-              voiceConvState={voiceConv.convState}
-              voiceConvSupported={voiceConv.isSupported}
-              onActivateVoice={voiceConv.activate}
-              lastAssistantMessage={[...messages].reverse().find((m: any) => m.role === 'assistant')?.content as string | undefined}
-            />
-          </div>
-        </div>
+          onWelcomeAction={(query) => {
+            const userMessage: Message = { id: crypto.randomUUID(), role: 'user', content: query, timestamp: new Date() };
+            setMessages((prev: Message[]) => [...prev, userMessage]);
+            setInput('');
+            generateRealResponse(query);
+          }}
+          setChats={setChats}
+          activeChat={activeChat}
+          voiceConvState={voiceConv.convState as any}
+          voiceConvSupported={voiceConv.isSupported}
+          onActivateVoice={voiceConv.activate}
+          lastAssistantMessage={[...messages].reverse().find((m: any) => m.role === 'assistant')?.content as string | undefined}
+        />
       </div>
 
-      {/* Credit Modals */}
-      <CreditModals
-        showPurchase={showPurchaseModal}
+      <ChatModals
+        showPurchaseModal={showPurchaseModal}
         purchaseAmount={purchaseAmount}
         setPurchaseAmount={setPurchaseAmount}
-        onClosePurchase={() => setShowPurchaseModal(false)}
-        onStripeCheckout={() => setShowStripeLightbox(true)}
-        onLogin={() => setShowLoginModal(true)}
-        showSubscription={showSubscriptionModal}
-        onCloseSubscription={() => setShowSubscriptionModal(false)}
-        onStripeSubscription={() => setShowStripeLightbox(true)}
-      />
-
-      {/* Auth Modals - extracted to separate component */}
-      <AuthModals
+        setShowPurchaseModal={setShowPurchaseModal}
+        showSubscriptionModal={showSubscriptionModal}
+        setShowSubscriptionModal={setShowSubscriptionModal}
+        setShowStripeLightbox={setShowStripeLightbox}
+        setShowLoginModal={setShowLoginModal}
         showLoginModal={showLoginModal}
         showSignupModal={showSignupModal}
-        setShowLoginModal={setShowLoginModal}
         setShowSignupModal={setShowSignupModal}
         setIsLoggedIn={setIsLoggedIn}
         setUser={setUser}
-      />
-
-      {/* User Lightbox */}
-      <UserLightbox
-        isOpen={showUserLightbox}
-        onClose={() => setShowUserLightbox(false)}
+        showUserLightbox={showUserLightbox}
+        setShowUserLightbox={setShowUserLightbox}
         user={user}
         onLogout={() => { setUser(null); setIsLoggedIn(false); setFantasyLeague(null); localStorage.removeItem('leverage_fantasy_league'); }}
         onInstructionsChange={setCustomInstructions}
-        onAttachFile={(file: any) => setUploadedFiles((prev: any) => [...prev, { ...file, url: '' }])}
-      />
-
-      {/* Settings Lightbox */}
-      <SettingsLightbox
-        isOpen={showSettingsLightbox}
-        onClose={() => setShowSettingsLightbox(false)}
-        user={user}
+        onAttachFile={(file) => setUploadedFiles((prev: any) => [...prev, { ...file, url: '' }])}
+        showSettingsLightbox={showSettingsLightbox}
+        setShowSettingsLightbox={setShowSettingsLightbox}
         onUserUpdate={setUser}
         onOpenStripe={handleOpenStripe}
         creditsRemaining={creditsRemaining}
-      />
-
-      {/* Alerts Lightbox */}
-      <AlertsLightbox
-        isOpen={showAlertsLightbox}
-        onClose={() => setShowAlertsLightbox(false)}
-        onAlertsCountChange={setAlertCount}
-      />
-
-      {/* Watchlist Lightbox */}
-      <WatchlistLightbox
-        isOpen={showWatchlistLightbox}
-        onClose={() => setShowWatchlistLightbox(false)}
+        showAlertsLightbox={showAlertsLightbox}
+        setShowAlertsLightbox={setShowAlertsLightbox}
+        setAlertCount={setAlertCount}
+        showWatchlistLightbox={showWatchlistLightbox}
+        setShowWatchlistLightbox={setShowWatchlistLightbox}
         onPlayerClick={handleSavedPlayerClick}
         onCardClick={handleSavedCardClick}
-      />
-
-      {/* Command Palette (Cmd+K) */}
-      <CommandPalette
-        open={showCommandPalette}
-        onClose={() => setShowCommandPalette(false)}
+        showCommandPalette={showCommandPalette}
+        setShowCommandPalette={setShowCommandPalette}
         chats={chats}
         activeChat={activeChat}
-        onSelectChat={(id) => { handleSelectChat(id); setSidebarOpen(false); }}
-        onNewChat={() => { handleNewChat(); setSidebarOpen(false); }}
-        onOpenSettings={() => setShowSettingsLightbox(true)}
+        onSelectChat={handleSelectChat}
+        onNewChat={handleNewChat}
+        setSidebarOpen={setSidebarOpen}
+        showStripeLightbox={showStripeLightbox}
+        addCredits={addCredits}
+        voiceIsActive={voiceConv.isActive}
+        voiceOverlay={voiceConv.isActive ? (
+          <VoiceConversationOverlay
+            state={voiceConv.convState}
+            liveTranscript={voiceConv.liveTranscript}
+            speakingPreview={voiceConv.speakingPreview}
+            isPushToTalk={voiceConv.isPushToTalk}
+            onSetPushToTalk={voiceConv.setIsPushToTalk}
+            lang={voiceConv.lang}
+            onSetLang={voiceConv.setLang}
+            onStartListening={voiceConv.startListening}
+            onStopListening={voiceConv.stopListening}
+            onClose={voiceConv.deactivate}
+          />
+        ) : null}
       />
-
-      {/* Stripe Purchase Lightbox */}
-      <StripeLightbox
-        isOpen={showStripeLightbox}
-        onClose={() => setShowStripeLightbox(false)}
-        onCreditsAdded={addCredits}
-        creditsRemaining={creditsRemaining}
-        userEmail={user?.email}
-      />
-
-      {/* Voice Conversation Overlay */}
-      {voiceConv.isActive && (
-        <VoiceConversationOverlay
-          state={voiceConv.convState}
-          liveTranscript={voiceConv.liveTranscript}
-          speakingPreview={voiceConv.speakingPreview}
-          isPushToTalk={voiceConv.isPushToTalk}
-          onSetPushToTalk={voiceConv.setIsPushToTalk}
-          lang={voiceConv.lang}
-          onSetLang={voiceConv.setLang}
-          onStartListening={voiceConv.startListening}
-          onStopListening={voiceConv.stopListening}
-          onClose={voiceConv.deactivate}
-        />
-      )}
-
     </div>
   );
 }

@@ -352,36 +352,32 @@ export const CARD_STATUS = {
 } as const;
 
 // Source Types
-export const SOURCE_TYPES = {
+const SOURCE_TYPES = {
   MODEL: 'model',
   API: 'api',
   DATABASE: 'database',
   CACHE: 'cache',
 } as const;
 
-// Trust Levels
-export const TRUST_LEVELS = {
+const TRUST_LEVELS = {
   HIGH: 'high',
   MEDIUM: 'medium',
   LOW: 'low',
 } as const;
 
-// Risk Levels
-export const RISK_LEVELS = {
+const RISK_LEVELS = {
   LOW: 'low',
   MEDIUM: 'medium',
   HIGH: 'high',
 } as const;
 
-// Health Status
-export const HEALTH_STATUS = {
+const HEALTH_STATUS = {
   HEALTHY: 'healthy',
   DEGRADED: 'degraded',
   UNHEALTHY: 'unhealthy',
 } as const;
 
-// Analysis Categories
-export const ANALYSIS_CATEGORIES = {
+const ANALYSIS_CATEGORIES = {
   ALL: 'all',
   BETTING: 'betting',
   FANTASY: 'fantasy',

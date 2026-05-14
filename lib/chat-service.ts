@@ -50,28 +50,6 @@ async function apiCall(path: string, options?: RequestInit): Promise<any> {
 // ── Thread operations ─────────────────────────────────────────────────────────
 
 /**
- * Load all chat threads for the authenticated user.
- * Returns [] on failure (graceful degradation).
- */
-export async function loadThreads(): Promise<ChatThread[]> {
-  try {
-    const json = await apiCall('/api/chats');
-    return (json.threads ?? []).map((t: any) => ({
-      id: t.id,
-      title: t.title,
-      preview: t.preview ?? '',
-      timestamp: new Date(t.updated_at ?? t.created_at),
-      starred: t.starred ?? false,
-      category: t.category ?? 'all',
-      tags: t.tags ?? [],
-    }));
-  } catch (err) {
-    console.warn('[v0] [Chat] loadThreads failed:', err);
-    return [];
-  }
-}
-
-/**
  * Create a new thread in Supabase and return it.
  * Returns null on failure.
  */
@@ -159,11 +137,7 @@ export async function loadMessages(threadId: string): Promise<PersistedMessage[]
   }
 }
 
-/**
- * Append a single message to a thread.
- * Returns the server-assigned message UUID on success, or null on failure.
- */
-export async function saveMessage(
+async function saveMessage(
   threadId: string,
   msg: { role: 'user' | 'assistant'; content: string; model_used?: string; confidence?: number; is_welcome?: boolean; cards?: unknown[] }
 ): Promise<string | null> {

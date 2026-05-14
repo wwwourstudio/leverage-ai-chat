@@ -792,7 +792,7 @@ export default function TradingPage() {
   const handleArbScan = async () => {
     setArbLoading(true);
     try {
-      const res = await fetch(`/api/trading/arbitrage?sport=${selectedSport}`);
+      const res = await fetch(`/api/arbitrage?sport=${selectedSport}`);
       const data = await res.json();
       if (data.success) setArbCount(data.data.arbitrageCount ?? 0);
     } catch { /* non-critical */ }

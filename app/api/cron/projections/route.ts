@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   const startedAt = Date.now();
 
   try {
-    const { runProjectionPipeline } = await import('@/lib/mlb-projections');
+    const { runProjectionPipeline } = await import('@/lib/mlb-projections/projection-pipeline');
 
     // Run the projection pipeline for today's slate
     // The pipeline fetches today's games internally from the MLB Stats API

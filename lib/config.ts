@@ -334,60 +334,6 @@ export function getConfigStatus() {
 // FORMATTING AND LOGGING
 // ============================================================================
 
-/**
- * Format service status for logging
- */
-export function formatServiceStatus(status: ServiceStatus): string {
-  let output = '\n=== Service Configuration Status ===\n\n';
-
-  output += `Overall: ${status.overall.ready ? '✅ READY' : '❌ NOT READY'}\n`;
-  output += `Critical Issues: ${status.overall.criticalMissing}\n`;
-  output += `Warnings: ${status.overall.warningCount}\n\n`;
-
-  // Supabase
-  output += `📦 Supabase: ${status.supabase.configured ? '✅' : '❌'}\n`;
-  if (status.supabase.missing.length > 0) {
-    output += `   Missing: ${status.supabase.missing.join(', ')}\n`;
-  }
-  if (status.supabase.warnings.length > 0) {
-    status.supabase.warnings.forEach(w => output += `   ⚠️  ${w}\n`);
-  }
-
-  // Grok
-  output += `\n🤖 Grok AI: ${status.grok.configured ? '✅' : '❌'}\n`;
-  if (status.grok.missing.length > 0) {
-    output += `   Missing: ${status.grok.missing.join(', ')}\n`;
-  }
-
-  // Odds
-  output += `\n📊 Odds API: ${status.odds.configured ? '✅' : '❌'}\n`;
-  if (status.odds.missing.length > 0) {
-    output += `   Missing: ${status.odds.missing.join(', ')}\n`;
-  }
-  if (status.odds.warnings.length > 0) {
-    status.odds.warnings.forEach(w => output += `   ⚠️  ${w}\n`);
-  }
-
-  output += '\n================================\n';
-
-  return output;
-}
-
-/**
- * Safe environment variable logger (doesn't expose secrets)
- */
-export function logEnvStatus() {
-  const status = getConfigStatus();
-  console.log('\n[ENV] Configuration Status:');
-  console.log(`  Supabase: ${status.supabase ? '✅' : '❌'}`);
-  console.log(`  Grok AI:  ${status.grok ? '✅' : '❌'}`);
-  console.log(`  Odds API: ${status.odds ? '✅' : '❌'}`);
-  console.log(`  All Ready: ${status.allReady ? '✅' : '❌'}\n`);
-  
-  if (!status.allReady) {
-    console.log('[ENV] Some services are not configured. See ENV_CONFIGURATION.md\n');
-  }
-}
 
 // ============================================================================
 // ASSERTIONS AND VALIDATION
@@ -498,40 +444,6 @@ export function validateServerEnv(): EnvValidationResult {
   return { isValid: missing.length === 0, missing, warnings, errors };
 }
 
-export function validateClientEnv(): EnvValidationResult {
-  if (typeof window === 'undefined') {
-    return { isValid: true, missing: [], warnings: [], errors: [] };
-  }
-  const missing: string[] = [];
-  const errors: string[] = [];
-  for (const key of ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY']) {
-    const value = process.env[key];
-    if (!value || value.trim() === '') {
-      missing.push(`${key} (${REQUIRED_ENV_VARS[key]})`);
-      errors.push(`Missing required public environment variable: ${key}`);
-    }
-  }
-  return { isValid: missing.length === 0, missing, warnings: [], errors };
-}
-
-let envLogged = false;
-export function logEnvValidation(result: EnvValidationResult, context: 'server' | 'client') {
-  if (result.missing.length > 0) {
-    console.error(`[v0] ${context.toUpperCase()}: Missing required env vars:`, result.missing);
-  }
-  if (result.errors.length > 0) {
-    console.error(`[v0] ${context.toUpperCase()}: Environment errors:`, result.errors);
-  }
-  if (!envLogged) {
-    envLogged = true;
-    console.log(`[v0] ${context.toUpperCase()}: Environment validation ${result.isValid ? '✓ PASSED' : '✗ FAILED'}`);
-    if (result.warnings.length > 0 && process.env.NODE_ENV === 'development') {
-      console.log(`[v0] Environment info:`, result.warnings.filter(w => !w.startsWith('Optional:')).length > 0
-        ? result.warnings
-        : `${result.warnings.length} optional vars not configured (non-critical)`);
-    }
-  }
-}
 
 export function getMissingAPIKeys(): string[] {
   return ['XAI_API_KEY', 'ODDS_API_KEY'].filter(key => !process.env[key]);

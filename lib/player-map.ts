@@ -11,8 +11,10 @@
  * but 24h staleness is acceptable for betting analysis.
  */
 
+import { TtlCache } from '@/lib/utils/cache';
+
 const MLB_PEOPLE_SEARCH = 'https://statsapi.mlb.com/api/v1/people/search';
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 5_000;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -35,9 +37,10 @@ export interface PlayerMap {
 // ── Module-level cache ────────────────────────────────────────────────────────
 // Keyed by normalised name (trimmed, lowercase). The cache is per-process-instance
 // (Vercel serverless warm invocations reuse it); cold starts re-fetch on first call.
+// Stores PlayerMap | null — null means "player not found" (avoids repeated API calls).
 
-const nameCache = new Map<string, { data: PlayerMap | null; expiry: number }>();
-const idCache   = new Map<number, { data: PlayerMap | null; expiry: number }>();
+const nameCache = new TtlCache<PlayerMap | null>(500);
+const idCache   = new TtlCache<PlayerMap | null>(500);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -72,10 +75,9 @@ function normalizeName(name: string): string {
  */
 export async function getPlayerByName(name: string): Promise<PlayerMap | null> {
   const key = normalizeName(name);
-  const now = Date.now();
 
-  const hit = nameCache.get(key);
-  if (hit && hit.expiry > now) return hit.data;
+  const hit = nameCache.get(key, CACHE_TTL_MS);
+  if (hit !== undefined) return hit;
 
   // Build name variants to try: "Aaron Judge" → also try "Judge, Aaron"
   const variants = [name];
@@ -113,9 +115,8 @@ export async function getPlayerByName(name: string): Promise<PlayerMap | null> {
         pitchHand: person.pitchHand?.code,
       };
 
-      const expiry = now + CACHE_TTL_MS;
-      nameCache.set(key, { data: player, expiry });
-      idCache.set(player.id, { data: player, expiry });
+      nameCache.set(key, player);
+      idCache.set(String(player.id), player);
       return player;
     } catch {
       // Try next variant
@@ -123,7 +124,7 @@ export async function getPlayerByName(name: string): Promise<PlayerMap | null> {
   }
 
   // Cache null to avoid hammering the API for unknown players
-  nameCache.set(key, { data: null, expiry: now + CACHE_TTL_MS });
+  nameCache.set(key, null);
   return null;
 }
 
@@ -134,10 +135,8 @@ export async function getPlayerByName(name: string): Promise<PlayerMap | null> {
  * Useful when you already have an ID from Statcast data and need the display name.
  */
 export async function getPlayerById(id: number): Promise<PlayerMap | null> {
-  const now = Date.now();
-
-  const hit = idCache.get(id);
-  if (hit && hit.expiry > now) return hit.data;
+  const hit = idCache.get(String(id), CACHE_TTL_MS);
+  if (hit !== undefined) return hit;
 
   try {
     const res = await fetch(
@@ -169,9 +168,8 @@ export async function getPlayerById(id: number): Promise<PlayerMap | null> {
       pitchHand: person.pitchHand?.code,
     };
 
-    const expiry = now + CACHE_TTL_MS;
-    idCache.set(id, { data: player, expiry });
-    nameCache.set(normalizeName(player.fullName), { data: player, expiry });
+    idCache.set(String(id), player);
+    nameCache.set(normalizeName(player.fullName), player);
     return player;
   } catch {
     return null;

@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react';
 import type { PickResult } from '@/lib/picks-engine';
 import type { BetTier } from '@/lib/card-pipeline';
+import { getTodayDateET } from '@/lib/utils/index';
 
 // ── Tier config ────────────────────────────────────────────────────────────────
 
@@ -174,7 +175,7 @@ export default function PicksPage() {
   const [activeTier, setActiveTier] = useState<BetTier | 'ALL'>('ALL');
   const [generating, setGenerating] = useState(false);
   const [date, setDate]           = useState(() =>
-    new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }),
+    getTodayDateET(),
   );
 
   const loadPicks = async (d: string) => {

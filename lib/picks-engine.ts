@@ -28,6 +28,7 @@ import { getOddsApiKey } from '@/lib/config';
 import { logger, LogCategory } from '@/lib/logger';
 import type { BetTier } from '@/lib/card-pipeline';
 import { americanToImpliedProb } from '@/lib/utils/odds-math';
+import { getTodayDateET } from '@/lib/utils/index';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -536,8 +537,4 @@ async function analyzePlayer(
   } catch {
     return null;
   }
-}
-
-function getTodayDateET(): string {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 }

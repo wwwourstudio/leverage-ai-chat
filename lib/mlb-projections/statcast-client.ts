@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { TtlCache } from '@/lib/utils/cache';
 
 /**
  * Baseball Savant / Statcast Client
@@ -58,21 +59,15 @@ export interface StatcastPitcherStats {
  * L2: Supabase `statcast_leaderboard_cache` table for cross-invocation persistence
  *     (6-hour TTL). This is the fix for Vercel serverless cold-start cache misses.
  */
-const memCache = new Map<string, { data: unknown; ts: number }>();
-const MEM_TTL  = 5 * 60 * 1000; // 5 min — reuse within the same warm instance
+const memCache = new TtlCache<unknown>(100);
+const MEM_TTL  = 5 * 60 * 1000;
 
-function getMemCached<T>(key: string): T | null {
-  const entry = memCache.get(key) as { data: T; ts: number } | undefined;
-  if (entry && Date.now() - entry.ts < MEM_TTL) return entry.data;
-  return null;
+function getCached<T>(key: string): T | null {
+  return (memCache.get(key, MEM_TTL) as T | undefined) ?? null;
 }
-function setMemCached<T>(key: string, data: T) {
-  memCache.set(key, { data, ts: Date.now() });
+function setCached<T>(key: string, data: T) {
+  memCache.set(key, data);
 }
-
-// Keep old names as aliases so existing callers (if any) don't break
-const getCached  = getMemCached;
-const setCached  = setMemCached;
 
 function getSupabaseCache() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

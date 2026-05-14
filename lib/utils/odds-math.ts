@@ -53,6 +53,16 @@ export function americanOddsPayout(odds: number, stake: number): number {
 }
 
 /**
+ * Convert a win probability [0,1] back to American odds.
+ * Returns 0 for invalid inputs (prob ≤ 0 or ≥ 1).
+ */
+export function probToAmericanOdds(prob: number): number {
+  if (prob <= 0 || prob >= 1) return 0;
+  if (prob >= 0.5) return Math.round(-(prob / (1 - prob)) * 100);
+  return Math.round((1 - prob) / prob * 100);
+}
+
+/**
  * Calculate the profit margin (ROI) for an arbitrage across N outcomes.
  * A positive return means an arb exists.
  * @param impliedProbs - Implied probabilities of each outcome (0–1)

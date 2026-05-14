@@ -12,11 +12,12 @@
 import { NextResponse } from 'next/server';
 import { getMarketByTicker } from '@/lib/kalshi/index';
 import { KalshiClient } from '@/lib/kalshi/kalshiClient';
+import { TtlCache } from '@/lib/utils/cache';
 
 export const runtime = 'nodejs';
 
 // Per-ticker cache: 30s TTL (prices move fast)
-const TICKER_CACHE = new Map<string, { data: unknown; expires: number }>();
+const TICKER_CACHE = new TtlCache<unknown>(200);
 const TICKER_TTL   = 30_000;
 
 export async function GET(
@@ -33,9 +34,9 @@ export async function GET(
   }
 
   // Check per-ticker cache
-  const cached = TICKER_CACHE.get(ticker);
-  if (cached && cached.expires > Date.now()) {
-    return NextResponse.json(cached.data, {
+  const cached = TICKER_CACHE.get(ticker, TICKER_TTL);
+  if (cached !== undefined) {
+    return NextResponse.json(cached, {
       headers: { 'X-Cache': 'HIT', 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' },
     });
   }
@@ -66,7 +67,7 @@ export async function GET(
       timestamp: new Date().toISOString(),
     };
 
-    TICKER_CACHE.set(ticker, { data: body, expires: Date.now() + TICKER_TTL });
+    TICKER_CACHE.set(ticker, body);
 
     return NextResponse.json(body, {
       headers: { 'X-Cache': 'MISS', 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' },

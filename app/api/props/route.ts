@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOddsApiKey } from '@/lib/config';
 import { EXTERNAL_APIS } from '@/lib/constants';
+import { TtlCache } from '@/lib/utils/cache';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -44,8 +45,8 @@ interface OddsApiBookmaker {
 
 // ── Module-level 15-minute cache ───────────────────────────────────────────────
 
-const propCache = new Map<string, { data: PlayerPropResult[]; ts: number }>();
-const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+const propCache = new TtlCache<PlayerPropResult[]>(50);
+const CACHE_TTL = 15 * 60 * 1000;
 
 // ── Sport-specific player prop markets ────────────────────────────────────────
 
@@ -81,13 +82,13 @@ export async function GET(req: NextRequest) {
   }
 
   // Return cached data if fresh
-  const cached = propCache.get(sport);
-  if (cached && Date.now() - cached.ts < CACHE_TTL) {
+  const cached = propCache.get(sport, CACHE_TTL);
+  if (cached !== undefined) {
     return NextResponse.json({
       success: true,
-      players: cached.data,
-      props: toCompatProps(cached.data, sport),
-      timestamp: new Date(cached.ts).toISOString(),
+      players: cached,
+      props: toCompatProps(cached, sport),
+      timestamp: new Date().toISOString(),
     });
   }
 
@@ -105,7 +106,7 @@ export async function GET(req: NextRequest) {
 
     if (!Array.isArray(events) || events.length === 0) {
       // Cache the empty result only when events genuinely don't exist
-      propCache.set(sport, { data: [], ts: Date.now() });
+      propCache.set(sport, []);
       return NextResponse.json({
         success: true,
         players: [],
@@ -212,7 +213,7 @@ export async function GET(req: NextRequest) {
     // Only cache non-empty results — a 0-player result from transient API
     // failures (e.g. 422, 429) should not lock out fresh data for 15 minutes.
     if (players.length > 0) {
-      propCache.set(sport, { data: players, ts: Date.now() });
+      propCache.set(sport, players);
     }
 
     return NextResponse.json({

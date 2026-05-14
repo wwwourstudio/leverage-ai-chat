@@ -135,57 +135,38 @@ leverage-ai-chat/
 │   ├── utils/index.ts                # Additional utility functions
 │   ├── logger.ts                     # Structured logging
 │   ├── error-handlers.ts             # Error classification + user messages
-│   ├── env-validator.ts              # Environment variable validation
-│   ├── dynamic-config.ts             # Runtime config from Supabase
-│   ├── performance-utils.ts          # Performance optimization utilities
 │   ├── data-service.ts               # fetchDynamicCards(), fetchUserInsights()
 │   ├── server-data-loader.ts         # Server-side parallel data fetching
-│   ├── unified-data-service.ts       # Unified data orchestration layer
 │   ├── cards-generator.ts            # AI-assisted card generation
 │   ├── chat-service.ts               # Chat history and context management
 │   ├── data/index.ts                 # Static/fallback data
 │   ├── unified-odds-fetcher.ts       # Central odds fetch layer
 │   ├── odds/index.ts                 # Odds utilities and transformations
 │   ├── odds-persistence.ts           # Odds caching to Supabase
-│   ├── odds-transformer.ts           # Odds format conversion utilities
-│   ├── odds-alignment.ts             # Cross-book odds comparison
 │   ├── supabase-odds-service.ts      # Supabase odds storage
 │   ├── player-projections.ts         # Player prop fetching from Odds API
 │   ├── player-props-service.ts       # Extended player props service
 │   ├── api-request-manager.ts        # Request deduplication + rate limiting
-│   ├── grok-pipeline.ts              # Grok AI analysis pipeline
 │   ├── hallucination-detector.ts     # AI output validation
-│   ├── leveraged-ai.ts               # Core AI orchestration
-│   ├── ai-database-orchestrator.ts   # AI + database coordination
 │   ├── line-movement-tracker.ts      # Line movement tracking
-│   ├── statistical-monitor.ts        # Statistical anomaly detection
 │   ├── benford-validator.ts          # Benford's Law data integrity checks
 │   ├── arbitrage/index.ts            # Arbitrage detection and analysis
 │   ├── kelly/index.ts                # Kelly Criterion bet sizing
-│   ├── engine/runTradingEngine.ts    # Quantitative trading engine
 │   ├── quant/quantEngine.ts          # Quantitative analysis core
-│   ├── kalshi-client.ts              # Legacy Kalshi API client
 │   ├── kalshi/index.ts               # Kalshi utilities
 │   ├── kalshi/kalshiClient.ts        # Current Kalshi client (api.elections.kalshi.com)
-│   ├── weather-service.ts            # Weather fetching + impact analysis
-│   ├── weather/index.ts              # Weather utilities
+│   ├── weather/index.ts              # Weather utilities + enrichCardsWithWeather()
 │   ├── seasonal-context.ts           # Season-aware data context
-│   ├── active-sports-detector.ts     # Detects in-season sports
-│   ├── sports-validator.ts           # Sport/team validation
 │   ├── baseball-savant.ts            # Baseball Savant integration
 │   ├── statcastQuery.ts              # Statcast data queries
-│   ├── physics.ts                    # Physics calculations (e.g., home run distances)
 │   ├── hrEngine.ts                   # Home run probability model
-│   ├── monteCarlo.ts                 # Monte Carlo simulations
 │   ├── adp-data.ts                   # ADP data utilities
 │   ├── nfl-adp-data.ts               # NFL-specific ADP data
 │   ├── supabase-data-service.ts      # Supabase data access layer
 │   ├── supabase-validator.ts         # Supabase response validation
 │   ├── supabase/client.ts            # Browser client (singleton)
 │   ├── supabase/server.ts            # Server client (cookie-aware)
-│   ├── supabase/proxy.ts             # Proxy configuration
 │   ├── hooks/use-realtime.ts         # Supabase realtime React hook
-│   ├── hooks/use-debounce.ts         # Debounce hook
 │   ├── fantasy/                      # Fantasy sports engine
 │   │   ├── types.ts                  # Fantasy type definitions
 │   │   ├── vpe.ts                    # VPE (Value Per Expected) calculations
@@ -390,7 +371,7 @@ This project uses Tailwind CSS v4 with the `@tailwindcss/postcss` plugin. There 
 
 ### Kalshi API
 
-The current Kalshi client (`lib/kalshi/kalshiClient.ts`) uses `api.elections.kalshi.com` as the base URL. The legacy `lib/kalshi-client.ts` still exists but prefer the newer client. Do not use `trading-api.kalshi.com` or `api.kalshi.com` — both redirect with 401 errors.
+The Kalshi client (`lib/kalshi/kalshiClient.ts`) uses `api.elections.kalshi.com` as the base URL. Do not use `trading-api.kalshi.com` or `api.kalshi.com` — both redirect with 401 errors.
 
 ---
 

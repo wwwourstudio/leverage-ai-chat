@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import type { BetTier } from '@/lib/card-pipeline';
+import { getTodayDateET } from '@/lib/utils/index';
 
 export const maxDuration = 60;
 
@@ -143,8 +144,3 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-// ── Helper ─────────────────────────────────────────────────────────────────────
-
-function getTodayDateET(): string {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-}

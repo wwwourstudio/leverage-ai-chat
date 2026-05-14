@@ -5,6 +5,7 @@
  */
 
 import { EXTERNAL_APIS, CARD_TYPES, CARD_STATUS, LOG_PREFIXES } from '@/lib/constants';
+import { TtlCache } from '@/lib/utils/cache';
 
 // Minimal stadium data inlined (lib/stadium-database was removed in refactor)
 interface Stadium {
@@ -98,7 +99,7 @@ export interface WindAnalysis {
 // Cache Management
 // ============================================
 
-const weatherCache = new Map<string, { data: WeatherData; timestamp: number }>();
+const weatherCache = new TtlCache<WeatherData>();
 const WEATHER_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 export function clearWeatherCache(): void {
@@ -130,10 +131,8 @@ export async function fetchWeatherForLocation(
   const cacheKey = `${latitude.toFixed(2)},${longitude.toFixed(2)}`;
   
   if (!skipCache) {
-    const cached = weatherCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < WEATHER_CACHE_TTL) {
-      return cached.data;
-    }
+    const cached = weatherCache.get(cacheKey, WEATHER_CACHE_TTL);
+    if (cached !== undefined) return cached;
   }
   
   try {
@@ -165,10 +164,7 @@ export async function fetchWeatherForLocation(
       condition: getWeatherCondition(current.weathercode)
     };
     
-    weatherCache.set(cacheKey, {
-      data: weatherData,
-      timestamp: Date.now()
-    });
+    weatherCache.set(cacheKey, weatherData);
     
     return weatherData;
   } catch (error) {
@@ -564,4 +560,120 @@ export function weatherHRFactor(ctx: WeatherHRContext): number {
 
   // Clamp to realistic range
   return Math.max(0.70, Math.min(1.40, factor));
+}
+
+// ── Card Weather Enrichment ───────────────────────────────────────────────────
+
+interface EnrichmentStadium {
+  team: string;
+  latitude: number;
+  longitude: number;
+  roofType: 'open' | 'dome' | 'retractable';
+}
+
+const ENRICHMENT_STADIUMS: EnrichmentStadium[] = [
+  // NFL
+  { team: 'green bay packers',    latitude: 44.5013,  longitude: -88.0622,  roofType: 'open' },
+  { team: 'kansas city chiefs',   latitude: 39.0489,  longitude: -94.4839,  roofType: 'open' },
+  { team: 'buffalo bills',        latitude: 42.7738,  longitude: -78.7870,  roofType: 'open' },
+  { team: 'chicago bears',        latitude: 41.8623,  longitude: -87.6167,  roofType: 'open' },
+  { team: 'new york giants',      latitude: 40.8136,  longitude: -74.0745,  roofType: 'open' },
+  { team: 'new york jets',        latitude: 40.8136,  longitude: -74.0745,  roofType: 'open' },
+  { team: 'denver broncos',       latitude: 39.7439,  longitude: -105.0201, roofType: 'open' },
+  { team: 'seattle seahawks',     latitude: 47.5952,  longitude: -122.3316, roofType: 'open' },
+  { team: 'san francisco 49ers',  latitude: 37.4033,  longitude: -121.9694, roofType: 'open' },
+  { team: 'new england patriots', latitude: 42.0909,  longitude: -71.2643,  roofType: 'open' },
+  { team: 'pittsburgh steelers',  latitude: 40.4468,  longitude: -80.0158,  roofType: 'open' },
+  { team: 'cleveland browns',     latitude: 41.5061,  longitude: -81.6995,  roofType: 'open' },
+  { team: 'baltimore ravens',     latitude: 39.2779,  longitude: -76.6227,  roofType: 'open' },
+  { team: 'cincinnati bengals',   latitude: 39.0954,  longitude: -84.5160,  roofType: 'open' },
+  { team: 'miami dolphins',       latitude: 25.9580,  longitude: -80.2389,  roofType: 'open' },
+  // MLB
+  { team: 'chicago cubs',         latitude: 41.9484,  longitude: -87.6554,  roofType: 'open' },
+  { team: 'boston red sox',       latitude: 42.3467,  longitude: -71.0972,  roofType: 'open' },
+  { team: 'new york yankees',     latitude: 40.8296,  longitude: -73.9262,  roofType: 'open' },
+  { team: 'new york mets',        latitude: 40.7571,  longitude: -73.8458,  roofType: 'open' },
+  { team: 'san francisco giants', latitude: 37.7786,  longitude: -122.3893, roofType: 'open' },
+  { team: 'los angeles dodgers',  latitude: 34.0739,  longitude: -118.2400, roofType: 'open' },
+  { team: 'pittsburgh pirates',   latitude: 40.4469,  longitude: -80.0057,  roofType: 'open' },
+];
+
+function findEnrichmentStadium(teamName: string): EnrichmentStadium | undefined {
+  const normalized = teamName.toLowerCase();
+  return ENRICHMENT_STADIUMS.find(
+    s => normalized.includes(s.team) || s.team.includes(normalized)
+  );
+}
+
+function extractTeamFromCard(card: Record<string, unknown>): string | null {
+  const data = card.data as Record<string, unknown> | undefined;
+  if (!data) return null;
+  for (const key of ['homeTeam', 'home_team', 'team', 'awayTeam', 'away_team', 'matchup']) {
+    const val = data[key];
+    if (typeof val === 'string' && val.length > 1) return val;
+  }
+  if (typeof card.title === 'string') return card.title;
+  return null;
+}
+
+/**
+ * Enrich a set of cards with live weather data from Open-Meteo.
+ * Appends a WeatherCard for each outdoor-sport card that references a known stadium.
+ * Non-throwing — a weather fetch failure never causes the caller to lose its original cards.
+ */
+export async function enrichCardsWithWeather<T>(cards: T[]): Promise<T[]> {
+  if (!Array.isArray(cards) || cards.length === 0) return cards;
+
+  const { CARD_TYPES, CARD_STATUS } = await import('@/lib/constants');
+  const added = new Set<string>();
+  const weatherCards: T[] = [];
+
+  await Promise.all(
+    cards.map(async (card) => {
+      const c = card as Record<string, unknown>;
+      const team = extractTeamFromCard(c);
+      if (!team) return;
+
+      const stadium = findEnrichmentStadium(team);
+      if (!stadium || stadium.roofType === 'dome') return;
+
+      const key = `${stadium.latitude.toFixed(2)},${stadium.longitude.toFixed(2)}`;
+      if (added.has(key)) return;
+      added.add(key);
+
+      try {
+        const wx = await Promise.race([
+          fetchWeatherForLocation(stadium.latitude, stadium.longitude),
+          new Promise<null>(resolve => setTimeout(() => resolve(null), 4000)),
+        ]);
+        if (!wx) return;
+
+        const impact = getGameImpact(wx);
+        const isHighImpact = wx.windSpeed > 15 || wx.precipitation > 3 || wx.temperature < 32;
+
+        weatherCards.push({
+          type: CARD_TYPES.WEATHER_GAME,
+          title: `Game Weather — ${stadium.team.split(' ').slice(-1)[0]}`,
+          category: 'Weather',
+          subcategory: 'Current Conditions',
+          gradient: 'from-sky-600 to-blue-800',
+          status: isHighImpact ? CARD_STATUS.ALERT : CARD_STATUS.NEUTRAL,
+          realData: true,
+          data: {
+            Team:          stadium.team,
+            Temperature:   `${wx.temperature}°F`,
+            Condition:     wx.condition,
+            'Wind Speed':  `${wx.windSpeed} mph`,
+            Humidity:      `${wx.humidity}%`,
+            Precipitation: wx.precipitation > 0 ? `${wx.precipitation} mm` : 'None',
+            Impact:        impact,
+          },
+        } as unknown as T);
+      } catch {
+        // Weather enrichment is best-effort
+      }
+    })
+  );
+
+  return [...cards, ...weatherCards];
 }

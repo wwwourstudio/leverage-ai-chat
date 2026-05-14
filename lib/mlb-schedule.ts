@@ -12,9 +12,12 @@
  * Cache TTL: 2 hours — schedule and pitchers are stable once posted day-of.
  */
 
+import { TtlCache } from '@/lib/utils/cache';
+import { getTodayDateET } from '@/lib/utils/index';
+
 const MLB_SCHEDULE_BASE = 'https://statsapi.mlb.com/api/v1/schedule';
 const MLB_PEOPLE_BASE   = 'https://statsapi.mlb.com/api/v1/people';
-const CACHE_TTL_MS      = 2 * 60 * 60 * 1000; // 2 hours
+const CACHE_TTL_MS      = 2 * 60 * 60 * 1000;
 const REQUEST_TIMEOUT   = 8_000;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -61,7 +64,7 @@ function isDomeVenue(venueName: string): boolean {
 
 // ── Module-level cache ─────────────────────────────────────────────────────────
 
-const scheduleCache = new Map<string, { data: ScheduledGame[]; expiry: number }>();
+const scheduleCache = new TtlCache<ScheduledGame[]>();
 
 // ── Public API ─────────────────────────────────────────────────────────────────
 
@@ -73,10 +76,9 @@ const scheduleCache = new Map<string, { data: ScheduledGame[]; expiry: number }>
  */
 export async function getTodayGames(date?: string): Promise<ScheduledGame[]> {
   const gameDate = date ?? getTodayDateET();
-  const now      = Date.now();
 
-  const cached = scheduleCache.get(gameDate);
-  if (cached && cached.expiry > now) return cached.data;
+  const cached = scheduleCache.get(gameDate, CACHE_TTL_MS);
+  if (cached !== undefined) return cached;
 
   const url = `${MLB_SCHEDULE_BASE}?sportId=1&date=${gameDate}&hydrate=probablePitcher,officials`;
 
@@ -140,7 +142,7 @@ export async function getTodayGames(date?: string): Promise<ScheduledGame[]> {
       };
     });
 
-    scheduleCache.set(gameDate, { data: games, expiry: now + CACHE_TTL_MS });
+    scheduleCache.set(gameDate, games);
     return games;
   } catch {
     return [];
@@ -184,12 +186,6 @@ export function clearScheduleCache(): void {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-/** Returns today's date in Eastern Time as YYYY-MM-DD */
-function getTodayDateET(): string {
-  return new Date()
-    .toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); // 'en-CA' → YYYY-MM-DD
-}
 
 /**
  * Batch-fetch pitcher throwing hands from the MLB Stats API.

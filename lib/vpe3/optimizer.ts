@@ -16,7 +16,7 @@ import {
   type DFSModifiers,
   type SimulationResult,
 } from './types';
-import { americanToImpliedProb, americanToDecimal } from '@/lib/utils/odds-math';
+import { americanToImpliedProb, americanToDecimal, probToAmericanOdds } from '@/lib/utils/odds-math';
 import { hitterVpeVal, pitcherVpeVal, ageFactor, compositeDFSMultiplier } from './core';
 import { calculateInjuryRisk } from './injury';
 
@@ -172,16 +172,6 @@ export function optimizeDFSLineup(
 
 // ── Betting EV Calculator ───────────────────────────────────────────────────
 
-/**
- * Convert probability to American odds.
- */
-function probToAmericanOdds(prob: number): number {
-  if (prob <= 0 || prob >= 1) return 0;
-  if (prob >= 0.5) {
-    return Math.round(-prob / (1 - prob) * 100);
-  }
-  return Math.round((1 - prob) / prob * 100);
-}
 
 const americanOddsToProb = americanToImpliedProb;
 

@@ -16,6 +16,7 @@ import {
   type HRPropMarketLine,
 } from './hr-prop-market';
 import { getOddsApiKey } from '@/lib/config';
+import { probToAmericanOdds } from '@/lib/utils/odds-math';
 
 export interface BettingEdgeCardData {
   type: 'hr_prop_card';
@@ -189,15 +190,6 @@ function buildKPropCard(proj: MLBProjectionCardData): BettingEdgeCardData {
 }
 
 // ─── Math helpers ─────────────────────────────────────────────────────────────
-
-/** Convert decimal probability to American moneyline odds */
-function probToAmericanOdds(prob: number): number {
-  if (prob <= 0 || prob >= 1) return 0;
-  if (prob >= 0.5) {
-    return Math.round(-(prob / (1 - prob)) * 100);
-  }
-  return Math.round(((1 - prob) / prob) * 100);
-}
 
 function formatAmericanOdds(odds: number): string {
   if (odds === 0) return 'N/A';

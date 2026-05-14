@@ -1,31 +1,41 @@
 /**
  * Data Service (Client-Side)
  * Fetches dynamic data from internal API routes for use in client components.
- * Server-side equivalents live in lib/data/index.ts.
- *
- * Shared types are canonical in lib/data/index.ts and re-exported here.
  */
 
 import {
   CACHE_CONFIG,
   API_ENDPOINTS,
   LOG_PREFIXES,
-  DATA_SOURCES,
-  HTTP_STATUS,
-  ERROR_MESSAGES,
 } from '@/lib/constants';
 import { TtlCache } from '@/lib/utils/cache';
 
-// Import and re-export canonical types from lib/data/index.ts
-import type { DynamicCard, UserInsights } from '@/lib/data/index';
-export type { DynamicCard, UserInsights };
+export interface DynamicCard {
+  id?: string;
+  type: string;
+  title: string;
+  icon: string;
+  category: string;
+  subcategory: string;
+  gradient: string;
+  data: Record<string, any>;
+  status: string;
+  realData: boolean;
+  metadata?: Record<string, any>;
+}
 
-// Cache configuration (using centralized constants)
-const CACHE_DURATION = {
-  CARDS: CACHE_CONFIG.CARDS_TTL,
-  INSIGHTS: CACHE_CONFIG.INSIGHTS_TTL,
-  ODDS: CACHE_CONFIG.ODDS_TTL,
-};
+export interface UserInsights {
+  totalValue: number;
+  winRate: number;
+  roi: number;
+  activeContests: number;
+  totalInvested: number;
+  avgConfidence?: number;
+  dataSource: string;
+  message?: string;
+}
+
+const CARDS_TTL = CACHE_CONFIG.CARDS_TTL;
 
 const cache = new TtlCache<any>(100);
 
@@ -101,7 +111,7 @@ export async function fetchDynamicCards(params: {
   
   // Sort keys for a deterministic cache key regardless of object property order
   const cacheKey = `cards:${JSON.stringify(params, Object.keys(params).sort())}`;
-  const cached = cache.get(cacheKey, CACHE_DURATION.CARDS);
+  const cached = cache.get(cacheKey, CARDS_TTL);
   if (cached !== undefined) return cached;
 
   const controller = new AbortController();
@@ -163,313 +173,3 @@ export async function fetchDynamicCards(params: {
   }
 }
 
-/**
- * Fetch user insights from Supabase
- * CLIENT-SIDE ONLY - Do not call from server components
- */
-export async function fetchUserInsights(): Promise<UserInsights> {
-  // Skip if running on server
-  if (typeof window === 'undefined') {
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Skipping fetchUserInsights on server`);
-    return {
-      totalValue: 0,
-      winRate: 0,
-      roi: 0,
-      activeContests: 0,
-      totalInvested: 0,
-      dataSource: DATA_SOURCES.DEFAULT,
-      message: 'Loading...'
-    };
-  }
-
-  const cacheKey = 'insights:user';
-  const cached = cache.get(cacheKey, CACHE_DURATION.INSIGHTS);
-  if (cached !== undefined) {
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Returning cached insights`);
-    return cached;
-  }
-
-  const insightsController = new AbortController();
-  const insightsTimeoutId = setTimeout(() => insightsController.abort(), 10000); // 10s timeout
-
-  try {
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Fetching fresh insights from API`);
-    const response = await fetch(API_ENDPOINTS.INSIGHTS, {
-      method: 'GET',
-      signal: insightsController.signal,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Insights API returned ${response.status}`);
-    }
-
-    // Validate response is JSON before parsing
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      throw new Error('Insights API returned non-JSON response');
-    }
-
-    const result = await safeJsonParse(response);
-
-    if (!result || typeof result !== 'object') {
-      throw new Error('Invalid response format from insights API');
-    }
-
-    const insights = result.insights || {
-      totalValue: 0,
-      winRate: 0,
-      roi: 0,
-      activeContests: 0,
-      totalInvested: 0,
-      dataSource: DATA_SOURCES.DEFAULT,
-      message: 'No insights available'
-    };
-
-    cache.set(cacheKey, insights);
-    return insights;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Error fetching insights:`, errorMessage);
-    return {
-      totalValue: 0,
-      winRate: 0,
-      roi: 0,
-      activeContests: 0,
-      totalInvested: 0,
-      dataSource: DATA_SOURCES.ERROR,
-      message: ERROR_MESSAGES.SERVICE_UNAVAILABLE
-    };
-  } finally {
-    clearTimeout(insightsTimeoutId);
-  }
-}
-
-/**
- * Fetch live odds data
- * CLIENT-SIDE ONLY - Do not call from server components
- */
-export async function fetchLiveOdds(sport: string, marketType: string = 'h2h') {
-  // Skip if running on server
-  if (typeof window === 'undefined') {
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Skipping fetchLiveOdds on server`);
-    return { 
-      success: false, 
-      error: 'Server-side fetch not supported',
-      events: [],
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  const cacheKey = `odds:${sport}:${marketType}`;
-  const cached = cache.get(cacheKey, CACHE_DURATION.ODDS);
-  if (cached !== undefined) {
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Returning cached odds`);
-    return cached;
-  }
-
-  const oddsController = new AbortController();
-  const oddsTimeoutId = setTimeout(() => oddsController.abort(), 10000); // 10s timeout
-
-  try {
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Fetching fresh odds from API`);
-    const response = await fetch(API_ENDPOINTS.ODDS, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sport, marketType }),
-      signal: oddsController.signal,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Odds API returned ${response.status}`);
-    }
-
-    // Validate JSON response
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      throw new Error('Odds API returned non-JSON response');
-    }
-
-    const result = await safeJsonParse(response);
-    cache.set(cacheKey, result);
-    return result;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Error fetching odds:`, errorMessage);
-    return {
-      success: false,
-      error: errorMessage,
-      events: [],
-      timestamp: new Date().toISOString()
-    };
-  } finally {
-    clearTimeout(oddsTimeoutId);
-  }
-}
-
-/**
- * Fetch player data (ADP + roster info)
- * CLIENT-SIDE ONLY
- */
-export async function fetchPlayers(params: {
-  search?: string;
-  sport?: string;
-  position?: string;
-  limit?: number;
-} = {}) {
-  if (typeof window === 'undefined') {
-    return { success: false, players: [], error: 'Server-side fetch not supported' };
-  }
-
-  const qs = new URLSearchParams();
-  if (params.search) qs.set('search', params.search);
-  if (params.sport) qs.set('sport', params.sport);
-  if (params.position) qs.set('position', params.position);
-  if (params.limit) qs.set('limit', String(params.limit));
-
-  const cacheKey = `players:${qs.toString()}`;
-  const cached = cache.get(cacheKey, CACHE_DURATION.CARDS);
-  if (cached !== undefined) return cached;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-  try {
-    const url = `${API_ENDPOINTS.PLAYERS}?${qs.toString()}`;
-    const response = await fetch(url, { signal: controller.signal });
-
-    if (!response.ok) throw new Error(`Players API returned ${response.status}`);
-
-    const result = await safeJsonParse(response);
-    cache.set(cacheKey, result);
-    return result;
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Unknown error';
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Error fetching players:`, msg);
-    return { success: false, players: [], error: msg };
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-/**
- * Fetch DFS projections
- * CLIENT-SIDE ONLY
- */
-export async function fetchDFS(params: {
-  date?: string;
-  position?: string;
-  sort?: string;
-  limit?: number;
-} = {}) {
-  if (typeof window === 'undefined') {
-    return { success: false, projections: [], error: 'Server-side fetch not supported' };
-  }
-
-  const qs = new URLSearchParams();
-  if (params.date) qs.set('date', params.date);
-  if (params.position) qs.set('position', params.position);
-  if (params.sort) qs.set('sort', params.sort);
-  if (params.limit) qs.set('limit', String(params.limit));
-
-  const cacheKey = `dfs:${qs.toString()}`;
-  const cached = cache.get(cacheKey, CACHE_DURATION.CARDS);
-  if (cached !== undefined) return cached;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-  try {
-    const url = `${API_ENDPOINTS.DFS}?${qs.toString()}`;
-    const response = await fetch(url, { signal: controller.signal });
-
-    if (!response.ok) throw new Error(`DFS API returned ${response.status}`);
-
-    const result = await safeJsonParse(response);
-    cache.set(cacheKey, result);
-    return result;
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Unknown error';
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Error fetching DFS projections:`, msg);
-    return { success: false, projections: [], error: msg };
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-/**
- * Fetch Statcast leaderboard data
- * CLIENT-SIDE ONLY
- */
-export async function fetchStatcast(metric = 'xwoba', limit = 25) {
-  if (typeof window === 'undefined') {
-    return { success: false, leaders: [], error: 'Server-side fetch not supported' };
-  }
-
-  const qs = new URLSearchParams({ metric, limit: String(limit) });
-  const cacheKey = `statcast:${qs.toString()}`;
-  const cached = cache.get(cacheKey, CACHE_DURATION.CARDS);
-  if (cached !== undefined) return cached;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-  try {
-    const response = await fetch(`${API_ENDPOINTS.STATCAST}?${qs.toString()}`, {
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`Statcast API returned ${response.status}`);
-    const result = await safeJsonParse(response);
-    cache.set(cacheKey, result);
-    return result;
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Unknown error';
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Error fetching statcast:`, msg);
-    return { success: false, leaders: [], error: msg };
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-/**
- * Fetch arbitrage opportunities
- * CLIENT-SIDE ONLY
- */
-export async function fetchArbitrage(sport = 'baseball_mlb') {
-  if (typeof window === 'undefined') {
-    return { success: false, opportunities: [], error: 'Server-side fetch not supported' };
-  }
-
-  const cacheKey = `arbitrage:${sport}`;
-  const cached = cache.get(cacheKey, CACHE_DURATION.CARDS);
-  if (cached !== undefined) return cached;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-  try {
-    const response = await fetch(`${API_ENDPOINTS.ARBITRAGE}?sport=${sport}`, {
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`Arbitrage API returned ${response.status}`);
-    const result = await safeJsonParse(response);
-    cache.set(cacheKey, result);
-    return result;
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Unknown error';
-    console.log(`${LOG_PREFIXES.DATA_SERVICE} Error fetching arbitrage:`, msg);
-    return { success: false, opportunities: [], error: msg };
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-/**
- * Clear cache for specific key or all
- */
-export function clearCache(key?: string) {
-  cache.clear(key);
-}
-
-export function getCacheStats() {
-  return { size: cache.size, keys: cache.keys() };
-}

@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { Sparkles, TrendingUp, Users, Zap, BarChart2 } from 'lucide-react';
-import type { EnrichedOddsEvent } from '@/components/cards/OddsCard';
-import type { KalshiMarket } from '@/components/cards/KalshiMarketCard';
+import type { EnrichedOddsEvent } from '@/components/data-cards/OddsCard';
+import type { KalshiMarket } from '@/components/data-cards/KalshiMarketCard';
 
 interface Props {
   welcomeText?: string;

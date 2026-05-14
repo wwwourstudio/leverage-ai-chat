@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyCronSecretWithDbFallback } from '@/lib/config';
+import { getTodayDateET } from '@/lib/utils/index';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
     // Run the projection pipeline for today's slate
     // The pipeline fetches today's games internally from the MLB Stats API
     const result = await runProjectionPipeline({
-      date: todayET(),
+      date: getTodayDateET(),
     });
 
     const playerCount = Array.isArray(result) ? result.length : 0;
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
       success: true,
       meta: {
         playersProjected: playerCount,
-        date: todayET(),
+        date: getTodayDateET(),
         durationMs: Date.now() - startedAt,
         runAt: new Date().toISOString(),
       },
@@ -59,10 +60,4 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
-}
-
-function todayET(): string {
-  // Use Eastern Time for baseball schedule alignment
-  return new Date()
-    .toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 }

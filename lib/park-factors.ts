@@ -125,5 +125,3 @@ export function getParkFactor(teamName: string): ParkFactor {
 
   return NEUTRAL;
 }
-
-export { PARK_FACTORS };

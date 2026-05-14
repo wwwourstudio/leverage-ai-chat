@@ -45,7 +45,7 @@ export interface BullpenStatus {
   fatigueFactor:       number;
 }
 
-export const NEUTRAL_BULLPEN: BullpenStatus = {
+const NEUTRAL_BULLPEN: BullpenStatus = {
   team:                'Unknown',
   avgPitchersPerGame:  4,
   totalBullpenPitches: 200,
@@ -239,7 +239,3 @@ export async function getBullpenStatus(teamName: string): Promise<BullpenStatus>
   }
 }
 
-/** Clear the cache (for tests or forced refresh). */
-export function clearBullpenCache(): void {
-  cache.clear();
-}

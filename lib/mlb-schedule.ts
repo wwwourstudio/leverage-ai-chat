@@ -181,10 +181,6 @@ export function getOpposingPitcher(
 /**
  * Clear the schedule cache (e.g. after midnight).
  */
-export function clearScheduleCache(): void {
-  scheduleCache.clear();
-}
-
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 /**

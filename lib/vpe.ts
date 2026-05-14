@@ -9,32 +9,14 @@
 // UTILITY FUNCTIONS
 //////////////////////////
 
-export const zScore = (value: number, mean: number, std: number): number =>
+const zScore = (value: number, mean: number, std: number): number =>
   std === 0 ? 0 : (value - mean) / std;
-
-export const randomNormal = (mean = 0, std = 1, seed?: number): number => {
-  let x = seed ?? Math.random();
-  x = Math.sin(x * 10000) * 10000;
-  return mean + std * (x - Math.floor(x));
-};
-
-export const monteCarlo = (
-  fn: () => number,
-  iterations: number,
-  _seed = 42
-): number[] => {
-  const results: number[] = [];
-  for (let i = 0; i < iterations; i++) {
-    results.push(fn());
-  }
-  return results;
-};
 
 //////////////////////////
 // BASE CLASSES
 //////////////////////////
 
-export class Player {
+class Player {
   name: string;
   age: number;
   position: string;
@@ -98,7 +80,7 @@ export class Hitter extends Player {
 // PITCHERS
 //////////////////////////
 
-export interface PitcherStats {
+interface PitcherStats {
   velocity: number;
   verticalBreak: number;
   horizontalBreak: number;
@@ -110,7 +92,7 @@ export interface PitcherStats {
 }
 
 // League-average pitcher stats for z-score normalization
-export const LEAGUE_AVG_PITCHER: PitcherStats = {
+const LEAGUE_AVG_PITCHER: PitcherStats = {
   velocity: 93.5,
   verticalBreak: 8.5,
   horizontalBreak: 3.5,
@@ -121,7 +103,7 @@ export const LEAGUE_AVG_PITCHER: PitcherStats = {
   CSW: 0.27,
 };
 
-export const LEAGUE_STD_PITCHER: PitcherStats = {
+const LEAGUE_STD_PITCHER: PitcherStats = {
   velocity: 2.5,
   verticalBreak: 2.0,
   horizontalBreak: 1.5,
@@ -195,61 +177,3 @@ export class Pitcher extends Player {
 // MINOR LEAGUE PLAYER
 //////////////////////////
 
-export class MinorLeaguePlayer extends Hitter {
-  level: 'AAA' | 'AA' | 'High-A' | 'Low-A';
-
-  constructor(
-    name: string,
-    age: number,
-    position: string,
-    stats: HitterStats,
-    level: 'AAA' | 'AA' | 'High-A' | 'Low-A'
-  ) {
-    super(name, age, position, stats);
-    this.level = level;
-  }
-
-  /** Translate MiLB → MLB projection */
-  mlbProjection(): number {
-    const levelFactor: Record<string, number> = { AAA: 0.9, AA: 0.75, 'High-A': 0.6, 'Low-A': 0.5 };
-    return this.vpeValHit() * (levelFactor[this.level] ?? 0.5);
-  }
-}
-
-//////////////////////////
-// TEAM
-//////////////////////////
-
-export class Team {
-  name: string;
-  hitters: Hitter[];
-  pitchers: Pitcher[];
-
-  constructor(name: string, hitters: Hitter[], pitchers: Pitcher[]) {
-    this.name = name;
-    this.hitters = hitters;
-    this.pitchers = pitchers;
-  }
-
-  /** Team Wins via Pythagorean expectation */
-  pythagoreanWins(): number {
-    const runs = this.hitters.reduce((sum, h) => sum + h.vpeValHit(), 0);
-    const runsAllowed = this.pitchers.reduce((sum, p) => sum + p.vpeValPitch(), 0);
-    if (runs <= 0 && runsAllowed <= 0) return 81;
-    const rPow = Math.pow(Math.max(runs, 1), 1.83);
-    const raPow = Math.pow(Math.max(runsAllowed, 1), 1.83);
-    return (rPow / (rPow + raPow)) * 162;
-  }
-}
-
-//////////////////////////
-// TRADE VALUE
-//////////////////////////
-
-export const tradeValue = (
-  projectedWAR: number,
-  age: number,
-  contractSurplus: number,
-  injuryRisk: number,
-  positionalScarcity: number
-): number => 3 * projectedWAR + 2 * age + 1.5 * contractSurplus - injuryRisk + 0.8 * positionalScarcity;

@@ -16,7 +16,7 @@
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface OddsSnapshot {
+interface OddsSnapshot {
   /** MLBAM player ID */
   playerId: number;
   playerName: string;
@@ -30,7 +30,7 @@ export interface OddsSnapshot {
   timestamp: number;
 }
 
-export interface SharpMovementResult {
+interface SharpMovementResult {
   /** Total price change from first to last snapshot (American odds points) */
   movement: number;
   /** Direction: 'shortening' = odds dropping (sharp money in), 'lengthening' = odds rising */

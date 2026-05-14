@@ -12,7 +12,7 @@ export interface SeasonInfo {
   context: string;
 }
 
-export interface SportSeasonConfig {
+interface SportSeasonConfig {
   name: string;
   regularSeasonMonths: number[]; // Months when sport is in regular season (1-12)
   playoffMonths?: number[]; // Months with playoff games

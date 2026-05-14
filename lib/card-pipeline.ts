@@ -10,7 +10,7 @@
  */
 
 import type {
-  Card, CardType, CardInsights, DataSourceMeta, DataSourceName,
+  Card, CardType, DataSourceMeta,
   NormalizedStats, OddsData, ParsedIntent, Player, Trend,
 } from '@/lib/card-schema';
 import { AI_CONFIG } from '@/lib/constants';

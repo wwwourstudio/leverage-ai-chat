@@ -24,6 +24,7 @@ import {
   fetchFinanceMarkets,
   fetchTopMarketsByVolume,
 } from '@/lib/kalshi/index';
+import { TtlCache } from '@/lib/utils/cache';
 
 // Node.js runtime — needed for crypto (RSA signing)
 export const runtime = 'nodejs';
@@ -32,8 +33,8 @@ export const runtime = 'nodejs';
 const CDN_CACHE = 'public, s-maxage=60, stale-while-revalidate=300';
 
 // Route-level in-memory cache (separate from lib-level cache, keyed by full URL)
-const ROUTE_CACHE = new Map<string, { data: unknown; expires: number }>();
-const ROUTE_TTL   = 60_000; // 60 seconds
+const ROUTE_CACHE = new TtlCache<unknown>(100);
+const ROUTE_TTL   = 60_000;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -44,9 +45,9 @@ export async function GET(request: Request) {
 
   // Check in-memory route cache
   const cacheKey = `markets:${category}:${search || ''}:${limit}:${status}`;
-  const cached   = ROUTE_CACHE.get(cacheKey);
-  if (cached && cached.expires > Date.now()) {
-    return NextResponse.json(cached.data, {
+  const cached   = ROUTE_CACHE.get(cacheKey, ROUTE_TTL);
+  if (cached !== undefined) {
+    return NextResponse.json(cached, {
       headers: { 'X-Cache': 'HIT', 'Cache-Control': CDN_CACHE },
     });
   }
@@ -108,7 +109,7 @@ export async function GET(request: Request) {
     };
 
     // Store in route cache
-    ROUTE_CACHE.set(cacheKey, { data: body, expires: Date.now() + ROUTE_TTL });
+    ROUTE_CACHE.set(cacheKey, body);
 
     return NextResponse.json(body, {
       headers: { 'X-Cache': 'MISS', 'Cache-Control': CDN_CACHE },

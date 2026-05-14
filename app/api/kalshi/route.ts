@@ -17,19 +17,19 @@ import {
   type KalshiMarket,
 } from '@/lib/kalshi/index';
 import { createClient } from '@/lib/supabase/server';
+import { TtlCache } from '@/lib/utils/cache';
 
 // No edge runtime — Node.js runtime needed for in-memory cache and full API surface
 
 // ── Route-level response cache (90s TTL) ─────────────────────────────────────
-const ROUTE_CACHE = new Map<string, { data: unknown; expires: number }>();
+const ROUTE_CACHE = new TtlCache<unknown>(100);
 const ROUTE_CACHE_TTL = 90_000;
 
 function getRouteCache(key: string): unknown | null {
-  const entry = ROUTE_CACHE.get(key);
-  return entry && entry.expires > Date.now() ? entry.data : null;
+  return ROUTE_CACHE.get(key, ROUTE_CACHE_TTL) ?? null;
 }
 function setRouteCache(key: string, data: unknown): void {
-  ROUTE_CACHE.set(key, { data, expires: Date.now() + ROUTE_CACHE_TTL });
+  ROUTE_CACHE.set(key, data);
 }
 
 function kalshiActivityScore(m: { priceIsReal?: boolean; yesBid?: number; yesAsk?: number; volume24h?: number; volume?: number; openInterest?: number }): number {

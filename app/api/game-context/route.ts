@@ -9,6 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { TtlCache } from '@/lib/utils/cache';
 
 export const runtime = 'nodejs';
 export const maxDuration = 15;
@@ -17,13 +18,12 @@ const MLB = 'https://statsapi.mlb.com/api/v1';
 const CACHE_TTL = 5 * 60 * 1000;
 
 // ── Module-level cache keyed by arbitrary string ───────────────────────────
-const cache = new Map<string, { data: unknown; ts: number }>();
+const cache = new TtlCache<unknown>(200);
 function fromCache<T>(key: string): T | null {
-  const hit = cache.get(key);
-  return hit && Date.now() - hit.ts < CACHE_TTL ? (hit.data as T) : null;
+  return (cache.get(key, CACHE_TTL) as T | undefined) ?? null;
 }
 function toCache(key: string, data: unknown) {
-  cache.set(key, { data, ts: Date.now() });
+  cache.set(key, data);
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────

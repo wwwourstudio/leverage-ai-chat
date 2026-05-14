@@ -11,6 +11,8 @@
  * from server-only code (API routes, server components).
  */
 
+import { TtlCache } from '@/lib/utils/cache';
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 /** Minimal shape used by VBD/cliff/waiver math in fantasy-card-generator.ts */
@@ -26,11 +28,11 @@ export interface GenericProjection {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
+const CACHE_TTL_MS = 4 * 60 * 60 * 1000;
 
 // ── Module-level in-memory cache ──────────────────────────────────────────────
 
-const cache: Record<string, { data: GenericProjection[]; fetchedAt: number }> = {};
+const cache = new TtlCache<GenericProjection[]>(50);
 
 // ── Season helpers ─────────────────────────────────────────────────────────────
 
@@ -91,16 +93,14 @@ export async function getProjections(
   getFallback: () => GenericProjection[],
 ): Promise<GenericProjection[]> {
   const key = `${sport}:${season}`;
-  const cached = cache[key];
+  const cached = cache.get(key, CACHE_TTL_MS);
 
   // 1. In-memory cache hit
-  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-    return cached.data;
-  }
+  if (cached !== undefined) return cached;
 
   // 2. Hardcoded fallback
   const fallback = getFallback();
-  cache[key] = { data: fallback, fetchedAt: Date.now() };
+  cache.set(key, fallback);
   return fallback;
 }
 
@@ -113,14 +113,14 @@ export function seedProjectionsCache(
   season: number,
   players: GenericProjection[],
 ): void {
-  cache[`${sport}:${season}`] = { data: players, fetchedAt: Date.now() };
+  cache.set(`${sport}:${season}`, players);
 }
 
 /** Invalidate cache for a sport/season (call after an admin uploads new projections) */
 export function invalidateProjectionsCache(sport?: 'nfl' | 'mlb' | 'nba', season?: number): void {
   if (sport && season) {
-    delete cache[`${sport}:${season}`];
+    cache.delete(`${sport}:${season}`);
   } else {
-    Object.keys(cache).forEach(k => delete cache[k]);
+    cache.clear();
   }
 }

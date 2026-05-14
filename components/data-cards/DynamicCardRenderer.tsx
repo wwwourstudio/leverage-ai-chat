@@ -17,11 +17,11 @@ export interface SavedCardEntry {
 const SAVED_CARDS_KEY = 'leverage_saved_cards';
 
 // Standalone typed card components (used for direct API data, not AI-generated CardData)
-import { OddsCard } from '@/components/cards/OddsCard';
-import { KalshiMarketCard } from '@/components/cards/KalshiMarketCard';
-import { PlayerCard } from '@/components/cards/PlayerCard';
-import { DFSLineupCard } from '@/components/cards/DFSLineupCard';
-import { ArbitrageOpportunityCard } from '@/components/cards/ArbitrageOpportunityCard';
+import { OddsCard } from './OddsCard';
+import { KalshiMarketCard } from './KalshiMarketCard';
+import { PlayerCard } from './PlayerCard';
+import { DFSLineupCard } from './DFSLineupCard';
+import { ArbitrageOpportunityCard } from './ArbitrageOpportunityCard';
 
 import { BettingCard } from './BettingCard';
 import { DFSCard } from './DFSCard';

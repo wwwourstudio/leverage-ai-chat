@@ -7,7 +7,7 @@ import {
   CheckCircle, PieChart, Clock, Search,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { InsightCard } from '@/components/InsightCard';
+import type { InsightCard } from '@/lib/cards-generator';
 import { isDev } from '@/lib/config';
 
 export interface UseSuggestedPromptsOptions {

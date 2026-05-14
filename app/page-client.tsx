@@ -138,7 +138,16 @@ interface Message extends HookChatMessage {
   // are inherited from HookChatMessage as optional fields
 }
 
-import type { ServerDataResult } from '@/lib/server-data-loader';
+interface ServerDataResult {
+  initialCards: Record<string, unknown>[];
+  initialInsights: { stats: Record<string, unknown> | null; preferences: Record<string, unknown> | null } | null;
+  userSession: { user: { id: string; email: string | undefined; name: string } } | null;
+  serverTime: string;
+  missingKeys: string[];
+  envErrors: string[];
+  dataSourcesUsed: string[];
+  fetchErrors: string[];
+}
 export type ServerDataProps = ServerDataResult;
 
 interface UnifiedAIPlatformProps {

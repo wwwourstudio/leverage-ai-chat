@@ -16,8 +16,6 @@
  *   statsapi.mlb.com/api/v1/schedule?gamePk={id}&hydrate=officials
  */
 
-const REQUEST_TIMEOUT = 5_000;
-
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface UmpireProfile {
@@ -100,50 +98,4 @@ export function getUmpireProfile(name: string): UmpireProfile {
 
 // ── MLB Stats API ──────────────────────────────────────────────────────────────
 
-/**
- * Fetch the HP umpire name for a given MLB gamePk.
- * Returns null when not yet assigned (early AM) or on network error.
- *
- * MLB Stats API:
- *   /api/v1/schedule?gamePk={id}&hydrate=officials
- */
-export async function fetchGameHPUmpire(gamePk: number): Promise<string | null> {
-  try {
-    const url = `https://statsapi.mlb.com/api/v1/schedule?gamePk=${gamePk}&hydrate=officials`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT) });
-    if (!res.ok) return null;
 
-    const json = await res.json() as {
-      dates?: Array<{
-        games?: Array<{
-          officials?: Array<{
-            official:     { id: number; fullName: string };
-            officialType: string;
-          }>;
-        }>;
-      }>;
-    };
-
-    const officials = json.dates?.[0]?.games?.[0]?.officials ?? [];
-    const hp = officials.find(o =>
-      o.officialType === 'Home Plate' ||
-      o.officialType.toLowerCase().includes('home'),
-    );
-
-    return hp?.official.fullName ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Fetch HP umpire for a game and return their career profile.
- * Non-throwing — returns NEUTRAL_UMPIRE on any failure.
- */
-export async function getGameUmpireProfile(gamePk: number): Promise<UmpireProfile & { umpireName: string | null }> {
-  const name = await fetchGameHPUmpire(gamePk).catch(() => null);
-  const profile = name ? getUmpireProfile(name) : NEUTRAL_UMPIRE;
-  return { ...profile, umpireName: name };
-}
-
-export { UMPIRE_PROFILES };

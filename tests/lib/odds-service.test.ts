@@ -8,7 +8,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   validateSportKey,
-  clearOddsCache,
   ODDS_API_SPORTS,
   ODDS_MARKETS,
   BETTING_REGIONS,
@@ -138,24 +137,6 @@ describe('validateSportKey', () => {
 });
 
 // ============================================================================
-// clearOddsCache — smoke tests (validates it runs without throwing)
-// ============================================================================
-
-describe('clearOddsCache', () => {
-  it('clears the full cache without throwing', () => {
-    expect(() => clearOddsCache()).not.toThrow();
-  });
-
-  it('clears cache for a specific sport key without throwing', () => {
-    expect(() => clearOddsCache('basketball_nba')).not.toThrow();
-  });
-
-  it('handles clearing cache for an unknown sport key', () => {
-    expect(() => clearOddsCache('sport_does_not_exist')).not.toThrow();
-  });
-});
-
-// ============================================================================
 // Constants shape validation
 // ============================================================================
 
@@ -168,7 +149,7 @@ describe('ODDS_API_SPORTS', () => {
   });
 
   it('all values are non-empty strings', () => {
-    for (const val of Object.values(ODDS_API_SPORTS)) {
+    for (const val of Object.values(ODDS_API_SPORTS) as string[]) {
       expect(typeof val).toBe('string');
       expect(val.length).toBeGreaterThan(0);
     }

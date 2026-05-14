@@ -47,7 +47,7 @@ export interface StatcastPlayer {
   hardHitPct: number;
 }
 
-export interface StatcastQueryParams {
+interface StatcastQueryParams {
   /** Partial player name — case-insensitive, matches anywhere in name */
   player?: string;
   /** Restrict results to batters or pitchers */
@@ -272,7 +272,7 @@ async function fetchStatcastType(playerType: 'batter' | 'pitcher'): Promise<Stat
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-export interface StatcastResult {
+interface StatcastResult {
   players: StatcastPlayer[];
   /** true = live Baseball Savant API data; false = static 2024 fallback */
   isLiveData: boolean;
@@ -352,7 +352,7 @@ export function queryStatcast(players: StatcastPlayer[], params: StatcastQueryPa
  * Recent (last N days) aggregated Statcast metrics from pitch-level game data.
  * More actionable than season averages for short-term prop betting.
  */
-export interface RecentStatcastData {
+interface RecentStatcastData {
   /** Average exit velocity on balls in play (mph) */
   avgExitVelo: number;
   /** Barrel rate on balls in play (%) — simplified MLB definition: EV ≥ 98 + angle 26–30° */

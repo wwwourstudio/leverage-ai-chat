@@ -1,16 +1,14 @@
-import { loadADP } from '@/lib/adp';
-
-export const dynamic = 'force-static';
+import { getADPData } from '@/lib/adp-data';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const position = searchParams.get('position')?.toUpperCase();
   const limit = parseInt(searchParams.get('limit') ?? '300');
 
-  const players = loadADP();
+  const players = await getADPData();
 
   const filtered = position
-    ? players.filter(p => p.position === position)
+    ? players.filter(p => p.positions?.includes(position))
     : players;
 
   return Response.json({

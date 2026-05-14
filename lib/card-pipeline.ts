@@ -10,14 +10,12 @@
  */
 
 import type {
-  Card, CardType, CardInsights, DataSourceMeta, DataSourceName,
+  Card, CardType, DataSourceMeta,
   NormalizedStats, OddsData, ParsedIntent, Player, Trend,
 } from '@/lib/card-schema';
 import { AI_CONFIG } from '@/lib/constants';
-import { getGrokApiKey, getOddsApiKey } from '@/lib/config';
+import { getGrokApiKey } from '@/lib/config';
 import { logger, LogCategory } from '@/lib/logger';
-import type { InsightCard } from '@/lib/cards-generator';
-import { americanToImpliedProb } from '@/lib/utils/odds-math';
 
 // ============================================================================
 // 1. INTENT PARSER — deterministic, no AI
@@ -129,20 +127,6 @@ type RawOddsEvent = {
 };
 
 /**
- * Normalise raw Statcast data into the consistent NormalizedStats shape.
- */
-export function normalizeStatcast(raw: RawStatcastPlayer): NormalizedStats {
-  return {
-    avgExitVelo:   raw.avg_exit_velocity != null ? Number(raw.avg_exit_velocity) : undefined,
-    barrelRate:    raw.barrel_rate        != null ? Number(raw.barrel_rate)        : undefined,
-    xwOBA:         raw.xwoba             != null ? Number(raw.xwoba)             : undefined,
-    xBA:           raw.xba               != null ? Number(raw.xba)               : undefined,
-    hardHitRate:   raw.hard_hit_pct      != null ? Number(raw.hard_hit_pct)      : undefined,
-    sweetSpotRate: raw.sweet_spot_pct    != null ? Number(raw.sweet_spot_pct)    : undefined,
-  };
-}
-
-/**
  * Normalise a raw Odds API event into the OddsData shape.
  * Picks the highest-ranked bookmaker (DraftKings > FanDuel > BetMGM …).
  */
@@ -214,7 +198,7 @@ export function calculateEdge(modelProbability: number, impliedProbability: numb
  * Derive a confidence score (0–100) from data completeness and edge magnitude.
  * More data sources + larger edge = higher confidence.
  */
-export function calculateConfidence(
+function calculateConfidence(
   sources: DataSourceMeta[],
   edge?: number,
 ): number {
@@ -238,7 +222,7 @@ type CanonicalStatus = Card['status'];
  * Map a numeric edge (or generic card context) to a canonical StatusBadgeKey.
  * This is the ONLY place where badge status is assigned — no magic strings.
  */
-export function edgeToStatus(edge?: number, hasPriceOdds?: boolean): CanonicalStatus {
+function edgeToStatus(edge?: number, hasPriceOdds?: boolean): CanonicalStatus {
   if (edge != null) {
     if (edge >= 10)  return 'hot';
     if (edge >= 5)   return 'edge';
@@ -339,7 +323,7 @@ interface EnrichmentResult {
  * If the AI response cannot be parsed, returns deterministic fallback text —
  * the card is NEVER discarded due to an AI failure.
  */
-export async function enrichCardWithAI(
+async function enrichCardWithAI(
   card: Card,
   apiKey: string,
   model: string,
@@ -493,135 +477,6 @@ export async function enrichCards(
 }
 
 // ============================================================================
-// ADAPTER — Card → InsightCard (backwards compatibility with existing renderer)
-// ============================================================================
-
-/**
- * Convert a new Card to the legacy InsightCard shape so it can be rendered
- * by the existing DynamicCardRenderer + card components without changes.
- *
- * Forward-compat: once the renderer is migrated to Card, remove this adapter.
- */
-export function toInsightCard(card: Card): InsightCard {
-  const { stats, odds, projections, trends } = card.data;
-
-  return {
-    id:          card.id,
-    type:        card.type,
-    title:       card.title,
-    icon:        iconForCardType(card.type),
-    category:    card.sport.toUpperCase(),
-    subcategory: card.subtitle ?? labelForCardType(card.type),
-    gradient:    gradientForStatus(card.status),
-    status:      card.status,
-    realData:    card.sources.some(s => s.success && s.source !== 'fallback'),
-    metadata:    {
-      realData:   card.sources.some(s => s.success && s.source !== 'fallback'),
-      sources:    card.sources,
-      pipelineV2: true,
-    },
-    data: {
-      // Stats layer
-      ...flattenStats(stats),
-      // Odds layer
-      ...(odds ? {
-        homeOdds:         odds.homeOdds != null ? formatAmerican(odds.homeOdds) : undefined,
-        awayOdds:         odds.awayOdds != null ? formatAmerican(odds.awayOdds) : undefined,
-        overUnder:        odds.line     != null ? `O/U ${odds.line}` : undefined,
-        bookmaker:        odds.bookmaker,
-        bookmakerCount:   odds.bookmakerCount,
-        impliedProb:      odds.impliedProbability != null ? `${odds.impliedProbability}%` : undefined,
-      } : {}),
-      // Projections
-      ...(projections ? Object.fromEntries(
-        Object.entries(projections).map(([k, v]) => [k, String(v)])
-      ) : {}),
-      // Trends as readable rows
-      ...(trends ? Object.fromEntries(
-        trends.map(t => [t.label, String(t.value)])
-      ) : {}),
-      // AI insights
-      insight:      card.insights.summary,
-      keyFactors:   card.insights.keyFactors.join(' · '),
-      confidence:   card.insights.confidence,
-      edge:         card.insights.edge != null ? `${card.insights.edge > 0 ? '+' : ''}${card.insights.edge}%` : undefined,
-      // Player
-      player:       card.player?.name,
-      team:         card.player?.team,
-      position:     card.player?.position,
-    },
-    summary_metrics: stats ? buildSummaryMetrics(stats) : undefined,
-    trend_note:  card.insights.keyFactors[0],
-    last_updated: new Date(card.createdAt).toLocaleDateString(),
-  };
-}
-
-// ── Adapter helpers ──────────────────────────────────────────────────────────
-
-function iconForCardType(type: CardType): string {
-  const map: Record<CardType, string> = {
-    player_analysis:   '⚾',
-    prop_bet:          'TrendingUp',
-    fantasy_start_sit: 'Star',
-    game_outlook:      'Calendar',
-    trend_alert:       'Activity',
-  };
-  return map[type] ?? 'BarChart';
-}
-
-function labelForCardType(type: CardType): string {
-  const map: Record<CardType, string> = {
-    player_analysis:   'Player Analysis',
-    prop_bet:          'Prop Bet',
-    fantasy_start_sit: 'Start/Sit',
-    game_outlook:      'Game Outlook',
-    trend_alert:       'Trend Alert',
-  };
-  return map[type] ?? 'Analysis';
-}
-
-function gradientForStatus(status: Card['status']): string {
-  const map: Record<Card['status'], string> = {
-    hot:         'from-red-600/80 via-rose-700/60 to-red-900/40',
-    value:       'from-emerald-600/80 via-green-700/60 to-emerald-900/40',
-    edge:        'from-orange-600/80 via-amber-700/60 to-orange-900/40',
-    optimal:     'from-sky-600/80 via-blue-700/60 to-sky-900/40',
-    elite:       'from-purple-600/80 via-violet-700/60 to-purple-900/40',
-    target:      'from-teal-600/80 via-cyan-700/60 to-teal-900/40',
-    sleeper:     'from-indigo-600/80 via-violet-700/60 to-indigo-900/40',
-    opportunity: 'from-blue-600/80 via-indigo-700/60 to-blue-900/40',
-    alert:       'from-amber-600/80 via-yellow-700/60 to-amber-900/40',
-    favorable:   'from-green-600/80 via-emerald-700/60 to-green-900/40',
-    neutral:     'from-slate-600/80 via-gray-700/60 to-slate-900/40',
-  };
-  return map[status] ?? 'from-blue-600/80 via-indigo-700/60 to-blue-900/40';
-}
-
-function flattenStats(stats?: NormalizedStats): Record<string, string> {
-  if (!stats) return {};
-  const out: Record<string, string> = {};
-  if (stats.avgExitVelo  != null) out['Avg Exit Velo'] = `${stats.avgExitVelo} mph`;
-  if (stats.barrelRate   != null) out['Barrel Rate']   = `${stats.barrelRate}%`;
-  if (stats.xwOBA        != null) out['xwOBA']         = String(stats.xwOBA);
-  if (stats.xBA          != null) out['xBA']           = String(stats.xBA);
-  if (stats.hardHitRate  != null) out['Hard Hit %']    = `${stats.hardHitRate}%`;
-  if (stats.sweetSpotRate != null) out['Sweet Spot %'] = `${stats.sweetSpotRate}%`;
-  if (stats.hrProjection != null) out['HR Proj']       = stats.hrProjection.toFixed(3);
-  if (stats.kProjection  != null) out['K Proj']        = String(stats.kProjection);
-  return out;
-}
-
-function buildSummaryMetrics(stats: NormalizedStats): Array<{ label: string; value: string }> {
-  return Object.entries(flattenStats(stats))
-    .map(([label, value]) => ({ label, value }))
-    .slice(0, 5);
-}
-
-function formatAmerican(price: number): string {
-  return price > 0 ? `+${price}` : String(price);
-}
-
-// ============================================================================
 // BET RANKING ENGINE
 //
 // Combines model edge with environment multipliers (weather, pitcher matchup,
@@ -702,332 +557,3 @@ export function rankBet({
   };
 }
 
-// ============================================================================
-// HR EDGE ANALYSER — full real-data pipeline for HR prop betting
-//
-// Pipeline:
-//   1. MLBAM ID             — getPlayerByName() — canonical player identity
-//   2. Recent Statcast      — getRecentStatcast(playerId) — 14-day game data
-//   3. Season fallback      — getStatcastData() — if recent sample too thin
-//   4. HR model             — computeHRProb() — Bayesian logistic [0–1]
-//   5. Multi-book odds      — getAllHRLines() — best + all book lines
-//   6. Edge calculation     — calculateEdge() — model vs market pp
-// ============================================================================
-
-/** A single book's HR prop line for a player */
-export interface HRBookLine {
-  bookmaker:         string;
-  overOdds:          number;
-  line:              number;
-  impliedProbability: number;
-}
-
-/**
- * Result of the HR prop edge analysis pipeline.
- * All probabilities are in [0,1]; edge is in percentage points.
- */
-export interface HREdgeResult {
-  playerName:         string;
-  /** Canonical full name from MLB Stats API (may differ from input) */
-  canonicalName:      string;
-  /** MLBAM player ID, null if lookup failed */
-  mlbamId:            number | null;
-  /** Model-estimated HR probability per plate appearance [0,1] */
-  modelProbability:   number;
-  /** Best market-implied HR probability across all books [0,1] */
-  impliedProbability: number;
-  /** Edge = (modelProb − bestImpliedProb) × 100 percentage points */
-  edge:               number;
-  /** Fair American odds implied by the model */
-  fairOdds:           number;
-  /** Best American over-odds found (highest number = most favourable) */
-  bestOdds:           number;
-  /** Bookmaker offering the best odds */
-  bestBook:           string;
-  /** HR prop line (almost always 0.5) */
-  line:               number;
-  /** All book lines sorted best → worst odds */
-  allLines:           HRBookLine[];
-  /** 0–100 confidence score */
-  confidence:         number;
-  /** Data quality tier: recent 14-day > full season > fallback */
-  dataSource:         'recent_14d' | 'season' | 'fallback';
-  /** Full bet ranking including weather + matchup adjustments */
-  rank:               BetRank;
-}
-
-/**
- * Optional game-context for enriched ranking.
- * When provided, `analyzeHREdge` applies weather + matchup adjustments
- * to produce an adjusted edge and ELITE/STRONG/LEAN/PASS tier.
- */
-export interface HREdgeContext {
-  /** Home team name — used to fetch Open-Meteo weather + look up stadium orientation */
-  homeTeam?: string;
-  /** Latitude for weather fetch (overrides stadium lookup) */
-  lat?: number;
-  /** Longitude for weather fetch (overrides stadium lookup) */
-  lon?: number;
-  /** Pitcher's HR rate per 9 innings — 1.2 = league average */
-  pitcherHR9?: number;
-  /** Pitcher's throwing hand */
-  pitcherHand?: 'L' | 'R';
-  /** Batter's hitting hand */
-  batterHand?: 'L' | 'R';
-  /** Whether the line-movement tracker detected sharp money on this player */
-  isSharp?: boolean;
-}
-
-const americanToProb = americanToImpliedProb;
-
-/**
- * Fetch all book HR prop lines for a player from The Odds API.
- * Returns lines sorted from best (highest odds) to worst.
- * Returns empty array when no market is found or on fetch failure.
- */
-export async function getAllHRLines(
-  playerName: string,
-  oddsApiKey: string,
-): Promise<HRBookLine[]> {
-  try {
-    const url = `https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?apiKey=${oddsApiKey}&regions=us&markets=player_home_runs&oddsFormat=american`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(6_000) });
-    if (!res.ok) return [];
-
-    const games = await res.json() as Array<{
-      bookmakers?: Array<{
-        title: string;
-        markets?: Array<{
-          key: string;
-          outcomes?: Array<{ name: string; price: number; point?: number }>;
-        }>;
-      }>;
-    }>;
-
-    const lower = playerName.toLowerCase();
-    const lines: HRBookLine[] = [];
-
-    for (const game of games) {
-      for (const book of (game.bookmakers ?? [])) {
-        for (const market of (book.markets ?? [])) {
-          if (market.key !== 'player_home_runs') continue;
-          for (const outcome of (market.outcomes ?? [])) {
-            if (!outcome.name?.toLowerCase().includes(lower)) continue;
-            lines.push({
-              bookmaker:          book.title,
-              overOdds:           outcome.price,
-              line:               outcome.point ?? 0.5,
-              impliedProbability: americanToProb(outcome.price),
-            });
-          }
-        }
-      }
-    }
-
-    // Sort: highest odds first (best value for bettor)
-    return lines.sort((a, b) => b.overOdds - a.overOdds);
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Run the full HR prop edge analysis pipeline for a named MLB batter.
- *
- * Returns null when:
- * - No Statcast data could be resolved for the player
- * - No HR prop market is available in The Odds API
- * - ODDS_API_KEY is not configured
- *
- * Non-throwing — all errors are caught and return null gracefully.
- */
-export async function analyzeHREdge(
-  playerName: string,
-  ctx: HREdgeContext = {},
-): Promise<HREdgeResult | null> {
-  const oddsApiKey = getOddsApiKey();
-  if (!oddsApiKey) return null;
-
-  // ── Step 1: Canonical player identity (MLBAM ID) ──────────────────────────
-  const { getPlayerByName } = await import('@/lib/player-map');
-  const playerProfile = await getPlayerByName(playerName).catch(() => null);
-  const mlbamId       = playerProfile?.id ?? null;
-  const canonicalName = playerProfile?.fullName ?? playerName;
-
-  // ── Step 2: Statcast features ─────────────────────────────────────────────
-  // Prefer MLBAM ID lookup (eliminates name ambiguity); fall back to name search.
-  const { getRecentStatcast, getStatcastData, queryStatcast } = await import('@/lib/baseball-savant');
-
-  let barrelRate    = 0;  // fraction 0–1 for hrEngine
-  let avgExitVelo   = 0;
-  let sampleSize    = 0;
-  let dataSource: HREdgeResult['dataSource'] = 'fallback';
-
-  // Use canonicalName for searches so "Judge" → "Aaron Judge" resolves correctly
-  const recent = await getRecentStatcast(canonicalName, 14, mlbamId ?? undefined).catch(() => null);
-  if (recent && recent.sampleSize >= 10) {
-    barrelRate  = recent.barrelRate  / 100;
-    avgExitVelo = recent.avgExitVelo;
-    sampleSize  = recent.sampleSize;
-    dataSource  = 'recent_14d';
-  } else {
-    // Season aggregates
-    const { players } = await getStatcastData().catch(() => ({ players: [] as import('@/lib/baseball-savant').StatcastPlayer[] }));
-    const match = queryStatcast(players, { player: canonicalName, playerType: 'batter', limit: 1 });
-    if (match.length > 0) {
-      barrelRate  = match[0].barrelRate  / 100;
-      avgExitVelo = match[0].exitVelocity;
-      sampleSize  = match[0].pa;
-      dataSource  = 'season';
-    }
-  }
-
-  if (sampleSize === 0) return null; // no Statcast data at all
-
-  // ── Step 3: HR model probability ─────────────────────────────────────────
-  const { computeHRProb, fairAmericanOdds } = await import('@/lib/hrEngine');
-
-  // airPullRate: not available from leaderboard endpoints — estimate from barrel rate
-  // (R² ≈ 0.62 in Statcast data; barrels concentrate on pulled air balls)
-  const airPullRate = Math.min(0.60, barrelRate * 2.2);
-
-  const modelProbability = computeHRProb({
-    airPullRate,
-    barrelRate,
-    avgExitVelocity:      avgExitVelo,
-    platoonAdvantage:     0,    // neutral — matchup not available at this layer
-    parkHRFactor:         1.0,  // neutral — park not known without specific game
-    pitcherHRSuppression: 0.5,  // median
-    sampleSize,
-  });
-
-  const fairOdds = fairAmericanOdds(modelProbability);
-
-  // ── Step 4: Multi-book odds — find best line ──────────────────────────────
-  // Use canonicalName for market search; also try the original playerName as fallback
-  let allLines = await getAllHRLines(canonicalName, oddsApiKey);
-  if (allLines.length === 0 && canonicalName !== playerName) {
-    allLines = await getAllHRLines(playerName, oddsApiKey);
-  }
-
-  if (allLines.length === 0) return null; // no market
-
-  const best = allLines[0]; // sorted best → worst already
-  const impliedProbability = best.impliedProbability;
-  const marketOdds = best.overOdds;
-  const line       = best.line;
-  const bookmaker  = best.bookmaker;
-
-  // ── Step 5: Edge + confidence ─────────────────────────────────────────────
-  const edge = calculateEdge(modelProbability, impliedProbability);
-  const confidence = calculateConfidence(
-    [{ source: 'statcast' as const, latencyMs: 0, success: true, cached: dataSource === 'season' }],
-    edge,
-  );
-
-  // ── Step 6: Weather + matchup adjustments → final ranking ────────────────
-  let weatherFactor  = 1.0;
-  let matchupFactor  = 1.0;
-
-  if (ctx.homeTeam || (ctx.lat != null && ctx.lon != null)) {
-    try {
-      const { fetchWeatherForLocation, weatherHRFactor } = await import('@/lib/weather/index');
-      // Use provided lat/lon or fall back to rough lookup via homeTeam
-      const latLon = (ctx.lat != null && ctx.lon != null)
-        ? { lat: ctx.lat, lon: ctx.lon }
-        : await resolveTeamLatLon(ctx.homeTeam!);
-      if (latLon) {
-        const weather = await fetchWeatherForLocation(latLon.lat, latLon.lon);
-        if (!weather) throw new Error('weather null');
-        weatherFactor = weatherHRFactor({
-          temp:      weather.temperature,
-          windSpeed: weather.windSpeed,
-          windDeg:   0, // Open-Meteo provides windDirection in HourlyForecast but not WeatherData
-          homeTeam:  ctx.homeTeam,
-        });
-      }
-    } catch {
-      // Non-fatal — weather context is additive
-    }
-  }
-
-  if (ctx.pitcherHR9 != null) {
-    // Simple matchup factor: pitcher HR/9 relative to league average (1.2)
-    // A pitcher allowing 1.8 HR/9 = 50% above average = 1.5× factor
-    matchupFactor = Math.max(0.5, Math.min(2.0, ctx.pitcherHR9 / 1.2));
-    // Platoon advantage: batter facing opposite hand = +8% factor
-    if (ctx.pitcherHand && ctx.batterHand && ctx.pitcherHand !== ctx.batterHand) {
-      matchupFactor *= 1.08;
-    }
-  }
-
-  const rank = rankBet({
-    projection:    modelProbability,
-    implied:       impliedProbability,
-    weatherFactor,
-    matchupFactor,
-    isSharp:       ctx.isSharp ?? false,
-  });
-
-  return {
-    playerName,
-    canonicalName,
-    mlbamId,
-    modelProbability,
-    impliedProbability,
-    edge,
-    fairOdds,
-    bestOdds:  marketOdds,
-    bestBook:  bookmaker,
-    line,
-    allLines,
-    confidence,
-    dataSource,
-    rank,
-  };
-}
-
-/** Rough lat/lon lookup for MLB home teams. Used when exact coordinates are not provided. */
-async function resolveTeamLatLon(teamName: string): Promise<{ lat: number; lon: number } | null> {
-  // MLB stadium coordinates (approximate centre-field)
-  const MLB_COORDS: Record<string, { lat: number; lon: number }> = {
-    'New York Yankees':       { lat: 40.8296, lon: -73.9262 },
-    'New York Mets':          { lat: 40.7571, lon: -73.8458 },
-    'Boston Red Sox':         { lat: 42.3467, lon: -71.0972 },
-    'Los Angeles Dodgers':    { lat: 34.0739, lon: -118.2400 },
-    'Los Angeles Angels':     { lat: 33.8003, lon: -117.8827 },
-    'San Francisco Giants':   { lat: 37.7786, lon: -122.3893 },
-    'Chicago Cubs':           { lat: 41.9484, lon: -87.6554 },
-    'Chicago White Sox':      { lat: 41.8299, lon: -87.6338 },
-    'Houston Astros':         { lat: 29.7573, lon: -95.3555 },
-    'Atlanta Braves':         { lat: 33.8908, lon: -84.4678 },
-    'Philadelphia Phillies':  { lat: 39.9061, lon: -75.1665 },
-    'Washington Nationals':   { lat: 38.8730, lon: -77.0074 },
-    'Pittsburgh Pirates':     { lat: 40.4469, lon: -80.0057 },
-    'Cincinnati Reds':        { lat: 39.0975, lon: -84.5070 },
-    'St. Louis Cardinals':    { lat: 38.6226, lon: -90.1928 },
-    'Milwaukee Brewers':      { lat: 43.0280, lon: -87.9712 },
-    'Minnesota Twins':        { lat: 44.9817, lon: -93.2776 },
-    'Detroit Tigers':         { lat: 42.3390, lon: -83.0485 },
-    'Cleveland Guardians':    { lat: 41.4962, lon: -81.6852 },
-    'Baltimore Orioles':      { lat: 39.2839, lon: -76.6217 },
-    'Toronto Blue Jays':      { lat: 43.6414, lon: -79.3894 },
-    'Tampa Bay Rays':         { lat: 27.7683, lon: -82.6534 },
-    'Miami Marlins':          { lat: 25.7781, lon: -80.2196 },
-    'Colorado Rockies':       { lat: 39.7559, lon: -104.9942 },
-    'Arizona Diamondbacks':   { lat: 33.4455, lon: -112.0667 },
-    'Seattle Mariners':       { lat: 47.5914, lon: -122.3321 },
-    'Oakland Athletics':      { lat: 37.7516, lon: -122.2005 },
-    'San Diego Padres':       { lat: 32.7073, lon: -117.1566 },
-    'Texas Rangers':          { lat: 32.7512, lon: -97.0832 },
-    'Kansas City Royals':     { lat: 39.0517, lon: -94.4803 },
-  };
-
-  const lower = teamName.toLowerCase();
-  for (const [name, coords] of Object.entries(MLB_COORDS)) {
-    if (name.toLowerCase().includes(lower) || lower.includes(name.toLowerCase())) {
-      return coords;
-    }
-  }
-  return null;
-}

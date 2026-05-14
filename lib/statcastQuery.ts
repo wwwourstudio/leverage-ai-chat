@@ -142,36 +142,6 @@ export async function getRawStatcast(filters: StatcastFilters): Promise<QueryRes
  * Fetch pitches for tunneling analysis for a given pitcher.
  * Returns the most recent 1 000 pitches with movement data.
  */
-export async function getPitcherTunneling(
-  pitcherId: number,
-  start?: string,
-): Promise<QueryResult<StatcastPitch>> {
-  try {
-    const supabase = await getSupabase();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let query: any = supabase
-      .from('statcast_events')
-      .select('pitch_type, release_speed, release_spin_rate, pfx_x, pfx_z, plate_x, plate_z')
-      .eq('pitcher_id', pitcherId)
-      .not('pfx_x', 'is', null)
-      .not('pfx_z', 'is', null)
-      .order('game_date', { ascending: false })
-      .limit(1_000);
-
-    if (start) query = query.gte('game_date', start);
-
-    const { data, error, count } = await query;
-
-    return {
-      data: (data as StatcastPitch[]) ?? [],
-      error: handleSupabaseError(error),
-      count: count ?? 0,
-    };
-  } catch (e) {
-    return { data: [], error: e instanceof Error ? e.message : 'Statcast query failed' };
-  }
-}
-
 /**
  * Compute aggregated Statcast metrics for a player by name from api.statcast_events.
  * Searches batter_name (playerType='batter') or pitcher_name (playerType='pitcher').
@@ -260,52 +230,3 @@ export async function getPlayerAggregate(
   }
 }
 
-/**
- * Fetch top hitters from statcast_events ranked by avg exit velocity (last 30 days).
- * Returns up to `limit` rows (max 50).
- */
-export async function getExitVeloLeaderboard(
-  limit = 10,
-  days = 30,
-): Promise<{ playerName: string; avgExitVelo: number; sampleBIP: number }[]> {
-  try {
-    const supabase = await getSupabase();
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - days);
-
-    // Use Supabase RPC or raw query — fall back to JS aggregation
-    const { data, error } = await supabase
-      .from('statcast_events')
-      .select('batter_name, launch_speed')
-      .gte('game_date', cutoff.toISOString().slice(0, 10))
-      .not('launch_speed', 'is', null)
-      .gt('launch_speed', 0)
-      .limit(50_000); // fetch enough to aggregate
-
-    if (error || !data) return [];
-
-    // JS-side aggregation
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const map = new Map<string, { total: number; count: number }>();
-    for (const row of data as any[]) {
-      const name: string = row.batter_name ?? 'Unknown';
-      const ev: number = row.launch_speed ?? 0;
-      const entry = map.get(name) ?? { total: 0, count: 0 };
-      entry.total += ev;
-      entry.count += 1;
-      map.set(name, entry);
-    }
-
-    return Array.from(map.entries())
-      .filter(([, v]) => v.count >= 20) // min 20 BIP
-      .map(([name, v]) => ({
-        playerName: name,
-        avgExitVelo: Math.round((v.total / v.count) * 10) / 10,
-        sampleBIP: v.count,
-      }))
-      .sort((a, b) => b.avgExitVelo - a.avgExitVelo)
-      .slice(0, Math.min(limit, 50));
-  } catch {
-    return [];
-  }
-}

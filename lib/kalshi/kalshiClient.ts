@@ -9,6 +9,7 @@
 
 import { createSign, constants } from 'crypto';
 import { getKalshiApiKey, getKalshiPrivateKey } from '@/lib/config';
+import { TtlCache } from '@/lib/utils/cache';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -95,15 +96,15 @@ function acquireRateToken(): Promise<void> {
 
 // ─── GET response cache (keyed by URL, TTL = 60s) ─────────────────────────────
 
-const _requestCache = new Map<string, { data: unknown; expires: number }>();
+const _requestCache = new TtlCache<unknown>(200);
+const CACHE_TTL_MS  = 60_000;
 
 function getCachedResponse(key: string): unknown | null {
-  const entry = _requestCache.get(key);
-  return entry && entry.expires > Date.now() ? entry.data : null;
+  return _requestCache.get(key, CACHE_TTL_MS) ?? null;
 }
 
 function setCachedResponse(key: string, data: unknown): void {
-  _requestCache.set(key, { data, expires: Date.now() + 60_000 });
+  _requestCache.set(key, data);
 }
 
 // ─── Client ───────────────────────────────────────────────────────────────────

@@ -8,7 +8,6 @@
  *   Model config       → model-config  (coefficients + Platt calibration params)
  *   Models             → models        (inference: hrProbabilityPerAB, etc.)
  *   Simulation         → monte-carlo
- *   Signal aggregation → signal-aggregator  (composite real-time signal)
  *   Backtesting        → backtester         (historical evaluation + calibration)
  *   Card builders      → betting-edges, dfs-adapter, fantasy-adapter, slate-builder
  *   Pipeline           → projection-pipeline (orchestrates all layers)
@@ -43,20 +42,6 @@ export { simulateHitter, simulatePitcher, formatPercentiles } from './monte-carl
 
 // ── Matchup engine ─────────────────────────────────────────────────────────────
 export { computeMatchupVariables, getDFSMatchupLabel } from './matchup-engine';
-
-// ── Signal aggregation (real-time composite layer) ────────────────────────────
-// The main user-interaction enhancement: aggregateSignal() combines model prob
-// + live market odds + sharp signals + calibration into one CompositeSignal.
-export { aggregateSignal, aggregateSlate, aggregateSharpSignals } from './signal-aggregator';
-export type {
-  CompositeSignal,
-  SignalStrength,
-  Recommendation,
-  SharpSignalRecord,
-  SharpContext,
-  AggregatorInput,
-  ConfidenceBand,
-} from './signal-aggregator';
 
 // ── Backtesting framework ─────────────────────────────────────────────────────
 // runBacktest() is pure TS — no DB calls. DB I/O lives in cron/backtest/route.ts.

@@ -1,20 +1,19 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+const UNAUTHED_RESPONSE = { success: true, tier: 'free', periodEnd: null, cancelAtPeriodEnd: false };
+
 /**
  * GET /api/user/subscription
- *
  * Returns the authenticated user's current subscription tier and period info.
  * Used by StripeLightbox to show "X days remaining" and the Manage button.
+ * Gracefully returns free tier for unauthenticated users or on any error.
  */
 export async function GET() {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ success: true, tier: 'free', periodEnd: null, cancelAtPeriodEnd: false });
-    }
+    if (!user) return NextResponse.json(UNAUTHED_RESPONSE);
 
     const { data } = await supabase
       .from('subscription_tiers')
@@ -30,6 +29,6 @@ export async function GET() {
     });
   } catch (err) {
     console.error('[API/user/subscription] Error:', err);
-    return NextResponse.json({ success: true, tier: 'free', periodEnd: null, cancelAtPeriodEnd: false });
+    return NextResponse.json(UNAUTHED_RESPONSE);
   }
 }

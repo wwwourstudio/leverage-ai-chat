@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { HTTP_STATUS } from '@/lib/constants';
-import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
+import {
+  requireAuth,
+  AuthRequiredError,
+  unauthorized,
+  badRequest,
+  payloadTooLarge,
+  parseJsonBody,
+  JsonParseError,
+  rateLimitGuard,
+  internalError,
+} from '@/lib/api/route-helpers';
 
 // ============================================================================
 // GET /api/chats — List authenticated user's chat threads
@@ -9,15 +18,7 @@ import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
 
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: HTTP_STATUS.UNAUTHORIZED }
-      );
-    }
+    const { supabase, user } = await requireAuth();
 
     const { data: threads, error } = await supabase
       .from('chat_threads')
@@ -27,28 +28,20 @@ export async function GET() {
       .limit(50);
 
     if (error) {
-      // If the table doesn't exist yet (schema not migrated), return empty list gracefully
       const isMissingTable =
         error.message?.toLowerCase().includes('does not exist') ||
         (error as any).code === '42P01' ||
         (error as any).code === 'PGRST200';
-      if (isMissingTable) {
-        return NextResponse.json({ success: true, threads: [] });
-      }
+      if (isMissingTable) return NextResponse.json({ success: true, threads: [] });
       console.error('[v0] [API/chats] List error:', error);
-      return NextResponse.json(
-        { success: false, error: 'Failed to fetch chat threads' },
-        { status: HTTP_STATUS.INTERNAL_ERROR }
-      );
+      return internalError('Failed to fetch chat threads');
     }
 
     return NextResponse.json({ success: true, threads: threads ?? [] });
   } catch (err) {
+    if (err instanceof AuthRequiredError) return unauthorized();
     console.error('[v0] [API/chats] GET error:', err);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: HTTP_STATUS.INTERNAL_ERROR }
-    );
+    return internalError();
   }
 }
 
@@ -58,38 +51,16 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { supabase, user } = await requireAuth();
 
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: HTTP_STATUS.UNAUTHORIZED }
-      );
-    }
+    const rl = rateLimitGuard(request, user.id, 'chats-post', { limit: 30, windowMs: 60_000 });
+    if (rl) return rl;
 
-    // Rate limit: 30 new chats per minute per user
-    const rl = checkRateLimit('chats-post', getRateLimitId(request, user.id), { limit: 30, windowMs: 60_000 });
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { success: false, error: 'Too many requests' },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
-      );
-    }
+    const sizeCheck = request.headers.get('content-length');
+    if (Number(sizeCheck ?? 0) > 10_000) return payloadTooLarge();
 
-    // Reject oversized payloads before parsing
-    const contentLength = Number(request.headers.get('content-length') ?? 0);
-    if (contentLength > 10_000) {
-      return NextResponse.json({ success: false, error: 'Request too large' }, { status: 413 });
-    }
-
-    let body: Record<string, unknown>;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: HTTP_STATUS.BAD_REQUEST });
-    }
-    const { title = 'New Chat', category = 'all', tags = [] } = body;
+    const body = await parseJsonBody(request);
+    const { title = 'New Chat', category = 'all', tags = [] } = body as Record<string, unknown>;
 
     const { data: thread, error } = await supabase
       .from('chat_threads')
@@ -108,25 +79,27 @@ export async function POST(request: NextRequest) {
         (error as any).code === '42P01' ||
         (error as any).code === 'PGRST200';
       if (isMissingTable) {
-        // Table not yet migrated — return a stub thread so the client can still function
         return NextResponse.json({
           success: true,
-          thread: { id: `local-${Date.now()}`, title, category, tags, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+          thread: {
+            id: `local-${Date.now()}`,
+            title,
+            category,
+            tags,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
         });
       }
       console.error('[v0] [API/chats] Create error:', error);
-      return NextResponse.json(
-        { success: false, error: 'Failed to create chat thread' },
-        { status: HTTP_STATUS.INTERNAL_ERROR }
-      );
+      return internalError('Failed to create chat thread');
     }
 
-    return NextResponse.json({ success: true, thread });
+    return NextResponse.json({ success: true, thread }, { status: HTTP_STATUS.OK });
   } catch (err) {
+    if (err instanceof AuthRequiredError) return unauthorized();
+    if (err instanceof JsonParseError) return badRequest(err.message);
     console.error('[v0] [API/chats] POST error:', err);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: HTTP_STATUS.INTERNAL_ERROR }
-    );
+    return internalError();
   }
 }

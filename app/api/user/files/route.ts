@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import {
+  requireAuth,
+  AuthRequiredError,
+  unauthorized,
+  internalError,
+} from '@/lib/api/route-helpers';
 
 /**
  * GET /api/user/files
@@ -8,9 +13,7 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ success: true, files: [] });
+    const { supabase, user } = await requireAuth();
 
     const { data } = await supabase
       .from('user_preferences')
@@ -18,9 +21,9 @@ export async function GET() {
       .eq('user_id', user.id)
       .single();
 
-    const files = data?.saved_files ?? [];
-    return NextResponse.json({ success: true, files });
+    return NextResponse.json({ success: true, files: data?.saved_files ?? [] });
   } catch (err) {
+    if (err instanceof AuthRequiredError) return NextResponse.json({ success: true, files: [] });
     console.error('[API/user/files GET]', err);
     return NextResponse.json({ success: false, files: [], error: 'Failed to load files' });
   }
@@ -34,9 +37,7 @@ export async function GET() {
  */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
+    const { supabase, user } = await requireAuth();
 
     const body = await req.json();
     const files = Array.isArray(body.files) ? body.files.slice(0, 20) : [];
@@ -48,7 +49,6 @@ export async function POST(req: NextRequest) {
       type: f.type,
       size: f.size,
       savedAt: f.savedAt,
-      // Preserve text data (CSV headers/rows, txt/json content) but cap at 50KB
       data: f.data ?? null,
       textContent: typeof f.textContent === 'string' ? f.textContent.slice(0, 50_000) : null,
     }));
@@ -62,7 +62,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, count: sanitized.length });
   } catch (err) {
+    if (err instanceof AuthRequiredError) return unauthorized();
     console.error('[API/user/files POST]', err);
-    return NextResponse.json({ success: false, error: 'Failed to save files' }, { status: 500 });
+    return internalError('Failed to save files');
   }
 }

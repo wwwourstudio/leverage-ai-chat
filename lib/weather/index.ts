@@ -86,26 +86,12 @@ export interface GameTimeForecast {
   recommendation: string;
 }
 
-export interface WindAnalysis {
-  direction: number;
-  speed: number;
-  gust: number;
-  favoredEndzone: 'north' | 'south' | 'east' | 'west' | 'none';
-  passingImpact: 'severe' | 'moderate' | 'minimal';
-  kickingImpact: 'severe' | 'moderate' | 'minimal';
-}
-
 // ============================================
 // Cache Management
 // ============================================
 
 const weatherCache = new TtlCache<WeatherData>();
 const WEATHER_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
-
-export function clearWeatherCache(): void {
-  weatherCache.clear();
-  console.log(`${LOG_PREFIXES.API} Weather cache cleared`);
-}
 
 // ============================================
 // Core Weather Fetching
@@ -278,36 +264,6 @@ export async function getGameTimeForecast(
 // ============================================
 // Wind Analysis
 // ============================================
-
-export function analyzeWindDirection(
-  stadium: Stadium,
-  windDirection: number,
-  windSpeed: number
-): WindAnalysis {
-  const fieldOrientation = parseFieldOrientation(stadium.fieldOrientation || 'North-South');
-  const relativeAngle = (windDirection - fieldOrientation + 360) % 360;
-  
-  let favoredEndzone: WindAnalysis['favoredEndzone'] = 'none';
-  if (windSpeed > 10) {
-    if (relativeAngle >= 0 && relativeAngle < 45) favoredEndzone = 'north';
-    else if (relativeAngle >= 45 && relativeAngle < 135) favoredEndzone = 'east';
-    else if (relativeAngle >= 135 && relativeAngle < 225) favoredEndzone = 'south';
-    else if (relativeAngle >= 225 && relativeAngle < 315) favoredEndzone = 'west';
-    else favoredEndzone = 'north';
-  }
-
-  const passingImpact = windSpeed > 20 ? 'severe' : windSpeed > 12 ? 'moderate' : 'minimal';
-  const kickingImpact = windSpeed > 15 ? 'severe' : windSpeed > 10 ? 'moderate' : 'minimal';
-
-  return {
-    direction: windDirection,
-    speed: windSpeed,
-    gust: windSpeed * 1.3,
-    favoredEndzone,
-    passingImpact,
-    kickingImpact
-  };
-}
 
 // ============================================
 // Helper Functions

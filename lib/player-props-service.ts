@@ -420,41 +420,6 @@ export async function fetchPlayerProps(options: PlayerPropsOptions): Promise<Pla
 }
 
 /**
- * Get props for a specific player
- */
-export async function getPlayerProps(playerName: string, sport: string): Promise<PlayerProp[]> {
-  const supabase = getReadClient();
-  
-  const { data, error } = await supabase
-    .from('player_props_markets')
-    .select('*')
-    .eq('sport', sport)
-    .ilike('player_name', `%${playerName}%`)
-    .gte('fetched_at', new Date(Date.now() - CACHE_TTL_MS).toISOString())
-    .order('game_time', { ascending: true });
-  
-  if (error) {
-    console.error(`[v0] [PLAYER-PROPS] Error fetching props for ${playerName}:`, error);
-    return [];
-  }
-  
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    sport: row.sport,
-    gameId: row.game_id,
-    playerName: row.player_name,
-    statType: row.stat_type,
-    line: row.line,
-    overOdds: row.over_odds,
-    underOdds: row.under_odds,
-    bookmaker: row.bookmaker,
-    gameTime: row.game_time,
-    homeTeam: row.home_team,
-    awayTeam: row.away_team,
-  }));
-}
-
-/**
  * Convert player prop to card format
  */
 export function playerPropToCard(prop: PlayerProp): any {

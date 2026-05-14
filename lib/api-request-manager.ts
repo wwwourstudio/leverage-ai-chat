@@ -4,17 +4,16 @@
  * for external API calls
  */
 
-export interface RequestQueueItem {
+interface RequestQueueItem {
   id: string;
   execute: () => Promise<any>;
   priority: number;
   createdAt: number;
 }
 
-export interface RateLimitConfig {
+interface RateLimitConfig {
   requestsPerSecond: number;
   burstSize?: number;
-  retryAfterMs?: number;
 }
 
 /**
@@ -69,7 +68,7 @@ class TokenBucketRateLimiter {
 /**
  * Priority Request Queue with Rate Limiting
  */
-export class RequestQueue {
+class RequestQueue {
   private queue: RequestQueueItem[] = [];
   private processing = false;
   private rateLimiter: TokenBucketRateLimiter;
@@ -177,118 +176,6 @@ export class RequestQueue {
   }
 }
 
-/**
- * Exponential Backoff with Jitter
- */
-export async function exponentialBackoff(
-  attempt: number,
-  baseDelayMs: number = 1000,
-  maxDelayMs: number = 30000
-): Promise<void> {
-  const exponentialDelay = Math.min(
-    baseDelayMs * Math.pow(2, attempt),
-    maxDelayMs
-  );
-  
-  // Add random jitter (0-25% of delay)
-  const jitter = exponentialDelay * 0.25 * Math.random();
-  const finalDelay = exponentialDelay + jitter;
-  
-  console.log(`[API] Backing off for ${Math.round(finalDelay)}ms (attempt ${attempt + 1})`);
-  
-  await new Promise(resolve => setTimeout(resolve, finalDelay));
-}
-
-/**
- * Retry with exponential backoff
- */
-export async function retryWithExponentialBackoff<T>(
-  fn: () => Promise<T>,
-  options: {
-    maxRetries?: number;
-    baseDelayMs?: number;
-    maxDelayMs?: number;
-    shouldRetry?: (error: any) => boolean;
-    onRetry?: (attempt: number, error: any) => void;
-  } = {}
-): Promise<T> {
-  const {
-    maxRetries = 3,
-    baseDelayMs = 1000,
-    maxDelayMs = 30000,
-    shouldRetry = (error: any) => {
-      const status = error?.status || error?.response?.status;
-      // Retry on network errors, 5xx errors, and 429 (rate limit)
-      return !status || status === 429 || status >= 500;
-    },
-    onRetry,
-  } = options;
-
-  let lastError: Error | null = null;
-
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error as Error;
-
-      if (attempt === maxRetries - 1 || !shouldRetry(error)) {
-        throw error;
-      }
-
-      if (onRetry) {
-        onRetry(attempt, error);
-      }
-
-      await exponentialBackoff(attempt, baseDelayMs, maxDelayMs);
-    }
-  }
-
-  throw lastError || new Error('Max retries exceeded');
-}
-
-/**
- * Batch requests with automatic splitting
- */
-export async function batchRequests<T, R>(
-  items: T[],
-  requestFn: (item: T) => Promise<R>,
-  options: {
-    batchSize?: number;
-    delayBetweenBatchesMs?: number;
-    queue?: RequestQueue;
-  } = {}
-): Promise<R[]> {
-  const {
-    batchSize = 5,
-    delayBetweenBatchesMs = 1000,
-  } = options;
-
-  const results: R[] = [];
-  
-  for (let i = 0; i < items.length; i += batchSize) {
-    const batch = items.slice(i, i + batchSize);
-    
-    console.log(`[API] Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(items.length / batchSize)}`);
-    
-    const batchResults = await Promise.all(
-      batch.map(item => requestFn(item))
-    );
-    
-    results.push(...batchResults);
-    
-    // Delay between batches (except for last batch)
-    if (i + batchSize < items.length) {
-      await new Promise(resolve => setTimeout(resolve, delayBetweenBatchesMs));
-    }
-  }
-  
-  return results;
-}
-
-/**
- * Global request queue instances for different services
- */
 export const oddsApiQueue = new RequestQueue(
   {
     requestsPerSecond: 2, // Conservative limit for free tier (avoid 429s)
@@ -305,10 +192,3 @@ export const playerPropsQueue = new RequestQueue(
   3 // Max 3 concurrent requests
 );
 
-export const weatherApiQueue = new RequestQueue(
-  {
-    requestsPerSecond: 10, // Weather APIs typically have higher limits
-    burstSize: 20,
-  },
-  10
-);

@@ -29,7 +29,7 @@ export const ODDS_API_SPORTS = {
   WTA: 'tennis_wta',
 } as const;
 
-export type OddsSport = typeof ODDS_API_SPORTS[keyof typeof ODDS_API_SPORTS];
+type OddsSport = typeof ODDS_API_SPORTS[keyof typeof ODDS_API_SPORTS];
 
 export const ODDS_MARKETS = {
   H2H: 'h2h',
@@ -66,20 +66,6 @@ export interface OddsAPIOptions {
 const requestCache = new Map<string, { data: any; timestamp: number; promise?: Promise<any> }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const IN_FLIGHT_TTL = 30 * 1000; // 30 seconds
-
-export function clearOddsCache(sportKey?: string): void {
-  if (sportKey) {
-    for (const key of requestCache.keys()) {
-      if (key.startsWith(`odds:${sportKey}:`)) {
-        requestCache.delete(key);
-      }
-    }
-    console.log(`${LOG_PREFIXES.API} Cleared cache for ${sportKey}`);
-  } else {
-    requestCache.clear();
-    console.log(`${LOG_PREFIXES.API} Cleared all odds cache`);
-  }
-}
 
 // ============================================
 // Sport Validation

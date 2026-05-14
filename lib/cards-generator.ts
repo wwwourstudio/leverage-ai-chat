@@ -73,7 +73,7 @@ function makeCacheKey(category?: string, sport?: string): string {
 }
 
 /** Retrieve cached cards if still fresh for the given category+sport key */
-export function getCachedCards(category?: string, sport?: string, count: number = 6, _userContext?: string): InsightCard[] | null {
+function getCachedCards(category?: string, sport?: string, count: number = 6, _userContext?: string): InsightCard[] | null {
   const key = makeCacheKey(category, sport);
   const entry = cardCacheMap.get(key);
   if (!entry) return null;

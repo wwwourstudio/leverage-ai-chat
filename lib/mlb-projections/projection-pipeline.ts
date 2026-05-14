@@ -503,7 +503,7 @@ async function buildWeatherConditions(game: MLBGame): Promise<WeatherConditions>
   }
 
   try {
-    const { fetchWeatherForLocation } = await import('@/lib/weather-service');
+    const { fetchWeatherForLocation } = await import('@/lib/weather/index');
     if (!game.venueLat || !game.venueLon) throw new Error('No coordinates');
     const w = await fetchWeatherForLocation(game.venueLat, game.venueLon);
     if (!w) throw new Error('No weather data returned');

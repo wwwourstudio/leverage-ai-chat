@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server';
 import { loadActiveModel } from '@/lib/market-intelligence/signal-tracker';
 import { logger, LogCategory } from '@/lib/logger';
 import { HTTP_STATUS } from '@/lib/constants';
+import { requireServiceRole, badRequest, internalError } from '@/lib/api/route-helpers';
 
 export const maxDuration = 10;
 
@@ -30,32 +31,19 @@ export async function GET(): Promise<NextResponse> {
     });
   } catch (err) {
     logger.info(LogCategory.API, '[market-intelligence/signals] GET error', { error: err instanceof Error ? err : String(err) });
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: HTTP_STATUS.INTERNAL_ERROR }
-    );
+    return internalError();
   }
 }
 
 export async function PATCH(req: NextRequest): Promise<NextResponse> {
-  // Guard: require service role key in header
-  const authHeader = req.headers.get('x-service-role-key');
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceKey || authHeader !== serviceKey) {
-    return NextResponse.json(
-      { success: false, error: 'Unauthorized' },
-      { status: HTTP_STATUS.UNAUTHORIZED }
-    );
-  }
+  const authErr = requireServiceRole(req);
+  if (authErr) return authErr;
 
   try {
     const { signal_name, weight } = await req.json();
 
     if (!signal_name || typeof weight !== 'number' || weight < 0 || weight > 1) {
-      return NextResponse.json(
-        { success: false, error: 'signal_name (string) and weight (0-1) are required' },
-        { status: HTTP_STATUS.BAD_REQUEST }
-      );
+      return badRequest('signal_name (string) and weight (0-1) are required');
     }
 
     const supabase = await createClient();
@@ -66,20 +54,12 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
       .select()
       .single();
 
-    if (error) {
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: HTTP_STATUS.INTERNAL_ERROR }
-      );
-    }
+    if (error) return NextResponse.json({ success: false, error: error.message }, { status: HTTP_STATUS.INTERNAL_ERROR });
 
     logger.info(LogCategory.API, '[market-intelligence/signals] weight updated', { metadata: { signal_name, weight } });
     return NextResponse.json({ success: true, signal: data });
   } catch (err) {
     logger.info(LogCategory.API, '[market-intelligence/signals] PATCH error', { error: err instanceof Error ? err : String(err) });
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: HTTP_STATUS.INTERNAL_ERROR }
-    );
+    return internalError();
   }
 }

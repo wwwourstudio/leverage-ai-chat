@@ -259,3 +259,18 @@ export function getRuntimeEnvironment(): string {
 
 // Re-export client-safe formatters from lib/utils so server-side callers can also use them
 export { formatRelativeTime, fmtVol } from '@/lib/utils';
+
+// ============================================
+// Sports Utilities
+// ============================================
+
+/**
+ * Returns the default Odds API sport key for the current calendar month.
+ * MLB: Mar–Oct | NFL: Sep–Feb | NBA: all other times
+ */
+export function getDefaultSport(): string {
+  const month = new Date().getMonth() + 1; // 1-12
+  if (month >= 3 && month <= 10) return 'baseball_mlb';
+  if (month >= 9 || month <= 2) return 'americanfootball_nfl';
+  return 'basketball_nba';
+}

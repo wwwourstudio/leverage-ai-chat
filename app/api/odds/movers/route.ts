@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { HTTP_STATUS } from '@/lib/constants';
+import { parseIntParam, internalError } from '@/lib/api/route-helpers';
 
 export const runtime = 'nodejs';
 export const maxDuration = 15;
@@ -18,8 +18,8 @@ export const maxDuration = 15;
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const hours = Math.max(1, Math.min(parseInt(searchParams.get('hours') ?? '24', 10) || 24, 168));
-  const limit = Math.max(1, Math.min(parseInt(searchParams.get('limit') ?? '20', 10) || 20, 100));
+  const hours = parseIntParam(searchParams, 'hours', 24, 1, 168);
+  const limit = parseIntParam(searchParams, 'limit', 20, 1, 100);
 
   try {
     const supabase = await createClient();
@@ -36,21 +36,12 @@ export async function GET(req: NextRequest) {
         selection: row.selection,
         move:      Math.abs(Number(row.move)),
       }));
-
-      return NextResponse.json({
-        success: true,
-        movers,
-        count: movers.length,
-        hours,
-        timestamp: new Date().toISOString(),
-      });
+      return NextResponse.json({ success: true, movers, count: movers.length, hours, timestamp: new Date().toISOString() });
     }
 
     // ── Fallback: direct query ───────────────────────────────────────────────
     const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 
-    // api.line_movement columns: game_id_uuid, market_type, home_team, away_team,
-    //   line_change, timestamp (actual schema — no game_id, movement, or detected_at)
     const { data: fallbackRows, error: fallbackErr } = await supabase
       .schema('api')
       .from('line_movement')
@@ -60,15 +51,7 @@ export async function GET(req: NextRequest) {
       .limit(limit);
 
     if (fallbackErr) {
-      // Table may not exist yet — return empty gracefully
-      return NextResponse.json({
-        success: true,
-        movers: [],
-        count: 0,
-        hours,
-        note: 'Line movement tracking not yet available',
-        timestamp: new Date().toISOString(),
-      });
+      return NextResponse.json({ success: true, movers: [], count: 0, hours, note: 'Line movement tracking not yet available', timestamp: new Date().toISOString() });
     }
 
     const movers = (fallbackRows ?? []).map((row: any) => ({
@@ -79,22 +62,9 @@ export async function GET(req: NextRequest) {
       detected_at: row.timestamp,
     }));
 
-    return NextResponse.json({
-      success: true,
-      movers,
-      count: movers.length,
-      hours,
-      timestamp: new Date().toISOString(),
-    });
+    return NextResponse.json({ success: true, movers, count: movers.length, hours, timestamp: new Date().toISOString() });
   } catch (err) {
     console.error('[API/odds/movers] Error:', err);
-    return NextResponse.json(
-      {
-        success: false,
-        error: err instanceof Error ? err.message : 'Failed to fetch movers',
-        movers: [],
-      },
-      { status: HTTP_STATUS.INTERNAL_ERROR }
-    );
+    return internalError(err instanceof Error ? err.message : 'Failed to fetch movers');
   }
 }

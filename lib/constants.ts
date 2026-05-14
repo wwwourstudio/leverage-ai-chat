@@ -577,6 +577,18 @@ export const DATA_SOURCES = {
   ERROR: 'error',
 } as const;
 
+// Default insights — returned when no historical data exists or user is unauthenticated.
+// Shared between /api/insights and /api/init to avoid duplication.
+export const DEFAULT_INSIGHTS = {
+  totalValue: 0,
+  winRate: 0,
+  roi: 0,
+  activeContests: 0,
+  totalInvested: 0,
+  dataSource: 'default',
+  message: 'No historical data yet. Start analyzing to build your track record.',
+} as const;
+
 // Log Prefixes
 export const LOG_PREFIXES = {
   API: '[API]',

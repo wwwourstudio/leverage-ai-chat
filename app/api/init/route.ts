@@ -13,20 +13,11 @@
 
 import { NextResponse } from 'next/server';
 import { isSupabaseConfigured } from '@/lib/config';
+import { DEFAULT_INSIGHTS } from '@/lib/constants';
 import type { User } from '@supabase/supabase-js';
 
 export const runtime  = 'nodejs';
 export const maxDuration = 10;
-
-const DEFAULT_INSIGHTS = {
-  totalValue: 0,
-  winRate: 0,
-  roi: 0,
-  activeContests: 0,
-  totalInvested: 0,
-  dataSource: 'default',
-  message: 'No historical data yet. Start analyzing to build your track record.',
-};
 
 type SupabaseClient = Awaited<ReturnType<typeof import('@/lib/supabase/server')['createClient']>>;
 

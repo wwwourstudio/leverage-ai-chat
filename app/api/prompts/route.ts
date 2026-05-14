@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
 import { createXai } from '@ai-sdk/xai';
 import { getGrokApiKey, getOddsApiKey } from '@/lib/config';
-import { AI_CONFIG } from '@/lib/constants';
+import { AI_CONFIG, SPORT_KEYS } from '@/lib/constants';
+import { getDefaultSport } from '@/lib/utils/index';
 
 // ── In-memory cache (10-minute TTL) ─────────────────────────────────────────
 
@@ -26,31 +27,22 @@ function setCached(key: string, prompts: Array<{ label: string; query: string }>
   cache.set(key, { prompts, expiresAt: Date.now() + 10 * 60 * 1000 });
 }
 
-// ── Sport key mapping (user-facing → Odds API) ───────────────────────────────
+// ── Sport key mapping (user-facing short name → Odds API key) ────────────────
+// Built from the canonical SPORT_KEYS constant; extended with alias forms.
 
-const SPORT_API_MAP: Record<string, string> = {
-  mlb: 'baseball_mlb',
-  nba: 'basketball_nba',
-  nfl: 'americanfootball_nfl',
-  nhl: 'icehockey_nhl',
-  ncaa: 'americanfootball_ncaaf',
-  'ncaa-football': 'americanfootball_ncaaf',
-  'ncaa-basketball': 'basketball_ncaab',
-};
-
-function getDefaultApiSport(): string {
-  const month = new Date().getMonth() + 1;
-  if (month >= 3 && month <= 10) return 'baseball_mlb';
-  if (month >= 9 || month <= 2) return 'americanfootball_nfl';
-  return 'basketball_nba';
-}
+const SPORT_API_MAP: Record<string, string> = Object.fromEntries([
+  ...Object.values(SPORT_KEYS).map(s => [s.SHORT, s.API] as [string, string]),
+  ['ncaa', SPORT_KEYS.NCAAF.API],
+  ['ncaa-football', SPORT_KEYS.NCAAF.API],
+  ['ncaa-basketball', SPORT_KEYS.NCAAB.API],
+]);
 
 /** Fetch today's real scheduled games from the Odds API (max 3s) */
 async function fetchTodaysGames(sport: string): Promise<string[]> {
   const oddsKey = getOddsApiKey();
   if (!oddsKey) return [];
 
-  const sportKey = SPORT_API_MAP[sport.toLowerCase()] ?? getDefaultApiSport();
+  const sportKey = SPORT_API_MAP[sport.toLowerCase()] ?? getDefaultSport();
   const cutoff = Date.now() + 48 * 60 * 60 * 1000;
 
   try {

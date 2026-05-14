@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { unauthorized, badRequest, internalError } from '@/lib/api/route-helpers';
 
 // Credits table — row-per-user, stored in api.user_credits (created below if missing)
 // Falls back gracefully if the table doesn't exist yet.
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
+    if (!user) return unauthorized();
 
     const body = await req.json();
     const action: 'consume' | 'add' = body.action ?? 'consume';
@@ -86,9 +87,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, credits: newBalance, added: amount });
     }
 
-    return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
+    return badRequest('Invalid action');
   } catch (err) {
     console.error('[API/credits POST]', err);
-    return NextResponse.json({ success: false, error: 'Failed to update credits' }, { status: 500 });
+    return internalError('Failed to update credits');
   }
 }

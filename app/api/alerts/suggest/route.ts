@@ -1,51 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateText } from 'ai';
-import { createXai } from '@ai-sdk/xai';
-import { createClient } from '@/lib/supabase/server';
-import { getGrokApiKey } from '@/lib/config';
-import { AI_CONFIG } from '@/lib/constants';
+import {
+  requireAuth,
+  AuthRequiredError,
+  unauthorized,
+  badRequest,
+  serviceUnavailable,
+  parseJsonBody,
+  JsonParseError,
+  internalError,
+} from '@/lib/api/route-helpers';
+import { generateJson, AiNotConfiguredError } from '@/lib/api/ai-generate';
 
-/**
- * POST /api/alerts/suggest
- *
- * Accepts partial alert input and returns an AI-generated alert configuration suggestion.
- * Requires authentication.
- *
- * Body: { input: string, alert_type?: string, sport?: string }
- * Returns: { suggestion: { title, alert_type, threshold, description } }
- */
-export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+const VALID_TYPES = ['odds_change', 'line_movement', 'player_prop', 'arbitrage', 'kalshi_price', 'game_start'];
 
-  if (!user) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const apiKey = getGrokApiKey();
-  if (!apiKey) {
-    return NextResponse.json({ success: false, error: 'AI service unavailable' }, { status: 503 });
-  }
-
-  let body: { input?: string; alert_type?: string; sport?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ success: false, error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const { input, alert_type, sport } = body;
-  if (!input || input.trim().length < 2) {
-    return NextResponse.json({ success: false, error: 'Input too short' }, { status: 400 });
-  }
-
-  const xai = createXai({ apiKey });
-
-  const prompt = `You are a sports betting alert configuration assistant. Based on the user's partial description, suggest an optimal alert configuration.
-
-User input: "${input.trim()}"
-${alert_type ? `Preferred alert type: ${alert_type}` : ''}
-${sport ? `Sport context: ${sport}` : ''}
+const SYSTEM = `You are a sports betting alert configuration assistant. Based on the user's partial description, suggest an optimal alert configuration.
 
 Available alert types: odds_change, line_movement, player_prop, arbitrage, kalshi_price, game_start
 Available sports: NBA, NFL, MLB, NHL, NCAA Football, NCAA Basketball, Premier League, MLS
@@ -59,20 +27,34 @@ Respond ONLY with a JSON object (no markdown, no explanation):
   "sport": "sport name or null"
 }`;
 
+/**
+ * POST /api/alerts/suggest
+ * Accepts partial alert input and returns an AI-generated alert configuration suggestion.
+ * Body: { input: string, alert_type?: string, sport?: string }
+ */
+export async function POST(req: NextRequest) {
   try {
-    const { text } = await generateText({
-      model: xai(AI_CONFIG.MODEL_NAME),
-      prompt,
-      maxOutputTokens: 200,
-    });
+    const { user } = await requireAuth();
+    void user; // auth confirmed; user ID not needed for this endpoint
 
-    // Parse the JSON response
-    const cleaned = text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
-    const suggestion = JSON.parse(cleaned);
+    const body = await parseJsonBody<{ input?: string; alert_type?: string; sport?: string }>(req);
+    const { input, alert_type, sport } = body;
 
-    // Validate required fields
-    const validTypes = ['odds_change', 'line_movement', 'player_prop', 'arbitrage', 'kalshi_price', 'game_start'];
-    if (!suggestion.title || !validTypes.includes(suggestion.alert_type)) {
+    if (!input || input.trim().length < 2) return badRequest('Input too short');
+
+    const prompt = `User input: "${input.trim()}"
+${alert_type ? `Preferred alert type: ${alert_type}` : ''}
+${sport ? `Sport context: ${sport}` : ''}`;
+
+    const suggestion = await generateJson<{
+      title?: string;
+      alert_type?: string;
+      threshold?: number | null;
+      description?: string;
+      sport?: string | null;
+    }>(prompt, { system: SYSTEM, maxOutputTokens: 200 });
+
+    if (!suggestion.title || !VALID_TYPES.includes(suggestion.alert_type ?? '')) {
       throw new Error('Invalid suggestion format');
     }
 
@@ -87,7 +69,10 @@ Respond ONLY with a JSON object (no markdown, no explanation):
       },
     });
   } catch (err) {
+    if (err instanceof AuthRequiredError) return unauthorized();
+    if (err instanceof JsonParseError) return badRequest(err.message);
+    if (err instanceof AiNotConfiguredError) return serviceUnavailable(err.message);
     console.error('[Alerts] Suggest failed:', err);
-    return NextResponse.json({ success: false, error: 'Failed to generate suggestion' }, { status: 500 });
+    return internalError('Failed to generate suggestion');
   }
 }

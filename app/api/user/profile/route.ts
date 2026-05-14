@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import {
+  requireAuth,
+  AuthRequiredError,
+  unauthorized,
+  internalError,
+} from '@/lib/api/route-helpers';
 
 /**
  * GET /api/user/profile
@@ -7,11 +12,8 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
+    const { supabase, user } = await requireAuth();
 
-    // Pull from auth metadata + user_preferences table
     const { data: prefs } = await supabase
       .from('user_preferences')
       .select('custom_instructions, updated_at')
@@ -30,8 +32,9 @@ export async function GET() {
       },
     });
   } catch (err) {
+    if (err instanceof AuthRequiredError) return unauthorized();
     console.error('[API/user/profile GET]', err);
-    return NextResponse.json({ success: false, error: 'Failed to load profile' }, { status: 500 });
+    return internalError('Failed to load profile');
   }
 }
 
@@ -43,29 +46,25 @@ export async function GET() {
  */
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
+    const { supabase, user } = await requireAuth();
 
     const body = await req.json();
-    const updates: Record<string, string> = {};
+    const metadata: Record<string, string> = {};
     if (typeof body.name === 'string' && body.name.trim()) {
-      updates['data.full_name'] = body.name.trim().slice(0, 100);
+      metadata['full_name'] = body.name.trim().slice(0, 100);
     }
     if (typeof body.avatar === 'string') {
-      updates['data.avatar_url'] = body.avatar.slice(0, 500);
+      metadata['avatar_url'] = body.avatar.slice(0, 500);
     }
 
-    if (Object.keys(updates).length > 0) {
-      const metadata: Record<string, string> = {};
-      if (updates['data.full_name']) metadata['full_name'] = updates['data.full_name'];
-      if (updates['data.avatar_url']) metadata['avatar_url'] = updates['data.avatar_url'];
+    if (Object.keys(metadata).length > 0) {
       await supabase.auth.updateUser({ data: metadata });
     }
 
     return NextResponse.json({ success: true });
   } catch (err) {
+    if (err instanceof AuthRequiredError) return unauthorized();
     console.error('[API/user/profile PATCH]', err);
-    return NextResponse.json({ success: false, error: 'Failed to update profile' }, { status: 500 });
+    return internalError('Failed to update profile');
   }
 }

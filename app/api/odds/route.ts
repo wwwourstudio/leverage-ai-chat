@@ -8,18 +8,7 @@ import {
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/lib/constants';
 import { getOddsApiKey } from '@/lib/config';
 import { americanToImpliedProb } from '@/lib/utils/odds-math';
-
-// ============================================================================
-// Default sport based on current month (season-aware)
-// ============================================================================
-
-function getDefaultSport(): string {
-  const month = new Date().getMonth() + 1; // 1-12
-  // NFL: Sep–Feb, MLB: Mar–Oct, NBA: Oct–Jun
-  if (month >= 3 && month <= 10) return 'baseball_mlb';
-  if (month >= 9 || month <= 2) return 'americanfootball_nfl';
-  return 'basketball_nba';
-}
+import { getDefaultSport } from '@/lib/utils/index';
 
 // ============================================================================
 // Odds enrichment — compute derived fields from raw bookmaker data

@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { validateSportKey } from '@/lib/odds/index';
 import { HTTP_STATUS } from '@/lib/constants';
+import {
+  parseIntParam,
+  parseAndValidateSport,
+  InvalidSportError,
+} from '@/lib/api/route-helpers';
 
 export const runtime = 'nodejs';
 export const maxDuration = 15;
@@ -20,20 +24,18 @@ export const maxDuration = 15;
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const hours = Math.min(parseInt(searchParams.get('hours') ?? '24', 10) || 24, 168);
-  const limit = Math.min(parseInt(searchParams.get('limit') ?? '20', 10) || 20, 100);
+  const hours = parseIntParam(searchParams, 'hours', 24, 1, 168);
+  const limit = parseIntParam(searchParams, 'limit', 20, 1, 100);
   const sportParam = searchParams.get('sport') ?? undefined;
 
   let normalizedSport: string | undefined;
-  if (sportParam) {
-    const v = validateSportKey(sportParam);
-    if (!v.isValid || !v.normalizedKey) {
-      return NextResponse.json(
-        { success: false, error: `Unknown sport: ${sportParam}`, movers: [] },
-        { status: HTTP_STATUS.BAD_REQUEST }
-      );
+  try {
+    normalizedSport = parseAndValidateSport(sportParam);
+  } catch (err) {
+    if (err instanceof InvalidSportError) {
+      return NextResponse.json({ success: false, error: err.message, movers: [] }, { status: HTTP_STATUS.BAD_REQUEST });
     }
-    normalizedSport = v.normalizedKey;
+    throw err;
   }
 
   try {

@@ -253,6 +253,11 @@ export function getRuntimeEnvironment(): string {
 // Re-export client-safe formatters from lib/utils so server-side callers can also use them
 export { formatRelativeTime, fmtVol } from '@/lib/utils';
 
+/** Returns today's date in Eastern Time as YYYY-MM-DD. */
+export function getTodayDateET(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+}
+
 // ============================================
 // Sports Utilities
 // ============================================

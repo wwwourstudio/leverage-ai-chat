@@ -13,6 +13,7 @@
  */
 
 import { TtlCache } from '@/lib/utils/cache';
+import { getTodayDateET } from '@/lib/utils/index';
 
 const MLB_SCHEDULE_BASE = 'https://statsapi.mlb.com/api/v1/schedule';
 const MLB_PEOPLE_BASE   = 'https://statsapi.mlb.com/api/v1/people';
@@ -185,12 +186,6 @@ export function clearScheduleCache(): void {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-/** Returns today's date in Eastern Time as YYYY-MM-DD */
-function getTodayDateET(): string {
-  return new Date()
-    .toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); // 'en-CA' → YYYY-MM-DD
-}
 
 /**
  * Batch-fetch pitcher throwing hands from the MLB Stats API.

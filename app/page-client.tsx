@@ -49,7 +49,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ChatHeader, ChatInput, EnvironmentWarningBanner, KalshiBettingBanner, RateLimitNotification, FantasyLeagueContextBar, MessageActionsToolbar, SourcesPanel } from '@/components/chat';
 import { SuggestedPrompts } from '@/components/suggested-prompts';
-import { InsightCardItem, type InsightCard } from '@/components/InsightCard';
+import type { InsightCard } from '@/lib/cards-generator';
 
 import { createThread, updateThread, loadMessages, saveMessagesBatch } from '@/lib/chat-service';
 import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
@@ -774,9 +774,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         const freshCards = await fetchDynamicCards({ sport: refreshSport, userContext: lastUserQuery, category: detectedCategory, limit: 7 });
         if (freshCards.length === 0) return;
 
-        const converted = freshCards.map(convertToInsightCard);
         setMessages((prev: any) => {
           const updated = [...prev];
+          const converted = freshCards;
           // Only fill messages that still have no cards
           for (let i = updated.length - 1; i >= 0; i--) {
             if (updated[i].role === 'assistant' && !updated[i].cards?.length) {
@@ -1502,57 +1502,12 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         toast.info('Live data unavailable — showing AI estimates. Data will refresh shortly.');
       }
 
-      // Convert DynamicCard to InsightCard format
-      const convertedCards = dynamicCards.map(card => convertToInsightCard(card));
-
-      if (isDev) console.log('[v0] Returning', convertedCards.length, 'converted insight cards');
-      return convertedCards;
+      if (isDev) console.log('[v0] Returning', dynamicCards.length, 'dynamic cards');
+      return dynamicCards;
     } catch (error) {
       console.error('[v0] Error fetching dynamic cards:', error instanceof Error ? error.message : String(error));
       return [];
     }
-  };
-
-  const convertToInsightCard = (dynamicCard: DynamicCard): InsightCard => {
-    
-    // Validate required fields
-    if (!dynamicCard || typeof dynamicCard !== 'object') {
-      console.error('[v0] Invalid card: not an object', dynamicCard);
-      throw new Error('Invalid card data: must be an object');
-    }
-    
-    if (!dynamicCard.type || !dynamicCard.title) {
-      console.error('[v0] Invalid card: missing required fields', dynamicCard);
-      throw new Error('Invalid card data: missing type or title');
-    }
-    
-    // Map icon string to actual icon component
-    const iconMap: Record<string, any> = {
-      'Zap': Zap,
-      'Target': Target,
-      'Award': Award,
-      'DollarSign': DollarSign,
-      'TrendingUp': TrendingUp,
-      'Medal': Medal,
-      'ShoppingCart': ShoppingCart,
-      'BarChart3': BarChart3,
-      'Activity': Activity,
-      'Sparkles': Sparkles
-    };
-    
-    // Ensure all required fields have valid values
-    const validatedCard: InsightCard = {
-      type: String(dynamicCard.type || 'unknown'),
-      title: String(dynamicCard.title || 'Untitled Card'),
-      icon: iconMap[dynamicCard.icon] || Zap,
-      category: String(dynamicCard.category || 'General'),
-      subcategory: String(dynamicCard.subcategory || 'Info'),
-      gradient: String(dynamicCard.gradient || 'from-blue-500 to-purple-500'),
-      data: dynamicCard.data && typeof dynamicCard.data === 'object' ? dynamicCard.data : {},
-      status: String(dynamicCard.status || 'active')
-    };
-    
-    return validatedCard;
   };
 
   const buildSourcesList = (oddsData: APIResponse<OddsEvent[]> | null): Array<{ name: string; type: 'database' | 'api' | 'model' | 'cache'; reliability: number; url?: string }> => {

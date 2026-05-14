@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import type { InsightCard } from '@/components/InsightCard';
+import type { InsightCard } from '@/lib/cards-generator';
 
 interface CardAnalysisResponse {
   success: boolean;

@@ -7,8 +7,121 @@
 import { ENV_KEYS, LOG_PREFIXES, EXTERNAL_APIS } from '@/lib/constants';
 import { getOddsApiKey } from '@/lib/config';
 import { americanToImpliedProb } from '@/lib/utils/odds-math';
-import { supabaseOddsService } from '@/lib/supabase-odds-service';
 import { oddsApiQueue } from '@/lib/api-request-manager';
+
+// ── Supabase odds persistence (inlined from supabase-odds-service.ts) ──────────
+
+function getSupabaseClient() {
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return null;
+    if (typeof window !== 'undefined') {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { createClient } = require('@/lib/supabase/client');
+      return createClient();
+    }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { createClient } = require('@supabase/supabase-js');
+    return createClient(url, key, { db: { schema: 'api' } });
+  } catch {
+    return null;
+  }
+}
+
+const supabaseOddsService = {
+  async getCachedOdds(sport: string) {
+    const db = getSupabaseClient();
+    if (!db) return [];
+    try {
+      const { data, error } = await db
+        .from('live_odds_cache')
+        .select('*')
+        .eq('sport_key', sport)
+        .gt('expires_at', new Date().toISOString())
+        .order('cached_at', { ascending: false })
+        .limit(50);
+      if (error) return [];
+      return data || [];
+    } catch { return []; }
+  },
+
+  async storeOdds(_sport: string, _sportKey: string, games: unknown[]) {
+    if (!games.length) return false;
+    let client = getSupabaseClient();
+    try {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (url && serviceKey) {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { createClient } = require('@supabase/supabase-js');
+        client = createClient(url, serviceKey, { db: { schema: 'api' } });
+      }
+    } catch { /* fall through */ }
+    if (!client) return false;
+    try {
+      const { error } = await client.rpc('process_odds_batch', { p_payload: games });
+      if (error) {
+        const msg: string = (error as { message?: string }).message ?? '';
+        const isSilent = msg.includes('permission') || msg.includes('42501') ||
+          msg.includes('schema cache') || msg.includes('Could not find the function') ||
+          msg.includes('fetch failed') || msg.includes('network') ||
+          (msg.includes('function') && msg.includes('does not exist'));
+        if (!isSilent) console.error('[Supabase] process_odds_batch error:', msg);
+        return false;
+      }
+    } catch { return false; }
+    return true;
+  },
+
+  async storeSportOdds(sport: string, games: unknown[]) {
+    const db = getSupabaseClient();
+    if (!db || !games.length) return false;
+    const TABLE_MAP: Record<string, string> = {
+      basketball_nba: 'nba_odds', basketball_ncaab: 'ncaab_odds',
+      americanfootball_nfl: 'nfl_odds', americanfootball_ncaaf: 'ncaaf_odds',
+      baseball_mlb: 'mlb_odds', icehockey_nhl: 'nhl_odds',
+    };
+    const tableName = TABLE_MAP[sport];
+    if (!tableName) return false;
+    const records = (games as Array<Record<string, unknown>>).map(game => {
+      const h2h: unknown[] = [], spreads: unknown[] = [], totals: unknown[] = [];
+      for (const book of (game.bookmakers as Array<Record<string, unknown>>) || []) {
+        for (const market of (book.markets as Array<Record<string, unknown>>) || []) {
+          const entry = { bookmaker: book.key, outcomes: market.outcomes };
+          if (market.key === 'h2h') h2h.push(entry);
+          else if (market.key === 'spreads') spreads.push(entry);
+          else if (market.key === 'totals') totals.push(entry);
+        }
+      }
+      return {
+        game_id: game.id, home_team: game.home_team, away_team: game.away_team,
+        commence_time: game.commence_time,
+        h2h_odds: h2h.length ? h2h : null,
+        spreads: spreads.length ? spreads : null,
+        totals: totals.length ? totals : null,
+        cached_at: new Date().toISOString(),
+      };
+    });
+    try {
+      const { error } = await db.from(tableName).upsert(records, { onConflict: 'game_id' });
+      if (error) {
+        const code = (error as { code?: string }).code;
+        const msg: string = (error as { message?: string }).message ?? '';
+        if (!['PGRST204', 'PGRST205', '42P10', '42501', '23505'].includes(code ?? '') &&
+            !msg.includes('policy') && !msg.includes('fetch failed') && !msg.includes('schema cache')) {
+          console.error(`[Supabase] storeSportOdds error (${tableName}):`, msg || error);
+        }
+        return false;
+      }
+    } catch (err) {
+      console.warn(`[Supabase] storeSportOdds transient error (${tableName}):`,
+        err instanceof Error ? err.message : err);
+      return false;
+    }
+    return true;
+  },
+};
 
 // ============================================
 // Types & Constants

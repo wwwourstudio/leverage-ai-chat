@@ -1,20 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { HTTP_STATUS, SUCCESS_MESSAGES } from '@/lib/constants';
+import { HTTP_STATUS, SUCCESS_MESSAGES, DEFAULT_INSIGHTS } from '@/lib/constants';
 import { isSupabaseConfigured } from '@/lib/config';
-
-// ============================================================================
-// Default insights when no data is available
-// ============================================================================
-
-const DEFAULT_INSIGHTS = {
-  totalValue: 0,
-  winRate: 0,
-  roi: 0,
-  activeContests: 0,
-  totalInvested: 0,
-  dataSource: 'default',
-  message: 'No historical data yet. Start analyzing to build your track record.',
-};
 
 // ============================================================================
 // GET /api/insights

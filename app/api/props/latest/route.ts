@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { validateSportKey } from '@/lib/odds/index';
 import { HTTP_STATUS } from '@/lib/constants';
+import {
+  parseIntParam,
+  parseAndValidateSport,
+  InvalidSportError,
+  internalError,
+} from '@/lib/api/route-helpers';
 
 export const runtime = 'nodejs';
 export const maxDuration = 15;
@@ -20,21 +25,19 @@ export const maxDuration = 15;
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const sportParam  = searchParams.get('sport') ?? undefined;
-  const player      = searchParams.get('player') ?? undefined;
-  const market      = searchParams.get('market') ?? undefined;
-  const limit       = Math.min(parseInt(searchParams.get('limit') ?? '50', 10) || 50, 200);
+  const sportParam = searchParams.get('sport') ?? undefined;
+  const player = searchParams.get('player') ?? undefined;
+  const market = searchParams.get('market') ?? undefined;
+  const limit = parseIntParam(searchParams, 'limit', 50, 1, 200);
 
   let normalizedSport: string | undefined;
-  if (sportParam) {
-    const v = validateSportKey(sportParam);
-    if (!v.isValid || !v.normalizedKey) {
-      return NextResponse.json(
-        { success: false, error: `Unknown sport: ${sportParam}`, props: [] },
-        { status: HTTP_STATUS.BAD_REQUEST }
-      );
+  try {
+    normalizedSport = parseAndValidateSport(sportParam);
+  } catch (err) {
+    if (err instanceof InvalidSportError) {
+      return NextResponse.json({ success: false, error: err.message, props: [] }, { status: HTTP_STATUS.BAD_REQUEST });
     }
-    normalizedSport = v.normalizedKey;
+    throw err;
   }
 
   try {
@@ -58,12 +61,8 @@ export async function GET(req: NextRequest) {
       .order('updated_at', { ascending: false })
       .limit(limit);
 
-    if (normalizedSport) {
-      query = query.eq('game.sport', normalizedSport);
-    }
-    if (market) {
-      query = query.eq('market.market_key', market);
-    }
+    if (normalizedSport) query = query.eq('game.sport', normalizedSport);
+    if (market) query = query.eq('market.market_key', market);
 
     const { data: propsRows, error } = await query;
 
@@ -85,20 +84,11 @@ export async function GET(req: NextRequest) {
         updated_at:  row.updated_at,
       }));
 
-      // Optional player name filter (client-side since it's a join column)
       const filtered = player
-        ? props.filter(p =>
-            p.player_name?.toLowerCase().includes(player.toLowerCase())
-          )
+        ? props.filter(p => p.player_name?.toLowerCase().includes(player.toLowerCase()))
         : props;
 
-      return NextResponse.json({
-        success: true,
-        props: filtered,
-        count: filtered.length,
-        source: 'normalized',
-        timestamp: new Date().toISOString(),
-      });
+      return NextResponse.json({ success: true, props: filtered, count: filtered.length, source: 'normalized', timestamp: new Date().toISOString() });
     }
 
     // ── Fallback: existing player_props_markets table ────────────────────────
@@ -109,18 +99,11 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    if (normalizedSport) {
-      legacyQuery = legacyQuery.eq('sport', normalizedSport);
-    }
-    if (player) {
-      legacyQuery = legacyQuery.ilike('player_name', `%${player}%`);
-    }
-    if (market) {
-      legacyQuery = legacyQuery.eq('stat_type', market);
-    }
+    if (normalizedSport) legacyQuery = legacyQuery.eq('sport', normalizedSport);
+    if (player) legacyQuery = legacyQuery.ilike('player_name', `%${player}%`);
+    if (market) legacyQuery = legacyQuery.eq('stat_type', market);
 
     const { data: legacyRows } = await legacyQuery;
-
     const props = (legacyRows ?? []).map((row: any) => ({
       sport:       row.sport,
       game_id:     row.game_id,
@@ -135,22 +118,9 @@ export async function GET(req: NextRequest) {
       away_team:   row.away_team,
     }));
 
-    return NextResponse.json({
-      success: true,
-      props,
-      count: props.length,
-      source: 'player_props_markets',
-      timestamp: new Date().toISOString(),
-    });
+    return NextResponse.json({ success: true, props, count: props.length, source: 'player_props_markets', timestamp: new Date().toISOString() });
   } catch (err) {
     console.error('[API/props/latest] Error:', err);
-    return NextResponse.json(
-      {
-        success: false,
-        error: err instanceof Error ? err.message : 'Failed to fetch props',
-        props: [],
-      },
-      { status: HTTP_STATUS.INTERNAL_ERROR }
-    );
+    return internalError(err instanceof Error ? err.message : 'Failed to fetch props');
   }
 }

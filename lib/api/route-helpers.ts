@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { HTTP_STATUS } from '@/lib/constants';
 import { checkRateLimit, getRateLimitId, type RateLimitOptions } from '@/lib/middleware/rate-limit';
+import { validateSportKey } from '@/lib/odds/index';
 
 // ── Response helpers ──────────────────────────────────────────────────────────
 
@@ -85,4 +86,57 @@ export function rateLimitGuard(
 ): NextResponse | null {
   const rl = checkRateLimit(key, getRateLimitId(req, userId), options);
   return rl.allowed ? null : tooManyRequests(rl.retryAfter ?? 60);
+}
+
+// ── Service-role guard ────────────────────────────────────────────────────────
+
+/**
+ * Validates the service-role secret from the given request header.
+ * Returns a 401 response if the header is missing or wrong, null if valid.
+ * Use for internal/cron endpoints that should never be publicly callable.
+ */
+export function requireServiceRole(
+  req: NextRequest,
+  headerName = 'x-service-role-key'
+): NextResponse | null {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceKey || req.headers.get(headerName) !== serviceKey) {
+    return unauthorized();
+  }
+  return null;
+}
+
+// ── Query param helpers ───────────────────────────────────────────────────────
+
+/**
+ * Parses an integer query param with a default, clamped to [min, max].
+ * Returns defaultVal if the param is missing or NaN.
+ */
+export function parseIntParam(
+  searchParams: URLSearchParams,
+  key: string,
+  defaultVal: number,
+  min: number,
+  max: number
+): number {
+  const raw = parseInt(searchParams.get(key) ?? String(defaultVal), 10);
+  return Math.min(max, Math.max(min, isNaN(raw) ? defaultVal : raw));
+}
+
+// ── Sport key validation ──────────────────────────────────────────────────────
+
+export class InvalidSportError extends Error {
+  constructor(sport: string) { super(`Unknown sport: ${sport}`); }
+}
+
+/**
+ * Validates and normalizes a sport query param via lib/odds validateSportKey.
+ * Returns undefined when sportParam is null/empty (sport is optional).
+ * Throws InvalidSportError for unrecognized sport strings.
+ */
+export function parseAndValidateSport(sportParam: string | null | undefined): string | undefined {
+  if (!sportParam) return undefined;
+  const v = validateSportKey(sportParam);
+  if (!v.isValid || !v.normalizedKey) throw new InvalidSportError(sportParam);
+  return v.normalizedKey;
 }

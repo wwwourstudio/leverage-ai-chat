@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { validateSportKey } from '@/lib/odds/index';
 import { HTTP_STATUS } from '@/lib/constants';
+import {
+  parseIntParam,
+  parseAndValidateSport,
+  InvalidSportError,
+  badRequest,
+  internalError,
+} from '@/lib/api/route-helpers';
 
 export const runtime = 'nodejs';
 export const maxDuration = 15;
@@ -20,21 +26,18 @@ export const maxDuration = 15;
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const sportParam  = searchParams.get('sport') ?? undefined;
-  const market      = searchParams.get('market') ?? undefined;
-  const limit       = Math.min(parseInt(searchParams.get('limit') ?? '50', 10) || 50, 200);
+  const sportParam = searchParams.get('sport') ?? undefined;
+  const market = searchParams.get('market') ?? undefined;
+  const limit = parseIntParam(searchParams, 'limit', 50, 1, 200);
 
-  // Validate sport key if provided
   let normalizedSport: string | undefined;
-  if (sportParam) {
-    const v = validateSportKey(sportParam);
-    if (!v.isValid || !v.normalizedKey) {
-      return NextResponse.json(
-        { success: false, error: `Unknown sport: ${sportParam}`, odds: [] },
-        { status: HTTP_STATUS.BAD_REQUEST }
-      );
+  try {
+    normalizedSport = parseAndValidateSport(sportParam);
+  } catch (err) {
+    if (err instanceof InvalidSportError) {
+      return NextResponse.json({ success: false, error: err.message, odds: [] }, { status: HTTP_STATUS.BAD_REQUEST });
     }
-    normalizedSport = v.normalizedKey;
+    throw err;
   }
 
   try {
@@ -57,13 +60,8 @@ export async function GET(req: NextRequest) {
       .order('updated_at', { ascending: false })
       .limit(limit);
 
-    if (normalizedSport) {
-      // Filter via the joined games table
-      query = query.eq('game.sport', normalizedSport);
-    }
-    if (market) {
-      query = query.eq('market', market);
-    }
+    if (normalizedSport) query = query.eq('game.sport', normalizedSport);
+    if (market) query = query.eq('market', market);
 
     const { data: oddsRows, error } = await query;
 
@@ -80,14 +78,7 @@ export async function GET(req: NextRequest) {
         price:      row.price,
         updated_at: row.updated_at,
       }));
-
-      return NextResponse.json({
-        success: true,
-        odds,
-        count: odds.length,
-        source: 'normalized',
-        timestamp: new Date().toISOString(),
-      });
+      return NextResponse.json({ success: true, odds, count: odds.length, source: 'normalized', timestamp: new Date().toISOString() });
     }
 
     // ── Fallback: live_odds_cache ────────────────────────────────────────────
@@ -98,12 +89,9 @@ export async function GET(req: NextRequest) {
       .gt('expires_at', new Date().toISOString())
       .limit(limit);
 
-    if (normalizedSport) {
-      cacheQuery = cacheQuery.eq('sport_key', normalizedSport);
-    }
+    if (normalizedSport) cacheQuery = cacheQuery.eq('sport_key', normalizedSport);
 
     const { data: cacheRows } = await cacheQuery;
-
     const odds = (cacheRows ?? []).map((row: any) => ({
       sport:      row.sport_key,
       game_id:    row.game_id,
@@ -111,22 +99,9 @@ export async function GET(req: NextRequest) {
       source:     'cache',
     }));
 
-    return NextResponse.json({
-      success: true,
-      odds,
-      count: odds.length,
-      source: 'live_odds_cache',
-      timestamp: new Date().toISOString(),
-    });
+    return NextResponse.json({ success: true, odds, count: odds.length, source: 'live_odds_cache', timestamp: new Date().toISOString() });
   } catch (err) {
     console.error('[API/odds/latest] Error:', err);
-    return NextResponse.json(
-      {
-        success: false,
-        error: err instanceof Error ? err.message : 'Failed to fetch odds',
-        odds: [],
-      },
-      { status: HTTP_STATUS.INTERNAL_ERROR }
-    );
+    return internalError(err instanceof Error ? err.message : 'Failed to fetch odds');
   }
 }

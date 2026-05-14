@@ -450,8 +450,8 @@ async function analyzePlayer(
     // ── 7. Park factor ────────────────────────────────────────────────────────
     let parkFactor = 1.0;
     if (game) {
-      const { getParkFactor } = await import('@/lib/park-factors');
-      parkFactor = getParkFactor(game.homeTeam).hrFactor;
+      const { getParkFactors } = await import('@/lib/mlb-projections/park-factors');
+      parkFactor = getParkFactors(game.homeTeam).hr;
     }
 
     // ── 8. Umpire factor ──────────────────────────────────────────────────────

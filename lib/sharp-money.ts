@@ -127,7 +127,7 @@ function withDecay(rows: LineMovementRow[]): Array<LineMovementRow & { weight: n
  * @param rows    All movement records for one game (any market type).
  * @param ctx     Optional public-betting context for reverse-line detection.
  */
-export function scoreMovements(
+function scoreMovements(
   rows: LineMovementRow[],
   ctx?: PublicBettingContext,
 ): SharpScore {
@@ -382,6 +382,3 @@ function neutralScore(gameId: string): SharpScore {
     avgAgeMins: 0,
   };
 }
-
-/** Exported for use in UI components that want to show "X min ago" labels */
-export { decayWeight };

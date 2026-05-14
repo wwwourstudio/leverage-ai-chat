@@ -12,7 +12,7 @@ export interface PromptItem {
   query?: string;
 }
 
-export const platformPrompts: Record<string, PromptItem[]> = {
+const platformPrompts: Record<string, PromptItem[]> = {
   all: [
     { label: 'Cross-platform arbitrage opportunities', icon: Sparkles, category: 'all' },
     { label: "Today's best value plays across all platforms", icon: TrendingUp, category: 'all' },
@@ -55,7 +55,7 @@ export const platformPrompts: Record<string, PromptItem[]> = {
   ]
 };
 
-export const sportBettingPrompts: Record<string, PromptItem[]> = {
+const sportBettingPrompts: Record<string, PromptItem[]> = {
   nfl: [
     { label: 'NFL best lines and spreads this week', icon: TrendingUp, category: 'betting' },
     { label: 'NFL player props with sharp edge',     icon: Target,     category: 'betting' },
@@ -107,7 +107,7 @@ export const sportBettingPrompts: Record<string, PromptItem[]> = {
   ],
 };
 
-export const sportFantasyPrompts: Record<string, PromptItem[]> = {
+const sportFantasyPrompts: Record<string, PromptItem[]> = {
   nfl: [
     { label: 'NFL waiver wire priorities this week', icon: TrendingUp,  category: 'fantasy' },
     { label: 'NFL start/sit decisions this week',    icon: Trophy,      category: 'fantasy' },
@@ -158,7 +158,7 @@ export const sportFantasyPrompts: Record<string, PromptItem[]> = {
   ],
 };
 
-export const sportDFSPrompts: Record<string, PromptItem[]> = {
+const sportDFSPrompts: Record<string, PromptItem[]> = {
   nfl: [
     { label: 'NFL DFS optimal lineups for DraftKings', icon: Award,      category: 'dfs' },
     { label: 'NFL FanDuel value plays this week',       icon: DollarSign, category: 'dfs' },
@@ -210,7 +210,7 @@ export const sportDFSPrompts: Record<string, PromptItem[]> = {
   ],
 };
 
-export const kalshiTopicPrompts: Record<string, PromptItem[]> = {
+const kalshiTopicPrompts: Record<string, PromptItem[]> = {
   Trending: [
     { label: 'What trending Kalshi market has the best edge right now?', icon: TrendingUp, category: 'kalshi' },
     { label: 'Biggest volume moves in the last 24 hours',                icon: Activity,   category: 'kalshi' },
@@ -279,7 +279,7 @@ export const kalshiTopicPrompts: Record<string, PromptItem[]> = {
   ],
 };
 
-export const sportAllPrompts: Record<string, PromptItem[]> = {
+const sportAllPrompts: Record<string, PromptItem[]> = {
   mlb: [
     { label: 'MLB best bets and value plays today',          icon: TrendingUp, category: 'all' },
     { label: 'MLB player props with edge tonight',           icon: Target,     category: 'all' },

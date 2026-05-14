@@ -16,7 +16,7 @@
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface OddsSnapshot {
+interface OddsSnapshot {
   /** MLBAM player ID */
   playerId: number;
   playerName: string;
@@ -30,7 +30,7 @@ export interface OddsSnapshot {
   timestamp: number;
 }
 
-export interface SharpMovementResult {
+interface SharpMovementResult {
   /** Total price change from first to last snapshot (American odds points) */
   movement: number;
   /** Direction: 'shortening' = odds dropping (sharp money in), 'lengthening' = odds rising */
@@ -130,49 +130,7 @@ async function persistLineMovement(
   }
 }
 
-/**
- * Retrieve recent snapshots for a player + market + book.
- * Returns an empty array when no history is available.
- */
-export function getSnapshotHistory(
-  playerId: number,
-  market: string,
-  bookmaker: string,
-): OddsSnapshot[] {
-  const key = buildKey(playerId, market, bookmaker);
-  const snapshots = pruneExpired(snapshotStore.get(key) ?? []);
-  snapshotStore.set(key, snapshots); // prune in place
-  return [...snapshots];
-}
-
-/**
- * Retrieve snapshots across ALL bookmakers for a player + market.
- * Useful for detecting consensus movement (multiple books shortening together).
- */
-export function getAllBookSnapshots(
-  playerId: number,
-  market: string,
-): OddsSnapshot[] {
-  const results: OddsSnapshot[] = [];
-  for (const [key, snapshots] of snapshotStore) {
-    if (key.startsWith(`${playerId}:${market}:`)) {
-      results.push(...pruneExpired(snapshots));
-    }
-  }
-  return results.sort((a, b) => a.timestamp - b.timestamp);
-}
-
-/**
- * Analyse snapshot history for a player + market + book and return a sharp-money signal.
- *
- * Sharp signal interpretation:
- *   isSharp = true → odds shortened ≥ 20 American odds points from open
- *                    (e.g. +220 → +180 = 40-point drop). Sharp bettors typically
- *                    bet into a price until the market moves 15–30 points.
- *   direction = 'shortening' → price getting shorter (more likely, market pricing in)
- *   direction = 'lengthening' → price drifting out (public fade or injury concern)
- */
-export function detectSharpMovement(
+function detectSharpMovement(
   history: OddsSnapshot[],
 ): SharpMovementResult | null {
   const valid = history.filter(s => Date.now() - s.timestamp <= SNAPSHOT_TTL_MS);
@@ -204,20 +162,3 @@ export function detectSharpMovement(
   };
 }
 
-/**
- * Clear all snapshots for a specific player + market (e.g. after game starts).
- */
-export function clearPlayerSnapshots(playerId: number, market?: string): void {
-  for (const key of snapshotStore.keys()) {
-    if (key.startsWith(`${playerId}:${market ?? ''}`)) {
-      snapshotStore.delete(key);
-    }
-  }
-}
-
-/**
- * Clear entire snapshot store (tests / server restart).
- */
-export function clearAllSnapshots(): void {
-  snapshotStore.clear();
-}

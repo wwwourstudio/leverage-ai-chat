@@ -11,7 +11,7 @@ import { isDev as getIsDev } from '@/lib/config';
 // Checked in order: league acronym → sport-specific terms → team names.
 // History inheritance only fires when the current message has NO match here.
 
-export const MLB_KEYWORDS = [
+const MLB_KEYWORDS = [
   // League / generic
   'mlb', 'baseball', 'adp',
   // Positions
@@ -54,7 +54,7 @@ export const MLB_KEYWORDS = [
   '(lad)', '(sf)', '(sd)', '(ari)', '(col)',
 ];
 
-export const NBA_KEYWORDS = [
+const NBA_KEYWORDS = [
   // League / generic
   'nba', 'basketball',
   // Positions (use word boundary pattern — avoid false matches like "pgs")
@@ -84,7 +84,7 @@ export const NBA_KEYWORDS = [
   'butler', 'booker', 'davis', 'adebayo', 'mitchell', 'morant',
 ];
 
-export const NFL_KEYWORDS = [
+const NFL_KEYWORDS = [
   // League / generic
   'nfl', 'football',
   // Positions
@@ -127,7 +127,7 @@ export const NFL_KEYWORDS = [
   'kelce', 'mccaffrey', 'henry', 'chubb', 'ekeler',
 ];
 
-export const NHL_KEYWORDS = [
+const NHL_KEYWORDS = [
   'nhl', 'hockey',
   ' lw', ' rw', ' d ',
   '(lw)', '(rw)', '(d)',

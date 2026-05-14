@@ -14,6 +14,7 @@ import {
   HTTP_STATUS,
   ERROR_MESSAGES,
 } from '@/lib/constants';
+import { TtlCache } from '@/lib/utils/cache';
 
 // Import and re-export canonical types from lib/data/index.ts
 import type { DynamicCard, UserInsights } from '@/lib/data/index';
@@ -26,22 +27,7 @@ const CACHE_DURATION = {
   ODDS: CACHE_CONFIG.ODDS_TTL,
 };
 
-const cache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_MAX_SIZE = 100; // prevent unbounded growth
-
-/** Evict expired entries; if still over max, remove oldest first (single O(n log n) pass). */
-function evictCache(): void {
-  const now = Date.now();
-  const maxTtl = Math.max(CACHE_DURATION.CARDS, CACHE_DURATION.INSIGHTS, CACHE_DURATION.ODDS);
-  for (const [key, entry] of cache) {
-    if (now - entry.timestamp > maxTtl) cache.delete(key);
-  }
-  if (cache.size > CACHE_MAX_SIZE) {
-    const overage = cache.size - CACHE_MAX_SIZE;
-    const byAge = [...cache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp);
-    for (let i = 0; i < overage; i++) cache.delete(byAge[i][0]);
-  }
-}
+const cache = new TtlCache<any>(100);
 
 /**
  * Safely parse JSON with error handling
@@ -115,11 +101,8 @@ export async function fetchDynamicCards(params: {
   
   // Sort keys for a deterministic cache key regardless of object property order
   const cacheKey = `cards:${JSON.stringify(params, Object.keys(params).sort())}`;
-  const cached = cache.get(cacheKey);
-
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION.CARDS) {
-    return cached.data;
-  }
+  const cached = cache.get(cacheKey, CACHE_DURATION.CARDS);
+  if (cached !== undefined) return cached;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
@@ -163,8 +146,7 @@ export async function fetchDynamicCards(params: {
       console.log(`${LOG_PREFIXES.DATA_SERVICE} Full API response:`, JSON.stringify(result, null, 2));
     }
 
-    evictCache();
-    cache.set(cacheKey, { data: cards, timestamp: Date.now() });
+    cache.set(cacheKey, cards);
     console.log(`${LOG_PREFIXES.DATA_SERVICE} ✓ Cached ${cards.length} cards`);
     console.log(`${LOG_PREFIXES.DATA_SERVICE} ========================================`);
     return cards;
@@ -201,11 +183,10 @@ export async function fetchUserInsights(): Promise<UserInsights> {
   }
 
   const cacheKey = 'insights:user';
-  const cached = cache.get(cacheKey);
-
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION.INSIGHTS) {
+  const cached = cache.get(cacheKey, CACHE_DURATION.INSIGHTS);
+  if (cached !== undefined) {
     console.log(`${LOG_PREFIXES.DATA_SERVICE} Returning cached insights`);
-    return cached.data;
+    return cached;
   }
 
   const insightsController = new AbortController();
@@ -244,8 +225,7 @@ export async function fetchUserInsights(): Promise<UserInsights> {
       message: 'No insights available'
     };
 
-    evictCache();
-    cache.set(cacheKey, { data: insights, timestamp: Date.now() });
+    cache.set(cacheKey, insights);
     return insights;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -281,11 +261,10 @@ export async function fetchLiveOdds(sport: string, marketType: string = 'h2h') {
   }
 
   const cacheKey = `odds:${sport}:${marketType}`;
-  const cached = cache.get(cacheKey);
-
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION.ODDS) {
+  const cached = cache.get(cacheKey, CACHE_DURATION.ODDS);
+  if (cached !== undefined) {
     console.log(`${LOG_PREFIXES.DATA_SERVICE} Returning cached odds`);
-    return cached.data;
+    return cached;
   }
 
   const oddsController = new AbortController();
@@ -311,8 +290,7 @@ export async function fetchLiveOdds(sport: string, marketType: string = 'h2h') {
     }
 
     const result = await safeJsonParse(response);
-    evictCache();
-    cache.set(cacheKey, { data: result, timestamp: Date.now() });
+    cache.set(cacheKey, result);
     return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -349,10 +327,8 @@ export async function fetchPlayers(params: {
   if (params.limit) qs.set('limit', String(params.limit));
 
   const cacheKey = `players:${qs.toString()}`;
-  const cached = cache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION.CARDS) {
-    return cached.data;
-  }
+  const cached = cache.get(cacheKey, CACHE_DURATION.CARDS);
+  if (cached !== undefined) return cached;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -364,8 +340,7 @@ export async function fetchPlayers(params: {
     if (!response.ok) throw new Error(`Players API returned ${response.status}`);
 
     const result = await safeJsonParse(response);
-    evictCache();
-    cache.set(cacheKey, { data: result, timestamp: Date.now() });
+    cache.set(cacheKey, result);
     return result;
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -397,10 +372,8 @@ export async function fetchDFS(params: {
   if (params.limit) qs.set('limit', String(params.limit));
 
   const cacheKey = `dfs:${qs.toString()}`;
-  const cached = cache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION.CARDS) {
-    return cached.data;
-  }
+  const cached = cache.get(cacheKey, CACHE_DURATION.CARDS);
+  if (cached !== undefined) return cached;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -412,8 +385,7 @@ export async function fetchDFS(params: {
     if (!response.ok) throw new Error(`DFS API returned ${response.status}`);
 
     const result = await safeJsonParse(response);
-    evictCache();
-    cache.set(cacheKey, { data: result, timestamp: Date.now() });
+    cache.set(cacheKey, result);
     return result;
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -435,10 +407,8 @@ export async function fetchStatcast(metric = 'xwoba', limit = 25) {
 
   const qs = new URLSearchParams({ metric, limit: String(limit) });
   const cacheKey = `statcast:${qs.toString()}`;
-  const cached = cache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION.CARDS) {
-    return cached.data;
-  }
+  const cached = cache.get(cacheKey, CACHE_DURATION.CARDS);
+  if (cached !== undefined) return cached;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -449,8 +419,7 @@ export async function fetchStatcast(metric = 'xwoba', limit = 25) {
     });
     if (!response.ok) throw new Error(`Statcast API returned ${response.status}`);
     const result = await safeJsonParse(response);
-    evictCache();
-    cache.set(cacheKey, { data: result, timestamp: Date.now() });
+    cache.set(cacheKey, result);
     return result;
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -471,10 +440,8 @@ export async function fetchArbitrage(sport = 'baseball_mlb') {
   }
 
   const cacheKey = `arbitrage:${sport}`;
-  const cached = cache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION.CARDS) {
-    return cached.data;
-  }
+  const cached = cache.get(cacheKey, CACHE_DURATION.CARDS);
+  if (cached !== undefined) return cached;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -485,8 +452,7 @@ export async function fetchArbitrage(sport = 'baseball_mlb') {
     });
     if (!response.ok) throw new Error(`Arbitrage API returned ${response.status}`);
     const result = await safeJsonParse(response);
-    evictCache();
-    cache.set(cacheKey, { data: result, timestamp: Date.now() });
+    cache.set(cacheKey, result);
     return result;
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -501,22 +467,9 @@ export async function fetchArbitrage(sport = 'baseball_mlb') {
  * Clear cache for specific key or all
  */
 export function clearCache(key?: string) {
-  if (key) {
-    cache.delete(key);
-  } else {
-    cache.clear();
-  }
+  cache.clear(key);
 }
 
-/**
- * Get cache statistics
- */
 export function getCacheStats() {
-  return {
-    size: cache.size,
-    keys: Array.from(cache.keys()),
-    oldestEntry: Array.from(cache.values()).reduce((oldest, current) => 
-      current.timestamp < oldest ? current.timestamp : oldest
-    , Date.now())
-  };
+  return { size: cache.size, keys: cache.keys() };
 }

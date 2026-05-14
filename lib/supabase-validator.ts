@@ -5,35 +5,26 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { LOG_PREFIXES, EXTERNAL_APIS } from '@/lib/constants';
+import { TtlCache } from '@/lib/utils/cache';
 
-// Cache for table existence checks (valid for 5 minutes)
-const tableExistenceCache = new Map<string, { exists: boolean; timestamp: number }>();
+const tableExistenceCache = new TtlCache<boolean>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-/**
- * Check if a table exists in Supabase
- */
 export async function checkTableExists(
   supabase: SupabaseClient,
   tableName: string
 ): Promise<boolean> {
-  // Check cache first
-  const cached = tableExistenceCache.get(tableName);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return cached.exists;
-  }
+  const cached = tableExistenceCache.get(tableName, CACHE_DURATION);
+  if (cached !== undefined) return cached;
 
   try {
-    // Try to query with limit 0 to check existence without fetching data
     const { error } = await supabase
       .from(tableName)
       .select('*', { count: 'exact', head: true })
       .limit(0);
 
     const exists = !error || !error.message.includes('does not exist');
-    
-    // Cache the result
-    tableExistenceCache.set(tableName, { exists, timestamp: Date.now() });
+    tableExistenceCache.set(tableName, exists);
     
     if (!exists) {
       console.log(`${LOG_PREFIXES.DATABASE} Table '${tableName}' does not exist`);

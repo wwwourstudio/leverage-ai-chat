@@ -23,6 +23,8 @@
  *   > 6.0 → 1.15  taxed pen — likely tired relievers
  */
 
+import { TtlCache } from '@/lib/utils/cache';
+
 const MLB_SCHEDULE_BASE = 'https://statsapi.mlb.com/api/v1/schedule';
 const MLB_GAME_BASE     = 'https://statsapi.mlb.com/api/v1/game';
 const REQUEST_TIMEOUT   = 7_000;
@@ -102,7 +104,7 @@ function resolveTeamId(teamName: string): number | null {
 
 // ── Module-level cache ─────────────────────────────────────────────────────────
 
-const cache = new Map<string, { data: BullpenStatus; ts: number }>();
+const cache = new TtlCache<BullpenStatus>();
 
 // ── MLB Stats API helpers ──────────────────────────────────────────────────────
 
@@ -202,8 +204,8 @@ function fatigueFactor(avgPitchers: number): number {
  * Cached 4 hours. Returns NEUTRAL_BULLPEN on any failure.
  */
 export async function getBullpenStatus(teamName: string): Promise<BullpenStatus> {
-  const hit = cache.get(teamName);
-  if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.data;
+  const hit = cache.get(teamName, CACHE_TTL_MS);
+  if (hit !== undefined) return hit;
 
   const teamId = resolveTeamId(teamName);
   if (!teamId) return NEUTRAL_BULLPEN;
@@ -230,7 +232,7 @@ export async function getBullpenStatus(teamName: string): Promise<BullpenStatus>
       fatigueFactor:       fatigueFactor(avgPitchers),
     };
 
-    cache.set(teamName, { data: status, ts: Date.now() });
+    cache.set(teamName, status);
     return status;
   } catch {
     return NEUTRAL_BULLPEN;

@@ -9,6 +9,7 @@ import { CACHE_CONFIG, API_ENDPOINTS, LOG_PREFIXES, DATA_SOURCES } from '@/lib/c
 import type { Result } from '@/lib/types';
 import { Ok, Err } from '@/lib/types';
 import { americanToImpliedProb, americanToDecimal } from '@/lib/utils/odds-math';
+import { TtlCache } from '@/lib/utils/cache';
 
 // ============================================
 // Types
@@ -55,7 +56,7 @@ export interface OddsRecord {
 // Cache Management
 // ============================================
 
-const cache = new Map<string, { data: any; timestamp: number }>();
+const cache = new TtlCache<any>(100);
 
 const CACHE_DURATION = {
   CARDS: CACHE_CONFIG.CARDS_TTL,
@@ -64,11 +65,7 @@ const CACHE_DURATION = {
 };
 
 export function clearCache(key?: string) {
-  if (key) {
-    cache.delete(key);
-  } else {
-    cache.clear();
-  }
+  cache.clear(key);
 }
 
 // ============================================
@@ -97,11 +94,8 @@ export async function fetchDynamicCards(params: {
   limit?: number;
 }): Promise<DynamicCard[]> {
   const cacheKey = `cards:${JSON.stringify(params)}`;
-  const cached = cache.get(cacheKey);
-
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION.CARDS) {
-    return cached.data;
-  }
+  const cached = cache.get(cacheKey, CACHE_DURATION.CARDS);
+  if (cached !== undefined) return cached;
 
   try {
     const response = await fetch(API_ENDPOINTS.CARDS, {
@@ -117,7 +111,7 @@ export async function fetchDynamicCards(params: {
     const result = await safeJsonParse(response);
     const cards = Array.isArray(result.cards) ? result.cards : [];
 
-    cache.set(cacheKey, { data: cards, timestamp: Date.now() });
+    cache.set(cacheKey, cards);
     return cards;
   } catch (error) {
     console.error(`${LOG_PREFIXES.DATA_SERVICE} Fetch error:`, error);
@@ -127,11 +121,8 @@ export async function fetchDynamicCards(params: {
 
 export async function fetchUserInsights(): Promise<UserInsights> {
   const cacheKey = 'insights:user';
-  const cached = cache.get(cacheKey);
-
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION.INSIGHTS) {
-    return cached.data;
-  }
+  const cached = cache.get(cacheKey, CACHE_DURATION.INSIGHTS);
+  if (cached !== undefined) return cached;
 
   try {
     const response = await fetch(API_ENDPOINTS.INSIGHTS, { method: 'GET' });
@@ -150,7 +141,7 @@ export async function fetchUserInsights(): Promise<UserInsights> {
       dataSource: DATA_SOURCES.DEFAULT
     };
 
-    cache.set(cacheKey, { data: insights, timestamp: Date.now() });
+    cache.set(cacheKey, insights);
     return insights;
   } catch (error) {
     return {

@@ -5,6 +5,7 @@
  */
 
 import { EXTERNAL_APIS, CARD_TYPES, CARD_STATUS, LOG_PREFIXES } from '@/lib/constants';
+import { TtlCache } from '@/lib/utils/cache';
 
 // Minimal stadium data inlined (lib/stadium-database was removed in refactor)
 interface Stadium {
@@ -98,7 +99,7 @@ export interface WindAnalysis {
 // Cache Management
 // ============================================
 
-const weatherCache = new Map<string, { data: WeatherData; timestamp: number }>();
+const weatherCache = new TtlCache<WeatherData>();
 const WEATHER_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 export function clearWeatherCache(): void {
@@ -130,10 +131,8 @@ export async function fetchWeatherForLocation(
   const cacheKey = `${latitude.toFixed(2)},${longitude.toFixed(2)}`;
   
   if (!skipCache) {
-    const cached = weatherCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < WEATHER_CACHE_TTL) {
-      return cached.data;
-    }
+    const cached = weatherCache.get(cacheKey, WEATHER_CACHE_TTL);
+    if (cached !== undefined) return cached;
   }
   
   try {
@@ -165,10 +164,7 @@ export async function fetchWeatherForLocation(
       condition: getWeatherCondition(current.weathercode)
     };
     
-    weatherCache.set(cacheKey, {
-      data: weatherData,
-      timestamp: Date.now()
-    });
+    weatherCache.set(cacheKey, weatherData);
     
     return weatherData;
   } catch (error) {

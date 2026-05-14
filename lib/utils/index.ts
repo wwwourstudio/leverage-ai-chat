@@ -3,18 +3,11 @@
  * Consolidates utils.ts, auth-utils.ts, debug-utils.ts, and process-utils.ts
  */
 
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
-// ============================================
-// Styling Utilities
-// ============================================
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+// Re-export cn from the canonical client-safe utils module
+export { cn } from '@/lib/utils';
 
 // ============================================
 // Authentication Utilities

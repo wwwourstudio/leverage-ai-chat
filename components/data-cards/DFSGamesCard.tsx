@@ -2,7 +2,7 @@
 
 import { memo, useState } from 'react';
 import Image from 'next/image';
-import { Calendar, ChevronRight, Clock, Zap } from 'lucide-react';
+import { Calendar, ChevronRight, Clock, Zap, Sparkles, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /* ─── TeamLogoByAbbr ─────────────────────────────────────────────────────── */
@@ -79,6 +79,19 @@ function formatGameTime(iso: string): string {
 
 const MAX_GAMES_SHOWN = 6;
 
+/** Pick the "best" slate index to highlight with AI badge.
+ *  Prefer: classic type > most games > first occurrence. */
+function getBestSlateIndex(slates: EnrichedSlate[]): number {
+  let best = 0;
+  let bestScore = -1;
+  slates.forEach((s, i) => {
+    const isClassic = s.contestType !== 'showdown' ? 1 : 0;
+    const score = isClassic * 1000 + s.gameCount;
+    if (score > bestScore) { bestScore = score; best = i; }
+  });
+  return best;
+}
+
 /** Slate type → badge config */
 function getSlateBadge(label: string, contestType: string, selected: boolean) {
   if (selected) return { cls: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300', dot: true };
@@ -87,6 +100,7 @@ function getSlateBadge(label: string, contestType: string, selected: boolean) {
   if (l.includes('turbo'))        return { cls: 'bg-amber-500/15 border-amber-500/30 text-amber-300', dot: false };
   if (l.includes('early'))        return { cls: 'bg-sky-500/15 border-sky-500/30 text-sky-300', dot: false };
   if (l.includes('main'))         return { cls: 'bg-indigo-500/15 border-indigo-500/30 text-indigo-300', dot: false };
+  if (l.includes('featured'))     return { cls: 'bg-blue-500/15 border-blue-500/30 text-blue-300', dot: false };
   return { cls: 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-muted)]', dot: false };
 }
 
@@ -113,7 +127,7 @@ function PlatformToggle({ value, onChange }: { value: 'DK' | 'FD'; onChange: (v:
   );
 }
 
-/* ─── GameRow ─────────────────────────────────────────────────────────────── */
+/* ─── GameRow ────────────────────────────────────────────────────────────── */
 
 function GameRow({ g, sport }: { g: EnrichedGameRef; sport: string }) {
   const awayLastName = g.awayPitcher?.split(' ').pop();
@@ -122,38 +136,55 @@ function GameRow({ g, sport }: { g: EnrichedGameRef; sport: string }) {
 
   return (
     <div className="flex items-center gap-2.5 py-2 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]/60">
-      {/* Away team */}
-      <div className="flex items-center gap-1.5 min-w-0">
-        <TeamLogoByAbbr abbr={g.awayTeamAbbr} sport={sport} size={32} />
+      {/* Away */}
+      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+        <TeamLogoByAbbr abbr={g.awayTeamAbbr} sport={sport} size={30} />
         <span className="font-black text-[13px] text-white tracking-wide leading-none">{g.awayTeamAbbr}</span>
       </div>
 
-      {/* VS divider */}
-      <span className="text-[10px] text-[var(--text-faint)] font-bold shrink-0">@</span>
-
-      {/* Home team */}
-      <div className="flex items-center gap-1.5 min-w-0">
-        <TeamLogoByAbbr abbr={g.homeTeamAbbr} sport={sport} size={32} />
-        <span className="font-black text-[13px] text-white tracking-wide leading-none">{g.homeTeamAbbr}</span>
-      </div>
-
-      {/* Right: time + pitchers */}
-      <div className="ml-auto flex flex-col items-end gap-0.5 shrink-0">
+      {/* VS */}
+      <div className="flex flex-col items-center shrink-0 gap-0.5">
+        <span className="text-[9px] text-[var(--text-faint)] font-bold">@</span>
         {g.startTime && (
-          <span
-            suppressHydrationWarning
-            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[9px] text-[var(--text-faint)] tabular-nums"
-          >
-            <Clock className="w-2 h-2 opacity-50" />
+          <span suppressHydrationWarning className="text-[8px] text-[var(--text-faint)] tabular-nums">
             {formatGameTime(g.startTime)}
           </span>
         )}
-        {hasPitchers && (
-          <span className="text-[9px] text-[var(--text-muted)]">
-            {awayLastName ?? 'TBD'} vs {homeLastName ?? 'TBD'}
-          </span>
-        )}
       </div>
+
+      {/* Home */}
+      <div className="flex items-center gap-1.5 min-w-0 flex-1 justify-end">
+        <span className="font-black text-[13px] text-white tracking-wide leading-none">{g.homeTeamAbbr}</span>
+        <TeamLogoByAbbr abbr={g.homeTeamAbbr} sport={sport} size={30} />
+      </div>
+
+      {/* Pitchers */}
+      {hasPitchers && (
+        <div className="ml-1 shrink-0 text-right">
+          <span className="text-[8px] text-[var(--text-muted)] block">{awayLastName ?? 'TBD'}</span>
+          <span className="text-[8px] text-[var(--text-muted)] block">{homeLastName ?? 'TBD'}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Shown when games array is empty but gameCount > 0 */
+function GameCountFallback({ count, startTime }: { count: number; startTime: string }) {
+  return (
+    <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]/60">
+      <div className="flex items-center gap-2">
+        <Calendar className="w-3.5 h-3.5 text-[var(--text-faint)]" />
+        <span className="text-[11px] font-bold text-[var(--text-muted)]">
+          {count} game{count !== 1 ? 's' : ''} on this slate
+        </span>
+      </div>
+      {startTime && (
+        <span suppressHydrationWarning className="inline-flex items-center gap-0.5 text-[9px] text-[var(--text-faint)] tabular-nums">
+          <Clock className="w-2.5 h-2.5 opacity-60" />
+          {formatGameTime(startTime)}
+        </span>
+      )}
     </div>
   );
 }
@@ -166,12 +197,14 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
   const slates: EnrichedSlate[] = Array.isArray(data.slates) ? data.slates : [];
   const selectedId: number | null = data.selectedDraftGroupId ?? null;
   const sport: string = data.sport ?? 'mlb';
-  const sportLabel = sport.replace('_', ' ').toUpperCase();
+  const sportLabel = sport.replace(/_/g, ' ').toUpperCase();
+
+  const bestSlateIdx = slates.length > 0 ? getBestSlateIndex(slates) : -1;
 
   function handleSlateClick(slate: EnrichedSlate) {
     if (!onAsk) return;
     const platformName = platform === 'DK' ? 'DraftKings' : 'FanDuel';
-    if (slate.contestType === 'showdown' && slate.games.length === 1) {
+    if (slate.contestType === 'showdown' && (slate.games ?? []).length === 1) {
       const g = slate.games[0];
       onAsk(`Build ${platform} DFS showdown lineup for ${g.awayTeamAbbr} @ ${g.homeTeamAbbr} (${platformName} #${slate.draftGroupId})`);
     } else {
@@ -186,7 +219,6 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
       <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-[var(--cat-dfs,oklch(0.72_0.20_80))]/20 via-amber-900/5 to-transparent border-b border-[var(--border-subtle)]">
         <div className="absolute top-0 right-0 w-40 h-20 bg-[var(--cat-dfs,oklch(0.72_0.20_80))]/5 rounded-bl-full blur-3xl pointer-events-none" />
 
-        {/* Top: breadcrumb + LIVE badge */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5 text-white/60">
             <span className="text-[9px] font-black uppercase tracking-widest">{sportLabel}</span>
@@ -207,7 +239,6 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
           {slates.length} slate{slates.length !== 1 ? 's' : ''} available · tap to build a lineup
         </p>
 
-        {/* Platform toggle */}
         <PlatformToggle value={platform} onChange={setPlatform} />
       </div>
 
@@ -224,17 +255,21 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
 
       {/* ── Slate list ───────────────────────────────────────────────── */}
       <div className="p-3 space-y-3">
-        {slates.map(slate => {
-          const isSelected  = slate.draftGroupId === selectedId;
-          const badge       = getSlateBadge(slate.slateLabel, slate.contestType, isSelected);
-          const leftBorderCls =
-            isSelected           ? 'border-l-2 border-l-emerald-400'
-            : slate.contestType === 'showdown' ? 'border-l-2 border-l-violet-500'
-            : slate.slateLabel.toLowerCase().includes('main') ? 'border-l-2 border-l-[var(--cat-dfs,oklch(0.72_0.20_80))]'
-            : 'border-l-2 border-l-[var(--border-subtle)]';
+        {slates.map((slate, slateIdx) => {
+          const isSelected   = slate.draftGroupId === selectedId;
+          const isBestPlay   = slateIdx === bestSlateIdx;
+          const badge        = getSlateBadge(slate.slateLabel, slate.contestType, isSelected);
+          const games        = slate.games ?? [];
+          const visibleGames = games.slice(0, MAX_GAMES_SHOWN);
+          const hiddenCount  = games.length - visibleGames.length;
+          const hasGames     = games.length > 0;
 
-          const visibleGames = slate.games.slice(0, MAX_GAMES_SHOWN);
-          const hiddenCount  = slate.games.length - visibleGames.length;
+          const leftBorderCls =
+            isSelected ? 'border-l-2 border-l-emerald-400'
+            : isBestPlay ? 'border-l-2 border-l-[var(--cat-dfs,oklch(0.72_0.20_80))]'
+            : slate.contestType === 'showdown' ? 'border-l-2 border-l-violet-500'
+            : slate.slateLabel.toLowerCase().includes('main') ? 'border-l-2 border-l-indigo-400'
+            : 'border-l-2 border-l-[var(--border-subtle)]';
 
           return (
             <div
@@ -243,11 +278,20 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
                 'rounded-xl bg-[var(--bg-elevated)] p-3 transition-all duration-200',
                 leftBorderCls,
                 isSelected ? 'shadow-[0_0_12px_oklch(0.72_0.20_80/0.12)]' : '',
+                isBestPlay && !isSelected ? 'ring-1 ring-[var(--cat-dfs,oklch(0.72_0.20_80))]/20' : '',
               )}
             >
+              {/* AI Best Play alert banner */}
+              {isBestPlay && (
+                <div className="flex items-center gap-1.5 mb-2 px-2 py-1.5 rounded-lg bg-[var(--cat-dfs,oklch(0.72_0.20_80))]/10 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/25">
+                  <Sparkles className="w-3 h-3 text-[var(--cat-dfs,oklch(0.72_0.20_80))] shrink-0" />
+                  <span className="text-[9px] font-black uppercase tracking-wider text-[var(--cat-dfs,oklch(0.72_0.20_80))]">AI Best Play</span>
+                  <Trophy className="w-3 h-3 text-[var(--cat-dfs,oklch(0.72_0.20_80))] ml-auto" />
+                </div>
+              )}
+
               {/* Slate header row */}
               <div className="flex items-center gap-2 mb-2.5">
-                {/* Slate label badge */}
                 <span className={cn(
                   'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-widest shrink-0',
                   badge.cls,
@@ -256,29 +300,33 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
                   {slate.slateLabel}
                 </span>
 
-                {/* Start time */}
                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[9px] text-[var(--text-muted)] tabular-nums">
                   <Clock className="w-2.5 h-2.5 opacity-60" />
                   <span suppressHydrationWarning>{formatGameTime(slate.startDate)}</span>
                 </span>
 
-                {/* Game count */}
-                <span className="ml-auto text-[9px] font-black text-[var(--text-faint)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-1.5 py-0.5 rounded-full">
+                <span className="ml-auto inline-flex items-center gap-1 text-[9px] font-black text-[var(--text-faint)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-1.5 py-0.5 rounded-full">
                   {slate.gameCount}G
                 </span>
               </div>
 
-              {/* Game rows */}
+              {/* Game rows — or fallback when games array is empty */}
               <div className="space-y-1.5">
-                {visibleGames.map(g => (
-                  <GameRow key={g.gameId} g={g} sport={sport} />
-                ))}
-                {hiddenCount > 0 && (
-                  <div className="flex items-center justify-center py-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]/40">
-                    <span className="text-[9px] font-bold text-[var(--text-faint)] uppercase tracking-wide">
-                      +{hiddenCount} more game{hiddenCount !== 1 ? 's' : ''}
-                    </span>
-                  </div>
+                {hasGames ? (
+                  <>
+                    {visibleGames.map(g => (
+                      <GameRow key={g.gameId} g={g} sport={sport} />
+                    ))}
+                    {hiddenCount > 0 && (
+                      <div className="flex items-center justify-center py-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]/40">
+                        <span className="text-[9px] font-bold text-[var(--text-faint)] uppercase tracking-wide">
+                          +{hiddenCount} more game{hiddenCount !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <GameCountFallback count={slate.gameCount} startTime={slate.startDate} />
                 )}
               </div>
 
@@ -287,10 +335,12 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
                 <button
                   onClick={() => handleSlateClick(slate)}
                   className={cn(
-                    'mt-2.5 w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all duration-200',
+                    'mt-2.5 w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all duration-200 relative overflow-hidden',
                     isSelected
-                      ? 'relative overflow-hidden bg-gradient-to-r from-[var(--cat-dfs,oklch(0.72_0.20_80))]/80 to-amber-500/80 text-black shadow-[0_0_12px_oklch(0.72_0.20_80/0.4)] hover:shadow-[0_0_18px_oklch(0.72_0.20_80/0.6)]'
-                      : 'bg-gradient-to-r from-[var(--cat-dfs,oklch(0.72_0.20_80))]/20 to-amber-600/20 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 text-[var(--cat-dfs,oklch(0.72_0.20_80))] hover:from-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 hover:text-white',
+                      ? 'bg-gradient-to-r from-[var(--cat-dfs,oklch(0.72_0.20_80))]/80 to-amber-500/80 text-black shadow-[0_0_12px_oklch(0.72_0.20_80/0.4)] hover:shadow-[0_0_18px_oklch(0.72_0.20_80/0.6)]'
+                      : isBestPlay
+                      ? 'bg-gradient-to-r from-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 to-amber-600/30 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/40 text-[var(--cat-dfs,oklch(0.72_0.20_80))] hover:from-[var(--cat-dfs,oklch(0.72_0.20_80))]/50 hover:text-white'
+                      : 'bg-gradient-to-r from-[var(--cat-dfs,oklch(0.72_0.20_80))]/15 to-amber-600/15 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/25 text-[var(--cat-dfs,oklch(0.72_0.20_80))]/80 hover:from-[var(--cat-dfs,oklch(0.72_0.20_80))]/25 hover:text-[var(--cat-dfs,oklch(0.72_0.20_80))]',
                   )}
                 >
                   {isSelected && (

@@ -89,7 +89,7 @@ interface DFSGamesCardProps {
 function formatGameTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
+  return d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + ' ET';
 }
 
 const MAX_GAMES_SHOWN = 6;
@@ -144,9 +144,16 @@ function PlatformToggle({ value, onChange }: { value: 'DK' | 'FD'; onChange: (v:
 
 /* ─── GameRow ────────────────────────────────────────────────────────────── */
 
+function formatPitcherName(full: string | undefined): string | undefined {
+  if (!full) return undefined;
+  const parts = full.trim().split(' ');
+  if (parts.length < 2) return full;
+  return `${parts[0][0]}. ${parts.slice(1).join(' ')}`;
+}
+
 function GameRow({ g, sport }: { g: EnrichedGameRef; sport: string }) {
-  const awayLastName = g.awayPitcher?.split(' ').pop();
-  const homeLastName = g.homePitcher?.split(' ').pop();
+  const awayLastName = formatPitcherName(g.awayPitcher);
+  const homeLastName = formatPitcherName(g.homePitcher);
   const hasPitchers  = Boolean(g.awayPitcher || g.homePitcher);
 
   return (

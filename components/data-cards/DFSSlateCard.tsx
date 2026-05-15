@@ -15,6 +15,13 @@ interface SlatePlayer {
   dkValue: string;
   stackTeam?: string;
   isPlaying?: boolean;
+  matchupScore?: number | string;
+  hrProb?: string;
+  confirmedStarter?: boolean;
+  availabilityReason?: string;
+  cardCategory?: string;
+  boomCeiling?: number | string;
+  bustFloor?: number | string;
 }
 
 interface DFSSlateCardProps {
@@ -185,9 +192,10 @@ export const DFSSlateCard = memo(function DFSSlateCard({ title, data, onAnalyze,
       ) : (
         <div className="pb-1 divide-y divide-[var(--border-subtle)]/40">
           {slate.map((p, i) => {
-            const ownNum   = parseFloat(p.ownership) || 0;
-            const dkValNum = parseFloat(p.dkValue)   || 0;
-            const isStacked = Boolean(p.stackTeam);
+            const ownNum     = parseFloat(p.ownership)   || 0;
+            const dkValNum   = parseFloat(p.dkValue)     || 0;
+            const matchupNum = p.matchupScore != null ? parseFloat(String(p.matchupScore)) : null;
+            const isStacked  = Boolean(p.stackTeam);
 
             return (
               <div
@@ -206,6 +214,9 @@ export const DFSSlateCard = memo(function DFSSlateCard({ title, data, onAnalyze,
                   <div className="flex items-center gap-1.5">
                     <span className="font-black text-white text-[12px] truncate">{p.player}</span>
                     <span className="text-[10px] font-bold text-white/40 shrink-0">{p.team}</span>
+                    {p.confirmedStarter && (
+                      <span className="shrink-0 w-2 h-2 rounded-full bg-emerald-400" title="Confirmed starter" />
+                    )}
                     {isStacked && (
                       <span className="ml-auto shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/25 text-[8px] font-black text-indigo-300 uppercase tracking-wide">
                         STK
@@ -231,6 +242,17 @@ export const DFSSlateCard = memo(function DFSSlateCard({ title, data, onAnalyze,
 
                 {/* Projection */}
                 <span className="text-[11px] font-black text-emerald-400 tabular-nums w-12 text-right">{p.projection}</span>
+
+                {/* Matchup dot */}
+                {matchupNum !== null && !isNaN(matchupNum) && (
+                  <div
+                    className={cn(
+                      'w-2 h-2 rounded-full shrink-0',
+                      matchupNum >= 70 ? 'bg-emerald-400' : matchupNum >= 50 ? 'bg-amber-400' : 'bg-red-400',
+                    )}
+                    title={`Matchup: ${Math.round(matchupNum)}/100`}
+                  />
+                )}
 
                 {/* Value grade */}
                 <div className="w-9 flex justify-end">

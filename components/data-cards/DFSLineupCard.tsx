@@ -7,6 +7,7 @@ export interface DFSProjection {
   player_name: string;
   player_type: string;
   dk_pts_mean: number;
+  salary?: string | number;
   matchup_score?: number;
   p10?: number;
   p50?: number;
@@ -106,6 +107,12 @@ export function DFSLineupCard({ lineup, totalProjected, site = 'DK', onAsk }: DF
   const totalP10 = lineup.some(p => p.p10 != null) ? lineup.reduce((s, p) => s + (p.p10 ?? p.dk_pts_mean ?? 0), 0) : null;
   const totalP90 = lineup.some(p => p.p90 != null) ? lineup.reduce((s, p) => s + (p.p90 ?? p.dk_pts_mean ?? 0), 0) : null;
 
+  // Total salary
+  const hasSalary = lineup.some(p => p.salary != null);
+  const totalSalaryNum = hasSalary
+    ? lineup.reduce((s, p) => s + parseFloat(String(p.salary ?? '0').replace(/[^0-9.]/g, '')), 0)
+    : 0;
+
   const platformLabel = site.toUpperCase();
 
   return (
@@ -185,6 +192,13 @@ export function DFSLineupCard({ lineup, totalProjected, site = 'DK', onAsk }: DF
               {/* Matchup chip */}
               {hasMatchup && <MatchupDot score={p.matchup_score!} />}
 
+              {/* Salary */}
+              {p.salary != null && (
+                <span className="text-[10px] font-bold text-[var(--cat-dfs,oklch(0.72_0.20_80))]/80 tabular-nums shrink-0">
+                  {String(p.salary).startsWith('$') ? String(p.salary) : `$${p.salary}`}
+                </span>
+              )}
+
               {/* Projected pts */}
               <div className="flex flex-col items-end shrink-0">
                 <span className="text-[14px] font-black text-[var(--cat-dfs,oklch(0.72_0.20_80))] tabular-nums leading-none">
@@ -202,7 +216,14 @@ export function DFSLineupCard({ lineup, totalProjected, site = 'DK', onAsk }: DF
         <div className="px-3 pt-3 pb-3 space-y-2.5 border-t border-[var(--border-subtle)]">
           {/* Total row */}
           <div className="flex items-center justify-between px-1">
-            <span className="text-[10px] font-black uppercase tracking-wider text-[var(--text-muted)]">Total Projected</span>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] font-black uppercase tracking-wider text-[var(--text-muted)]">Total Projected</span>
+              {hasSalary && totalSalaryNum > 0 && (
+                <span className="text-[9px] font-bold text-[var(--cat-dfs,oklch(0.72_0.20_80))]/80 tabular-nums">
+                  ${(totalSalaryNum / 1000).toFixed(1)}K salary
+                </span>
+              )}
+            </div>
             <div className="flex items-baseline gap-2">
               {totalP10 !== null && (
                 <span className="text-[10px] text-red-400 tabular-nums font-bold">Floor {totalP10.toFixed(1)}</span>

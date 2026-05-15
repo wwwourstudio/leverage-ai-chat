@@ -72,5 +72,8 @@ export interface ToolResultsOutput {
   pendingADPUploadCard: InsightCard | null;
   pendingStatcastCard: InsightCard | null;
   pendingHRPredictionCard: InsightCard | null;
+  pendingDFSSlateCard: InsightCard | null;
+  pendingDFSGamesCard: InsightCard | null;
+  pendingDFSLineupCard: InsightCard | null;
   skipStatcastJSON: boolean;
 }

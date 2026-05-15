@@ -2,7 +2,7 @@
 
 import { memo, useState } from 'react';
 import Image from 'next/image';
-import { Award, Users, Gamepad2, ChevronRight, TrendingUp, Star, Zap, Link2, Target } from 'lucide-react';
+import { AlertCircle, Award, CheckCircle2, Users, Gamepad2, ChevronRight, TrendingUp, Star, Zap, Link2, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ESPN_TEAM_ABBR } from '@/lib/constants';
 
@@ -195,6 +195,7 @@ export const DFSCard = memo(function DFSCard({
     stackTeam, stackPartners, playerId, isStack,
     matchupScore, parkFactor,
     fdSalary,
+    hrProb, isPlaying, availabilityReason, confirmedStarter, stackType,
     ...rest
   } = data;
 
@@ -284,11 +285,16 @@ export const DFSCard = memo(function DFSCard({
                 )}
                 {team && <span className="text-[10px] font-bold text-white/50">{team}</span>}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {team && <TeamLogo team={team} sport={sport} size={32} />}
                 <span className={cn('font-black text-white leading-tight', isHero ? 'text-2xl' : 'text-xl')}>
                   {player}
                 </span>
+                {confirmedStarter && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[9px] font-black text-emerald-400 uppercase tracking-wider">
+                    <CheckCircle2 className="w-2.5 h-2.5" />Confirmed
+                  </span>
+                )}
               </div>
             </div>
             {valueScore !== null && <ValueGrade score={valueScore} />}
@@ -307,6 +313,21 @@ export const DFSCard = memo(function DFSCard({
           </div>
         )}
       </div>
+
+      {/* ══ AVAILABILITY WARNING ═════════════════════════════════════════════ */}
+      {isPlaying === false && (
+        <div className="mx-4 mt-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30">
+          <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <span className="text-[11px] font-black text-red-400 uppercase tracking-wider">Not Playing</span>
+            {availabilityReason && availabilityReason !== 'available' && (
+              <span className="text-[10px] text-red-300/70 ml-1.5">
+                ({availabilityReason === 'IL' ? 'Injured List' : availabilityReason === 'scratched' ? 'Scratched' : availabilityReason === 'not-in-lineup' ? 'Not in lineup' : availabilityReason === 'no-game' ? 'No game today' : availabilityReason})
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ══ STATS ZONE ══════════════════════════════════════════════════════ */}
       <div className="px-4 pt-3 pb-0 space-y-3">
@@ -483,14 +504,14 @@ export const DFSCard = memo(function DFSCard({
               <span className="text-[8px] font-black uppercase tracking-wider text-[var(--text-muted)] block mb-1">Home {homeSplitGames ? `· ${homeSplitGames}G` : ''}</span>
               <div className="flex items-baseline justify-center gap-0.5">
                 <span className="text-base font-black text-white tabular-nums">{homeDKAvg ?? '—'}</span>
-                <span className="text-[9px] text-[var(--text-faint)]">DK</span>
+                <span className="text-[9px] text-[var(--text-faint)]">{platformLabel}</span>
               </div>
             </div>
             <div className="rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-2 py-2.5 text-center">
               <span className="text-[8px] font-black uppercase tracking-wider text-[var(--text-muted)] block mb-1">Road {roadSplitGames ? `· ${roadSplitGames}G` : ''}</span>
               <div className="flex items-baseline justify-center gap-0.5">
                 <span className="text-base font-black text-white tabular-nums">{roadDKAvg ?? '—'}</span>
-                <span className="text-[9px] text-[var(--text-faint)]">DK</span>
+                <span className="text-[9px] text-[var(--text-faint)]">{platformLabel}</span>
               </div>
             </div>
           </div>
@@ -502,6 +523,11 @@ export const DFSCard = memo(function DFSCard({
             <div className="flex items-center gap-1.5 mb-2">
               <Link2 className="w-3 h-3 text-indigo-400" />
               <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400">Stack Correlation</span>
+              {stackType && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/25 text-[8px] font-black text-indigo-300 uppercase tracking-wider">
+                  {stackType === 'full' ? 'Full Stack' : stackType === 'mini' ? 'Mini-Stack' : stackType}
+                </span>
+              )}
               {targetGame && (
                 <span className="ml-auto text-[9px] font-bold text-[var(--text-faint)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-2 py-0.5 rounded-full">
                   <Award className="w-2 h-2 inline mr-0.5" />{targetGame}
@@ -520,6 +546,14 @@ export const DFSCard = memo(function DFSCard({
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* HR probability chip — hitters only */}
+        {hrProb && position && !['SP', 'P', 'RP'].includes(String(position).toUpperCase()) && (
+          <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/8 border border-rose-500/20">
+            <span className="text-[10px] font-black uppercase tracking-wider text-rose-400">HR Prob</span>
+            <span className="ml-auto text-sm font-black text-rose-300 tabular-nums">{String(hrProb)}</span>
           </div>
         )}
 

@@ -159,9 +159,17 @@ export function createTools(context: AnalyzeContext, rawQueryLower: string) {
           cards = card ? [card] : [];
         } else switch (resolvedOutputFor) {
           case 'dfs': {
-            const { buildDFSSlate } = await import('@/lib/mlb-projections/slate-builder');
-            cards = await buildDFSSlate({ limit: limit ?? 9, date });
-            break;
+            const { buildDFSSlateMulti } = await import('@/lib/mlb-projections/slate-builder');
+            const multi = await buildDFSSlateMulti({ limit: limit ?? 9, date });
+            return {
+              success: true,
+              cards: multi.slateForCard,
+              count: multi.slateForCard.length,
+              date: date ?? new Date().toISOString().slice(0, 10),
+              source: 'LeverageMetrics MLB Projection Engine',
+              outputFor: resolvedOutputFor,
+              slateMetadata: multi.metadata,
+            };
           }
           case 'fantasy': {
             const { buildFantasyCards } = await import('@/lib/mlb-projections/fantasy-adapter');

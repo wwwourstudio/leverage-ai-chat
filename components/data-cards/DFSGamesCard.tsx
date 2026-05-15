@@ -7,9 +7,24 @@ import { cn } from '@/lib/utils';
 
 /* ─── TeamLogoByAbbr ─────────────────────────────────────────────────────── */
 
+// Legacy MLB Stats API teamCode values → correct ESPN CDN abbreviations.
+// The MLB Stats API returns teamCode (e.g. "tig", "pir") which differs from
+// the abbreviation field (e.g. "DET", "PIT") that ESPN CDN expects.
+// This map ensures old stored card data still resolves to valid logo URLs.
+const MLB_LEGACY_CODES: Record<string, string> = {
+  tig: 'det', pir: 'pit', dod: 'lad', gia: 'sf',  jay: 'tor',
+  nat: 'wsh', cub: 'chc', bra: 'atl', sox: 'bos', roy: 'kc',
+  ori: 'bal', ath: 'oak', ang: 'laa', ast: 'hou', ran: 'tex',
+  car: 'stl', bre: 'mil', mar: 'mia', twi: 'min', met: 'nym',
+  yan: 'nyy', pad: 'sd',  ray: 'tb',  cha: 'chw', red: 'cin',
+  gua: 'cle', roc: 'col', dia: 'ari',
+};
+
 function TeamLogoByAbbr({ abbr, sport = 'mlb', size = 32 }: { abbr: string; sport?: string; size?: number }) {
   const [errored, setErrored] = useState(false);
-  const src = `https://a.espncdn.com/i/teamlogos/${sport.toLowerCase()}/500/${abbr.toLowerCase()}.png`;
+  const lower      = abbr.toLowerCase();
+  const normalized = sport === 'mlb' ? (MLB_LEGACY_CODES[lower] ?? lower) : lower;
+  const src = `https://a.espncdn.com/i/teamlogos/${sport.toLowerCase()}/500/${normalized}.png`;
 
   if (errored) {
     return (

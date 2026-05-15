@@ -40,6 +40,9 @@ export function extractToolResults(
   let pendingADPUploadCard: InsightCard | null = null;
   let pendingStatcastCard: InsightCard | null = null;
   let pendingHRPredictionCard: InsightCard | null = null;
+  let pendingDFSSlateCard: InsightCard | null = null;
+  let pendingDFSGamesCard: InsightCard | null = null;
+  let pendingDFSLineupCard: InsightCard | null = null;
   let skipStatcastJSON = false;
 
   // ── ADP tool results ──────────────────────────────────────────────────────
@@ -185,11 +188,126 @@ export function extractToolResults(
     }
   }
 
+  // ── MLB DFS projection tool results → dfs-slate + dfs-games cards ───────────
+  const mlbProjResult = allToolResults.find((tr: any) => tr.toolName === 'query_mlb_projections');
+  if (mlbProjResult?.result?.success && mlbProjResult?.result?.outputFor === 'dfs') {
+    const playerCards: any[] = Array.isArray(mlbProjResult.result.cards) ? mlbProjResult.result.cards : [];
+    const meta: any = mlbProjResult.result.slateMetadata ?? {};
+
+    if (playerCards.length >= 3) {
+      const totalSalaryNum: number = typeof meta.totalSalary === 'number' ? meta.totalSalary : 0;
+      const totalProjPts: number   = typeof meta.totalProjPts === 'number' ? meta.totalProjPts : 0;
+      const topStack: { team: string; type: string } | null = meta.topStack ?? null;
+
+      pendingDFSSlateCard = {
+        type: 'dfs-slate',
+        title: meta.slate?.slateLabel
+          ? `DK MLB ${meta.slate.slateLabel}`
+          : 'DraftKings MLB Optimal Lineup',
+        category: 'MLB',
+        subcategory: `${playerCards.length} players · DraftKings MLB`,
+        gradient: 'from-orange-600 to-red-700',
+        status: 'optimal',
+        realData: true,
+        data: {
+          slate: playerCards.map((c: any) => ({
+            position:         c.data?.position        ?? '',
+            player:           c.data?.player          ?? '',
+            team:             c.data?.team            ?? '',
+            salary:           c.data?.salary          ?? '',
+            projection:       c.data?.projection      ?? '',
+            ownership:        c.data?.ownership       ?? '',
+            dkValue:          c.data?.dkValue         ?? '',
+            stackTeam:        c.data?.stackTeam,
+            matchupScore:     c.data?.matchupScore,
+            confirmedStarter: c.data?.confirmedStarter,
+            isPlaying:        c.data?.isPlaying,
+          })),
+          totalSalary: totalSalaryNum > 0 ? `$${totalSalaryNum.toLocaleString()}` : '—',
+          totalProjPts: totalProjPts > 0 ? totalProjPts.toFixed(1) : '—',
+          topStack:  topStack?.team ?? undefined,
+          capValid:  meta.capValid ?? true,
+          site:      'DK',
+          slateLabel: meta.slate?.slateLabel,
+          realData:  true,
+        },
+        metadata: { realData: true, source: 'LeverageMetrics + DraftKings' },
+      } as unknown as InsightCard;
+      console.log('[API/analyze] Built dfs-slate card from MLB projection tool result:', playerCards.length, 'players');
+    }
+
+    // Also build a dfs_lineup card (DFSLineupCard with range bars)
+    if (playerCards.length >= 3) {
+      const parseNum = (s: any): number | undefined => {
+        if (s == null) return undefined;
+        const n = parseFloat(String(s).replace(/[^0-9.]/g, ''));
+        return isNaN(n) || n <= 0 ? undefined : n;
+      };
+      const parseMScore = (s: any): number | undefined => {
+        if (s == null) return undefined;
+        const n = parseFloat(String(s));
+        return isNaN(n) ? undefined : Math.min(100, Math.max(0, n));
+      };
+      const rosterArr = playerCards.map((c: any) => ({
+        player_name:   c.data?.player        ?? '',
+        player_type:   c.data?.position      ?? 'UTIL',
+        dk_pts_mean:   parseNum(c.data?.projection) ?? 0,
+        salary:        c.data?.salary,
+        p10:           parseNum(c.data?.bustFloor),
+        p50:           parseNum(c.data?.projection),
+        p90:           parseNum(c.data?.boomCeiling),
+        matchup_score: parseMScore(c.data?.matchupScore),
+        park_factor:   parseNum(c.data?.parkFactor),
+      }));
+      const lineupTotal = rosterArr.reduce((s: number, p: any) => s + p.dk_pts_mean, 0);
+      pendingDFSLineupCard = {
+        type: 'dfs_lineup',
+        title: meta.slate?.slateLabel
+          ? `DK MLB ${meta.slate.slateLabel} — Lineup`
+          : 'DraftKings MLB Optimal Lineup',
+        category: 'MLB',
+        subcategory: `${rosterArr.length} players · ${lineupTotal.toFixed(1)} proj pts`,
+        gradient: 'from-orange-600 to-red-700',
+        status: 'optimal',
+        realData: true,
+        data: {
+          lineup: { roster: rosterArr, totalProjected: Math.round(lineupTotal * 10) / 10 },
+          site: 'DK',
+          realData: true,
+        },
+        metadata: { realData: true, source: 'LeverageMetrics + DraftKings' },
+      } as unknown as InsightCard;
+    }
+
+    const allSlates: any[] = Array.isArray(meta.allSlates) ? meta.allSlates : [];
+    if (allSlates.length > 0) {
+      pendingDFSGamesCard = {
+        type: 'dfs-games',
+        title: "Today's DFS Slates",
+        category: 'DFS',
+        subcategory: `${allSlates.length} slate${allSlates.length !== 1 ? 's' : ''} · DraftKings MLB`,
+        gradient: 'from-blue-700 to-indigo-700',
+        status: 'live',
+        realData: true,
+        data: {
+          slates:               allSlates,
+          selectedDraftGroupId: meta.slate?.draftGroupId ?? null,
+          sport:                'mlb',
+        },
+        metadata: { realData: true, source: 'DraftKings + MLB Stats API' },
+      } as unknown as InsightCard;
+      console.log('[API/analyze] Built dfs-games card:', allSlates.length, 'slates');
+    }
+  }
+
   return {
     pendingADPCard,
     pendingADPUploadCard,
     pendingStatcastCard,
     pendingHRPredictionCard,
+    pendingDFSSlateCard,
+    pendingDFSGamesCard,
+    pendingDFSLineupCard,
     skipStatcastJSON,
   };
 }
@@ -257,6 +375,9 @@ export function assembleFinalCards(
     pendingADPUploadCard,
     pendingStatcastCard,
     pendingHRPredictionCard,
+    pendingDFSSlateCard,
+    pendingDFSGamesCard,
+    pendingDFSLineupCard,
     skipStatcastJSON,
   } = toolOutput;
 
@@ -265,6 +386,17 @@ export function assembleFinalCards(
 
   // ── Prepend pending tool cards ─────────────────────────────────────────────
   if (pendingHRPredictionCard) cards = [pendingHRPredictionCard, ...cards.slice(0, 4)];
+
+  // DFS cards from MLB projection tool — replaces any existing dfs-* type matches
+  if (pendingDFSGamesCard) {
+    cards = [pendingDFSGamesCard, ...cards.filter(c => c.type !== 'dfs-games').slice(0, 5)];
+  }
+  if (pendingDFSSlateCard) {
+    cards = [pendingDFSSlateCard, ...cards.filter(c => c.type !== 'dfs-slate').slice(0, 5)];
+  }
+  if (pendingDFSLineupCard) {
+    cards = [...cards.slice(0, 3), pendingDFSLineupCard, ...cards.slice(3)].slice(0, 6);
+  }
   if (pendingADPCard) {
     if (context.hasPlayerIntent) {
       cards = [cards[0], pendingADPCard, ...cards.slice(1, 5)].filter(Boolean) as InsightCard[];

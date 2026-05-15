@@ -17,8 +17,6 @@ import {
   ERROR_MESSAGES,
   NFBC_DRAFT_YEAR,
   NFL_SEASON_YEAR,
-  PLAYER_SPORT_MAP,
-  STAT_SPORT_MAP,
   LOG_PREFIXES,
 } from '@/lib/constants';
 import { getADPData, queryADP, parseTSV, saveADPToSupabase, clearADPCache } from '@/lib/adp-data';
@@ -30,40 +28,17 @@ import { parseIntent } from '@/lib/card-pipeline';
 import { detectHallucinations } from '@/lib/hallucination-detector';
 import { getGrokApiKey, getOddsApiKey } from '@/lib/config';
 import { logger, LogCategory } from '@/lib/logger';
-import { getMarketIntelligenceSummary } from '@/lib/market-intelligence';
 import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
-
-// ── Prediction market / political detection constants ─────────────────────────
-// Used by Layer -2 sport detection — checked FIRST before any sports signals.
-// Prevents stale client sport context (e.g. 'nfl') from poisoning Kalshi queries.
-const MARKET_SIGNALS = [
-  'kalshi', 'polymarket', 'prediction market', 'prediction markets',
-  'senate', 'senate seat', 'congress', 'house seat', 'governor',
-  'election market', 'ballot', 'referendum',
-  'fed rate', 'federal reserve', 'interest rate cut', 'fomc',
-  'recession', 'gdp growth', 'inflation rate',
-  'yes/no market', 'contract price', 'implied probability',
-  'political market', 'event contract', 'will trump', 'will biden',
-  'will democrats', 'will republicans',
-];
-
-// ── MLB parenthetical detection constants ────────────────────────────────────
-// Used by Layer -1 sport detection to parse patterns like "Juan Soto (NYM OF)"
-const MLB_TEAM_ABBREVS = new Set([
-  'NYM','NYY','BOS','LAD','SFG','SF','CHC','CHW','HOU','ATL',
-  'PHI','MIL','STL','ARI','SD','SDP','COL','CIN','PIT','MIA',
-  'MIN','CLE','DET','KC','KCR','TEX','OAK','ATH','SEA',
-  'TB','TBR','BAL','TOR','LAA','WSH','WSN',
-]);
-const MLB_POSITION_ABBREVS = new Set([
-  'OF','SP','RP','CP','1B','2B','3B','SS','DH','LF','CF','RF','C',
-]);
+import { detectSportAndIntents } from '@/lib/analyze/sport-detection';
+import { buildEnrichedPrompt } from '@/lib/analyze/prompt-enrichment';
+import { extractToolResults, assembleFinalCards } from '@/lib/analyze/post-processor';
+import { generateFallbackResponse } from '@/lib/analyze/fallback';
+import type { AnalyzeRequestBody, AnalyzeContext, ImageAttachment } from '@/lib/analyze/types';
 
 // ── Response deduplication cache ─────────────────────────────────────────────
-// Prevents identical queries (e.g. double-taps, retry on same message) from
-// hitting the Grok API a second time within the TTL window.
+// Prevents identical queries from hitting the Grok API a second time within TTL.
 // Module-level: survives across requests on the same warm serverless instance.
-const DEDUP_CACHE_TTL_MS = 15_000; // 15 seconds — short enough not to block follow-up queries
+const DEDUP_CACHE_TTL_MS = 15_000;
 const DEDUP_CACHE_MAX = 50;
 const dedupCache = new Map<number, { text: string; cards: unknown[]; confidence: number; ts: number }>();
 
@@ -81,50 +56,13 @@ function evictDedupCache(): void {
     if (now - v.ts > DEDUP_CACHE_TTL_MS) dedupCache.delete(k);
   }
   if (dedupCache.size > DEDUP_CACHE_MAX) {
-    const overage = dedupCache.size - DEDUP_CACHE_MAX + 5; // evict a small batch to amortise the sort cost
+    const overage = dedupCache.size - DEDUP_CACHE_MAX + 5;
     const byAge = [...dedupCache.entries()].sort((a, b) => a[1].ts - b[1].ts);
     for (let i = 0; i < Math.min(overage, byAge.length); i++) dedupCache.delete(byAge[i][0]);
   }
 }
+
 import { createClient } from '@/lib/supabase/server';
-
-// ============================================================================
-// Types
-// ============================================================================
-
-interface ImageAttachment {
-  name: string;
-  base64: string;    // Raw base64 without data: URI prefix
-  mimeType: string;  // e.g. 'image/jpeg'
-}
-
-interface AnalyzeRequestBody {
-  userMessage: string;
-  existingCards?: InsightCard[];
-  customInstructions?: string;
-  imageAttachments?: ImageAttachment[];
-  deepThink?: boolean;
-  context?: {
-    sport?: string | null;
-    marketType?: string | null;
-    platform?: string | null;
-    isSportsQuery?: boolean;
-    isPoliticalMarket?: boolean;
-    hasFantasyIntent?: boolean;
-    hasBettingIntent?: boolean;
-    oddsData?: any;
-    noGamesAvailable?: boolean;
-    noGamesMessage?: string;
-    previousMessages?: Array<{ role: string; content: string }>;
-    kalshiSubcategory?: string;
-    selectedCategory?: string;
-    oddsKeyMissing?: boolean;
-    leagueSize?: number;
-    leagueScoringFormat?: string;
-    hasPlayerIntent?: boolean;
-    playerName?: string;
-  };
-}
 
 // ============================================================================
 // Model routing helpers
@@ -132,10 +70,10 @@ interface AnalyzeRequestBody {
 
 /**
  * Returns true for query types that use the fast path (grok-3-fast):
- * - DFS lineup questions (no live-odds accuracy needed)
  * - Pure fantasy queries (hasFantasyIntent && !hasBettingIntent)
  * - CSV / file uploads (user's own data, not real-time odds)
  * - Off-season / no-games contexts
+ * - Kalshi/political market queries
  */
 function shouldUseFastModel(
   userMessage: string,
@@ -143,18 +81,14 @@ function shouldUseFastModel(
 ): boolean {
   const lower = userMessage.toLowerCase();
   if (context?.hasFantasyIntent && !context?.hasBettingIntent) return true;
-  if (userMessage.includes('[File:')) return true;   // CSV / file upload
-  if (context?.noGamesAvailable) return true;         // off-season
-  if (context?.isPoliticalMarket) return true;        // Kalshi — no live-odds accuracy needed
+  if (userMessage.includes('[File:')) return true;
+  if (context?.noGamesAvailable) return true;
+  if (context?.isPoliticalMarket) return true;
 
-  // Kalshi/prediction-market follow-ups often lose isPoliticalMarket=true (e.g. "Deeper analysis on: yes Jokić: 6+...")
-  // Detect them by keyword so they always take the fast path regardless of context flags.
-  // Use a regex to handle both ",yes " and ", yes " patterns (no-space after comma from Kalshi titles).
   const kalshiKeywords = ['kalshi', 'prediction market', 'deeper analysis on:'];
   if (kalshiKeywords.some(k => lower.includes(k))) return true;
-  if (/[,\s]yes\s+\w/i.test(userMessage)) return true; // catches ",yes Giannis" and ", yes Team"
+  if (/[,\s]yes\s+\w/i.test(userMessage)) return true;
 
-  // MLB Statcast / HR / pitch queries always use the primary model — accuracy matters
   if (context?.sport === 'mlb' && (lower.includes('hr') || lower.includes('statcast') || lower.includes('pitch') || lower.includes('home run') || lower.includes('barrel'))) {
     return false;
   }
@@ -166,8 +100,6 @@ function shouldUseFastModel(
 // ============================================================================
 
 // ── Request body schema ──────────────────────────────────────────────────────
-// Validates at the HTTP boundary so malformed bodies fail fast with a clean 400
-// instead of propagating undefined/oversized values deep into the pipeline.
 const AnalyzeBodySchema = z.object({
   userMessage:        z.string().min(1, 'Message is required').max(24000, 'Message too long'),
   existingCards:      z.array(z.any()).max(50).optional().default([]),
@@ -180,10 +112,9 @@ const AnalyzeBodySchema = z.object({
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
-  // ── Rate limiting: prefer user ID when authenticated ────────────────────────
-  // Authenticated users get a per-user bucket (10 req/min) so shared IPs (office
-  // NAT, VPN) don't exhaust a single anonymous quota.
-  // Anonymous users get a per-IP bucket (30 req/hour) — same as before.
+  // ── Phase 1: Rate limiting ────────────────────────────────────────────────
+  // Authenticated users get a per-user bucket (10 req/min).
+  // Anonymous users get a per-IP bucket (30 req/hour).
   let rateLimitUserId: string | undefined;
   try {
     const supabase = await createClient();
@@ -203,14 +134,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Per-AI-call timeouts (independent from each other and from card generation):
+  // Per-AI-call timeouts:
   //   grok-3-fast primary: ~15-30s first-token | fallback: 10s
-  // Vercel serverless functions have a 60s wall-clock limit.
-  // primary(46s non-fast / 28s fast) + fallback(10s) + overhead(4s) = 60s max.
   const PRIMARY_TIMEOUT_MS = (useFastPath: boolean) => useFastPath ? 28_000 : 46_000;
   const FALLBACK_TIMEOUT_MS = 10_000;
 
   try {
+    // ── Phase 2: Parse + validate request ────────────────────────────────────
     const rawBody = await request.json();
     const parsed = AnalyzeBodySchema.safeParse(rawBody);
     if (!parsed.success) {
@@ -221,14 +151,13 @@ export async function POST(request: NextRequest) {
       );
     }
     const body = parsed.data as AnalyzeRequestBody;
-    const { existingCards = [], context = {}, customInstructions } = body;
+    const { existingCards = [], context = {} as AnalyzeContext, customInstructions } = body;
 
     // xAI internally routes to Anthropic and adds cache_control to ALL content
     // blocks. When an assistant message has only tool calls (no text), xAI sends
     // content:"" which becomes an empty text block — Anthropic then rejects the
     // request with "cache_control cannot be set for empty text blocks". Fix: wrap
-    // the model with middleware that injects a non-empty stub text into any
-    // tool-only assistant history message before xAI's SDK sees it.
+    // the model with middleware that injects a non-empty stub text.
     const xaiNoEmptyContent = (rawModel: ReturnType<ReturnType<typeof createXai>>) =>
       wrapLanguageModel({
         model: rawModel,
@@ -241,7 +170,6 @@ export async function POST(request: NextRequest) {
               const hasText = parts.some((p) => p.type === 'text' && p.text && p.text.length > 0);
               const hasToolCall = parts.some((p) => p.type === 'tool-call');
               if (!hasText && hasToolCall) {
-                // Prepend a minimal text so xAI never sends content:"" to Anthropic
                 return { ...msg, content: [{ type: 'text', text: '.' }, ...parts] };
               }
               return msg;
@@ -251,10 +179,9 @@ export async function POST(request: NextRequest) {
         },
       });
 
-    // ── Guardrail 1: File-size guard ─────────────────────────────────────────
-    // The client caps file rows at 100 (chat-input) but we add a server-side
-    // safety net: replace inline file blocks > 50 data rows with a summary so
-    // the enriched prompt stays well within the 12k-token budget.
+    // ── Guardrail 1: File-size guard ──────────────────────────────────────────
+    // Replace inline file blocks > 50 data rows with a summary so the enriched
+    // prompt stays well within the 12k-token budget.
     const userMessage = (() => {
       if (!body.userMessage.includes('[File:')) return body.userMessage;
       return body.userMessage.replace(
@@ -270,9 +197,7 @@ export async function POST(request: NextRequest) {
       );
     })();
 
-    // ── Guardrail 4: Response deduplication ──────────────────────────────────
-    // Hash the first 600 chars of the user message scoped to the user ID so that
-    // anonymous users or different authenticated users never share cached responses.
+    // ── Guardrail 4: Response deduplication ───────────────────────────────────
     const queryHash = djb2(`${rateLimitUserId ?? 'anon'}:${userMessage.slice(0, 600)}`);
     evictDedupCache();
     const dedupHit = dedupCache.get(queryHash);
@@ -295,24 +220,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Inject live date into system prompt
+    // ── Phase 3: Build system prompt ──────────────────────────────────────────
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const baseSystemPrompt = SYSTEM_PROMPT.replace('[CURRENT_DATE]', dateStr);
 
-    // Build dynamic system prompt — inject user instructions at highest priority level.
-    // For MLB queries, append the MLB_ANALYSIS_ADDENDUM so Grok returns structured
-    // JSON cards (statcast_summary_card, hr_prop_card, etc.) instead of prose.
-    const isMLBQuery = context?.sport === 'mlb';
-
-    // ADP intent: user is asking about NFBC/NFFC draft positions or rankings only.
-    // Narrowed: no longer fires for all MLB fantasy queries — only explicit ADP keywords.
     const msgLower = userMessage.toLowerCase();
 
-    // Strip the [Fantasy League Context: ...]\n\n prefix the client injects so that
-    // an NFBC user's platform name ("nfbc") in the context block doesn't falsely fire
-    // hasADPIntent / hasStartSitIntent for every message they send.
-    // Using explicit indexOf rather than a regex to avoid edge cases with brackets inside leagueCtx.
+    // Strip the [Fantasy League Context: ...]\n\n prefix so platform names
+    // don't falsely trigger ADP/start-sit detection for every message.
     const rawQueryLower = (() => {
       if (userMessage.startsWith('[Fantasy League Context:')) {
         const closingIdx = userMessage.indexOf(']\n\n');
@@ -321,358 +237,54 @@ export async function POST(request: NextRequest) {
       return msgLower;
     })();
 
-    // Declare hasADPIntent early — used by sport-detection layer 0 and later
-    // intent routing. Must be before the TEAM_TO_SPORT / inferredSport block to
-    // avoid a TDZ ReferenceError.
-    const hasADPIntent =
-      ['adp', 'nfbc', 'nffc', 'average draft', 'draft position', 'draft rank', 'draft order', 'nfbc board', 'nffc board']
-        .some(k => rawQueryLower.includes(k));
+    // ── Phase 4: Sport + intent detection ────────────────────────────────────
+    const detection = detectSportAndIntents(userMessage, context, msgLower, rawQueryLower);
+    const {
+      isMLBQuery,
+      hasADPIntent,
+      hasStartSitIntent,
+      hasMLBProjectionIntent,
+      hasHRPredictionIntent,
+      hasKalshiToolIntent,
+      isMLBStatcastMode,
+      expectsStatcastJSON,
+      category,
+      isAmbiguous: isAmbiguousBase,
+      needsFantasySport,
+      needsDFSSport,
+      needsBettingSport,
+      hasLineMovementIntent,
+      hasPropsToolIntent,
+    } = detection;
 
-    // ── Team-name → sport inference ──────────────────────────────────────────
-    // When context.sport is absent or 'none', scan the user message for known
-    // team nicknames and infer the sport so card generation and model routing
-    // use the correct sport context instead of falling through to 'all'.
-    const TEAM_TO_SPORT: Record<string, string> = {
-      // NBA — unambiguous team nicknames only
-      cavaliers: 'nba', cavs: 'nba', mavericks: 'nba', mavs: 'nba',
-      lakers: 'nba', celtics: 'nba', warriors: 'nba', bucks: 'nba',
-      heat: 'nba', knicks: 'nba', nets: 'nba', sixers: 'nba',
-      suns: 'nba', nuggets: 'nba', clippers: 'nba', thunder: 'nba',
-      raptors: 'nba', timberwolves: 'nba', pelicans: 'nba', grizzlies: 'nba',
-      rockets: 'nba', spurs: 'nba', jazz: 'nba', magic: 'nba',
-      wizards: 'nba', pistons: 'nba', pacers: 'nba', hornets: 'nba',
-      '76ers': 'nba', blazers: 'nba',
-      // NFL — unambiguous nicknames only (giants/cardinals/panthers/rangers are ambiguous)
-      cowboys: 'nfl', patriots: 'nfl', chiefs: 'nfl', eagles: 'nfl',
-      packers: 'nfl', ravens: 'nfl', bills: 'nfl', rams: 'nfl',
-      niners: 'nfl', '49ers': 'nfl', broncos: 'nfl', steelers: 'nfl',
-      bengals: 'nfl', buccaneers: 'nfl', jaguars: 'nfl', titans: 'nfl',
-      colts: 'nfl', texans: 'nfl', raiders: 'nfl', chargers: 'nfl',
-      commanders: 'nfl', falcons: 'nfl', saints: 'nfl', seahawks: 'nfl',
-      // MLB — unambiguous nicknames only (giants/cardinals removed — ambiguous with NFL)
-      yankees: 'mlb', dodgers: 'mlb', cubs: 'mlb', astros: 'mlb',
-      braves: 'mlb', mets: 'mlb', 'red sox': 'mlb',
-      phillies: 'mlb', padres: 'mlb', mariners: 'mlb', guardians: 'mlb',
-      brewers: 'mlb', reds: 'mlb', pirates: 'mlb', nationals: 'mlb',
-      marlins: 'mlb', royals: 'mlb', twins: 'mlb', diamondbacks: 'mlb',
-      rockies: 'mlb', orioles: 'mlb',
-      // NHL — unambiguous nicknames only (panthers removed — ambiguous with NFL)
-      penguins: 'nhl', bruins: 'nhl', lightning: 'nhl',
-      oilers: 'nhl', avalanche: 'nhl', 'maple leafs': 'nhl', canucks: 'nhl',
-      flames: 'nhl', jets: 'nhl', predators: 'nhl', blues: 'nhl',
-      // Note: 'rangers' → NHL Rangers vs MLB Rangers (ambiguous, omitted)
-      // Note: 'giants' → NFL Giants vs MLB Giants (ambiguous, omitted)
-      // Note: 'cardinals' → NFL Cardinals vs MLB Cardinals (ambiguous, omitted)
-      // Note: 'panthers' → NFL Panthers vs NHL Panthers (ambiguous, omitted)
-    };
+    // customInstructions check is applied on top of the base ambiguity flag
+    const isAmbiguous = isAmbiguousBase && !customInstructions?.trim();
 
-    // context.sport is a HINT from the client (persisted tab selection / previous query).
-    // Always run all detection layers against the query text; if they produce a different
-    // sport, the query text wins — this prevents stale NBA/etc. tab state from poisoning
-    // sport routing for unambiguous queries like "Saquon Barkley against the Cowboys".
-    let inferredSport = context?.sport && context.sport !== 'none' ? context.sport : undefined;
-
-    const MLB_FORCE_TERMS = [
-      // Fantasy / ADP meta-keywords
-      'nfbc', 'nffc', '5x5', 'roto', 'saves+holds', 'shgn',
-      'adp board', 'draft board', 'mock draft', 'fantasy baseball',
-      // Statcast / baseball-specific stats not used in other sports
-      'barrel rate', 'exit velocity', 'xwoba', 'babip', 'xfip', 'fip',
-      'statcast', 'baseball savant', 'spin rate', 'whiff rate',
-      // MLB team abbreviations (caps) — e.g. "LAD starter" or "NYY lineup"
-      ' lad ', ' nyy ', ' bos ', ' hou ', ' chc ', ' atl ', ' sd ',
-      ' sea ', ' kc ', ' cle ', ' det ', ' tb ', ' mil ', ' cin ',
-      // Player names not yet in PLAYER_SPORT_MAP
-      'witt jr', 'de la cruz', 'caminero', 'raleigh', 'skubal', 'skenes',
-      'judge', 'crochet', 'kurtz',
-    ];
-
-    let detectedSport: string | undefined;
-
-    // Layer -2: Prediction markets / political detection (absolute highest priority)
-    // Prevents NFL/sports context bleed for Kalshi and political queries.
-    // Must run before any sports-layer so "Senate seat markets" never routes to NFL.
-    if (MARKET_SIGNALS.some(signal => msgLower.includes(signal))) {
-      detectedSport = 'markets';
-      console.log('[API/analyze] Detected category: prediction_markets (Layer -2)');
-    }
-
-    // Layer -1: Parenthetical MLB team/position abbreviation detection
-    // Catches patterns like "Juan Soto (NYM OF)", "Gerrit Cole (NYY SP)", "Cal Raleigh (SEA C)"
-    // Skip if Layer -2 already identified a prediction market (don't override 'markets' with 'mlb')
-    if (!detectedSport) {
-      const parenMatches = [...userMessage.matchAll(/\(([^)]+)\)/g)];
-      for (const match of parenMatches) {
-        const tokens = match[1].trim().split(/\s+/);
-        for (const token of tokens) {
-          if (MLB_TEAM_ABBREVS.has(token) || MLB_POSITION_ABBREVS.has(token)) {
-            detectedSport = 'mlb';
-            break;
-          }
-        }
-        if (detectedSport) break;
-      }
-    }
-
-    // Layer 0: MLB force-lock — highest priority
-    if (!detectedSport && MLB_FORCE_TERMS.some(t => msgLower.includes(t))) {
-      detectedSport = 'mlb';
-    }
-    // Layer 1: unambiguous team nicknames
-    if (!detectedSport) {
-      for (const [team, sportName] of Object.entries(TEAM_TO_SPORT)) {
-        if (msgLower.includes(team)) { detectedSport = sportName; break; }
-      }
-    }
-    // Layer 2: well-known player last names
-    if (!detectedSport) {
-      for (const [player, sportName] of Object.entries(PLAYER_SPORT_MAP)) {
-        if (msgLower.includes(player)) { detectedSport = sportName; break; }
-      }
-    }
-    // Layer 3: sport-specific statistical vocabulary (most-specific terms first)
-    if (!detectedSport) {
-      for (const { term, sport: sportName } of STAT_SPORT_MAP) {
-        if (msgLower.includes(term)) { detectedSport = sportName; break; }
-      }
-    }
-
-    // Override stale context sport when query text clearly signals a different sport
-    if (detectedSport) {
-      if (detectedSport !== inferredSport && inferredSport) {
-        console.log(`[API/analyze] Sport override: context='${inferredSport}' → detected='${detectedSport}' from query signals`);
-      }
-      inferredSport = detectedSport;
-    }
-
-    // Merge inferred sport back into context so downstream handlers pick it up.
-    // 'markets' is a virtual sport used only for routing — do NOT set context.sport
-    // to 'markets' because sports-card handlers don't know that key. Instead,
-    // flag as a political market and clear stale sport so Kalshi routing fires.
-    if (inferredSport === 'markets') {
-      context.isPoliticalMarket = true;
-      context.sport = undefined;
-      console.log('[API/analyze] Routing to Kalshi pipeline (sport=markets → isPoliticalMarket=true)');
-    } else if (inferredSport) {
-      context.sport = inferredSport;
-    }
-    // ADP queries with no explicit sport default to MLB — this app is MLB-first.
-    // NFFC/football signals detected above already set inferredSport = 'nfl'.
-    if (hasADPIntent && !context.sport) {
-      context.sport = 'mlb';
-      console.log('[API/analyze] ADP intent with no sport — defaulting to MLB');
-    }
-    // DFS with no explicit sport defaults to NBA — highest DFS volume market
-    if (context.selectedCategory === 'dfs' && !context.sport) {
-      context.sport = 'basketball_nba';
-      console.log('[API/analyze] DFS with no sport — defaulting to NBA');
-    }
-
-    // Start/sit intent: user wants daily matchup-based start or sit advice.
-    const START_SIT_KEYWORDS = [
-      'start/sit', 'start or sit', 'sit or start', 'who should i start',
-      'who do i start', 'should i start', 'should i sit', 'matchup-based',
-      'matchup based', 'streaming', 'stream this week', 'stream today',
-      'must start', 'must sit', 'favorable matchup', 'tough matchup',
-    ];
-    // The hasFantasyIntent guard is intentionally absent: these keywords are
-    // unambiguous in a sports context (e.g. "stream this week", "who should i start")
-    // and the fantasy-intent classifier occasionally misses streaming questions.
-    // Without the guard, isMLBStatcastMode is correctly suppressed so expectsStatcastJSON
-    // stays false and no spurious "JSON not found" warning is logged for prose responses.
-    const hasStartSitIntent = START_SIT_KEYWORDS.some(k => rawQueryLower.includes(k));
-
-    // Statcast JSON mode applies to player-specific or non-betting MLB queries only.
-    // General betting queries (hasBettingIntent && !hasPlayerIntent) get prose via baseSystemPrompt
-    // — injecting MLB_ANALYSIS_ADDENDUM (which mandates JSON output) causes a prompt/response
-    // mismatch: the AI correctly returns prose about odds, then we log a spurious JSON warning.
-    // Similarly, general fantasy strategy questions (hasFantasyIntent && !hasPlayerIntent) —
-    // e.g. "15-team roto draft strategy" — should return prose, not a JSON Statcast card.
-    const isMLBStatcastMode =
-      isMLBQuery &&
-      !hasADPIntent &&
-      !hasStartSitIntent &&
-      !context?.hasPlayerIntent &&
-      (!context?.hasBettingIntent || !!context?.hasPlayerIntent) &&
-      !(!!context?.hasFantasyIntent && !context?.hasPlayerIntent);
-
-    // ── HR Prediction intent ────────────────────────────────────────────────
-    // Fires when user asks about a specific player's HR probability for today.
-    // Distinct from hasMLBProjectionIntent (slate-level DFS/fantasy) — this is
-    // a single-player, probability-first query that calls the v3 prediction engine
-    // with platoon scores ± 1, pitch mix vuln, and live market edge.
-    const HR_PREDICTION_KEYWORDS = [
-      'will he hit', 'will he homer', 'chance of', 'probability of',
-      'hr tonight', 'homer tonight', 'home run tonight',
-      'hit a hr', 'hit a homer', 'hit a home run',
-      'odds of hitting', 'predict his hr', 'predict hr',
-      'what are the odds', 'hr prediction', 'home run prediction',
-      'hr probability', 'home run probability',
-    ];
-    const hasHRPredictionIntent =
-      isMLBQuery &&
-      !hasADPIntent &&
-      !hasStartSitIntent &&
-      HR_PREDICTION_KEYWORDS.some(k => rawQueryLower.includes(k)) &&
-      (rawQueryLower.includes('hr') || rawQueryLower.includes('homer') || rawQueryLower.includes('home run'));
-
-    // Kalshi tool intent: fires when user explicitly wants live market data or prices
-    // via the tool (distinct from the existing isPoliticalMarket prompt-enrichment path
-    // which injects Kalshi data as context without a tool call).
-    const KALSHI_TOOL_KEYWORDS = [
-      'kalshi market', 'prediction market', 'kalshi price', 'kalshi odds',
-      'what\'s the price on', 'current price on', 'market price for',
-      'show kalshi', 'list kalshi', 'kalshi election', 'kalshi trump',
-      'yes price', 'no price', 'yes/no price', 'edge on yes', 'edge on no',
-      'championship winner', 'contract pricing', 'championship contract',
-      'winner contract', 'market contract', 'implied odds',
-    ];
-    const hasKalshiToolIntent =
-      (context?.isPoliticalMarket || context?.selectedCategory === 'kalshi') &&
-      KALSHI_TOOL_KEYWORDS.some(k => rawQueryLower.includes(k));
-
-    // MLB Projection Engine intent: projection/DFS/fantasy/betting queries that need
-    // the LeverageMetrics algorithm (Monte Carlo, HR model, breakout scores).
-    const MLB_PROJECTION_KEYWORDS = [
-      'dfs', 'daily fantasy', 'draftkings lineup', 'fanduel lineup',
-      'salary', 'stack', 'lineup',
-      'waiver', 'ros', 'rest of season',
-      'projection', 'project', 'breakout', 'monte carlo',
-      'forecast', 'pace', 'park factor',
-      'hr prop', 'k prop', 'strikeout prop',
-    ];
-    const hasMLBProjectionIntent =
-      isMLBQuery &&
-      !hasADPIntent &&
-      !hasStartSitIntent &&
-      MLB_PROJECTION_KEYWORDS.some(k => rawQueryLower.includes(k));
-
-    // True only when MLB_ANALYSIS_ADDENDUM is the active system prompt — i.e. the model
-    // was instructed to return a Statcast JSON card.  When hasMLBProjectionIntent is true
-    // the system prompt switches to MLB_PROJECTION_ADDENDUM (prose), so we must NOT attempt
-    // to parse JSON from that response or log a spurious "fell back to text extraction" warning.
-    const expectsStatcastJSON = isMLBStatcastMode && !hasMLBProjectionIntent;
-
-    const baseWithAddendum = hasStartSitIntent
-      ? `${baseSystemPrompt}${FANTASY_STARTSIT_ADDENDUM}`
-      : hasMLBProjectionIntent
-        ? `${baseSystemPrompt}${MLB_PROJECTION_ADDENDUM}`
-        : isMLBStatcastMode
-          ? `${baseSystemPrompt}${MLB_ANALYSIS_ADDENDUM}`
-          : hasADPIntent
-            ? `${baseSystemPrompt}${NFBC_ADP_ADDENDUM}`
-            : baseSystemPrompt;
-    // ── Prompt-injection guard ────────────────────────────────────────────────
-    // Strip common jailbreak patterns from user-controlled custom instructions
-    // before injecting them into the system prompt.
-    const sanitizeCustomInstructions = (raw: string): string => {
-      const sanitized = raw
-        .slice(0, 2000) // hard character cap
-        .replace(/ignore\s+(all\s+)?(previous|above|prior)\s+instructions?/gi, '[filtered]')
-        .replace(/forget\s+(all\s+)?(previous|above|prior)\s+instructions?/gi, '[filtered]')
-        .replace(/disregard\s+(all\s+)?(previous|above|prior)\s+instructions?/gi, '[filtered]')
-        .replace(/\bsystem\s*prompt\b/gi, '[filtered]')
-        .replace(/\[INST\]|\[\/INST\]|<s>|<\/s>|<\|im_start\|>|<\|im_end\|>/g, '') // LLM escape tokens
-        .replace(/\bDAN\b|\bjailbreak\b/gi, '[filtered]') // common jailbreak keywords
-        .trim();
-      if (sanitized !== raw.trim().slice(0, 2000)) {
-        console.warn('[API/analyze] Custom instructions sanitized — potential injection attempt filtered');
-      }
-      return sanitized;
-    };
-
-    const baseWithProfile = customInstructions?.trim()
-      ? `${baseWithAddendum}\n\n## USER PROFILE & BETTING PREFERENCES\n${sanitizeCustomInstructions(customInstructions)}`
-      : baseWithAddendum;
-    const systemPrompt = body.deepThink
-      ? `${baseWithProfile}${DEEP_THINK_ADDENDUM}`
-      : baseWithProfile;
-
-    // ── Prompt cache split (Phase 1.3) ────────────────────────────────────────
-    // The cached body excludes the date line and the per-user profile so the
-    // prefix is stable across calls and across users. The addendum (per-intent)
-    // and DEEP_THINK_ADDENDUM remain in the cached body — they vary across at
-    // most ~5 intent buckets so we still get high cache hit rate.
-    //
-    // Dynamic prefix carries `Today: ${dateStr}.` and the sanitized user
-    // profile block (if any). These change per-day / per-user and would bust
-    // the cache if included in the static block.
-    const cachedSystemBaseNoDate = SYSTEM_PROMPT.replace('Today: [CURRENT_DATE].', '').replace(/^\n+/, '');
-    const cachedWithAddendum = hasStartSitIntent
-      ? `${cachedSystemBaseNoDate}${FANTASY_STARTSIT_ADDENDUM}`
-      : hasMLBProjectionIntent
-        ? `${cachedSystemBaseNoDate}${MLB_PROJECTION_ADDENDUM}`
-        : isMLBStatcastMode
-          ? `${cachedSystemBaseNoDate}${MLB_ANALYSIS_ADDENDUM}`
-          : hasADPIntent
-            ? `${cachedSystemBaseNoDate}${NFBC_ADP_ADDENDUM}`
-            : cachedSystemBaseNoDate;
-    const cachedSystem = body.deepThink
-      ? `${cachedWithAddendum}${DEEP_THINK_ADDENDUM}`
-      : cachedWithAddendum;
-
-    const dynamicSystemParts: string[] = [`Today: ${dateStr}.`];
-    if (customInstructions?.trim()) {
-      dynamicSystemParts.push(`## USER PROFILE & BETTING PREFERENCES\n${sanitizeCustomInstructions(customInstructions)}`);
-    }
-    const dynamicSystem = dynamicSystemParts.join('\n\n');
-
-    // ── Auto-save inline TSV/CSV ADP uploads ─────────────────────────────────────
-    // When a user drags a TSV file into the chat, the content is embedded inline
-    // as "[File: ADP.tsv (N rows)]\nCol1\tCol2\t...\n...". If this message has
-    // ADP intent we extract and save to Supabase right now so that the query_adp
-    // tool (called later) returns the real uploaded data instead of static fallback.
+    // Auto-save inline TSV/CSV ADP uploads
     if (hasADPIntent && body.userMessage.includes('[File:')) {
-      // Find all inline file blocks: "[File: name (N rows)]\n<content up to next [File: or end>"
-      // IMPORTANT: use body.userMessage (original) not userMessage (truncated to 50 rows)
-      // so we save the full file, not just the first 50 players.
       const fileBlockRe = /\[File:\s*([^\]]+\.(?:tsv|csv))[^\]]*\]\n([\s\S]*?)(?=\n\[File:|$)/gi;
       let fileMatch;
       while ((fileMatch = fileBlockRe.exec(body.userMessage)) !== null) {
         const fileName = (fileMatch[1] ?? '').toLowerCase();
         const rawContent = fileMatch[2] ?? '';
         if (!rawContent.trim()) continue;
-
-        // Reconstruct minimal TSV with header from page-client's format:
-        // The first line IS the header (tab-joined), subsequent lines are rows.
         const players = parseTSV(rawContent);
-        if (players.length < 5) continue; // not a real ADP board
-
+        if (players.length < 5) continue;
         const isNFLFile = fileName.includes('nfl') || fileName.includes('football') ||
           msgLower.includes('nfl') || msgLower.includes('nffc') || msgLower.includes('football');
         const sport = isNFLFile ? 'nfl' : 'mlb';
-
         try {
           await saveADPToSupabase(players, sport);
-          if (sport === 'nfl') {
-            clearNFLADPCache();
-          } else {
-            clearADPCache();
-          }
+          if (sport === 'nfl') { clearNFLADPCache(); } else { clearADPCache(); }
           console.log(`[API/analyze] Auto-saved ${players.length} ${sport.toUpperCase()} ADP players from inline file upload`);
         } catch (saveErr) {
           console.warn('[API/analyze] Failed to auto-save inline ADP upload:', saveErr);
         }
-        break; // only process the first valid ADP file
+        break;
       }
     }
 
-    // Detect ambiguous queries with no sport/intent context — ask a clarifying question
-    const isAmbiguous = !context?.sport
-      && !context?.isSportsQuery
-      && !context?.hasFantasyIntent
-      && !context?.isPoliticalMarket
-      && !context?.hasBettingIntent
-      && context?.selectedCategory !== 'kalshi'
-      && !customInstructions?.trim();
-
-    // Sport-specific clarification: intent known but sport missing
-    const needsFantasySport = !!(context?.hasFantasyIntent && !context?.sport
-      && context?.selectedCategory === 'fantasy' && !context?.isPoliticalMarket);
-    const needsDFSSport = !!(context?.selectedCategory === 'dfs' && !context?.sport);
-    const needsBettingSport = !!(context?.hasBettingIntent && !context?.sport
-      && !context?.isPoliticalMarket && context?.selectedCategory === 'betting');
-
+    // Clarification options for ambiguous / no-sport / no-live-games queries
     let clarificationOptions: string[] = isAmbiguous
       ? [
           'NBA betting odds tonight',
@@ -712,316 +324,69 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Determine analysis category from context
-    // Sports queries (even without explicit betting keywords like "MLB Offseason")
-    // should use 'betting' so generateContextualCards fetches real game/odds cards.
-    // Player-specific queries (e.g. "Aaron Judge") take priority before generic sports routing.
-    // Props and Kelly intent are detected early here so the card generator receives the
-    // correct category ('props' / 'kelly') rather than falling through to 'player' / 'betting'.
-    const PROPS_KEYWORDS_EARLY = [
-      'props', 'player prop', 'player props', 'prop bet', 'prop bets',
-      'strikeout prop', 'hr prop', 'anytime td', 'receptions prop',
-      'points prop', 'assists prop', 'hits prop', 'rbi prop', 'k prop',
-      'over/under prop', 'player over', 'player under',
-    ];
-    const hasPropsIntentEarly = PROPS_KEYWORDS_EARLY.some(k => rawQueryLower.includes(k));
-    const hasKellyIntentEarly =
-      rawQueryLower.includes('kelly') ||
-      rawQueryLower.includes('bet sizing') ||
-      rawQueryLower.includes('kelly criterion') ||
-      rawQueryLower.includes('bankroll management') ||
-      rawQueryLower.includes('optimal stake') ||
-      rawQueryLower.includes('fractional kelly');
+    const baseWithAddendum = hasStartSitIntent
+      ? `${baseSystemPrompt}${FANTASY_STARTSIT_ADDENDUM}`
+      : hasMLBProjectionIntent
+        ? `${baseSystemPrompt}${MLB_PROJECTION_ADDENDUM}`
+        : isMLBStatcastMode
+          ? `${baseSystemPrompt}${MLB_ANALYSIS_ADDENDUM}`
+          : hasADPIntent
+            ? `${baseSystemPrompt}${NFBC_ADP_ADDENDUM}`
+            : baseSystemPrompt;
 
-    const category = context.isPoliticalMarket
-      ? 'kalshi'
-      : context.selectedCategory === 'dfs'
-        ? 'dfs'
-        : hasKellyIntentEarly
-          ? 'kelly'
-          : hasPropsIntentEarly
-            ? 'props'
-            : context.hasPlayerIntent
-              ? 'player'
-              : context.hasFantasyIntent && !context.hasBettingIntent
-                ? 'fantasy'
-                : (context.hasBettingIntent || context.isSportsQuery)
-                  ? 'betting'
-                  : 'all';
-
-    // ── Server-side cross-sport contamination guard ───────────────────────────
-    // The client may send stale oddsData from a previous sport fetch (e.g., cached
-    // NBA odds while the current query is about MLB). Validate sport match before
-    // any prompt injection or card construction consumes the oddsData.
-    // Normalizes both keys to their base form (strips prefix: 'baseball_mlb' → 'mlb').
-    if (context.sport && context.oddsData?.sport) {
-      const normalizeSportKey = (s: string) => s.toLowerCase().replace(/^[a-z]+_/, '');
-      const ctxSportNorm  = normalizeSportKey(context.sport);
-      const oddsSportNorm = normalizeSportKey(context.oddsData.sport);
-      if (ctxSportNorm !== oddsSportNorm) {
-        console.warn(
-          `[v0] [CROSS-SPORT GUARD] Cleared oddsData: context.sport="${context.sport}" ≠ oddsData.sport="${context.oddsData.sport}" — fetching fresh data server-side`,
-        );
-        context.oddsData = undefined as any;
+    // ── Prompt-injection guard ────────────────────────────────────────────────
+    const sanitizeCustomInstructions = (raw: string): string => {
+      const sanitized = raw
+        .slice(0, 2000)
+        .replace(/ignore\s+(all\s+)?(previous|above|prior)\s+instructions?/gi, '[filtered]')
+        .replace(/forget\s+(all\s+)?(previous|above|prior)\s+instructions?/gi, '[filtered]')
+        .replace(/disregard\s+(all\s+)?(previous|above|prior)\s+instructions?/gi, '[filtered]')
+        .replace(/\bsystem\s*prompt\b/gi, '[filtered]')
+        .replace(/\[INST\]|\[\/INST\]|<s>|<\/s>|<\|im_start\|>|<\|im_end\|>/g, '')
+        .replace(/\bDAN\b|\bjailbreak\b/gi, '[filtered]')
+        .trim();
+      if (sanitized !== raw.trim().slice(0, 2000)) {
+        console.warn('[API/analyze] Custom instructions sanitized — potential injection attempt filtered');
       }
-    }
-
-    // Build the enriched prompt with any real odds data or contextual info
-    let enrichedPrompt = userMessage;
-    // Holds Kalshi sports markets fetched during prompt enrichment so the card
-    // pipeline can reuse them without a second API call.
-    let kalshiSportsFallbackMarkets: any[] | null = null;
-    // Holds the exact Kalshi markets injected into the AI prompt so cards always
-    // show the same data the AI is analysing (no second independent fetch).
-    let kalshiPromptMarkets: any[] | null = null;
-    // Track which data sources were actually injected into the AI prompt (for pipeline log)
-    let serverFetchedOdds = false;
-    let statcastInjected = false;
-    // True when both Odds API and Kalshi return 0 results — triggers clarification pills
-    let noLiveGamesDetected = false;
-
-    // Valid American odds are always ≤ -100 or ≥ +100 — filter anything in-between
-    const fmtOdds = (p: unknown): string => {
-      if (typeof p !== 'number' || !Number.isFinite(p) || Math.abs(p) < 100) return 'N/A';
-      return `${p > 0 ? '+' : ''}${p}`;
+      return sanitized;
     };
 
-    if (context.oddsData?.events?.length > 0 && !context.isPoliticalMarket) {
-      const oddsPreview = context.oddsData.events
-        .slice(0, 8)
-        .map((e: any) => {
-          const lines: string[] = [`${e.away_team} @ ${e.home_team}`];
-          for (const book of (e.bookmakers || []).slice(0, 2)) {
-            const h2h = book.markets?.find((m: any) => m.key === 'h2h');
-            const spread = book.markets?.find((m: any) => m.key === 'spreads');
-            const total = book.markets?.find((m: any) => m.key === 'totals');
-            if (h2h) {
-              const home = h2h.outcomes?.find((o: any) => o.name === e.home_team);
-              const away = h2h.outcomes?.find((o: any) => o.name === e.away_team);
-              lines.push(`  ML (${book.title}): ${e.away_team} ${fmtOdds(away?.price)} | ${e.home_team} ${fmtOdds(home?.price)}`);
-            }
-            if (spread) {
-              const home = spread.outcomes?.find((o: any) => o.name === e.home_team);
-              const away = spread.outcomes?.find((o: any) => o.name === e.away_team);
-              lines.push(`  Spread (${book.title}): ${e.away_team} ${away?.point > 0 ? '+' : ''}${away?.point ?? ''} (${fmtOdds(away?.price)}) | ${e.home_team} ${home?.point > 0 ? '+' : ''}${home?.point ?? ''} (${fmtOdds(home?.price)})`);
-            }
-            if (total) {
-              const over = total.outcomes?.find((o: any) => o.name === 'Over');
-              const under = total.outcomes?.find((o: any) => o.name === 'Under');
-              lines.push(`  Total (${book.title}): O${over?.point ?? ''} (${fmtOdds(over?.price)}) | U${under?.point ?? ''} (${fmtOdds(under?.price)})`);
-            }
-          }
-          return lines.join('\n');
-        })
-        .join('\n\n');
+    const baseWithProfile = customInstructions?.trim()
+      ? `${baseWithAddendum}\n\n## USER PROFILE & BETTING PREFERENCES\n${sanitizeCustomInstructions(customInstructions)}`
+      : baseWithAddendum;
+    const systemPrompt = body.deepThink
+      ? `${baseWithProfile}${DEEP_THINK_ADDENDUM}`
+      : baseWithProfile;
 
-      enrichedPrompt += `\n\n--- REAL LIVE ODDS DATA (use ONLY these numbers for odds/lines) ---\nSport: ${context.oddsData.sport}\n\n${oddsPreview}\n--- END ODDS DATA ---`;
-    } else if (context.noGamesAvailable) {
-      // No live games but let the AI give knowledge-based analysis
-      enrichedPrompt += `\n\n[Context: No live ${context.sport?.toUpperCase() || 'sports'} games are currently scheduled (offseason or between games). Provide expert analysis, offseason insights, betting strategy, and relevant market knowledge instead of live odds.]`;
-    } else if (!context.hasBettingIntent && context.sport) {
-      // Sports question without betting intent — give expert analysis
-      enrichedPrompt += `\n\n[Context: User is asking about ${context.sport.toUpperCase()} — provide expert analysis using your knowledge. No live odds needed for this question.]`;
-    } else if (context.isPoliticalMarket || context.selectedCategory === 'kalshi') {
-      // Pre-fetch actual Kalshi markets so the AI describes real data, not hallucinated markets.
-      // Fetch 50 markets (matching the card generator's needs) so the 60s in-memory cache is
-      // warm enough for card generation to reuse without a second API call.
-      // A 3s timeout prevents blocking the AI call on a slow fetch.
-      try {
-        const { fetchElectionMarkets, fetchKalshiMarketsWithRetry, fetchEntertainmentMarkets } = await import('@/lib/kalshi/index');
-        const sub = (context.kalshiSubcategory || '').toLowerCase();
-        // Route to the appropriate market source based on Kalshi sub-category.
-        // For 'sports': use a targeted keyword search — faster than fetchSportsMarkets()
-        // which makes 12 sequential API calls and would exceed any reasonable timeout.
-        const ENTERTAINMENT_SUBS = ['entertainment', 'culture', 'awards', 'oscars', 'grammys',
-          'emmys', 'films', 'movies', 'music', 'tv', 'celebrity', 'pop culture', 'arts',
-          'film', 'oscar', 'grammy', 'emmy'];
-        const fetchMarkets =
-          (sub === 'politics' || sub === 'elections' || sub === 'election')
-            ? fetchElectionMarkets({ limit: 50 })
-          : (sub === 'sports' || sub === 'sport')
-            ? fetchKalshiMarketsWithRetry({ search: 'NFL NBA MLB NHL Super Bowl March Madness', limit: 30, maxRetries: 2 })
-          : ENTERTAINMENT_SUBS.includes(sub)
-            ? fetchEntertainmentMarkets(50)
-          : fetchKalshiMarketsWithRetry({ limit: 50, maxRetries: 3 });
-        const markets = await Promise.race([
-          fetchMarkets,
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000)),
-        ]).catch(() => null);
-        if (markets && (markets as any[]).length > 0) {
-          // Sort by activity score before slicing so both AI text and cards surface
-          // the most relevant (real-priced, high-volume) markets first.
-          const sorted = (markets as any[]).sort((a: any, b: any) => {
-            const score = (m: any) =>
-              (m.priceIsReal ? 1_000_000 : 0)
-              + ((m.yesBid > 0 || m.yesAsk > 0) ? 200_000 : 0)
-              + (m.volume24h ?? 0) * 10
-              + (m.volume ?? 0);
-            return score(b) - score(a);
-          });
-          const topMarkets = sorted.slice(0, 6);
-          // Bridge: store these markets so the card pipeline renders the exact
-          // same data the AI is about to analyse (instead of a fresh independent fetch).
-          kalshiPromptMarkets = topMarkets;
-          const marketSummary = topMarkets.map((m: any, i: number) => {
-            // yesPrice is in cents (0–100). Treat directly as implied probability %.
-            const yesCents = Math.min(100, Math.max(0, m.yesPrice ?? m.yesBid ?? m.yes_bid ?? 50));
-            const noCents  = Math.min(100, Math.max(0, m.noPrice  ?? m.noAsk  ?? m.no_ask  ?? (100 - yesCents)));
-            const spread   = m.spread ?? Math.abs(yesCents - (100 - noCents));
-            const vol = m.volume24h ?? m.volume ?? 0;
-            const volStr = vol > 1_000_000 ? `${(vol / 1_000_000).toFixed(1)}M` : vol > 1_000 ? `${(vol / 1_000).toFixed(0)}K` : `${vol}`;
-            return `${i + 1}. "${m.title}" — YES: ${yesCents}% implied prob, NO: ${noCents}%, Spread: ${spread}¢, Vol: ${volStr}`;
-          }).join('\n');
-          console.log(`[KALSHI] Injected ${topMarkets.length} prediction markets into AI context`);
-          enrichedPrompt += `\n\n--- LIVE KALSHI PREDICTION MARKETS ---\n${marketSummary}\n[YES % = market-implied probability. Edge = difference between your model probability and YES %. Ground analysis in these real prices — do not invent tickers or volumes.]\n--- END KALSHI DATA ---`;
-        } else {
-          enrichedPrompt += `\n\n[Context: Kalshi prediction market query. No live markets available — provide general prediction market analysis and strategy.]`;
-        }
-      } catch {
-        enrichedPrompt += `\n\n[Context: This is a Kalshi prediction market query. Answer directly with prediction market analysis, probability edge, and trading recommendations. Do NOT ask the user to choose a sports platform or area — the user is already on the Kalshi tab. Analyze the specific market or topic asked about.]`;
-      }
-    } else if ((context.hasBettingIntent || context.isSportsQuery) && context.sport && !context.isPoliticalMarket && !hasADPIntent) {
-      // Client didn't include live odds — try fetching from the Odds API server-side first.
-      // This covers cases where the user typed directly in chat without the UI pre-fetching odds.
-      const _oddsKey = getOddsApiKey();
-      if (_oddsKey && context.sport !== 'none') {
-        try {
-          const { fetchLiveOdds, validateSportKey } = await import('@/lib/odds/index');
-          const _sportKey = validateSportKey(context.sport).normalizedKey ?? context.sport;
-          const _serverEvents = await Promise.race([
-            fetchLiveOdds(_sportKey, { apiKey: _oddsKey, markets: ['h2h', 'spreads', 'totals'], regions: ['us'], oddsFormat: 'american' }),
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
-          ]).catch(() => null);
-          if (Array.isArray(_serverEvents) && _serverEvents.length > 0) {
-            const oddsPreview = (_serverEvents as any[])
-              .slice(0, 8)
-              .map((e: any) => {
-                const lines: string[] = [`${e.away_team} @ ${e.home_team}`];
-                for (const book of (e.bookmakers || []).slice(0, 2)) {
-                  const h2h    = book.markets?.find((m: any) => m.key === 'h2h');
-                  const spread = book.markets?.find((m: any) => m.key === 'spreads');
-                  const total  = book.markets?.find((m: any) => m.key === 'totals');
-                  if (h2h) {
-                    const home = h2h.outcomes?.find((o: any) => o.name === e.home_team);
-                    const away = h2h.outcomes?.find((o: any) => o.name === e.away_team);
-                    lines.push(`  ML (${book.title}): ${e.away_team} ${(away?.price ?? 0) > 0 ? '+' : ''}${away?.price ?? 'N/A'} | ${e.home_team} ${(home?.price ?? 0) > 0 ? '+' : ''}${home?.price ?? 'N/A'}`);
-                  }
-                  if (spread) {
-                    const home = spread.outcomes?.find((o: any) => o.name === e.home_team);
-                    const away = spread.outcomes?.find((o: any) => o.name === e.away_team);
-                    lines.push(`  Spread (${book.title}): ${e.away_team} ${(away?.point ?? 0) > 0 ? '+' : ''}${away?.point ?? ''} (${(away?.price ?? 0) > 0 ? '+' : ''}${away?.price ?? 'N/A'}) | ${e.home_team} ${(home?.point ?? 0) > 0 ? '+' : ''}${home?.point ?? ''} (${(home?.price ?? 0) > 0 ? '+' : ''}${home?.price ?? 'N/A'})`);
-                  }
-                  if (total) {
-                    const over  = total.outcomes?.find((o: any) => o.name === 'Over');
-                    const under = total.outcomes?.find((o: any) => o.name === 'Under');
-                    lines.push(`  Total (${book.title}): O${over?.point ?? ''} (${(over?.price ?? 0) > 0 ? '+' : ''}${over?.price ?? 'N/A'}) | U${under?.point ?? ''} (${(under?.price ?? 0) > 0 ? '+' : ''}${under?.price ?? 'N/A'})`);
-                  }
-                }
-                return lines.join('\n');
-              })
-              .join('\n\n');
-            enrichedPrompt += `\n\n--- REAL LIVE ODDS DATA (use ONLY these numbers for odds/lines) ---\nSport: ${context.sport}\n\n${oddsPreview}\n--- END ODDS DATA ---`;
-            serverFetchedOdds = true;
-            // Bridge server-fetched events to the hallucination detector so it can
-            // cross-reference AI-cited moneylines against real bookmaker lines.
-            context.oddsData = { events: _serverEvents, sport: _sportKey };
-            console.log(`[v0] [ANALYZE] Server-fetched ${_serverEvents.length} ${context.sport} games from Odds API`);
+    // ── Prompt cache split ────────────────────────────────────────────────────
+    // The cached body excludes the date line and per-user profile so the prefix
+    // is stable across calls. The dynamic prefix carries the date + user profile.
+    const cachedSystemBaseNoDate = SYSTEM_PROMPT.replace('Today: [CURRENT_DATE].', '').replace(/^\n+/, '');
+    const cachedWithAddendum = hasStartSitIntent
+      ? `${cachedSystemBaseNoDate}${FANTASY_STARTSIT_ADDENDUM}`
+      : hasMLBProjectionIntent
+        ? `${cachedSystemBaseNoDate}${MLB_PROJECTION_ADDENDUM}`
+        : isMLBStatcastMode
+          ? `${cachedSystemBaseNoDate}${MLB_ANALYSIS_ADDENDUM}`
+          : hasADPIntent
+            ? `${cachedSystemBaseNoDate}${NFBC_ADP_ADDENDUM}`
+            : cachedSystemBaseNoDate;
+    const cachedSystem = body.deepThink
+      ? `${cachedWithAddendum}${DEEP_THINK_ADDENDUM}`
+      : cachedWithAddendum;
 
-            // Query Supabase for notable line movements in the last 4 hours for this sport.
-            // These indicate where sharp money has been bet — valuable AI context.
-            try {
-              const { createClient: createSbClient } = await import('@/lib/supabase/server');
-              const _sb = await createSbClient();
-              const { data: _moves } = await _sb
-                .from('line_movement')
-                .select('game_id, market_type, bookmaker, old_odds, new_odds, updated_at')
-                .eq('sport', context.sport)
-                .gte('updated_at', new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString())
-                .order('updated_at', { ascending: false })
-                .limit(10);
-              if (_moves && _moves.length > 0) {
-                const sharpLines = _moves.map((m: any) => {
-                  const delta = (m.new_odds ?? 0) - (m.old_odds ?? 0);
-                  const direction = delta < 0 ? 'shortening ▼' : 'lengthening ▲';
-                  const isSharp  = Math.abs(delta) >= 20;
-                  return `  ${m.market_type} (${m.bookmaker}): ${m.old_odds > 0 ? '+' : ''}${m.old_odds} → ${m.new_odds > 0 ? '+' : ''}${m.new_odds} (${direction}${isSharp ? ' 🔥 SHARP' : ''})`;
-                }).join('\n');
-                enrichedPrompt += `\n\n--- RECENT LINE MOVEMENT (last 4h, ${context.sport}) ---\n${sharpLines}\n[Shortening ≥20pts = likely sharp money. Factor into your confidence/recommendation.]\n--- END LINE MOVEMENT ---`;
-                console.log(`[v0] [ANALYZE] Injected ${_moves.length} line movement signals`);
-              }
-            } catch {
-              // Non-critical — skip if Supabase is unavailable
-            }
-          }
-        } catch (oddsErr) {
-          // Non-fatal — fall through to Kalshi fallback below.
-          // Downgrade 4xx errors (invalid API key, quota exceeded) to warn
-          // so they don't appear as error-level logs when the path is handled.
-          const oddsStatus = (oddsErr as any)?.status ?? (oddsErr as any)?.statusCode;
-          const oddsMsg = oddsErr instanceof Error ? oddsErr.message : String(oddsErr);
-          if (oddsStatus && oddsStatus >= 400 && oddsStatus < 500) {
-            console.warn('[v0] [ANALYZE] Odds API ' + oddsStatus + ' — ' + oddsMsg + '. Using Kalshi fallback.');
-          }
-        }
-      }
-
-      if (serverFetchedOdds) {
-        // Odds API delivered real lines — no need for Kalshi fallback
-      } else {
-      // Odds API returned no games or key missing — use Kalshi sports markets as an
-      // independent probability signal (win/loss futures, player props, championship markets).
-      // Skip for ADP queries: the NFBC system prompt + ADP tool already provides the right context.
-      // Maps the internal sport key to the search term Kalshi understands.
-      const SPORT_TO_KALSHI_KW: Record<string, string> = {
-        basketball_nba: 'NBA', basketball_ncaab: 'college basketball',
-        americanfootball_nfl: 'NFL', americanfootball_ncaaf: 'college football',
-        baseball_mlb: 'MLB', icehockey_nhl: 'NHL',
-        soccer_epl: 'Premier League', soccer_mls: 'MLS',
-        mma_mixed_martial_arts: 'UFC MMA',
-      };
-      const sportKw = SPORT_TO_KALSHI_KW[context.sport]
-        ?? context.sport.replace(/^[a-z]+_/, '').toUpperCase();
-      try {
-        const { fetchKalshiMarketsWithRetry, generateKalshiCards } = await import('@/lib/kalshi/index');
-        const markets = await Promise.race([
-          fetchKalshiMarketsWithRetry({ search: sportKw, limit: 10, maxRetries: 3 }),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)),
-        ]).catch(() => null);
-        if (markets && (markets as any[]).length > 0) {
-          const top = (markets as any[]).slice(0, 6);
-          kalshiSportsFallbackMarkets = top; // reused by card pipeline below
-          const marketLines = top.map((m: any, i: number) => {
-            const yesCents = Math.min(100, Math.max(0, m.yesPrice ?? m.yesBid ?? 50));
-            const noCents  = Math.min(100, Math.max(0, 100 - yesCents));
-            const vol = m.volume24h ?? m.volume ?? 0;
-            const volStr = vol > 1_000_000 ? `${(vol / 1_000_000).toFixed(1)}M` : vol > 1_000 ? `${(vol / 1_000).toFixed(0)}K` : `${vol}`;
-            return `${i + 1}. "${m.title}" — YES: ${yesCents}% (implied prob ${(yesCents / 100).toFixed(3)}), NO: ${noCents}%, Vol: ${volStr}`;
-          }).join('\n');
-          console.log(`[KALSHI] Injected ${top.length} ${sportKw} markets as odds fallback`);
-          enrichedPrompt += `\n\n--- KALSHI ${sportKw.toUpperCase()} MARKETS (live market-implied probabilities — sportsbook odds unavailable) ---\n${marketLines}\n[YES % = market-implied probability. Use these as your probability baseline. Identify edge where your model probability diverges from market price.]\n--- END KALSHI DATA ---`;
-        } else {
-          // No sportsbook odds AND no Kalshi markets — signal to AI not to hallucinate
-          noLiveGamesDetected = true;
-          enrichedPrompt += `\n\n[IMPORTANT: No live ${context.sport.toUpperCase()} odds or prediction market data is available right now. You MUST NOT invent or assume specific game matchups, scores, teams, or betting lines that you are not 100% certain about. Do not fabricate schedules. Instead: (1) clearly state that verified live data is currently unavailable, (2) offer general betting strategy or historical context for this sport, and (3) ask the user what they would like to analyze — futures, trends, season-long analysis, or to wait for confirmed schedules. Today: ${dateStr}.]`;
-          console.log(`[KALSHI] No ${sportKw} markets found — injecting no-hallucination guard`);
-        }
-      } catch (err) {
-        console.warn(`[KALSHI] Sports market fetch failed for ${sportKw}:`, err instanceof Error ? err.message : String(err));
-        noLiveGamesDetected = true;
-        enrichedPrompt += `\n\n[IMPORTANT: Live ${context.sport.toUpperCase()} odds data is unavailable right now. Do NOT invent game matchups, scores, or betting lines. Clearly state data is unavailable and offer general betting strategy instead.]`;
-      }
-      } // end else (Kalshi fallback when Odds API had no data)
-    } else if (hasADPIntent && context.sport) {
-      // ADP/draft query — NFBC system prompt + ADP tool provide all context; no odds data needed
-      enrichedPrompt += `\n\n[Context: Fantasy draft/ADP query for ${context.sport.toUpperCase()}. Use the query_adp tool and your NFBC expertise to answer. Focus on draft value, positional scarcity, and roster construction — not sportsbook odds.]`;
-    } else if (!context.hasBettingIntent && !context.sport && !context.isPoliticalMarket) {
-      // General question — answer from knowledge
-      enrichedPrompt += `\n\n[Context: General question — answer with your full expert knowledge about sports betting, fantasy, DFS, or prediction markets as appropriate.]`;
+    const dynamicSystemParts: string[] = [`Today: ${dateStr}.`];
+    if (customInstructions?.trim()) {
+      dynamicSystemParts.push(`## USER PROFILE & BETTING PREFERENCES\n${sanitizeCustomInstructions(customInstructions)}`);
     }
+    const dynamicSystem = dynamicSystemParts.join('\n\n');
 
-    // ── Clarification pills for no-live-games scenarios ───────────────────────
-    // When both Odds API and Kalshi returned 0 results, surface sport-specific
-    // prompt options so the user can pivot to something the AI can answer.
+    // ── Phase 5: Prompt enrichment ────────────────────────────────────────────
+    const enrichment = await buildEnrichedPrompt(userMessage, context, detection, dateStr);
+    let { enrichedPrompt } = enrichment;
+    const { kalshiSportsFallbackMarkets, kalshiPromptMarkets, serverFetchedOdds, noLiveGamesDetected } = enrichment;
+
+    // Clarification pills for no-live-games scenarios
     if (noLiveGamesDetected && clarificationOptions.length === 0 && context.sport) {
       const sportClarifications: Record<string, string[]> = {
         basketball_ncaab: [
@@ -1070,193 +435,18 @@ export async function POST(request: NextRequest) {
       ];
     }
 
-    // ── Statcast enrichment for MLB queries ───────────────────────────────────
-    // Inject top barrel rate / exit velocity leaders so the AI has real Statcast
-    // context for any MLB question, not just explicit Statcast-mode queries.
-    // Skipped for ADP and non-MLB queries.
-    //
-    // Strategy: DB-first (instant, no external API) → fall back to Baseball Savant
-    // when the statcast_daily table is empty (first ever request or after schema reset).
-    // The fallback warms the DB so subsequent cold-starts skip the full 1546-row fetch.
-    if (isMLBQuery && !hasADPIntent && !context.isPoliticalMarket) {
-      const STATCAST_SEASON = new Date().getFullYear() - (new Date().getMonth() + 1 >= 4 ? 0 : 1);
-      try {
-        // ① Try DB first — avoids Baseball Savant API call and 1546-row upsert on warm runs
-        const { getTopStatcastLeadersFromDB } = await import('@/lib/services/statcast-ingest');
-        const { batters: dbBatters, pitchers: dbPitchers } = await Promise.race([
-          getTopStatcastLeadersFromDB(STATCAST_SEASON, 5),
-          new Promise<{ batters: never[]; pitchers: never[] }>(
-            resolve => setTimeout(() => resolve({ batters: [], pitchers: [] }), 800)
-          ),
-        ]);
-
-        if (dbBatters.length >= 3 && dbPitchers.length >= 3) {
-          // DB warm — use cached leaders directly
-          const fmtB = (p: Record<string, unknown>) =>
-            `  ${p.player_name}: Barrel% ${Number(p.barrel_rate ?? 0).toFixed(1)}, xwOBA ${Number(p.xwoba ?? 0).toFixed(3)}, HardHit% ${Number(p.hard_hit_pct ?? 0).toFixed(1)}, ExitVelo ${Number(p.avg_exit_velocity ?? 0).toFixed(1)} mph`;
-          const fmtP = (p: Record<string, unknown>) =>
-            `  ${p.player_name}: xSLG-allowed ${Number(p.xslg ?? 0).toFixed(3)}, Barrel%-allowed ${Number(p.barrel_rate ?? 0).toFixed(1)}, xwOBA-against ${Number(p.xwoba ?? 0).toFixed(3)}`;
-          enrichedPrompt += `\n\n${[
-            `--- MLB STATCAST LEADERS (${STATCAST_SEASON} season) ---`,
-            'Top Batters by Barrel Rate:',
-            ...dbBatters.map(fmtB),
-            'Top Pitchers (lowest xSLG allowed):',
-            ...dbPitchers.map(fmtP),
-            '--- END STATCAST ---',
-          ].join('\n')}`;
-          statcastInjected = true;
-          console.log(`[v0] [ANALYZE] Injected Statcast leaders from DB: ${dbBatters.length} batters, ${dbPitchers.length} pitchers`);
-        } else {
-          // ② DB cold — fetch from Baseball Savant and warm the DB for next time
-          const { getStatcastData, queryStatcast } = await import('@/lib/baseball-savant');
-          const { players: statcastPlayers } = await Promise.race([
-            getStatcastData(),
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)),
-          ]);
-          if (statcastPlayers.length > 0) {
-            const batters = queryStatcast(statcastPlayers, { playerType: 'batter', limit: 5 })
-              .sort((a, b) => b.barrelRate - a.barrelRate);
-            const pitchers = queryStatcast(statcastPlayers, { playerType: 'pitcher', limit: 5 })
-              .sort((a, b) => a.xslg - b.xslg);
-            const fmtB = (p: (typeof batters)[0]) =>
-              `  ${p.name}: Barrel% ${p.barrelRate.toFixed(1)}, xwOBA ${p.xwoba.toFixed(3)}, HardHit% ${p.hardHitPct.toFixed(1)}, ExitVelo ${p.exitVelocity.toFixed(1)} mph`;
-            const fmtP = (p: (typeof pitchers)[0]) =>
-              `  ${p.name}: xSLG-allowed ${p.xslg.toFixed(3)}, Barrel%-allowed ${p.barrelRate.toFixed(1)}, xwOBA-against ${p.xwoba.toFixed(3)}`;
-            enrichedPrompt += `\n\n${[
-              `--- MLB STATCAST LEADERS (${STATCAST_SEASON} season) ---`,
-              'Top Batters by Barrel Rate:',
-              ...batters.map(fmtB),
-              'Top Pitchers (lowest xSLG allowed):',
-              ...pitchers.map(fmtP),
-              '--- END STATCAST ---',
-            ].join('\n')}`;
-            statcastInjected = true;
-            console.log(`[v0] [ANALYZE] Injected Statcast leaders: ${batters.length} batters, ${pitchers.length} pitchers`);
-            // Warm the DB so subsequent cold-starts skip this fetch (fire-and-forget)
-            void import('@/lib/services/statcast-ingest').then(({ persistStatcastLeaders }) =>
-              persistStatcastLeaders(statcastPlayers)
-            ).catch((e: unknown) => {
-              console.warn('[v0] [ANALYZE] statcast DB warm failed (non-critical):', e instanceof Error ? e.message : e);
-            });
-          }
-        }
-      } catch {
-        // Non-critical — skip if DB and Baseball Savant are both unreachable
-      }
+    // ── Phase 6: Token budget guard ───────────────────────────────────────────
+    const TOKEN_BUDGET_CHARS = 48_000;
+    if (enrichedPrompt.length > TOKEN_BUDGET_CHARS) {
+      const before = enrichedPrompt.length;
+      enrichedPrompt = enrichedPrompt
+        .replace(/\[File:[^\]]+\]\n[\s\S]*?\n\[\.\.\. \d+ more rows[^\]]*\]/g, '[File: (truncated — use query_adp tool)]')
+        .slice(0, TOKEN_BUDGET_CHARS);
+      enrichedPrompt += '\n\n[CONTEXT TRIMMED — token budget. Full data available via query_adp tool.]';
+      console.warn(`[API/analyze] Token budget: trimmed ${before} → ${enrichedPrompt.length} chars (~${Math.ceil(before / 4)} → 12k tokens)`);
     }
 
-    // Market Intelligence signal injection (non-blocking, 2s timeout)
-    // Only injected when we have a primary event in live odds data
-    if (context.sport && context.oddsData?.events?.length > 0) {
-      try {
-        const primaryEvent = context.oddsData.events[0];
-        const primaryEventId = primaryEvent?.id;
-        if (primaryEventId) {
-          const intel = await Promise.race([
-            getMarketIntelligenceSummary(primaryEventId, context.sport),
-            new Promise<null>(resolve => setTimeout(() => resolve(null), 2000)),
-          ]);
-          if (intel && intel.severity !== 'none') {
-            enrichedPrompt += `\n\n[Market Intelligence Signals]\nAnomaly Score: ${intel.anomalyScore.toFixed(2)} (${intel.severity} severity)\nSurface Probability: ${(intel.surfaceProbability * 100).toFixed(1)}%\nLine Movement: ${intel.movementType} (velocity ${intel.velocityScore.toFixed(0)}/100)\nBenford Trust Score: ${intel.benfordTrust.toFixed(0)}/100\nComposite Signal Strength: ${intel.signalStrength.toFixed(0)}/100\n[Use these signals to contextualize your analysis. High anomaly scores may indicate smart-money movement or cross-market mispricing worth highlighting.]`;
-          }
-        }
-      } catch {
-        // Non-blocking — intelligence signals are additive, never block the AI response
-      }
-    }
-
-    // ── MLB today's schedule injection — prevents recommending inactive pitchers ──────────────
-    // Fetches today's probable starters from the MLB Stats API (cached 10 min) and injects
-    // them as ground truth so the AI can't hallucinate start/sit advice for pitchers who
-    // aren't actually scheduled to pitch today.
-    if (isMLBQuery && !context.isPoliticalMarket) {
-      try {
-        const { fetchTodaysGames } = await import('@/lib/mlb-projections/mlb-stats-api');
-        const todaysGames = await Promise.race([
-          fetchTodaysGames(),
-          new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000)),
-        ]).catch(() => [] as Awaited<ReturnType<typeof fetchTodaysGames>>);
-
-        if (todaysGames.length > 0) {
-          const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-          const scheduleLines = todaysGames.map((g: any) =>
-            `${g.awayTeam ?? g.away ?? 'Away'} @ ${g.homeTeam ?? g.home ?? 'Home'}` +
-            ` | Away SP: ${g.probableAwayPitcher?.fullName ?? 'TBD'}` +
-            ` | Home SP: ${g.probableHomePitcher?.fullName ?? 'TBD'}`
-          );
-          enrichedPrompt +=
-            `\n\n--- TODAY'S MLB SCHEDULE (${todayLabel}) ---\n` +
-            scheduleLines.join('\n') +
-            `\n--- END SCHEDULE ---\n` +
-            `CRITICAL: Only recommend pitchers who appear in TODAY'S SCHEDULE above. ` +
-            `If a pitcher is NOT listed, explicitly state they are not scheduled to pitch today and decline to give a start/sit recommendation for them.\n`;
-        } else {
-          enrichedPrompt += `\n\n[MLB Schedule: No games found for today or schedule unavailable. Do not make start/sit pitcher recommendations without verified schedule data.]\n`;
-        }
-      } catch {
-        // Non-blocking — skip if schedule API is unavailable
-      }
-    }
-
-    // ── NFL data-provenance context (fires for ANY NFL query with no live odds) ─────────────
-    // This app has no live NFL stats API. Without live odds/props injected above, any NFL
-    // player stats in the response come purely from Grok's training data, which may predate
-    // or incompletely cover the most recent NFL season. Inject explicit framing so the AI
-    // doesn't silently hallucinate stats or label stale data as current.
-    const isNFLQuery = (context.sport ?? '').includes('football') || (context.sport ?? '') === 'nfl' || (context.sport ?? '') === '';
-    const hasLiveNFLOdds = (context.oddsData?.events?.length ?? 0) > 0;
-    if (isNFLQuery && !hasLiveNFLOdds && !context.isPoliticalMarket) {
-      const now2 = new Date();
-      const month = now2.getMonth() + 1;
-      const isOffseason = month >= 3 && month <= 8; // Mar–Aug = NFL offseason
-      const isPlayoffs = month === 1 || month === 2; // Jan–Feb = NFL playoffs/Super Bowl
-      const isRegularSeason = month >= 9 || month === 12; // Sep–Dec = regular season
-      const phaseLabel = isOffseason
-        ? `${NFL_SEASON_YEAR} NFL season is complete (Super Bowl concluded ~Feb ${NFL_SEASON_YEAR + 1}). It is currently the ${NFL_SEASON_YEAR + 1} offseason (free agency, draft prep, rookie minis).`
-        : isPlayoffs
-        ? `The ${NFL_SEASON_YEAR} NFL regular season is complete; playoffs are in progress.`
-        : isRegularSeason
-        ? `The ${NFL_SEASON_YEAR} NFL regular season is in progress.`
-        : `NFL offseason.`;
-      enrichedPrompt += `\n\n[NFL Season Context — ${NFL_SEASON_YEAR}]\n${phaseLabel}\nIMPORTANT: No live NFL stats are available in this session. Any player stats, snap counts, yards, TDs, or performance metrics you provide are sourced from your training knowledge and may be incomplete for the ${NFL_SEASON_YEAR} season. Label all AI-sourced stats as "(${NFL_SEASON_YEAR} season — AI estimate)" and encourage the user to verify at NFL.com, Pro Football Reference, or ESPN for official figures.`;
-    }
-
-    // Fantasy-specific context injection — only when fantasy is the primary intent.
-    // Mirrors the card-generation guard (line ~640): betting takes priority over fantasy
-    // when both intents are detected, so don't pollute a live-odds betting prompt with
-    // a Fantasy Context block that tells the AI to give fantasy advice instead.
-    if (context.hasFantasyIntent && (!context.hasBettingIntent || context.selectedCategory === 'fantasy' || context.selectedCategory === 'dfs')) {
-      const sport = context.sport || '';
-      const isNFL = sport.includes('football') || sport === '';
-      if (isNFL) {
-        // NFL season complete — tell AI to focus on the upcoming offseason/draft cycle
-        enrichedPrompt += `\n\n[Fantasy Context: The ${NFL_SEASON_YEAR} NFL regular season and playoffs are complete. Fantasy advice should address the ${NFL_SEASON_YEAR + 1} offseason: free agency moves, rookie targets, ADP for ${NFL_SEASON_YEAR + 1} redraft leagues, and dynasty/devy strategy. Any stats referenced are ${NFL_SEASON_YEAR} season figures from AI training data — label them as "(${NFL_SEASON_YEAR} — AI estimate)" and encourage verification.]`;
-      } else {
-        // In-season sport (NBA, MLB, NHL, etc.) — tell AI to use its current knowledge
-        const sportName = sport.replace(/^(americanfootball|basketball|baseball|icehockey|soccer|mma)_?/, '').toUpperCase().replace(/_/g, ' ') || sport.toUpperCase();
-        enrichedPrompt += `\n\n[Fantasy Context: The user is asking about ${sportName} fantasy. Use your current knowledge of active rosters, recent performance, injury reports, and this week's matchups to give accurate advice. Today's date: ${dateStr}.]`;
-      }
-    }
-
-    // Regardless of other odds context, tell the AI when the key is missing
-    if (context.oddsKeyMissing) {
-      enrichedPrompt += `\n\n[System: Live odds are unavailable — ODDS_API_KEY is not configured in the server environment. Inform the user they need to add ODDS_API_KEY to their Vercel environment variables to enable live odds.]`;
-    }
-
-    // ── Card generation + AI prompt alignment ────────────────────────────────
-    //
-    // ARCHITECTURE: For queries where the client already sent live odds (context.oddsData),
-    // cards are built synchronously from those odds AND the same odds are in enrichedPrompt
-    // above — AI and cards are perfectly aligned with zero extra latency.
-    //
-    // For all other cases (server-fetched cards), we now AWAIT card generation before
-    // building the final AI prompt, then inject a compact summary of the fetched card
-    // data via cardsToPromptContext(). This ensures the AI response directly references
-    // the same games, players, and odds shown in the UI cards below it.
-    //
-    // Trade-off: adds ~600-900ms sequential overhead for server-fetch cases, but
-    // eliminates the mismatch between AI narrative and displayed card data.
-    //
+    // ── Phase 7: Card generation ───────────────────────────────────────────────
     const hasExistingCards = Array.isArray(existingCards) && existingCards.length > 0
       && !context.sport
       && !context.isSportsQuery
@@ -1267,11 +457,10 @@ export async function POST(request: NextRequest) {
       && context.selectedCategory !== 'dfs'
       && context.selectedCategory !== 'fantasy';
 
-    // Cards we've already resolved (available for prompt injection before AI starts)
     let resolvedCards: InsightCard[] | null = null;
     let cardPromise: Promise<InsightCard[]>;
 
-    // ── Case 1: Client sent live odds → cards built synchronously, AI already has data ──
+    // Case 1: Client sent live odds → cards built synchronously
     if (!context.isPoliticalMarket && context.selectedCategory !== 'kalshi' && !isAmbiguous && !context.hasPlayerIntent && !context.hasFantasyIntent && (context.isSportsQuery || context.hasBettingIntent) && context.oddsData?.events?.length > 0) {
       const sportKey = context.sport || context.oddsData.sport || 'sports';
       const builtCards = oddsEventsToBettingCards(
@@ -1281,72 +470,60 @@ export async function POST(request: NextRequest) {
       );
       resolvedCards = builtCards;
       cardPromise = Promise.resolve(builtCards);
-      // enrichedPrompt already contains these odds from the earlier injection above
 
-    // ── Case 2: Reuse existing cards for truly general queries ────────────────
+    // Case 2: Reuse existing cards for truly general queries
     } else if (hasExistingCards) {
       cardPromise = Promise.resolve(existingCards as InsightCard[]);
 
-    // ── Case 3: Server must fetch cards — await first so AI references same data ──
+    // Case 3: Server must fetch cards — await first so AI references same data
     } else {
-      // Build the appropriate fetch promise for this query type
       let cardFetchPromise: Promise<InsightCard[]>;
 
       if (isAmbiguous) {
-        // Ambiguous query: show multi-sport real games and tell AI what's displayed
         cardFetchPromise = generateContextualCards('all', undefined, 7).catch(() => []);
 
       } else if (!context.isPoliticalMarket && context.selectedCategory === 'dfs') {
-        // DFS tab: fetch real player prop lines
         cardFetchPromise = generateContextualCards('dfs', context.sport ?? undefined, 7).catch(() => []);
 
       } else if (!context.isPoliticalMarket && context.selectedCategory !== 'kalshi' && ((context.hasFantasyIntent || hasADPIntent) || context.selectedCategory === 'fantasy') && (!context.hasBettingIntent || context.selectedCategory === 'fantasy' || hasADPIntent)) {
-        // Fantasy + specific player named → show that player's card (not a generic value board)
         if (context.playerName) {
           const intent = parseIntent(userMessage, context.sport ?? undefined);
           const resolvedPlayerName = context.playerName ?? (intent.players.length > 0 ? intent.players[0] : undefined);
           cardFetchPromise = generateContextualCards('player', context.sport ?? undefined, 1, false, undefined, { playerName: resolvedPlayerName })
             .catch(() => []);
         } else {
-        // Fantasy: warm projection cache (fire-and-forget) then generate fantasy cards
-        // Default to NFL when no sport specified — covers "start or sit", "waiver wire", etc.
-        const fantSport: 'mlb' | 'nfl' | 'nba' = context.sport === 'mlb' ? 'mlb'
-          : context.sport === 'nba' ? 'nba'
-          : 'nfl'; // covers americanfootball_nfl, undefined, and unknown
-        import('@/lib/fantasy/projections-cache')
-          .then(({ currentSeasonFor }) => {
-            const season = currentSeasonFor(fantSport);
-            return import('@/lib/fantasy/projections-seeder').then(({ seedProjectionsFromSupabase }) =>
-              seedProjectionsFromSupabase(fantSport, season)
-            );
-          })
-          .catch((err: unknown) => {
-            console.warn('[API/analyze] Projection seeding failed:', err instanceof Error ? err.message : String(err));
-          });
-        cardFetchPromise = import('@/lib/fantasy/cards/fantasy-card-generator')
-          .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 6, context.sport || undefined, {
-            teamCount: context.leagueSize ?? undefined,
-            scoringFormat: context.leagueScoringFormat ?? undefined,
-            isStartSit: hasStartSitIntent,
-          }))
-          .catch(() => generateContextualCards('fantasy', context.sport ?? undefined, 7).catch(() => []));
-        } // end else (no playerName)
+          const fantSport: 'mlb' | 'nfl' | 'nba' = context.sport === 'mlb' ? 'mlb'
+            : context.sport === 'nba' ? 'nba'
+            : 'nfl';
+          import('@/lib/fantasy/projections-cache')
+            .then(({ currentSeasonFor }) => {
+              const season = currentSeasonFor(fantSport);
+              return import('@/lib/fantasy/projections-seeder').then(({ seedProjectionsFromSupabase }) =>
+                seedProjectionsFromSupabase(fantSport, season)
+              );
+            })
+            .catch((err: unknown) => {
+              console.warn('[API/analyze] Projection seeding failed:', err instanceof Error ? err.message : String(err));
+            });
+          cardFetchPromise = import('@/lib/fantasy/cards/fantasy-card-generator')
+            .then(({ generateFantasyCards }) => generateFantasyCards(userMessage, 6, context.sport || undefined, {
+              teamCount: context.leagueSize ?? undefined,
+              scoringFormat: context.leagueScoringFormat ?? undefined,
+              isStartSit: hasStartSitIntent,
+            }))
+            .catch(() => generateContextualCards('fantasy', context.sport ?? undefined, 7).catch(() => []));
+        }
 
       } else if (!context.isPoliticalMarket && context.hasPlayerIntent) {
-        // Player-specific: Statcast/VPE cards.
-        // Use parseIntent to extract a player name from the query text when the client
-        // did not supply context.playerName (e.g. "Aaron Judge stats" with no playerName set).
         const intent = parseIntent(userMessage, context.sport ?? undefined);
         const resolvedPlayerName = context.playerName
           ?? (intent.players.length > 0 ? intent.players[0] : undefined);
         if (resolvedPlayerName && !context.playerName) {
           console.log(`[API/analyze] parseIntent extracted playerName="${resolvedPlayerName}" from query`);
         }
-        // Single player — show only their card, no supplementary betting cards.
         cardFetchPromise = generateContextualCards('player', context.sport ?? undefined, 1, false, undefined, { playerName: resolvedPlayerName }).catch(() => []);
 
       } else if (!context.isPoliticalMarket && context.selectedCategory !== 'kalshi' && (context.isSportsQuery || context.hasBettingIntent)) {
-        // Prop-specific queries: route to props category so real prop cards are generated
         const PROP_CARD_KEYWORDS = [
           'pitcher prop', 'pitcher props', 'batter prop', 'batter props',
           'player prop', 'player props', 'prop bet', 'prop bets', 'prop pick', 'prop picks',
@@ -1374,9 +551,6 @@ export async function POST(request: NextRequest) {
         }
 
       } else if (context.isPoliticalMarket || context.selectedCategory === 'kalshi' || (kalshiPromptMarkets && kalshiPromptMarkets.length > 0)) {
-        // Kalshi query — reuse prompt-bridge markets when available; otherwise fall back
-        // to generateContextualCards('kalshi'). Condition includes isPoliticalMarket so
-        // card generation fires even when the Kalshi fetch returned 0 markets.
         cardFetchPromise = import('@/lib/kalshi/index')
           .then(({ kalshiMarketToCard }) => {
             const cards = kalshiPromptMarkets!.map((m: any) => kalshiMarketToCard(m));
@@ -1385,7 +559,6 @@ export async function POST(request: NextRequest) {
           })
           .catch(() => generateContextualCards('kalshi', context.sport ?? undefined, 6, false, context.kalshiSubcategory).catch(() => []));
       } else {
-        // General / fallback — avoid triggering ADP/fantasy cards when there's no fantasy intent
         const isFantasyOrDFSCategory = category === 'fantasy' || category === 'dfs';
         const hasFantasyOrADPIntent = context.hasFantasyIntent || hasADPIntent;
         const validSelectedCategory = context.selectedCategory && ['betting', 'dfs', 'fantasy', 'kalshi', 'props'].includes(context.selectedCategory) ? context.selectedCategory : undefined;
@@ -1393,15 +566,11 @@ export async function POST(request: NextRequest) {
         cardFetchPromise = generateContextualCards(effectiveCategory, context.sport ?? undefined, 6, false, context.kalshiSubcategory).catch(() => []);
       }
 
-      // Await with a generous timeout — cards typically resolve in 600-900ms.
-      // If they exceed 5s we start AI with whatever we have (or empty).
       resolvedCards = await Promise.race([
         cardFetchPromise,
         new Promise<InsightCard[]>(resolve => setTimeout(() => resolve([]), 5000)),
       ]);
 
-      // Inject card context into enrichedPrompt so the AI knows what data the user sees.
-      // Only inject for real-data cards — skip when cards are empty or all fallback.
       const realCards = resolvedCards.filter(c => c.data?.realData === true || c.metadata?.realData === true);
       if (realCards.length > 0) {
         const cardCtx = cardsToPromptContext(realCards);
@@ -1413,38 +582,17 @@ export async function POST(request: NextRequest) {
 
       cardPromise = Promise.resolve(resolvedCards);
     }
-    // ── Guardrail 3: Token budget guard ──────────────────────────────────────
-    // Hard cap: 12k prompt tokens (~48k chars). If the enriched prompt exceeds
-    // this, truncate inline file sections rather than cutting arbitrary content.
-    const TOKEN_BUDGET_CHARS = 48_000;
-    if (enrichedPrompt.length > TOKEN_BUDGET_CHARS) {
-      const before = enrichedPrompt.length;
-      // Prefer to shrink inline file blocks first (they're already summarised)
-      enrichedPrompt = enrichedPrompt
-        .replace(/\[File:[^\]]+\]\n[\s\S]*?\n\[\.\.\. \d+ more rows[^\]]*\]/g, '[File: (truncated — use query_adp tool)]')
-        .slice(0, TOKEN_BUDGET_CHARS);
-      enrichedPrompt += '\n\n[CONTEXT TRIMMED — token budget. Full data available via query_adp tool.]';
-      console.warn(`[API/analyze] Token budget: trimmed ${before} → ${enrichedPrompt.length} chars (~${Math.ceil(before / 4)} → 12k tokens)`);
-    }
 
-    // ── AI generation starts now ──────────────────────────────────────────────
-
+    // ── Phase 8: Model selection + streamText ─────────────────────────────────
     const xaiApiKey = getGrokApiKey();
     const oddsApiKey = getOddsApiKey();
     const hasClientOddsData = !!(context.oddsData?.events?.length);
-    // All queries use grok-3-fast. deepThink overrides to grok-3-fast with extended reasoning.
-    // Fast-path queries skip extended reasoning for lower latency.
-    // ADP queries override to primary: reliable tool use requires the stronger model.
-    // isAmbiguous queries only need a short clarification reply — no need for primary.
     const useFastPath = body.deepThink ? false : (hasADPIntent ? false : (isAmbiguous || shouldUseFastModel(userMessage, context)));
     const primaryModel = body.deepThink ? AI_CONFIG.MODEL_NAME : (useFastPath ? AI_CONFIG.FAST_MODEL_NAME : AI_CONFIG.MODEL_NAME);
-    // Always log the resolved model so failures are immediately traceable in Vercel logs
+
     logger.info(LogCategory.AI, 'model_selected', {
       metadata: { model: primaryModel, fastPath: useFastPath, hasADPIntent, sport: context?.sport ?? null },
     });
-    // ── Pipeline observability log ────────────────────────────────────────────
-    // Single structured entry shows exactly which data sources are active for
-    // this request — makes debugging silent failures fast.
     console.log(LOG_PREFIXES.PIPELINE, {
       sport:    context.sport  ?? 'none',
       category,
@@ -1454,7 +602,7 @@ export async function POST(request: NextRequest) {
         odds:        hasClientOddsData || serverFetchedOdds,
         kalshi:      !!(kalshiSportsFallbackMarkets?.length) || context.isPoliticalMarket || context.selectedCategory === 'kalshi',
         adp:         hasADPIntent,
-        statcast:    expectsStatcastJSON || statcastInjected,
+        statcast:    expectsStatcastJSON || enrichment.statcastInjected,
         projections:   hasMLBProjectionIntent,
         hrPrediction:  hasHRPredictionIntent,
         fantasy:       !!(context.hasFantasyIntent),
@@ -1471,37 +619,23 @@ export async function POST(request: NextRequest) {
       keys: {
         XAI_API_KEY:    !!xaiApiKey,
         ODDS_API_KEY:   !!oddsApiKey,
-        KALSHI_API_KEY: !!(process.env.KALSHI_API_KEY_ID && process.env.KALSHI_PRIVATE_KEY),
       },
     });
+
     let aiText = '';
     let modelUsed: string = AI_CONFIG.MODEL_DISPLAY_NAME;
     let usedFallback = false;
+    let sentDoneEvent = false;
     let tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number } | null = null;
-    let pendingADPCard: InsightCard | null = null;
-    let pendingADPUploadCard: InsightCard | null = null;
-    let pendingStatcastCard: InsightCard | null = null;
-    let pendingHRPredictionCard: InsightCard | null = null;
-    let skipStatcastJSON = false;
 
-    // Card types that can come from the MLB_ANALYSIS_ADDENDUM JSON output
-    const STATCAST_CARD_TYPES = new Set([
-      'statcast_summary_card', 'hr_prop_card', 'game_simulation_card',
-      'leaderboard_card', 'pitch_analysis_card',
-    ]);
-
-    const _MAX_HALLUCINATION_RETRIES = 2; // reserved for future retry logic
-
-    // ── Image attachment validation ───────────────────────────────────────────
-    // Validate MIME type and estimated file size before forwarding to Grok.
+    // ── Image attachment validation ────────────────────────────────────────────
     const ALLOWED_IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-    const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+    const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
     const validatedImageAttachments = (body.imageAttachments ?? []).filter((img: ImageAttachment) => {
       if (!ALLOWED_IMAGE_MIMES.has(img.mimeType)) {
         console.warn(`[API/analyze] Rejected image with unsupported MIME type: ${img.mimeType}`);
         return false;
       }
-      // base64 encodes ~4/3 of raw bytes; multiply length × 0.75 to estimate bytes
       const estimatedBytes = (img.base64?.length ?? 0) * 0.75;
       if (estimatedBytes > MAX_IMAGE_BYTES) {
         console.warn(`[API/analyze] Rejected image exceeding size limit: ~${Math.round(estimatedBytes / 1024)}KB`);
@@ -1514,7 +648,6 @@ export async function POST(request: NextRequest) {
     /** Build the generateText call options supporting both text-only and multimodal */
     const buildGenOptions = (prompt: string, imgs?: ImageAttachment[]) => {
       if (imgs?.length) {
-        // Multimodal: images + text in messages array
         type ContentPart = { type: 'text'; text: string } | { type: 'image'; image: string; mimeType: string };
         const content: ContentPart[] = [{ type: 'text', text: prompt }];
         for (const img of imgs) {
@@ -1527,16 +660,7 @@ export async function POST(request: NextRequest) {
 
     /**
      * Build streamText/generateText call options with conversation memory.
-     *
-     * Returns { system, messages } where `system` is a plain string (the correct
-     * Vercel AI SDK pattern for xAI/Grok) and `messages` contains only user/assistant
-     * turns. A prior approach embedded the system prompt as role:'system' inside the
-     * messages array with Anthropic cacheControl providerOptions — xAI rejects both,
-     * causing AI_InvalidPromptError on every request.
-     *
-     * Conversation memory: prior user/assistant turns from `context.previousMessages`
-     * are injected before the new user message. Capped at the last 6 turns and
-     * ~4000 chars total to stay well under the model context window.
+     * Returns { system, messages } where `system` is a plain string.
      */
     const buildMessagesWithCacheAndMemory = (
       cachedSystem: string,
@@ -1545,14 +669,10 @@ export async function POST(request: NextRequest) {
       imgs: ImageAttachment[] | undefined,
       priorTurns: Array<{ role: string; content: string }> | undefined,
     ) => {
-      // Combine static system body + dynamic prefix (date, user profile) into one string.
       const system = dynamicSystem.trim().length > 0
         ? `${cachedSystem}\n\n${dynamicSystem}`
         : cachedSystem;
 
-      // Memory: include up to last 6 prior turns, normalized to user/assistant roles.
-      // Cap each message at 1500 chars and total memory at ~4000 chars to leave room
-      // for the new user message and the AI response within the model context window.
       const memoryMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
       if (Array.isArray(priorTurns) && priorTurns.length > 0) {
         const last6 = priorTurns.slice(-6);
@@ -1567,8 +687,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // User message: text-only or multimodal (image attachments)
-      let userMessage: { role: 'user'; content: string | Array<{ type: 'text'; text: string } | { type: 'image'; image: string; mimeType: string }> };
+      let userMessageObj: { role: 'user'; content: string | Array<{ type: 'text'; text: string } | { type: 'image'; image: string; mimeType: string }> };
       if (imgs?.length) {
         const content: Array<{ type: 'text'; text: string } | { type: 'image'; image: string; mimeType: string }> = [
           { type: 'text', text: userPrompt },
@@ -1576,19 +695,24 @@ export async function POST(request: NextRequest) {
         for (const img of imgs) {
           content.push({ type: 'image', image: img.base64, mimeType: img.mimeType });
         }
-        userMessage = { role: 'user', content };
+        userMessageObj = { role: 'user', content };
       } else {
-        userMessage = { role: 'user', content: userPrompt };
+        userMessageObj = { role: 'user', content: userPrompt };
       }
 
       const messages: ModelMessage[] = [
         ...memoryMessages,
-        userMessage as unknown as ModelMessage,
+        userMessageObj as unknown as ModelMessage,
       ];
       return { system, messages };
     };
 
-    // ── ADP tool (injected when hasADPIntent) ────────────────────────────────────
+    // ── TOOL DEFINITIONS ──────────────────────────────────────────────────────
+    // These tools close over context/detection variables and cannot easily be
+    // extracted without a significant interface refactor. They remain inline
+    // but are grouped under this section comment for clarity.
+
+    // ── ADP tool ─────────────────────────────────────────────────────────────
     const adpParams = z.object({
       player:    z.string().optional().describe('Partial player name — case-insensitive (e.g. "Judge", "Ohtani", "Trout")'),
       position:  z.string().optional().describe('Position filter: SP | RP | 1B | 2B | 3B | SS | OF | DH | C'),
@@ -1620,9 +744,6 @@ export async function POST(request: NextRequest) {
             error: 'ADP data is temporarily unavailable. Please try again shortly or consult nfc.shgn.com.',
           };
         }
-        // Live NFBC/NFFC boards typically have 300+ players. If we have ≤150, we are
-        // serving the 120-player static fallback (seeded directly or via Supabase after
-        // the live endpoint failed) — flag this so the AI warns the user.
         const adpIsStatic = data.length <= 150;
         const results = queryADP(data, { player, position, rankMin, rankMax, limit, team, valueOnly });
         return {
@@ -1634,7 +755,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // ── Statcast tool (injected when isMLBStatcastMode) ──────────────────────────
+    // ── Statcast tool ─────────────────────────────────────────────────────────
     const statcastParams = z.object({
       player:     z.string().optional().describe('Partial player name — case-insensitive (e.g. "Judge", "Ohtani")'),
       playerType: z.enum(['batter', 'pitcher']).optional().describe('Restrict to batters or pitchers only'),
@@ -1652,14 +773,10 @@ export async function POST(request: NextRequest) {
       inputSchema: statcastParams,
       execute: async ({ player, playerType, limit }: z.infer<typeof statcastParams>) => {
         console.log('[API/analyze] Statcast tool called:', { player, playerType, limit });
-
-        // 1. Season-level xwOBA/xBA/xSLG from Baseball Savant public API
         const { players: allPlayers, isLiveData, season } = await getStatcastData();
         const results = allPlayers.length > 0
           ? queryStatcast(allPlayers, { player, playerType, limit })
           : [];
-
-        // 2. Pitch-level aggregate from our Supabase statcast_events DB (recent 30 days)
         let dbAggregate = null;
         if (player) {
           try {
@@ -1669,7 +786,6 @@ export async function POST(request: NextRequest) {
             // non-fatal — DB may be empty if scraper hasn't run yet
           }
         }
-
         return {
           players: results,
           total_in_dataset: allPlayers.length,
@@ -1697,7 +813,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // ── MLB Projection Engine tool (injected when hasMLBProjectionIntent) ────────
+    // ── MLB Projection Engine tool ────────────────────────────────────────────
     const mlbProjectionParams = z.object({
       playerType: z.enum(['hitter', 'pitcher', 'all']).optional()
         .describe('Filter by player type: hitter, pitcher, or all (default: all)'),
@@ -1725,10 +841,6 @@ export async function POST(request: NextRequest) {
         try {
           const resolvedOutputFor = outputFor ?? 'projections';
           let cards: unknown[];
-
-          // Player-specific: always route to single-player projection regardless of outputFor.
-          // This covers all use cases (projections, betting edge, fantasy) in one call and
-          // prevents the AI from calling the tool twice with different outputFor values.
           if (player) {
             const { projectSinglePlayer } = await import('@/lib/mlb-projections/projection-pipeline');
             const type = playerType === 'all' || !playerType ? 'hitter' : playerType;
@@ -1757,7 +869,6 @@ export async function POST(request: NextRequest) {
               break;
             }
           }
-
           return {
             success: true,
             cards,
@@ -1780,9 +891,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // ── HR Prediction Tool (v3 engine: platoon scores + pitch mix vuln) ─────────
-    // Called when user asks about a specific player's HR probability today.
-    // Uses hr-prediction-bridge to resolve player name → game → pitcher → v3 output.
+    // ── HR Prediction tool ────────────────────────────────────────────────────
     const hrPredictionParams = z.object({
       player:  z.string().describe('Full or partial player name, e.g. "Aaron Judge", "Judge", "Ohtani"'),
       date:    z.string().optional().describe('Game date YYYY-MM-DD — defaults to today'),
@@ -1800,26 +909,16 @@ export async function POST(request: NextRequest) {
         try {
           const { predictHRForPlayer } = await import('@/lib/engine/hr-prediction-bridge');
           const result = await predictHRForPlayer({ playerName: player, date });
-          return {
-            success:      true,
-            type:         'hr_prediction_card',
-            player,
-            ...result,
-          };
+          return { success: true, type: 'hr_prediction_card', player, ...result };
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Unknown error';
           console.error('[API/analyze] predictHR tool error:', msg);
-          return {
-            success: false,
-            error:   msg,
-            player,
-            type:    'hr_prediction_card',
-          };
+          return { success: false, error: msg, player, type: 'hr_prediction_card' };
         }
       },
     });
 
-    // ── Kalshi Market Tools ───────────────────────────────────────────────────────
+    // ── Kalshi Market Tools ────────────────────────────────────────────────────
     const kalshiGetMarketsParams = z.object({
       category: z.enum(['election', 'sports', 'weather', 'finance', 'trending', 'all'])
         .optional()
@@ -1892,9 +991,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // ── get_live_odds tool — fetches real-time sportsbook odds on demand ─────────
-    // Triggered as a fallback when the user has betting intent but the pre-fetch
-    // did not inject odds (e.g. wrong sport detected, follow-up question, etc.).
+    // ── get_live_odds tool ─────────────────────────────────────────────────────
     const getLiveOddsParams = z.object({
       sport: z.string().describe('Sport key: basketball_nba | americanfootball_nfl | baseball_mlb | icehockey_nhl'),
     });
@@ -1922,14 +1019,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // ── Line movement / sharp money tool ─────────────────────────────────────
-    const LINE_MOVEMENT_KEYWORDS = [
-      'line movement', 'line move', 'line moves', 'steam move', 'steam',
-      'sharp money', 'sharp action', 'sharp bet', 'sharps', 'movers',
-      'reverse line movement', 'rlm', 'public money', 'biggest mover',
-    ];
-    const hasLineMovementIntent = LINE_MOVEMENT_KEYWORDS.some(k => rawQueryLower.includes(k));
-
+    // ── Line movement / sharp money tool ──────────────────────────────────────
     const getOddsMoversTool = tool({
       description: 'Fetch the biggest game-level line movements (spreads, totals, h2h) in the last 24 hours. Use when the user asks about line movement, steam moves, sharp money, or biggest movers.',
       inputSchema: z.object({
@@ -1953,18 +1043,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // ── Best props / prop picks tool ──────────────────────────────────────────
-    const PROPS_KEYWORDS = [
-      'best props', 'prop picks', 'top props', 'player props', 'prop bets',
-      'player prop', 'best bets props', 'prop value', 'favorite prop',
-      'pitcher props', 'pitcher prop', 'batter props', 'batter prop',
-      'strikeout prop', 'hr prop', 'k prop', 'hits prop', 'rbi prop',
-    ];
-    const hasPropsToolIntent = PROPS_KEYWORDS.some(k => rawQueryLower.includes(k));
-
-    // When props are requested but we already know no live game data exists,
-    // pre-warn the AI so it acknowledges data unavailability gracefully instead of
-    // hallucinating prop lines or saying the tool "failed".
+    // ── Best props / prop picks tool ───────────────────────────────────────────
+    // Pre-warn the AI when props are requested but no live game data exists
     if (hasPropsToolIntent && noLiveGamesDetected) {
       enrichedPrompt += `\n\n[Note: Player props data may be unavailable if no live games are currently scheduled. If the get_props_latest tool returns empty results, clearly acknowledge that live prop lines are not available for this sport today and offer alternatives: historical prop hit rates, season-long averages, or ask what the user wants to analyze instead.]`;
     }
@@ -1996,20 +1076,15 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // ── SSE streaming response — wraps AI generation + post-processing ──────────
+    // ── SSE streaming response ─────────────────────────────────────────────────
     const encoder = new TextEncoder();
     const sseChunk = (data: object) => encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
-    // safeEnqueue: wraps controller.enqueue so that writes after abort/close are silently dropped.
-    // The ReadableStream controller throws if enqueued after the stream is cancelled (e.g. client
-    // disconnects mid-generation), which would surface as an unhandled rejection in Vercel logs.
     let streamClosed = false;
     const safeEnqueue = (ctrl: ReadableStreamDefaultController, chunk: Uint8Array) => {
       if (streamClosed) return;
       try { ctrl.enqueue(chunk); } catch { streamClosed = true; }
     };
 
-    // Maps each tool name to a function that extracts a short human-readable
-    // summary from its result (shown inline in the chat as a tool-call badge).
     const toolResultSummary = (toolName: string, result: unknown): string => {
       try {
         const r = result as Record<string, unknown>;
@@ -2028,17 +1103,16 @@ export async function POST(request: NextRequest) {
 
     const responseStream = new ReadableStream({
       async start(controller) {
+        // Capture safeEnqueue for use in post-processor
+        const enqueue = (chunk: Uint8Array) => safeEnqueue(controller, chunk);
+
         try {
           if (xaiApiKey) {
             const primaryTimeoutMs = PRIMARY_TIMEOUT_MS(useFastPath);
             const abortCtrl = new AbortController();
-            // Record wall-clock start so the per-step timer reset can budget against
-            // total Vercel function time (60s hard limit).
             const streamStartMs = Date.now();
-            // 4s headroom before Vercel's 60s wall-clock kills the function.
             const VERCEL_BUDGET_MS = 56_000;
 
-            // streamText returns immediately; tokens arrive via textStream async iterable
             const streamResult = streamText({
               model: xaiNoEmptyContent(createXai({ apiKey: xaiApiKey })(primaryModel)),
               ...buildMessagesWithCacheAndMemory(
@@ -2054,10 +1128,6 @@ export async function POST(request: NextRequest) {
               abortSignal: abortCtrl.signal,
               onStepFinish: ({ toolCalls, toolResults }) => {
                 if (!toolCalls?.length) return;
-                // A tool-call step produces no text tokens, so the firstTokenTimer
-                // never resets in the text loop below. Reset it here so the NEXT
-                // step (the synthesising response) gets its own deadline instead of
-                // running out of the original budget that started before tool execution.
                 clearTimeout(firstTokenTimer);
                 const elapsed = Date.now() - streamStartMs;
                 const remaining = Math.max(8_000, VERCEL_BUDGET_MS - elapsed);
@@ -2071,27 +1141,19 @@ export async function POST(request: NextRequest) {
                   safeEnqueue(controller, sseChunk({ type: 'tool_call', name: tc.toolName, summary }));
                 }
               },
-              // stepCountIs capped at 2 for all tools — xAI's API rejects messages[6]+
-              // (3rd assistant tool-call) because it converts empty content to Anthropic
-              // format internally and then fails with cache_control on empty text blocks.
+              // stepCountIs capped at 2 for all tools — xAI rejects messages[6]+
               ...(hasADPIntent && { tools: { query_adp: adpTool }, stopWhen: stepCountIs(2) }),
               ...(hasHRPredictionIntent && { tools: { predict_hr: predictHRTool }, stopWhen: stepCountIs(2) }),
               ...(hasKalshiToolIntent && !hasHRPredictionIntent && !hasADPIntent && { tools: { kalshi_get_markets: kalshiGetMarketsTool, kalshi_get_price: kalshiGetPriceTool }, stopWhen: stepCountIs(2) }),
               ...(!hasHRPredictionIntent && !hasKalshiToolIntent && hasMLBProjectionIntent && { tools: { query_mlb_projections: mlbProjectionTool }, stopWhen: stepCountIs(2) }),
               ...(!hasHRPredictionIntent && !hasKalshiToolIntent && !hasMLBProjectionIntent && isMLBStatcastMode && { tools: { query_statcast: statcastTool }, stopWhen: stepCountIs(2) }),
-              // Line movement / sharp money queries
               ...(hasLineMovementIntent && { tools: { get_odds_movers: getOddsMoversTool }, stopWhen: stepCountIs(2) }),
-              // Best props queries
               ...(hasPropsToolIntent && !hasLineMovementIntent && { tools: { get_props_latest: getPropsLatestTool }, stopWhen: stepCountIs(2) }),
-              // Fallback: betting intent but no tool matched and no odds pre-injected → let Grok fetch live odds
               ...(!hasADPIntent && !hasHRPredictionIntent && !hasKalshiToolIntent && !hasMLBProjectionIntent && !isMLBStatcastMode && !hasLineMovementIntent && !hasPropsToolIntent && context.hasBettingIntent && !serverFetchedOdds && { tools: { get_live_odds: getLiveOddsTool }, stopWhen: stepCountIs(2) }),
-              // Deep Think: 3 max steps (more than 2 risks messages[6]+ cache_control error)
               ...(body.deepThink && { maxSteps: 3 }),
             });
 
-            // Emit individual card SSE frames as soon as cards resolve (concurrently with
-            // the AI text stream). For Cases 1/2/3 cardPromise is already synchronously
-            // resolved, so this fires on the next microtask — before the first text token.
+            // Emit card SSE frames as soon as cards resolve (concurrently with text stream)
             cardPromise.then(earlyCards => {
               for (const c of earlyCards) {
                 safeEnqueue(controller, sseChunk({ type: 'card', card: c }));
@@ -2100,12 +1162,8 @@ export async function POST(request: NextRequest) {
               console.warn('[v0] [ANALYZE] card SSE emit failed:', e instanceof Error ? e.message : e);
             });
 
-            // Abort if the first token doesn't arrive within the timeout budget.
-            // Declared with `let` so onStepFinish can reset it after tool calls.
             // eslint-disable-next-line prefer-const
             let firstTokenTimer = setTimeout(() => abortCtrl.abort(new Error('Primary timeout')), primaryTimeoutMs);
-
-            // Max chars to stream before truncating a runaway response
             const RESPONSE_CHAR_LIMIT = 8_000;
 
             try {
@@ -2113,9 +1171,8 @@ export async function POST(request: NextRequest) {
               let responseTruncated = false;
               for await (const delta of streamResult.textStream) {
                 if (!gotFirstToken) { gotFirstToken = true; clearTimeout(firstTokenTimer); }
-                if (responseTruncated) continue; // drain the stream without emitting
+                if (responseTruncated) continue;
                 if (aiText.length + delta.length > RESPONSE_CHAR_LIMIT) {
-                  // Emit the remaining chars up to the cap, then inject a notice
                   const remaining = RESPONSE_CHAR_LIMIT - aiText.length;
                   if (remaining > 0) {
                     const partial = delta.slice(0, remaining);
@@ -2135,7 +1192,7 @@ export async function POST(request: NextRequest) {
               clearTimeout(firstTokenTimer);
               modelUsed = useFastPath ? AI_CONFIG.FAST_MODEL_DISPLAY_NAME : AI_CONFIG.MODEL_DISPLAY_NAME;
 
-              // ── Capture token usage ────────────────────────────────────────────
+              // ── Capture token usage ─────────────────────────────────────────
               try {
                 const usage = await streamResult.usage;
                 if (usage) {
@@ -2144,9 +1201,6 @@ export async function POST(request: NextRequest) {
                     completionTokens: usage.outputTokens ?? 0,
                     totalTokens: usage.totalTokens ?? 0,
                   };
-                  // Anthropic prompt cache metrics — only present when caching is honored
-                  // by the upstream provider. xAI proxies to Anthropic so these may flow
-                  // through. Logged for visibility into cache hit rate.
                   const anthrUsage = usage as Record<string, unknown>;
                   const cacheRead = anthrUsage.cacheReadInputTokens as number | undefined;
                   const cacheWrite = anthrUsage.cacheCreationInputTokens as number | undefined;
@@ -2158,171 +1212,118 @@ export async function POST(request: NextRequest) {
                   }
                 }
               } catch {
-                // Non-fatal — usage may not be available for all model configurations
+                // Non-fatal
               }
 
-              // ── Capture tool results after streaming completes ──────────────────
+              // ── Phase 9: Post-processing + done SSE ───────────────────────
               const allToolResults: any[] = await (streamResult as any).toolResults ?? [];
               const allToolCalls: any[] = await (streamResult as any).toolCalls ?? [];
 
-              // ADP tool results
-              if (hasADPIntent) {
-                const adpResult = allToolResults.find((tr: any) => tr.toolName === 'query_adp');
-                if (adpResult?.result?.players?.length > 0) {
-                  const tr = adpResult.result;
-                  const callArgs = allToolCalls.find((tc: any) => tc.toolName === 'query_adp')?.args ?? {};
-            const adpSource = tr.source ?? `NFBC ${NFBC_DRAFT_YEAR} ADP`;
-            const isNFLResult = adpSource.includes('NFFC') || adpSource.includes('NFL');
-            const adpBrand = isNFLResult ? 'NFFC' : 'NFBC';
-            let cardTitle = isNFLResult
-              ? `NFFC ${NFBC_DRAFT_YEAR} NFL ADP Rankings`
-              : `NFBC ${NFBC_DRAFT_YEAR} ADP Rankings`;
-            if (callArgs.player) {
-              const name = tr.players[0]?.displayName ?? callArgs.player;
-              cardTitle = `${name} — ${adpBrand} ADP`;
-            } else if (callArgs.position) {
-              const rankSuffix = callArgs.rankMax ? ` (Top ${callArgs.rankMax})` : '';
-              cardTitle = `Top ${callArgs.position}${rankSuffix} — ${adpBrand} ADP Board`;
-            } else if (callArgs.rankMin != null || callArgs.rankMax != null) {
-              const lo = callArgs.rankMin ?? 1;
-              const hi = callArgs.rankMax ?? tr.total_players_in_dataset;
-              cardTitle = `${adpBrand} ADP Picks #${lo}–${hi}`;
-            }
-            pendingADPCard = {
-              type: 'adp-analysis',
-              title: cardTitle,
-              category: isNFLResult ? 'NFL' : 'MLB',
-              subcategory: isNFLResult ? 'NFFC Draft Board' : 'NFBC Draft Board',
-              gradient: isNFLResult
-                ? 'from-green-600/80 via-emerald-700/60 to-green-900/40'
-                : 'from-cyan-600/80 via-teal-700/60 to-cyan-900/40',
-              status: 'value',
-              realData: !tr.is_static_fallback,
-              icon: isNFLResult ? '🏈' : '⚾',
-              data: {
-                players: JSON.stringify(tr.players),
-                source: adpSource,
-                totalInDataset: tr.total_players_in_dataset,
-              },
-            };
+              const toolOutput = extractToolResults(allToolResults, allToolCalls, detection, context);
+              const { cards: finalCards, aiText: processedAiText } = assembleFinalCards(
+                await cardPromise.catch(() => []),
+                toolOutput,
+                aiText,
+                detection,
+                context,
+                noLiveGamesDetected,
+                usedFallback,
+                enqueue,
+                sseChunk,
+                logger,
+                LogCategory,
+              );
+              aiText = processedAiText;
 
-            // When serving static fallback, also emit an upload card so the user
-            // can provide the real TSV without leaving the chat.
-            if (tr.is_static_fallback) {
-              pendingADPUploadCard = {
-                type: 'adp-upload',
-                title: isNFLResult ? 'Upload NFFC Football ADP' : 'Upload NFBC Baseball ADP',
-                icon: isNFLResult ? '🏈' : '⚾',
-                category: isNFLResult ? 'NFL' : 'MLB',
-                subcategory: isNFLResult ? 'NFFC ADP Upload' : 'NFBC ADP Upload',
-                gradient: 'from-violet-600/80 via-purple-700/60 to-violet-900/40',
-                status: 'pending',
-                realData: false,
-                data: { sport: isNFLResult ? 'nfl' : 'mlb' },
-              };
-            }
-                }
-              }
+              const processingTime = Date.now() - startTime;
+              logger.info(LogCategory.AI, 'response_complete', {
+                metadata: { cardCount: finalCards.length, clarification: isAmbiguous, sport: context?.sport ?? null, latencyMs: processingTime },
+              });
 
-              // HR Prediction tool results
-              if (hasHRPredictionIntent) {
-                const hrResult = allToolResults.find((tr: any) => tr.toolName === 'predict_hr');
-                if (hrResult?.result) {
-                  const hr = hrResult.result;
-                  pendingHRPredictionCard = {
-                    type:       'hr_prediction_card',
-                    title:      `${hr.player ?? 'Player'} — HR Prediction`,
-                    icon:       '💣',
-                    category:   'MLB',
-                    subcategory: 'HR Prop · v3 Engine',
-                    gradient:   'from-rose-600/20 via-red-900/15 to-slate-900/40',
-                    status:     hr.success ? 'edge' : 'neutral',
-                    realData:   true,
-                    data:       hr,
-                  };
-                  console.log('[API/analyze] HR prediction card built for:', hr.player);
-                } else {
-                  // Tool didn't fire or returned undefined — emit a degraded card so the
-                  // UI slot is never silently empty when the user asked for a HR prediction.
-                  pendingHRPredictionCard = {
-                    type:       'hr_prediction_card',
-                    title:      'HR Prediction',
-                    icon:       '💣',
-                    category:   'MLB',
-                    subcategory: 'HR Prop · v3 Engine',
-                    gradient:   'from-rose-600/20 via-red-900/15 to-slate-900/40',
-                    status:     'neutral',
-                    realData:   false,
-                    data:       {
-                      success: false,
-                      error:   'Live MLB data unavailable — prediction could not be generated.',
-                      player:  'Unknown',
-                      type:    'hr_prediction_card',
-                    },
-                  };
-                  console.warn('[API/analyze] HR prediction tool did not fire — emitting degraded card');
-                }
-              }
-
-              // Statcast tool results — only relevant when MLB_ANALYSIS_ADDENDUM is active
-              if (expectsStatcastJSON) {
-                const statcastResult = allToolResults.find((tr: any) => tr.toolName === 'query_statcast');
-                if (statcastResult) {
-                  const srPlayers: StatcastPlayer[] = statcastResult.result?.players ?? [];
-                  if (srPlayers.length === 0) {
-                    skipStatcastJSON = true;
-                    console.warn('[API/analyze] Statcast tool returned no players — skipping JSON card mode');
-                  } else {
-                    const srSource: string = statcastResult.result?.source ?? 'Baseball Savant';
-                    // Build a fallback card for single-player lookups (≤3 results = targeted query)
-                    if (srPlayers.length <= 3) {
-                      const p = srPlayers[0];
-                      const fmt = (n: number | undefined, decimals = 1) =>
-                        n != null ? n.toFixed(decimals) : 'N/A';
-                      const fmtAvg = (n: number | undefined) =>
-                        n != null ? n.toFixed(3).replace(/^0/, '') : 'N/A';
-                      pendingStatcastCard = {
-                        type: 'statcast_summary_card',
-                        title: `${p.name} — Statcast Profile`,
-                        category: 'MLB',
-                        subcategory: p.playerType === 'pitcher' ? 'Pitcher Metrics' : 'Contact Quality',
-                        gradient: 'from-indigo-600/80 via-violet-700/60 to-indigo-900/40',
-                        status: 'edge',
-                        icon: '⚾',
-                        realData: srSource.includes('real data'),
-                        summary_metrics: p.playerType === 'pitcher'
-                          ? [
-                              { label: 'xwOBA Against', value: fmtAvg(p.xwoba) },
-                              { label: 'Barrel % Against', value: `${fmt(p.barrelRate)}%` },
-                              { label: 'Hard Hit % Against', value: `${fmt(p.hardHitPct)}%` },
-                              { label: 'Exit Velo Against', value: `${fmt(p.exitVelocity)} mph` },
-                              { label: 'Sweet Spot % Against', value: `${fmt(p.sweetSpotPct)}%` },
-                            ]
-                          : [
-                              { label: 'xBA', value: fmtAvg(p.xba) },
-                              { label: 'xwOBA', value: fmtAvg(p.xwoba) },
-                              { label: 'Sweet Spot %', value: `${fmt(p.sweetSpotPct)}%` },
-                              { label: 'Hard Hit %', value: `${fmt(p.hardHitPct)}%` },
-                              { label: 'Barrel %', value: `${fmt(p.barrelRate)}%` },
-                            ],
-                        last_updated: srSource,
-                        data: { source: srSource },
-                      };
-                    }
+              const hasRealOdds = !!(context.oddsData?.events?.length > 0);
+              const baseMetrics = usedFallback
+                ? {
+                    benfordIntegrity: 65,
+                    oddsAlignment: 65,
+                    marketConsensus: 65,
+                    historicalAccuracy: 68,
+                    finalConfidence: 65,
+                    trustLevel: 'medium' as const,
+                    riskLevel: 'medium' as const,
+                    adjustedTone: 'Limited data — AI unavailable',
+                    flags: [{ type: 'info', message: 'Using fallback mode — AI temporarily unavailable', severity: 'info' as const }],
                   }
-                }
+                : detectHallucinations(aiText, userMessage, context.oddsData, { category, hasBettingIntent: context.hasBettingIntent });
+
+              const trustMetrics = (hasRealOdds && !usedFallback)
+                ? {
+                    ...baseMetrics,
+                    oddsAlignment: Math.min(99, (baseMetrics.oddsAlignment ?? 80) + 8),
+                    marketConsensus: Math.min(99, (baseMetrics.marketConsensus ?? 80) + 6),
+                    finalConfidence: Math.min(99, (baseMetrics.finalConfidence ?? 80) + 5),
+                    adjustedTone: baseMetrics.finalConfidence >= 85 ? 'Strong signal — live data verified' : baseMetrics.adjustedTone,
+                  }
+                : baseMetrics;
+
+              const sources: Array<{ name: string; type: string; reliability: number }> = [
+                usedFallback
+                  ? { name: 'Fallback Mode', type: 'cache' as const, reliability: 65 }
+                  : DEFAULT_SOURCES.GROK_AI,
+              ];
+              if (hasRealOdds) sources.push(DEFAULT_SOURCES.ODDS_API);
+              if (context.isPoliticalMarket) sources.push(DEFAULT_SOURCES.KALSHI);
+              if (context.hasFantasyIntent && !context.hasBettingIntent) {
+                sources.push({ name: 'Fantasy Projections Engine', type: 'database' as const, reliability: 91 });
               }
+              if (hasADPIntent) {
+                const isNFLContext = context?.sport?.includes('football') || context?.sport === 'nfl' || rawQueryLower.includes('nffc') || rawQueryLower.includes('nfl draft') || rawQueryLower.includes('fantasy football');
+                const adpBoardName = isNFLContext
+                  ? `NFFC ${new Date().getFullYear()} NFL ADP Board`
+                  : `NFBC ${new Date().getFullYear()} ADP Board`;
+                sources.push({ name: adpBoardName, type: 'api' as const, reliability: 97 });
+              }
+
+              // Store successful response in dedup cache
+              if (aiText && !usedFallback) {
+                dedupCache.set(queryHash, {
+                  text: aiText,
+                  cards: finalCards,
+                  confidence: trustMetrics.finalConfidence,
+                  ts: Date.now(),
+                });
+              }
+
+              const responsePayloadSize = aiText.length + JSON.stringify(finalCards).length;
+              console.log(
+                `[API/analyze] done — text=${aiText.length}B cards=${finalCards.length} payload≈${responsePayloadSize}B` +
+                (tokenUsage ? ` tokens=${tokenUsage.totalTokens}` : '') +
+                ` time=${processingTime}ms`,
+              );
+
+              sentDoneEvent = true;
+              safeEnqueue(controller, sseChunk({
+                type: 'done',
+                success: true,
+                text: aiText,
+                cards: finalCards,
+                confidence: trustMetrics.finalConfidence,
+                sources,
+                modelUsed,
+                trustMetrics,
+                processingTime,
+                useFallback: usedFallback,
+                clarificationNeeded: isAmbiguous || noLiveGamesDetected,
+                clarificationOptions,
+                ...(tokenUsage && { tokenUsage }),
+              }));
 
             } catch (streamErr) {
               clearTimeout(firstTokenTimer);
-              // Primary stream failed — fall back to generateText (no streaming for fallback)
               const alreadyFast = useFastPath;
               const actualFallbackModel = alreadyFast ? AI_CONFIG.MODEL_NAME : AI_CONFIG.FAST_MODEL_NAME;
               const errBody = (() => {
                 if (streamErr && typeof streamErr === 'object') {
                   const e = streamErr as Record<string, unknown>;
-                  // Detect xAI's Anthropic-format invalid_request_error (cache_control on empty
-                  // text block) — log a clean diagnostic instead of the raw API response body.
                   const responseBody = typeof e.responseBody === 'string' ? e.responseBody : '';
                   if (responseBody.includes('cache_control') || responseBody.includes('invalid_request_error')) {
                     return { summary: 'xAI 400 invalid_request_error (multi-step tool call exceeded safe depth)', isBadRequest: true };
@@ -2341,7 +1342,7 @@ export async function POST(request: NextRequest) {
                     cachedSystem,
                     dynamicSystem,
                     enrichedPrompt,
-                    undefined, // fallback path is text-only
+                    undefined,
                     context?.previousMessages,
                   ),
                   temperature: AI_CONFIG.DEFAULT_TEMPERATURE,
@@ -2357,8 +1358,6 @@ export async function POST(request: NextRequest) {
               } catch (fallbackErr) {
                 const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
                 console.error('[API/analyze] Fallback also failed:', fallbackMsg);
-                // Surface rate-limit and auth errors as SSE error events so the
-                // client can show a meaningful message instead of a silent fallback.
                 const primaryStatus = (streamErr as Record<string, unknown>)?.statusCode as number | undefined;
                 const isRateLimit = primaryStatus === 429 || fallbackMsg.includes('429') || fallbackMsg.toLowerCase().includes('rate limit');
                 const isAuthError = primaryStatus === 401 || fallbackMsg.includes('401') || fallbackMsg.toLowerCase().includes('unauthorized');
@@ -2384,211 +1383,39 @@ export async function POST(request: NextRequest) {
             safeEnqueue(controller, sseChunk({ type: 'text', delta: aiText }));
           }
 
-          // ── Post-processing: cards, trust metrics, done event ─────────────────
-          let cards: InsightCard[] = await cardPromise.catch(() => []);
-
-          if (pendingHRPredictionCard) cards = [pendingHRPredictionCard, ...cards.slice(0, 4)];
-          if (pendingADPCard) {
-            if (context.hasPlayerIntent) {
-              // Player card stays as hero; ADP card goes after it as a thumbnail
-              cards = [cards[0], pendingADPCard, ...cards.slice(1, 5)].filter(Boolean) as InsightCard[];
-            } else {
-              cards = [pendingADPCard, ...cards.slice(0, 5)];
-            }
-          }
-          if (pendingADPUploadCard) cards = [...cards, pendingADPUploadCard];
-
-          // MLB Statcast: parse Grok's JSON response into a card.
-          // Runs for all MLB queries (not just expectsStatcastJSON) because the AI occasionally
-          // generates a valid card JSON even when the ADP or projection addendum is active.
-          // Projection / DFS / stack queries normally return prose — the inner type-check guard
-          // (STATCAST_CARD_TYPES.has) prevents spurious parses of non-card JSON.
-          if (isMLBQuery && !usedFallback && !skipStatcastJSON) {
-            /** Attempt to parse a JSON string and return it if it has a valid Statcast card type. */
-            const tryParseStatcastCard = (src: string): Record<string, unknown> | null => {
-              try {
-                const p = JSON.parse(src) as Record<string, unknown>;
-                if (
-                  p !== null &&
-                  typeof p === 'object' &&
-                  typeof p.type === 'string' &&
-                  STATCAST_CARD_TYPES.has(p.type) &&
-                  typeof p.title === 'string' &&
-                  Array.isArray(p.summary_metrics)
-                ) {
-                  return p;
-                }
-              } catch {
-                // not valid JSON — try next candidate
-              }
-              return null;
+          // ── Post-processing when done event wasn't sent by the success path ──
+          // Covers: (1) no API key, (2) primary stream failed + fallback succeeded,
+          // (3) primary stream failed + fallback also failed (usedFallback=true).
+          if (!sentDoneEvent) {
+            let cards: InsightCard[] = await cardPromise.catch(() => []);
+            const processingTime = Date.now() - startTime;
+            const trustMetrics = {
+              benfordIntegrity: 65, oddsAlignment: 65, marketConsensus: 65,
+              historicalAccuracy: 68, finalConfidence: 65,
+              trustLevel: 'medium' as const, riskLevel: 'medium' as const,
+              adjustedTone: 'Limited data — AI unavailable',
+              flags: [{ type: 'info', message: 'Using fallback mode — AI temporarily unavailable', severity: 'info' as const }],
             };
-
-            // Build candidate list ordered by specificity:
-            // 1. ```json ... ``` or ``` ... ``` code fences (Grok sometimes wraps JSON despite instructions)
-            // 2. Non-greedy {...} blocks (avoids merging adjacent objects)
-            // 3. Full greedy {...} span as last resort (handles deeply-nested objects)
-            const jsonCandidates: string[] = [];
-            const codeFenceMatch = aiText.match(/```(?:json)?\s*([\s\S]*?)```/);
-            if (codeFenceMatch) jsonCandidates.push(codeFenceMatch[1].trim());
-            for (const m of aiText.matchAll(/\{[\s\S]*?\}/g)) jsonCandidates.push(m[0]);
-            const fullSpanMatch = aiText.match(/\{[\s\S]*\}/);
-            if (fullSpanMatch) jsonCandidates.push(fullSpanMatch[0]);
-
-            let parsedStatcast: Record<string, unknown> | null = null;
-            for (const candidate of jsonCandidates) {
-              parsedStatcast = tryParseStatcastCard(candidate);
-              if (parsedStatcast) break;
-            }
-
-            if (parsedStatcast) {
-              const statcastCard: InsightCard = { icon: '⚾', ...parsedStatcast } as InsightCard;
-              cards = [statcastCard, ...cards.slice(0, 5)];
-              pendingStatcastCard = null;
-              const metricLines = ((parsedStatcast.summary_metrics as { label: string; value: string }[] | undefined) ?? [])
-                .slice(0, 3)
-                .map((m: { label: string; value: string }) => `**${m.label}:** ${m.value}`)
-                .join(' · ');
-              const cleanText = [
-                `**${parsedStatcast.title}** — MLB Statcast Analysis`,
-                metricLines,
-                'See the card below for the full breakdown and splits.',
-              ].filter(Boolean).join('\n');
-              aiText = cleanText;
-              // Replace the raw JSON the client already received with readable prose
-              safeEnqueue(controller, sseChunk({ type: 'replace', text: cleanText }));
-            } else if (expectsStatcastJSON) {
-              // Grok returned markdown/text despite JSON instructions — log with context
-              // so we can diagnose prompt-compliance issues without surface-level noise.
-              // Only warn when expectsStatcastJSON=true; prose is correct for all other paths.
-              const preview = aiText.slice(0, 120).replace(/\n/g, ' ');
-              logger.warn(LogCategory.API, '[API/analyze] MLB Statcast JSON not found in response — prose fallback', {
-                metadata: { previewChars: preview, responseLength: aiText.length, hasCodeFence: aiText.includes('```'), hasBrace: aiText.includes('{') },
-              });
-            }
-          }
-
-          if (pendingStatcastCard) {
-            if (!STATCAST_CARD_TYPES.has(cards[0]?.type as string)) {
-              cards = [pendingStatcastCard, ...cards.slice(0, 5)];
-              console.log('[API/analyze] Injected Statcast fallback card:', pendingStatcastCard.title);
-            }
-          }
-
-          if (cards.length === 0 && !isAmbiguous && !usedFallback && context.sport) {
-            const bullets = (aiText.match(/^[-•]\s+(.+)$/gm) ?? []).slice(0, 3);
-            if (bullets.length > 0) {
-              const sportGradients: Record<string, string> = {
-                nba: 'from-orange-600/20 to-orange-900/10',
-                nfl: 'from-blue-600/20 to-blue-900/10',
-                mlb: 'from-red-600/20 to-red-900/10',
-                nhl: 'from-cyan-600/20 to-cyan-900/10',
-                ncaab: 'from-indigo-600/20 to-indigo-900/10',
-                ncaaf: 'from-yellow-600/20 to-yellow-900/10',
-              };
-              const sport = context.sport.toLowerCase();
-              cards = bullets.map(b => ({
-                type: 'betting-insight',
-                title: `${sport.toUpperCase()} Analysis`,
-                category: sport,
-                subcategory: 'AI Analysis',
-                gradient: sportGradients[sport] ?? 'from-blue-600/20 to-purple-900/10',
-                data: { insight: b.replace(/^[-•]\s+/, ''), source: 'Grok 4' },
-                status: 'neutral',
-                realData: false,
-              } as InsightCard));
-            }
-          }
-
-          const processingTime = Date.now() - startTime;
-          logger.info(LogCategory.AI, 'response_complete', {
-            metadata: { cardCount: cards.length, clarification: isAmbiguous, sport: context?.sport ?? null, latencyMs: processingTime },
-          });
-
-          const hasRealOdds = !!(context.oddsData?.events?.length > 0);
-          const baseMetrics = usedFallback
-            ? {
-                benfordIntegrity: 65,
-                oddsAlignment: 65,
-                marketConsensus: 65,
-                historicalAccuracy: 68,
-                finalConfidence: 65,
-                trustLevel: 'medium' as const,
-                riskLevel: 'medium' as const,
-                adjustedTone: 'Limited data — AI unavailable',
-                flags: [{ type: 'info', message: 'Using fallback mode — AI temporarily unavailable', severity: 'info' as const }],
-              }
-            : detectHallucinations(aiText, userMessage, context.oddsData, { category, hasBettingIntent: context.hasBettingIntent });
-
-          const trustMetrics = (hasRealOdds && !usedFallback)
-            ? {
-                ...baseMetrics,
-                oddsAlignment: Math.min(99, (baseMetrics.oddsAlignment ?? 80) + 8),
-                marketConsensus: Math.min(99, (baseMetrics.marketConsensus ?? 80) + 6),
-                finalConfidence: Math.min(99, (baseMetrics.finalConfidence ?? 80) + 5),
-                adjustedTone: baseMetrics.finalConfidence >= 85 ? 'Strong signal — live data verified' : baseMetrics.adjustedTone,
-              }
-            : baseMetrics;
-
-          const sources: Array<{ name: string; type: string; reliability: number }> = [
-            usedFallback
-              ? { name: 'Fallback Mode', type: 'cache' as const, reliability: 65 }
-              : DEFAULT_SOURCES.GROK_AI,
-          ];
-          if (hasRealOdds) sources.push(DEFAULT_SOURCES.ODDS_API);
-          if (context.isPoliticalMarket) sources.push(DEFAULT_SOURCES.KALSHI);
-          if (context.hasFantasyIntent && !context.hasBettingIntent) {
-            sources.push({ name: 'Fantasy Projections Engine', type: 'database' as const, reliability: 91 });
-          }
-          if (hasADPIntent) {
-            const isNFLContext = context?.sport?.includes('football') || context?.sport === 'nfl' || rawQueryLower.includes('nffc') || rawQueryLower.includes('nfl draft') || rawQueryLower.includes('fantasy football');
-            const adpBoardName = isNFLContext
-              ? `NFFC ${new Date().getFullYear()} NFL ADP Board`
-              : `NFBC ${new Date().getFullYear()} ADP Board`;
-            sources.push({ name: adpBoardName, type: 'api' as const, reliability: 97 });
-          }
-
-          // When no live game data was found, strip out realData:false placeholder cards
-          // (e.g. "No Games Available" banners). They render with empty odds fields
-          // and look like broken cards. The clarification pills guide the user instead.
-          const finalCards = noLiveGamesDetected
-            ? cards.filter((c: InsightCard) => c.data?.realData !== false && c.metadata?.realData !== false)
-            : cards;
-
-          // ── Guardrail 4: store successful response in dedup cache ────────────
-          if (aiText && !usedFallback) {
-            dedupCache.set(queryHash, {
+            const finalCards = noLiveGamesDetected
+              ? cards.filter((c: InsightCard) => c.data?.realData !== false && c.metadata?.realData !== false)
+              : cards;
+            const sources = [{ name: 'Fallback Mode', type: 'cache' as const, reliability: 65 }];
+            console.log(`[API/analyze] done (fallback) — text=${aiText.length}B cards=${finalCards.length} time=${processingTime}ms`);
+            safeEnqueue(controller, sseChunk({
+              type: 'done',
+              success: true,
               text: aiText,
               cards: finalCards,
-              confidence: trustMetrics.finalConfidence,
-              ts: Date.now(),
-            });
+              confidence: 65,
+              sources,
+              modelUsed,
+              trustMetrics,
+              processingTime,
+              useFallback: true,
+              clarificationNeeded: isAmbiguous || noLiveGamesDetected,
+              clarificationOptions,
+            }));
           }
-
-          // Log response metrics for size monitoring
-          const responsePayloadSize = aiText.length + JSON.stringify(finalCards).length;
-          console.log(
-            `[API/analyze] done — text=${aiText.length}B cards=${finalCards.length} payload≈${responsePayloadSize}B` +
-            (tokenUsage ? ` tokens=${tokenUsage.totalTokens}` : '') +
-            ` time=${processingTime}ms`,
-          );
-
-          // Send done event with full metadata
-          safeEnqueue(controller, sseChunk({
-            type: 'done',
-            success: true,
-            text: aiText,
-            cards: finalCards,
-            confidence: trustMetrics.finalConfidence,
-            sources,
-            modelUsed,
-            trustMetrics,
-            processingTime,
-            useFallback: usedFallback,
-            clarificationNeeded: isAmbiguous || noLiveGamesDetected,
-            clarificationOptions,
-            ...(tokenUsage && { tokenUsage }),
-          }));
 
         } catch (innerError) {
           console.error('[API/analyze] Stream controller error:', innerError);
@@ -2629,11 +1456,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[API/analyze] Unhandled error:', error);
 
-    // Check if timeout or abort error
     if (error instanceof Error && (error.message.includes('timeout') || error.name === 'AbortError')) {
       return NextResponse.json(
         {
-          success: true, // Return success with fallback to avoid breaking UI
+          success: true,
           text: generateFallbackResponse(
             'Analysis request',
             { noGamesAvailable: true, sport: 'sports' }
@@ -2673,57 +1499,4 @@ export async function POST(request: NextRequest) {
       { status: HTTP_STATUS.INTERNAL_ERROR }
     );
   }
-}
-
-// ============================================================================
-// Fallback response when AI is unavailable
-// ============================================================================
-
-function generateFallbackResponse(
-  userMessage: string,
-  context: AnalyzeRequestBody['context'] = {}
-): string {
-  const lowerMsg = userMessage.toLowerCase();
-
-  // With live odds data, summarize what we found
-  if (context?.oddsData?.events?.length) {
-    const count = context.oddsData.events.length;
-    const sport = context.oddsData.sport?.replace('_', ' ').toUpperCase() || 'sports';
-    const sample = context.oddsData.events.slice(0, 3).map((e: any) => {
-      const book = e.bookmakers?.[0];
-      const h2h = book?.markets?.find((m: any) => m.key === 'h2h');
-      const home = h2h?.outcomes?.find((o: any) => o.name === e.home_team);
-      const away = h2h?.outcomes?.find((o: any) => o.name === e.away_team);
-      return `• ${e.away_team} @ ${e.home_team}: ${e.away_team} ${away?.price > 0 ? '+' : ''}${away?.price ?? 'N/A'} / ${e.home_team} ${home?.price > 0 ? '+' : ''}${home?.price ?? 'N/A'}`;
-    }).join('\n');
-    return `**Live ${sport} Games (${count} available)**\n\nHere are the current moneylines:\n${sample}\n\n• For AI-powered sharp money analysis, please try again in a moment.`;
-  }
-
-  // No live games — give a useful knowledge-based response
-  if (context?.noGamesAvailable || (context?.sport && !context?.oddsData)) {
-    const sport = context.sport?.toUpperCase() || 'sports';
-    if (lowerMsg.includes('offseason') || lowerMsg.includes('trade') || lowerMsg.includes('free agent')) {
-      return `**${sport} Offseason Analysis**\n\n• No live games are scheduled right now, but there's plenty of betting value to track in the offseason.\n• Monitor futures markets — championship odds often offer the best value before spring/summer public betting shifts prices.\n• Track free agency signings and trades: roster changes are the #1 driver of futures line movement.\n• Win totals are set early in the offseason and tend to close toward public perception — sharp bettors target the opening numbers.`;
-    }
-    return `**${sport} Analysis**\n\n• No live games are currently scheduled. ${sport} season games typically post odds 24–48 hours before tip/kickoff.\n• In the meantime, futures markets (division winner, championship odds) are open year-round.\n• This is a great time to research team trends, injury reports, and schedule strength ahead of the season.`;
-  }
-
-  // General betting/strategy question
-  if (lowerMsg.includes('arbitrage') || lowerMsg.includes('arb')) {
-    return `**Arbitrage Betting**\n\n• Arbitrage occurs when odds discrepancies between sportsbooks guarantee profit regardless of outcome.\n• Example: Book A has Team A at +105, Book B has Team B at -100 — you can cover both sides for guaranteed profit.\n• Typical arb margins: 1–3%. Higher margins are rare and close quickly.\n• Best found on: player props, alternative lines, early morning odds before sharp action.\n• Use the live data cards above to find current arbitrage opportunities across books.`;
-  }
-
-  if (lowerMsg.includes('kelly') || lowerMsg.includes('bankroll')) {
-    return `**Bankroll Management (Kelly Criterion)**\n\n• Kelly Formula: f = (bp - q) / b, where b = decimal odds-1, p = win probability, q = 1-p.\n• Most pros use "quarter Kelly" (25% of full Kelly) to reduce variance.\n• Rule of thumb: never bet more than 3–5% of bankroll on a single play.\n• Flat betting (1–2 units per game) is more sustainable for recreational bettors.\n• Track ROI per sport/bet type to find your real edges over time.`;
-  }
-
-  if (lowerMsg.includes('dfs') || lowerMsg.includes('draftkings') || lowerMsg.includes('fanduel')) {
-    return `**DFS Strategy**\n\n• Cash games: target high-floor players (consistent producers, good matchups, safe volume).\n• GPP tournaments: need leverage — rostering underowned players at premium positions.\n• Correlation stacking: QB + WR + opposing pass catcher is the most proven NFL GPP stack.\n• Ownership matters: in large field GPPs, a 70% owned chalk player who scores 30 pts barely moves the needle.\n• Target salary inefficiencies: players priced down due to one bad game but with strong underlying metrics.`;
-  }
-
-  if (context?.isPoliticalMarket || lowerMsg.includes('kalshi') || lowerMsg.includes('prediction market')) {
-    return `**Kalshi Prediction Markets**\n\n• Kalshi markets are CFTC-regulated event contracts that pay $1 if the event occurs, $0 if not.\n• Prices represent implied probability — 65¢ YES = 65% market probability of that outcome.\n• Look for: markets trading significantly away from your probability estimate.\n• Key categories: elections, economic indicators (CPI, unemployment, Fed rate), weather events, sports championships.\n• Strategy: compare Kalshi prices to Polymarket/PredictIt for cross-market arbitrage.`;
-  }
-
-  return `**Leverage AI — Expert Sports Analysis**\n\n• I'm ready to analyze betting lines, DFS, fantasy, Kalshi markets, and more.\n• Ask me about specific games, offseason moves, betting strategy, or prediction markets.\n• Live odds data cards are loading below — click any card for detailed analysis.`;
 }

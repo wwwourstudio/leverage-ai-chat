@@ -175,7 +175,11 @@ export function DynamicCardRenderer({
   const meaningfulKeys = Object.keys(safeCard.data).filter(
     k => k !== 'realData' && k !== 'status' && safeCard.data[k] != null && safeCard.data[k] !== '',
   );
-  if (meaningfulKeys.length === 0) {
+  // Statcast-type cards store their metrics at the top level (summary_metrics, lightbox),
+  // not inside the data object — skip the empty-data check for them.
+  const isStatcastType = STATS_CARD_TYPES.has(card.type) || card.type?.includes('statcast') || card.type?.includes('simulation');
+  const hasTopLevelMetrics = isStatcastType && Array.isArray((card as unknown as Record<string, unknown>).summary_metrics);
+  if (meaningfulKeys.length === 0 && !hasTopLevelMetrics) {
     if (safeCard.realData === false) {
       // Simulated/fallback card with no data — safe to suppress
       return null;

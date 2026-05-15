@@ -139,7 +139,7 @@ function GameRow({ g, sport }: { g: EnrichedGameRef; sport: string }) {
       {/* Away */}
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
         <TeamLogoByAbbr abbr={g.awayTeamAbbr} sport={sport} size={30} />
-        <span className="font-black text-[13px] text-white tracking-wide leading-none">{g.awayTeamAbbr}</span>
+        <span className="font-black text-[13px] text-white tracking-wide leading-none">{g.awayTeamAbbr.toUpperCase()}</span>
       </div>
 
       {/* VS */}
@@ -154,7 +154,7 @@ function GameRow({ g, sport }: { g: EnrichedGameRef; sport: string }) {
 
       {/* Home */}
       <div className="flex items-center gap-1.5 min-w-0 flex-1 justify-end">
-        <span className="font-black text-[13px] text-white tracking-wide leading-none">{g.homeTeamAbbr}</span>
+        <span className="font-black text-[13px] text-white tracking-wide leading-none">{g.homeTeamAbbr.toUpperCase()}</span>
         <TeamLogoByAbbr abbr={g.homeTeamAbbr} sport={sport} size={30} />
       </div>
 
@@ -206,7 +206,7 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
     const platformName = platform === 'DK' ? 'DraftKings' : 'FanDuel';
     if (slate.contestType === 'showdown' && (slate.games ?? []).length === 1) {
       const g = slate.games[0];
-      onAsk(`Build ${platform} DFS showdown lineup for ${g.awayTeamAbbr} @ ${g.homeTeamAbbr} (${platformName} #${slate.draftGroupId})`);
+      onAsk(`Build ${platform} DFS showdown lineup for ${g.awayTeamAbbr.toUpperCase()} @ ${g.homeTeamAbbr.toUpperCase()} (${platformName} #${slate.draftGroupId})`);
     } else {
       onAsk(`Build ${platform} DFS lineup for the ${slate.slateLabel} slate (${platformName} #${slate.draftGroupId})`);
     }

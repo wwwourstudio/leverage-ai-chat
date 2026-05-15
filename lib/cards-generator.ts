@@ -2626,7 +2626,59 @@ async function _generateContextualCards(
           }).filter(g => g.total > 0).sort((a, b) => b.total - a.total);
 
           if (dfsGames.length > 0) {
-            const teamAbbr = (name: string) => name.split(' ').pop()?.slice(0, 3).toUpperCase() ?? name.slice(0, 3).toUpperCase();
+            // ESPN CDN slugs keyed by last word (or last 2 words for ambiguous names).
+            // Values are lowercase ESPN team identifiers used in logo URLs.
+            const ESPN_TEAMS: Record<string, Record<string, string>> = {
+              baseball_mlb: {
+                'Red Sox': 'bos', 'White Sox': 'chw', 'Blue Jays': 'tor',
+                'Dodgers': 'lad', 'Giants': 'sf', 'Royals': 'kc', 'Cubs': 'chc',
+                'Braves': 'atl', 'Phillies': 'phi', 'Pirates': 'pit', 'Cardinals': 'stl',
+                'Guardians': 'cle', 'Rockies': 'col', 'Mariners': 'sea', 'Angels': 'laa',
+                'Padres': 'sd', 'Diamondbacks': 'ari', 'Rangers': 'tex', 'Astros': 'hou',
+                'Athletics': 'oak', 'Tigers': 'det', 'Orioles': 'bal', 'Nationals': 'wsh',
+                'Marlins': 'mia', 'Reds': 'cin', 'Brewers': 'mil', 'Twins': 'min',
+                'Mets': 'nym', 'Yankees': 'nyy', 'Rays': 'tb',
+              },
+              basketball_nba: {
+                'Trail Blazers': 'por', 'Jazz': 'utah',
+                'Hawks': 'atl', 'Celtics': 'bos', 'Nets': 'bkn', 'Hornets': 'cha',
+                'Bulls': 'chi', 'Cavaliers': 'cle', 'Mavericks': 'dal', 'Nuggets': 'den',
+                'Pistons': 'det', 'Warriors': 'gs', 'Rockets': 'hou', 'Pacers': 'ind',
+                'Clippers': 'lac', 'Lakers': 'lal', 'Grizzlies': 'mem', 'Heat': 'mia',
+                'Bucks': 'mil', 'Timberwolves': 'min', 'Pelicans': 'no', 'Knicks': 'ny',
+                'Thunder': 'okc', 'Magic': 'orl', '76ers': 'phi', 'Suns': 'phx',
+                'Kings': 'sac', 'Spurs': 'sa', 'Raptors': 'tor', 'Wizards': 'wsh',
+              },
+              americanfootball_nfl: {
+                '49ers': 'sf',
+                'Cardinals': 'ari', 'Falcons': 'atl', 'Ravens': 'bal', 'Bills': 'buf',
+                'Panthers': 'car', 'Bears': 'chi', 'Bengals': 'cin', 'Browns': 'cle',
+                'Cowboys': 'dal', 'Broncos': 'den', 'Lions': 'det', 'Packers': 'gb',
+                'Texans': 'hou', 'Colts': 'ind', 'Jaguars': 'jax', 'Chiefs': 'kc',
+                'Raiders': 'lv', 'Chargers': 'lac', 'Rams': 'lar', 'Dolphins': 'mia',
+                'Vikings': 'min', 'Patriots': 'ne', 'Saints': 'no', 'Giants': 'nyg',
+                'Jets': 'nyj', 'Eagles': 'phi', 'Steelers': 'pit', 'Seahawks': 'sea',
+                'Buccaneers': 'tb', 'Titans': 'ten', 'Commanders': 'wsh',
+              },
+              icehockey_nhl: {
+                'Maple Leafs': 'tor', 'Blue Jackets': 'cbj', 'Golden Knights': 'vgk',
+                'Ducks': 'ana', 'Bruins': 'bos', 'Sabres': 'buf', 'Flames': 'cgy',
+                'Hurricanes': 'car', 'Blackhawks': 'chi', 'Avalanche': 'col',
+                'Stars': 'dal', 'Wings': 'det', 'Oilers': 'edm', 'Panthers': 'fla',
+                'Kings': 'lak', 'Wild': 'min', 'Canadiens': 'mtl', 'Predators': 'nsh',
+                'Devils': 'njd', 'Islanders': 'nyi', 'Rangers': 'nyr', 'Senators': 'ott',
+                'Flyers': 'phi', 'Penguins': 'pit', 'Sharks': 'sjs', 'Kraken': 'sea',
+                'Blues': 'stl', 'Lightning': 'tb', 'Canucks': 'van', 'Capitals': 'wsh',
+                'Jets': 'wpg',
+              },
+            };
+            const teamAbbr = (name: string): string => {
+              const words = name.trim().split(/\s+/);
+              const last = words[words.length - 1] ?? name;
+              const last2 = words.length >= 2 ? `${words[words.length - 2]} ${last}` : last;
+              const map = ESPN_TEAMS[normalizedSport] ?? {};
+              return map[last2] ?? map[last] ?? last.slice(0, 3).toLowerCase();
+            };
             // Group games into time-window slates (games ≤90 min apart share a slate)
             const byTime = [...dfsGames].sort((a, b) => a.startTime.localeCompare(b.startTime));
             type SlateGroup = { startTime: string; games: DFSGame[] };
@@ -2661,7 +2713,7 @@ async function _generateContextualCards(
               gradient: 'from-blue-700 to-indigo-700',
               status: 'live',
               realData: true,
-              data: { slates: dfsSlates, selectedDraftGroupId: null },
+              data: { slates: dfsSlates, selectedDraftGroupId: null, sport: normalizedSport.includes('basketball') ? 'nba' : normalizedSport.includes('football') ? 'nfl' : normalizedSport.includes('hockey') ? 'nhl' : 'mlb' },
               metadata: { realData: true, source: 'The Odds API' },
             });
             // Sport-specific DFS projection config

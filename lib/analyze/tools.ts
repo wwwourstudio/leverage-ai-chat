@@ -1,11 +1,23 @@
 /**
  * lib/analyze/tools.ts
- * Factory functions for all Vercel AI SDK tool instances and the tool-selection
- * logic that determines which tools are activated for a given request.
+ * Tool factory and declarative selection registry for the analyze endpoint.
  *
- * Tools are created per-request via createTools() because their execute()
- * callbacks close over request-scoped variables (context, rawQueryLower).
- * selectTools() maps detection flags → the exact spread used by streamText().
+ * ARCHITECTURE
+ * ┌─────────────────────────────────────────────────────────────────────┐
+ * │  createTools(context, rawQueryLower)                                │
+ * │    → builds one Tool instance per capability (closes over context)  │
+ * │                                                                     │
+ * │  selectTools(toolSet, detection, ...)                               │
+ * │    → consults TOOL_SLOTS registry                                   │
+ * │    → picks the last active slot (last-wins = original semantics)    │
+ * │    → returns { tools, stopWhen, maxSteps? } spread for streamText   │
+ * └─────────────────────────────────────────────────────────────────────┘
+ *
+ * xAI COMPATIBILITY
+ *   Every slot uses stopWhen: stepCountIs(2) — xAI rejects messages[6+]
+ *   that carry cache_control on empty text blocks (Anthropic limitation
+ *   surfaced through the xAI gateway). Two steps (1 tool call + 1 synthesis)
+ *   is the maximum safe count. deepThink raises this to maxSteps: 3.
  */
 import { tool, stepCountIs } from 'ai';
 import { z } from 'zod';
@@ -16,12 +28,13 @@ import { getOddsApiKey } from '@/lib/config';
 import { NFBC_DRAFT_YEAR } from '@/lib/constants';
 import type { AnalyzeContext, SportDetectionResult } from './types';
 
-// ── Tool factory ───────────────────────────────────────────────────────────────
+// =============================================================================
+// Tool factory — one instance per request (execute() closes over context)
+// =============================================================================
 
-/** Create all tool instances for a single request. */
 export function createTools(context: AnalyzeContext, rawQueryLower: string) {
 
-  // ── ADP tool ─────────────────────────────────────────────────────────────────
+  // ── Fantasy draft / ADP ───────────────────────────────────────────────────
   const adpTool = tool({
     description:
       'Query NFBC MLB or NFFC NFL Average Draft Position (ADP) data. ' +
@@ -55,12 +68,12 @@ export function createTools(context: AnalyzeContext, rawQueryLower: string) {
         players: results,
         total_players_in_dataset: data.length,
         source,
-        is_static_fallback: data.length <= 150, // ≤150 = static fallback seeded from Supabase
+        is_static_fallback: data.length <= 150,
       };
     },
   });
 
-  // ── Statcast tool ─────────────────────────────────────────────────────────────
+  // ── Baseball Savant Statcast metrics ──────────────────────────────────────
   const statcastTool = tool({
     description:
       'Query REAL Baseball Savant Statcast metrics (barrel rate, exit velocity, ' +
@@ -94,18 +107,18 @@ export function createTools(context: AnalyzeContext, rawQueryLower: string) {
         source: isLiveData ? `Baseball Savant ${season} (real data)` : `Baseball Savant ${season} (cached fallback)`,
         ...(dbAggregate && {
           db_recent_30d: {
-            source: 'Leverage AI Statcast DB (Baseball Savant pitch-level)',
-            playerName:     dbAggregate.playerName,
-            samplePitches:  dbAggregate.samplePitches,
-            sampleBIP:      dbAggregate.sampleBIP,
-            avgExitVelo:    dbAggregate.avgExitVelo,
-            barrelRate:     dbAggregate.barrelRate,
-            hardHitRate:    dbAggregate.hardHitRate,
-            sweetSpotRate:  dbAggregate.sweetSpotRate,
-            avgLaunchAngle: dbAggregate.avgLaunchAngle,
+            source:          'Leverage AI Statcast DB (Baseball Savant pitch-level)',
+            playerName:      dbAggregate.playerName,
+            samplePitches:   dbAggregate.samplePitches,
+            sampleBIP:       dbAggregate.sampleBIP,
+            avgExitVelo:     dbAggregate.avgExitVelo,
+            barrelRate:      dbAggregate.barrelRate,
+            hardHitRate:     dbAggregate.hardHitRate,
+            sweetSpotRate:   dbAggregate.sweetSpotRate,
+            avgLaunchAngle:  dbAggregate.avgLaunchAngle,
             avgReleaseSpeed: dbAggregate.avgReleaseSpeed,
-            avgSpinRate:    dbAggregate.avgSpinRate,
-            dateRange:      dbAggregate.dateRange,
+            avgSpinRate:     dbAggregate.avgSpinRate,
+            dateRange:       dbAggregate.dateRange,
           },
         }),
         ...(results.length === 0 && !dbAggregate && {
@@ -115,7 +128,7 @@ export function createTools(context: AnalyzeContext, rawQueryLower: string) {
     },
   });
 
-  // ── MLB Projection Engine tool ────────────────────────────────────────────────
+  // ── LeverageMetrics MLB projection engine ─────────────────────────────────
   const mlbProjectionTool = tool({
     description:
       'Run the LeverageMetrics MLB projection engine (Monte Carlo N=1,000, HR Super Model, ' +
@@ -181,7 +194,7 @@ export function createTools(context: AnalyzeContext, rawQueryLower: string) {
     },
   });
 
-  // ── HR Prediction tool ────────────────────────────────────────────────────────
+  // ── LeverageMetrics HR probability model ──────────────────────────────────
   const predictHRTool = tool({
     description:
       "Predict the probability that a specific MLB batter hits a home run in today's game, " +
@@ -207,7 +220,7 @@ export function createTools(context: AnalyzeContext, rawQueryLower: string) {
     },
   });
 
-  // ── Kalshi: list markets ──────────────────────────────────────────────────────
+  // ── Kalshi: browse prediction markets ────────────────────────────────────
   const kalshiGetMarketsTool = tool({
     description:
       'Fetch live Kalshi prediction market data. Use when user asks to "show Kalshi markets", ' +
@@ -242,7 +255,7 @@ export function createTools(context: AnalyzeContext, rawQueryLower: string) {
     },
   });
 
-  // ── Kalshi: price by ticker ────────────────────────────────────────────────────
+  // ── Kalshi: price a specific market ticker ────────────────────────────────
   const kalshiGetPriceTool = tool({
     description:
       'Get the current YES/NO price for a specific Kalshi market by ticker. ' +
@@ -263,16 +276,21 @@ export function createTools(context: AnalyzeContext, rawQueryLower: string) {
         const edge = (modelProb != null && modelProb >= 0 && modelProb <= 1)
           ? KalshiClient.computeEdge(modelProb, market.yesBid, market.yesAsk)
           : null;
-        return { success: true, market, edge, kalshiUrl: `https://kalshi.com/markets/${market.eventTicker || ticker}/${ticker.toUpperCase()}` };
+        return {
+          success: true, market, edge,
+          kalshiUrl: `https://kalshi.com/markets/${market.eventTicker || ticker}/${ticker.toUpperCase()}`,
+        };
       } catch (err) {
         return { success: false, error: err instanceof Error ? err.message : String(err), market: null };
       }
     },
   });
 
-  // ── Live odds (fallback) ──────────────────────────────────────────────────────
+  // ── Live odds: sportsbook h2h / spreads / totals ──────────────────────────
   const getLiveOddsTool = tool({
-    description: "Fetch current sportsbook odds for a sport. Use when the user asks about a game, spread, moneyline, or total and live odds aren't already provided in the context.",
+    description:
+      "Fetch current sportsbook odds for a sport. Use when the user asks about a game, " +
+      "spread, moneyline, or total and live odds aren't already provided in the context.",
     inputSchema: z.object({
       sport: z.string().describe('Sport key: basketball_nba | americanfootball_nfl | baseball_mlb | icehockey_nhl'),
     }),
@@ -290,9 +308,11 @@ export function createTools(context: AnalyzeContext, rawQueryLower: string) {
     },
   });
 
-  // ── Line movement / sharp money ───────────────────────────────────────────────
+  // ── Line movement / sharp money steam moves ───────────────────────────────
   const getOddsMoversTool = tool({
-    description: 'Fetch the biggest game-level line movements (spreads, totals, h2h) in the last 24 hours. Use when the user asks about line movement, steam moves, sharp money, or biggest movers.',
+    description:
+      'Fetch the biggest game-level line movements (spreads, totals, h2h) in the last 24 hours. ' +
+      'Use when the user asks about line movement, steam moves, sharp money, or biggest movers.',
     inputSchema: z.object({
       hours: z.number().optional().describe('Look-back window in hours (default 24)'),
     }),
@@ -311,9 +331,11 @@ export function createTools(context: AnalyzeContext, rawQueryLower: string) {
     },
   });
 
-  // ── Best props / prop picks ───────────────────────────────────────────────────
+  // ── Latest player prop lines ──────────────────────────────────────────────
   const getPropsLatestTool = tool({
-    description: 'Fetch the latest player prop lines (over/under lines and prices). Use when the user asks about best props, prop picks, or player prop betting.',
+    description:
+      'Fetch the latest player prop lines (over/under lines and prices). ' +
+      'Use when the user asks about best props, prop picks, or player prop betting.',
     inputSchema: z.object({
       sport:  z.string().optional().describe('Sport key, e.g. basketball_nba'),
       market: z.string().optional().describe('Market key, e.g. batter_home_runs, player_points'),
@@ -337,18 +359,177 @@ export function createTools(context: AnalyzeContext, rawQueryLower: string) {
   });
 
   return {
-    adpTool, statcastTool, mlbProjectionTool, predictHRTool,
-    kalshiGetMarketsTool, kalshiGetPriceTool,
-    getLiveOddsTool, getOddsMoversTool, getPropsLatestTool,
+    adpTool,
+    statcastTool,
+    mlbProjectionTool,
+    predictHRTool,
+    kalshiGetMarketsTool,
+    kalshiGetPriceTool,
+    getLiveOddsTool,
+    getOddsMoversTool,
+    getPropsLatestTool,
   };
 }
 
-// ── Tool selection ─────────────────────────────────────────────────────────────
+// =============================================================================
+// Declarative tool-selection registry
+// =============================================================================
+
 /**
- * Return the streamText spread (tools + stopWhen + optional maxSteps) for the
- * active detection context. At most one tools+stopWhen pair is active per request
- * because each condition is guarded against the others — last spread wins
- * (same as the original inline multiple-spread approach, preserved for parity).
+ * One entry in the tool registry: a named group of tools that is conditionally
+ * activated based on the detection flags for the current request.
+ */
+interface ToolSlot {
+  /** Debugging label — shows up in dev-mode logs when multiple slots match. */
+  name:   string;
+  /** Whether this slot should be active for the current request. */
+  active: boolean;
+  /** Tools to expose to the model, keyed by the name the model sees. */
+  tools:  Record<string, unknown>;
+}
+
+/**
+ * Build the ordered list of tool slots for this request.
+ *
+ * PRIORITY: slots are listed low → high priority. When multiple slots are
+ * active, the LAST one wins — identical to the original spread-override
+ * semantics. In practice only one slot fires per request; the ordering only
+ * matters when two intents appear in the same query (e.g. "line movement for
+ * Judge tonight" triggers both HR and line-movement intents; line movement
+ * comes later so it wins).
+ *
+ * Priority ladder (lowest → highest):
+ *   adp
+ *   → hr-prediction   (overrides adp if both fire)
+ *   → kalshi          (exclusive: skipped when hr or adp is active)
+ *   → mlb-projections (exclusive: skipped when hr or kalshi is active)
+ *   → statcast        (exclusive: skipped when hr, kalshi, or projections active)
+ *   → line-movement   (cross-cutting: can override any MLB-specific slot)
+ *   → props           (cross-cutting: overrides specific tools, yields to line-movement)
+ *   → live-odds       (fallback: only when no specific intent matched)
+ */
+function buildToolSlots(
+  toolSet: ReturnType<typeof createTools>,
+  detection: SportDetectionResult,
+  serverFetchedOdds: boolean,
+  hasBettingIntent: boolean | undefined,
+): ToolSlot[] {
+  const {
+    hasADPIntent,
+    hasHRPredictionIntent,
+    hasKalshiToolIntent,
+    hasMLBProjectionIntent,
+    isMLBStatcastMode,
+    hasLineMovementIntent,
+    hasPropsToolIntent,
+  } = detection;
+
+  // Pre-compute the "any specific tool matched" guard used by the live-odds fallback.
+  const hasAnySpecificIntent =
+    hasADPIntent || hasHRPredictionIntent || hasKalshiToolIntent ||
+    hasMLBProjectionIntent || isMLBStatcastMode ||
+    hasLineMovementIntent || hasPropsToolIntent;
+
+  return [
+    // ── Fantasy draft / ADP rankings ────────────────────────────────────────
+    // Enabled: user asks about draft position, ADP, positional scarcity.
+    {
+      name:   'adp',
+      active: hasADPIntent,
+      tools:  { query_adp: toolSet.adpTool },
+    },
+
+    // ── HR probability tonight ───────────────────────────────────────────────
+    // Enabled: user asks for a specific player's HR odds or probability.
+    // Overrides 'adp' if both fire (HR intent is more specific).
+    {
+      name:   'hr-prediction',
+      active: hasHRPredictionIntent,
+      tools:  { predict_hr: toolSet.predictHRTool },
+    },
+
+    // ── Kalshi prediction markets ────────────────────────────────────────────
+    // Enabled: user asks about Kalshi / prediction-market prices or listings.
+    // Skipped when 'adp' or 'hr-prediction' is active — those are more specific
+    // and the Kalshi tools would add noise without adding value.
+    {
+      name:   'kalshi',
+      active: hasKalshiToolIntent && !hasHRPredictionIntent && !hasADPIntent,
+      tools:  {
+        kalshi_get_markets: toolSet.kalshiGetMarketsTool,
+        kalshi_get_price:   toolSet.kalshiGetPriceTool,
+      },
+    },
+
+    // ── MLB projection engine ────────────────────────────────────────────────
+    // Enabled: user asks about MLB DFS, fantasy projections, or betting edges.
+    // Skipped when 'hr-prediction' or 'kalshi' are already active (they are
+    // more targeted and the projection tool call would be redundant).
+    {
+      name:   'mlb-projections',
+      active: hasMLBProjectionIntent && !hasHRPredictionIntent && !hasKalshiToolIntent,
+      tools:  { query_mlb_projections: toolSet.mlbProjectionTool },
+    },
+
+    // ── Baseball Savant Statcast metrics ─────────────────────────────────────
+    // Enabled: user asks about Statcast numbers (barrel rate, exit velo, etc.).
+    // Skipped when any of the three higher-specificity MLB tools are active —
+    // Statcast alone can't answer HR probability, Kalshi, or projection queries.
+    {
+      name:   'statcast',
+      active: isMLBStatcastMode
+        && !hasHRPredictionIntent
+        && !hasKalshiToolIntent
+        && !hasMLBProjectionIntent,
+      tools:  { query_statcast: toolSet.statcastTool },
+    },
+
+    // ── Sportsbook line movement / sharp money ───────────────────────────────
+    // Enabled: user asks about line movement, steam moves, or sharp action.
+    // Cross-cutting: not exclusive with the MLB-specific slots above, so it
+    // can override them when a query straddles both intents (e.g. "line moves
+    // for Judge tonight" triggers Statcast + line-movement; line-movement wins).
+    {
+      name:   'line-movement',
+      active: hasLineMovementIntent,
+      tools:  { get_odds_movers: toolSet.getOddsMoversTool },
+    },
+
+    // ── Latest player prop lines ─────────────────────────────────────────────
+    // Enabled: user asks about prop picks or prop lines.
+    // Yields to 'line-movement' when both intents fire (line-movement is more
+    // actionable for the same query and comes later in the priority ladder).
+    {
+      name:   'props',
+      active: hasPropsToolIntent && !hasLineMovementIntent,
+      tools:  { get_props_latest: toolSet.getPropsLatestTool },
+    },
+
+    // ── Live sportsbook odds (fallback) ──────────────────────────────────────
+    // Enabled: user has a betting intent but odds were NOT already server-fetched
+    // and no specific tool (ADP, HR, Kalshi, projections, Statcast, line movers,
+    // props) is handling the request. The most general fallback.
+    {
+      name:   'live-odds',
+      active: !!hasBettingIntent && !serverFetchedOdds && !hasAnySpecificIntent,
+      tools:  { get_live_odds: toolSet.getLiveOddsTool },
+    },
+  ];
+}
+
+// =============================================================================
+// Public selector — called by the analyze route
+// =============================================================================
+
+/**
+ * Return the `streamText` spread ({ tools, stopWhen, maxSteps? }) for the
+ * active detection context.
+ *
+ * @param toolSet         - All tool instances for this request (from createTools)
+ * @param detection       - Sport/intent flags from detectSportAndIntents
+ * @param serverFetchedOdds - True when odds were already fetched server-side
+ * @param hasBettingIntent  - From request context
+ * @param deepThink         - If true, raise maxSteps to 3 for deeper analysis
  */
 export function selectTools(
   toolSet: ReturnType<typeof createTools>,
@@ -357,34 +538,23 @@ export function selectTools(
   hasBettingIntent: boolean | undefined,
   deepThink: boolean,
 ): Record<string, unknown> {
-  const {
-    hasADPIntent, hasHRPredictionIntent, hasKalshiToolIntent, hasMLBProjectionIntent,
-    isMLBStatcastMode, hasLineMovementIntent, hasPropsToolIntent,
-  } = detection;
+  const slots   = buildToolSlots(toolSet, detection, serverFetchedOdds, hasBettingIntent);
+  const active  = slots.filter(s => s.active);
+
+  // Last active slot wins — preserves the original spread-override semantics.
+  const winner  = active[active.length - 1];
+
+  // Dev-only: surface when multiple slots compete so the priority ladder can be tuned.
+  if (process.env.NODE_ENV !== 'production' && active.length > 1) {
+    console.debug(
+      '[tools] Multiple active slots:',
+      active.map(s => s.name).join(' → '),
+      `| winner: ${winner?.name}`,
+    );
+  }
 
   return {
-    // Priority order mirrors the original inline spreads exactly
-    ...(hasADPIntent && { tools: { query_adp: toolSet.adpTool }, stopWhen: stepCountIs(2) }),
-    ...(hasHRPredictionIntent && { tools: { predict_hr: toolSet.predictHRTool }, stopWhen: stepCountIs(2) }),
-    ...(hasKalshiToolIntent && !hasHRPredictionIntent && !hasADPIntent && {
-      tools: { kalshi_get_markets: toolSet.kalshiGetMarketsTool, kalshi_get_price: toolSet.kalshiGetPriceTool },
-      stopWhen: stepCountIs(2),
-    }),
-    ...(!hasHRPredictionIntent && !hasKalshiToolIntent && hasMLBProjectionIntent && {
-      tools: { query_mlb_projections: toolSet.mlbProjectionTool }, stopWhen: stepCountIs(2),
-    }),
-    ...(!hasHRPredictionIntent && !hasKalshiToolIntent && !hasMLBProjectionIntent && isMLBStatcastMode && {
-      tools: { query_statcast: toolSet.statcastTool }, stopWhen: stepCountIs(2),
-    }),
-    ...(hasLineMovementIntent && { tools: { get_odds_movers: toolSet.getOddsMoversTool }, stopWhen: stepCountIs(2) }),
-    ...(hasPropsToolIntent && !hasLineMovementIntent && {
-      tools: { get_props_latest: toolSet.getPropsLatestTool }, stopWhen: stepCountIs(2),
-    }),
-    ...(!hasADPIntent && !hasHRPredictionIntent && !hasKalshiToolIntent && !hasMLBProjectionIntent &&
-      !isMLBStatcastMode && !hasLineMovementIntent && !hasPropsToolIntent &&
-      hasBettingIntent && !serverFetchedOdds && {
-        tools: { get_live_odds: toolSet.getLiveOddsTool }, stopWhen: stepCountIs(2),
-      }),
+    ...(winner && { tools: winner.tools, stopWhen: stepCountIs(2) }),
     ...(deepThink && { maxSteps: 3 }),
   };
 }

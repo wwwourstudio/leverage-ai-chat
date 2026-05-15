@@ -63,6 +63,16 @@ function evictDedupCache(): void {
 const PRIMARY_TIMEOUT_MS  = (fast: boolean) => fast ? 28_000 : 46_000;
 const FALLBACK_TIMEOUT_MS = 10_000;
 
+// ── Per-request streaming state ───────────────────────────────────────────────
+// Single mutable accumulator (const reference) vs five scattered let vars.
+interface ProcessingState {
+  aiText: string;
+  modelUsed: string;
+  usedFallback: boolean;
+  sentDoneEvent: boolean;
+  tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number } | null;
+}
+
 // =============================================================================
 // POST /api/analyze
 // =============================================================================
@@ -186,8 +196,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Clarification options for ambiguous / no-sport queries
-    let clarificationOptions: string[] = isAmbiguous
+    // Base clarification options — may be extended after enrichment reveals no live games
+    const baseClarificationOptions: string[] = isAmbiguous
       ? ['NBA betting odds tonight', 'NFL betting analysis', 'MLB betting picks', 'NHL betting lines',
          'Kalshi prediction markets', 'DFS lineups today', 'Fantasy advice']
       : needsFantasySport
@@ -213,45 +223,56 @@ export async function POST(request: NextRequest) {
 
     // ── Phase 5: Prompt enrichment (odds / Kalshi / Statcast / schedule) ───────
     const enrichment = await buildEnrichedPrompt(userMessage, context, detection, dateStr);
-    let { enrichedPrompt } = enrichment;
-    const { kalshiSportsFallbackMarkets, kalshiPromptMarkets, serverFetchedOdds, noLiveGamesDetected } = enrichment;
+    const {
+      enrichedPrompt: rawEnrichedPrompt,
+      kalshiSportsFallbackMarkets, kalshiPromptMarkets,
+      serverFetchedOdds, noLiveGamesDetected,
+    } = enrichment;
 
-    // Clarification pills for no-live-games scenarios
-    if (noLiveGamesDetected && clarificationOptions.length === 0 && context.sport) {
-      const sportClarifications: Record<string, string[]> = {
-        basketball_ncaab: ['NCAA Tournament futures and Final Four odds', 'College basketball conference betting trends and ATS records', 'Best March Madness upset patterns and handicapping strategy', 'Top college basketball player props and value bets'],
-        basketball_nba:   ['NBA playoff picture, standings, and series odds', 'NBA Finals futures and championship contenders', 'Best NBA player props and over/under value tonight', 'NBA betting trends and best ATS systems this season'],
-        americanfootball_nfl:  ['NFL Super Bowl futures and offseason team outlooks', 'NFL draft prospects and team needs for next season', 'Best NFL historical ATS trends and betting systems', 'NFL player props strategy and target values'],
-        americanfootball_ncaaf: ['College football futures, conference champions, and bowl odds', 'Top college football ATS records and betting trends', 'College football recruiting and team strength analysis', 'Best CFB player props and value bets'],
-        baseball_mlb:    ['MLB season futures and World Series odds', 'MLB daily player props and run line value', 'Baseball betting systems and best ATS trends', 'Statcast leaders and pitching matchup analysis'],
-        icehockey_nhl:   ['NHL playoff odds and Stanley Cup futures', 'NHL puck line value and best betting systems', 'Top NHL player props and goal-scorer odds', 'NHL standings and playoff picture analysis'],
-      };
+    // Sport-specific clarification pills for no-live-game scenarios; computed
+    // after enrichment so noLiveGamesDetected is known.
+    const sportClarificationMap: Record<string, string[]> = {
+      basketball_ncaab: ['NCAA Tournament futures and Final Four odds', 'College basketball conference betting trends and ATS records', 'Best March Madness upset patterns and handicapping strategy', 'Top college basketball player props and value bets'],
+      basketball_nba:   ['NBA playoff picture, standings, and series odds', 'NBA Finals futures and championship contenders', 'Best NBA player props and over/under value tonight', 'NBA betting trends and best ATS systems this season'],
+      americanfootball_nfl:  ['NFL Super Bowl futures and offseason team outlooks', 'NFL draft prospects and team needs for next season', 'Best NFL historical ATS trends and betting systems', 'NFL player props strategy and target values'],
+      americanfootball_ncaaf: ['College football futures, conference champions, and bowl odds', 'Top college football ATS records and betting trends', 'College football recruiting and team strength analysis', 'Best CFB player props and value bets'],
+      baseball_mlb:    ['MLB season futures and World Series odds', 'MLB daily player props and run line value', 'Baseball betting systems and best ATS trends', 'Statcast leaders and pitching matchup analysis'],
+      icehockey_nhl:   ['NHL playoff odds and Stanley Cup futures', 'NHL puck line value and best betting systems', 'Top NHL player props and goal-scorer odds', 'NHL standings and playoff picture analysis'],
+    };
+    const clarificationOptions: string[] = (() => {
+      if (!noLiveGamesDetected || baseClarificationOptions.length > 0 || !context.sport) {
+        return baseClarificationOptions;
+      }
       const sk = context.sport as string;
-      clarificationOptions = sportClarifications[sk] ?? [
+      return sportClarificationMap[sk] ?? [
         `${sk.replace(/^[a-z]+_/, '').toUpperCase()} futures and season-long analysis`,
         `${sk.replace(/^[a-z]+_/, '').toUpperCase()} betting strategy and historical trends`,
         `Best ${sk.replace(/^[a-z]+_/, '').toUpperCase()} player props and value bets`,
         `${sk.replace(/^[a-z]+_/, '').toUpperCase()} upcoming schedule and matchup previews`,
       ];
-    }
+    })();
 
     // ── Phase 6: Token budget guard ────────────────────────────────────────────
     const TOKEN_BUDGET_CHARS = 48_000;
-    if (enrichedPrompt.length > TOKEN_BUDGET_CHARS) {
-      const before = enrichedPrompt.length;
-      enrichedPrompt = enrichedPrompt
-        .replace(/\[File:[^\]]+\]\n[\s\S]*?\n\[\.\.\. \d+ more rows[^\]]*\]/g, '[File: (truncated — use query_adp tool)]')
-        .slice(0, TOKEN_BUDGET_CHARS);
-      enrichedPrompt += '\n\n[CONTEXT TRIMMED — token budget. Full data available via query_adp tool.]';
-      console.warn(`[API/analyze] Token budget: trimmed ${before} → ${enrichedPrompt.length} chars`);
-    }
+    const budgetedPrompt = rawEnrichedPrompt.length > TOKEN_BUDGET_CHARS
+      ? (() => {
+          const before  = rawEnrichedPrompt.length;
+          const trimmed = rawEnrichedPrompt
+            .replace(/\[File:[^\]]+\]\n[\s\S]*?\n\[\.\.\. \d+ more rows[^\]]*\]/g, '[File: (truncated — use query_adp tool)]')
+            .slice(0, TOKEN_BUDGET_CHARS);
+          console.warn(`[API/analyze] Token budget: trimmed ${before} → ${trimmed.length} chars`);
+          return trimmed + '\n\n[CONTEXT TRIMMED — token budget. Full data available via query_adp tool.]';
+        })()
+      : rawEnrichedPrompt;
 
     // Append props-unavailable warning before card generation so it's in the final prompt
-    if (hasPropsToolIntent && noLiveGamesDetected) {
-      enrichedPrompt += `\n\n[Note: Player props data may be unavailable if no live games are currently scheduled. If the get_props_latest tool returns empty results, clearly acknowledge that live prop lines are not available for this sport today and offer alternatives: historical prop hit rates, season-long averages, or ask what the user wants to analyze instead.]`;
-    }
+    const enrichedPrompt = (hasPropsToolIntent && noLiveGamesDetected)
+      ? budgetedPrompt + `\n\n[Note: Player props data may be unavailable if no live games are currently scheduled. If the get_props_latest tool returns empty results, clearly acknowledge that live prop lines are not available for this sport today and offer alternatives: historical prop hit rates, season-long averages, or ask what the user wants to analyze instead.]`
+      : budgetedPrompt;
 
     // ── Phase 7: Card generation ───────────────────────────────────────────────
+    // aiPrompt extends enrichedPrompt with any card context injected during card fetch
+    let aiPrompt = enrichedPrompt;
     const hasExistingCards =
       Array.isArray(existingCards) && existingCards.length > 0 &&
       !context.sport && !context.isSportsQuery && !context.hasBettingIntent &&
@@ -363,7 +384,7 @@ export async function POST(request: NextRequest) {
       if (realCards.length > 0) {
         const cardCtx = cardsToPromptContext(realCards);
         if (cardCtx) {
-          enrichedPrompt += `\n\n${cardCtx}`;
+          aiPrompt += `\n\n${cardCtx}`;
           console.log(`[v0] [ANALYZE] Injected ${realCards.length} card(s) into AI prompt context`);
         }
       }
@@ -401,11 +422,14 @@ export async function POST(request: NextRequest) {
     const tools            = createTools(context, rawQueryLower);
     const toolSelection    = selectTools(tools, detection, serverFetchedOdds, context.hasBettingIntent, body.deepThink ?? false);
 
-    let aiText       = '';
-    let modelUsed: string = AI_CONFIG.MODEL_DISPLAY_NAME;
-    let usedFallback = false;
-    let sentDoneEvent = false;
-    let tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number } | null = null;
+    // Single mutable accumulator for all state built up during the stream
+    const state: ProcessingState = {
+      aiText:       '',
+      modelUsed:    AI_CONFIG.MODEL_DISPLAY_NAME,
+      usedFallback: false,
+      sentDoneEvent: false,
+      tokenUsage:   null,
+    };
 
     const sse = createSSEHelpers();
     const { sseChunk, safeEnqueue } = sse;
@@ -424,7 +448,7 @@ export async function POST(request: NextRequest) {
             const streamResult = streamText({
               model: createXaiMiddleware(createXai({ apiKey: xaiApiKey })(primaryModel)),
               ...buildMessagesWithCacheAndMemory(
-                cachedSystem, dynamicSystem, enrichedPrompt,
+                cachedSystem, dynamicSystem, aiPrompt,
                 hasImages ? validatedImages : undefined,
                 context?.previousMessages,
               ),
@@ -466,27 +490,27 @@ export async function POST(request: NextRequest) {
               for await (const delta of streamResult.textStream) {
                 if (!gotFirstToken) { gotFirstToken = true; clearTimeout(firstTokenTimer); }
                 if (responseTruncated) continue;
-                if (aiText.length + delta.length > RESPONSE_CHAR_LIMIT) {
-                  const rem = RESPONSE_CHAR_LIMIT - aiText.length;
-                  if (rem > 0) { aiText += delta.slice(0, rem); enq(sseChunk({ type: 'text', delta: delta.slice(0, rem) })); }
+                if (state.aiText.length + delta.length > RESPONSE_CHAR_LIMIT) {
+                  const rem = RESPONSE_CHAR_LIMIT - state.aiText.length;
+                  if (rem > 0) { state.aiText += delta.slice(0, rem); enq(sseChunk({ type: 'text', delta: delta.slice(0, rem) })); }
                   const notice = '\n\n---\n_Response truncated — ask me to continue or be more specific._';
-                  aiText += notice;
+                  state.aiText += notice;
                   enq(sseChunk({ type: 'text', delta: notice }));
                   responseTruncated = true;
                   console.warn(`[API/analyze] Response truncated at ${RESPONSE_CHAR_LIMIT} chars`);
                   continue;
                 }
-                aiText += delta;
+                state.aiText += delta;
                 enq(sseChunk({ type: 'text', delta }));
               }
               clearTimeout(firstTokenTimer);
-              modelUsed = useFastPath ? AI_CONFIG.FAST_MODEL_DISPLAY_NAME : AI_CONFIG.MODEL_DISPLAY_NAME;
+              state.modelUsed = useFastPath ? AI_CONFIG.FAST_MODEL_DISPLAY_NAME : AI_CONFIG.MODEL_DISPLAY_NAME;
 
               // Capture token usage (Anthropic cache metrics may flow through xAI)
               try {
                 const usage = await streamResult.usage;
                 if (usage) {
-                  tokenUsage = { promptTokens: usage.inputTokens ?? 0, completionTokens: usage.outputTokens ?? 0, totalTokens: usage.totalTokens ?? 0 };
+                  state.tokenUsage = { promptTokens: usage.inputTokens ?? 0, completionTokens: usage.outputTokens ?? 0, totalTokens: usage.totalTokens ?? 0 };
                   const au = usage as Record<string, unknown>;
                   const cR = au.cacheReadInputTokens as number | undefined;
                   const cW = au.cacheCreationInputTokens as number | undefined;
@@ -503,10 +527,10 @@ export async function POST(request: NextRequest) {
               const toolOutput = extractToolResults(allToolResults, allToolCalls, detection, context);
               const { cards: finalCards, aiText: processedText } = assembleFinalCards(
                 await cardPromise.catch(() => []),
-                toolOutput, aiText, detection, context, noLiveGamesDetected, usedFallback,
+                toolOutput, state.aiText, detection, context, noLiveGamesDetected, state.usedFallback,
                 enq, sseChunk, logger, LogCategory,
               );
-              aiText = processedText;
+              state.aiText = processedText;
 
               const processingTime = Date.now() - startTime;
               logger.info(LogCategory.AI, 'response_complete', {
@@ -514,15 +538,15 @@ export async function POST(request: NextRequest) {
               });
 
               const hasRealOdds  = !!(context.oddsData?.events?.length > 0);
-              const baseMetrics  = usedFallback
+              const baseMetrics  = state.usedFallback
                 ? { benfordIntegrity: 65, oddsAlignment: 65, marketConsensus: 65, historicalAccuracy: 68, finalConfidence: 65, trustLevel: 'medium' as const, riskLevel: 'medium' as const, adjustedTone: 'Limited data — AI unavailable', flags: [{ type: 'info', message: 'Using fallback mode — AI temporarily unavailable', severity: 'info' as const }] }
-                : detectHallucinations(aiText, userMessage, context.oddsData, { category, hasBettingIntent: context.hasBettingIntent });
-              const trustMetrics = (hasRealOdds && !usedFallback)
+                : detectHallucinations(state.aiText, userMessage, context.oddsData, { category, hasBettingIntent: context.hasBettingIntent });
+              const trustMetrics = (hasRealOdds && !state.usedFallback)
                 ? { ...baseMetrics, oddsAlignment: Math.min(99, (baseMetrics.oddsAlignment ?? 80) + 8), marketConsensus: Math.min(99, (baseMetrics.marketConsensus ?? 80) + 6), finalConfidence: Math.min(99, (baseMetrics.finalConfidence ?? 80) + 5), adjustedTone: baseMetrics.finalConfidence >= 85 ? 'Strong signal — live data verified' : baseMetrics.adjustedTone }
                 : baseMetrics;
 
               const sources: Array<{ name: string; type: string; reliability: number }> = [
-                usedFallback ? { name: 'Fallback Mode', type: 'cache', reliability: 65 } : DEFAULT_SOURCES.GROK_AI,
+                state.usedFallback ? { name: 'Fallback Mode', type: 'cache', reliability: 65 } : DEFAULT_SOURCES.GROK_AI,
               ];
               if (hasRealOdds)                                     sources.push(DEFAULT_SOURCES.ODDS_API);
               if (context.isPoliticalMarket)                        sources.push(DEFAULT_SOURCES.KALSHI);
@@ -532,18 +556,18 @@ export async function POST(request: NextRequest) {
                 sources.push({ name: isNFLC ? `NFFC ${new Date().getFullYear()} NFL ADP Board` : `NFBC ${new Date().getFullYear()} ADP Board`, type: 'api', reliability: 97 });
               }
 
-              if (aiText && !usedFallback) {
-                dedupCache.set(queryHash, { text: aiText, cards: finalCards, confidence: trustMetrics.finalConfidence, ts: Date.now() });
+              if (state.aiText && !state.usedFallback) {
+                dedupCache.set(queryHash, { text: state.aiText, cards: finalCards, confidence: trustMetrics.finalConfidence, ts: Date.now() });
               }
 
-              console.log(`[API/analyze] done — text=${aiText.length}B cards=${finalCards.length} payload≈${aiText.length + JSON.stringify(finalCards).length}B${tokenUsage ? ` tokens=${tokenUsage.totalTokens}` : ''} time=${processingTime}ms`);
-              sentDoneEvent = true;
+              console.log(`[API/analyze] done — text=${state.aiText.length}B cards=${finalCards.length} payload≈${state.aiText.length + JSON.stringify(finalCards).length}B${state.tokenUsage ? ` tokens=${state.tokenUsage.totalTokens}` : ''} time=${processingTime}ms`);
+              state.sentDoneEvent = true;
               enq(sseChunk({
-                type: 'done', success: true, text: aiText, cards: finalCards,
-                confidence: trustMetrics.finalConfidence, sources, modelUsed, trustMetrics,
-                processingTime, useFallback: usedFallback,
+                type: 'done', success: true, text: state.aiText, cards: finalCards,
+                confidence: trustMetrics.finalConfidence, sources, modelUsed: state.modelUsed, trustMetrics,
+                processingTime, useFallback: state.usedFallback,
                 clarificationNeeded: isAmbiguous || noLiveGamesDetected, clarificationOptions,
-                ...(tokenUsage && { tokenUsage }),
+                ...(state.tokenUsage && { tokenUsage: state.tokenUsage }),
               }));
 
             } catch (streamErr) {
@@ -566,14 +590,14 @@ export async function POST(request: NextRequest) {
                 const fbTimer = setTimeout(() => fbAbort.abort(new Error('Fallback timeout')), FALLBACK_TIMEOUT_MS);
                 const fbResult = await generateText({
                   model: createXai({ apiKey: xaiApiKey })(actualFallbackModel),
-                  ...buildMessagesWithCacheAndMemory(cachedSystem, dynamicSystem, enrichedPrompt, undefined, context?.previousMessages),
+                  ...buildMessagesWithCacheAndMemory(cachedSystem, dynamicSystem, aiPrompt, undefined, context?.previousMessages),
                   temperature: AI_CONFIG.DEFAULT_TEMPERATURE, maxOutputTokens: AI_CONFIG.DEFAULT_MAX_TOKENS, maxRetries: 0, abortSignal: fbAbort.signal,
                 });
                 clearTimeout(fbTimer);
-                aiText    = fbResult.text;
-                modelUsed = alreadyFast ? `${AI_CONFIG.MODEL_DISPLAY_NAME} (fallback)` : `${AI_CONFIG.FAST_MODEL_DISPLAY_NAME} (fallback)`;
+                state.aiText    = fbResult.text;
+                state.modelUsed = alreadyFast ? `${AI_CONFIG.MODEL_DISPLAY_NAME} (fallback)` : `${AI_CONFIG.FAST_MODEL_DISPLAY_NAME} (fallback)`;
                 console.log(`[API/analyze] Fallback succeeded with ${actualFallbackModel}`);
-                enq(sseChunk({ type: 'text', delta: aiText }));
+                enq(sseChunk({ type: 'text', delta: state.aiText }));
               } catch (fbErr) {
                 const fbMsg = fbErr instanceof Error ? fbErr.message : String(fbErr);
                 console.error('[API/analyze] Fallback also failed:', fbMsg);
@@ -583,34 +607,34 @@ export async function POST(request: NextRequest) {
                 if (isRL || isAuth) {
                   const errMsg = isRL ? 'AI rate limit reached — please wait a moment and try again.' : 'AI API key error — contact support if this persists.';
                   enq(sseChunk({ type: 'error', message: errMsg }));
-                  aiText = errMsg;
+                  state.aiText = errMsg;
                 } else {
-                  aiText = generateFallbackResponse(userMessage, context);
-                  enq(sseChunk({ type: 'text', delta: aiText }));
+                  state.aiText = generateFallbackResponse(userMessage, context);
+                  enq(sseChunk({ type: 'text', delta: state.aiText }));
                 }
-                modelUsed = isRL ? 'Fallback (rate limited)' : isAuth ? 'Fallback (auth error)' : fbMsg.includes('timeout') ? 'Fallback (timeout)' : 'Fallback (API error — check XAI_API_KEY)';
-                usedFallback = true;
+                state.modelUsed    = isRL ? 'Fallback (rate limited)' : isAuth ? 'Fallback (auth error)' : fbMsg.includes('timeout') ? 'Fallback (timeout)' : 'Fallback (API error — check XAI_API_KEY)';
+                state.usedFallback = true;
               }
             }
           } else {
             // No API key — static fallback
-            aiText       = generateFallbackResponse(userMessage, context);
-            modelUsed    = 'Fallback';
-            usedFallback = true;
-            enq(sseChunk({ type: 'text', delta: aiText }));
+            state.aiText       = generateFallbackResponse(userMessage, context);
+            state.modelUsed    = 'Fallback';
+            state.usedFallback = true;
+            enq(sseChunk({ type: 'text', delta: state.aiText }));
           }
 
           // Covers: no API key / primary-failed+fallback-succeeded / both-failed paths
-          if (!sentDoneEvent) {
+          if (!state.sentDoneEvent) {
             const cards          = await cardPromise.catch(() => [] as InsightCard[]);
             const processingTime = Date.now() - startTime;
             const trustMetrics   = { benfordIntegrity: 65, oddsAlignment: 65, marketConsensus: 65, historicalAccuracy: 68, finalConfidence: 65, trustLevel: 'medium' as const, riskLevel: 'medium' as const, adjustedTone: 'Limited data — AI unavailable', flags: [{ type: 'info', message: 'Using fallback mode — AI temporarily unavailable', severity: 'info' as const }] };
             const finalCards     = noLiveGamesDetected ? cards.filter((c: InsightCard) => c.data?.realData !== false && c.metadata?.realData !== false) : cards;
-            console.log(`[API/analyze] done (fallback) — text=${aiText.length}B cards=${finalCards.length} time=${processingTime}ms`);
+            console.log(`[API/analyze] done (fallback) — text=${state.aiText.length}B cards=${finalCards.length} time=${processingTime}ms`);
             enq(sseChunk({
-              type: 'done', success: true, text: aiText, cards: finalCards,
+              type: 'done', success: true, text: state.aiText, cards: finalCards,
               confidence: 65, sources: [{ name: 'Fallback Mode', type: 'cache', reliability: 65 }],
-              modelUsed, trustMetrics, processingTime, useFallback: true,
+              modelUsed: state.modelUsed, trustMetrics, processingTime, useFallback: true,
               clarificationNeeded: isAmbiguous || noLiveGamesDetected, clarificationOptions,
             }));
           }

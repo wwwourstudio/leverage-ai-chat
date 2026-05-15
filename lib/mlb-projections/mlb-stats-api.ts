@@ -66,7 +66,8 @@ function formatDate(d: Date): string {
 
 /** Extract team abbreviation from schedule API team object */
 function extractAbbr(teamObj: any): string {
-  return teamObj?.teamCode?.toUpperCase() || teamObj?.abbreviation?.toUpperCase() || '';
+  // abbreviation (e.g. "DET", "LAD") matches ESPN CDN; teamCode is legacy ("tig", "dod") and causes 404s
+  return teamObj?.abbreviation?.toUpperCase() || teamObj?.teamCode?.toUpperCase() || '';
 }
 
 /**

@@ -22,7 +22,7 @@ import { fetchDynamicCards } from '@/lib/data-service';
 import { FREE_TIER, GROK_VOICE_STORAGE_KEY, GROK_VOICE_DEFAULT } from '@/lib/constants';
 import { isDev as getIsDev } from '@/lib/config';
 import { createClient } from '@/lib/supabase/client';
-import { extractSportFromText } from '@/lib/sport-detection';
+import { extractSportFromText, extractSport } from '@/lib/sport-detection';
 import { useModalState } from '@/lib/hooks/useModalState';
 import { useCredits } from '@/lib/hooks/useCredits';
 import { useMessageEditor } from '@/lib/hooks/useMessageEditor';
@@ -670,7 +670,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           : selectedCategory === 'fantasy' && !hasFantasyOrDFSQuery
           ? 'betting'
           : selectedCategory;
-        const refreshSport = extractSportFromText(lastUserQuery) || selectedSport || undefined;
+        const conversationHistory = messages.slice(-10).map((m: any) => ({ role: m.role, content: m.content || '' }));
+        const refreshSport = extractSport(lastUserQuery, conversationHistory) || selectedSport || undefined;
+        console.log('[v0] fillMissingCards sport:', refreshSport, '(query:', lastUserQuery?.slice(0, 60), ')');
         const freshCards = await fetchDynamicCards({ sport: refreshSport, userContext: lastUserQuery, category: detectedCategory, limit: 7 });
         if (freshCards.length === 0) return;
 

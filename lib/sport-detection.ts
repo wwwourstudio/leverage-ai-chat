@@ -228,6 +228,10 @@ export function extractSport(
     'these props', 'those props', 'these players', 'those players',
     'this parlay', 'that parlay', 'for this', 'for that',
     'correlated', 'same-game', 'sgp',
+    'this player prop', 'this prop', 'that prop',
+    'historical hit rate', 'hit rate', 'prop hit rate',
+    'this lineup', 'this slate', 'this pick', 'that pick',
+    'for this player', 'for that player',
   ];
   const hasContextualReference = contextualKeywords.some(k => message.toLowerCase().includes(k));
 

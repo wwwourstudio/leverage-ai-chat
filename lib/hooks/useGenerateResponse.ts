@@ -89,9 +89,22 @@ export function useGenerateResponse(opts: UseGenerateResponseOptions) {
         : selectedSport || null;
 
       const directMessageSport = detectSportFromText(userMessage);
+
+      // Contextual follow-up phrases ("this prop", "hit rate", etc.) should inherit
+      // sport from conversation history rather than being overridden by the UI sport.
+      const contextualFollowUpPhrases = [
+        'this player prop', 'this prop', 'that prop', 'these props', 'those props',
+        'historical hit rate', 'hit rate', 'prop hit rate',
+        'this game', 'that game', 'the game', 'same game',
+        'this lineup', 'this slate', 'this pick', 'that pick',
+        'for this', 'for that', 'for this player', 'correlated', 'same-game', 'sgp',
+      ];
+      const hasContextualRef = contextualFollowUpPhrases.some(k => lowerMsg.includes(k));
+
       const effectiveSport = directMessageSport
+        || (hasContextualRef ? detectedSport : null)
         || (selectedCategory !== 'kalshi' ? selectedSportNormalized : null)
-        || (!selectedSportNormalized ? detectedSport : null);
+        || detectedSport;
 
       const bettingKeywords = ['odds', 'bet', 'line', 'spread', 'arbitrage', 'arb', 'h2h', 'sportsbook', 'draftkings', 'fanduel', 'moneyline', 'prop', 'parlay'];
       const hasBettingIntent = bettingKeywords.some(k => lowerMsg.includes(k)) || selectedCategory === 'betting';

@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import { create } from 'zustand';
 
-export interface ModalState {
+// ── Zustand store (single global instance) ───────────────────────────────────
+
+interface ModalStoreState {
   showLoginModal: boolean;
   showSignupModal: boolean;
   showUserLightbox: boolean;
@@ -14,43 +16,49 @@ export interface ModalState {
   showSubscriptionModal: boolean;
   showCommandPalette: boolean;
   showLimitNotification: boolean;
-  setShowLoginModal: Dispatch<SetStateAction<boolean>>;
-  setShowSignupModal: Dispatch<SetStateAction<boolean>>;
-  setShowUserLightbox: Dispatch<SetStateAction<boolean>>;
-  setShowSettingsLightbox: Dispatch<SetStateAction<boolean>>;
-  setShowAlertsLightbox: Dispatch<SetStateAction<boolean>>;
-  setShowWatchlistLightbox: Dispatch<SetStateAction<boolean>>;
-  setShowStripeLightbox: Dispatch<SetStateAction<boolean>>;
-  setShowPurchaseModal: Dispatch<SetStateAction<boolean>>;
-  setShowSubscriptionModal: Dispatch<SetStateAction<boolean>>;
-  setShowCommandPalette: Dispatch<SetStateAction<boolean>>;
-  setShowLimitNotification: Dispatch<SetStateAction<boolean>>;
+  setShowLoginModal: (v: boolean) => void;
+  setShowSignupModal: (v: boolean) => void;
+  setShowUserLightbox: (v: boolean) => void;
+  setShowSettingsLightbox: (v: boolean) => void;
+  setShowAlertsLightbox: (v: boolean) => void;
+  setShowWatchlistLightbox: (v: boolean) => void;
+  setShowStripeLightbox: (v: boolean) => void;
+  setShowPurchaseModal: (v: boolean) => void;
+  setShowSubscriptionModal: (v: boolean) => void;
+  setShowCommandPalette: (v: boolean | ((prev: boolean) => boolean)) => void;
+  setShowLimitNotification: (v: boolean) => void;
 }
 
-export function useModalState(): ModalState {
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [showSignupModal, setShowSignupModal] = useState(false);
-  const [showUserLightbox, setShowUserLightbox] = useState(false);
-  const [showSettingsLightbox, setShowSettingsLightbox] = useState(false);
-  const [showAlertsLightbox, setShowAlertsLightbox] = useState(false);
-  const [showWatchlistLightbox, setShowWatchlistLightbox] = useState(false);
-  const [showStripeLightbox, setShowStripeLightbox] = useState(false);
-  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
-  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [showLimitNotification, setShowLimitNotification] = useState(false);
+const useModalStore = create<ModalStoreState>()((set) => ({
+  showLoginModal: false,
+  showSignupModal: false,
+  showUserLightbox: false,
+  showSettingsLightbox: false,
+  showAlertsLightbox: false,
+  showWatchlistLightbox: false,
+  showStripeLightbox: false,
+  showPurchaseModal: false,
+  showSubscriptionModal: false,
+  showCommandPalette: false,
+  showLimitNotification: false,
+  setShowLoginModal: (v) => set({ showLoginModal: v }),
+  setShowSignupModal: (v) => set({ showSignupModal: v }),
+  setShowUserLightbox: (v) => set({ showUserLightbox: v }),
+  setShowSettingsLightbox: (v) => set({ showSettingsLightbox: v }),
+  setShowAlertsLightbox: (v) => set({ showAlertsLightbox: v }),
+  setShowWatchlistLightbox: (v) => set({ showWatchlistLightbox: v }),
+  setShowStripeLightbox: (v) => set({ showStripeLightbox: v }),
+  setShowPurchaseModal: (v) => set({ showPurchaseModal: v }),
+  setShowSubscriptionModal: (v) => set({ showSubscriptionModal: v }),
+  setShowCommandPalette: (fn) =>
+    set((s) => ({ showCommandPalette: typeof fn === 'function' ? fn(s.showCommandPalette) : fn })),
+  setShowLimitNotification: (v) => set({ showLimitNotification: v }),
+}));
 
-  return {
-    showLoginModal, setShowLoginModal,
-    showSignupModal, setShowSignupModal,
-    showUserLightbox, setShowUserLightbox,
-    showSettingsLightbox, setShowSettingsLightbox,
-    showAlertsLightbox, setShowAlertsLightbox,
-    showWatchlistLightbox, setShowWatchlistLightbox,
-    showStripeLightbox, setShowStripeLightbox,
-    showPurchaseModal, setShowPurchaseModal,
-    showSubscriptionModal, setShowSubscriptionModal,
-    showCommandPalette, setShowCommandPalette,
-    showLimitNotification, setShowLimitNotification,
-  };
+// ── Public hook (backward-compatible API) ─────────────────────────────────────
+
+export type { ModalStoreState as ModalState };
+
+export function useModalState() {
+  return useModalStore();
 }

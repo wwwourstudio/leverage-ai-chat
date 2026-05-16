@@ -2,11 +2,15 @@
 
 import { ChatInput, RateLimitNotification, FantasyLeagueContextBar } from '@/components/chat';
 import { SuggestedPrompts } from '@/components/suggested-prompts';
-import { FantasyLeagueSetup, type FantasyLeague } from '@/components/index/FantasyLeagueSetup';
+import { FantasyLeagueSetup } from '@/components/index/FantasyLeagueSetup';
 import type { FileAttachment } from '@/lib/hooks/useFileHandling';
 import type { Chat } from '@/lib/hooks/useChatList';
 import type { Message } from '@/app/types/chat';
 import type { PromptItem } from '@/lib/prompt-data';
+import { useAppStore } from '@/lib/store/app-store';
+import { useUserStore } from '@/lib/store/user-store';
+import { useFantasyStore } from '@/lib/store/fantasy-store';
+import { useModalState } from '@/lib/hooks/useModalState';
 
 interface ChatInputSectionProps {
   // Input
@@ -25,31 +29,14 @@ interface ChatInputSectionProps {
   // Credits
   creditsRemaining: number;
   onOpenStripe: () => void;
-  // UI state
+  // Context
   lastUserQuery: string;
-  selectedCategory: string;
-  selectedSport: string;
-  deepThink: boolean;
-  onToggleDeepThink: () => void;
-  systemStatus: 'ok' | 'degraded' | 'down';
-  // Rate limit
-  showLimitNotification: boolean;
-  setShowLimitNotification: (v: boolean) => void;
   getRateLimitData: () => { resetTime: number };
-  // Fantasy league
-  fantasyLeague: FantasyLeague | null;
-  setFantasyLeague: (l: FantasyLeague | null) => void;
-  fantasySetupData: Partial<FantasyLeague>;
-  setFantasySetupData: (d: Partial<FantasyLeague>) => void;
-  fantasySetupStep: number;
-  setFantasySetupStep: (s: number) => void;
-  isLoggedIn: boolean;
   // Suggested prompts
   messages: Message[];
   suggestedPrompts: PromptItem[];
   quickActions: PromptItem[];
   isClarificationPills: boolean;
-  onCategorySelect: (cat: string) => void;
   onPromptClick: (text: string) => void;
   onWelcomeAction: (query: string) => void;
   setChats: (fn: (prev: Chat[]) => Chat[]) => void;
@@ -65,13 +52,16 @@ export function ChatInputSection({
   input, setInput, onSubmit, isTyping, onStopGeneration,
   uploadedFiles, onFileUpload, onRemoveFile, onSaveFile, onFileDrop, onFilesAdded,
   creditsRemaining, onOpenStripe,
-  lastUserQuery, selectedCategory, selectedSport, deepThink, onToggleDeepThink, systemStatus,
-  showLimitNotification, setShowLimitNotification, getRateLimitData,
-  fantasyLeague, setFantasyLeague, fantasySetupData, setFantasySetupData, fantasySetupStep, setFantasySetupStep, isLoggedIn,
+  lastUserQuery, getRateLimitData,
   messages, suggestedPrompts, quickActions, isClarificationPills,
-  onCategorySelect, onPromptClick, onWelcomeAction, setChats, activeChat,
+  onPromptClick, onWelcomeAction, setChats, activeChat,
   voiceConvState, voiceConvSupported, onActivateVoice, lastAssistantMessage,
 }: ChatInputSectionProps) {
+  const { selectedCategory, selectedSport, deepThink, toggleDeepThink, systemStatus, selectCategory } = useAppStore();
+  const { isLoggedIn } = useUserStore();
+  const { fantasyLeague, setFantasyLeague, fantasySetupData, setFantasySetupData, fantasySetupStep, setFantasySetupStep, resetSetup } = useFantasyStore();
+  const { showLimitNotification, setShowLimitNotification } = useModalState();
+
   return (
     <div className="relative border-t border-[var(--border-subtle)] bg-gradient-to-b from-background to-black px-4 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl backdrop-blur-xl">
       <div className="absolute inset-0 bg-gradient-to-t from-blue-600/5 via-transparent to-transparent pointer-events-none" />
@@ -92,8 +82,7 @@ export function ChatInputSection({
             isLoggedIn={isLoggedIn}
             onSave={(league) => {
               setFantasyLeague(league);
-              setFantasySetupStep(0);
-              setFantasySetupData({ sport: 'nfl', platform: 'espn', teams: 12, leagueType: 'ppr' });
+              resetSetup();
             }}
           />
         )}
@@ -112,7 +101,7 @@ export function ChatInputSection({
         <SuggestedPrompts
           showWelcomeGrid={messages.length === 1 && !!messages[0]?.isWelcome && suggestedPrompts.length === 0 && selectedCategory === 'all'}
           onWelcomeAction={onWelcomeAction}
-          onCategorySelect={onCategorySelect}
+          onCategorySelect={selectCategory}
           suggestedPrompts={suggestedPrompts}
           quickActions={quickActions}
           hasMessages={messages.length > 1}
@@ -140,7 +129,7 @@ export function ChatInputSection({
           lastUserQuery={lastUserQuery}
           selectedCategory={selectedCategory}
           deepThink={deepThink}
-          onToggleDeepThink={onToggleDeepThink}
+          onToggleDeepThink={toggleDeepThink}
           systemStatus={systemStatus}
           voiceConvState={voiceConvState as any}
           voiceConvSupported={voiceConvSupported}

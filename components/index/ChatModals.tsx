@@ -5,6 +5,9 @@ import { CreditModals } from '@/components/index/CreditModals';
 import { CommandPalette } from '@/components/CommandPalette';
 import type { Chat } from '@/lib/hooks/useChatList';
 import type { FileAttachment } from '@/lib/hooks/useFileHandling';
+import { useModalState } from '@/lib/hooks/useModalState';
+import { useUserStore } from '@/lib/store/user-store';
+import { useAppStore } from '@/lib/store/app-store';
 
 const AuthModals = dynamic(() => import('@/components/AuthModals').then(m => ({ default: m.AuthModals })), { ssr: false });
 const UserLightbox = dynamic(() => import('@/components/UserLightbox').then(m => ({ default: m.UserLightbox })), { ssr: false });
@@ -14,71 +17,44 @@ const WatchlistLightbox = dynamic(() => import('@/components/WatchlistLightbox')
 const StripeLightbox = dynamic(() => import('@/components/StripeLightbox').then(m => ({ default: m.StripeLightbox })), { ssr: false });
 
 interface ChatModalsProps {
-  // Credit modals
-  showPurchaseModal: boolean;
-  purchaseAmount: string;
-  setPurchaseAmount: (v: string) => void;
-  setShowPurchaseModal: (v: boolean) => void;
-  showSubscriptionModal: boolean;
-  setShowSubscriptionModal: (v: boolean) => void;
-  setShowStripeLightbox: (v: boolean) => void;
-  setShowLoginModal: (v: boolean) => void;
-  // Auth modals
-  showLoginModal: boolean;
-  showSignupModal: boolean;
-  setShowSignupModal: (v: boolean) => void;
-  setIsLoggedIn: (v: boolean) => void;
-  setUser: (u: { name: string; email: string; avatar?: string } | null) => void;
-  // User lightbox
-  showUserLightbox: boolean;
-  setShowUserLightbox: (v: boolean) => void;
-  user: { name: string; email: string; avatar?: string } | null;
-  onLogout: () => void;
-  onInstructionsChange: (v: string) => void;
-  onAttachFile: (file: FileAttachment) => void;
-  // Settings
-  showSettingsLightbox: boolean;
-  setShowSettingsLightbox: (v: boolean) => void;
-  onUserUpdate: (u: { name: string; email: string; avatar?: string } | null) => void;
-  onOpenStripe: () => void;
   creditsRemaining: number;
-  // Alerts
-  showAlertsLightbox: boolean;
-  setShowAlertsLightbox: (v: boolean) => void;
-  setAlertCount: (n: number) => void;
-  // Watchlist
-  showWatchlistLightbox: boolean;
-  setShowWatchlistLightbox: (v: boolean) => void;
-  onPlayerClick: (...args: any[]) => void;
-  onCardClick: (...args: any[]) => void;
-  // Command palette
-  showCommandPalette: boolean;
-  setShowCommandPalette: (v: boolean) => void;
+  addCredits: (n: number) => void;
   chats: Chat[];
   activeChat: string;
   onSelectChat: (id: string) => void;
   onNewChat: () => void;
-  setSidebarOpen: (v: boolean) => void;
-  // Stripe
-  showStripeLightbox: boolean;
-  addCredits: (n: number) => void;
-  // Voice overlay
+  onLogout: () => void;
+  onAttachFile: (file: FileAttachment) => void;
+  onOpenStripe: () => void;
+  onPlayerClick: (...args: any[]) => void;
+  onCardClick: (...args: any[]) => void;
   voiceIsActive: boolean;
   voiceOverlay: React.ReactNode;
 }
 
 export function ChatModals({
-  showPurchaseModal, purchaseAmount, setPurchaseAmount, setShowPurchaseModal,
-  showSubscriptionModal, setShowSubscriptionModal, setShowStripeLightbox, setShowLoginModal,
-  showLoginModal, showSignupModal, setShowSignupModal, setIsLoggedIn, setUser,
-  showUserLightbox, setShowUserLightbox, user, onLogout, onInstructionsChange, onAttachFile,
-  showSettingsLightbox, setShowSettingsLightbox, onUserUpdate, onOpenStripe, creditsRemaining,
-  showAlertsLightbox, setShowAlertsLightbox, setAlertCount,
-  showWatchlistLightbox, setShowWatchlistLightbox, onPlayerClick, onCardClick,
-  showCommandPalette, setShowCommandPalette, chats, activeChat, onSelectChat, onNewChat, setSidebarOpen,
-  showStripeLightbox, addCredits,
+  creditsRemaining, addCredits,
+  chats, activeChat, onSelectChat, onNewChat,
+  onLogout, onAttachFile, onOpenStripe,
+  onPlayerClick, onCardClick,
   voiceIsActive, voiceOverlay,
 }: ChatModalsProps) {
+  const {
+    showPurchaseModal, setShowPurchaseModal,
+    showSubscriptionModal, setShowSubscriptionModal,
+    showStripeLightbox, setShowStripeLightbox,
+    showLoginModal, setShowLoginModal,
+    showSignupModal, setShowSignupModal,
+    showUserLightbox, setShowUserLightbox,
+    showSettingsLightbox, setShowSettingsLightbox,
+    showAlertsLightbox, setShowAlertsLightbox,
+    showWatchlistLightbox, setShowWatchlistLightbox,
+    showCommandPalette, setShowCommandPalette,
+  } = useModalState();
+
+  const { user, setIsLoggedIn, setUser, purchaseAmount, setPurchaseAmount, setAlertCount, setCustomInstructions } = useUserStore();
+  const { setSidebarOpen } = useAppStore();
+
   return (
     <>
       <CreditModals
@@ -107,7 +83,7 @@ export function ChatModals({
         onClose={() => setShowUserLightbox(false)}
         user={user}
         onLogout={onLogout}
-        onInstructionsChange={onInstructionsChange}
+        onInstructionsChange={setCustomInstructions}
         onAttachFile={(file: any) => onAttachFile({ ...file, url: '' })}
       />
 
@@ -115,7 +91,7 @@ export function ChatModals({
         isOpen={showSettingsLightbox}
         onClose={() => setShowSettingsLightbox(false)}
         user={user}
-        onUserUpdate={onUserUpdate}
+        onUserUpdate={setUser}
         onOpenStripe={onOpenStripe}
         creditsRemaining={creditsRemaining}
       />

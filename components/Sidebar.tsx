@@ -2,9 +2,12 @@
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import Image from 'next/image';
-import { Plus, Search, Star, Trash2, MessageSquare, Edit3, CheckCircle, LayoutGrid, TrendingUp, Trophy, Award, BarChart3, UserCircle, Crosshair, LineChart } from 'lucide-react';
+import { Plus, Search, Star, Trash2, MessageSquare, Edit3, CheckCircle, LayoutGrid, TrendingUp, Trophy, Award, BarChart3, Crosshair, LineChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/utils';
+import { useAppStore } from '@/lib/store/app-store';
+import { useUserStore } from '@/lib/store/user-store';
+import { useModalState } from '@/lib/hooks/useModalState';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -33,18 +36,11 @@ interface SportDef {
 }
 
 export interface SidebarProps {
-  open: boolean;
   onNewChat: () => void;
   chatSearch: string;
   setChatSearch: (v: string) => void;
   activeChat: string;
   onSelectChat: (id: string) => void;
-  selectedCategory: string;
-  setSelectedCategory: (c: string) => void;
-  selectedSport: string;
-  setSelectedSport: (s: string) => void;
-  selectedKalshiTopic: string;
-  setSelectedKalshiTopic: (t: string) => void;
   filteredChats: Chat[];
   editingChatId: string | null;
   editingChatTitle: string;
@@ -58,10 +54,7 @@ export interface SidebarProps {
   sports: SportDef[];
   setSuggestedPrompts: (p: any[]) => void;
   setLastUserQuery: (q: string) => void;
-  user: { name: string; email: string; avatar?: string } | null;
-  onUserClick?: () => void;
   isLoadingChats?: boolean;
-  onClose?: () => void;
   onNavigate?: (query: string, category?: string, sport?: string) => void;
 }
 
@@ -75,7 +68,6 @@ const SHORT_CAT_NAMES: Record<string, string> = {
   kalshi: 'Kalshi',
 };
 
-/** Returns active sport pill color classes by category */
 function activeSportColor(category: string): string {
   if (category === 'fantasy')   return 'bg-[var(--chip-bg)] text-[var(--cat-fantasy)] border-[var(--cat-fantasy)]/40';
   if (category === 'dfs')       return 'bg-[var(--chip-bg)] text-[var(--cat-dfs)] border-[var(--cat-dfs)]/40';
@@ -84,7 +76,6 @@ function activeSportColor(category: string): string {
   return 'bg-[var(--chip-bg)] text-[var(--cat-betting)] border-[var(--cat-betting)]/40';
 }
 
-/** Returns a Tailwind left-border accent class based on the chat's first tag */
 function tagAccentClass(tags: string[]): string {
   const first = (tags[0] ?? '').toLowerCase();
   if (first === 'betting' || first === 'multi-platform') return 'border-l-2 border-l-blue-500/60';
@@ -98,7 +89,6 @@ function tagAccentClass(tags: string[]): string {
   return 'border-l-2 border-l-[var(--border-subtle)]';
 }
 
-/** Groups non-starred chats by recency */
 function groupChatsByDate(chats: Chat[]): Array<{ label: string; chats: Chat[] }> {
   const todayMs   = new Date().setHours(0, 0, 0, 0);
   const yesterMs  = todayMs - 86_400_000;
@@ -122,7 +112,6 @@ function groupChatsByDate(chats: Chat[]): Array<{ label: string; chats: Chat[] }
   return groups.filter(g => g.chats.length > 0);
 }
 
-/** Icon to use in icon-rail for each category id */
 const RAIL_ICONS: Record<string, React.FC<{ className?: string }>> = {
   all:     LayoutGrid,
   betting: TrendingUp,
@@ -183,7 +172,6 @@ const ChatCard = memo(function ChatCard({
       )}
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          {/* Title row */}
           <div className="flex items-center gap-1.5 mb-1 group/title">
             <MessageSquare className={cn(
               'w-3 h-3 flex-shrink-0 transition-colors',
@@ -222,12 +210,10 @@ const ChatCard = memo(function ChatCard({
             )}
           </div>
 
-          {/* Preview */}
           <p className="text-[11px] text-[var(--text-faint)] truncate mb-1.5 leading-tight pl-[18px]">
             {chat.preview}
           </p>
 
-          {/* Tags + timestamp */}
           <div className="flex items-center justify-between gap-2 pl-[18px]">
             <div className="flex items-center gap-1 flex-wrap">
               {chat.tags.slice(0, 2).map((tag, i) => (
@@ -245,7 +231,6 @@ const ChatCard = memo(function ChatCard({
           </div>
         </div>
 
-        {/* Action buttons */}
         <div className="flex flex-col gap-0.5 flex-shrink-0">
           <button
             onClick={(e: any) => onStarChat(chat.id, e)}
@@ -278,24 +263,19 @@ const ChatCard = memo(function ChatCard({
 
 function IconRail({
   categories,
-  selectedCategory,
-  setSelectedCategory,
   onNewChat,
-  user,
-  onUserClick,
   onNavigate,
 }: {
   categories: CategoryDef[];
-  selectedCategory: string;
-  setSelectedCategory: (c: string) => void;
   onNewChat: () => void;
-  user: { name: string; email?: string; avatar?: string } | null;
-  onUserClick?: () => void;
   onNavigate?: (query: string, category?: string, sport?: string) => void;
 }) {
+  const { selectedCategory, selectCategory } = useAppStore();
+  const { user } = useUserStore();
+  const { setShowUserLightbox } = useModalState();
+
   return (
     <div className="w-14 flex flex-col items-center py-3 gap-1 h-full">
-      {/* New Analysis button */}
       <button
         onClick={onNewChat}
         className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 flex items-center justify-center transition-all duration-200 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/35 mb-2 flex-shrink-0"
@@ -304,7 +284,6 @@ function IconRail({
         <Plus className="w-4 h-4 text-white" />
       </button>
 
-      {/* Category icons */}
       <div className="flex flex-col items-center gap-1 w-full px-2">
         {categories.map(cat => {
           const Icon = RAIL_ICONS[cat.id] ?? cat.icon;
@@ -312,13 +291,11 @@ function IconRail({
           return (
             <button
               key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
+              onClick={() => selectCategory(cat.id)}
               title={cat.name}
               className={cn(
                 'w-full h-9 rounded-xl flex items-center justify-center transition-all duration-200',
-                isActive
-                  ? 'bg-[var(--bg-elevated)]'
-                  : 'hover:bg-[var(--bg-surface)]',
+                isActive ? 'bg-[var(--bg-elevated)]' : 'hover:bg-[var(--bg-surface)]',
               )}
             >
               <Icon className={cn(
@@ -330,10 +307,8 @@ function IconRail({
         })}
       </div>
 
-      {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Quick-nav icons */}
       <button onClick={() => onNavigate?.("Show me today's MLB daily picks — ELITE and STRONG tier players with the best betting edges", 'betting', 'baseball_mlb')} title="Daily Picks" className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-[var(--bg-surface)] transition-colors mb-0.5">
         <Crosshair className="w-4 h-4 text-[var(--text-faint)]" />
       </button>
@@ -341,12 +316,11 @@ function IconRail({
         <LineChart className="w-4 h-4 text-[var(--text-faint)]" />
       </button>
 
-      {/* User avatar */}
       {user && (
         <div
           className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 mb-1 cursor-pointer hover:ring-2 hover:ring-blue-400/50 active:scale-95 transition-all"
           title={user.name}
-          onClick={onUserClick}
+          onClick={() => setShowUserLightbox(true)}
         >
           {user.avatar
             ? <Image src={user.avatar} className="w-8 h-8 rounded-full object-cover" alt="" width={32} height={32} />
@@ -361,19 +335,11 @@ function IconRail({
 // ── Main Sidebar ───────────────────────────────────────────────────────────────
 
 export function Sidebar({
-  open,
   onNewChat,
   chatSearch,
   setChatSearch,
   activeChat,
   onSelectChat,
-  selectedCategory,
-  setSelectedCategory,
-  selectedSport,
-  setSelectedSport,
-
-  selectedKalshiTopic,
-  setSelectedKalshiTopic,
   filteredChats,
   editingChatId,
   editingChatTitle,
@@ -387,12 +353,13 @@ export function Sidebar({
   sports,
   setSuggestedPrompts,
   setLastUserQuery,
-  user,
-  onUserClick,
   isLoadingChats = false,
-  onClose,
   onNavigate,
 }: SidebarProps) {
+  const { sidebarOpen, setSidebarOpen, selectedCategory, selectCategory, selectedSport, setSelectedSport, selectedKalshiTopic, setSelectedKalshiTopic } = useAppStore();
+  const { user } = useUserStore();
+  const { setShowUserLightbox } = useModalState();
+
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -400,21 +367,18 @@ export function Sidebar({
   const scrollRef = useRef<HTMLDivElement>(null);
   const SCROLL_KEY = 'sidebar_scroll';
 
-  // Restore scroll position from sessionStorage on open
   useEffect(() => {
-    if (!open || !scrollRef.current) return;
+    if (!sidebarOpen || !scrollRef.current) return;
     const saved = sessionStorage.getItem(SCROLL_KEY);
     if (saved) scrollRef.current.scrollTop = Number(saved);
-  }, [open]);
+  }, [sidebarOpen]);
 
-  // Persist scroll position
   const handleScroll = useCallback(() => {
     if (scrollRef.current) {
       sessionStorage.setItem(SCROLL_KEY, String(scrollRef.current.scrollTop));
     }
   }, []);
 
-  // Keyboard navigation: j/k=prev/next chat, /=focus search, Escape=clear/close
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
@@ -428,7 +392,7 @@ export function Sidebar({
       }
       if (e.key === 'Escape') {
         if (chatSearch) { setChatSearch(''); return; }
-        onClose?.();
+        setSidebarOpen(false);
         return;
       }
       if (e.key === 'j' || e.key === 'k') {
@@ -444,12 +408,12 @@ export function Sidebar({
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [filteredChats, activeChat, chatSearch, onSelectChat, setChatSearch, onClose]);
+  }, [filteredChats, activeChat, chatSearch, onSelectChat, setChatSearch, setSidebarOpen]);
 
   const handleSelectChatWithClose = useCallback((id: string) => {
     onSelectChat(id);
-    onClose?.();
-  }, [onSelectChat, onClose]);
+    setSidebarOpen(false);
+  }, [onSelectChat, setSidebarOpen]);
 
   const starredChats = filteredChats.filter(c => c.starred);
   const unstarredChats = filteredChats.filter(c => !c.starred);
@@ -460,298 +424,294 @@ export function Sidebar({
   const activeCategory = categories.find(c => c.id === selectedCategory);
 
   function handleCategorySelect(catId: string) {
-    setSelectedCategory(catId);
+    selectCategory(catId);
+    if (catId !== 'kalshi') setSelectedKalshiTopic('');
     setSuggestedPrompts([]);
     setLastUserQuery('');
-    // Reset Kalshi topic when leaving kalshi
-    if (catId !== 'kalshi') setSelectedKalshiTopic('');
   }
 
   return (
     <div
       className={cn(
         'flex flex-col h-full bg-[var(--bg-overlay)] border-r border-[var(--border-subtle)] overflow-hidden flex-shrink-0',
-        // Desktop: animate width. Mobile: always full-width drawer (transform handles visibility).
-        open ? 'w-72' : 'w-72 md:w-14',
+        sidebarOpen ? 'w-72' : 'w-72 md:w-14',
         'md:transition-all md:duration-300 md:ease-in-out',
       )}
     >
       {/* Icon rail — desktop only, collapsed state */}
-      {!open && (
+      {!sidebarOpen && (
         <div className="hidden md:flex flex-col h-full">
           <IconRail
             categories={categories}
-            selectedCategory={selectedCategory}
-            setSelectedCategory={setSelectedCategory}
             onNewChat={onNewChat}
-            user={user}
-            onUserClick={onUserClick}
             onNavigate={onNavigate}
           />
         </div>
       )}
 
-      {/* Full sidebar body: always rendered on mobile (off-screen via transform when closed);
-          only rendered when open on desktop */}
-      <div className={cn('flex flex-col h-full', !open && 'md:hidden')}>
-          {/* ── Header ─────────────────────────────────────────────────────── */}
-          <div className="px-3 pt-3 pb-2 border-b border-[var(--border-subtle)] bg-[var(--bg-overlay)] space-y-2.5 flex-shrink-0">
-            {/* New Analysis button */}
-            <button
-              onClick={onNewChat}
-              className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white rounded-xl px-4 py-2.5 transition-all duration-300 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/35 flex items-center justify-center gap-2 font-bold group relative overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-              <Plus className="w-4 h-4 relative z-10 group-hover:rotate-90 transition-transform duration-300" />
-              <span className="relative z-10 text-sm">New Analysis</span>
-            </button>
+      {/* Full sidebar body */}
+      <div className={cn('flex flex-col h-full', !sidebarOpen && 'md:hidden')}>
+        {/* ── Header ─────────────────────────────────────────────────────── */}
+        <div className="px-3 pt-3 pb-2 border-b border-[var(--border-subtle)] bg-[var(--bg-overlay)] space-y-2.5 flex-shrink-0">
+          <button
+            onClick={onNewChat}
+            className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white rounded-xl px-4 py-2.5 transition-all duration-300 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/35 flex items-center justify-center gap-2 font-bold group relative overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+            <Plus className="w-4 h-4 relative z-10 group-hover:rotate-90 transition-transform duration-300" />
+            <span className="relative z-10 text-sm">New Analysis</span>
+          </button>
 
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-faint)] pointer-events-none" />
-              <input
-                ref={searchRef}
-                value={chatSearch}
-                onChange={(e: any) => setChatSearch(e.target.value)}
-                placeholder="Search chats… ( / )"
-                className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg py-2 pl-8 pr-3 text-sm text-[var(--text-muted)] placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50 transition-colors"
-              />
-            </div>
-
-            {/* ── Category tabs ──────────────────────────────────────────── */}
-            <div>
-              <div className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-1.5 px-0.5">Platform</div>
-              {/* Compact pill row — short names fit on one line */}
-              <div className="flex gap-1 flex-wrap">
-                {categories.map(cat => {
-                  const Icon = cat.icon;
-                  const isActive = selectedCategory === cat.id;
-                  return (
-                    <button
-                      key={cat.id}
-                      onClick={() => handleCategorySelect(cat.id)}
-                      title={cat.desc}
-                      className={cn(
-                        'flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all duration-200 whitespace-nowrap border',
-                        isActive
-                          ? `bg-[var(--bg-elevated)] border-[var(--border-subtle)] ${cat.color}`
-                          : 'border-transparent text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
-                      )}
-                    >
-                      <Icon className={cn(
-                        'w-3 h-3 flex-shrink-0 transition-colors',
-                        isActive ? cat.color : 'text-[var(--text-faint)]',
-                      )} />
-                      <span>{SHORT_CAT_NAMES[cat.id] ?? cat.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Active category description */}
-              {activeCategory && selectedCategory !== 'all' && (
-                <p className="text-[9px] text-[var(--text-faint)] px-0.5 mt-1 leading-tight">
-                  {activeCategory.desc}
-                </p>
-              )}
-
-              {/* ── Sport sub-filter (non-Kalshi) ──────────────────────── */}
-              {selectedCategory !== 'kalshi' && (
-                <div className="relative mt-2">
-                  <div className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-1 px-0.5">Sport</div>
-                  <div className="relative">
-                    <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
-                    <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-hide pr-8">
-                      {sports
-                        .filter(s => !(['fantasy', 'dfs'].includes(selectedCategory) && s.id.startsWith('ncaa')))
-                        .map(sport => {
-                          const isActive = selectedSport === sport.id;
-                          return (
-                            <button
-                              key={sport.id}
-                              onClick={() => setSelectedSport(isActive ? '' : sport.id)}
-                              className={cn(
-                                'flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0 border',
-                                isActive
-                                  ? activeSportColor(selectedCategory)
-                                  : sport.isInSeason
-                                    ? 'border-transparent text-[var(--text-muted)] hover:text-foreground hover:bg-[var(--bg-surface)]'
-                                    : 'border-transparent text-[var(--text-faint)] hover:text-[var(--text-faint)] hover:bg-[var(--bg-surface)]',
-                              )}
-                            >
-                              {sport.isInSeason && (
-                                <span className={cn(
-                                  'w-1 h-1 rounded-full shrink-0',
-                                  isActive ? 'bg-current opacity-70' : 'bg-green-400/70',
-                                )} />
-                              )}
-                              {sport.name}
-                            </button>
-                          );
-                        })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ── Kalshi topic sub-filter ────────────────────────────── */}
-              {selectedCategory === 'kalshi' && (
-                <div className="mt-2">
-                  <div className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-1 px-0.5">Topic</div>
-                  <div className="relative">
-                    <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
-                    <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-hide pr-8">
-                      {KALSHI_TOPICS.map(topic => (
-                        <button
-                          key={topic}
-                          onClick={() => setSelectedKalshiTopic(selectedKalshiTopic === topic ? '' : topic)}
-                          className={cn(
-                            'px-2 py-1 rounded-full text-[9px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0 border',
-                            selectedKalshiTopic === topic
-                              ? 'bg-cyan-600/20 text-cyan-300 border-cyan-500/30'
-                              : 'border-transparent text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
-                          )}
-                        >
-                          {topic}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-faint)] pointer-events-none" />
+            <input
+              ref={searchRef}
+              value={chatSearch}
+              onChange={(e: any) => setChatSearch(e.target.value)}
+              placeholder="Search chats… ( / )"
+              className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg py-2 pl-8 pr-3 text-sm text-[var(--text-muted)] placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50 transition-colors"
+            />
           </div>
 
-          {/* ── Chat list ──────────────────────────────────────────────────── */}
-          <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] space-y-3 custom-scrollbar">
-            {/* Loading skeletons */}
-            {isLoadingChats && (
-              <div className="space-y-1.5 px-1 pt-1" aria-busy="true" aria-label="Loading chats">
-                {[1, 0.8, 0.9, 0.75, 0.85].map((w, i) => (
-                  <div key={i} className="relative flex items-center gap-2 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] h-[52px] px-3 overflow-hidden">
-                    <div className="w-0.5 h-full absolute left-0 top-0 bg-[var(--border-subtle)] rounded-l-xl" />
-                    <div className="flex-1 space-y-1.5 pl-1">
-                      <div className="h-2.5 rounded-full bg-[var(--bg-elevated)] animate-pulse" style={{ width: `${w * 100}%` }} />
-                      <div className="h-2 rounded-full bg-[var(--bg-surface)] animate-pulse" style={{ width: `${w * 60}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Starred section */}
-            {starredChats.length > 0 && (
-              <div className="space-y-1">
-                <div className="flex items-center justify-between px-2 py-1">
-                  <div className="flex items-center gap-1.5">
-                    <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                    <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">Starred</span>
-                  </div>
-                  <span className="text-[9px] font-bold text-[var(--text-faint)]">{starredChats.length}</span>
-                </div>
-                {starredChats.map((chat, i) => (
-                  <div
-                    key={chat.id}
-                    className="animate-fade-in"
-                    style={{ animationDelay: `${Math.min(i * 40, 280)}ms` }}
+          {/* Category tabs */}
+          <div>
+            <div className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-1.5 px-0.5">Platform</div>
+            <div className="flex gap-1 flex-wrap">
+              {categories.map(cat => {
+                const Icon = cat.icon;
+                const isActive = selectedCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => handleCategorySelect(cat.id)}
+                    title={cat.desc}
+                    className={cn(
+                      'flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all duration-200 whitespace-nowrap border',
+                      isActive
+                        ? `bg-[var(--bg-elevated)] border-[var(--border-subtle)] ${cat.color}`
+                        : 'border-transparent text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
+                    )}
                   >
-                    <ChatCard
-                      chat={chat}
-                      isActive={activeChat === chat.id}
-                      editingChatId={editingChatId}
-                      editingChatTitle={editingChatTitle}
-                      setEditingChatTitle={setEditingChatTitle}
-                      onEditChatTitle={onEditChatTitle}
-                      onSaveChatTitle={onSaveChatTitle}
-                      onKeyDownChatTitle={onKeyDownChatTitle}
-                      onSelectChat={handleSelectChatWithClose}
-                      onStarChat={onStarChat}
-                      onDeleteChat={onDeleteChat}
-                    />
-                  </div>
-                ))}
-              </div>
+                    <Icon className={cn(
+                      'w-3 h-3 flex-shrink-0 transition-colors',
+                      isActive ? cat.color : 'text-[var(--text-faint)]',
+                    )} />
+                    <span>{SHORT_CAT_NAMES[cat.id] ?? cat.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {activeCategory && selectedCategory !== 'all' && (
+              <p className="text-[9px] text-[var(--text-faint)] px-0.5 mt-1 leading-tight">
+                {activeCategory.desc}
+              </p>
             )}
 
-            {/* Date-grouped sections */}
-            {dateGroups.map(group => (
-              <div key={group.label} className="space-y-1">
-                <div className="flex items-center justify-between px-2 py-1">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">
-                    {group.label}
-                  </span>
-                  <span className="text-[9px] font-bold text-[var(--text-faint)]">{group.chats.length}</span>
+            {/* Sport sub-filter (non-Kalshi) */}
+            {selectedCategory !== 'kalshi' && (
+              <div className="relative mt-2">
+                <div className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-1 px-0.5">Sport</div>
+                <div className="relative">
+                  <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
+                  <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-hide pr-8">
+                    {sports
+                      .filter(s => !(['fantasy', 'dfs'].includes(selectedCategory) && s.id.startsWith('ncaa')))
+                      .map(sport => {
+                        const isActive = selectedSport === sport.id;
+                        return (
+                          <button
+                            key={sport.id}
+                            onClick={() => setSelectedSport(isActive ? '' : sport.id)}
+                            className={cn(
+                              'flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0 border',
+                              isActive
+                                ? activeSportColor(selectedCategory)
+                                : sport.isInSeason
+                                  ? 'border-transparent text-[var(--text-muted)] hover:text-foreground hover:bg-[var(--bg-surface)]'
+                                  : 'border-transparent text-[var(--text-faint)] hover:text-[var(--text-faint)] hover:bg-[var(--bg-surface)]',
+                            )}
+                          >
+                            {sport.isInSeason && (
+                              <span className={cn(
+                                'w-1 h-1 rounded-full shrink-0',
+                                isActive ? 'bg-current opacity-70' : 'bg-green-400/70',
+                              )} />
+                            )}
+                            {sport.name}
+                          </button>
+                        );
+                      })}
+                  </div>
                 </div>
-                {group.chats.map((chat, i) => (
-                  <div
-                    key={chat.id}
-                    className="animate-fade-in"
-                    style={{ animationDelay: `${Math.min(i * 40, 280)}ms` }}
-                  >
-                    <ChatCard
-                      chat={chat}
-                      isActive={activeChat === chat.id}
-                      editingChatId={editingChatId}
-                      editingChatTitle={editingChatTitle}
-                      setEditingChatTitle={setEditingChatTitle}
-                      onEditChatTitle={onEditChatTitle}
-                      onSaveChatTitle={onSaveChatTitle}
-                      onKeyDownChatTitle={onKeyDownChatTitle}
-                      onSelectChat={handleSelectChatWithClose}
-                      onStarChat={onStarChat}
-                      onDeleteChat={onDeleteChat}
-                    />
-                  </div>
-                ))}
-              </div>
-            ))}
-
-            {/* Empty state */}
-            {filteredChats.length === 0 && !isLoadingChats && (
-              <div className="flex flex-col items-center justify-center py-10 px-4 text-center animate-fade-in">
-                {chatSearch ? (
-                  <>
-                    <Search className="w-7 h-7 text-[var(--text-faint)] mb-3 opacity-50" />
-                    <p className="text-xs font-bold text-[var(--text-faint)] mb-1">No results</p>
-                    <p className="text-[10px] text-[var(--text-faint)] opacity-70">
-                      Nothing matches &ldquo;{chatSearch}&rdquo;
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-blue-500/20 flex items-center justify-center mb-3">
-                      <MessageSquare className="w-5 h-5 text-[var(--text-faint)]" />
-                    </div>
-                    <p className="text-xs font-bold text-[var(--text-faint)] mb-1">No chats yet</p>
-                    <p className="text-[10px] text-[var(--text-faint)] opacity-70">
-                      Start a new analysis above
-                    </p>
-                  </>
-                )}
               </div>
             )}
-          </div>
 
-          {/* ── Quick-nav footer ───────────────────────────────────────────── */}
-          <div className="flex-shrink-0 border-t border-[var(--border-subtle)] px-2 py-2 flex gap-1">
-            <button
-              onClick={() => onNavigate?.("Show me today's MLB daily picks — ELITE and STRONG tier players with the best betting edges", 'betting', 'baseball_mlb')}
-              className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-[10px] font-semibold text-[var(--text-faint)] hover:text-[var(--text-body)] hover:bg-[var(--bg-surface)] transition-colors"
-              title="Daily MLB Picks"
-            >
-              <Crosshair className="w-3.5 h-3.5 flex-shrink-0" />
-              <span>Daily Picks</span>
-            </button>
-            <button
-              onClick={() => onNavigate?.('Show me the quantitative trading opportunities and arbitrage analysis right now', 'betting')}
-              className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-[10px] font-semibold text-[var(--text-faint)] hover:text-[var(--text-body)] hover:bg-[var(--bg-surface)] transition-colors"
-              title="Quantitative Trading"
-            >
-              <LineChart className="w-3.5 h-3.5 flex-shrink-0" />
-              <span>Quant Trading</span>
-            </button>
+            {/* Kalshi topic sub-filter */}
+            {selectedCategory === 'kalshi' && (
+              <div className="mt-2">
+                <div className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-1 px-0.5">Topic</div>
+                <div className="relative">
+                  <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
+                  <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-hide pr-8">
+                    {KALSHI_TOPICS.map(topic => (
+                      <button
+                        key={topic}
+                        onClick={() => setSelectedKalshiTopic(selectedKalshiTopic === topic ? '' : topic)}
+                        className={cn(
+                          'px-2 py-1 rounded-full text-[9px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0 border',
+                          selectedKalshiTopic === topic
+                            ? 'bg-cyan-600/20 text-cyan-300 border-cyan-500/30'
+                            : 'border-transparent text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
+                        )}
+                      >
+                        {topic}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* ── Chat list ──────────────────────────────────────────────────── */}
+        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] space-y-3 custom-scrollbar">
+          {isLoadingChats && (
+            <div className="space-y-1.5 px-1 pt-1" aria-busy="true" aria-label="Loading chats">
+              {[1, 0.8, 0.9, 0.75, 0.85].map((w, i) => (
+                <div key={i} className="relative flex items-center gap-2 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] h-[52px] px-3 overflow-hidden">
+                  <div className="w-0.5 h-full absolute left-0 top-0 bg-[var(--border-subtle)] rounded-l-xl" />
+                  <div className="flex-1 space-y-1.5 pl-1">
+                    <div className="h-2.5 rounded-full bg-[var(--bg-elevated)] animate-pulse" style={{ width: `${w * 100}%` }} />
+                    <div className="h-2 rounded-full bg-[var(--bg-surface)] animate-pulse" style={{ width: `${w * 60}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {starredChats.length > 0 && (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between px-2 py-1">
+                <div className="flex items-center gap-1.5">
+                  <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                  <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">Starred</span>
+                </div>
+                <span className="text-[9px] font-bold text-[var(--text-faint)]">{starredChats.length}</span>
+              </div>
+              {starredChats.map((chat, i) => (
+                <div key={chat.id} className="animate-fade-in" style={{ animationDelay: `${Math.min(i * 40, 280)}ms` }}>
+                  <ChatCard
+                    chat={chat}
+                    isActive={activeChat === chat.id}
+                    editingChatId={editingChatId}
+                    editingChatTitle={editingChatTitle}
+                    setEditingChatTitle={setEditingChatTitle}
+                    onEditChatTitle={onEditChatTitle}
+                    onSaveChatTitle={onSaveChatTitle}
+                    onKeyDownChatTitle={onKeyDownChatTitle}
+                    onSelectChat={handleSelectChatWithClose}
+                    onStarChat={onStarChat}
+                    onDeleteChat={onDeleteChat}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {dateGroups.map(group => (
+            <div key={group.label} className="space-y-1">
+              <div className="flex items-center justify-between px-2 py-1">
+                <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">
+                  {group.label}
+                </span>
+                <span className="text-[9px] font-bold text-[var(--text-faint)]">{group.chats.length}</span>
+              </div>
+              {group.chats.map((chat, i) => (
+                <div key={chat.id} className="animate-fade-in" style={{ animationDelay: `${Math.min(i * 40, 280)}ms` }}>
+                  <ChatCard
+                    chat={chat}
+                    isActive={activeChat === chat.id}
+                    editingChatId={editingChatId}
+                    editingChatTitle={editingChatTitle}
+                    setEditingChatTitle={setEditingChatTitle}
+                    onEditChatTitle={onEditChatTitle}
+                    onSaveChatTitle={onSaveChatTitle}
+                    onKeyDownChatTitle={onKeyDownChatTitle}
+                    onSelectChat={handleSelectChatWithClose}
+                    onStarChat={onStarChat}
+                    onDeleteChat={onDeleteChat}
+                  />
+                </div>
+              ))}
+            </div>
+          ))}
+
+          {filteredChats.length === 0 && !isLoadingChats && (
+            <div className="flex flex-col items-center justify-center py-10 px-4 text-center animate-fade-in">
+              {chatSearch ? (
+                <>
+                  <Search className="w-7 h-7 text-[var(--text-faint)] mb-3 opacity-50" />
+                  <p className="text-xs font-bold text-[var(--text-faint)] mb-1">No results</p>
+                  <p className="text-[10px] text-[var(--text-faint)] opacity-70">
+                    Nothing matches &ldquo;{chatSearch}&rdquo;
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-blue-500/20 flex items-center justify-center mb-3">
+                    <MessageSquare className="w-5 h-5 text-[var(--text-faint)]" />
+                  </div>
+                  <p className="text-xs font-bold text-[var(--text-faint)] mb-1">No chats yet</p>
+                  <p className="text-[10px] text-[var(--text-faint)] opacity-70">
+                    Start a new analysis above
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Quick-nav footer ───────────────────────────────────────────── */}
+        <div className="flex-shrink-0 border-t border-[var(--border-subtle)] px-2 py-2 flex gap-1">
+          <button
+            onClick={() => onNavigate?.("Show me today's MLB daily picks — ELITE and STRONG tier players with the best betting edges", 'betting', 'baseball_mlb')}
+            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-[10px] font-semibold text-[var(--text-faint)] hover:text-[var(--text-body)] hover:bg-[var(--bg-surface)] transition-colors"
+            title="Daily MLB Picks"
+          >
+            <Crosshair className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>Daily Picks</span>
+          </button>
+          <button
+            onClick={() => onNavigate?.('Show me the quantitative trading opportunities and arbitrage analysis right now', 'betting')}
+            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-[10px] font-semibold text-[var(--text-faint)] hover:text-[var(--text-body)] hover:bg-[var(--bg-surface)] transition-colors"
+            title="Quantitative Trading"
+          >
+            <LineChart className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>Quant Trading</span>
+          </button>
+        </div>
+
+        {/* ── User profile footer ────────────────────────────────────────── */}
+        {user && (
+          <button
+            onClick={() => setShowUserLightbox(true)}
+            className="flex-shrink-0 border-t border-[var(--border-subtle)] px-3 py-2.5 flex items-center gap-2.5 hover:bg-[var(--bg-elevated)] transition-colors group"
+          >
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 overflow-hidden">
+              {user.avatar
+                ? <Image src={user.avatar} className="w-7 h-7 rounded-full object-cover" alt="" width={28} height={28} />
+                : <span className="text-[10px] font-black text-white">{user.name[0]?.toUpperCase()}</span>
+              }
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <div className="text-xs font-bold text-white truncate">{user.name}</div>
+              <div className="text-[9px] text-[var(--text-faint)] truncate">{user.email}</div>
+            </div>
+          </button>
+        )}
+      </div>
     </div>
   );
 }

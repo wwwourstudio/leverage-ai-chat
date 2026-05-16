@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Bookmark, FlaskConical, Share2, Check, Pin } from 'lucide-react';
 
@@ -266,16 +266,52 @@ export function DynamicCardRenderer({
     } catch {}
   }, [safeCard]);
 
+  // Historical comparison: compare current data to the last snapshot for this card type+title.
+  // Detects numeric field movements so we can show ↑/↓ "Updated" badges.
+  const HIST_KEY = `chist:${safeCard.type}:${safeCard.title}`;
+  const [deltaDir, setDeltaDir] = useState<'up' | 'down' | null>(null);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(HIST_KEY);
+      if (raw) {
+        const prev = JSON.parse(raw) as Record<string, any>;
+        let ups = 0, downs = 0;
+        for (const [k, v] of Object.entries(safeCard.data)) {
+          if (k === 'realData' || k === 'status') continue;
+          const pv = prev[k];
+          if (typeof v === 'number' && typeof pv === 'number' && v !== pv) {
+            v > pv ? ups++ : downs++;
+          }
+        }
+        if (ups + downs > 0) setDeltaDir(ups >= downs ? 'up' : 'down');
+      }
+      localStorage.setItem(HIST_KEY, JSON.stringify(safeCard.data));
+    } catch {}
+    // Intentionally runs only on mount — safeCard.data is stable per render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Live indicator: shown on cards with confirmed real data (not estimated)
+  const isLive = safeCard.realData === true;
+
   // Wraps any card element with ESTIMATED badge, trust score chip, pin and share buttons.
   // Pass skipBookmark=true for card types that have their own save/watch mechanism.
   function withOverlays(el: React.ReactElement, skipBookmark = false): React.ReactElement {
     return (
       <div className="relative group/card animate-card-enter">
         {el}
-        {/* Top-right action column — appears on hover, always visible when pinned */}
+
+        {/* Top-left: LIVE pulse for confirmed real-time data */}
+        {isLive && (
+          <span className="absolute top-2 left-2 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-sm pointer-events-none">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-[8px] font-bold text-emerald-400 uppercase tracking-wider">Live</span>
+          </span>
+        )}
+
+        {/* Top-right: share + pin buttons — revealed on hover, always shown when pinned */}
         <div className="absolute top-2 right-2 z-10 flex flex-col items-end gap-1 pointer-events-none">
           <div className={`flex items-center gap-1 transition-opacity duration-150 pointer-events-auto ${isBookmarked ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100'}`}>
-            {/* Share button */}
             <button
               onClick={shareCard}
               className="p-1 rounded-md transition-all duration-150 hover:bg-[var(--bg-elevated)]"
@@ -286,7 +322,6 @@ export function DynamicCardRenderer({
                 : <Share2 className="w-3.5 h-3.5 text-[var(--text-faint)]" />
               }
             </button>
-            {/* Pin / bookmark button */}
             {!skipBookmark && (
               <button
                 onClick={toggleBookmark}
@@ -304,19 +339,36 @@ export function DynamicCardRenderer({
             </span>
           )}
         </div>
+
+        {/* Bottom-right: data age label */}
         {dataAgeLabel && !isEstimated && (
           <span className="absolute bottom-2 right-2 z-10 px-1.5 py-0.5 rounded text-[8px] font-semibold tabular-nums bg-[var(--bg-overlay)]/80 text-[var(--text-faint)] border border-[var(--border-subtle)] backdrop-blur-sm pointer-events-none">
             {dataAgeLabel}
           </span>
         )}
-        {hasTrustOverlay && (
-          <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--bg-overlay)]/80 backdrop-blur-sm border border-[var(--border-subtle)] pointer-events-none">
-            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-              trustLevel === 'high' ? 'bg-emerald-400' :
-              trustLevel === 'medium' ? 'bg-yellow-400' :
-              'bg-red-400'
-            }`} />
-            <span className="text-[8px] font-bold text-[var(--text-faint)]">{trustScore}%</span>
+
+        {/* Bottom-left: trust score + historical delta badge side-by-side */}
+        {(hasTrustOverlay || deltaDir) && (
+          <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1 pointer-events-none">
+            {hasTrustOverlay && (
+              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--bg-overlay)]/80 backdrop-blur-sm border border-[var(--border-subtle)]">
+                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                  trustLevel === 'high' ? 'bg-emerald-400' :
+                  trustLevel === 'medium' ? 'bg-yellow-400' :
+                  'bg-red-400'
+                }`} />
+                <span className="text-[8px] font-bold text-[var(--text-faint)]">{trustScore}%</span>
+              </div>
+            )}
+            {deltaDir && (
+              <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold border backdrop-blur-sm ${
+                deltaDir === 'up'
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                  : 'bg-red-500/10 border-red-500/20 text-red-400'
+              }`} aria-label={`Data ${deltaDir === 'up' ? 'increased' : 'decreased'} since last view`}>
+                {deltaDir === 'up' ? '↑' : '↓'} Updated
+              </span>
+            )}
           </div>
         )}
       </div>

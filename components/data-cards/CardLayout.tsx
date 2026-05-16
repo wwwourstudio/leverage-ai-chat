@@ -92,6 +92,17 @@ export const CardLayout = memo(function CardLayout({
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
+  // Whether any card in this set has confirmed live (non-estimated) data
+  const hasLiveData = cards.some(c => c.realData === true);
+
+  // Show stale banner after 5 min when live data is present
+  const [isStale, setIsStale] = useState(false);
+  useEffect(() => {
+    if (!hasLiveData) return;
+    const id = setTimeout(() => setIsStale(true), 5 * 60_000);
+    return () => clearTimeout(id);
+  }, [hasLiveData]);
+
   // Update "X ago" label every minute
   useEffect(() => {
     const id = setInterval(() => setAgeLabel(formatAge(loadedAt)), 60_000);
@@ -163,6 +174,25 @@ export const CardLayout = memo(function CardLayout({
 
   return (
     <div className="mt-4 space-y-3 w-full">
+      {/* ── Stale data banner ────────────────────────────────────────── */}
+      {isStale && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 animate-fade-in">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+          <span className="text-[10px] font-medium text-amber-300">Live data may be stale</span>
+          {onAsk && (
+            <button
+              onClick={() => {
+                setIsStale(false);
+                onAsk(`Refresh ${heroCard.category} ${heroCard.subcategory} analysis`);
+              }}
+              className="ml-auto text-[10px] font-bold text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors"
+            >
+              Refresh
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Hero Card ────────────────────────────────────────────────── */}
       <div className="w-full animate-card-enter">
         <DynamicCardRenderer

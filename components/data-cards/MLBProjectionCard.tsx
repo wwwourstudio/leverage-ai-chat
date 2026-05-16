@@ -196,6 +196,7 @@ function metricValueColor(label: string, value: string): string {
 
 export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnalyze, isHero = false }: MLBProjectionCardProps) {
   const [showLightbox, setShowLightbox] = useState(false);
+  const [headshotError, setHeadshotError] = useState(false);
 
   // Normalize data (handles both flat and nested formats)
   const playerName  = data.player_name ?? data.data?.player ?? data.title ?? 'Player';
@@ -268,7 +269,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
           <div className="flex items-center gap-3">
             {(() => {
               const headshotUrl = getPlayerHeadshotUrl(playerName);
-              if (!headshotUrl) return null;
+              if (!headshotUrl || headshotError) return null;
               return (
                 <div className="relative shrink-0">
                   <Image
@@ -278,7 +279,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
                       'rounded-2xl object-cover bg-white/5 border border-white/10',
                       isHero ? 'w-14 h-14' : 'w-11 h-11',
                     )}
-                    onError={() => {}}
+                    onError={() => setHeadshotError(true)}
                     unoptimized
                   />
                 </div>

@@ -201,7 +201,7 @@ export const PLAYER_HEADSHOT_IDS: Record<string, { id: string; sport: 'nba' | 'n
   'Emmanuel Clase':          { id: '667670',  sport: 'mlb' },
   'Paul Skenes':             { id: '694973',  sport: 'mlb' },
   'Jackson Chourio':         { id: '694192',  sport: 'mlb' },
-  'Jackson Merrill':         { id: '694192',  sport: 'mlb' },
+  'Jackson Merrill':         { id: '694197',  sport: 'mlb' },
   'CJ Abrams':               { id: '682928',  sport: 'mlb' },
   'Tarik Skubal':            { id: '669373',  sport: 'mlb' },
   'Blake Snell':             { id: '605483',  sport: 'mlb' },
@@ -218,7 +218,7 @@ export function getPlayerHeadshotUrl(playerName: string): string | null {
     return `https://a.espncdn.com/combiner/i?img=/i/headshots/nfl/players/full/${entry.id}.png&w=96&h=70&scale=crop&location=origin&transparent=true`;
   }
   if (entry.sport === 'mlb') {
-    return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${entry.id}/headshot/67/current`;
+    return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png,w_213,q_auto:best/v1/people/${entry.id}/headshot/67/current`;
   }
   return null;
 }

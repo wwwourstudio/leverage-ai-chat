@@ -16,6 +16,8 @@ import type { Message } from '@/app/types/chat';
 import { GROK_VOICE_STORAGE_KEY, GROK_VOICE_DEFAULT } from '@/lib/constants';
 import { speakText, stopVoice } from '@/lib/voice-player';
 import { cardsToSpeech } from '@/lib/card-speech';
+import { useAppStore } from '@/lib/store/app-store';
+import { useUserStore } from '@/lib/store/user-store';
 
 interface ChatMessageListProps {
   messages: Message[];
@@ -23,15 +25,10 @@ interface ChatMessageListProps {
   verifyStage: 'analyzing' | 'reverifying';
   editingMessageIndex: number | null;
   editingContent: string;
-  speakingMessageId: string | null;
-  setSpeakingMessageId: (id: string | null) => void;
-  kalshiBettingBannerVisible: boolean;
-  setKalshiBettingBannerVisible: (v: boolean) => void;
   editTextareaRef: RefObject<HTMLTextAreaElement | null>;
   onEditContentChange: (val: string) => void;
   adjustEditTextareaHeight: () => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-  selectedCategory: string;
   onGenerateResponse: (query: string) => void;
   onFollowUp: (action: 'correlated' | 'metrics', cardData?: any) => void;
   onEditMessage: (index: number) => void;
@@ -44,12 +41,14 @@ interface ChatMessageListProps {
 
 export function ChatMessageList({
   messages, isTyping, verifyStage,
-  editingMessageIndex, editingContent, speakingMessageId, setSpeakingMessageId,
-  kalshiBettingBannerVisible, setKalshiBettingBannerVisible,
+  editingMessageIndex, editingContent,
   editTextareaRef, onEditContentChange, adjustEditTextareaHeight, onKeyDown,
-  selectedCategory, onGenerateResponse, onFollowUp,
+  onGenerateResponse, onFollowUp,
   onEditMessage, onSaveEdit, onCancelEdit, onCopyMessage, onRegenerateResponse, onVote,
 }: ChatMessageListProps) {
+  const { selectedCategory, kalshiBettingBannerVisible, setKalshiBettingBannerVisible } = useAppStore();
+  const { speakingMessageId, setSpeakingMessageId } = useUserStore();
+
   return (
     <div
       className="flex-1 min-h-0 overflow-y-auto px-4 py-6 custom-scrollbar scroll-smooth"

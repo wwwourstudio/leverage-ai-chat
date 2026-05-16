@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { Bookmark, FlaskConical } from 'lucide-react';
+import { Bookmark, FlaskConical, Share2, Check, Pin } from 'lucide-react';
 
 // ── Saved-card entry (shared with WatchlistLightbox) ──────────────────────────
 export interface SavedCardEntry {
@@ -218,7 +218,7 @@ export function DynamicCardRenderer({
     return `${Math.floor(mins / 60)}h ago`;
   })();
 
-  // Per-card bookmark state (persisted to localStorage)
+  // Per-card bookmark/pin state (persisted to localStorage)
   const bookmarkKey = `bookmark:${safeCard.type}:${safeCard.title}`;
   const cardId = `${safeCard.type}:${safeCard.title}`;
   const [isBookmarked, setIsBookmarked] = useState(() => {
@@ -228,39 +228,77 @@ export function DynamicCardRenderer({
     setIsBookmarked(prev => {
       const next = !prev;
       try {
-        // Flag key for fast init check
         next ? localStorage.setItem(bookmarkKey, '1') : localStorage.removeItem(bookmarkKey);
-        // Full card data in saved_cards array
         const existing: SavedCardEntry[] = JSON.parse(localStorage.getItem(SAVED_CARDS_KEY) ?? '[]');
         const updated = next
           ? [{ id: cardId, savedAt: new Date().toISOString(), card: { type: safeCard.type, title: safeCard.title, category: safeCard.category, subcategory: safeCard.subcategory, gradient: safeCard.gradient, status: safeCard.status, data: safeCard.data } }, ...existing.filter(e => e.id !== cardId)]
           : existing.filter(e => e.id !== cardId);
         localStorage.setItem(SAVED_CARDS_KEY, JSON.stringify(updated));
         window.dispatchEvent(new CustomEvent('saved-cards-update', { detail: { count: updated.length } }));
+        // Notify CardLayout to re-sort pinned cards to top
+        window.dispatchEvent(new CustomEvent('card-pin-update'));
       } catch {}
       return next;
     });
   }, [bookmarkKey, cardId, safeCard]);
 
-  // Wraps any card element with ESTIMATED badge, trust score chip, and bookmark button.
+  // Share card: copy formatted summary to clipboard with visual feedback
+  const [isShared, setIsShared] = useState(false);
+  const shareTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shareCard = useCallback(() => {
+    const dataLines = Object.entries(safeCard.data)
+      .filter(([k, v]) => k !== 'realData' && k !== 'status' && v != null && v !== '')
+      .slice(0, 6)
+      .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`)
+      .join('\n');
+    const text = [
+      `📊 ${safeCard.title}`,
+      `${safeCard.category} · ${safeCard.subcategory}`,
+      dataLines,
+      '',
+      'Shared from Leverage AI',
+    ].join('\n');
+    try {
+      navigator.clipboard.writeText(text);
+      setIsShared(true);
+      if (shareTimerRef.current) clearTimeout(shareTimerRef.current);
+      shareTimerRef.current = setTimeout(() => setIsShared(false), 2000);
+    } catch {}
+  }, [safeCard]);
+
+  // Wraps any card element with ESTIMATED badge, trust score chip, pin and share buttons.
   // Pass skipBookmark=true for card types that have their own save/watch mechanism.
   function withOverlays(el: React.ReactElement, skipBookmark = false): React.ReactElement {
     return (
-      <div className="relative group/card">
+      <div className="relative group/card animate-card-enter">
         {el}
-        {/* Top-right overlay column — stacked vertically so card's own header badges never collide horizontally */}
+        {/* Top-right action column — appears on hover, always visible when pinned */}
         <div className="absolute top-2 right-2 z-10 flex flex-col items-end gap-1 pointer-events-none">
-          {!skipBookmark && (
+          <div className={`flex items-center gap-1 transition-opacity duration-150 pointer-events-auto ${isBookmarked ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100'}`}>
+            {/* Share button */}
             <button
-              onClick={toggleBookmark}
-              className={`pointer-events-auto p-1 rounded-md transition-all duration-150 hover:bg-[var(--bg-elevated)] ${isBookmarked ? 'opacity-100' : 'opacity-40 group-hover/card:opacity-100'}`}
-              aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark card'}
+              onClick={shareCard}
+              className="p-1 rounded-md transition-all duration-150 hover:bg-[var(--bg-elevated)]"
+              aria-label="Copy card to clipboard"
             >
-              <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-blue-500 text-blue-500' : 'text-[var(--text-faint)]'}`} />
+              {isShared
+                ? <Check className="w-3.5 h-3.5 text-emerald-400" />
+                : <Share2 className="w-3.5 h-3.5 text-[var(--text-faint)]" />
+              }
             </button>
-          )}
+            {/* Pin / bookmark button */}
+            {!skipBookmark && (
+              <button
+                onClick={toggleBookmark}
+                className={`p-1 rounded-md transition-all duration-150 hover:bg-[var(--bg-elevated)] ${isBookmarked ? 'bg-blue-500/10' : ''}`}
+                aria-label={isBookmarked ? 'Unpin card' : 'Pin card'}
+              >
+                <Pin className={`w-3.5 h-3.5 transition-colors ${isBookmarked ? 'fill-blue-500 text-blue-500' : 'text-[var(--text-faint)]'}`} />
+              </button>
+            )}
+          </div>
           {isEstimated && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold backdrop-blur-sm" role="note" aria-label="Estimated data">
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold backdrop-blur-sm pointer-events-none" role="note" aria-label="Estimated data">
               <FlaskConical className="w-3 h-3" aria-hidden="true" />
               Estimated
             </span>

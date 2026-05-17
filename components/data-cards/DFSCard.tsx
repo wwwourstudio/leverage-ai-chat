@@ -111,12 +111,12 @@ function CeilingFloorBar({ ceiling, floor, projection }: { ceiling: number; floo
         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-3 rounded-full bg-red-400/70" />
         <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-3 rounded-full bg-emerald-400/70" />
         <div
-          className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white border-2 border-[var(--cat-dfs,oklch(0.72_0.20_80))] shadow-[0_0_6px_oklch(0.72_0.20_80/0.5)] transition-all duration-500"
+          className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-[var(--bg-elevated)] dark:bg-white border-2 border-[var(--cat-dfs,oklch(0.72_0.20_80))] shadow-[0_0_6px_oklch(0.72_0.20_80/0.5)] transition-all duration-500"
           style={{ left: `calc(${projPct}% - 5px)` }}
         />
       </div>
       <div className="flex items-center justify-center">
-        <span className="text-[9px] text-[var(--text-muted)]">Proj: <span className="text-white font-black">{projection.toFixed(1)}</span></span>
+        <span className="text-[9px] text-[var(--text-muted)]">Proj: <span className="text-[var(--foreground)] font-black">{projection.toFixed(1)}</span></span>
       </div>
     </div>
   );
@@ -155,7 +155,7 @@ function MatchupMeter({ score }: { score: number }) {
 /** DK/FD platform toggle */
 function PlatformToggle({ value, onChange }: { value: 'DK' | 'FD'; onChange: (v: 'DK' | 'FD') => void }) {
   return (
-    <div className="inline-flex items-center rounded-full bg-black/30 border border-white/10 p-0.5 gap-0.5">
+    <div className="inline-flex items-center rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-0.5 gap-0.5">
       {(['DK', 'FD'] as const).map(p => (
         <button
           key={p}
@@ -164,7 +164,7 @@ function PlatformToggle({ value, onChange }: { value: 'DK' | 'FD'; onChange: (v:
             'px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all duration-150',
             value === p
               ? 'bg-[var(--cat-dfs,oklch(0.72_0.20_80))] text-black shadow-sm'
-              : 'text-white/50 hover:text-white/80',
+              : 'text-[var(--foreground)]/50 hover:text-[var(--foreground)]/80',
           )}
         >
           {p}
@@ -249,9 +249,9 @@ export const DFSCard = memo(function DFSCard({
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <Gamepad2 className="w-3 h-3 text-[var(--cat-dfs,oklch(0.72_0.20_80))]/70 shrink-0" />
-            <span className="text-[9px] font-black uppercase tracking-widest text-white/60">{category}</span>
-            <span className="text-white/30">·</span>
-            <span className="text-[9px] text-white/50 truncate">{subcategory}</span>
+            <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/60">{category}</span>
+            <span className="text-[var(--foreground)]/30">·</span>
+            <span className="text-[9px] text-[var(--foreground)]/50 truncate">{subcategory}</span>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {realData && (
@@ -269,7 +269,7 @@ export const DFSCard = memo(function DFSCard({
         </div>
 
         {/* Title */}
-        <h3 className={cn('font-black text-white leading-snug text-balance', isHero ? 'text-lg' : 'text-sm')}>
+        <h3 className={cn('font-black text-[var(--foreground)] leading-snug text-balance', isHero ? 'text-lg' : 'text-sm')}>
           {title}
         </h3>
 
@@ -283,11 +283,11 @@ export const DFSCard = memo(function DFSCard({
                     {position}
                   </span>
                 )}
-                {team && <span className="text-[10px] font-bold text-white/50">{team}</span>}
+                {team && <span className="text-[10px] font-bold text-[var(--foreground)]/50">{team}</span>}
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {team && <TeamLogo team={team} sport={sport} size={32} />}
-                <span className={cn('font-black text-white leading-tight', isHero ? 'text-2xl' : 'text-xl')}>
+                <span className={cn('font-black text-[var(--foreground)] leading-tight', isHero ? 'text-2xl' : 'text-xl')}>
                   {player}
                 </span>
                 {confirmedStarter && (
@@ -305,7 +305,7 @@ export const DFSCard = memo(function DFSCard({
         {isStackPlay && (
           <div className="mt-2 flex items-center gap-1.5">
             {(stackTeam || team) && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-[10px] font-black text-white">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[10px] font-black text-[var(--foreground)]">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
                 Stack: {stackTeam ?? team}
               </span>
@@ -367,10 +367,10 @@ export const DFSCard = memo(function DFSCard({
             {hasVal(ownership) && (
               <div className="flex flex-col items-center gap-1 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-2 py-2.5">
                 <span className="text-[8px] font-black uppercase tracking-wider text-[var(--text-muted)]">Own%</span>
-                <span className="text-base font-black text-white tabular-nums leading-tight">{String(ownership)}</span>
+                <span className="text-base font-black text-[var(--foreground)] tabular-nums leading-tight">{String(ownership)}</span>
                 {!isNaN(ownershipNum) && ownershipNum > 0 && (
                   <div className="w-full mt-0.5">
-                    <div className="h-0.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+                    <div className="h-0.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                       <div
                         className={cn('h-full rounded-full transition-all duration-500',
                           ownershipNum >= 35 ? 'bg-red-400' : ownershipNum >= 20 ? 'bg-amber-400' : ownershipNum >= 10 ? 'bg-blue-400' : 'bg-emerald-400'
@@ -389,7 +389,7 @@ export const DFSCard = memo(function DFSCard({
         {isStackPlay && (
           <div className="rounded-xl border border-blue-500/30 bg-blue-500/6 px-3 py-3 space-y-2">
             <span className="text-[10px] font-black uppercase tracking-wider text-blue-400">Stack Recommendation</span>
-            {targetGame && <p className="text-sm font-bold text-white">{targetGame}</p>}
+            {targetGame && <p className="text-sm font-bold text-[var(--foreground)]">{targetGame}</p>}
             <div className="grid grid-cols-2 gap-1.5">
               {hasVal(projection) && (
                 <div className="flex flex-col items-center gap-0.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-1.5 py-2">
@@ -400,7 +400,7 @@ export const DFSCard = memo(function DFSCard({
               {hasVal(ownership) && (
                 <div className="flex flex-col items-center gap-0.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-1.5 py-2">
                   <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Own %</span>
-                  <span className="text-sm font-black text-white tabular-nums">{String(ownership)}</span>
+                  <span className="text-sm font-black text-[var(--foreground)] tabular-nums">{String(ownership)}</span>
                 </div>
               )}
             </div>
@@ -433,7 +433,7 @@ export const DFSCard = memo(function DFSCard({
               <div className="relative h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                 <div className={cn('h-full rounded-full bg-gradient-to-r transition-all duration-700', valCls)} style={{ width: `${valPct}%` }} />
                 {/* League avg tick at 4.0 = 50% */}
-                <div className="absolute top-0 bottom-0 w-px bg-white/30" style={{ left: '50%' }} />
+                <div className="absolute top-0 bottom-0 w-px bg-[var(--foreground)]/20" style={{ left: '50%' }} />
               </div>
             </div>
           );
@@ -503,14 +503,14 @@ export const DFSCard = memo(function DFSCard({
             <div className="rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-2 py-2.5 text-center">
               <span className="text-[8px] font-black uppercase tracking-wider text-[var(--text-muted)] block mb-1">Home {homeSplitGames ? `· ${homeSplitGames}G` : ''}</span>
               <div className="flex items-baseline justify-center gap-0.5">
-                <span className="text-base font-black text-white tabular-nums">{homeDKAvg ?? '—'}</span>
+                <span className="text-base font-black text-[var(--foreground)] tabular-nums">{homeDKAvg ?? '—'}</span>
                 <span className="text-[9px] text-[var(--text-faint)]">{platformLabel}</span>
               </div>
             </div>
             <div className="rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-2 py-2.5 text-center">
               <span className="text-[8px] font-black uppercase tracking-wider text-[var(--text-muted)] block mb-1">Road {roadSplitGames ? `· ${roadSplitGames}G` : ''}</span>
               <div className="flex items-baseline justify-center gap-0.5">
-                <span className="text-base font-black text-white tabular-nums">{roadDKAvg ?? '—'}</span>
+                <span className="text-base font-black text-[var(--foreground)] tabular-nums">{roadDKAvg ?? '—'}</span>
                 <span className="text-[9px] text-[var(--text-faint)]">{platformLabel}</span>
               </div>
             </div>
@@ -604,7 +604,7 @@ export const DFSCard = memo(function DFSCard({
                 <span className="text-[11px] text-[var(--text-muted)] uppercase tracking-wide">
                   {k.replace(/([A-Z])/g, ' $1').trim()}
                 </span>
-                <span className={cn('text-sm font-bold tabular-nums', String(rest[k]).endsWith('%') ? 'text-amber-400' : 'text-white')}>
+                <span className={cn('text-sm font-bold tabular-nums', String(rest[k]).endsWith('%') ? 'text-amber-400' : 'text-[var(--foreground)]')}>
                   {String(rest[k])}
                 </span>
               </div>
@@ -616,7 +616,7 @@ export const DFSCard = memo(function DFSCard({
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-gradient-to-r from-[var(--cat-dfs,oklch(0.72_0.20_80))]/20 to-amber-600/20 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 text-xs font-bold text-[var(--cat-dfs,oklch(0.72_0.20_80))] hover:from-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 hover:to-amber-600/30 hover:text-white hover:border-[var(--cat-dfs,oklch(0.72_0.20_80))]/50 transition-all duration-150"
+            className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-gradient-to-r from-[var(--cat-dfs,oklch(0.72_0.20_80))]/20 to-amber-600/20 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 text-xs font-bold text-[var(--cat-dfs,oklch(0.72_0.20_80))] hover:from-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 hover:to-amber-600/30 hover:text-[var(--foreground)] hover:border-[var(--cat-dfs,oklch(0.72_0.20_80))]/50 transition-all duration-150"
             aria-label={`Analyze ${title}`}
           >
             <TrendingUp className="w-3.5 h-3.5" />

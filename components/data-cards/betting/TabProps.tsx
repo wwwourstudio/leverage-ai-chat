@@ -59,7 +59,7 @@ export function TabProps({ data, onAnalyze, onAsk, loading = false }: {
         <div key={playerName} className="rounded-2xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] overflow-hidden">
           {/* Player header */}
           <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-[var(--bg-elevated)] border-b border-[var(--border-subtle)]">
-            <div className="w-6 h-6 rounded-lg bg-white/5 border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
+            <div className="w-6 h-6 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
               <span className="text-[9px] font-black text-[var(--text-muted)]">
                 {(playerName || '?').charAt(0).toUpperCase()}
               </span>
@@ -98,7 +98,7 @@ export function TabProps({ data, onAnalyze, onAsk, loading = false }: {
                   <div className="flex-1 min-w-0">
                     <p className="text-[11px] font-bold text-[var(--text-muted)] truncate">{p.stat}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-sm font-black text-white tabular-nums">{p.line}</span>
+                      <span className="text-sm font-black text-[var(--foreground)] tabular-nums">{p.line}</span>
                       {hasHitRate && (
                         <div className="flex items-center gap-1.5 flex-1 min-w-0">
                           <div className="flex-1 h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden max-w-16">

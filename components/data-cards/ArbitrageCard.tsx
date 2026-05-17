@@ -182,7 +182,7 @@ export function ArbitrageCard({
           : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-glow)]',
     )}>
       {/* Gradient header */}
-      <div className="absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-emerald-600/25 via-teal-800/10 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-emerald-500/5 to-transparent dark:from-emerald-600/25 dark:via-teal-800/10 pointer-events-none" />
 
       <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)}
            aria-hidden="true" />
@@ -251,7 +251,7 @@ export function ArbitrageCard({
           <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
             <div className="flex-1 text-center">
               <div className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-0.5">Total Investment</div>
-              <div className="text-sm font-black text-white tabular-nums">{data.totalStake}</div>
+              <div className="text-sm font-black text-[var(--foreground)] tabular-nums">{data.totalStake}</div>
             </div>
             <div className="text-[var(--text-faint)] text-xs">→</div>
             <div className="flex-1 text-center">

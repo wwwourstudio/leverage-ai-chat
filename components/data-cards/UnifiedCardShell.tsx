@@ -17,8 +17,9 @@ const STATUS_GLOW: Record<string, string> = {
   hot:     'card-hot     animate-ember-burst',
   value:   'card-value   animate-value-glow',
   optimal: 'card-optimal animate-optimal-glow',
+  edge:    'card-edge    animate-optimal-glow',
   arb:     'card-arb     animate-arb-flash',
-  live:    'card-live animate-live-glow',
+  live:    'card-live    animate-live-glow',
 };
 
 export function UnifiedCardShell({
@@ -28,7 +29,8 @@ export function UnifiedCardShell({
   status,
   animate = false,
 }: UnifiedCardShellProps) {
-  const glowClass = status ? (STATUS_GLOW[status.toLowerCase()] ?? '') : '';
+  const key = status?.toLowerCase();
+  const glowClass = key ? (STATUS_GLOW[key] ?? (process.env.NODE_ENV !== 'production' && console.warn(`[UnifiedCardShell] Unknown status: "${status}"`), '')) : '';
 
   return (
     <div

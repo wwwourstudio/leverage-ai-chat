@@ -53,8 +53,8 @@ export function createTools(context: AnalyzeContext, rawQueryLower: string) {
     execute: async ({ player, position, rankMin, rankMax, limit, team, valueOnly }) => {
       console.log('[API/analyze] ADP tool called:', { player, position, rankMin, rankMax, limit, team, valueOnly });
       const isNFL =
-        context?.sport?.includes('football') || context?.sport === 'nfl' ||
-        rawQueryLower.includes('football') || rawQueryLower.includes('nfl') || rawQueryLower.includes('nffc');
+        context?.sport === 'nfl' ||
+        /\b(nfl|nffc|nfl\s*draft)\b/.test(rawQueryLower);
       const data   = isNFL ? await getNFLADPData() : await getADPData();
       const source = isNFL ? `NFFC ${NFBC_DRAFT_YEAR} NFL ADP` : `NFBC ${NFBC_DRAFT_YEAR} ADP`;
       if (data.length === 0) {

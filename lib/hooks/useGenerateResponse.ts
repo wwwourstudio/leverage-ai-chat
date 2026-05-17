@@ -510,8 +510,8 @@ export function useGenerateResponse(opts: UseGenerateResponseOptions) {
     setIsTyping, selectedCategory, selectedSport, setKalshiBettingBannerVisible,
     customInstructions, deepThink, fantasyLeague, setVerifyStage,
     setSuggestedPrompts, setIsClarificationPills, generateContextualSuggestions, setLastUserQuery,
-    activeChat, setActiveChat, setChats, pendingThreadRef, isLoggedIn,
-    oddsCacheRef, analyzingMessageRef, toast,
+    activeChat, setActiveChat, setChats, isLoggedIn, toast,
+    // refs intentionally omitted — stable by design and never need to be deps
   ]);
 
   return generateRealResponse;

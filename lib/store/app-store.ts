@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 type SystemStatus = 'ok' | 'degraded' | 'down';
+export type AppCategory = 'all' | 'betting' | 'kalshi' | 'dfs' | 'fantasy';
 
 interface AppStore {
   // Sidebar
@@ -11,11 +12,11 @@ interface AppStore {
   setSidebarOpen: (v: boolean) => void;
   toggleSidebar: () => void;
   // Category / sport filter
-  selectedCategory: string;
+  selectedCategory: AppCategory;
   selectedSport: string;
   selectedKalshiTopic: string;
   /** Set category and auto-clear kalshiBettingBannerVisible when leaving Kalshi */
-  selectCategory: (catId: string) => void;
+  selectCategory: (catId: AppCategory) => void;
   setSelectedSport: (v: string) => void;
   setSelectedKalshiTopic: (v: string) => void;
   // System health
@@ -33,7 +34,7 @@ export const useAppStore = create<AppStore>()(
   persist(
     (set) => ({
       sidebarOpen: false,
-      selectedCategory: 'all',
+      selectedCategory: 'all' as AppCategory,
       selectedSport: '',
       selectedKalshiTopic: '',
       systemStatus: 'ok',

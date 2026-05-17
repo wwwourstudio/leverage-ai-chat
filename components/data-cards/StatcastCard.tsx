@@ -52,31 +52,31 @@ interface TypeConf {
 const TYPE_CONFIG: Record<string, TypeConf> = {
   statcast_summary_card: {
     emoji: '⚾', label: 'Statcast',
-    gradient: 'from-cyan-600/25 via-blue-800/10 to-slate-900/5',
+    gradient: 'from-cyan-500/5 dark:from-cyan-600/25 dark:via-blue-800/10 to-transparent',
     accentBorder: 'border-cyan-500/30', accentText: 'text-cyan-400',
     accentBg: 'bg-cyan-500/10', iconBg: 'bg-cyan-500/15',
   },
   hr_prop_card: {
     emoji: '💣', label: 'HR Prop',
-    gradient: 'from-rose-600/25 via-red-900/10 to-slate-900/5',
+    gradient: 'from-rose-500/5 dark:from-rose-600/25 dark:via-red-900/10 to-transparent',
     accentBorder: 'border-rose-500/30', accentText: 'text-rose-400',
     accentBg: 'bg-rose-500/10', iconBg: 'bg-rose-500/15',
   },
   game_simulation_card: {
     emoji: '🎲', label: 'Simulation',
-    gradient: 'from-violet-600/25 via-purple-900/10 to-slate-900/5',
+    gradient: 'from-violet-500/5 dark:from-violet-600/25 dark:via-purple-900/10 to-transparent',
     accentBorder: 'border-violet-500/30', accentText: 'text-violet-400',
     accentBg: 'bg-violet-500/10', iconBg: 'bg-violet-500/15',
   },
   leaderboard_card: {
     emoji: '🏆', label: 'Leaderboard',
-    gradient: 'from-amber-600/25 via-yellow-900/10 to-slate-900/5',
+    gradient: 'from-amber-500/5 dark:from-amber-600/25 dark:via-yellow-900/10 to-transparent',
     accentBorder: 'border-amber-500/30', accentText: 'text-amber-400',
     accentBg: 'bg-amber-500/10', iconBg: 'bg-amber-500/15',
   },
   pitch_analysis_card: {
     emoji: '🌀', label: 'Pitch Mix',
-    gradient: 'from-teal-600/25 via-cyan-900/10 to-slate-900/5',
+    gradient: 'from-teal-500/5 dark:from-teal-600/25 dark:via-cyan-900/10 to-transparent',
     accentBorder: 'border-teal-500/30', accentText: 'text-teal-400',
     accentBg: 'bg-teal-500/10', iconBg: 'bg-teal-500/15',
   },
@@ -264,7 +264,7 @@ function PitcherGauges({ metrics }: { metrics: Metric[] }) {
             <div className="relative w-20 h-20">
               <GaugeArc percentile={pct ?? 50} color={color} />
               <div className="absolute inset-0 flex flex-col items-center justify-center pt-1">
-                <span className="text-[14px] font-black tabular-nums text-white leading-none">
+                <span className="text-[14px] font-black tabular-nums text-[var(--foreground)] leading-none">
                   {m.value}
                 </span>
                 {pct !== null && (
@@ -274,11 +274,11 @@ function PitcherGauges({ metrics }: { metrics: Metric[] }) {
                 )}
               </div>
             </div>
-            <span className="text-[9px] font-black uppercase tracking-wider text-white/40 text-center leading-tight px-0.5">
+            <span className="text-[9px] font-black uppercase tracking-wider text-[var(--foreground)]/40 text-center leading-tight px-0.5">
               {PITCH_LABEL_SHORT[m.label] ?? m.label}
             </span>
             {PITCHER_LEAGUE_AVG[m.label] && (
-              <span className="text-[8px] text-white/20">
+              <span className="text-[8px] text-[var(--foreground)]/20">
                 lg avg {PITCHER_LEAGUE_AVG[m.label].avg}
               </span>
             )}
@@ -429,7 +429,7 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
                     <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: p.color }}>
                       {p.label}
                     </span>
-                    <span className="text-[11px] font-black text-white tabular-nums">{p.val}</span>
+                    <span className="text-[11px] font-black text-[var(--foreground)] tabular-nums">{p.val}</span>
                   </div>
                   <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                     <div
@@ -488,7 +488,7 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
           <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-2">Recent Form</p>
           {/* Dot sparkline */}
           <div className="flex items-center gap-1.5 mb-3">
-            <span className="text-[8px] text-white/25 uppercase tracking-widest">Form</span>
+            <span className="text-[8px] text-[var(--foreground)]/25 uppercase tracking-widest">Form</span>
             {gameLog.slice(0, 5).map((g, i) => {
               const er = g.er ?? 0;
               const ip = parseFloat(g.ip ?? '0');
@@ -510,7 +510,7 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
                 </div>
               );
             })}
-            <span className="text-[8px] text-white/20 ml-1">← recent</span>
+            <span className="text-[8px] text-[var(--foreground)]/20 ml-1">← recent</span>
           </div>
 
           {/* Game log table */}
@@ -538,7 +538,7 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
                     {isQS && <span className="ml-1 text-[7px] font-black text-emerald-400">QS</span>}
                   </span>
                   <span className="text-[10px] text-[var(--text-muted)] font-bold text-right truncate">{g.opp}</span>
-                  <span className="text-[10px] text-white/70 font-bold text-right">{g.ip ?? '—'}</span>
+                  <span className="text-[10px] text-[var(--foreground)]/70 font-bold text-right">{g.ip ?? '—'}</span>
                   <span className="text-[10px] font-black text-emerald-400 text-right">{g.k ?? '—'}</span>
                   <span className={cn(
                     'text-[10px] font-black text-right',
@@ -692,7 +692,7 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
   const playerName  = data.data?.playerName as string ?? data.title ?? '';
   const headshotUrl = (data.data?.headshotUrl as string | null | undefined) ?? getPlayerHeadshotUrl(playerName);
   const seasonStats = data.data?.seasonStats as SeasonStats | undefined;
-  const gameLog     = (data.data?.gameLog as GameLogEntry[] | undefined) ?? [];
+  const gameLog     = Array.isArray(data.data?.gameLog) ? (data.data.gameLog as GameLogEntry[]) : [];
   const propLines   = (data.data?.propLines as PropLine[] | undefined) ?? [];
 
   const { watched, toggle: toggleWatch } = useWatchlist(playerName);
@@ -779,7 +779,7 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
               'flex items-center gap-1.5 px-2.5 py-1 rounded-xl border',
               statusConf.bgCls, statusConf.borderCls,
             )}>
-              <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0 shadow-sm', statusConf.dotCls)} />
+              <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0 shadow-sm animate-pulse', statusConf.dotCls)} />
               <span className={cn('text-[9px] font-black tracking-widest', statusConf.textCls)}>{statusConf.label}</span>
             </div>
           </div>

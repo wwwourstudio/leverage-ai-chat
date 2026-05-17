@@ -1151,16 +1151,16 @@ export const KalshiCard = memo(function KalshiCard({
   if (d.status === 'API_UNAVAILABLE' || d.ticker === 'UNAVAILABLE') {
     return (
       <article className="group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] transition-all duration-300">
-        <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-fuchsia-900/30 via-pink-900/15 to-transparent border-b border-[var(--border-subtle)]">
+        <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-fuchsia-500/5 via-pink-500/3 dark:from-fuchsia-900/30 dark:via-pink-900/15 to-transparent border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-1.5 mb-2">
             <div className="flex items-center justify-center w-4 h-4 rounded shrink-0 bg-fuchsia-500/20">
               <TrendingUp className="w-2.5 h-2.5 text-fuchsia-400" />
             </div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/70">Kalshi</span>
-            <span className="text-white/30">·</span>
-            <span className="text-[10px] text-white/50">Prediction Markets</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-[var(--foreground)]/70">Kalshi</span>
+            <span className="text-[var(--foreground)]/30">·</span>
+            <span className="text-[10px] text-[var(--foreground)]/50">Prediction Markets</span>
           </div>
-          <h3 className="font-black text-white text-sm leading-snug pr-4">{title}</h3>
+          <h3 className="font-black text-[var(--foreground)] text-sm leading-snug pr-4">{title}</h3>
         </div>
         <div className="px-4 py-5 flex flex-col items-center gap-3 text-center">
           <div className="w-10 h-10 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center">
@@ -1205,18 +1205,18 @@ export const KalshiCard = memo(function KalshiCard({
       />
 
       {/* ── Gradient header ─────────────────────────────────────────────────── */}
-      <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-fuchsia-900/30 via-pink-900/15 to-transparent border-b border-[var(--border-subtle)]">
+      <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-fuchsia-500/5 via-pink-500/3 dark:from-fuchsia-900/30 dark:via-pink-900/15 to-transparent border-b border-[var(--border-subtle)]">
 
         {/* Status badge — top right */}
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
           {!isActive ? (
-            <span className="text-[9px] font-black uppercase tracking-widest text-white/40 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+            <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/40 px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
               Closed
             </span>
           ) : !d.priceIsReal ? (
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
-              <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-white/50">
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--foreground)]/30" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/50">
                 Pending
               </span>
             </div>
@@ -1224,7 +1224,7 @@ export const KalshiCard = memo(function KalshiCard({
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-fuchsia-500/10 border border-fuchsia-500/25">
               <span className={cn('w-1.5 h-1.5 rounded-full bg-fuchsia-400', livePrice ? 'animate-pulse' : '')} />
               <span className="text-[9px] font-black uppercase tracking-widest text-fuchsia-300">
-                {livePrice ? 'Live' : 'Live'}
+                {livePrice ? 'Live' : 'Offline'}
               </span>
             </div>
           )}
@@ -1238,8 +1238,8 @@ export const KalshiCard = memo(function KalshiCard({
             <CategoryIcon label={d.iconLabel} size={10} style={{ color: '#e879f9' }} />
           </div>
           <span className="text-[9px] font-black uppercase tracking-widest text-fuchsia-300/70">Kalshi</span>
-          <span className="text-white/20">·</span>
-          <span className="text-[9px] text-white/40 truncate">{marketCat}</span>
+          <span className="text-[var(--foreground)]/20">·</span>
+          <span className="text-[9px] text-[var(--foreground)]/40 truncate">{marketCat}</span>
           {d.isHot && (
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 text-orange-400 bg-orange-500/10 border border-orange-500/20">
               <Flame className="w-2.5 h-2.5" /> Hot
@@ -1250,7 +1250,7 @@ export const KalshiCard = memo(function KalshiCard({
         {/* Title row with countdown chip */}
         <div className="flex items-start justify-between gap-2 pr-16">
           <h3
-            className={cn('font-black text-white leading-snug flex-1', isHero ? 'text-base' : 'text-sm', 'line-clamp-2')}
+            className={cn('font-black text-[var(--foreground)] leading-snug flex-1', isHero ? 'text-base' : 'text-sm', 'line-clamp-2')}
             title={title}
           >
             {shortenTitle(title)}
@@ -1260,7 +1260,7 @@ export const KalshiCard = memo(function KalshiCard({
 
         {/* Subtitle */}
         {d.subtitle && d.subtitle !== title && d.subtitle.length > 0 && (
-          <p className="text-[10px] mt-1 line-clamp-1 leading-relaxed text-white/40">
+          <p className="text-[10px] mt-1 line-clamp-1 leading-relaxed text-[var(--foreground)]/40">
             {d.subtitle}
           </p>
         )}

@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { FantasyLeague } from '@/components/index/FantasyLeagueSetup';
 
 interface FantasyStore {
@@ -21,15 +22,27 @@ const DEFAULT_SETUP: Partial<FantasyLeague> = {
   leagueType: 'ppr',
 };
 
-export const useFantasyStore = create<FantasyStore>()((set) => ({
-  fantasyLeague: null,
-  fantasySetupStep: 0,
-  fantasySetupData: DEFAULT_SETUP,
+export const useFantasyStore = create<FantasyStore>()(
+  persist(
+    (set) => ({
+      fantasyLeague: null,
+      fantasySetupStep: 0,
+      fantasySetupData: DEFAULT_SETUP,
 
-  setFantasyLeague: (league) => set({ fantasyLeague: league }),
-  setFantasySetupStep: (fn) =>
-    set((s) => ({ fantasySetupStep: typeof fn === 'function' ? fn(s.fantasySetupStep) : fn })),
-  setFantasySetupData: (fn) =>
-    set((s) => ({ fantasySetupData: typeof fn === 'function' ? fn(s.fantasySetupData) : fn })),
-  resetSetup: () => set({ fantasySetupStep: 0, fantasySetupData: DEFAULT_SETUP }),
-}));
+      setFantasyLeague: (league) => set({ fantasyLeague: league }),
+      setFantasySetupStep: (fn) =>
+        set((s) => ({ fantasySetupStep: typeof fn === 'function' ? fn(s.fantasySetupStep) : fn })),
+      setFantasySetupData: (fn) =>
+        set((s) => ({ fantasySetupData: typeof fn === 'function' ? fn(s.fantasySetupData) : fn })),
+      resetSetup: () => set({ fantasySetupStep: 0, fantasySetupData: DEFAULT_SETUP }),
+    }),
+    {
+      name: 'leverage-fantasy-prefs',
+      partialize: (s) => ({
+        fantasyLeague: s.fantasyLeague,
+        fantasySetupStep: s.fantasySetupStep,
+        fantasySetupData: s.fantasySetupData,
+      }),
+    }
+  )
+);

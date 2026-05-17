@@ -151,10 +151,10 @@ export const ChatHeader = memo(function ChatHeader({ activeChat, messages = [] }
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setShowExportMenu(false)} />
                   <div className="absolute right-0 top-full mt-2 z-40 bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-xl shadow-2xl overflow-hidden min-w-[160px] animate-menu-slide">
-                    <button onClick={handleExportMarkdown} className="w-full px-4 py-3 text-sm text-left text-gray-200 hover:bg-[var(--bg-elevated)] transition-colors">
+                    <button onClick={handleExportMarkdown} className="w-full px-4 py-3 text-sm text-left text-[var(--foreground)] hover:bg-[var(--bg-elevated)] transition-colors">
                       Export as Markdown
                     </button>
-                    <button onClick={handleExportJSON} className="w-full px-4 py-3 text-sm text-left text-gray-200 hover:bg-[var(--bg-elevated)] transition-colors">
+                    <button onClick={handleExportJSON} className="w-full px-4 py-3 text-sm text-left text-[var(--foreground)] hover:bg-[var(--bg-elevated)] transition-colors">
                       Export as JSON
                     </button>
                   </div>
@@ -214,7 +214,7 @@ export const ChatHeader = memo(function ChatHeader({ activeChat, messages = [] }
                 className="relative p-2 hover:bg-[var(--bg-elevated)] rounded-xl transition-all group active:scale-95"
                 title="Bookmarks"
               >
-                <Bookmark className={`w-4 h-4 transition-colors ${watchlistCount > 0 ? 'text-blue-400 fill-blue-400' : 'text-[var(--text-muted)] group-hover:text-white'}`} />
+                <Bookmark className={`w-4 h-4 transition-colors ${watchlistCount > 0 ? 'text-blue-400 fill-blue-400' : 'text-[var(--text-muted)] group-hover:text-[var(--foreground)]'}`} />
                 {watchlistCount > 0 && (
                   <div className="absolute top-1 right-1 min-w-[14px] h-[14px] px-0.5 bg-blue-500 rounded-full border border-[var(--bg-overlay)] flex items-center justify-center">
                     <span className="text-[8px] font-black text-white">{watchlistCount}</span>

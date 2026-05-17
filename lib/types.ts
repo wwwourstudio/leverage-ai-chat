@@ -266,3 +266,41 @@ export function trySync<T>(fn: () => T): Result<T, Error> {
     return Err(isError(error) ? error : new Error(getErrorMessage(error)));
   }
 }
+
+// ============================================================================
+// Card System Types — single source of truth for the entire cards pipeline
+// ============================================================================
+
+/** Canonical card shape shared by the generator, data service, and all renderers. */
+export interface CardData {
+  /** Stable deterministic ID (djb2 hash of type+category+title+index). */
+  id?: string;
+  /** Card type — must be a value from the CARD_TYPES constant. */
+  type: string;
+  title: string;
+  /** Icon name for display (e.g. "TrendingUp"). */
+  icon?: string;
+  /** Display category (e.g. "NBA", "DFS", "MLB"). */
+  category: string;
+  /** Subtype label (e.g. "Point Spread", "Player Prop"). */
+  subcategory: string;
+  /** Tailwind CSS gradient classes for the card background. */
+  gradient: string;
+  /** Card-type-specific payload. Always an object — never undefined at runtime (normalised at generator boundary). */
+  data: Record<string, any>;
+  /**
+   * Card status. Optional in authoring/generation; the generator's stamp step
+   * normalises to "neutral" so downstream consumers always receive a string.
+   */
+  status?: string;
+  /** true = live API data, false = placeholder / estimated. */
+  realData?: boolean;
+  /** Source metadata (bookmaker, gameId, fetchedAt timestamp, etc.). */
+  metadata?: Record<string, any>;
+  /** Statcast summary metrics — used by StatcastCard only. */
+  summary_metrics?: Array<{ label: string; value: string }>;
+  /** Source / timestamp label shown on Statcast cards. */
+  last_updated?: string;
+  /** Contextual insight note shown at the bottom of Statcast cards. */
+  trend_note?: string;
+}

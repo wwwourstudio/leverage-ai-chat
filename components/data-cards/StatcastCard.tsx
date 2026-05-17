@@ -196,7 +196,8 @@ function HeroMetrics({ metrics, conf }: { metrics: Metric[]; conf: TypeConf }) {
             'flex flex-col items-center rounded-2xl border py-3 px-2 text-center',
             conf.accentBg, conf.accentBorder,
             'shadow-sm',
-          )}>
+            'animate-fade-in-up',
+          )} style={{ animationDelay: `${i * 60}ms` }}>
             <span className={cn('text-xl font-black tabular-nums leading-none', textCls)}>{m.value}</span>
             <span className={cn('mt-1.5 text-[9px] font-black uppercase tracking-widest opacity-70 leading-tight', conf.accentText)}>
               {m.label}
@@ -423,7 +424,7 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
             ].filter(p => p.val != null).map((p, i) => {
               const pct = parseFloat(p.val ?? '0') || 0;
               return (
-                <div key={i}>
+                <div key={i} className="animate-fade-in-up" style={{ animationDelay: `${i * 80}ms` }}>
                   <div className="flex justify-between items-center mb-1.5">
                     <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: p.color }}>
                       {p.label}
@@ -496,12 +497,13 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
               return (
                 <div
                   key={i}
-                  className="w-4 h-4 rounded-md flex-shrink-0 flex items-center justify-center text-[8px] font-black"
+                  className="w-4 h-4 rounded-md flex-shrink-0 flex items-center justify-center text-[8px] font-black animate-fade-in-up"
                   title={`${g.date} vs ${g.opp}: ${g.ip ?? '?'} IP, ${g.k ?? 0} K, ${er} ER`}
                   style={{
                     background: isQS ? 'rgba(74,222,128,0.2)' : isBad ? 'rgba(248,113,113,0.2)' : 'rgba(251,191,36,0.2)',
                     border: `1px solid ${isQS ? 'rgba(74,222,128,0.4)' : isBad ? 'rgba(248,113,113,0.4)' : 'rgba(251,191,36,0.3)'}`,
                     color: isQS ? '#4ade80' : isBad ? '#f87171' : '#fbbf24',
+                    animationDelay: `${i * 60}ms`,
                   }}
                 >
                   {isQS ? 'Q' : isBad ? '✗' : '·'}
@@ -865,7 +867,7 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
             {onAnalyze && (
               <button
                 onClick={onAnalyze}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--bg-elevated)] hover:bg-white/8 text-[var(--text-muted)] hover:text-foreground text-[10px] font-black transition-colors border border-[var(--border-subtle)]"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--bg-elevated)] hover:bg-white/8 text-[var(--text-muted)] hover:text-foreground text-[10px] font-black transition-colors border border-[var(--border-subtle)] hover:scale-105 active:scale-95 transition-transform duration-150"
               >
                 <BarChart3 className="w-3 h-3" />
                 AI Analysis
@@ -877,6 +879,7 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
                 className={cn(
                   'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-black transition-all border shadow-sm',
                   conf.accentBg, 'hover:opacity-90', conf.accentText, conf.accentBorder,
+                  'hover:scale-105 active:scale-95 transition-transform duration-150',
                 )}
               >
                 <ChevronRight className="w-3 h-3" />

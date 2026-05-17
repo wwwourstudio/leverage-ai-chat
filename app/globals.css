@@ -639,6 +639,13 @@
 .card-arb     { border-color: oklch(0.74 0.22 160 / 0.40) !important; }
 .card-live    { border-color: oklch(0.72 0.24 145 / 0.40) !important; }
 
+/* ── Status card hover glow amplification ────────────────────────────────── */
+.card-hot:hover    { box-shadow: var(--shadow-hot),     0 10px 32px oklch(0.62 0.25 27 / 0.22); }
+.card-value:hover  { box-shadow: var(--shadow-value),   0 10px 32px oklch(0.70 0.22 160 / 0.18); }
+.card-optimal:hover{ box-shadow: var(--shadow-optimal), 0 10px 32px oklch(0.62 0.18 258 / 0.18); }
+.card-arb:hover    { box-shadow: var(--shadow-arb),     0 10px 32px oklch(0.55 0.28 295 / 0.18); }
+.card-live:hover   { box-shadow: var(--shadow-live),    0 10px 32px oklch(0.70 0.22 145 / 0.18); }
+
 /* ── Chat compose bar focus aura ────────────────────────────────────────── */
 .chat-input-shell:focus-within {
   border-color: oklch(0.52 0.18 258) !important;

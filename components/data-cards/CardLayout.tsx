@@ -194,7 +194,7 @@ export const CardLayout = memo(function CardLayout({
           trustLevel={trustLevel}
         />
         {insight && (
-          <UnifiedCardShell className="mt-2 px-3 py-2 bg-[var(--bg-overlay)] flex items-start gap-2">
+          <UnifiedCardShell className="mt-2 px-3 py-2 bg-[var(--bg-overlay)] flex items-start gap-2 animate-fade-in animate-delay-300">
             <Sparkles className="w-3 h-3 text-blue-400 mt-0.5 shrink-0" aria-hidden="true" />
             <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{insight}</p>
           </UnifiedCardShell>

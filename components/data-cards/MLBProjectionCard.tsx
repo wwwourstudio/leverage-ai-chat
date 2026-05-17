@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, memo, useId } from 'react';
+import React, { useState, memo, useId } from 'react';
 import Image from 'next/image';
 import { TrendingUp, ChevronRight, Zap, Target, Activity, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -314,10 +314,22 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
 
           {/* ── Hero metrics 2×2 tile grid ──────────────────────────── */}
           <div className="grid grid-cols-2 gap-2">
-            <StatTile label={hero1.label} value={hero1.value} accent="blue" large />
-            <StatTile label={hero2.label} value={hero2.value} accent="indigo" large />
-            {dkPts && <StatTile label="DK Pts" value={dkPts} accent="emerald" />}
-            {kProj > 0 && !isPitcher && <StatTile label="K Proj" value={`${kProj}`} accent="slate" />}
+            {[
+              { label: hero1.label, value: hero1.value, accent: 'blue' as const, large: true },
+              { label: hero2.label, value: hero2.value, accent: 'indigo' as const, large: true },
+              ...(dkPts ? [{ label: 'DK Pts', value: dkPts, accent: 'emerald' as const, large: false }] : []),
+              ...(kProj > 0 && !isPitcher ? [{ label: 'K Proj', value: `${kProj}`, accent: 'slate' as const, large: false }] : []),
+            ].map((tile, index) => (
+              <StatTile
+                key={tile.label}
+                label={tile.label}
+                value={tile.value}
+                accent={tile.accent}
+                large={tile.large}
+                className="animate-fade-in-up"
+                style={{ animationDelay: `${index * 80}ms` }}
+              />
+            ))}
           </div>
 
           {/* ── Breakout score bar ──────────────────────────────────── */}
@@ -412,7 +424,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
 
           {/* ── Trend note ─────────────────────────────────────────── */}
           {trendNote && (
-            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-500/8 border border-amber-500/20">
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-500/8 border border-amber-500/20 animate-fade-in-up animate-delay-225">
               <Zap className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
               <p className="text-[10px] text-amber-300/80 leading-relaxed line-clamp-2">{trendNote}</p>
             </div>
@@ -423,7 +435,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
             {lightboxSections.length > 0 && (
               <button
                 onClick={() => setShowLightbox(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-white/40 hover:text-white hover:bg-white/8 hover:border-white/20 transition-all duration-150"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-white/40 hover:text-white hover:bg-white/8 hover:border-white/20 transition-all duration-150 hover:scale-105 active:scale-95 transition-transform"
               >
                 <BarChart3 className="w-3.5 h-3.5" />
                 Full Breakdown
@@ -432,7 +444,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
             {onAnalyze && (
               <button
                 onClick={onAnalyze}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-blue-500/15 border border-blue-500/30 text-xs font-semibold text-blue-300 hover:bg-blue-500/25 hover:border-blue-400/50 transition-all duration-150"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-blue-500/15 border border-blue-500/30 text-xs font-semibold text-blue-300 hover:bg-blue-500/25 hover:border-blue-400/50 transition-all duration-150 hover:scale-105 active:scale-95 transition-transform"
               >
                 <TrendingUp className="w-3.5 h-3.5" />
                 Analyze
@@ -473,7 +485,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
 
 // ─── Sub-component ────────────────────────────────────────────────────────────
 
-function StatTile({ label, value, accent = 'blue', large = false }: { label: string; value: string; accent?: 'blue' | 'indigo' | 'emerald' | 'slate'; large?: boolean }) {
+function StatTile({ label, value, accent = 'blue', large = false, className, style }: { label: string; value: string; accent?: 'blue' | 'indigo' | 'emerald' | 'slate'; large?: boolean; className?: string; style?: React.CSSProperties }) {
   const accentMap = {
     blue:   { bg: 'bg-blue-500/10',   border: 'border-blue-500/20',   text: 'text-blue-300'   },
     indigo: { bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', text: 'text-indigo-300' },
@@ -482,7 +494,7 @@ function StatTile({ label, value, accent = 'blue', large = false }: { label: str
   };
   const a = accentMap[accent];
   return (
-    <div className={cn('flex flex-col items-center rounded-xl border px-2 py-3', a.bg, a.border)}>
+    <div className={cn('flex flex-col items-center rounded-xl border px-2 py-3', a.bg, a.border, className)} style={style}>
       <span className="text-[8px] font-black uppercase tracking-widest text-white/35 mb-1">{label}</span>
       <span className={cn('font-black tabular-nums', large ? 'text-xl' : 'text-base', a.text)}>
         {value}

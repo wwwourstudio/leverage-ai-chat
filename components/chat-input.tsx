@@ -204,12 +204,12 @@ export const ChatInput = memo(function ChatInput({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={cn(
-          'relative rounded-2xl border transition-all duration-200',
+          'relative rounded-2xl border transition-all duration-200 chat-input-shell',
           isDragOver
             ? 'border-blue-500/60 bg-blue-500/5 ring-1 ring-blue-500/30'
             : isRecording
             ? 'bg-[var(--bg-overlay)] border-red-500/50 ring-1 ring-red-500/20'
-            : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)] hover:border-[var(--border-hover)] focus-within:border-blue-500/60 focus-within:ring-1 focus-within:ring-blue-500/20',
+            : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)] hover:border-[var(--border-hover)]',
         )}
       >
         {/* Drag overlay */}

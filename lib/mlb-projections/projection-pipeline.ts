@@ -4,7 +4,7 @@
  */
 
 import { fetchTodaysGames, type MLBGame, type MLBBatter, type MLBPitcher } from './mlb-stats-api';
-import { fetchStatcastHitters, fetchStatcastPitchers, findHitterByName, findPitcherByName, type StatcastPitcherStats } from './statcast-client';
+import { fetchStatcastHitters, fetchStatcastPitchers, findHitterByName, findPitcherByName, type StatcastHitterStats, type StatcastPitcherStats } from './statcast-client';
 import { getParkFactors } from './park-factors';
 import {
   buildHitterFeatures,
@@ -246,9 +246,7 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
         const statcast = allHitters.find(h => h.playerId === batter.id) ??
           allHitters.find(h => nameMatchesPlayer(h.playerName, batter.fullName)) ??
           await findHitterByName(batter.fullName).catch(() => null) ??
-          null;
-
-        if (!statcast) { diag.hittersSkippedNoStatcast++; continue; }
+          makeLeagueAvgHitterProfile(batter);
 
         const parkFactors = getParkFactors(batter.teamAbbr);
         const features = buildHitterFeatures(
@@ -536,6 +534,30 @@ function defaultMatchupVars() {
  * Prevents the pipeline from skipping pitchers entirely when Baseball Savant
  * returns an empty leaderboard (HTTP 200 but no rows).
  */
+function makeLeagueAvgHitterProfile(batter: MLBBatter): StatcastHitterStats {
+  return {
+    playerId:        batter.id,
+    playerName:      batter.fullName,
+    team:            batter.teamAbbr,
+    pa:              100,
+    avgExitVelocity: 88.0,
+    maxExitVelocity: 108.0,
+    launchAngle:     15.0,
+    barrelPct:       7.5,
+    hardHitPct:      38.0,
+    sweetSpotPct:    35.0,
+    xwOBA:           0.315,
+    xBA:             0.255,
+    xSLG:            0.400,
+    pullPct:         38.0,
+    kPct:            22.0,
+    bbPct:           8.5,
+    iso:             0.145,
+    hrFbRatio:       0.15,
+    bats:            batter.bats ?? 'R',
+  };
+}
+
 function makeLeagueAvgPitcherProfile(pitcher: MLBPitcher): StatcastPitcherStats {
   return {
     playerId: pitcher.id,

@@ -179,11 +179,6 @@
   --sidebar-border:            oklch(0.22 0.030 260);
   --sidebar-ring:              oklch(0.55 0.20 255);
 
-  /* ── Animation timing ────────────────────────────────────────────── */
-  --duration-fast:   150ms;
-  --duration-normal: 250ms;
-  --duration-slow:   400ms;
-
   /* ── Elevation shadows ───────────────────────────────────────────── */
   --shadow-card:     0 2px 8px oklch(0 0 0 / 0.30);
   --shadow-elevated: 0 8px 24px oklch(0 0 0 / 0.45);
@@ -499,14 +494,14 @@
   width: 6px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(17, 24, 39, 0.3);
+  background: var(--bg-elevated);
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(75, 85, 99, 0.5);
+  background: var(--border-default);
   border-radius: 3px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(107, 114, 128, 0.7);
+  background: var(--border-hover);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

@@ -114,7 +114,10 @@ export async function POST(request: NextRequest) {
       );
     }
     const body = parsed.data as AnalyzeRequestBody;
-    const { existingCards = [], context = {} as AnalyzeContext, customInstructions } = body;
+    const { existingCards = [], context = {} as AnalyzeContext } = body;
+    const customInstructions = body.customInstructions
+      ? body.customInstructions.replace(/[\x00-\x1f\x7f]/g, '').slice(0, 500)
+      : undefined;
 
     // File-size guard: truncate inline file blocks > 50 rows server-side
     const userMessage = applyFileSizeGuard(body.userMessage);

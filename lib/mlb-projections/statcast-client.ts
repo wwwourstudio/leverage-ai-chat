@@ -188,6 +188,7 @@ export async function fetchStatcastHitters(limit = 50): Promise<StatcastHitterSt
       };
     });
 
+    console.info(`[StatcastClient] fetchStatcastHitters: ${hitters.length} rows from Baseball Savant (limit=${limit})`);
     setCached(cacheKey, hitters);
     void saveLeaderboardToDB(cacheKey, hitters); // fire-and-forget — never blocks response
     return hitters;

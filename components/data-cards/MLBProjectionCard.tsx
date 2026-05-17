@@ -83,10 +83,10 @@ function PercentileBar({ p10, p50, p90, label }: { p10: number; p50: number; p90
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[9px] font-black uppercase tracking-widest text-white/40">{label} Range</span>
-        <span className="text-[9px] text-white/50 tabular-nums">P10: {p10} · P50: {p50} · P90: {p90}</span>
+        <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/40">{label} Range</span>
+        <span className="text-[9px] text-[var(--foreground)]/50 tabular-nums">P10: {p10} · P50: {p50} · P90: {p90}</span>
       </div>
-      <div className="relative h-2 bg-white/5 rounded-full overflow-hidden">
+      <div className="relative h-2 bg-[var(--bg-overlay)] rounded-full overflow-hidden">
         <div
           className="absolute top-0 bottom-0 rounded-full bg-gradient-to-r from-blue-500/40 to-emerald-500/60"
           style={{ left: `${p10Pct}%`, right: `${100 - (p90 / maxVal * 100)}%` }}
@@ -96,7 +96,7 @@ function PercentileBar({ p10, p50, p90, label }: { p10: number; p50: number; p90
           style={{ left: `${p50Pct}%` }}
         />
       </div>
-      <div className="flex justify-between text-[9px] text-white/40">
+      <div className="flex justify-between text-[9px] text-[var(--foreground)]/40">
         <span>Floor</span>
         <span className="text-emerald-400 font-bold">Median</span>
         <span>Ceiling</span>
@@ -129,7 +129,7 @@ function BreakoutRing({ score }: { score: number }) {
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-[11px] font-black text-white">{score}</span>
+          <span className="text-[11px] font-black text-[var(--foreground)]">{score}</span>
         </div>
       </div>
       <span className="text-[9px] font-black uppercase tracking-wider" style={{ color }}>{label}</span>
@@ -178,7 +178,7 @@ function DKSparkline({ data, height = 28 }: { data: Array<{ price: number }>; he
 
 function metricValueColor(label: string, value: string): string {
   const num = parseFloat(value);
-  if (isNaN(num)) return 'text-white';
+  if (isNaN(num)) return 'text-[var(--foreground)]';
   const lo = label.toLowerCase();
   if (lo.includes('barrel') || lo.includes(' ev') || lo.includes('hard') || lo.includes('k/9') || lo.includes('strikeout') || lo.includes('csw') || lo.includes('swstr') || lo.includes('stuff')) {
     return num >= 12 ? 'text-emerald-400' : num >= 7 ? 'text-amber-400' : 'text-red-400';
@@ -189,7 +189,7 @@ function metricValueColor(label: string, value: string): string {
   if (value.endsWith('%')) {
     return num >= 60 ? 'text-emerald-400' : num >= 40 ? 'text-amber-400' : 'text-red-400';
   }
-  return 'text-white';
+  return 'text-[var(--foreground)]';
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -255,11 +255,11 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
           {/* Sport chip + status badge — inline, no absolute, clears bookmark overlay */}
           <div className="flex items-center justify-between gap-2 mb-2">
             <div className="flex items-center gap-1.5 min-w-0">
-              <Activity className="w-3 h-3 text-white/40 shrink-0" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-white/40">MLB · LeverageMetrics</span>
-              {data.subcategory && <><span className="text-white/20">·</span><span className="text-[9px] text-white/30 truncate">{data.subcategory}</span></>}
+              <Activity className="w-3 h-3 text-[var(--foreground)]/40 shrink-0" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/40">MLB · LeverageMetrics</span>
+              {data.subcategory && <><span className="text-[var(--foreground)]/20">·</span><span className="text-[9px] text-[var(--foreground)]/30 truncate">{data.subcategory}</span></>}
             </div>
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/30 backdrop-blur-sm border border-white/10 shrink-0">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[var(--bg-elevated)] backdrop-blur-sm border border-[var(--border-subtle)] shrink-0">
               <span className={cn('w-1.5 h-1.5 rounded-full animate-pulse', cfg.dot)} />
               <span className={cn('text-[9px] font-black uppercase tracking-widest', cfg.text)}>{cfg.label}</span>
             </div>
@@ -276,7 +276,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
                     src={headshotUrl} alt={playerName}
                     width={isHero ? 56 : 44} height={isHero ? 56 : 44}
                     className={cn(
-                      'rounded-2xl object-cover bg-white/5 border border-white/10',
+                      'rounded-2xl object-cover bg-[var(--bg-elevated)] border border-[var(--border-subtle)]',
                       isHero ? 'w-14 h-14' : 'w-11 h-11',
                     )}
                     onError={() => setHeadshotError(true)}
@@ -293,7 +293,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
               )}
               <h3
                 className={cn(
-                  'font-black text-white leading-tight',
+                  'font-black text-[var(--foreground)] leading-tight',
                   isHero ? 'text-xl' : 'text-base',
                   onAnalyze && 'cursor-pointer hover:text-blue-300 transition-colors',
                 )}
@@ -303,7 +303,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
                 {playerName}
               </h3>
               {!team && position && (
-                <p className="text-[10px] font-bold text-white/40 mt-0.5">{position}</p>
+                <p className="text-[10px] font-bold text-[var(--foreground)]/40 mt-0.5">{position}</p>
               )}
             </div>
             {breakout > 0 && <BreakoutRing score={breakout} />}
@@ -334,12 +334,12 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
 
           {/* ── Breakout score bar ──────────────────────────────────── */}
           {breakout > 0 && (
-            <div className="rounded-xl bg-white/3 border border-white/8 p-3">
+            <div className="rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-3">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[9px] font-black uppercase tracking-widest text-white/40">Breakout Score</span>
+                <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/40">Breakout Score</span>
                 <span className="text-[11px] font-black tabular-nums" style={{ color: breakoutColor }}>{breakout}/100</span>
               </div>
-              <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+              <div className="h-1.5 rounded-full bg-[var(--bg-overlay)] overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-700"
                   style={{ width: `${breakout}%`, background: breakout >= 70 ? 'linear-gradient(90deg, #f59e0b, #fbbf24)' : breakout >= 50 ? 'linear-gradient(90deg, #3b82f6, #60a5fa)' : 'rgba(100,116,139,0.6)' }}
@@ -350,7 +350,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
 
           {/* ── Percentile bar ──────────────────────────────────────── */}
           {(percentiles.p10 !== undefined || percentiles.p90 > 0) && (
-            <div className="rounded-xl bg-white/3 border border-white/8 p-3">
+            <div className="rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-3">
               <PercentileBar
                 p10={percentiles.p10}
                 p50={percentiles.p50}
@@ -362,11 +362,11 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
 
           {/* ── Recent form sparkline with dots ─────────────────────── */}
           {sparkData.length >= 3 && (
-            <div className="rounded-xl bg-white/3 border border-white/8 p-3">
+            <div className="rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-3">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-[9px] font-black uppercase tracking-widest text-white/40">Recent Form</span>
+                <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/40">Recent Form</span>
                 {recentAvgLabel && (
-                  <span className="text-[9px] font-bold text-white/50">{recentAvgLabel}</span>
+                  <span className="text-[9px] font-bold text-[var(--foreground)]/50">{recentAvgLabel}</span>
                 )}
               </div>
               <DKSparkline data={sparkData} height={28} />
@@ -379,15 +379,15 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
               {homeDkAvg && (
                 <div className="flex flex-col items-center gap-0.5 rounded-xl bg-emerald-500/8 border border-emerald-500/20 px-3 py-2.5">
                   <span className="text-[8px] font-black uppercase tracking-widest text-emerald-400/60">Home</span>
-                  <span className="text-base font-black text-white tabular-nums">{homeDkAvg}</span>
-                  {homeGames && <span className="text-[9px] text-white/30">{homeGames}</span>}
+                  <span className="text-base font-black text-[var(--foreground)] tabular-nums">{homeDkAvg}</span>
+                  {homeGames && <span className="text-[9px] text-[var(--foreground)]/30">{homeGames}</span>}
                 </div>
               )}
               {roadDkAvg && (
                 <div className="flex flex-col items-center gap-0.5 rounded-xl bg-slate-500/8 border border-slate-500/20 px-3 py-2.5">
                   <span className="text-[8px] font-black uppercase tracking-widest text-slate-400/60">Road</span>
-                  <span className="text-base font-black text-white tabular-nums">{roadDkAvg}</span>
-                  {roadGames && <span className="text-[9px] text-white/30">{roadGames}</span>}
+                  <span className="text-base font-black text-[var(--foreground)] tabular-nums">{roadDkAvg}</span>
+                  {roadGames && <span className="text-[9px] text-[var(--foreground)]/30">{roadGames}</span>}
                 </div>
               )}
             </div>
@@ -400,11 +400,11 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
                 const isPercent = String(m.value).endsWith('%');
                 const numVal = parseFloat(String(m.value));
                 return (
-                  <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/3 border border-white/5">
-                    <span className="text-[9px] text-white/40 uppercase tracking-wide">{m.label}</span>
+                  <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+                    <span className="text-[9px] text-[var(--foreground)]/40 uppercase tracking-wide">{m.label}</span>
                     <div className="flex items-center gap-2">
                       {isPercent && !isNaN(numVal) && (
-                        <div className="h-1 w-16 rounded-full bg-white/5 overflow-hidden">
+                        <div className="h-1 w-16 rounded-full bg-[var(--bg-overlay)] overflow-hidden">
                           <div
                             className="h-full rounded-full"
                             style={{
@@ -435,7 +435,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
             {lightboxSections.length > 0 && (
               <button
                 onClick={() => setShowLightbox(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-white/40 hover:text-white hover:bg-white/8 hover:border-white/20 transition-all duration-150 hover:scale-105 active:scale-95 transition-transform"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--foreground)]/40 hover:text-[var(--foreground)] hover:bg-[var(--bg-overlay)] hover:border-[var(--border-default)] transition-all duration-150 hover:scale-105 active:scale-95 transition-transform"
               >
                 <BarChart3 className="w-3.5 h-3.5" />
                 Full Breakdown
@@ -454,16 +454,16 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
           </div>
 
           {/* ── Data source badge ─────────────────────────────────── */}
-          <div className="flex items-center justify-between pt-2 border-t border-white/5">
+          <div className="flex items-center justify-between pt-2 border-t border-[var(--border-subtle)]">
             <div className="flex items-center gap-1">
-              <Target className="w-2.5 h-2.5 text-white/20" />
-              <span className="text-[9px] font-bold text-white/20 uppercase tracking-wider">LeverageMetrics Engine</span>
+              <Target className="w-2.5 h-2.5 text-[var(--foreground)]/20" />
+              <span className="text-[9px] font-bold text-[var(--foreground)]/20 uppercase tracking-wider">LeverageMetrics Engine</span>
             </div>
             <div className="flex items-center gap-2">
               {data.last_updated && (
-                <span className="text-[9px] text-white/20">{data.last_updated}</span>
+                <span className="text-[9px] text-[var(--foreground)]/20">{data.last_updated}</span>
               )}
-              <span className="text-[9px] text-white/20">Monte Carlo N=1,000</span>
+              <span className="text-[9px] text-[var(--foreground)]/20">Monte Carlo N=1,000</span>
             </div>
           </div>
         </div>
@@ -490,12 +490,12 @@ function StatTile({ label, value, accent = 'blue', large = false, className, sty
     blue:   { bg: 'bg-blue-500/10',   border: 'border-blue-500/20',   text: 'text-blue-300'   },
     indigo: { bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', text: 'text-indigo-300' },
     emerald:{ bg: 'bg-emerald-500/10',border: 'border-emerald-500/20',text: 'text-emerald-300' },
-    slate:  { bg: 'bg-white/4',       border: 'border-white/8',       text: 'text-white/70'   },
+    slate:  { bg: 'bg-[var(--bg-elevated)]', border: 'border-[var(--border-subtle)]', text: 'text-[var(--foreground)]/70' },
   };
   const a = accentMap[accent];
   return (
     <div className={cn('flex flex-col items-center rounded-xl border px-2 py-3', a.bg, a.border, className)} style={style}>
-      <span className="text-[8px] font-black uppercase tracking-widest text-white/35 mb-1">{label}</span>
+      <span className="text-[8px] font-black uppercase tracking-widest text-[var(--foreground)]/35 mb-1">{label}</span>
       <span className={cn('font-black tabular-nums', large ? 'text-xl' : 'text-base', a.text)}>
         {value}
       </span>

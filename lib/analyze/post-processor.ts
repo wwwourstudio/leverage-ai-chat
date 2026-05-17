@@ -342,7 +342,7 @@ export function parseStatcastCardFromText(
   const jsonCandidates: string[] = [];
   const codeFenceMatch = aiText.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (codeFenceMatch) jsonCandidates.push(codeFenceMatch[1].trim());
-  for (const m of aiText.matchAll(/\{[\s\S]*?\}/g)) jsonCandidates.push(m[0]);
+  for (const m of [...aiText.matchAll(/\{[\s\S]*?\}/g)].slice(0, 5)) jsonCandidates.push(m[0]);
   const fullSpanMatch = aiText.match(/\{[\s\S]*\}/);
   if (fullSpanMatch) jsonCandidates.push(fullSpanMatch[0]);
 

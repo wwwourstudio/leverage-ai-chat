@@ -151,10 +151,10 @@ export const ChatHeader = memo(function ChatHeader({ activeChat, messages = [] }
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setShowExportMenu(false)} />
                   <div className="absolute right-0 top-full mt-2 z-40 bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-xl shadow-2xl overflow-hidden min-w-[160px] animate-menu-slide">
-                    <button onClick={handleExportMarkdown} className="w-full px-4 py-3 text-sm text-left text-gray-200 hover:bg-[var(--bg-elevated)] transition-colors">
+                    <button onClick={handleExportMarkdown} className="w-full px-4 py-3 text-sm text-left text-[var(--foreground)] hover:bg-[var(--bg-elevated)] transition-colors">
                       Export as Markdown
                     </button>
-                    <button onClick={handleExportJSON} className="w-full px-4 py-3 text-sm text-left text-gray-200 hover:bg-[var(--bg-elevated)] transition-colors">
+                    <button onClick={handleExportJSON} className="w-full px-4 py-3 text-sm text-left text-[var(--foreground)] hover:bg-[var(--bg-elevated)] transition-colors">
                       Export as JSON
                     </button>
                   </div>
@@ -178,43 +178,12 @@ export const ChatHeader = memo(function ChatHeader({ activeChat, messages = [] }
 
           {isLoggedIn && user ? (
             <>
-              {/* User profile card — desktop only */}
-              <button
-                onClick={() => setShowUserLightbox(true)}
-                className="hidden md:flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-elevated)] transition-all cursor-pointer"
-              >
-                <div className="relative">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold overflow-hidden">
-                    {user.avatar
-                      ? <Image src={user.avatar} alt={user.name} width={32} height={32} className="w-full h-full object-cover" />
-                      : user.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-violet-500 rounded-full border-2 border-[var(--bg-overlay)]" />
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-sm font-bold text-white leading-tight">{user.name}</span>
-                  <span className="text-[10px] text-[var(--text-faint)] leading-tight">{user.email}</span>
-                </div>
-              </button>
-
-              {/* Mobile: user avatar button only */}
-              <button
-                onClick={() => setShowUserLightbox(true)}
-                className="md:hidden p-1.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all group active:scale-95"
-              >
-                <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold overflow-hidden">
-                  {user.avatar
-                    ? <Image src={user.avatar} alt={user.name} width={28} height={28} className="w-full h-full object-cover" />
-                    : user.name.charAt(0).toUpperCase()}
-                </div>
-              </button>
-
               <button
                 onClick={() => setShowWatchlistLightbox(true)}
                 className="relative p-2 hover:bg-[var(--bg-elevated)] rounded-xl transition-all group active:scale-95"
                 title="Bookmarks"
               >
-                <Bookmark className={`w-4 h-4 transition-colors ${watchlistCount > 0 ? 'text-blue-400 fill-blue-400' : 'text-[var(--text-muted)] group-hover:text-white'}`} />
+                <Bookmark className={`w-4 h-4 transition-colors ${watchlistCount > 0 ? 'text-blue-400 fill-blue-400' : 'text-[var(--text-muted)] group-hover:text-[var(--foreground)]'}`} />
                 {watchlistCount > 0 && (
                   <div className="absolute top-1 right-1 min-w-[14px] h-[14px] px-0.5 bg-blue-500 rounded-full border border-[var(--bg-overlay)] flex items-center justify-center">
                     <span className="text-[8px] font-black text-white">{watchlistCount}</span>

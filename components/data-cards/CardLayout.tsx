@@ -74,7 +74,10 @@ export const CardLayout = memo(function CardLayout({
           .filter(c => !!localStorage.getItem(`bookmark:${c.type}:${c.title}`))
           .map(c => `${c.type}:${c.title}`)
       );
-    } catch { return new Set(); }
+    } catch (e) {
+      if (process.env.NODE_ENV !== 'production') console.warn('[CardLayout] localStorage read failed:', e);
+      return new Set();
+    }
   });
   const [loadedAt] = useState(() => new Date());
   const [ageLabel, setAgeLabel] = useState(() => formatAge(new Date()));
@@ -152,7 +155,7 @@ export const CardLayout = memo(function CardLayout({
     if (touchStartX.current === null || touchStartY.current === null) return;
     const dx = touchStartX.current - e.changedTouches[0].clientX;
     const dy = Math.abs(touchStartY.current - e.changedTouches[0].clientY);
-    if (Math.abs(dx) > 44 && Math.abs(dx) > dy * 1.5) {
+    if (Math.abs(dx) > 64 && Math.abs(dx) > dy * 1.5) {
       dx > 0 ? goTo(page + 1) : goTo(page - 1);
     }
     touchStartX.current = null;
@@ -167,7 +170,7 @@ export const CardLayout = memo(function CardLayout({
       {isStale && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 animate-fade-in">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
-          <span className="text-[10px] font-medium text-amber-300">Live data may be stale</span>
+          <span className="text-[10px] font-medium text-amber-600 dark:text-amber-300">Live data may be stale</span>
           {onAsk && (
             <button
               onClick={() => {
@@ -222,7 +225,7 @@ export const CardLayout = memo(function CardLayout({
               </button>
             ))}
             {hasPinned && (
-              <span className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20">
+              <span className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20">
                 <Pin className="w-2.5 h-2.5" />
                 Pinned first
               </span>

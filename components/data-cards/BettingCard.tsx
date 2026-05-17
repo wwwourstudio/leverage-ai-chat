@@ -149,9 +149,9 @@ export const BettingCard = memo(function BettingCard({
         {/* Category breadcrumb + status badge — inline, no absolute, clears bookmark overlay */}
         <div className="flex items-center justify-between gap-2 mb-1.5">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/70">{category}</span>
-            <span className="text-white/30">·</span>
-            <span className="text-[10px] text-white/50 truncate">{subcategory}</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-[var(--foreground)]/70">{category}</span>
+            <span className="text-[var(--foreground)]/30">·</span>
+            <span className="text-[10px] text-[var(--foreground)]/50 truncate">{subcategory}</span>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {(isLiveGame || isExtremeOdds) && !isFinal && (
@@ -179,21 +179,21 @@ export const BettingCard = memo(function BettingCard({
           <div className="flex items-center gap-2 mb-1.5">
             <div className="flex items-center gap-1.5">
               <TeamLogo name={teams.away} sport={data.sport} avatarCls={theme.avatarCls} isLarge={false} />
-              <span className="font-black text-white text-xs tracking-wide">{abbr(teams.away)}</span>
+              <span className="font-black text-[var(--foreground)] text-xs tracking-wide">{abbr(teams.away)}</span>
             </div>
             {awayML && (
-              <span className={cn('text-sm font-black tabular-nums', awayML.positive ? 'text-emerald-400' : 'text-white/90')}>
+              <span className={cn('text-sm font-black tabular-nums', awayML.positive ? 'text-emerald-400' : 'text-[var(--foreground)]/90')}>
                 {awayML.display}
               </span>
             )}
-            <span className="text-[9px] font-black text-white/40 mx-0.5">@</span>
+            <span className="text-[9px] font-black text-[var(--foreground)]/40 mx-0.5">@</span>
             {homeML && (
-              <span className={cn('text-sm font-black tabular-nums', homeML.positive ? 'text-emerald-400' : 'text-white/90')}>
+              <span className={cn('text-sm font-black tabular-nums', homeML.positive ? 'text-emerald-400' : 'text-[var(--foreground)]/90')}>
                 {homeML.display}
               </span>
             )}
             <div className="flex items-center gap-1.5">
-              <span className="font-black text-white text-xs tracking-wide">{abbr(teams.home)}</span>
+              <span className="font-black text-[var(--foreground)] text-xs tracking-wide">{abbr(teams.home)}</span>
               <TeamLogo name={teams.home} sport={data.sport} avatarCls={theme.avatarCls} isLarge={false} />
             </div>
           </div>
@@ -202,7 +202,7 @@ export const BettingCard = memo(function BettingCard({
         {/* Bottom row: game time + edge badge + line move pill */}
         <div className="flex items-center gap-2 flex-wrap mt-1">
           {data.gameTime && (
-            <div className="flex items-center gap-1 text-[10px] text-white/60">
+            <div className="flex items-center gap-1 text-[10px] text-[var(--foreground)]/60">
               <Clock className="w-3 h-3" />
               {data.gameTime}
             </div>
@@ -213,7 +213,7 @@ export const BettingCard = memo(function BettingCard({
               ? 'bg-emerald-500/20 border-emerald-500/35 text-emerald-300'
               : !isNaN(edgeNum) && edgeNum >= 2
               ? 'bg-amber-500/20 border-amber-500/35 text-amber-300'
-              : 'bg-white/10 border-white/20 text-white/70';
+              : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--foreground)]/70';
             return (
               <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider', edgeCls)}>
                 EDGE {data.edge}

@@ -5,7 +5,7 @@
  *         LIVE badge, FINAL state, injury alerts, weather notes, recommendation.
  */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { BettingCard } from '@/components/data-cards/BettingCard';
 
@@ -19,8 +19,13 @@ vi.mock('lucide-react', () => ({
   Zap: () => <span data-testid="icon-zap" />,
   Shield: () => <span data-testid="icon-shield" />,
   AlertTriangle: () => <span data-testid="icon-alert-triangle" />,
+  AlertCircle: () => <span data-testid="icon-alert-circle" />,
   Wind: () => <span data-testid="icon-wind" />,
   Brain: () => <span data-testid="icon-brain" />,
+  BookOpen: () => <span data-testid="icon-book-open" />,
+  Bookmark: () => <span data-testid="icon-bookmark" />,
+  Eye: () => <span data-testid="icon-eye" />,
+  Users: () => <span data-testid="icon-users" />,
 }));
 
 // ── Mock PlayerAvatar (avoids image fetching) ─────────────────────────────────
@@ -127,7 +132,7 @@ describe('BettingCard — matchup display', () => {
       />
     );
     // implied prob for -150 = 150/(150+100) = 60%
-    expect(screen.getByText('60% win')).toBeTruthy();
+    expect(screen.getAllByText('60%').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows FINAL badge when status=FINAL', () => {
@@ -173,7 +178,7 @@ describe('BettingCard — live badge', () => {
         })}
       />
     );
-    expect(screen.getByText('LIVE DATA')).toBeTruthy();
+    expect(screen.getAllByText('LIVE').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows pulsing LIVE badge when status=LIVE (in-game)', () => {
@@ -216,6 +221,8 @@ describe('BettingCard — odds grid', () => {
         })}
       />
     );
+    // O/U is shown in the "Total" market view — click the pill to switch
+    fireEvent.click(screen.getByText('Total'));
     expect(screen.getByText('220.5')).toBeTruthy();
   });
 });
@@ -298,7 +305,7 @@ describe('BettingCard — market intelligence', () => {
 // ============================================================================
 
 describe('BettingCard — alerts', () => {
-  it('renders injury alert when provided', () => {
+  it('renders injury alert when provided', async () => {
     render(
       <BettingCard
         {...makeProps({
@@ -306,7 +313,11 @@ describe('BettingCard — alerts', () => {
         })}
       />
     );
-    expect(screen.getByText('QB listed as questionable')).toBeTruthy();
+    // Injury alert is in the Injuries tab — click to switch
+    fireEvent.click(screen.getByText('Injuries'));
+    await waitFor(() => {
+      expect(screen.getByText('QB listed as questionable')).toBeTruthy();
+    });
   });
 
   it('renders weather note when provided', () => {

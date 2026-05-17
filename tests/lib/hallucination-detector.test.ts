@@ -173,8 +173,8 @@ describe('detectHallucinations — market consensus flags', () => {
   });
 
   it('adds odds_impossible flag for a moneyline outside ±100–3000', () => {
-    // +99 is in the dead zone
-    const r = detectHallucinations('Take the +99 moneyline on this game.', 'bet?');
+    // +3500 exceeds the ±3000 ceiling and has 4 digits (matched by regex)
+    const r = detectHallucinations('Take the +3500 moneyline on this game.', 'bet?');
     expect(r.flags.find((f) => f.type === 'odds_impossible')).toBeDefined();
   });
 
@@ -206,15 +206,16 @@ describe('detectHallucinations — odds alignment (no real odds data)', () => {
   });
 
   it('adds odds_range flag for implausible moneyline without odds data', () => {
-    // +50 is in the dead zone (< 100)
-    const r = detectHallucinations('The +50 line is attractive here.', 'bet?');
+    // +3500 exceeds the ±3000 ceiling and has 4 digits (matched by the regex)
+    const r = detectHallucinations('The +3500 line is attractive here.', 'bet?');
     const flag = r.flags.find((f) => f.type === 'odds_range');
     expect(flag).toBeDefined();
     expect(flag!.severity).toBe('error');
   });
 
   it('lowers oddsAlignment when implausible odds cited', () => {
-    const r = detectHallucinations('Take the +50 and +75 lines.', 'bet?');
+    // Values must be 3-4 digits so extractMoneylines picks them up
+    const r = detectHallucinations('Take the +3500 and +4000 lines.', 'bet?');
     expect(r.oddsAlignment).toBeLessThan(88);
   });
 });

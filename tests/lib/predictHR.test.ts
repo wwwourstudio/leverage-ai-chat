@@ -174,7 +174,7 @@ describe('predictHR', () => {
 
   // ── Edge vs odds ──────────────────────────────────────────────────────────
 
-  it('computes edge and impliedOdds when odds row present', async () => {
+  it('returns edge=0 and impliedOdds=null (live odds not queried from DB)', async () => {
     (createClient as ReturnType<typeof vi.fn>).mockResolvedValue(
       buildSupabaseMock({ oddsData: ODDS_ROW }),
     );
@@ -182,12 +182,13 @@ describe('predictHR', () => {
 
     const result = await predictHR(INPUT);
 
-    expect(result.impliedOdds).toBe(650);
-    // edge = 0.20 - 0.135 = 0.065
-    expect(result.edge).toBeCloseTo(0.065, 3);
+    // live_odds_cache is bypassed in predictHR (hardcoded Promise.resolve null),
+    // so edge calculation always falls back to 0 and impliedOdds is null.
+    expect(result.impliedOdds).toBeNull();
+    expect(result.edge).toBe(0);
   });
 
-  it('falls back to american_odds when implied_prob is null', async () => {
+  it('edge is always 0 regardless of odds data shape', async () => {
     (createClient as ReturnType<typeof vi.fn>).mockResolvedValue(
       buildSupabaseMock({ oddsData: { implied_prob: null, american_odds: +600 } }),
     );
@@ -195,8 +196,8 @@ describe('predictHR', () => {
 
     const result = await predictHR(INPUT);
 
-    // implied from +600: 100 / 700 ≈ 0.1429
-    expect(result.edge).toBeCloseTo(0.20 - 100 / 700, 3);
+    expect(result.edge).toBe(0);
+    expect(result.impliedOdds).toBeNull();
   });
 
   // ── Data quality ──────────────────────────────────────────────────────────

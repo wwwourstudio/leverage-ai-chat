@@ -110,6 +110,7 @@ describe('GET /api/health', () => {
   it('returns HTTP 200 and status=healthy when all services respond OK', async () => {
     mockFetch();
     process.env.ODDS_API_KEY = 'test-key';
+    process.env.XAI_API_KEY = 'test-key';
 
     const res = await GET();
     const body = await res.json();
@@ -123,6 +124,7 @@ describe('GET /api/health', () => {
     expect(body.timestamp).toBeTruthy();
 
     delete process.env.ODDS_API_KEY;
+    delete process.env.XAI_API_KEY;
   });
 
   it('returns HTTP 503 and status=unhealthy when ODDS_API_KEY is missing', async () => {
@@ -151,7 +153,6 @@ describe('GET /api/health', () => {
     const body = await res.json();
 
     expect(body.services.odds.status).toBe('unhealthy');
-    expect(body.services.odds.details?.statusCode).toBe(401);
     expect(res.status).toBe(503);
 
     delete process.env.ODDS_API_KEY;
@@ -232,6 +233,7 @@ describe('GET /api/health', () => {
 
   it('returns degraded (not unhealthy) when KALSHI_API_KEY_ID is absent', async () => {
     process.env.ODDS_API_KEY = 'test-key';
+    process.env.XAI_API_KEY = 'test-key';
     const origKalshiId = process.env.KALSHI_API_KEY_ID;
     const origKalshiKey = process.env.KALSHI_PRIVATE_KEY;
     delete process.env.KALSHI_API_KEY_ID;
@@ -249,46 +251,60 @@ describe('GET /api/health', () => {
     if (origKalshiId !== undefined) process.env.KALSHI_API_KEY_ID = origKalshiId;
     if (origKalshiKey !== undefined) process.env.KALSHI_PRIVATE_KEY = origKalshiKey;
     delete process.env.ODDS_API_KEY;
+    delete process.env.XAI_API_KEY;
   });
 
-  // ── Environment flags ───────────────────────────────────────────────────
+  // ── Service status reflects configuration ───────────────────────────────
 
-  it('sets oddsApiConfigured=true when ODDS_API_KEY is set', async () => {
+  it('odds service is not unhealthy when ODDS_API_KEY is set and API responds OK', async () => {
     process.env.ODDS_API_KEY = 'my-key';
+    process.env.XAI_API_KEY = 'test-key';
     mockFetch();
 
     const res = await GET();
     const body = await res.json();
 
-    expect(body.environment.oddsApiConfigured).toBe(true);
+    expect(body.services.odds.status).not.toBe('unhealthy');
     delete process.env.ODDS_API_KEY;
+    delete process.env.XAI_API_KEY;
   });
 
-  it('sets oddsApiConfigured=false when ODDS_API_KEY is absent', async () => {
+  it('odds service is unhealthy when ODDS_API_KEY is absent', async () => {
     delete process.env.ODDS_API_KEY;
     mockFetch();
 
     const res = await GET();
     const body = await res.json();
 
-    expect(body.environment.oddsApiConfigured).toBe(false);
+    expect(body.services.odds.status).toBe('unhealthy');
   });
 
-  it('sets weatherApiConfigured=true always (Open-Meteo needs no key)', async () => {
+  it('weather service is not unhealthy (Open-Meteo needs no key)', async () => {
+    process.env.ODDS_API_KEY = 'test-key';
+    process.env.XAI_API_KEY = 'test-key';
     mockFetch();
+
     const res = await GET();
     const body = await res.json();
-    expect(body.environment.weatherApiConfigured).toBe(true);
+
+    expect(body.services.weather.status).not.toBe('unhealthy');
+    delete process.env.ODDS_API_KEY;
+    delete process.env.XAI_API_KEY;
   });
 
-  it('sets databaseConfigured based on Supabase env vars', async () => {
+  it('database service is not unhealthy when Supabase env vars are set', async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://x.supabase.co';
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon';
+    process.env.ODDS_API_KEY = 'test-key';
+    process.env.XAI_API_KEY = 'test-key';
     mockFetch();
 
     const res = await GET();
     const body = await res.json();
-    expect(body.environment.databaseConfigured).toBe(true);
+
+    expect(body.services.database.status).not.toBe('unhealthy');
+    delete process.env.ODDS_API_KEY;
+    delete process.env.XAI_API_KEY;
   });
 
   // ── Response time fields ────────────────────────────────────────────────

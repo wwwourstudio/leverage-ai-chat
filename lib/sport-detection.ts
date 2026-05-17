@@ -190,15 +190,26 @@ export function detectSportFromText(text: string): string | null {
     'michael harris', 'james outman', 'jarren duran',
     'jose altuve', 'will smith', 'kyle tucker',
   ].some(p => t.includes(p))) return 'mlb';
+  // Strip DFS/sportsbook brand names before keyword-array scan to prevent substring false positives.
+  // 'draftkings' contains 'kings' (Sacramento Kings NBA team) → would return 'nba' without this.
+  const tKw = t
+    .replace(/draftkings?/g, '')
+    .replace(/fanduel/g, '')
+    .replace(/betmgm/g, '')
+    .replace(/pointsbet/g, '')
+    .replace(/caesars/g, '')
+    .replace(/betrivers?/g, '')
+    .replace(/pinnacle/g, '');
+
   // Deep scan: team names, positions, sport-specific terms.
-  if (NBA_KEYWORDS.some(k => t.includes(k))) return 'nba';
+  if (NBA_KEYWORDS.some(k => tKw.includes(k))) return 'nba';
   // For NFL vs MLB, score both and pick the winner
-  const nflCount = NFL_KEYWORDS.filter(k => t.includes(k)).length;
-  const mlbCount = MLB_KEYWORDS.filter(k => t.includes(k)).length;
+  const nflCount = NFL_KEYWORDS.filter(k => tKw.includes(k)).length;
+  const mlbCount = MLB_KEYWORDS.filter(k => tKw.includes(k)).length;
   if (nflCount > 0 || mlbCount > 0) {
     return mlbCount >= nflCount ? 'mlb' : 'nfl';
   }
-  if (NHL_KEYWORDS.some(k => t.includes(k))) return 'nhl';
+  if (NHL_KEYWORDS.some(k => tKw.includes(k))) return 'nhl';
   return null;
 }
 

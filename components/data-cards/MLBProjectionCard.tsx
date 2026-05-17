@@ -48,28 +48,28 @@ const STATUS_CONFIG: Record<string, { label: string; dot: string; text: string; 
     dot: 'bg-red-400',
     text: 'text-red-400',
     bg: 'bg-red-500/15 border-red-500/30',
-    header: 'from-red-600/30 via-rose-900/15 to-transparent',
+    header: 'from-red-600/30 dark:via-rose-900/15 to-transparent',
   },
   edge: {
     label: 'EDGE',
     dot: 'bg-emerald-400',
     text: 'text-emerald-400',
     bg: 'bg-emerald-500/15 border-emerald-500/30',
-    header: 'from-emerald-600/30 via-teal-900/15 to-transparent',
+    header: 'from-emerald-600/30 dark:via-teal-900/15 to-transparent',
   },
   value: {
     label: 'VALUE',
     dot: 'bg-blue-400',
     text: 'text-blue-400',
     bg: 'bg-blue-500/15 border-blue-500/30',
-    header: 'from-blue-600/30 via-indigo-900/15 to-transparent',
+    header: 'from-blue-600/30 dark:via-indigo-900/15 to-transparent',
   },
   neutral: {
     label: 'PROJ',
     dot: 'bg-[var(--text-faint)]',
     text: 'text-[var(--text-muted)]',
     bg: 'bg-[var(--bg-surface)] border-[var(--border-subtle)]',
-    header: 'from-blue-600/25 via-indigo-800/10 to-transparent',
+    header: 'from-blue-600/25 dark:via-indigo-800/10 to-transparent',
   },
 };
 

@@ -34,7 +34,7 @@ export function OddsCard({ event, onAsk }: OddsCardProps) {
   return (
     <div className="group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-glow)] transition-all duration-300">
       {/* Header gradient band */}
-      <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-blue-600/25 via-cyan-800/10 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-blue-600/25 dark:via-cyan-800/10 to-transparent pointer-events-none" />
 
       <div className="relative px-4 pt-4 pb-4 flex flex-col gap-3">
         {/* Top row: sport tag + game time */}

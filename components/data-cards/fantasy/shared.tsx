@@ -136,7 +136,7 @@ export function Shell({ title, category, subcategory, status, Icon, children, on
       {/* Gradient header */}
       <div className={cn(
         'relative px-4 pt-4 pb-3.5',
-        'bg-gradient-to-br from-violet-900/30 via-purple-900/15 to-transparent',
+        'bg-gradient-to-br dark:from-violet-900/30 dark:via-purple-900/15 to-transparent',
       )}>
         {/* Top-right status pill */}
         <div className="absolute top-3.5 right-3.5 flex items-center gap-1.5 px-2 py-0.5 rounded-full border bg-[var(--bg-overlay)]/60 backdrop-blur-sm" style={{ borderColor: `${cfg.dot}40` }}>

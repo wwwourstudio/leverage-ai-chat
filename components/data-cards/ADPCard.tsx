@@ -89,11 +89,11 @@ function RankCircle({ rank }: { rank: number }) {
 // ── Status config ─────────────────────────────────────────────────────────────
 
 const STATUS_CFG: Record<string, { label: string; dot: string; text: string; badgeCls: string; headerGrad: string }> = {
-  optimal: { label: 'OPTIMAL',  dot: 'bg-emerald-400', text: 'text-emerald-400', badgeCls: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400', headerGrad: 'from-emerald-600/25 via-teal-800/10' },
-  value:   { label: 'VALUE',    dot: 'bg-cyan-400',    text: 'text-cyan-400',    badgeCls: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400',           headerGrad: 'from-cyan-600/25 via-teal-800/10' },
-  target:  { label: 'TARGET',   dot: 'bg-teal-400',    text: 'text-teal-400',    badgeCls: 'bg-teal-500/15 border-teal-500/30 text-teal-400',           headerGrad: 'from-teal-600/25 via-cyan-800/10' },
-  hot:     { label: 'HOT',      dot: 'bg-red-400',     text: 'text-red-400',     badgeCls: 'bg-red-500/15 border-red-500/30 text-red-400',              headerGrad: 'from-red-600/25 via-rose-800/10' },
-  edge:    { label: 'EDGE',     dot: 'bg-indigo-400',  text: 'text-indigo-400',  badgeCls: 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400',     headerGrad: 'from-indigo-600/25 via-violet-800/10' },
+  optimal: { label: 'OPTIMAL',  dot: 'bg-emerald-400', text: 'text-emerald-400', badgeCls: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400', headerGrad: 'from-emerald-600/25 dark:via-teal-800/10' },
+  value:   { label: 'VALUE',    dot: 'bg-cyan-400',    text: 'text-cyan-400',    badgeCls: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400',           headerGrad: 'from-cyan-600/25 dark:via-teal-800/10' },
+  target:  { label: 'TARGET',   dot: 'bg-teal-400',    text: 'text-teal-400',    badgeCls: 'bg-teal-500/15 border-teal-500/30 text-teal-400',           headerGrad: 'from-teal-600/25 dark:via-cyan-800/10' },
+  hot:     { label: 'HOT',      dot: 'bg-red-400',     text: 'text-red-400',     badgeCls: 'bg-red-500/15 border-red-500/30 text-red-400',              headerGrad: 'from-red-600/25 dark:via-rose-800/10' },
+  edge:    { label: 'EDGE',     dot: 'bg-indigo-400',  text: 'text-indigo-400',  badgeCls: 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400',     headerGrad: 'from-indigo-600/25 dark:via-violet-800/10' },
 };
 
 // ── Main component ────────────────────────────────────────────────────────────

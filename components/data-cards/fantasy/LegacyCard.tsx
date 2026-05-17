@@ -27,7 +27,7 @@ export const LegacyCard = memo(function LegacyCard({ title, category, subcategor
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-violet-500/60 via-purple-400/80 to-violet-500/60" />
 
       {/* Gradient header — violet/purple fantasy theme */}
-      <div className="relative px-4 pt-4 pb-3.5 bg-gradient-to-br from-violet-900/30 via-purple-900/15 to-transparent">
+      <div className="relative px-4 pt-4 pb-3.5 bg-gradient-to-br dark:from-violet-900/30 dark:via-purple-900/15 to-transparent">
         {/* Status pill */}
         <div
           className="absolute top-3.5 right-3.5 flex items-center gap-1.5 px-2 py-0.5 rounded-full border bg-[var(--bg-overlay)]/60"

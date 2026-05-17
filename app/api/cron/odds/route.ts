@@ -282,18 +282,26 @@ export async function GET(req: NextRequest) {
         }
 
         // Retention cleanup — keep odds_snapshots to 48h window, closing_lines to 90d.
-        // Awaited before the response so Vercel doesn't kill the fetch mid-flight.
-        await Promise.allSettled([
+        // Run fire-and-forget (not awaited) with a local 20s AbortController so
+        // the cron response returns quickly and Vercel doesn't kill it mid-flight.
+        // The batched SQL function already limits each iteration to 5 000 rows,
+        // so a single invocation finishing within 20 s is realistic; if it times
+        // out the next cron run will catch up.
+        const cleanupCtrl = new AbortController();
+        const cleanupTimeout = setTimeout(() => cleanupCtrl.abort(), 20_000);
+        Promise.allSettled([
           supabase.rpc('cleanup_odds_snapshots', { retention_hours: 48 })
+            .abortSignal(cleanupCtrl.signal)
             .then(({ data, error }) => {
               if (error) console.warn('[v0] [cron/odds] Snapshot cleanup error:', error.message);
               else if ((data as number) > 0) console.log(`[v0] [cron/odds] Cleaned ${data} old snapshots`);
             }),
           supabase.rpc('cleanup_closing_lines', { retention_days: 90 })
+            .abortSignal(cleanupCtrl.signal)
             .then(({ error }) => {
               if (error) console.warn('[v0] [cron/odds] Closing lines cleanup error:', error.message);
             }),
-        ]);
+        ]).finally(() => clearTimeout(cleanupTimeout));
       } catch (snapErr) {
         console.error('[v0] [cron/odds] Snapshot write exception:', snapErr);
       }

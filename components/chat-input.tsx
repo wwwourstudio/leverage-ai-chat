@@ -1,11 +1,10 @@
 'use client';
 
 import { memo, useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
-import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles, Brain, Square, Mic, MicOff, Volume2, Radio } from 'lucide-react';
+import { Send, X, Paperclip, FileText, ImageIcon, Bookmark, Sparkles, Brain, Square, Mic, MicOff, Radio } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/toast-provider';
 import { useVoiceInput } from '@/lib/hooks/use-voice-input';
-import { useVoiceTTS } from '@/lib/hooks/use-voice-tts';
 import type { VoiceConvState } from '@/lib/hooks/use-voice-conversation';
 
 interface FileAttachment {
@@ -87,8 +86,6 @@ export const ChatInput = memo(function ChatInput({
       onInputChange(input ? `${input} ${transcript}` : transcript);
     }, [input, onInputChange]),
   );
-
-  const { voiceMode, isSpeaking, toggleVoiceMode, stopSpeaking } = useVoiceTTS(lastAssistantMessage);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -271,21 +268,6 @@ export const ChatInput = memo(function ChatInput({
                 {isRecording ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
               </button>
             )}
-            {/* Grok voice readback */}
-            <button
-              type="button"
-              onClick={isSpeaking ? stopSpeaking : toggleVoiceMode}
-              title={isSpeaking ? 'Stop speaking' : voiceMode ? 'Voice mode on' : 'Enable Grok voice'}
-              className={`flex items-center justify-center h-8 w-8 rounded-xl border transition-all ${
-                isSpeaking
-                  ? 'bg-blue-500/15 border-blue-500/40 text-blue-400 animate-pulse'
-                  : voiceMode
-                  ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-400'
-                  : 'text-[var(--text-faint)] border-transparent hover:text-foreground hover:bg-[var(--bg-elevated)] hover:border-[var(--border-subtle)]'
-              }`}
-            >
-              <Volume2 className="w-3.5 h-3.5" />
-            </button>
             {/* Voice Conversation — full duplex chat mode */}
             {voiceConvSupported && onActivateVoice && (
               <button

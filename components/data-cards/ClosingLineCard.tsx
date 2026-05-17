@@ -65,10 +65,10 @@ export function ClosingLineCard({
   const closeImplied = !isNaN(closeOddsNum) && closeOddsNum !== 0 ? impliedProbFromAmerican(closeOddsNum) : null;
 
   const verdictConfig = {
-    'beat close':   { icon: CheckCircle2, color: 'text-emerald-400', badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', label: 'BEAT CLOSE', verdictBg: 'from-emerald-600/25 via-emerald-900/10' },
-    'at close':     { icon: MinusCircle,  color: 'text-slate-400',   badge: 'bg-slate-500/10   border-slate-500/30   text-slate-400',   label: 'AT CLOSE',   verdictBg: 'from-slate-600/20 via-slate-900/10' },
-    'missed close': { icon: XCircle,      color: 'text-red-400',     badge: 'bg-red-500/15     border-red-500/40     text-red-400',     label: 'MISSED CLV', verdictBg: 'from-red-600/25 via-red-900/10' },
-  }[verdict] ?? { icon: MinusCircle, color: 'text-slate-400', badge: 'bg-slate-500/10 border-slate-500/30 text-slate-400', label: 'AT CLOSE', verdictBg: 'from-slate-600/20 via-slate-900/10' };
+    'beat close':   { icon: CheckCircle2, color: 'text-emerald-400', badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', label: 'BEAT CLOSE', verdictBg: 'from-emerald-600/25 dark:via-emerald-900/10' },
+    'at close':     { icon: MinusCircle,  color: 'text-slate-400',   badge: 'bg-slate-500/10   border-slate-500/30   text-slate-400',   label: 'AT CLOSE',   verdictBg: 'from-slate-600/20 dark:via-slate-900/10' },
+    'missed close': { icon: XCircle,      color: 'text-red-400',     badge: 'bg-red-500/15     border-red-500/40     text-red-400',     label: 'MISSED CLV', verdictBg: 'from-red-600/25 dark:via-red-900/10' },
+  }[verdict] ?? { icon: MinusCircle, color: 'text-slate-400', badge: 'bg-slate-500/10 border-slate-500/30 text-slate-400', label: 'AT CLOSE', verdictBg: 'from-slate-600/20 dark:via-slate-900/10' };
 
   const VerdictIcon = verdictConfig.icon;
 
@@ -83,7 +83,7 @@ export function ClosingLineCard({
       <div
         className={cn(
           'absolute inset-0 bg-gradient-to-br opacity-60 pointer-events-none',
-          'from-emerald-600/25 via-teal-800/10 to-transparent',
+          'from-emerald-600/25 dark:via-teal-800/10 to-transparent',
         )}
         aria-hidden="true"
       />

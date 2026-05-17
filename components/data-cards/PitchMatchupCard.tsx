@@ -32,9 +32,9 @@ interface PitchMatchupCardProps {
 }
 
 const ADV_CONFIG = {
-  batter:  { badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', header: 'from-emerald-900/30 via-green-900/10',   label: 'Batter Edge',  icon: 'text-emerald-400' },
-  pitcher: { badge: 'bg-red-500/15 border-red-500/40 text-red-400',             header: 'from-red-900/30 via-rose-900/10',        label: 'Pitcher Edge', icon: 'text-red-400'     },
-  neutral: { badge: 'bg-slate-500/10 border-slate-500/30 text-slate-400',       header: 'from-purple-900/25 via-violet-900/10',   label: 'Neutral',      icon: 'text-purple-400'  },
+  batter:  { badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', header: 'dark:from-emerald-900/30 dark:via-green-900/10',   label: 'Batter Edge',  icon: 'text-emerald-400' },
+  pitcher: { badge: 'bg-red-500/15 border-red-500/40 text-red-400',             header: 'dark:from-red-900/30 dark:via-rose-900/10',        label: 'Pitcher Edge', icon: 'text-red-400'     },
+  neutral: { badge: 'bg-slate-500/10 border-slate-500/30 text-slate-400',       header: 'dark:from-purple-900/25 dark:via-violet-900/10',   label: 'Neutral',      icon: 'text-purple-400'  },
 };
 
 const PITCH_COLORS: Record<string, string> = {

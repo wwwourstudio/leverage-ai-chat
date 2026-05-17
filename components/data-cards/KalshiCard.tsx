@@ -38,20 +38,20 @@ const NO_COLOR  = '#f63d58';
 interface CategoryConfig { accent: string; headerGrad: string; }
 
 const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
-  election:      { accent: '#3b82f6', headerGrad: 'from-blue-600/80 via-blue-700/60 to-blue-900/40' },
-  politics:      { accent: '#3b82f6', headerGrad: 'from-blue-600/80 via-blue-700/60 to-blue-900/40' },
-  sports:        { accent: '#10b981', headerGrad: 'from-emerald-600/80 via-emerald-700/60 to-emerald-900/40' },
-  weather:       { accent: '#22d3ee', headerGrad: 'from-cyan-600/80 via-cyan-700/60 to-cyan-900/40' },
-  finance:       { accent: '#f59e0b', headerGrad: 'from-amber-600/80 via-amber-700/60 to-amber-900/40' },
-  crypto:        { accent: '#8b5cf6', headerGrad: 'from-violet-600/80 via-violet-700/60 to-violet-900/40' },
-  tech:          { accent: '#7c3aed', headerGrad: 'from-violet-600/80 via-violet-700/60 to-violet-900/40' },
-  entertainment: { accent: '#ec4899', headerGrad: 'from-pink-600/80 via-pink-700/60 to-pink-900/40' },
-  market:        { accent: '#6366f1', headerGrad: 'from-indigo-600/80 via-indigo-700/60 to-indigo-900/40' },
+  election:      { accent: '#3b82f6', headerGrad: 'from-blue-500/10 dark:from-blue-600/80 dark:via-blue-700/60 dark:to-blue-900/40' },
+  politics:      { accent: '#3b82f6', headerGrad: 'from-blue-500/10 dark:from-blue-600/80 dark:via-blue-700/60 dark:to-blue-900/40' },
+  sports:        { accent: '#10b981', headerGrad: 'from-emerald-500/10 dark:from-emerald-600/80 dark:via-emerald-700/60 dark:to-emerald-900/40' },
+  weather:       { accent: '#22d3ee', headerGrad: 'from-cyan-500/10 dark:from-cyan-600/80 dark:via-cyan-700/60 dark:to-cyan-900/40' },
+  finance:       { accent: '#f59e0b', headerGrad: 'from-amber-500/10 dark:from-amber-600/80 dark:via-amber-700/60 dark:to-amber-900/40' },
+  crypto:        { accent: '#8b5cf6', headerGrad: 'from-violet-500/10 dark:from-violet-600/80 dark:via-violet-700/60 dark:to-violet-900/40' },
+  tech:          { accent: '#7c3aed', headerGrad: 'from-violet-500/10 dark:from-violet-600/80 dark:via-violet-700/60 dark:to-violet-900/40' },
+  entertainment: { accent: '#ec4899', headerGrad: 'from-pink-500/10 dark:from-pink-600/80 dark:via-pink-700/60 dark:to-pink-900/40' },
+  market:        { accent: '#6366f1', headerGrad: 'from-indigo-500/10 dark:from-indigo-600/80 dark:via-indigo-700/60 dark:to-indigo-900/40' },
 };
 
 const CATEGORY_CONFIG_DEFAULT: CategoryConfig = {
   accent: '#6366f1',
-  headerGrad: 'from-indigo-600/80 via-indigo-700/60 to-indigo-900/40',
+  headerGrad: 'from-indigo-500/10 dark:from-indigo-600/80 dark:via-indigo-700/60 dark:to-indigo-900/40',
 };
 
 function getCategoryConfig(label?: string): CategoryConfig {

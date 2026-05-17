@@ -47,7 +47,7 @@ export function SharpMoneyCard({
   const isBullish = !isShorting;
   const dirArrow = isBullish ? '▲' : '▼';
   const dirColor = isBullish ? 'text-emerald-400' : 'text-red-400';
-  const dirBg = isBullish ? 'from-emerald-600/25 via-emerald-800/10' : 'from-red-600/25 via-red-800/10';
+  const dirBg = isBullish ? 'from-emerald-600/25 dark:via-emerald-800/10' : 'from-red-600/25 dark:via-red-800/10';
 
   const magnitudeLabel = movementNum < 5 ? 'LOW' : movementNum < 15 ? 'MEDIUM' : 'HIGH';
   const confidenceColor =
@@ -70,7 +70,7 @@ export function SharpMoneyCard({
       <div
         className={cn(
           'absolute inset-0 bg-gradient-to-br opacity-60 pointer-events-none',
-          'from-amber-600/25 via-orange-800/10 to-transparent',
+          'from-amber-600/25 dark:via-orange-800/10 to-transparent',
         )}
         aria-hidden="true"
       />

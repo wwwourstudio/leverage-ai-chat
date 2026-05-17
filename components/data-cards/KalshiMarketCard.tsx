@@ -46,7 +46,7 @@ export function KalshiMarketCard({ market, onAsk }: KalshiMarketCardProps) {
     <div className="group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-glow,0_0_40px_rgb(0_0_0/0.3))] transition-all duration-300 flex flex-col">
       {/* Ambient fuchsia gradient */}
       <div
-        className="absolute inset-0 bg-gradient-to-br from-fuchsia-600/25 via-pink-800/10 to-transparent opacity-60 pointer-events-none"
+        className="absolute inset-0 bg-gradient-to-br from-fuchsia-600/25 dark:via-pink-800/10 to-transparent opacity-60 pointer-events-none"
         aria-hidden="true"
       />
 

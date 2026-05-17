@@ -246,9 +246,7 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
         const statcast = allHitters.find(h => h.playerId === batter.id) ??
           allHitters.find(h => nameMatchesPlayer(h.playerName, batter.fullName)) ??
           await findHitterByName(batter.fullName).catch(() => null) ??
-          null;
-
-        if (!statcast) { statcast = makeLeagueAvgHitterProfile(batter); }
+          makeLeagueAvgHitterProfile(batter);
 
         const parkFactors = getParkFactors(batter.teamAbbr);
         const features = buildHitterFeatures(

@@ -178,37 +178,6 @@ export const ChatHeader = memo(function ChatHeader({ activeChat, messages = [] }
 
           {isLoggedIn && user ? (
             <>
-              {/* User profile card — desktop only */}
-              <button
-                onClick={() => setShowUserLightbox(true)}
-                className="hidden md:flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-elevated)] transition-all cursor-pointer"
-              >
-                <div className="relative">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold overflow-hidden">
-                    {user.avatar
-                      ? <Image src={user.avatar} alt={user.name} width={32} height={32} className="w-full h-full object-cover" />
-                      : user.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-violet-500 rounded-full border-2 border-[var(--bg-overlay)]" />
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-sm font-bold text-white leading-tight">{user.name}</span>
-                  <span className="text-[10px] text-[var(--text-faint)] leading-tight">{user.email}</span>
-                </div>
-              </button>
-
-              {/* Mobile: user avatar button only */}
-              <button
-                onClick={() => setShowUserLightbox(true)}
-                className="md:hidden p-1.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all group active:scale-95"
-              >
-                <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold overflow-hidden">
-                  {user.avatar
-                    ? <Image src={user.avatar} alt={user.name} width={28} height={28} className="w-full h-full object-cover" />
-                    : user.name.charAt(0).toUpperCase()}
-                </div>
-              </button>
-
               <button
                 onClick={() => setShowWatchlistLightbox(true)}
                 className="relative p-2 hover:bg-[var(--bg-elevated)] rounded-xl transition-all group active:scale-95"

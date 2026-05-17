@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import Image from 'next/image';
-import { Plus, Search, Star, Trash2, MessageSquare, Edit3, CheckCircle, LayoutGrid, TrendingUp, Trophy, Award, BarChart3, Crosshair, LineChart } from 'lucide-react';
+import { Plus, Search, Star, Trash2, MessageSquare, Edit3, CheckCircle, LayoutGrid, TrendingUp, Trophy, Award, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/utils';
 import { useAppStore } from '@/lib/store/app-store';
@@ -308,13 +308,6 @@ function IconRail({
       </div>
 
       <div className="flex-1" />
-
-      <button onClick={() => onNavigate?.("Show me today's MLB daily picks — ELITE and STRONG tier players with the best betting edges", 'betting', 'baseball_mlb')} title="Daily Picks" className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-[var(--bg-surface)] transition-colors mb-0.5">
-        <Crosshair className="w-4 h-4 text-[var(--text-faint)]" />
-      </button>
-      <button onClick={() => onNavigate?.('Show me the quantitative trading opportunities and arbitrage analysis right now', 'betting')} title="Quant Trading" className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-[var(--bg-surface)] transition-colors mb-1">
-        <LineChart className="w-4 h-4 text-[var(--text-faint)]" />
-      </button>
 
       {user && (
         <div
@@ -671,26 +664,6 @@ export function Sidebar({
               )}
             </div>
           )}
-        </div>
-
-        {/* ── Quick-nav footer ───────────────────────────────────────────── */}
-        <div className="flex-shrink-0 border-t border-[var(--border-subtle)] px-2 py-2 flex gap-1">
-          <button
-            onClick={() => onNavigate?.("Show me today's MLB daily picks — ELITE and STRONG tier players with the best betting edges", 'betting', 'baseball_mlb')}
-            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-[10px] font-semibold text-[var(--text-faint)] hover:text-[var(--text-body)] hover:bg-[var(--bg-surface)] transition-colors"
-            title="Daily MLB Picks"
-          >
-            <Crosshair className="w-3.5 h-3.5 flex-shrink-0" />
-            <span>Daily Picks</span>
-          </button>
-          <button
-            onClick={() => onNavigate?.('Show me the quantitative trading opportunities and arbitrage analysis right now', 'betting')}
-            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-[10px] font-semibold text-[var(--text-faint)] hover:text-[var(--text-body)] hover:bg-[var(--bg-surface)] transition-colors"
-            title="Quantitative Trading"
-          >
-            <LineChart className="w-3.5 h-3.5 flex-shrink-0" />
-            <span>Quant Trading</span>
-          </button>
         </div>
 
         {/* ── User profile footer ────────────────────────────────────────── */}

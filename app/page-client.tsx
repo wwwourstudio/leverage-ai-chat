@@ -510,7 +510,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       const msgLow = (lastUserQuery || '').toLowerCase();
       const hasPropQuery = msgLow.includes('prop') || msgLow.includes('strikeout')
                         || msgLow.includes('hits over') || msgLow.includes('home run over')
-                        || msgLow.includes('player bet');
+                        || msgLow.includes('player bet') || msgLow.includes(' stats')
+                        || msgLow.includes('era') || msgLow.includes('batting average')
+                        || msgLow.includes('whip') || msgLow.includes('babip');
 
       const lastAIMessage = [...messages].reverse().find((m: any) => m.role === 'assistant');
       if (lastAIMessage?.cards?.length && !hasPropQuery) return;
@@ -529,6 +531,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           : hasFantasyOrDFSQuery && selectedCategory !== 'betting' && selectedCategory !== 'props'
           ? (hasDFSQuery ? 'dfs' : 'fantasy')
           : selectedCategory === 'fantasy' && !hasFantasyOrDFSQuery ? 'betting'
+          : selectedCategory === 'dfs' && !hasDFSQuery && !hasFantasyOrDFSQuery ? 'betting'
           : selectedCategory;
 
         const conversationHistory = messages.slice(-10).map((m: any) => ({ role: m.role, content: m.content || '' }));

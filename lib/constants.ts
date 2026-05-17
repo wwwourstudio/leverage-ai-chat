@@ -334,6 +334,14 @@ export const CARD_TYPES = {
   UMPIRE_IMPACT:          'umpire_impact_card',
   CATCHER_FRAMING:        'catcher_framing_card',
   CLOSING_LINE:           'closing_line_card',
+  // Cards dispatched via the renderer pre-registry (not AI-generated but typed)
+  HR_PREDICTION_CARD:     'hr_prediction_card',
+  PROP_HIT_RATE:          'prop-hit-rate',
+  PLAYER_PROFILE:         'player_profile',
+  ARBITRAGE_OPP:          'arbitrage_opp',
+  ODDS_EVENT:             'odds_event',
+  DFS_LINEUP_CARD:        'dfs_lineup',
+  BETTING_INSIGHT:        'betting-insight',
 } as const;
 
 // Card Status Values

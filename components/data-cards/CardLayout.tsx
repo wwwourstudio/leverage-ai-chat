@@ -6,18 +6,7 @@ import { DynamicCardRenderer } from './DynamicCardRenderer';
 import { CardsEmptyState } from './CardStates';
 import { UnifiedCardShell } from './UnifiedCardShell';
 import { cn } from '@/lib/utils';
-
-interface CardData {
-  id?: string;
-  type: string;
-  title: string;
-  category: string;
-  subcategory: string;
-  gradient: string;
-  data: Record<string, any>;
-  status: string;
-  realData?: boolean;
-}
+import type { CardData } from '@/lib/types';
 
 interface CardLayoutProps {
   cards: CardData[];

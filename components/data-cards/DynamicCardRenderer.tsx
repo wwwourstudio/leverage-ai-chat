@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { Bookmark, FlaskConical, Share2, Check, Pin } from 'lucide-react';
+import type { CardData } from '@/lib/types';
 
 // ── Saved-card entry (shared with WatchlistLightbox) ──────────────────────────
 export interface SavedCardEntry {
@@ -82,20 +83,6 @@ const PATTERN_STD_REGISTRY: Array<{ test: (t: string) => boolean; Component: Rea
   { test: t => t.includes('arbitrage'),                                                                                               Component: ArbitrageCard },
   { test: t => t.includes('odds') || t.includes('betting') || t.includes('moneyline') || t.includes('spread') || t.includes('totals'), Component: BettingCard },
 ];
-
-interface CardData {
-  id?: string;
-  type: string;
-  title: string;
-  category: string;
-  subcategory: string;
-  gradient: string;
-  icon?: string;
-  data: Record<string, any>;
-  status: string;
-  realData?: boolean;
-  metadata?: Record<string, any>;
-}
 
 interface DynamicCardRendererProps {
   card: CardData;

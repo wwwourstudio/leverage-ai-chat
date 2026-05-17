@@ -9,20 +9,10 @@ import {
   LOG_PREFIXES,
 } from '@/lib/constants';
 import { TtlCache } from '@/lib/utils/cache';
+import type { CardData } from '@/lib/types';
 
-export interface DynamicCard {
-  id?: string;
-  type: string;
-  title: string;
-  icon: string;
-  category: string;
-  subcategory: string;
-  gradient: string;
-  data: Record<string, any>;
-  status: string;
-  realData: boolean;
-  metadata?: Record<string, any>;
-}
+/** @deprecated Import CardData from @/lib/types instead. */
+export type DynamicCard = CardData;
 
 export interface UserInsights {
   totalValue: number;

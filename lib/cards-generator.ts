@@ -14,6 +14,7 @@ import { CARD_TYPES, CARD_STATUS, SPORT_KEYS, sportToApi, apiToSport, getSportGr
 import { generateNoDataMessage, getSeasonInfo } from '@/lib/seasonal-context';
 import { logger, LogCategory } from '@/lib/logger';
 import { getSupabaseUrl, getSupabaseAnonKey } from '@/lib/config';
+import type { CardData } from '@/lib/types';
 
 // ============================================================================
 // Deterministic card ID — djb2 hash over the card's key dimensions.
@@ -578,26 +579,8 @@ async function generateSportSpecificCards(
 
 // getSportGradient imported from @/lib/constants (centralized)
 
-export interface InsightCard {
-  /** Deterministic stable ID for React key and cache identity */
-  id?: string;
-  type: string;
-  title: string;
-  icon: string;
-  category: string;
-  subcategory: string;
-  gradient: string;
-  status?: string;
-  data?: any;
-  metadata?: any;
-  realData?: boolean;
-  /** Statcast summary card metrics — rendered by StatcastCard */
-  summary_metrics?: Array<{ label: string; value: string }>;
-  /** Source/timestamp label for Statcast cards */
-  last_updated?: string;
-  /** Contextual note shown at the bottom of Statcast cards */
-  trend_note?: string;
-}
+/** Alias for the canonical CardData type from @/lib/types. */
+export type InsightCard = CardData;
 
 // ============================================================================
 // Vortex Projection Engine (VPE 3.0) — Baseball-only card builder
@@ -2880,6 +2863,7 @@ async function _generateContextualCards(
         for (const c of projCards) {
           cards.push({
             ...c,
+            data: (c as any).data ?? {},
             icon: 'TrendingUp',
             metadata: { realData: true, source: 'LeverageMetrics' },
           });
@@ -3094,9 +3078,15 @@ async function _generateContextualCards(
     }
   }
 
-  // Assign stable deterministic IDs to all cards before returning
+  // Assign stable deterministic IDs and normalise required fields before returning.
+  // Ensures every card conforms to CardData: status is always a string, data is always an object.
   const final = cards.slice(0, count);
-  const stamped = final.map((c, i) => c.id ? c : { ...c, id: cardId(c.type, c.category, c.title, String(i)) });
+  const stamped: CardData[] = final.map((c, i) => ({
+    ...c,
+    id: c.id ?? cardId(c.type, c.category, c.title, String(i)),
+    status: c.status ?? 'neutral',
+    data: (c.data ?? {}) as Record<string, any>,
+  }));
   logger.info(LogCategory.API, 'cards_generated', { metadata: { count: stamped.length, sport, category, multiSport } });
   return stamped;
 }

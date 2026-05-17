@@ -87,7 +87,7 @@ export async function POST(
       ? (body.messages as MsgInput[])
       : [{ role: body.role as string, content: body.content as string, model_used: body.model_used as string | undefined, confidence: body.confidence as number | undefined, is_welcome: (body.is_welcome as boolean | undefined) ?? false, cards: body.cards as unknown[] | undefined }];
 
-    if (!msgs.length || msgs.some(m => !m.role || !m.content)) {
+    if (!msgs.length || msgs.some(m => !m.role || m.content == null)) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields: role, content' },
         { status: HTTP_STATUS.BAD_REQUEST }

@@ -145,12 +145,12 @@ export const ChatHeader = memo(function ChatHeader({ activeChat, messages = [] }
                 className="p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-200 group active:scale-95"
                 title="Export chat"
               >
-                <Download className="w-4 h-4 text-[var(--text-muted)] group-hover:text-white transition-colors" />
+                <Download className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--foreground)] transition-colors" />
               </button>
               {showExportMenu && (
                 <>
-                  <div className="fixed inset-0 z-30" onClick={() => setShowExportMenu(false)} />
-                  <div className="absolute right-0 top-full mt-2 z-40 bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-xl shadow-2xl overflow-hidden min-w-[160px] animate-menu-slide">
+                  <div className="fixed inset-0 z-[98]" onClick={() => setShowExportMenu(false)} />
+                  <div className="absolute right-0 top-full mt-2 z-[99] bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-xl shadow-2xl overflow-hidden min-w-[160px] animate-menu-slide">
                     <button onClick={handleExportMarkdown} className="w-full px-4 py-3 text-sm text-left text-[var(--foreground)] hover:bg-[var(--bg-elevated)] transition-colors">
                       Export as Markdown
                     </button>

@@ -168,7 +168,7 @@ function Sparkline({
       height={height}
       viewBox={`0 0 ${w} ${height}`}
       preserveAspectRatio="none"
-      className="overflow-visible block"
+      className={cn("overflow-visible block animate-fade-in")}
       aria-hidden="true"
     >
       <defs>
@@ -242,7 +242,7 @@ function SignalBanner({ recommendation, edgeScore }: { recommendation?: string; 
 
   return (
     <div
-      className="flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-semibold"
+      className="flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-semibold animate-badge-pop"
       style={{ color: config.color, backgroundColor: config.bg, border: `1px solid ${config.border}` }}
     >
       {config.icon}
@@ -396,9 +396,10 @@ function OrderBookMini({
             <div
               key={i}
               className={cn(
-                'relative flex items-center justify-between text-[10px] tabular-nums rounded-md overflow-hidden px-2 py-1',
+                'relative flex items-center justify-between text-[10px] tabular-nums rounded-md overflow-hidden px-2 py-1 animate-fade-in-up',
                 i % 2 === 0 ? 'bg-emerald-500/4' : '',
               )}
+              style={{ animationDelay: `${i * 60}ms` }}
             >
               <div className="absolute inset-0 rounded-md"
                    style={{ backgroundColor: YES_COLOR + '0a', width: `${(row.quantity / maxQty) * 100}%`, transition: 'width 600ms' }} />
@@ -413,9 +414,10 @@ function OrderBookMini({
             <div
               key={i}
               className={cn(
-                'relative flex items-center justify-between text-[10px] tabular-nums rounded-md overflow-hidden px-2 py-1',
+                'relative flex items-center justify-between text-[10px] tabular-nums rounded-md overflow-hidden px-2 py-1 animate-fade-in-up',
                 i % 2 === 0 ? 'bg-rose-500/4' : '',
               )}
+              style={{ animationDelay: `${i * 60 + 30}ms` }}
             >
               <div className="absolute right-0 inset-y-0 rounded-md"
                    style={{ backgroundColor: NO_COLOR + '0a', width: `${(row.quantity / maxQty) * 100}%`, transition: 'width 600ms' }} />
@@ -1296,63 +1298,65 @@ export const KalshiCard = memo(function KalshiCard({
       <div className={cn('px-4 pb-4', isHero ? 'pt-3' : 'pt-2.5')}>
 
         {/* Tab content */}
-        {activeTab === 0 && (
-          <TabMarket
-            yesPct={yesPct}
-            lastPrice={typeof d.lastPrice === 'number' ? d.lastPrice : undefined}
-            priceDir={priceDir}
-            priceChange={safeChange}
-            isHero={isHero}
-            animated={animated}
-            closeTimeIso={d.closeTimeIso as string | undefined}
-            recommendation={d.recommendation as string | undefined}
-            edgeScore={typeof d.edgeScore === 'number' ? d.edgeScore : undefined}
-            priceIsReal={!!d.priceIsReal}
-            safeChange={safeChange}
-          />
-        )}
-        {activeTab === 1 && (
-          <TabDepth
-            bids={Array.isArray(d.orderbookBids) ? d.orderbookBids as Array<{ price: number; quantity: number }> : []}
-            asks={Array.isArray(d.orderbookAsks) ? d.orderbookAsks as Array<{ price: number; quantity: number }> : []}
-            yesBid={yesBid} yesAsk={yesAsk}
-            noBid={noBid}   noAsk={noAsk}
-            spread={typeof d.spread === 'number' ? d.spread : undefined}
-            spreadLabel={typeof d.spreadLabel === 'string' ? d.spreadLabel : undefined}
-            hasPrices={hasPrices}
-            hasOrderBook={hasOrderBook}
-            priceFlash={priceFlash}
-            volume24hRaw={typeof d.volume24hRaw === 'number' ? d.volume24hRaw : undefined}
-            volumeRaw={typeof d.volumeRaw === 'number' ? d.volumeRaw : undefined}
-            openInterestRaw={typeof d.openInterestRaw === 'number' ? d.openInterestRaw : undefined}
-            volumeTier={typeof d.volumeTier === 'string' ? d.volumeTier : undefined}
-            isActive={isActive}
-          />
-        )}
-        {activeTab === 2 && (
-          <TabTrade
-            trades={trades}
-            priceChange={safeChange}
-            priceDir={priceDir}
-            lastPrice={typeof d.lastPrice === 'number' ? d.lastPrice : undefined}
-            volume24h={typeof d.volume24h === 'string' ? d.volume24h : undefined}
-            volumeTier={typeof d.volumeTier === 'string' ? d.volumeTier : undefined}
-            isHero={isHero}
-          />
-        )}
-        {activeTab === 3 && (
-          <TabWatch
-            title={title}
-            ticker={typeof d.ticker === 'string' ? d.ticker : undefined}
-            seriesTicker={typeof d.seriesTicker === 'string' ? d.seriesTicker : undefined}
-            eventTicker={typeof d.eventTicker === 'string' ? d.eventTicker : undefined}
-            closeTimeIso={typeof d.closeTimeIso === 'string' ? d.closeTimeIso : undefined}
-            tradeBase={tradeBase}
-            accentColor={accentColor}
-            watched={watched}
-            toggleWatch={toggleWatch}
-          />
-        )}
+        <div key={activeTab} className="animate-tab-enter">
+          {activeTab === 0 && (
+            <TabMarket
+              yesPct={yesPct}
+              lastPrice={typeof d.lastPrice === 'number' ? d.lastPrice : undefined}
+              priceDir={priceDir}
+              priceChange={safeChange}
+              isHero={isHero}
+              animated={animated}
+              closeTimeIso={d.closeTimeIso as string | undefined}
+              recommendation={d.recommendation as string | undefined}
+              edgeScore={typeof d.edgeScore === 'number' ? d.edgeScore : undefined}
+              priceIsReal={!!d.priceIsReal}
+              safeChange={safeChange}
+            />
+          )}
+          {activeTab === 1 && (
+            <TabDepth
+              bids={Array.isArray(d.orderbookBids) ? d.orderbookBids as Array<{ price: number; quantity: number }> : []}
+              asks={Array.isArray(d.orderbookAsks) ? d.orderbookAsks as Array<{ price: number; quantity: number }> : []}
+              yesBid={yesBid} yesAsk={yesAsk}
+              noBid={noBid}   noAsk={noAsk}
+              spread={typeof d.spread === 'number' ? d.spread : undefined}
+              spreadLabel={typeof d.spreadLabel === 'string' ? d.spreadLabel : undefined}
+              hasPrices={hasPrices}
+              hasOrderBook={hasOrderBook}
+              priceFlash={priceFlash}
+              volume24hRaw={typeof d.volume24hRaw === 'number' ? d.volume24hRaw : undefined}
+              volumeRaw={typeof d.volumeRaw === 'number' ? d.volumeRaw : undefined}
+              openInterestRaw={typeof d.openInterestRaw === 'number' ? d.openInterestRaw : undefined}
+              volumeTier={typeof d.volumeTier === 'string' ? d.volumeTier : undefined}
+              isActive={isActive}
+            />
+          )}
+          {activeTab === 2 && (
+            <TabTrade
+              trades={trades}
+              priceChange={safeChange}
+              priceDir={priceDir}
+              lastPrice={typeof d.lastPrice === 'number' ? d.lastPrice : undefined}
+              volume24h={typeof d.volume24h === 'string' ? d.volume24h : undefined}
+              volumeTier={typeof d.volumeTier === 'string' ? d.volumeTier : undefined}
+              isHero={isHero}
+            />
+          )}
+          {activeTab === 3 && (
+            <TabWatch
+              title={title}
+              ticker={typeof d.ticker === 'string' ? d.ticker : undefined}
+              seriesTicker={typeof d.seriesTicker === 'string' ? d.seriesTicker : undefined}
+              eventTicker={typeof d.eventTicker === 'string' ? d.eventTicker : undefined}
+              closeTimeIso={typeof d.closeTimeIso === 'string' ? d.closeTimeIso : undefined}
+              tradeBase={tradeBase}
+              accentColor={accentColor}
+              watched={watched}
+              toggleWatch={toggleWatch}
+            />
+          )}
+        </div>
 
         <Divider />
 

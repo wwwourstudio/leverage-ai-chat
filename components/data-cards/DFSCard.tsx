@@ -54,7 +54,7 @@ function ValueGrade({ score }: { score: number }) {
     : grade === 'C' ? 'text-amber-300 bg-amber-500/15 border-amber-500/35'
     : 'text-red-300 bg-red-500/15 border-red-500/35';
   return (
-    <div className={cn('flex flex-col items-center justify-center w-12 h-12 rounded-xl border font-black shrink-0', cls)}>
+    <div className={cn('flex flex-col items-center justify-center w-12 h-12 rounded-xl border font-black shrink-0 animate-badge-pop', cls)}>
       <span className="text-xl leading-none">{grade}</span>
       <span className="text-[7px] uppercase tracking-wider opacity-70">value</span>
     </div>

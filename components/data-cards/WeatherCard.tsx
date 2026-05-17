@@ -468,7 +468,7 @@ export function WeatherCard({
         )}
 
         {/* Temperature hero + emoji */}
-        <div className="flex items-end gap-3 mt-3">
+        <div className="flex items-end gap-3 mt-3 animate-card-enter-spring">
           <span className="text-4xl" role="img" aria-label={condition ?? 'weather'}>
             {conditionEmoji}
           </span>
@@ -493,10 +493,16 @@ export function WeatherCard({
         {/* ── Impact category badges: Wind · Precip · Temp · Visibility ── */}
         {hasImpactBadges && (
           <div className="mt-3 grid grid-cols-4 gap-1.5">
-            <ImpactBadge label="Wind"    level={windLevel}   />
-            <ImpactBadge label="Precip"  level={precipLevel} />
-            <ImpactBadge label="Temp"    level={tempLevel}   />
-            <ImpactBadge label="Visibility" level={visLevel} />
+            {([
+              { label: 'Wind',       level: windLevel   },
+              { label: 'Precip',     level: precipLevel },
+              { label: 'Temp',       level: tempLevel   },
+              { label: 'Visibility', level: visLevel    },
+            ] as Array<{ label: string; level: ImpactLevel }>).map(({ label, level }, index) => (
+              <div key={label} className="animate-fade-in-up" style={{ animationDelay: `${index * 75}ms` }}>
+                <ImpactBadge label={label} level={level} />
+              </div>
+            ))}
           </div>
         )}
 
@@ -521,7 +527,7 @@ export function WeatherCard({
         {(data.humidity || (!isNaN(precipNum) && precipNum >= 0 && precipPct === null)) && (
           <div className={cn('grid gap-2', data.humidity && !isNaN(precipNum) ? 'grid-cols-2' : 'grid-cols-1')}>
             {data.humidity && (
-              <div className="rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-2.5 text-center">
+              <div className="rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-2.5 text-center animate-fade-in-up" style={{ animationDelay: '0ms' }}>
                 <Droplets className="w-4 h-4 text-sky-400 mx-auto mb-1" />
                 <div className="text-lg font-black tabular-nums text-foreground">{String(data.humidity)}</div>
                 <div className="text-[10px] text-[var(--text-muted)] mt-0.5 uppercase tracking-wide">Humidity</div>
@@ -529,11 +535,11 @@ export function WeatherCard({
             )}
             {!isNaN(precipNum) && precipNum >= 0 && (
               <div className={cn(
-                'rounded-xl border p-2.5 text-center',
+                'rounded-xl border p-2.5 text-center animate-fade-in-up',
                 precipNum > 0.1
                   ? 'bg-blue-500/10 border-blue-500/20'
                   : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)]',
-              )}>
+              )} style={{ animationDelay: '75ms' }}>
                 <CloudRain className={cn('w-4 h-4 mx-auto mb-1', precipNum > 0.1 ? 'text-blue-400' : 'text-[var(--text-muted)]')} />
                 <div className="text-lg font-black tabular-nums text-foreground">{String(data.precipitation)}</div>
                 <div className="text-[10px] text-[var(--text-muted)] mt-0.5 uppercase tracking-wide">Precip</div>

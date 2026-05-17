@@ -11,11 +11,14 @@ export function TabProps({ data, onAnalyze, onAsk, loading = false }: {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-10">
-        <div className="relative w-6 h-6">
-          <div className="absolute inset-0 rounded-full border-2 border-[var(--border-subtle)]" />
-          <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-white/60 animate-spin" />
-        </div>
+      <div className="space-y-2 py-2 px-1">
+        {[0, 1, 2, 3].map(i => (
+          <div
+            key={i}
+            className="h-10 rounded-xl bg-[var(--bg-elevated)] animate-card-shimmer"
+            style={{ animationDelay: `${i * 80}ms` }}
+          />
+        ))}
       </div>
     );
   }

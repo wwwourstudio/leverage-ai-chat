@@ -168,10 +168,11 @@ export const ChatInput = memo(function ChatInput({
       {/* Attached file chips — shown above the card */}
       {uploadedFiles.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2 px-1">
-          {uploadedFiles.map((file) => (
+          {uploadedFiles.map((file, index) => (
             <div
               key={file.id}
-              className="flex items-center gap-2 px-2.5 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl text-xs"
+              className="flex items-center gap-2 px-2.5 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl text-xs animate-fade-in-up"
+              style={{ animationDelay: `${index * 60}ms` }}
             >
               {file.type === 'image'
                 ? <ImageIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
@@ -214,7 +215,7 @@ export const ChatInput = memo(function ChatInput({
       >
         {/* Drag overlay */}
         {isDragOver && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl pointer-events-none">
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl pointer-events-none animate-fade-in">
             <div className="flex flex-col items-center gap-2">
               <Paperclip className="w-6 h-6 text-blue-400" />
               <span className="text-sm font-semibold text-blue-300">Drop to attach</span>

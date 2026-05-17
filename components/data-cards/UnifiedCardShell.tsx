@@ -18,7 +18,7 @@ const STATUS_GLOW: Record<string, string> = {
   value:   'card-value   animate-value-glow',
   optimal: 'card-optimal animate-optimal-glow',
   arb:     'card-arb     animate-arb-flash',
-  live:    'card-live',
+  live:    'card-live animate-live-glow',
 };
 
 export function UnifiedCardShell({

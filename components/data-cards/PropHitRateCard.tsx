@@ -125,11 +125,12 @@ function RecentFormSquares({ dots }: { dots: boolean[] }) {
           <div
             key={i}
             className={cn(
-              'flex-1 h-6 rounded-md flex items-center justify-center text-[9px] font-black transition-all duration-300',
+              'flex-1 h-6 rounded-md flex items-center justify-center text-[9px] font-black transition-all duration-300 animate-scale-in',
               hit
                 ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-400'
                 : 'bg-red-500/15 border border-red-500/30 text-red-400',
             )}
+            style={{ animationDelay: `${i * 50}ms` }}
             title={hit ? 'Hit' : 'Miss'}
           >
             {hit ? 'H' : 'M'}
@@ -215,7 +216,7 @@ export const PropHitRateCard = memo(function PropHitRateCard({
         {/* Confidence badge */}
         <div className="absolute top-3 right-3">
           <span className={cn(
-            'text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-widest border',
+            'text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-widest border animate-badge-pop',
             confidence === 'high'   ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
             : confidence === 'medium' ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
             : 'bg-red-500/15 border-red-500/30 text-red-300',
@@ -334,7 +335,7 @@ export const PropHitRateCard = memo(function PropHitRateCard({
         </div>
 
         {/* ── Recommendation ── */}
-        <div className="rounded-xl border border-white/8 bg-white/3 px-3 py-2.5">
+        <div className="rounded-xl border border-white/8 bg-white/3 px-3 py-2.5 animate-fade-in animate-delay-225">
           <span className="text-[8px] font-black uppercase tracking-widest text-white/30 mb-1 block">
             AI Recommendation
           </span>

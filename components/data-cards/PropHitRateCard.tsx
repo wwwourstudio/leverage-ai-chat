@@ -51,7 +51,7 @@ function HitRateRing({ pct, isHero }: { pct: number; isHero?: boolean }) {
              className="-rotate-90" aria-hidden="true">
           {/* Outer glow track */}
           <circle cx={size / 2} cy={size / 2} r={r}
-            stroke="rgba(255,255,255,0.05)" strokeWidth="6" fill="none" />
+            stroke="var(--border-subtle)" strokeWidth="6" fill="none" />
           {/* Progress ring */}
           <circle cx={size / 2} cy={size / 2} r={r}
             stroke={color} strokeWidth="6" fill="none"
@@ -65,7 +65,7 @@ function HitRateRing({ pct, isHero }: { pct: number; isHero?: boolean }) {
         </svg>
         {/* Center content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="font-black tabular-nums leading-none text-white"
+          <span className="font-black tabular-nums leading-none text-[var(--foreground)]"
                 style={{ fontSize: isHero ? 15 : 13 }}>
             {pct.toFixed(0)}%
           </span>
@@ -105,7 +105,7 @@ function RecentFormSquares({ dots }: { dots: boolean[] }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[9px] font-black uppercase tracking-widest text-white/35">Recent Form</span>
+        <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/35">Recent Form</span>
         <div className="flex items-center gap-1">
           {l5Rate !== null && (
             <span className={cn('text-[8px] font-black px-1.5 py-0.5 rounded-md border', rateChipClass(l5Rate))}>
@@ -152,7 +152,7 @@ function RecentFormSquares({ dots }: { dots: boolean[] }) {
           ))}
         </div>
       )}
-      <div className="flex justify-between text-[8px] text-white/25">
+      <div className="flex justify-between text-[8px] text-[var(--foreground)]/35">
         <span>{last10.filter(Boolean).length}H / {last10.filter(h => !h).length}M</span>
         <span>last {last10.length}</span>
       </div>
@@ -184,10 +184,10 @@ export const PropHitRateCard = memo(function PropHitRateCard({
   const isWeak   = hitRatePercentage <= 35;
 
   const headerGrad = isStrong
-    ? 'from-emerald-600/25 via-teal-900/10 to-transparent'
+    ? 'from-emerald-500/8 to-transparent dark:from-emerald-600/25 dark:via-teal-900/10'
     : isWeak
-    ? 'from-red-600/25 via-rose-900/10 to-transparent'
-    : 'from-blue-600/25 via-indigo-900/10 to-transparent';
+    ? 'from-red-500/8 to-transparent dark:from-red-600/25 dark:via-rose-900/10'
+    : 'from-blue-500/8 to-transparent dark:from-blue-600/25 dark:via-indigo-900/10';
 
   const barColor = isStrong ? '#10b981' : isWeak ? '#ef4444' : '#f59e0b';
 
@@ -197,7 +197,7 @@ export const PropHitRateCard = memo(function PropHitRateCard({
 
   const trendColor = trend === 'improving' ? 'text-emerald-400'
     : trend === 'declining' ? 'text-red-400'
-    : 'text-white/40';
+    : 'text-[var(--foreground)]/40';
 
   const differential = avgActual - avgLine;
   const resolvedPhotoUrl = photoUrl ?? getPlayerHeadshotUrl(playerName);
@@ -226,7 +226,7 @@ export const PropHitRateCard = memo(function PropHitRateCard({
         </div>
 
         {/* Sport chip */}
-        <span className="text-[9px] font-black uppercase tracking-widest text-white/40 block mb-2">
+        <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/40 block mb-2">
           {sport ? sport.toUpperCase() : 'MLB'} · Prop Hit Rate
         </span>
 
@@ -239,11 +239,11 @@ export const PropHitRateCard = memo(function PropHitRateCard({
             size={isHero ? 'lg' : 'md'}
           />
           <div className="min-w-0 flex-1">
-            <h3 className={cn('font-black text-white truncate', isHero ? 'text-lg' : 'text-sm')}>
+            <h3 className={cn('font-black text-[var(--foreground)] truncate', isHero ? 'text-lg' : 'text-sm')}>
               {playerName}
             </h3>
             <div className="flex items-center gap-2 mt-1">
-              <p className="text-[10px] text-white/45 truncate">{statType}</p>
+              <p className="text-[10px] text-[var(--foreground)]/45 truncate">{statType}</p>
               {totalGames < 10 && (
                 <span className="inline-flex text-[8px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 font-bold">
                   Small ({totalGames}g)
@@ -252,10 +252,10 @@ export const PropHitRateCard = memo(function PropHitRateCard({
             </div>
             {/* Line display */}
             <div className="flex items-center gap-2 mt-1.5">
-              <span className="text-[9px] text-white/30">Line:</span>
-              <span className="text-[11px] font-black text-white tabular-nums">{avgLine.toFixed(1)}</span>
-              <span className="text-[9px] text-white/30">·</span>
-              <span className="text-[9px] text-white/30">Avg:</span>
+              <span className="text-[9px] text-[var(--foreground)]/40">Line:</span>
+              <span className="text-[11px] font-black text-[var(--foreground)] tabular-nums">{avgLine.toFixed(1)}</span>
+              <span className="text-[9px] text-[var(--foreground)]/40">·</span>
+              <span className="text-[9px] text-[var(--foreground)]/40">Avg:</span>
               <span className={cn('text-[11px] font-black tabular-nums', differential >= 0 ? 'text-emerald-400' : 'text-red-400')}>
                 {avgActual.toFixed(1)}
               </span>
@@ -271,14 +271,14 @@ export const PropHitRateCard = memo(function PropHitRateCard({
         {/* ── Hit rate progress bar ── */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[9px] font-black uppercase tracking-widest text-white/35">Hit Rate</span>
+            <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/40">Hit Rate</span>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black text-white tabular-nums">{hitRatePercentage.toFixed(0)}%</span>
+              <span className="text-[10px] font-black text-[var(--foreground)] tabular-nums">{hitRatePercentage.toFixed(0)}%</span>
               {isStrong && <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/25 text-emerald-400">OVER LEAN</span>}
               {isWeak   && <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-red-500/15 border border-red-500/25 text-red-400">UNDER LEAN</span>}
             </div>
           </div>
-          <div className="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+          <div className="h-1.5 w-full rounded-full bg-[var(--bg-overlay)] overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-700"
               style={{
@@ -288,7 +288,7 @@ export const PropHitRateCard = memo(function PropHitRateCard({
               }}
             />
           </div>
-          <div className="flex justify-between text-[8px] mt-1 text-white/25">
+          <div className="flex justify-between text-[8px] mt-1 text-[var(--foreground)]/35">
             <span>{hits} hits</span>
             <span>{totalGames} games</span>
             <span>{misses} misses</span>
@@ -316,7 +316,7 @@ export const PropHitRateCard = memo(function PropHitRateCard({
 
         {/* ── Recent form squares ── */}
         {formDots.length > 0 && (
-          <div className="rounded-xl bg-white/3 border border-white/6 p-3">
+          <div className="rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-3">
             <RecentFormSquares dots={formDots} />
           </div>
         )}
@@ -335,11 +335,11 @@ export const PropHitRateCard = memo(function PropHitRateCard({
         </div>
 
         {/* ── Recommendation ── */}
-        <div className="rounded-xl border border-white/8 bg-white/3 px-3 py-2.5 animate-fade-in animate-delay-225">
-          <span className="text-[8px] font-black uppercase tracking-widest text-white/30 mb-1 block">
+        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-3 py-2.5 animate-fade-in animate-delay-225">
+          <span className="text-[8px] font-black uppercase tracking-widest text-[var(--foreground)]/40 mb-1 block">
             AI Recommendation
           </span>
-          <p className="text-[10px] text-white/60 leading-relaxed">{recommendation}</p>
+          <p className="text-[10px] text-[var(--foreground)]/60 leading-relaxed">{recommendation}</p>
         </div>
 
         {/* ── AI Analysis CTA ── */}

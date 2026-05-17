@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
 
     const sharedSessionFields = {
       ui_mode: 'embedded' as const,
+      payment_method_types: ['card'] as ['card'],
       customer_email: customer_email || userEmail || undefined,
       allow_promotion_codes: true,
       return_url: returnUrl,

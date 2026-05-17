@@ -441,25 +441,23 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
       )}
       <div className={cn('max-w-3xl min-w-0', isUser ? 'order-2' : 'flex-1')}>
         <div className={cn(
-          'relative rounded-2xl px-4 py-3.5 overflow-hidden',
+          'relative px-4 py-3.5 overflow-hidden',
           isUser
-            ? 'bg-gradient-to-br from-[oklch(0.32_0.09_258)] to-[oklch(0.26_0.07_268)] text-white shadow-lg shadow-blue-900/40 border border-[oklch(0.40_0.08_258)] min-w-[120px]'
-            : message.isError
-              ? 'bg-[var(--bg-surface)] border border-red-500/20 shadow-sm'
-              : message.isPartial
-                ? 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm'
-                : 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm',
+            ? 'bubble-user bg-gradient-to-br from-[oklch(0.155_0.022_257)] to-[oklch(0.11_0.020_255)] text-white shadow-lg shadow-blue-900/30 border border-[oklch(0.31_0.035_258)] min-w-[120px]'
+            : 'rounded-2xl bg-[var(--bg-surface)] border shadow-sm',
+          !isUser && message.isError   && 'border-red-500/20',
+          !isUser && !message.isError  && 'border-[var(--border-subtle)]',
           (!isUser && (message.isPending || message.isStreaming)) ? 'min-h-[72px]' : '',
         )}>
           {/* Error / partial accent strip */}
           {!isUser && message.isError && (
-            <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl bg-red-500/70" />
+            <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl msg-accent-error" />
           )}
           {!isUser && message.isPartial && (
-            <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl bg-amber-500/60" />
+            <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl msg-accent-partial" />
           )}
           {!isUser && !message.isError && !message.isPartial && !message.isPending && !message.isStreaming && (
-            <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl bg-gradient-to-b from-blue-500/60 to-violet-500/30" />
+            <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl msg-accent-complete" />
           )}
           {/* ── Loading skeleton — shown while pending OR while first tokens arrive ── */}
           {!isUser && (message.isPending || (message.isStreaming && !message.content?.trim())) && (

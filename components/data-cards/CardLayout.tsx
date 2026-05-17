@@ -183,7 +183,7 @@ export const CardLayout = memo(function CardLayout({
       )}
 
       {/* ── Hero Card ────────────────────────────────────────────────── */}
-      <div className="w-full animate-card-enter">
+      <div className="w-full animate-card-enter-spring">
         <DynamicCardRenderer
           card={heroCard}
           index={0}

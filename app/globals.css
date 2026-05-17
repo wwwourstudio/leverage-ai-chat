@@ -221,6 +221,26 @@
   --ui-card-border-hover: var(--card-border-hover);
   --ui-shadow-card: var(--shadow-card);
   --ui-shadow-elevated: var(--shadow-elevated);
+
+  /* ── Extended primary glow ──────────────────────────────────────── */
+  --primary-glow:   oklch(0.62 0.23 255 / 0.22);
+  --primary-subtle: oklch(0.62 0.23 255 / 0.08);
+  --border-active:  oklch(0.52 0.18 258);
+
+  /* ── Status glow shadows ────────────────────────────────────────── */
+  --shadow-hot:     0 0 18px oklch(0.68 0.24 26 / 0.22), 0 0 40px oklch(0.68 0.24 26 / 0.10);
+  --shadow-value:   0 0 18px oklch(0.70 0.22 145 / 0.22), 0 0 40px oklch(0.70 0.22 145 / 0.10);
+  --shadow-optimal: 0 0 18px oklch(0.62 0.23 255 / 0.22), 0 0 40px oklch(0.62 0.23 255 / 0.10);
+  --shadow-arb:     0 0 18px oklch(0.74 0.22 160 / 0.22), 0 0 40px oklch(0.74 0.22 160 / 0.10);
+  --shadow-live:    0 0 18px oklch(0.72 0.24 145 / 0.28), 0 0 40px oklch(0.72 0.24 145 / 0.14);
+
+  /* ── Extended typography scale ──────────────────────────────────── */
+  --text-caption:  12px;
+  --text-body-sm:  13px;
+  --text-body:     14px;
+  --text-lead:     16px;
+  --text-title:    18px;
+  --text-display:  32px;
 }
 
 @theme inline {
@@ -486,4 +506,193 @@
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(107, 114, 128, 0.7);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   AWWWARDS-LEVEL DESIGN SYSTEM ADDITIONS
+   Status glows, signature animations, canonical component styles
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ── HOT card: ember burst on enter, breathing glow forever after ───────── */
+@keyframes ember-burst {
+  0%   { box-shadow: 0 0 0px oklch(0.68 0.24 26 / 0); }
+  30%  { box-shadow: 0 0 48px oklch(0.68 0.24 26 / 0.50),
+                     0 0 96px oklch(0.68 0.24 26 / 0.20),
+                     inset 0 0 24px oklch(0.68 0.24 26 / 0.06); }
+  100% { box-shadow: var(--shadow-hot, 0 0 18px oklch(0.68 0.24 26 / 0.32)); }
+}
+@keyframes ember-glow-pulse {
+  0%, 100% { box-shadow: var(--shadow-hot, 0 0 18px oklch(0.68 0.24 26 / 0.32)); }
+  50%       { box-shadow: 0 0 28px oklch(0.68 0.24 26 / 0.45),
+                          0 0 56px oklch(0.68 0.24 26 / 0.18); }
+}
+@utility animate-ember-burst {
+  animation:
+    ember-burst 0.4s cubic-bezier(0.16, 1, 0.3, 1) both,
+    ember-glow-pulse 3s ease-in-out 0.4s infinite;
+}
+
+/* ── ARB card: teal flash on enter, breathe after ───────────────────────── */
+@keyframes arb-flash {
+  0%   { box-shadow: 0 0 0px oklch(0.74 0.22 160 / 0); }
+  20%  { box-shadow: 0 0 60px oklch(0.74 0.22 160 / 0.55),
+                     0 0 120px oklch(0.74 0.22 160 / 0.22); }
+  100% { box-shadow: var(--shadow-arb, 0 0 18px oklch(0.74 0.22 160 / 0.30)); }
+}
+@keyframes arb-glow-pulse {
+  0%, 100% { box-shadow: var(--shadow-arb, 0 0 18px oklch(0.74 0.22 160 / 0.30)); }
+  50%       { box-shadow: 0 0 32px oklch(0.74 0.22 160 / 0.45),
+                          0 0 64px oklch(0.74 0.22 160 / 0.18); }
+}
+@utility animate-arb-flash {
+  animation:
+    arb-flash 0.35s cubic-bezier(0.16, 1, 0.3, 1) both,
+    arb-glow-pulse 3s ease-in-out 0.35s infinite;
+}
+
+/* ── VALUE card: green settle glow ─────────────────────────────────────── */
+@keyframes value-glow-pulse {
+  0%, 100% { box-shadow: var(--shadow-value, 0 0 18px oklch(0.70 0.22 145 / 0.30)); }
+  50%       { box-shadow: 0 0 28px oklch(0.70 0.22 145 / 0.42),
+                          0 0 56px oklch(0.70 0.22 145 / 0.16); }
+}
+@utility animate-value-glow {
+  animation: value-glow-pulse 3.5s ease-in-out 0.3s infinite;
+}
+
+/* ── OPTIMAL card: electric blue pulse ──────────────────────────────────── */
+@keyframes optimal-glow-pulse {
+  0%, 100% { box-shadow: var(--shadow-optimal, 0 0 18px oklch(0.62 0.23 255 / 0.30)); }
+  50%       { box-shadow: 0 0 28px oklch(0.62 0.23 255 / 0.42),
+                          0 0 56px oklch(0.62 0.23 255 / 0.16); }
+}
+@utility animate-optimal-glow {
+  animation: optimal-glow-pulse 3s ease-in-out 0.3s infinite;
+}
+
+/* ── LIVE dot: expanding ring + solid core ──────────────────────────────── */
+@keyframes live-dot-ping {
+  0%   { transform: scale(1);   opacity: 0.8; }
+  100% { transform: scale(2.4); opacity: 0;   }
+}
+@keyframes live-dot-core {
+  0%, 100% { opacity: 0.9; transform: scale(1);    }
+  50%       { opacity: 1;   transform: scale(1.12); }
+}
+.live-dot {
+  position: relative;
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: oklch(0.72 0.24 145);
+  animation: live-dot-core 1.4s ease-in-out infinite;
+}
+.live-dot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: oklch(0.72 0.24 145);
+  animation: live-dot-ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* ── HOT dot: ember pulse ──────────────────────────────────────────────── */
+@keyframes hot-dot-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(0.68 0.24 26 / 0.5); }
+  70%       { box-shadow: 0 0 0 4px oklch(0.68 0.24 26 / 0); }
+}
+.hot-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: oklch(0.68 0.24 26);
+  animation: hot-dot-pulse 2s ease-in-out infinite;
+}
+
+/* ── STATUS badge: canonical pill ──────────────────────────────────────── */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 100px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid;
+}
+.status-badge-hot     { color: oklch(0.68 0.24 26);  background: oklch(0.68 0.24 26  / 0.10); border-color: oklch(0.68 0.24 26  / 0.28); }
+.status-badge-value   { color: oklch(0.70 0.22 145); background: oklch(0.70 0.22 145 / 0.10); border-color: oklch(0.70 0.22 145 / 0.28); }
+.status-badge-optimal { color: oklch(0.62 0.23 255); background: oklch(0.62 0.23 255 / 0.10); border-color: oklch(0.62 0.23 255 / 0.28); }
+.status-badge-edge    { color: oklch(0.80 0.20 85);  background: oklch(0.80 0.20 85  / 0.10); border-color: oklch(0.80 0.20 85  / 0.28); }
+.status-badge-arb     { color: oklch(0.74 0.22 160); background: oklch(0.74 0.22 160 / 0.10); border-color: oklch(0.74 0.22 160 / 0.28); }
+.status-badge-live    { color: oklch(0.72 0.24 145); background: oklch(0.72 0.24 145 / 0.10); border-color: oklch(0.72 0.24 145 / 0.28); }
+.status-badge-neutral { color: oklch(0.55 0.015 265); background: oklch(0.55 0.015 265 / 0.08); border-color: oklch(0.55 0.015 265 / 0.20); }
+
+/* ── Card status glow modifiers (add to any card shell) ─────────────────── */
+.card-hot     { border-color: oklch(0.68 0.24 26  / 0.40) !important; }
+.card-value   { border-color: oklch(0.70 0.22 145 / 0.40) !important; }
+.card-optimal { border-color: oklch(0.62 0.23 255 / 0.40) !important; }
+.card-arb     { border-color: oklch(0.74 0.22 160 / 0.40) !important; }
+.card-live    { border-color: oklch(0.72 0.24 145 / 0.40) !important; }
+
+/* ── Chat compose bar focus aura ────────────────────────────────────────── */
+.chat-input-shell:focus-within {
+  border-color: oklch(0.52 0.18 258) !important;
+  box-shadow:
+    0 0 0 1px oklch(0.62 0.23 255 / 0.15),
+    0 4px 20px oklch(0 0 0 / 0.45) !important;
+}
+
+/* ── Odds number color semantics ────────────────────────────────────────── */
+.odds-positive { color: oklch(0.70 0.22 145); font-variant-numeric: tabular-nums; }
+.odds-negative { color: oklch(0.97 0.005 85);  font-variant-numeric: tabular-nums; }
+.odds-heavy    { color: oklch(0.55 0.015 265); font-variant-numeric: tabular-nums; }
+
+/* ── Tabular numerics on all data elements ──────────────────────────────── */
+[data-odds], [data-stat], [data-pct], [data-price] {
+  font-variant-numeric: tabular-nums lining-nums slashed-zero;
+  font-feature-settings: "tnum" on, "lnum" on, "zero" on;
+}
+
+/* ── Card hover lift (applied globally to all interactive cards) ─────────── */
+.card-interactive {
+  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 150ms ease,
+              box-shadow 150ms ease;
+}
+.card-interactive:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-hover) !important;
+  box-shadow: 0 4px 20px oklch(0 0 0 / 0.45), 0 12px 36px oklch(0 0 0 / 0.28);
+}
+
+/* ── User message bubble: "sent" corner treatment ──────────────────────── */
+.bubble-user {
+  border-radius: 16px 16px 4px 16px;
+}
+
+/* ── AI message left accent strip ──────────────────────────────────────── */
+.msg-accent-complete { background: linear-gradient(to bottom, oklch(0.62 0.22 255), oklch(0.65 0.22 295)); }
+.msg-accent-error    { background: oklch(0.50 0.22 20  / 0.70); }
+.msg-accent-partial  { background: oklch(0.80 0.20 85  / 0.60); }
+
+/* ── Enhanced card-enter: spring easing ──────────────────────────────────── */
+@keyframes card-enter-spring {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@utility animate-card-enter-spring {
+  animation: card-enter-spring 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Number tick-up animation (used for ROI%, arbitrage profit %) ────────── */
+@keyframes number-tick {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@utility animate-number-tick {
+  animation: number-tick 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }

@@ -124,7 +124,7 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
     <div className="group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_24px_rgba(244,63,94,0.10)] transition-all duration-300">
 
       {/* ── Header ── */}
-      <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-rose-600/25 via-red-900/10 to-transparent border-b border-[var(--border-subtle)]">
+      <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-rose-600/25 dark:via-red-900/10 to-transparent border-b border-[var(--border-subtle)]">
         {/* Confidence badge top-right */}
         <div className={`absolute top-3 right-3 text-[9px] font-black px-2 py-1 rounded-lg border ${confCfg.bg} ${confCfg.border} ${confCfg.color} uppercase tracking-widest`}>
           {confCfg.label} CONF

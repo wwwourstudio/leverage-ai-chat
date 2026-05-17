@@ -30,10 +30,10 @@ interface CatcherFramingCardProps {
 }
 
 const TIER_CONFIG = {
-  'elite':     { badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', bar: 'bg-emerald-500', header: 'from-emerald-900/30 via-teal-900/15',   label: 'Elite Framer',   icon: 'text-emerald-400' },
-  'above-avg': { badge: 'bg-blue-500/15 border-blue-500/40 text-blue-300',          bar: 'bg-blue-500',    header: 'from-blue-900/30 via-cyan-900/15',      label: 'Above Average',  icon: 'text-blue-400'    },
-  'average':   { badge: 'bg-slate-500/10 border-slate-500/30 text-slate-400',       bar: 'bg-slate-500',   header: 'from-slate-800/30 via-slate-900/10',    label: 'Average',        icon: 'text-slate-400'   },
-  'below-avg': { badge: 'bg-red-500/15 border-red-500/40 text-red-400',             bar: 'bg-red-500',     header: 'from-red-900/30 via-rose-900/15',       label: 'Below Average',  icon: 'text-red-400'     },
+  'elite':     { badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', bar: 'bg-emerald-500', header: 'dark:from-emerald-900/30 dark:via-teal-900/15',   label: 'Elite Framer',   icon: 'text-emerald-400' },
+  'above-avg': { badge: 'bg-blue-500/15 border-blue-500/40 text-blue-300',          bar: 'bg-blue-500',    header: 'dark:from-blue-900/30 dark:via-cyan-900/15',      label: 'Above Average',  icon: 'text-blue-400'    },
+  'average':   { badge: 'bg-slate-500/10 border-slate-500/30 text-slate-400',       bar: 'bg-slate-500',   header: 'dark:from-slate-800/30 dark:via-slate-900/10',    label: 'Average',        icon: 'text-slate-400'   },
+  'below-avg': { badge: 'bg-red-500/15 border-red-500/40 text-red-400',             bar: 'bg-red-500',     header: 'dark:from-red-900/30 dark:via-rose-900/15',       label: 'Below Average',  icon: 'text-red-400'     },
 };
 
 export function CatcherFramingCard({

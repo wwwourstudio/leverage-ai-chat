@@ -66,7 +66,7 @@ export function LineMovementCard({
     >
       {/* Ambient gradient */}
       <div
-        className="absolute inset-0 bg-gradient-to-br from-violet-600/25 via-purple-800/10 to-transparent opacity-60 pointer-events-none"
+        className="absolute inset-0 bg-gradient-to-br from-violet-600/25 dark:via-purple-800/10 to-transparent opacity-60 pointer-events-none"
         aria-hidden="true"
       />
 

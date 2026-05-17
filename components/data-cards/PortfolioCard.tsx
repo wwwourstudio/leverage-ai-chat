@@ -109,7 +109,7 @@ export function PortfolioCard({
       )}
     >
       {/* Header gradient */}
-      <div className="absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-violet-600/25 via-purple-800/10 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-violet-600/25 dark:via-purple-800/10 to-transparent pointer-events-none" />
 
       <div
         className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)}

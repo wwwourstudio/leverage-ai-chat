@@ -57,7 +57,7 @@ const statusConfig: Record<string, {
     label: 'ALERT',
     dotCls: 'bg-red-400',
     textCls: 'text-red-400',
-    headerGrad: 'from-red-700/70 via-rose-800/55 to-red-950/40',
+    headerGrad: 'from-red-500/10 dark:from-red-700/70 dark:via-rose-800/55 dark:to-red-950/40',
     AlertIcon: AlertTriangle,
     alertBg: 'bg-red-500/10 border-red-500/25',
   },
@@ -65,7 +65,7 @@ const statusConfig: Record<string, {
     label: 'FAVORABLE',
     dotCls: 'bg-emerald-400',
     textCls: 'text-emerald-400',
-    headerGrad: 'from-emerald-600/70 via-teal-700/55 to-emerald-900/40',
+    headerGrad: 'from-emerald-500/10 dark:from-emerald-600/70 dark:via-teal-700/55 dark:to-emerald-900/40',
     AlertIcon: CheckCircle,
     alertBg: 'bg-emerald-500/10 border-emerald-500/25',
   },
@@ -73,7 +73,7 @@ const statusConfig: Record<string, {
     label: 'NEUTRAL',
     dotCls: 'bg-slate-400',
     textCls: 'text-slate-400',
-    headerGrad: 'from-slate-600/70 via-gray-700/55 to-slate-900/40',
+    headerGrad: 'from-slate-400/10 dark:from-slate-600/70 dark:via-gray-700/55 dark:to-slate-900/40',
     AlertIcon: Cloud,
     alertBg: 'bg-slate-500/10 border-slate-500/25',
   },
@@ -384,12 +384,12 @@ export function WeatherCard({
   // ── Condition-based background tint for the header ──────────────────────────
   const conditionGrad = (() => {
     const c = (condition ?? '').toLowerCase();
-    if (c.includes('sun') || c.includes('clear') || c.includes('sunny')) return 'from-amber-700/60 via-yellow-800/40 to-amber-950/30';
-    if (c.includes('thunder') || c.includes('lightning')) return 'from-purple-700/60 via-violet-800/40 to-purple-950/30';
-    if (c.includes('rain') || c.includes('storm') || c.includes('shower')) return 'from-blue-700/60 via-blue-800/40 to-blue-950/30';
-    if (c.includes('snow') || c.includes('blizzard')) return 'from-sky-600/60 via-cyan-700/40 to-sky-950/30';
-    if (c.includes('wind') || c.includes('gust')) return 'from-slate-600/60 via-gray-700/40 to-slate-900/30';
-    if (c.includes('fog') || c.includes('mist')) return 'from-gray-600/60 via-slate-700/40 to-gray-950/30';
+    if (c.includes('sun') || c.includes('clear') || c.includes('sunny')) return 'from-amber-500/8 dark:from-amber-700/60 dark:via-yellow-800/40 dark:to-amber-950/30';
+    if (c.includes('thunder') || c.includes('lightning')) return 'from-purple-500/8 dark:from-purple-700/60 dark:via-violet-800/40 dark:to-purple-950/30';
+    if (c.includes('rain') || c.includes('storm') || c.includes('shower')) return 'from-blue-500/8 dark:from-blue-700/60 dark:via-blue-800/40 dark:to-blue-950/30';
+    if (c.includes('snow') || c.includes('blizzard')) return 'from-sky-500/8 dark:from-sky-600/60 via-cyan-700/40 dark:to-sky-950/30';
+    if (c.includes('wind') || c.includes('gust')) return 'from-slate-500/8 dark:from-slate-600/60 via-gray-700/40 dark:to-slate-900/30';
+    if (c.includes('fog') || c.includes('mist')) return 'from-gray-500/8 dark:from-gray-600/60 via-slate-700/40 dark:to-gray-950/30';
     return cfg.headerGrad;
   })();
 

@@ -31,9 +31,9 @@ interface UmpireImpactCardProps {
 }
 
 const BIAS_CONFIG = {
-  tight:  { badge: 'bg-amber-500/15 border-amber-500/40 text-amber-300',  barColor: 'bg-amber-500',  header: 'from-amber-900/30 via-yellow-900/10', label: 'Tight Zone', icon: 'text-amber-400'  },
-  normal: { badge: 'bg-slate-500/10 border-slate-500/30 text-slate-400',  barColor: 'bg-slate-400',  header: 'from-slate-800/30 via-slate-900/10',  label: 'Avg Zone',   icon: 'text-slate-400'  },
-  wide:   { badge: 'bg-blue-500/15  border-blue-500/40  text-blue-300',   barColor: 'bg-blue-500',   header: 'from-blue-900/30 via-cyan-900/10',    label: 'Wide Zone',  icon: 'text-blue-400'   },
+  tight:  { badge: 'bg-amber-500/15 border-amber-500/40 text-amber-300',  barColor: 'bg-amber-500',  header: 'dark:from-amber-900/30 dark:via-yellow-900/10', label: 'Tight Zone', icon: 'text-amber-400'  },
+  normal: { badge: 'bg-slate-500/10 border-slate-500/30 text-slate-400',  barColor: 'bg-slate-400',  header: 'dark:from-slate-800/30 dark:via-slate-900/10',  label: 'Avg Zone',   icon: 'text-slate-400'  },
+  wide:   { badge: 'bg-blue-500/15  border-blue-500/40  text-blue-300',   barColor: 'bg-blue-500',   header: 'dark:from-blue-900/30 dark:via-cyan-900/10',    label: 'Wide Zone',  icon: 'text-blue-400'   },
 };
 
 export function UmpireImpactCard({

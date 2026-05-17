@@ -47,7 +47,7 @@ export function ArbitrageOpportunityCard({ opportunity: opp, onAsk }: ArbitrageO
   return (
     <div className="group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-glow)] transition-all duration-300">
       {/* Gradient header */}
-      <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-emerald-600/25 via-teal-800/10 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-emerald-600/25 dark:via-teal-800/10 to-transparent pointer-events-none" />
 
       <div className="relative px-4 pt-4 pb-4 flex flex-col gap-3">
         {/* Header: ARBITRAGE badge + PROFIT hero */}

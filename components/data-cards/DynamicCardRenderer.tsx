@@ -412,7 +412,7 @@ export function DynamicCardRenderer({
     };
     const emoji = sportEmojis[safeCard.category?.toLowerCase() ?? ''] ?? '📊';
     return withOverlays(
-      <div className={`group relative bg-gradient-to-br ${safeCard.gradient || 'from-blue-600/20 to-purple-900/10'} rounded-2xl p-5 border border-[var(--border-subtle)] hover:border-[var(--border-hover)] transition-all duration-300 shadow-lg hover:shadow-xl`}>
+      <div className={`group relative bg-gradient-to-br ${safeCard.gradient || 'from-blue-600/20 dark:to-purple-900/10'} rounded-2xl p-5 border border-[var(--border-subtle)] hover:border-[var(--border-hover)] transition-all duration-300 shadow-lg hover:shadow-xl`}>
         <div className="flex items-start gap-3 mb-3">
           <div className="text-2xl leading-none mt-0.5">{emoji}</div>
           <div className="flex-1 min-w-0">

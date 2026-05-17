@@ -19,7 +19,7 @@ export function PlayerPropCard({ data, category, gradient, onAnalyze, isHero }: 
         'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_20px_rgba(59,130,246,0.08)] transition-all duration-300',
         isHero && 'sm:rounded-3xl',
       )}>
-        <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-blue-600/20 via-indigo-800/8 to-transparent border-b border-[var(--border-subtle)]">
+        <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-blue-600/20 dark:via-indigo-800/8 to-transparent border-b border-[var(--border-subtle)]">
           <span className="text-[9px] font-black uppercase tracking-widest text-white/40 block mb-2">{category} · Player Props</span>
           {data.description && (
             <p className="text-sm font-bold text-white leading-snug">{data.description}</p>
@@ -69,7 +69,7 @@ export function PlayerPropCard({ data, category, gradient, onAnalyze, isHero }: 
     )}>
 
       {/* ── Header ── */}
-      <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-blue-600/25 via-indigo-800/10 to-transparent border-b border-[var(--border-subtle)]">
+      <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-blue-600/25 dark:via-indigo-800/10 to-transparent border-b border-[var(--border-subtle)]">
         {/* Live badge top-right */}
         <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-blue-500/20 border border-blue-500/30">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />

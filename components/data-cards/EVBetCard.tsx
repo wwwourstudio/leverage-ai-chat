@@ -56,9 +56,9 @@ export function EVBetCard({
     : 'text-red-400';
 
   const evBgClass =
-    evRaw >= 5  ? 'from-emerald-600/25 via-cyan-800/10 to-transparent'
-    : evRaw > 0 ? 'from-sky-600/20 via-cyan-800/8 to-transparent'
-    : 'from-red-600/15 via-slate-800/5 to-transparent';
+    evRaw >= 5  ? 'from-emerald-600/25 dark:via-cyan-800/10 to-transparent'
+    : evRaw > 0 ? 'from-sky-600/20 dark:via-cyan-800/8 to-transparent'
+    : 'from-red-600/15 dark:via-slate-800/5 to-transparent';
 
   const modelPct   = data.modelProbability   !== undefined ? Number(data.modelProbability)   * 100 : null;
   const impliedPct = data.impliedProbability !== undefined ? Number(data.impliedProbability) * 100 : null;

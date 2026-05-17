@@ -30,9 +30,9 @@ interface BullpenFatigueCardProps {
 }
 
 const RISK_CONFIG = {
-  low:      { bar: 'bg-emerald-500', badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', header: 'from-emerald-900/30 via-green-900/10',    icon: 'text-emerald-400' },
-  moderate: { bar: 'bg-amber-500',   badge: 'bg-amber-500/15 border-amber-500/40 text-amber-300',       header: 'from-amber-900/30 via-orange-900/10',   icon: 'text-amber-400'   },
-  high:     { bar: 'bg-red-500',     badge: 'bg-red-500/15 border-red-500/40 text-red-400',             header: 'from-red-900/35 via-orange-900/15',     icon: 'text-red-400'     },
+  low:      { bar: 'bg-emerald-500', badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', header: 'dark:from-emerald-900/30 dark:via-green-900/10',    icon: 'text-emerald-400' },
+  moderate: { bar: 'bg-amber-500',   badge: 'bg-amber-500/15 border-amber-500/40 text-amber-300',       header: 'dark:from-amber-900/30 dark:via-orange-900/10',   icon: 'text-amber-400'   },
+  high:     { bar: 'bg-red-500',     badge: 'bg-red-500/15 border-red-500/40 text-red-400',             header: 'dark:from-red-900/35 dark:via-orange-900/15',     icon: 'text-red-400'     },
 };
 
 export function BullpenFatigueCard({

@@ -34,9 +34,9 @@ interface VPECardProps {
 }
 
 function roleGradientBg(role?: string): string {
-  if (role === 'Pitcher') return 'from-violet-600/25 via-purple-800/10 to-transparent';
-  if (role === 'Team') return 'from-blue-600/25 via-cyan-800/10 to-transparent';
-  return 'from-violet-600/25 via-indigo-800/10 to-transparent';
+  if (role === 'Pitcher') return 'from-violet-600/25 dark:via-purple-800/10 to-transparent';
+  if (role === 'Team') return 'from-blue-600/25 dark:via-cyan-800/10 to-transparent';
+  return 'from-violet-600/25 dark:via-indigo-800/10 to-transparent';
 }
 
 function roleBadgeStyle(role?: string): string {

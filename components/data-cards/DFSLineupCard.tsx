@@ -119,7 +119,7 @@ export function DFSLineupCard({ lineup, totalProjected, site = 'DK', onAsk }: DF
     <article className="group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_24px_oklch(0.72_0.20_80/0.12)] transition-all duration-300">
 
       {/* ── Header ───────────────────────────────────────────────────── */}
-      <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-[var(--cat-dfs,oklch(0.72_0.20_80))]/20 via-amber-900/5 to-transparent border-b border-[var(--border-subtle)]">
+      <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-[var(--cat-dfs,oklch(0.72_0.20_80))]/20 dark:via-amber-900/5 to-transparent border-b border-[var(--border-subtle)]">
         <div className="absolute top-0 right-0 w-40 h-20 bg-[var(--cat-dfs,oklch(0.72_0.20_80))]/5 rounded-bl-full blur-3xl pointer-events-none" />
 
         {/* Breadcrumb + platform */}

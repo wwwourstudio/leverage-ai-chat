@@ -45,27 +45,27 @@ function getTier(player: PlayerResult): { label: string; style: string; gradient
     return {
       label: 'VALUE',
       style: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300',
-      gradient: 'from-emerald-600/25 via-emerald-800/10 to-transparent',
+      gradient: 'from-emerald-600/25 dark:via-emerald-800/10 to-transparent',
     };
   }
   if (adp <= 24) {
     return {
       label: 'ELITE',
       style: 'bg-amber-500/15 border-amber-500/30 text-amber-300',
-      gradient: 'from-amber-600/25 via-orange-800/10 to-transparent',
+      gradient: 'from-amber-600/25 dark:via-orange-800/10 to-transparent',
     };
   }
   if (adp <= 75) {
     return {
       label: 'TOP',
       style: 'bg-blue-500/15 border-blue-500/30 text-blue-300',
-      gradient: 'from-blue-600/25 via-blue-800/10 to-transparent',
+      gradient: 'from-blue-600/25 dark:via-blue-800/10 to-transparent',
     };
   }
   return {
     label: 'ROSTER',
     style: 'bg-slate-500/10 border-slate-500/25 text-slate-400',
-    gradient: 'from-slate-600/20 via-slate-800/10 to-transparent',
+    gradient: 'from-slate-600/20 dark:via-slate-800/10 to-transparent',
   };
 }
 

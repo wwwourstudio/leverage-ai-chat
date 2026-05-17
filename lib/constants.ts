@@ -342,6 +342,8 @@ export const CARD_TYPES = {
   ODDS_EVENT:             'odds_event',
   DFS_LINEUP_CARD:        'dfs_lineup',
   BETTING_INSIGHT:        'betting-insight',
+  DFS_STACK:              'dfs-stack',
+  ADP_UPLOAD:             'adp-upload',
 } as const;
 
 // Card Status Values
@@ -357,6 +359,7 @@ export const CARD_STATUS = {
   ALERT: 'alert',
   FAVORABLE: 'favorable',
   NEUTRAL: 'neutral',
+  LIVE: 'live',
 } as const;
 
 // Source Types

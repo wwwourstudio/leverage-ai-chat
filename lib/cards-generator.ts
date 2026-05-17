@@ -1108,7 +1108,7 @@ async function buildVPECards(limit: number): Promise<InsightCard[]> {
 function buildKalshiUnavailableCards(_count: number): any[] {
   return [
     {
-      type: 'kalshi-market',
+      type: CARD_TYPES.KALSHI_MARKET,
       title: 'Kalshi Markets Temporarily Unavailable',
       icon: 'AlertTriangle',
       category: 'KALSHI',
@@ -1239,6 +1239,17 @@ function buildKalshiNoMarketsCards(): any[] {
   ];
 }
 
+/** Normalise a raw card array into fully-stamped CardData objects.
+ *  Called at every return path so no card ever escapes without an id/status/data. */
+function stampCards(raw: InsightCard[], category?: string, sport?: string): CardData[] {
+  return raw.map((c, i) => ({
+    ...c,
+    id: c.id ?? cardId(c.type, c.category, c.title, String(i)),
+    status: c.status ?? 'neutral',
+    data: (c.data ?? {}) as Record<string, any>,
+  }));
+}
+
 /**
  * Generate contextual cards based on category and sport
  * @param category - Type of analysis (betting, kalshi, dfs, fantasy)
@@ -1255,7 +1266,7 @@ async function _generateContextualCards(
   multiSport: boolean = !sport && (!category || category === 'betting'),
   kalshiSubcategory?: string,
   options?: { playerName?: string; userContext?: string; draftGroupId?: number }
-): Promise<InsightCard[]> {
+): Promise<CardData[]> {
   const userContext = options?.userContext;
   const draftGroupId = options?.draftGroupId;
   // Skip the card-level cache for props — the underlying prop data has its own
@@ -1268,7 +1279,7 @@ async function _generateContextualCards(
     const cached = getCachedCards(category, sport, count, userContext);
     if (cached && cached.length > 0) {
       logger.debug(LogCategory.CACHE, 'cards_cache_hit', { metadata: { count: cached.length, category, sport } });
-      return cached;
+      return stampCards(cached);
     }
   }
 
@@ -1322,10 +1333,10 @@ async function _generateContextualCards(
   // Player-specific query — fetch live Statcast data for the named player
   if (category === 'player') {
     const playerName = options?.playerName;
-    const cards = await buildPlayerCards(playerName, sport);
-    if (cards.length > 0) return cards;
+    const playerCards = await buildPlayerCards(playerName, sport);
+    if (playerCards.length > 0) return stampCards(playerCards);
     // Fallback to VPE overview if player not found
-    return buildVPECards(count);
+    return stampCards(await buildVPECards(count));
   }
 
   // If multiSport requested, generate variety from ALL major sports with REAL data
@@ -2688,13 +2699,13 @@ async function _generateContextualCards(
               })),
             }));
             cards.push({
-              type: 'dfs-games',
+              type: CARD_TYPES.DFS_GAMES,
               title: `Today's DFS Slates`,
               icon: 'Calendar',
               category: 'DFS',
               subcategory: `${dfsSlates.length} slate${dfsSlates.length !== 1 ? 's' : ''} · ${dfsGames.length} game${dfsGames.length !== 1 ? 's' : ''}`,
               gradient: 'from-blue-700 to-indigo-700',
-              status: 'live',
+              status: CARD_STATUS.LIVE,
               realData: true,
               data: { slates: dfsSlates, selectedDraftGroupId: null, sport: normalizedSport.includes('basketball') ? 'nba' : normalizedSport.includes('football') ? 'nfl' : normalizedSport.includes('hockey') ? 'nhl' : 'mlb' },
               metadata: { realData: true, source: 'The Odds API' },
@@ -2955,7 +2966,7 @@ async function _generateContextualCards(
   if (category === 'dfs') {
     if (cards.length === 0) {
       cards.push({
-        type: 'dfs-stack',
+        type: CARD_TYPES.DFS_STACK,
         title: 'DFS Strategy',
         icon: 'Award',
         category: displaySport,
@@ -3070,7 +3081,7 @@ async function _generateContextualCards(
         const { enrichCardsWithWeather } = await import('@/lib/weather/index');
         const enrichedCards = await enrichCardsWithWeather(cards);
         console.log('[v0] [CARDS GENERATOR] Weather enrichment complete:', enrichedCards.length - cards.length, 'weather cards added');
-        return enrichedCards.slice(0, count + 1); // Allow 1 extra for weather card
+        return stampCards(enrichedCards.slice(0, count + 1)); // Allow 1 extra for weather card
       } catch (error) {
         console.error('[v0] [CARDS GENERATOR] Weather enrichment failed:', error);
         // Fall through to return original cards
@@ -3078,15 +3089,7 @@ async function _generateContextualCards(
     }
   }
 
-  // Assign stable deterministic IDs and normalise required fields before returning.
-  // Ensures every card conforms to CardData: status is always a string, data is always an object.
-  const final = cards.slice(0, count);
-  const stamped: CardData[] = final.map((c, i) => ({
-    ...c,
-    id: c.id ?? cardId(c.type, c.category, c.title, String(i)),
-    status: c.status ?? 'neutral',
-    data: (c.data ?? {}) as Record<string, any>,
-  }));
+  const stamped = stampCards(cards.slice(0, count));
   logger.info(LogCategory.API, 'cards_generated', { metadata: { count: stamped.length, sport, category, multiSport } });
   return stamped;
 }

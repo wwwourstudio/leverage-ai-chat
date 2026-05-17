@@ -54,7 +54,7 @@ function ToolTimeline({ events, isStreaming }: { events: Array<{ name: string; s
         <Wrench className="w-3 h-3" />
         <span>{events.length} tool{events.length !== 1 ? 's' : ''} called</span>
         {isStreaming && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse ml-0.5" />}
-        <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-3 h-3 transition-transform duration-200 ease-out ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
         <div className="mt-1.5 pl-4 border-l border-white/10 space-y-1">
@@ -451,13 +451,13 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onEdit, on
         )}>
           {/* Error / partial accent strip */}
           {!isUser && message.isError && (
-            <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl msg-accent-error" />
+            <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl msg-accent-error animate-accent-slide" />
           )}
           {!isUser && message.isPartial && (
-            <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl msg-accent-partial" />
+            <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl msg-accent-partial animate-accent-slide" />
           )}
           {!isUser && !message.isError && !message.isPartial && !message.isPending && !message.isStreaming && (
-            <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl msg-accent-complete" />
+            <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl msg-accent-complete animate-accent-slide" />
           )}
           {/* ── Loading skeleton — shown while pending OR while first tokens arrive ── */}
           {!isUser && (message.isPending || (message.isStreaming && !message.content?.trim())) && (

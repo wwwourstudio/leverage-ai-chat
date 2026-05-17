@@ -287,12 +287,12 @@ export function DynamicCardRenderer({
   // Pass skipBookmark=true for card types that have their own save/watch mechanism.
   function withOverlays(el: React.ReactElement, skipBookmark = false): React.ReactElement {
     return (
-      <div className="relative group/card animate-card-enter">
+      <div className="relative group/card animate-card-enter" style={{ animationDelay: `${Math.min((index ?? 0) * 60, 300)}ms` }}>
         {el}
 
         {/* Top-left: LIVE pulse for confirmed real-time data */}
         {isLive && (
-          <span className="absolute top-2 left-2 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-sm pointer-events-none">
+          <span className="absolute top-2 left-2 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-sm pointer-events-none animate-badge-pop">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-[8px] font-bold text-emerald-400 uppercase tracking-wider">Live</span>
           </span>
@@ -303,7 +303,7 @@ export function DynamicCardRenderer({
           <div className={`flex items-center gap-1 transition-opacity duration-150 pointer-events-auto ${isBookmarked ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100'}`}>
             <button
               onClick={shareCard}
-              className="p-1 rounded-md transition-all duration-150 hover:bg-[var(--bg-elevated)]"
+              className="p-1 rounded-md transition-all duration-150 hover:bg-[var(--bg-elevated)] hover:scale-110 active:scale-90"
               aria-label="Copy card to clipboard"
             >
               {isShared
@@ -314,7 +314,7 @@ export function DynamicCardRenderer({
             {!skipBookmark && (
               <button
                 onClick={toggleBookmark}
-                className={`p-1 rounded-md transition-all duration-150 hover:bg-[var(--bg-elevated)] ${isBookmarked ? 'bg-blue-500/10' : ''}`}
+                className={`p-1 rounded-md transition-all duration-150 hover:bg-[var(--bg-elevated)] hover:scale-110 active:scale-90 ${isBookmarked ? 'bg-blue-500/10' : ''}`}
                 aria-label={isBookmarked ? 'Unpin card' : 'Pin card'}
               >
                 <Pin className={`w-3.5 h-3.5 transition-colors ${isBookmarked ? 'fill-blue-500 text-blue-500' : 'text-[var(--text-faint)]'}`} />
@@ -322,7 +322,7 @@ export function DynamicCardRenderer({
             )}
           </div>
           {isEstimated && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold backdrop-blur-sm pointer-events-none" role="note" aria-label="Estimated data">
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold backdrop-blur-sm pointer-events-none animate-badge-pop animate-delay-150" role="note" aria-label="Estimated data">
               <FlaskConical className="w-3 h-3" aria-hidden="true" />
               Estimated
             </span>

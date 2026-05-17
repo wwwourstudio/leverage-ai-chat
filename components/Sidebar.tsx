@@ -164,7 +164,7 @@ const ChatCard = memo(function ChatCard({
         tagAccentClass(chat.tags),
         isActive
           ? 'bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10 border border-blue-500/30 shadow-lg shadow-blue-500/10'
-          : 'bg-[var(--bg-overlay)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] hover:border-[var(--border-subtle)]',
+          : 'bg-[var(--bg-overlay)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] hover:border-[var(--border-subtle)] hover:-translate-y-px hover:shadow-md',
       )}
     >
       {isActive && (
@@ -235,7 +235,7 @@ const ChatCard = memo(function ChatCard({
           <button
             onClick={(e: any) => onStarChat(chat.id, e)}
             className={cn(
-              'p-1 rounded-md hover:bg-[var(--bg-elevated)] transition-all',
+              'p-1 rounded-md hover:bg-[var(--bg-elevated)] transition-all hover:scale-110 active:scale-90',
               chat.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
             )}
             title={chat.starred ? 'Unstar' : 'Star'} aria-label={chat.starred ? 'Unstar chat' : 'Star chat'}
@@ -247,7 +247,7 @@ const ChatCard = memo(function ChatCard({
           </button>
           <button
             onClick={(e: any) => onDeleteChat(chat.id, e)}
-            className="p-1 rounded-md hover:bg-[var(--bg-elevated)] opacity-0 group-hover:opacity-100 transition-all"
+            className="p-1 rounded-md hover:bg-[var(--bg-elevated)] opacity-0 group-hover:opacity-100 transition-all hover:scale-110 active:scale-90"
             title="Delete" aria-label="Delete chat"
           >
             <Trash2 className="w-3 h-3 text-[var(--text-faint)] hover:text-red-400 transition-colors" />

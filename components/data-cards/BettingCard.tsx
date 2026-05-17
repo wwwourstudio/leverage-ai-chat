@@ -343,7 +343,8 @@ export const BettingCard = memo(function BettingCard({
         {/* Tab bar */}
         <TabBar activeTab={activeTab} onSelect={setActiveTab} accentCls={theme.avatarCls} />
 
-        {/* Tab content */}
+        {/* Tab content — keyed div triggers re-mount animation on each tab switch */}
+        <div key={activeTab} className="animate-tab-enter">
         {activeTab === 0 && (
           <TabOdds
             data={data}
@@ -418,6 +419,7 @@ export const BettingCard = memo(function BettingCard({
             onAsk={onAsk}
           />
         )}
+        </div>{/* end animate-tab-enter */}
 
         {/* Footer */}
         <div className="pt-2 border-t border-[var(--border-subtle)] space-y-2">

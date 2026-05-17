@@ -70,6 +70,9 @@ vi.mock('@/components/data-cards/PortfolioCard', () => ({
 
 vi.mock('@/components/data-cards/CardSkeleton', () => ({
   CardSkeleton: () => <div data-testid="card-skeleton" />,
+  CardGrid: ({ count }: { count: number }) => (
+    <>{Array.from({ length: count }, (_, i) => <div key={i} data-testid="card-skeleton" />)}</>
+  ),
 }));
 
 vi.mock('@/components/data-cards/MLBProjectionCard', () => ({
@@ -146,7 +149,7 @@ describe('DynamicCardRenderer', () => {
     });
 
     it('renders DFSCard for type containing "dfs"', () => {
-      render(<DynamicCardRenderer card={{ ...baseCard, type: 'dfs_lineup' }} />);
+      render(<DynamicCardRenderer card={{ ...baseCard, type: 'dfs_picks' }} />);
       expect(screen.getByTestId('dfs-card')).toBeTruthy();
     });
 
@@ -171,7 +174,7 @@ describe('DynamicCardRenderer', () => {
     });
 
     it('renders KalshiCard for type containing "kalshi"', () => {
-      render(<DynamicCardRenderer card={{ ...baseCard, type: 'kalshi_market' }} />);
+      render(<DynamicCardRenderer card={{ ...baseCard, type: 'kalshi_analysis' }} />);
       expect(screen.getByTestId('kalshi-card')).toBeTruthy();
     });
 

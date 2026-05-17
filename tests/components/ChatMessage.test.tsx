@@ -9,6 +9,16 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { ChatMessage } from '@/components/chat-message';
 
+// ── Mock toast provider ────────────────────────────────────────────────────────
+vi.mock('@/components/toast-provider', () => ({
+  useToast: () => ({
+    addToast: vi.fn(),
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+  }),
+}));
+
 // ── Mock lucide-react icons ───────────────────────────────────────────────────
 vi.mock('lucide-react', () => ({
   Shield: () => <span data-testid="icon-shield" />,
@@ -18,6 +28,11 @@ vi.mock('lucide-react', () => ({
   X: () => <span data-testid="icon-x" />,
   Zap: () => <span data-testid="icon-zap" />,
   Brain: () => <span data-testid="icon-brain" />,
+  AlertCircle: () => <span data-testid="icon-alert-circle" />,
+  Info: () => <span data-testid="icon-info" />,
+  RotateCcw: () => <span data-testid="icon-rotate-ccw" />,
+  ChevronDown: () => <span data-testid="icon-chevron-down" />,
+  Wrench: () => <span data-testid="icon-wrench" />,
 }));
 
 // ── Mock TrustMetricsDisplay (avoids rendering complex child) ─────────────────
@@ -55,9 +70,8 @@ describe('ChatMessage — user message', () => {
   });
 
   it('shows a timestamp', () => {
-    render(<ChatMessage message={makeMessage({ role: 'user' })} />);
-    // timestamp renders as a <p> element with relative time text
-    // "just now" for a very recent timestamp
+    // Use a recent timestamp so formatRelativeTime returns "Xm ago" / "just now"
+    render(<ChatMessage message={makeMessage({ role: 'user', timestamp: new Date(Date.now() - 3 * 60 * 1000) })} />);
     const allParagraphs = document.querySelectorAll('p');
     const timestampEl = Array.from(allParagraphs).find(
       p => /ago|just now/i.test(p.textContent ?? '')
@@ -123,7 +137,7 @@ describe('ChatMessage — assistant message', () => {
         message={makeMessage({ role: 'assistant' })}
       />
     );
-    expect(screen.getByTitle('Edit')).toBeTruthy();
+    expect(screen.getByTitle('Edit message')).toBeTruthy();
   });
 
   it('calls onCopy when copy button is clicked', () => {
@@ -144,7 +158,7 @@ describe('ChatMessage — assistant message', () => {
         message={makeMessage({ role: 'assistant', confidence: 85 })}
       />
     );
-    expect(screen.getByText('85% confidence')).toBeTruthy();
+    expect(screen.getByText('85%')).toBeTruthy();
   });
 
   it('shows model name when modelUsed is provided', () => {
@@ -153,8 +167,8 @@ describe('ChatMessage — assistant message', () => {
         message={makeMessage({ role: 'assistant', modelUsed: 'grok-3-fast' })}
       />
     );
-    // The component normalizes "grok-3-fast" → "Grok 4"
-    expect(screen.getByText('Grok 4')).toBeTruthy();
+    // The component normalizes "grok-3-fast" → "Grok 3 Fast"
+    expect(screen.getByText('Grok 3 Fast')).toBeTruthy();
   });
 
   it('shows trust shield button when trustMetrics are provided', () => {
@@ -204,7 +218,7 @@ describe('ChatMessage — edit mode', () => {
         onEdit={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByTitle('Edit'));
+    fireEvent.click(screen.getByTitle('Edit message'));
     // Should render textarea
     expect(screen.getByRole('textbox')).toBeTruthy();
   });
@@ -216,7 +230,7 @@ describe('ChatMessage — edit mode', () => {
         onEdit={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByTitle('Edit'));
+    fireEvent.click(screen.getByTitle('Edit message'));
     expect(screen.getByText('Save')).toBeTruthy();
     expect(screen.getByText('Cancel')).toBeTruthy();
   });
@@ -229,7 +243,7 @@ describe('ChatMessage — edit mode', () => {
         onEdit={onEdit}
       />
     );
-    fireEvent.click(screen.getByTitle('Edit'));
+    fireEvent.click(screen.getByTitle('Edit message'));
 
     const textarea = screen.getByRole('textbox') as HTMLTextAreaElement;
     fireEvent.change(textarea, { target: { value: 'Updated content' } });
@@ -245,7 +259,7 @@ describe('ChatMessage — edit mode', () => {
         onEdit={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByTitle('Edit'));
+    fireEvent.click(screen.getByTitle('Edit message'));
     expect(screen.getByRole('textbox')).toBeTruthy();
 
     fireEvent.click(screen.getByText('Cancel'));

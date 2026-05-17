@@ -80,7 +80,9 @@ const PATTERN_STD_REGISTRY: Array<{ test: (t: string) => boolean; Component: Rea
   { test: t => t.includes('kalshi') || t.includes('prediction'),                                                                      Component: KalshiCard },
   { test: t => t.includes('weather') || t.includes('climate'),                                                                        Component: WeatherCard },
   { test: t => t === 'adp-analysis' || t.includes('adp'),                                                                             Component: ADPCard },
-  { test: t => t.includes('arbitrage'),                                                                                               Component: ArbitrageCard },
+  // Note: 'arbitrage' is NOT listed here — the pre-registry catches all arbitrage
+  // types (arbitrage_opp → ArbitrageOpportunityCard, *arbitrage* → ArbitrageCard)
+  // before this table is ever reached. An entry here would be dead code.
   { test: t => t.includes('odds') || t.includes('betting') || t.includes('moneyline') || t.includes('spread') || t.includes('totals'), Component: BettingCard },
 ];
 
@@ -165,7 +167,7 @@ export function DynamicCardRenderer({
   // Statcast-type cards store their metrics at the top level (summary_metrics, lightbox),
   // not inside the data object — skip the empty-data check for them.
   const isStatcastType = STATS_CARD_TYPES.has(card.type) || card.type?.includes('statcast') || card.type?.includes('simulation');
-  const hasTopLevelMetrics = isStatcastType && Array.isArray((card as unknown as Record<string, unknown>).summary_metrics);
+  const hasTopLevelMetrics = isStatcastType && Array.isArray(card.summary_metrics);
   if (meaningfulKeys.length === 0 && !hasTopLevelMetrics) {
     if (safeCard.realData === false) {
       // Simulated/fallback card with no data — safe to suppress
@@ -443,6 +445,9 @@ export function DynamicCardRenderer({
   if (cardType in EXACT_STD_REGISTRY) return renderStd(EXACT_STD_REGISTRY[cardType]);
   for (const { test, Component } of PATTERN_STD_REGISTRY) {
     if (test(cardType)) return renderStd(Component);
+  }
+  if (process.env.NODE_ENV === 'development') {
+    console.warn(`[DynamicCardRenderer] Unknown card type "${safeCard.type}" — falling back to BettingCard. Add it to CARD_TYPES and the dispatch chain.`);
   }
   return renderStd(BettingCard);
 }

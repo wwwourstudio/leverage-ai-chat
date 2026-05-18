@@ -143,8 +143,8 @@ export function DraftRoom({
             className={cn(
               'flex-1 py-2.5 text-xs font-bold transition-colors',
               mobileTab === tab.id
-                ? 'bg-[var(--bg-surface)] text-white'
-                : 'text-[var(--text-muted)] hover:text-white hover:bg-[var(--bg-elevated)]',
+                ? 'bg-[var(--bg-surface)] text-[var(--foreground)]'
+                : 'text-[var(--text-muted)] hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)]',
             )}
           >
             {tab.label}

@@ -130,10 +130,10 @@ export const DFSSlateCard = memo(function DFSSlateCard({ title, data, onAnalyze,
 
         {/* Breadcrumb + platform badge */}
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5 text-white/60">
+          <div className="flex items-center gap-1.5 text-[var(--foreground)]/60">
             <Users className="w-3 h-3" />
             <span className="text-[9px] font-black uppercase tracking-widest">DFS</span>
-            <span className="text-white/30">·</span>
+            <span className="text-[var(--foreground)]/30">·</span>
             <span className="text-[9px]">Optimal Lineup</span>
           </div>
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[var(--cat-dfs,oklch(0.72_0.20_80))]/15 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 text-[var(--cat-dfs,oklch(0.72_0.20_80))] text-[9px] font-black uppercase tracking-wider">
@@ -141,7 +141,7 @@ export const DFSSlateCard = memo(function DFSSlateCard({ title, data, onAnalyze,
           </span>
         </div>
 
-        <h3 className={cn('font-black text-white leading-snug', isHero ? 'text-lg' : 'text-sm')}>{title}</h3>
+        <h3 className={cn('font-black text-[var(--foreground)] leading-snug', isHero ? 'text-lg' : 'text-sm')}>{title}</h3>
 
         {/* Hero stats row */}
         <div className="mt-2.5 flex flex-wrap gap-2 items-center">
@@ -212,8 +212,8 @@ export const DFSSlateCard = memo(function DFSSlateCard({ title, data, onAnalyze,
                 {/* Name + team + ownership bar */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-black text-white text-[12px] truncate">{p.player}</span>
-                    <span className="text-[10px] font-bold text-white/40 shrink-0">{p.team}</span>
+                    <span className="font-black text-[var(--foreground)] text-[12px] truncate">{p.player}</span>
+                    <span className="text-[10px] font-bold text-[var(--foreground)]/40 shrink-0">{p.team}</span>
                     {p.confirmedStarter && (
                       <span className="shrink-0 w-2 h-2 rounded-full bg-emerald-400" title="Confirmed starter" />
                     )}
@@ -277,7 +277,7 @@ export const DFSSlateCard = memo(function DFSSlateCard({ title, data, onAnalyze,
         <div className="px-4 pb-4">
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-gradient-to-r from-[var(--cat-dfs,oklch(0.72_0.20_80))]/20 to-amber-600/20 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 text-xs font-bold text-[var(--cat-dfs,oklch(0.72_0.20_80))] hover:from-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 hover:text-white hover:border-[var(--cat-dfs,oklch(0.72_0.20_80))]/50 transition-all duration-150"
+            className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-gradient-to-r from-[var(--cat-dfs,oklch(0.72_0.20_80))]/20 to-amber-600/20 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 text-xs font-bold text-[var(--cat-dfs,oklch(0.72_0.20_80))] hover:from-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 hover:text-[var(--foreground)] hover:border-[var(--cat-dfs,oklch(0.72_0.20_80))]/50 transition-all duration-150"
           >
             <TrendingUp className="w-3.5 h-3.5" />
             View Full DFS Analysis

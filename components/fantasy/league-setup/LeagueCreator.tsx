@@ -709,7 +709,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
               <span className="text-xs font-bold text-foreground/80">{pos}</span>
               <div className="flex items-center gap-1.5">
                 <button
-                  className="w-5 h-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-white hover:bg-[var(--bg-surface)] transition-colors text-sm font-bold"
+                  className="w-5 h-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--foreground)] hover:bg-[var(--bg-surface)] transition-colors text-sm font-bold"
                   onClick={() => {
                     const slots = { ...form.rosterSlots };
                     slots[pos] = Math.max(0, count - 1);
@@ -718,7 +718,7 @@ export function LeagueCreator({ onCreateLeague, isLoading }: LeagueCreatorProps)
                 >−</button>
                 <span className="w-4 text-center text-xs font-black text-foreground">{count}</span>
                 <button
-                  className="w-5 h-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-white hover:bg-[var(--bg-surface)] transition-colors text-sm font-bold"
+                  className="w-5 h-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--foreground)] hover:bg-[var(--bg-surface)] transition-colors text-sm font-bold"
                   onClick={() => {
                     const slots = { ...form.rosterSlots };
                     slots[pos] = count + 1;

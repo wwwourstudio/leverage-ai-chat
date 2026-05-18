@@ -439,13 +439,13 @@ export function WeatherCard({
 
         {/* Breadcrumb */}
         <div className="flex items-center gap-1.5 mb-2">
-          <ConditionIcon className="w-3 h-3 text-white/60" />
-          <span className="text-[9px] font-black uppercase tracking-widest text-white/70">{category}</span>
-          <span className="text-white/30">·</span>
-          <span className="text-[9px] text-white/50 truncate">{subcategory}</span>
+          <ConditionIcon className="w-3 h-3 text-[var(--foreground)]/60" />
+          <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/70">{category}</span>
+          <span className="text-[var(--foreground)]/30">·</span>
+          <span className="text-[9px] text-[var(--foreground)]/50 truncate">{subcategory}</span>
         </div>
 
-        <h3 className={cn('font-black text-white leading-snug text-balance', isHero ? 'text-lg' : 'text-sm')}>
+        <h3 className={cn('font-black text-[var(--foreground)] leading-snug text-balance', isHero ? 'text-lg' : 'text-sm')}>
           {title}
         </h3>
 
@@ -453,13 +453,13 @@ export function WeatherCard({
         {(venueDisplay || data.location || gameTimeDisplay) && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5">
             {(venueDisplay ?? data.location) && (
-              <span className="flex items-center gap-1 text-[10px] text-white/60">
+              <span className="flex items-center gap-1 text-[10px] text-[var(--foreground)]/60">
                 <MapPin className="w-2.5 h-2.5 shrink-0" />
                 <span className="line-clamp-1">{venueDisplay ?? data.location}</span>
               </span>
             )}
             {gameTimeDisplay && (
-              <span className="flex items-center gap-1 text-[10px] text-white/60">
+              <span className="flex items-center gap-1 text-[10px] text-[var(--foreground)]/60">
                 <Clock className="w-2.5 h-2.5 shrink-0" />
                 <span>{gameTimeDisplay}</span>
               </span>
@@ -474,16 +474,16 @@ export function WeatherCard({
           </span>
           {!isNaN(tempNum) && (
             <div>
-              <span className="text-4xl font-black text-white tabular-nums leading-none">
+              <span className="text-4xl font-black text-[var(--foreground)] tabular-nums leading-none">
                 {Math.round(tempNum)}°F
               </span>
               {condition && (
-                <p className="text-sm text-white/70 mt-0.5">{condition}</p>
+                <p className="text-sm text-[var(--foreground)]/70 mt-0.5">{condition}</p>
               )}
             </div>
           )}
           {isNaN(tempNum) && condition && (
-            <span className="text-base text-white/70 mb-1">{condition}</span>
+            <span className="text-base text-[var(--foreground)]/70 mb-1">{condition}</span>
           )}
         </div>
       </div>

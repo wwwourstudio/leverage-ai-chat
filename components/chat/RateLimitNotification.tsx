@@ -23,7 +23,7 @@ export function RateLimitNotification({ visible, resetTimeMs, onDismiss }: RateL
               <AlertCircle className="w-5 h-5 text-orange-400" />
             </div>
             <div className="flex-1">
-              <h3 className="text-sm font-bold text-white mb-1">
+              <h3 className="text-sm font-bold text-[var(--foreground)] mb-1">
                 Chat Limit Reached
               </h3>
               <p className="text-xs text-[var(--text-muted)] leading-relaxed" suppressHydrationWarning>

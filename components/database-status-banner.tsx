@@ -125,7 +125,7 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
                     <p className="mb-2">Quick setup (2 minutes):</p>
                     <ol className="list-decimal list-inside space-y-1 opacity-80">
                       <li>Open Supabase SQL Editor</li>
-                      <li>Copy contents from <code className="bg-black/30 px-1.5 py-0.5 rounded">/scripts/setup-database.sql</code></li>
+                      <li>Copy contents from <code className="bg-[var(--bg-elevated)] px-1.5 py-0.5 rounded">/scripts/setup-database.sql</code></li>
                       <li>Paste and run in SQL Editor</li>
                       <li>Refresh this page</li>
                     </ol>
@@ -168,7 +168,7 @@ export function DatabaseStatusBanner({ onDismiss }: DatabaseStatusBannerProps) {
             
             <button
               onClick={handleDismiss}
-              className="flex-shrink-0 p-1 hover:bg-black/20 rounded-lg transition-colors"
+              className="flex-shrink-0 p-1 hover:bg-[var(--bg-elevated)] rounded-lg transition-colors"
               aria-label="Dismiss"
             >
               <X className="w-4 h-4" />

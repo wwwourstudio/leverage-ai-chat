@@ -105,7 +105,7 @@ export function PlayerCard({
 
       {/* Name + rank info */}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-bold text-white leading-tight">{player.playerName}</p>
+        <p className="truncate text-sm font-bold text-[var(--foreground)] leading-tight">{player.playerName}</p>
         <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-faint)] mt-0.5 flex-wrap">
           <span>#{player.positionRank} {player.position}</span>
           <span className="text-[var(--text-faint)]">·</span>

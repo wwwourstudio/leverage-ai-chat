@@ -124,15 +124,15 @@ export function PitcherFatigueCard({
 
         {/* Sport chip */}
         <div className="flex items-center gap-1.5 mb-2">
-          <Wind className="w-3 h-3 text-white/30" />
-          <span className="text-[9px] font-black uppercase tracking-widest text-white/40">{category} · {subcategory}</span>
+          <Wind className="w-3 h-3 text-[var(--foreground)]/30" />
+          <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/40">{category} · {subcategory}</span>
         </div>
 
         {/* Pitcher name hero */}
         {data.pitcherName && (
-          <h3 className="text-base font-black text-white truncate pr-20 mb-0.5">{data.pitcherName}</h3>
+          <h3 className="text-base font-black text-[var(--foreground)] truncate pr-20 mb-0.5">{data.pitcherName}</h3>
         )}
-        <p className="text-[10px] text-white/40 truncate pr-20">{title}</p>
+        <p className="text-[10px] text-[var(--foreground)]/40 truncate pr-20">{title}</p>
       </div>
 
       <div className="px-4 pb-4 pt-3 space-y-3">
@@ -140,7 +140,7 @@ export function PitcherFatigueCard({
         {/* ── Fatigue multiplier meter ── */}
         <div className="rounded-xl bg-white/3 border border-white/6 p-3 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[9px] font-black uppercase tracking-widest text-white/35">Fatigue Multiplier</span>
+            <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/35">Fatigue Multiplier</span>
             <span className={cn('text-xl font-black tabular-nums', styles.heroText)}>
               {multiplier.toFixed(2)}×
             </span>
@@ -159,7 +159,7 @@ export function PitcherFatigueCard({
               aria-valuemax={100}
             />
           </div>
-          <div className="flex justify-between text-[8px] text-white/25">
+          <div className="flex justify-between text-[8px] text-[var(--foreground)]/25">
             <span>Fresh (0.80)</span>
             <span>At Risk (1.50)</span>
           </div>
@@ -169,16 +169,16 @@ export function PitcherFatigueCard({
         <div className="grid grid-cols-3 gap-2">
           {data.pitchCountLastStart !== undefined && (
             <div className="flex flex-col items-center rounded-xl bg-white/3 border border-white/6 p-2.5 gap-1">
-              <span className="text-[8px] font-black uppercase tracking-widest text-white/30">Last Start</span>
-              <span className={cn('text-lg font-black tabular-nums', isHighCount ? 'text-amber-300' : 'text-white')}>
+              <span className="text-[8px] font-black uppercase tracking-widest text-[var(--foreground)]/30">Last Start</span>
+              <span className={cn('text-lg font-black tabular-nums', isHighCount ? 'text-amber-300' : 'text-[var(--foreground)]')}>
                 {data.pitchCountLastStart}
               </span>
-              <span className="text-[8px] text-white/25">pitches</span>
+              <span className="text-[8px] text-[var(--foreground)]/25">pitches</span>
             </div>
           )}
           {data.daysRest !== undefined && (
             <div className="flex flex-col items-center rounded-xl bg-white/3 border border-white/6 p-2.5 gap-1">
-              <span className="text-[8px] font-black uppercase tracking-widest text-white/30">Days Rest</span>
+              <span className="text-[8px] font-black uppercase tracking-widest text-[var(--foreground)]/30">Days Rest</span>
               <div className={cn('flex items-center gap-1 px-2 py-0.5 rounded-lg border', restChipStyle)}>
                 <Calendar className="w-2.5 h-2.5" />
                 <span className="text-sm font-black tabular-nums">{data.daysRest}d</span>
@@ -187,9 +187,9 @@ export function PitcherFatigueCard({
           )}
           {data.inningsLastStart !== undefined && (
             <div className="flex flex-col items-center rounded-xl bg-white/3 border border-white/6 p-2.5 gap-1">
-              <span className="text-[8px] font-black uppercase tracking-widest text-white/30">Innings</span>
-              <span className="text-lg font-black tabular-nums text-white">{data.inningsLastStart}</span>
-              <span className="text-[8px] text-white/25">IP</span>
+              <span className="text-[8px] font-black uppercase tracking-widest text-[var(--foreground)]/30">Innings</span>
+              <span className="text-lg font-black tabular-nums text-[var(--foreground)]">{data.inningsLastStart}</span>
+              <span className="text-[8px] text-[var(--foreground)]/25">IP</span>
             </div>
           )}
         </div>
@@ -198,8 +198,8 @@ export function PitcherFatigueCard({
         {pitchCount > 0 && (
           <div className="rounded-xl bg-white/3 border border-white/6 px-3 py-2.5 space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-[9px] font-black uppercase tracking-widest text-white/35">Pitch Count vs Typical Start</span>
-              <span className="text-[9px] text-white/40 tabular-nums">{pitchCount} / 100</span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/35">Pitch Count vs Typical Start</span>
+              <span className="text-[9px] text-[var(--foreground)]/40 tabular-nums">{pitchCount} / 100</span>
             </div>
             <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
               <div
@@ -218,7 +218,7 @@ export function PitcherFatigueCard({
                 style={{ left: `${(100 / 120) * 100}%` }}
               />
               <span
-                className="absolute text-[7px] text-white/25"
+                className="absolute text-[7px] text-[var(--foreground)]/25"
                 style={{ left: `${(100 / 120) * 100}%`, transform: 'translateX(-50%)' }}
               >
                 100
@@ -230,8 +230,8 @@ export function PitcherFatigueCard({
         {/* ── 7-day pitches ── */}
         {data.pitchCountLast7Days !== undefined && (
           <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-white/3 border border-white/6">
-            <span className="text-[9px] text-white/40 uppercase tracking-wide">7-Day Pitches</span>
-            <span className="text-sm font-black text-white tabular-nums">{data.pitchCountLast7Days}</span>
+            <span className="text-[9px] text-[var(--foreground)]/40 uppercase tracking-wide">7-Day Pitches</span>
+            <span className="text-sm font-black text-[var(--foreground)] tabular-nums">{data.pitchCountLast7Days}</span>
           </div>
         )}
 
@@ -260,11 +260,11 @@ export function PitcherFatigueCard({
 
         {/* ── Betting impact ── */}
         {data.bettingImpact && (
-          <p className="text-[10px] text-white/50 leading-relaxed">{data.bettingImpact}</p>
+          <p className="text-[10px] text-[var(--foreground)]/50 leading-relaxed">{data.bettingImpact}</p>
         )}
 
         {data.description && (
-          <p className="text-[10px] text-white/35 italic leading-relaxed">{data.description}</p>
+          <p className="text-[10px] text-[var(--foreground)]/35 italic leading-relaxed">{data.description}</p>
         )}
 
         {onAnalyze && (

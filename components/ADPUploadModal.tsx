@@ -69,7 +69,7 @@ export function ADPUploadModal({ sport, onSuccess }: ADPUploadModalProps) {
           <span className="text-[10px] font-bold uppercase tracking-widest text-violet-300/70">
             {sport.toUpperCase()} · ADP Data
           </span>
-          <h3 className="text-sm font-black text-white mt-0.5">Upload {label} ADP</h3>
+          <h3 className="text-sm font-black text-[var(--foreground)] mt-0.5">Upload {label} ADP</h3>
           <p className="text-xs text-[var(--text-muted)] mt-1">
             Download the TSV file from {label}, then upload it here to power AI draft analysis for all users.
           </p>
@@ -80,7 +80,7 @@ export function ADPUploadModal({ sport, onSuccess }: ADPUploadModalProps) {
       </div>
 
       {/* Step 1 — Download link */}
-      <div className="bg-black/20 rounded-lg p-3 mb-3">
+      <div className="bg-[var(--bg-elevated)] rounded-lg p-3 mb-3">
         <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">Step 1 — Download the TSV</p>
         <a
           href={downloadUrl}
@@ -97,7 +97,7 @@ export function ADPUploadModal({ sport, onSuccess }: ADPUploadModalProps) {
       </div>
 
       {/* Step 2 — Upload area */}
-      <div className="bg-black/20 rounded-lg p-3 mb-3">
+      <div className="bg-[var(--bg-elevated)] rounded-lg p-3 mb-3">
         <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Step 2 — Upload the file</p>
 
         {status === 'idle' && (

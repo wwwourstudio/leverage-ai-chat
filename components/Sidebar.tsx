@@ -679,7 +679,7 @@ export function Sidebar({
               }
             </div>
             <div className="flex-1 min-w-0 text-left">
-              <div className="text-xs font-bold text-white truncate">{user.name}</div>
+              <div className="text-xs font-bold text-[var(--foreground)] truncate">{user.name}</div>
               <div className="text-[9px] text-[var(--text-faint)] truncate">{user.email}</div>
             </div>
           </button>

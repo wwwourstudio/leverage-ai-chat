@@ -131,16 +131,16 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
         </div>
 
         {/* Sport chip */}
-        <span className="text-[9px] font-black uppercase tracking-widest text-white/40 block mb-2">
+        <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/40 block mb-2">
           MLB · HR Prediction · v3 Engine
         </span>
 
         {/* Player name hero */}
-        <h3 className="text-base font-black text-white leading-tight pr-20">{data.player}</h3>
+        <h3 className="text-base font-black text-[var(--foreground)] leading-tight pr-20">{data.player}</h3>
 
         {/* Venue / pitcher strip */}
         {(data.pitcherName || data.venue || data.gameTime) && (
-          <p className="text-[10px] text-white/40 mt-1 flex items-center gap-2 flex-wrap">
+          <p className="text-[10px] text-[var(--foreground)]/40 mt-1 flex items-center gap-2 flex-wrap">
             {data.pitcherName && <span>vs {data.pitcherName}</span>}
             {data.venue && <span>· {data.venue}</span>}
             {data.gameTime && <span>· {data.gameTime}</span>}
@@ -180,8 +180,8 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
         {/* Odds column */}
         <div className="flex-1 space-y-2">
           <div>
-            <p className="text-[9px] uppercase tracking-widest text-white/35 mb-0.5">Fair Value Odds</p>
-            <p className="text-3xl font-black text-white tabular-nums" style={{ color: heroColor }}>{fmtOdds(modelOdds)}</p>
+            <p className="text-[9px] uppercase tracking-widest text-[var(--foreground)]/35 mb-0.5">Fair Value Odds</p>
+            <p className="text-3xl font-black text-[var(--foreground)] tabular-nums" style={{ color: heroColor }}>{fmtOdds(modelOdds)}</p>
           </div>
           {kellyRec !== null && (
             <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/25">
@@ -203,23 +203,23 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
             <p className={`text-lg font-black tabular-nums ${edgePositive ? 'text-emerald-300' : 'text-rose-300'}`}>
               {fmtEdge(data.edge)}
             </p>
-            <p className="text-[8px] text-white/30 mt-0.5">mkt: {fmtOdds(data.impliedOdds)}</p>
+            <p className="text-[8px] text-[var(--foreground)]/30 mt-0.5">mkt: {fmtOdds(data.impliedOdds)}</p>
           </div>
         ) : (
-          <div className="shrink-0 text-center px-3 py-2.5 rounded-xl border border-white/8 bg-white/3">
-            <p className="text-[8px] font-black uppercase tracking-wider text-white/30 mb-0.5">MARKET</p>
-            <p className="text-lg font-black tabular-nums text-white/60">{fmtOdds(data.impliedOdds ?? null)}</p>
+          <div className="shrink-0 text-center px-3 py-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]">
+            <p className="text-[8px] font-black uppercase tracking-wider text-[var(--foreground)]/30 mb-0.5">MARKET</p>
+            <p className="text-lg font-black tabular-nums text-[var(--foreground)]/60">{fmtOdds(data.impliedOdds ?? null)}</p>
           </div>
         )}
       </div>
 
       {/* ── Confidence interval range ── */}
-      <div className="px-4 py-3 border-b border-white/5">
+      <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
         <div className="flex justify-between items-center mb-1.5">
-          <span className="text-[9px] font-black uppercase tracking-widest text-white/35">Probability Range</span>
-          <span className="text-[9px] font-bold text-white/50 tabular-nums">{(ciLo * 100).toFixed(1)}% – {(ciHi * 100).toFixed(1)}%</span>
+          <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/35">Probability Range</span>
+          <span className="text-[9px] font-bold text-[var(--foreground)]/50 tabular-nums">{(ciLo * 100).toFixed(1)}% – {(ciHi * 100).toFixed(1)}%</span>
         </div>
-        <div className="relative h-1.5 rounded-full bg-white/5 overflow-hidden">
+        <div className="relative h-1.5 rounded-full bg-[var(--bg-overlay)] overflow-hidden">
           <div
             className="absolute top-0 bottom-0 rounded-full bg-rose-500/50"
             style={{
@@ -228,11 +228,11 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
             }}
           />
           <div
-            className="absolute top-0 bottom-0 w-0.5 bg-white/70 rounded-full"
+            className="absolute top-0 bottom-0 w-0.5 bg-[var(--foreground)]/70 rounded-full"
             style={{ left: `${Math.min(100, (data.probability / CI_MAX) * 100)}%` }}
           />
         </div>
-        <div className="flex justify-between text-[8px] text-white/25 mt-1">
+        <div className="flex justify-between text-[8px] text-[var(--foreground)]/25 mt-1">
           <span>0%</span>
           <span>15%</span>
           <span>30%</span>
@@ -241,7 +241,7 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
 
       {/* ── Component factor bars ── */}
       <div className="px-4 py-3 space-y-2">
-        <p className="text-[9px] font-black uppercase tracking-widest text-white/35 mb-3">Factor Breakdown</p>
+        <p className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/35 mb-3">Factor Breakdown</p>
         {factors.map(f => {
           const [lo, hi] = f.range;
           const pct = Math.max(0, Math.min(100, ((f.value - lo) / (hi - lo)) * 100));
@@ -249,16 +249,16 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
           const barColor = fc?.bar ?? '#94a3b8';
           return (
             <div key={f.label} className="flex items-center gap-3">
-              <span className="text-[9px] font-black uppercase tracking-wider text-white/35 w-20 shrink-0">
+              <span className="text-[9px] font-black uppercase tracking-wider text-[var(--foreground)]/35 w-20 shrink-0">
                 {fc?.label ?? f.label}
               </span>
-              <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div className="flex-1 h-1.5 bg-[var(--bg-overlay)] rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-700"
                   style={{ width: `${pct}%`, background: barColor, boxShadow: `0 0 6px ${barColor}60` }}
                 />
               </div>
-              <span className="text-[10px] font-black text-white/60 w-12 text-right tabular-nums shrink-0">
+              <span className="text-[10px] font-black text-[var(--foreground)]/60 w-12 text-right tabular-nums shrink-0">
                 {f.fmt ? f.fmt(f.value) : f.value.toFixed(3)}
               </span>
             </div>
@@ -281,10 +281,10 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
       )}
 
       {/* ── Footer ── */}
-      <div className="px-4 pb-3 pt-1 flex items-center justify-between border-t border-white/5">
-        <span className="text-[9px] text-white/20">LeverageMetrics v3 · platoon ±1 · pitch mix vuln</span>
+      <div className="px-4 pb-3 pt-1 flex items-center justify-between border-t border-[var(--border-subtle)]">
+        <span className="text-[9px] text-[var(--foreground)]/20">LeverageMetrics v3 · platoon ±1 · pitch mix vuln</span>
         {data.dataSource && (
-          <span className="text-[9px] text-white/20">{data.dataSource === 'statcast_db' ? 'Statcast' : 'MLB API'}</span>
+          <span className="text-[9px] text-[var(--foreground)]/20">{data.dataSource === 'statcast_db' ? 'Statcast' : 'MLB API'}</span>
         )}
       </div>
     </div>

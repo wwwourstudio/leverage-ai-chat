@@ -155,7 +155,7 @@ export function SuggestedPrompts({
                     setPendingWelcomeCategory(null);
                     onCategorySelect?.('all');
                   }}
-                  className="flex items-center gap-1 text-[10px] font-bold text-[var(--text-faint)] hover:text-white transition-colors"
+                  className="flex items-center gap-1 text-[10px] font-bold text-[var(--text-faint)] hover:text-[var(--foreground)] transition-colors"
                 >
                   <ChevronLeft className="w-3 h-3" />
                   Back
@@ -180,7 +180,7 @@ export function SuggestedPrompts({
                     >
                       <div className="flex items-center gap-1.5">
                         <SubIcon className="w-3.5 h-3.5 text-blue-400 group-hover/sub:text-blue-300" />
-                        <span className="text-[11px] sm:text-xs font-bold text-foreground/80 group-hover/sub:text-white">{sub.label}</span>
+                        <span className="text-[11px] sm:text-xs font-bold text-foreground/80 group-hover/sub:text-[var(--foreground)]">{sub.label}</span>
                       </div>
                     </button>
                   );
@@ -222,10 +222,10 @@ export function SuggestedPrompts({
                   clarificationMode
                     ? 'bg-[var(--bg-overlay)] border-amber-500/50 text-amber-200/80 hover:bg-amber-900/20 hover:border-amber-400/70 hover:text-amber-100'
                     : isSuggested
-                      ? 'bg-[var(--bg-overlay)] border-blue-500/50 text-white/80 hover:bg-gradient-to-r hover:from-blue-600/20 hover:via-purple-600/20 hover:to-blue-600/20 hover:border-blue-400/70'
+                      ? 'bg-[var(--bg-overlay)] border-blue-500/50 text-[var(--foreground)]/80 hover:bg-gradient-to-r hover:from-blue-600/20 hover:via-purple-600/20 hover:to-blue-600/20 hover:border-blue-400/70'
                       : selectedCategory === 'kalshi'
                         ? 'bg-[var(--bg-overlay)] border-cyan-800/50 text-[var(--text-muted)] hover:bg-cyan-900/20 hover:border-cyan-600/50 hover:text-cyan-300'
-                        : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] hover:text-white/80'
+                        : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] hover:text-[var(--foreground)]/80'
                 }`}
               >
                 <Icon className={`w-3 h-3 md:w-4 md:h-4 flex-shrink-0 ${

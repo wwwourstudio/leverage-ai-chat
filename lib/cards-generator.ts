@@ -65,17 +65,18 @@ interface CachedCards {
   category: string;
 }
 
-const CARD_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+const CARD_CACHE_TTL = 45 * 1000; // 45 seconds — live sports data expires quickly
 const cardCacheMap = new Map<string, CachedCards>();
 
-/** Build a stable cache key from category + sport. Cards are public data — not user-specific. */
-function makeCacheKey(category?: string, sport?: string): string {
-  return `${category ?? 'all'}:${sport ?? ''}`;
+/** Build a stable cache key. Includes a userContext prefix so different queries get distinct card sets. */
+function makeCacheKey(category?: string, sport?: string, userContext?: string): string {
+  const ctxSlug = userContext ? userContext.slice(0, 50).toLowerCase().replace(/[^a-z0-9]+/g, '-') : '';
+  return `${category ?? 'all'}:${sport ?? ''}:${ctxSlug}`;
 }
 
-/** Retrieve cached cards if still fresh for the given category+sport key */
-function getCachedCards(category?: string, sport?: string, count: number = 6, _userContext?: string): InsightCard[] | null {
-  const key = makeCacheKey(category, sport);
+/** Retrieve cached cards if still fresh for the given key */
+function getCachedCards(category?: string, sport?: string, count: number = 6, userContext?: string): InsightCard[] | null {
+  const key = makeCacheKey(category, sport, userContext);
   const entry = cardCacheMap.get(key);
   if (!entry) return null;
   if (Date.now() - entry.timestamp > CARD_CACHE_TTL) {
@@ -85,9 +86,9 @@ function getCachedCards(category?: string, sport?: string, count: number = 6, _u
   return entry.cards.slice(0, count);
 }
 
-/** Store cards in the in-memory cache under the given category+sport key */
-function setCachedCards(cards: InsightCard[], category: string, sport?: string): void {
-  const key = makeCacheKey(category, sport);
+/** Store cards in the in-memory cache under the given key */
+function setCachedCards(cards: InsightCard[], category: string, sport?: string, userContext?: string): void {
+  const key = makeCacheKey(category, sport, userContext);
   cardCacheMap.set(key, { cards, timestamp: Date.now(), category });
 }
 
@@ -1309,7 +1310,7 @@ async function _generateContextualCards(
       // Sport-specific query → pure betting cards, no Kalshi contamination
       console.log(`[v0] [CARDS-GEN] All-category with sport=${normalizedSport}: pure betting mode`);
       const cards = await _generateContextualCards('betting', sport, count);
-      if (cards.length > 0) setCachedCards(cards, 'all', sport);
+      if (cards.length > 0) setCachedCards(cards, 'all', sport, userContext);
       return cards;
     }
     console.log('[v0] [CARDS-GEN] All-category mode: generating mixed betting + Kalshi cards');
@@ -1323,7 +1324,7 @@ async function _generateContextualCards(
     const kalshi  = kalshiResult.status  === 'fulfilled' ? kalshiResult.value  : [];
     const mixed = [...betting.slice(0, bettingCount), ...kalshi.slice(0, kalshiCount)].slice(0, count);
     if (mixed.length > 0) {
-      setCachedCards(mixed, 'all', sport);
+      setCachedCards(mixed, 'all', sport, userContext);
       return mixed;
     }
     // Both sources failed — fall back to pure betting cards
@@ -1474,7 +1475,7 @@ async function _generateContextualCards(
     
     const finalCards = cards.slice(0, count);
     console.log(`[v0] [MULTI-SPORT] Final result: ${finalCards.length} cards from ${[...new Set(finalCards.map(c => c.category))].join(', ')}`);
-    if (finalCards.length > 0) setCachedCards(finalCards, category || 'all', sport);
+    if (finalCards.length > 0) setCachedCards(finalCards, category || 'all', sport, userContext);
     return finalCards;
   }
 
@@ -1486,7 +1487,7 @@ async function _generateContextualCards(
     console.log(`[v0] [CARDS-GEN] Single-sport mode: fetching ${normalizedSport} odds directly`);
     const sportCards = await generateSportSpecificCards(normalizedSport, count, category);
     if (sportCards.length > 0) {
-      setCachedCards(sportCards, category || 'betting', normalizedSport);
+      setCachedCards(sportCards, category || 'betting', normalizedSport, userContext);
       return sportCards;
     }
     // Fall through if no games available (off-season etc.)

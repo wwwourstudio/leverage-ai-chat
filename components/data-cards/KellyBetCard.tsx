@@ -144,7 +144,7 @@ export function KellyBetCard({
         {bankrollPct !== null && (
           <div className="mb-4 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-4 text-center">
             <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Stake % of Bankroll</p>
-            <p className={cn('text-5xl font-black tabular-nums leading-none', isLowEdge ? 'text-amber-400' : 'text-white')}>
+            <p className={cn('text-5xl font-black tabular-nums leading-none', isLowEdge ? 'text-amber-400' : 'text-[var(--foreground)]')}>
               {bankrollPct}%
             </p>
             {data.recommendedStake && (

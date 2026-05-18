@@ -55,7 +55,7 @@ export function OddsCard({ event, onAsk }: OddsCardProps) {
         <div className="flex items-center gap-2 py-1">
           <div className="flex-1 text-center rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-3">
             <div className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Away</div>
-            <div className="text-sm font-black text-white leading-snug truncate">{event.away_team}</div>
+            <div className="text-sm font-black text-[var(--foreground)] leading-snug truncate">{event.away_team}</div>
             <div
               className={cn(
                 'text-2xl font-black tabular-nums mt-1.5',
@@ -78,7 +78,7 @@ export function OddsCard({ event, onAsk }: OddsCardProps) {
 
           <div className="flex-1 text-center rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-3">
             <div className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Home</div>
-            <div className="text-sm font-black text-white leading-snug truncate">{event.home_team}</div>
+            <div className="text-sm font-black text-[var(--foreground)] leading-snug truncate">{event.home_team}</div>
             <div
               className={cn(
                 'text-2xl font-black tabular-nums mt-1.5',
@@ -112,14 +112,14 @@ export function OddsCard({ event, onAsk }: OddsCardProps) {
             {event.spread && (
               <span className="bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-full px-3 py-1 text-[10px] font-semibold text-[var(--text-muted)]">
                 Spread{' '}
-                <span className="text-white">
+                <span className="text-[var(--foreground)]">
                   {event.spread.home > 0 ? '+' : ''}{event.spread.home} / {event.spread.away > 0 ? '+' : ''}{event.spread.away}
                 </span>
               </span>
             )}
             {event.total && (
               <span className="bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-full px-3 py-1 text-[10px] font-semibold text-[var(--text-muted)]">
-                O/U <span className="text-white">{event.total.line}</span>
+                O/U <span className="text-[var(--foreground)]">{event.total.line}</span>
               </span>
             )}
             {event.bookmakerCount != null && (

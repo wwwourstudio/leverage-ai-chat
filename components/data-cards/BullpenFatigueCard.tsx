@@ -48,7 +48,7 @@ export function BullpenFatigueCard({
   const fatigueScore = Number(data.fatigueScore ?? 0);
   const impact = Number(data.scoringEnvImpact ?? 0);
   const eraNum  = Number(data.eraLast14Days ?? 0);
-  const eraColor = eraNum > 5.0 ? 'text-red-400' : eraNum > 4.0 ? 'text-amber-400' : eraNum > 0 ? 'text-emerald-400' : 'text-white/70';
+  const eraColor = eraNum > 5.0 ? 'text-red-400' : eraNum > 4.0 ? 'text-amber-400' : eraNum > 0 ? 'text-emerald-400' : 'text-[var(--text-secondary,var(--text-muted))]';
 
   return (
     <article className={cn(
@@ -65,13 +65,13 @@ export function BullpenFatigueCard({
           </span>
         </div>
         <div className="flex items-center gap-1.5 mb-1.5">
-          <span className="text-[9px] font-black uppercase tracking-widest text-white/60">{category}</span>
-          <span className="text-white/25">·</span>
-          <span className="text-[9px] text-white/40">{subcategory}</span>
+          <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)]">{category}</span>
+          <span className="text-[var(--text-faint)]">·</span>
+          <span className="text-[9px] text-[var(--text-faint)]">{subcategory}</span>
         </div>
-        <h3 className="text-sm font-black text-white leading-snug pr-24">{title}</h3>
+        <h3 className="text-sm font-black text-[var(--foreground)] leading-snug pr-24">{title}</h3>
         {data.teamName && (
-          <p className="text-[10px] text-white/50 mt-0.5">{data.teamName} Bullpen</p>
+          <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{data.teamName} Bullpen</p>
         )}
       </div>
 
@@ -81,7 +81,7 @@ export function BullpenFatigueCard({
         <div>
           <div className="flex justify-between items-center mb-1.5">
             <span className="text-[10px] text-[var(--text-faint)] uppercase tracking-wide">Fatigue Score</span>
-            <span className="text-sm font-black tabular-nums text-white/80">{fatigueScore}<span className="text-[10px] text-[var(--text-faint)] font-normal">/100</span></span>
+            <span className="text-sm font-black tabular-nums text-[var(--foreground)]">{fatigueScore}<span className="text-[10px] text-[var(--text-faint)] font-normal">/100</span></span>
           </div>
           <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
             <div
@@ -100,13 +100,13 @@ export function BullpenFatigueCard({
           {data.inningsLast3Days !== undefined && (
             <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
               <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Inn / 3d</p>
-              <p className="text-base font-black tabular-nums text-white">{data.inningsLast3Days}</p>
+              <p className="text-base font-black tabular-nums text-[var(--foreground)]">{data.inningsLast3Days}</p>
             </div>
           )}
           {data.pitchCountLast3Days !== undefined && (
             <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
               <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Pitches / 3d</p>
-              <p className="text-base font-black tabular-nums text-white">{data.pitchCountLast3Days}</p>
+              <p className="text-base font-black tabular-nums text-[var(--foreground)]">{data.pitchCountLast3Days}</p>
             </div>
           )}
           {data.eraLast14Days !== undefined && (
@@ -147,7 +147,7 @@ export function BullpenFatigueCard({
         <div className="px-4 pb-4 pt-1">
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] text-[11px] font-semibold text-[var(--text-muted)] hover:text-white transition-all duration-150"
+            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--foreground)] transition-all duration-150"
           >
             Full Analysis
             <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />

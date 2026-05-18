@@ -559,7 +559,7 @@ export const CACHE_CONFIG = {
   DEFAULT_TTL: 5 * 60 * 1000, // 5 minutes
   INSIGHTS_TTL: 10 * 60 * 1000, // 10 minutes
   ODDS_TTL: 2 * 60 * 1000, // 2 minutes
-  CARDS_TTL: 5 * 60 * 1000, // 5 minutes
+  CARDS_TTL: 60 * 1000, // 1 minute — live sports data should refresh frequently
 } as const;
 
 // HTTP Status Codes

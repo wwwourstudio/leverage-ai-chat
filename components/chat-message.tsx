@@ -49,7 +49,7 @@ function ToolTimeline({ events, isStreaming }: { events: Array<{ name: string; s
     <div className="mb-3">
       <button
         onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/60 transition-colors"
+        className="flex items-center gap-1.5 text-[11px] text-[var(--foreground)]/40 hover:text-[var(--foreground)]/60 transition-colors"
       >
         <Wrench className="w-3 h-3" />
         <span>{events.length} tool{events.length !== 1 ? 's' : ''} called</span>
@@ -57,12 +57,12 @@ function ToolTimeline({ events, isStreaming }: { events: Array<{ name: string; s
         <ChevronDown className={`w-3 h-3 transition-transform duration-200 ease-out ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="mt-1.5 pl-4 border-l border-white/10 space-y-1">
+        <div className="mt-1.5 pl-4 border-l border-[var(--border-subtle)] space-y-1">
           {events.map((e, i) => (
             <div key={i} className="flex items-center gap-2 text-[11px]">
-              <span className="text-white/50 font-medium">{TOOL_LABELS[e.name] ?? e.name}</span>
-              <span className="text-white/30">→</span>
-              <span className="text-white/40">{e.summary}</span>
+              <span className="text-[var(--foreground)]/50 font-medium">{TOOL_LABELS[e.name] ?? e.name}</span>
+              <span className="text-[var(--foreground)]/30">→</span>
+              <span className="text-[var(--foreground)]/40">{e.summary}</span>
             </div>
           ))}
         </div>

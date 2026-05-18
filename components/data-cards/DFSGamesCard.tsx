@@ -29,7 +29,7 @@ function TeamLogoByAbbr({ abbr, sport = 'mlb', size = 32 }: { abbr: string; spor
   if (errored) {
     return (
       <span
-        className="inline-flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white font-black shrink-0"
+        className="inline-flex items-center justify-center rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--foreground)] font-black shrink-0"
         style={{ width: size, height: size, fontSize: Math.max(8, Math.round(size * 0.36)) } as React.CSSProperties}
       >
         {abbr.slice(0, 3)}
@@ -132,7 +132,7 @@ function PlatformToggle({ value, onChange }: { value: 'DK' | 'FD'; onChange: (v:
             'px-3 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all duration-150',
             value === p
               ? 'bg-[var(--cat-dfs,oklch(0.72_0.20_80))] text-black shadow-sm'
-              : 'text-white/50 hover:text-white/80',
+              : 'text-[var(--foreground)]/50 hover:text-[var(--foreground)]/80',
           )}
         >
           {p}
@@ -161,12 +161,12 @@ function GameRow({ g, sport }: { g: EnrichedGameRef; sport: string }) {
       {/* Away */}
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
         <TeamLogoByAbbr abbr={g.awayTeamAbbr} sport={sport} size={30} />
-        <span className="font-black text-[13px] text-white tracking-wide leading-none">{g.awayTeamAbbr.toUpperCase()}</span>
+        <span className="font-black text-[13px] text-[var(--foreground)] tracking-wide leading-none">{g.awayTeamAbbr.toUpperCase()}</span>
       </div>
 
       {/* VS */}
       <div className="flex flex-col items-center shrink-0 gap-0.5">
-        <span className="text-[9px] text-[var(--text-faint)] font-bold">@</span>
+        <span className="text-[9px] text-[var(--text-muted)] font-bold">@</span>
         {g.startTime && (
           <span suppressHydrationWarning className="text-[8px] text-[var(--text-faint)] tabular-nums">
             {formatGameTime(g.startTime)}
@@ -176,7 +176,7 @@ function GameRow({ g, sport }: { g: EnrichedGameRef; sport: string }) {
 
       {/* Home */}
       <div className="flex items-center gap-1.5 min-w-0 flex-1 justify-end">
-        <span className="font-black text-[13px] text-white tracking-wide leading-none">{g.homeTeamAbbr.toUpperCase()}</span>
+        <span className="font-black text-[13px] text-[var(--foreground)] tracking-wide leading-none">{g.homeTeamAbbr.toUpperCase()}</span>
         <TeamLogoByAbbr abbr={g.homeTeamAbbr} sport={sport} size={30} />
       </div>
 
@@ -242,9 +242,9 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
         <div className="absolute top-0 right-0 w-40 h-20 bg-[var(--cat-dfs,oklch(0.72_0.20_80))]/5 rounded-bl-full blur-3xl pointer-events-none" />
 
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5 text-white/60">
+          <div className="flex items-center gap-1.5 text-[var(--foreground)]/60">
             <span className="text-[9px] font-black uppercase tracking-widest">{sportLabel}</span>
-            <span className="text-white/30">·</span>
+            <span className="text-[var(--foreground)]/30">·</span>
             <span className="text-[9px]">DFS Slates</span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -256,8 +256,8 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
           </div>
         </div>
 
-        <h3 className="font-black text-white leading-snug text-sm">Today's DFS Slates</h3>
-        <p className="text-[10px] text-white/50 mt-0.5 mb-2.5">
+        <h3 className="font-black text-[var(--foreground)] leading-snug text-sm">Today's DFS Slates</h3>
+        <p className="text-[10px] text-[var(--foreground)]/50 mt-0.5 mb-2.5">
           {slates.length} slate{slates.length !== 1 ? 's' : ''} available · tap to build a lineup
         </p>
 
@@ -361,8 +361,8 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
                     isSelected
                       ? 'bg-gradient-to-r from-[var(--cat-dfs,oklch(0.72_0.20_80))]/80 to-amber-500/80 text-black shadow-[0_0_12px_oklch(0.72_0.20_80/0.4)] hover:shadow-[0_0_18px_oklch(0.72_0.20_80/0.6)]'
                       : isBestPlay
-                      ? 'bg-gradient-to-r from-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 to-amber-600/30 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/40 text-[var(--cat-dfs,oklch(0.72_0.20_80))] hover:from-[var(--cat-dfs,oklch(0.72_0.20_80))]/50 hover:text-white'
-                      : 'bg-gradient-to-r from-[var(--cat-dfs,oklch(0.72_0.20_80))]/15 to-amber-600/15 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/25 text-[var(--cat-dfs,oklch(0.72_0.20_80))]/80 hover:from-[var(--cat-dfs,oklch(0.72_0.20_80))]/25 hover:text-[var(--cat-dfs,oklch(0.72_0.20_80))]',
+                      ? 'bg-gradient-to-r from-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 to-amber-600/30 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/40 text-[var(--cat-dfs,oklch(0.72_0.20_80))] hover:from-[var(--cat-dfs,oklch(0.72_0.20_80))]/50 hover:text-[var(--foreground)]'
+                      : 'bg-[var(--cat-dfs,oklch(0.56_0.18_70))]/12 border border-[var(--cat-dfs,oklch(0.56_0.18_70))]/35 text-[var(--cat-dfs,oklch(0.56_0.18_70))] hover:bg-[var(--cat-dfs,oklch(0.56_0.18_70))]/22 hover:border-[var(--cat-dfs,oklch(0.56_0.18_70))]/55',
                   )}
                 >
                   {isSelected && (

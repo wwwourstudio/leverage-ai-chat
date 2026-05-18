@@ -146,11 +146,11 @@ const MarketCard = memo(function MarketCard({ market, onAnalyze, starred, onTogg
               className="opacity-0 group-hover:opacity-100 transition-opacity"
               title={starred ? 'Unwatch' : 'Watch market'}
             >
-              <Star className={cn('w-3.5 h-3.5', starred ? 'fill-yellow-400 text-yellow-400' : 'text-white/30 hover:text-yellow-400')} />
+              <Star className={cn('w-3.5 h-3.5', starred ? 'fill-yellow-400 text-yellow-400' : 'text-[var(--foreground)]/30 hover:text-yellow-400')} />
             </button>
           </div>
         </div>
-        <p className="text-sm font-semibold text-white leading-snug line-clamp-2">{market.title}</p>
+        <p className="text-sm font-semibold text-[var(--foreground)] leading-snug line-clamp-2">{market.title}</p>
       </div>
 
       {/* Probability bar */}
@@ -181,7 +181,7 @@ const MarketCard = memo(function MarketCard({ market, onAnalyze, starred, onTogg
       <div className="border-t border-[var(--border-subtle)] grid grid-cols-2 divide-x divide-white/5">
         <button
           onClick={() => onAnalyze(`Show me analysis and edge on this Kalshi market: "${market.title}" (YES: ${yesProb}¢, NO: ${noProb}¢, Ticker: ${market.ticker})`)}
-          className="py-2.5 text-[10px] font-semibold text-[var(--text-muted)] hover:text-white hover:bg-white/5 transition-colors"
+          className="py-2.5 text-[10px] font-semibold text-[var(--text-muted)] hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)] transition-colors"
         >
           Analyze Edge →
         </button>
@@ -354,7 +354,7 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
               <TrendingUp className="w-3.5 h-3.5 text-purple-400" />
             </div>
             <div>
-              <p className="text-xs font-bold text-white">Kalshi Prediction Markets</p>
+              <p className="text-xs font-bold text-[var(--foreground)]">Kalshi Prediction Markets</p>
               {lastFetch && (
                 <p className="text-[9px] text-[var(--text-faint)]">
                   <span suppressHydrationWarning>Updated {lastFetch.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -380,7 +380,7 @@ export function KalshiTab({ onChatMessage }: KalshiTabProps) {
             placeholder="Search markets…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-lg pl-8 pr-3 py-2 text-xs text-white placeholder:text-[var(--text-faint)] focus:outline-none focus:border-purple-500/40 focus:ring-1 focus:ring-purple-500/20"
+            className="w-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-lg pl-8 pr-3 py-2 text-xs text-[var(--foreground)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-purple-500/40 focus:ring-1 focus:ring-purple-500/20"
           />
         </div>
 

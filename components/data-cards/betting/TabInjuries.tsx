@@ -89,7 +89,7 @@ function InjuryRow({ inj, onAsk }: { inj: any; onAsk?: (q: string) => void }) {
 
         {/* Right side: status badge + bookmark */}
         <div className="flex items-center gap-2 shrink-0">
-          <span className={cn('px-2.5 py-1 rounded-xl text-[10px] font-black border', ss.text, ss.border, 'bg-black/20')}>
+          <span className={cn('px-2.5 py-1 rounded-xl text-[10px] font-black border', ss.text, ss.border, 'bg-[var(--bg-elevated)]')}>
             {ss.label}
           </span>
           <button

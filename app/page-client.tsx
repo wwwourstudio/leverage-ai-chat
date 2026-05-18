@@ -819,7 +819,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       </div>
 
       {/* Main content area */}
-      <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-gradient-to-br from-black via-background to-black">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-[var(--background)] dark:bg-gradient-to-br dark:from-black dark:via-background dark:to-black">
         <AddToHomeBanner />
 
         <ChatHeader

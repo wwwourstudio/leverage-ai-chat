@@ -203,7 +203,7 @@ function HeroMetrics({ metrics, conf }: { metrics: Metric[]; conf: TypeConf }) {
               {m.label}
             </span>
             {barWidth !== undefined && (
-              <div className="w-full h-1 rounded-full bg-black/20 overflow-hidden mt-2">
+              <div className="w-full h-1 rounded-full bg-[var(--bg-overlay)] overflow-hidden mt-2">
                 <div
                   className={cn(
                     'h-full rounded-full transition-all duration-700',

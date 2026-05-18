@@ -62,7 +62,7 @@ function MatchupDot({ score }: { score: number }) {
   const tip  = score >= 70 ? 'GREAT' : score >= 50 ? 'OK' : 'TOUGH';
   const txt  = score >= 70 ? 'text-emerald-400' : score >= 50 ? 'text-amber-400' : 'text-red-400';
   return (
-    <span className={cn('inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-black/20 border border-white/10 text-[8px] font-black uppercase tracking-wide shrink-0', txt)}>
+    <span className={cn('inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[8px] font-black uppercase tracking-wide shrink-0', txt)}>
       <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', cls)} />
       {tip}
     </span>

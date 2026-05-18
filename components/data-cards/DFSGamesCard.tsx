@@ -123,7 +123,7 @@ function getSlateBadge(label: string, contestType: string, selected: boolean) {
 
 function PlatformToggle({ value, onChange }: { value: 'DK' | 'FD'; onChange: (v: 'DK' | 'FD') => void }) {
   return (
-    <div className="inline-flex items-center rounded-full bg-black/30 border border-white/10 p-0.5 gap-0.5">
+    <div className="inline-flex items-center rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-0.5 gap-0.5">
       {(['DK', 'FD'] as const).map(p => (
         <button
           key={p}
@@ -370,7 +370,7 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
                   )}
                   {isSelected ? (
                     <>
-                      <span className="w-1.5 h-1.5 rounded-full bg-black animate-pulse" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--foreground)] animate-pulse" />
                       Active — Build {platform} Lineup
                     </>
                   ) : (

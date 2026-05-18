@@ -63,7 +63,7 @@ export function ChatInputSection({
   const { showLimitNotification, setShowLimitNotification } = useModalState();
 
   return (
-    <div className="relative border-t border-[var(--border-subtle)] bg-gradient-to-b from-background to-black px-4 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl backdrop-blur-xl">
+    <div className="relative border-t border-[var(--border-subtle)] bg-[var(--background)] dark:bg-gradient-to-b dark:from-background dark:to-black px-4 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl backdrop-blur-xl">
       <div className="absolute inset-0 bg-gradient-to-t from-blue-600/5 via-transparent to-transparent pointer-events-none" />
 
       <RateLimitNotification

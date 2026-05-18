@@ -79,7 +79,7 @@ export function KalshiMarketCard({ market, onAsk }: KalshiMarketCardProps) {
 
       <div className="relative z-10 flex flex-col gap-3 px-4 py-4 flex-1">
         {/* Market title */}
-        <p className="text-[13px] font-bold text-white/90 line-clamp-2 leading-snug">
+        <p className="text-[13px] font-bold text-[var(--foreground)]/90 line-clamp-2 leading-snug">
           {market.title}
         </p>
         {market.subtitle && (

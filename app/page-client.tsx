@@ -35,6 +35,7 @@ import { AddToHomeBanner } from '@/components/AddToHomeBanner';
 import { getHardcodedQuickActions } from '@/lib/prompt-data';
 import { useVoiceConversation } from '@/lib/hooks/use-voice-conversation';
 import { ChatMessageList } from '@/components/index/ChatMessageList';
+import { CardsPanel } from '@/components/index/CardsPanel';
 import { ChatInputSection } from '@/components/index/ChatInputSection';
 import { ChatModals } from '@/components/index/ChatModals';
 import { MobileNavBar } from '@/components/index/MobileNavBar';
@@ -142,6 +143,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [chatSearch, setChatSearch] = useState('');
+  const [currentCards, setCurrentCards] = useState<any[]>([]);
+  const [isFetchingCards, setIsFetchingCards] = useState(false);
+  const [currentCardsFetchedAt, setCurrentCardsFetchedAt] = useState<number | null>(null);
 
   const lastCompleteAssistantMessage = useMemo(() => {
     const complete = [...messages]
@@ -506,6 +510,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
       const fetchKey = `${lastUserQuery}::${selectedCategory}`;
       if (fetchedForQueryRef.current === fetchKey) return;
+      fetchedForQueryRef.current = fetchKey;
 
       const msgLow = (lastUserQuery || '').toLowerCase();
       const hasPropQuery = msgLow.includes('prop') || msgLow.includes('strikeout')
@@ -514,12 +519,8 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
                         || msgLow.includes('era') || msgLow.includes('batting average')
                         || msgLow.includes('whip') || msgLow.includes('babip');
 
-      const lastAIMessage = [...messages].reverse().find((m: any) => m.role === 'assistant');
-      if (lastAIMessage?.cards?.length && !hasPropQuery) return;
-
-      fetchedForQueryRef.current = fetchKey;
-
       try {
+        setIsFetchingCards(true);
         const hasFantasyOrDFSQuery = /\b(adp|draft|waiver|sleeper|fantasy|dfs|best ball|lineup|vbd|tier|rank)\b/i.test(lastUserQuery || '');
         const hasDFSQuery = /\b(dfs|daily fantasy|showdown|gpp|gpps|tournament lineup)\b/i.test(lastUserQuery || '');
         const hasBettingPlatformQuery =
@@ -539,6 +540,11 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         const freshCards = await fetchDynamicCards({ sport: refreshSport, userContext: lastUserQuery, category: detectedCategory, limit: 7 });
         if (freshCards.length === 0) return;
 
+        // Update the right-panel cards (always fresh for the current query)
+        setCurrentCards(freshCards);
+        setCurrentCardsFetchedAt(Date.now());
+
+        // Attach cards to the most recent assistant message that lacks them
         setMessages((prev: any) => {
           const updated = [...prev];
           for (let i = updated.length - 1; i >= 0; i--) {
@@ -550,6 +556,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           return updated;
         });
       } catch { /* non-critical */ }
+      finally { setIsFetchingCards(false); }
     };
 
     cardsRefreshIntervalRef.current = setTimeout(fillMissingCards, 3000) as unknown as NodeJS.Timeout;
@@ -570,6 +577,33 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     window.addEventListener('leveragePlayerClick', handler);
     return () => window.removeEventListener('leveragePlayerClick', handler);
   }, []);
+
+  // ── Manual card refresh ───────────────────────────────────────────────────────
+  const handleRefreshCards = useCallback(async () => {
+    if (!lastUserQuery || isFetchingCards) return;
+    fetchedForQueryRef.current = null; // force re-fetch on next fill
+    const msgLow = lastUserQuery.toLowerCase();
+    const hasPropQuery = msgLow.includes('prop') || msgLow.includes('strikeout');
+    const hasFantasyOrDFSQuery = /\b(adp|draft|waiver|sleeper|fantasy|dfs|best ball|lineup|vbd|tier|rank)\b/i.test(lastUserQuery);
+    const hasDFSQuery = /\b(dfs|daily fantasy|showdown|gpp|gpps|tournament lineup)\b/i.test(lastUserQuery);
+    const hasBettingPlatformQuery = /\b(draftkings|fanduel|betmgm|caesars|pointsbet|barstool)\b/i.test(lastUserQuery) && !/\b(lineup|slate|dfs|daily fantasy|gpp|showdown)\b/i.test(lastUserQuery);
+    const detectedCategory = hasPropQuery ? 'props'
+      : (msgLow.includes('kalshi') || msgLow.includes('prediction market')) ? 'kalshi'
+      : hasBettingPlatformQuery ? 'betting'
+      : hasFantasyOrDFSQuery ? (hasDFSQuery ? 'dfs' : 'fantasy')
+      : selectedCategory;
+    const conversationHistory = messages.slice(-10).map((m: any) => ({ role: m.role, content: m.content || '' }));
+    const refreshSport = extractSport(lastUserQuery, conversationHistory) || selectedSport || undefined;
+    try {
+      setIsFetchingCards(true);
+      const freshCards = await fetchDynamicCards({ sport: refreshSport, userContext: lastUserQuery, category: detectedCategory, limit: 7 });
+      if (freshCards.length > 0) {
+        setCurrentCards(freshCards);
+        setCurrentCardsFetchedAt(Date.now());
+      }
+    } catch { /* non-critical */ }
+    finally { setIsFetchingCards(false); }
+  }, [lastUserQuery, isFetchingCards, selectedCategory, selectedSport, messages]);
 
   // ── Response generation ───────────────────────────────────────────────────────
   const generateResponseStable = useCallback((msg: string) => {
@@ -827,25 +861,40 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           messages={messages as any}
         />
 
-        <ChatMessageList
-          messages={messages}
-          isTyping={isTyping}
-          verifyStage={verifyStage}
-          editingMessageIndex={editingMessageIndex}
-          editingContent={editingContent}
-          editTextareaRef={editTextareaRef}
-          onEditContentChange={setEditingContent}
-          adjustEditTextareaHeight={adjustEditTextareaHeight}
-          onKeyDown={handleKeyDown}
-          onGenerateResponse={(q) => generateRealResponse(q)}
-          onFollowUp={handleFollowUp}
-          onEditMessage={handleEditMessage}
-          onSaveEdit={handleSaveEdit}
-          onCancelEdit={handleCancelEdit}
-          onCopyMessage={handleCopyMessage}
-          onRegenerateResponse={handleRegenerateResponse}
-          onVote={handleVote}
-        />
+        {/* Two-column body: messages + live cards panel */}
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          <ChatMessageList
+            messages={messages}
+            isTyping={isTyping}
+            verifyStage={verifyStage}
+            editingMessageIndex={editingMessageIndex}
+            editingContent={editingContent}
+            editTextareaRef={editTextareaRef}
+            onEditContentChange={setEditingContent}
+            adjustEditTextareaHeight={adjustEditTextareaHeight}
+            onKeyDown={handleKeyDown}
+            onGenerateResponse={(q) => generateRealResponse(q)}
+            onFollowUp={handleFollowUp}
+            onEditMessage={handleEditMessage}
+            onSaveEdit={handleSaveEdit}
+            onCancelEdit={handleCancelEdit}
+            onCopyMessage={handleCopyMessage}
+            onRegenerateResponse={handleRegenerateResponse}
+            onVote={handleVote}
+          />
+
+          {/* Live cards panel — desktop only */}
+          <div className="hidden xl:flex flex-col w-[400px] shrink-0 border-l border-[var(--border-subtle)] overflow-hidden">
+            <CardsPanel
+              cards={currentCards}
+              isLoading={isFetchingCards}
+              fetchedAt={currentCardsFetchedAt}
+              lastQueryText={lastUserQuery}
+              onRefresh={handleRefreshCards}
+              onAsk={(q) => generateRealResponse(q)}
+            />
+          </div>
+        </div>
 
         <ChatInputSection
           input={input}

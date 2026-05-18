@@ -82,7 +82,7 @@ export function ChatMessageList({
                           <TrendingUp className="w-3.5 h-3.5 text-white" aria-hidden="true" />
                         </div>
                       </div>
-                      <span className="text-xs font-black tracking-tight text-white">Leverage<span className="text-blue-400"> AI</span></span>
+                      <span className="text-xs font-black tracking-tight text-[var(--foreground)]">Leverage<span className="text-blue-500 dark:text-blue-400"> AI</span></span>
                       {message.sources && message.sources.length > 0 && !message.isWelcome && (
                         <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md">
                           <CheckCheck className="w-2.5 h-2.5 text-blue-400" />
@@ -134,7 +134,7 @@ export function ChatMessageList({
                           </button>
                           <button
                             onClick={onCancelEdit}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-surface)] hover:bg-[var(--bg-surface)] text-white rounded-lg text-xs font-bold transition-all"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-[var(--foreground)] rounded-lg text-xs font-bold transition-all border border-[var(--border-subtle)]"
                           >
                             Cancel
                           </button>

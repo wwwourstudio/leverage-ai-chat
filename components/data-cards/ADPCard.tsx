@@ -155,20 +155,20 @@ export const ADPCard = memo(function ADPCard({
 
           {/* Breadcrumb */}
           <div className="flex items-center gap-1.5 mb-1.5">
-            <BarChart2 className="w-3 h-3 text-white/60" />
-            <span className="text-[9px] font-black uppercase tracking-widest text-white/60">{category}</span>
-            <span className="text-white/30">·</span>
-            <span className="text-[9px] text-white/50 truncate">{subcategory}</span>
+            <BarChart2 className="w-3 h-3 text-[var(--text-muted)]" />
+            <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)]">{category}</span>
+            <span className="text-[var(--text-faint)]">·</span>
+            <span className="text-[9px] text-[var(--text-muted)] truncate">{subcategory}</span>
           </div>
-          <h3 className={cn('font-black text-white leading-snug text-balance pr-20', isHero ? 'text-lg' : 'text-sm')}>
+          <h3 className={cn('font-black text-[var(--foreground)] leading-snug text-balance pr-20', isHero ? 'text-lg' : 'text-sm')}>
             {title}
           </h3>
 
           {/* Source tag */}
           <div className="mt-1.5 flex items-center gap-1.5">
-            <span className="text-[9px] text-white/40 font-bold">{source}</span>
+            <span className="text-[9px] text-[var(--text-faint)] font-bold">{source}</span>
             {totalInDataset && (
-              <span className="text-[9px] text-white/30">· {totalInDataset} players ranked</span>
+              <span className="text-[9px] text-[var(--text-faint)]">· {totalInDataset} players ranked</span>
             )}
           </div>
         </div>
@@ -216,7 +216,7 @@ export const ADPCard = memo(function ADPCard({
 
                   {/* Name + team */}
                   <div className="flex-1 min-w-0">
-                    <span className="text-sm font-black text-white truncate block">
+                    <span className="text-sm font-black text-[var(--foreground)] truncate block">
                       {p.displayName}
                     </span>
                     {p.team && (
@@ -291,7 +291,7 @@ export const ADPCard = memo(function ADPCard({
           {onAnalyze && (
             <button
               onClick={onAnalyze}
-              className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600/20 to-violet-600/20 border border-indigo-500/30 text-xs font-bold text-indigo-300 hover:from-indigo-600/30 hover:to-violet-600/30 hover:text-white hover:border-indigo-500/50 transition-all duration-150"
+              className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600/20 to-violet-600/20 border border-indigo-500/30 text-xs font-bold text-indigo-300 hover:from-indigo-600/30 hover:to-violet-600/30 hover:text-[var(--foreground)] hover:border-indigo-500/50 transition-all duration-150"
             >
               <TrendingUp className="w-3.5 h-3.5" />
               Full Analysis

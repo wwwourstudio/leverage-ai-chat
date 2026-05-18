@@ -58,7 +58,7 @@ export function CatcherFramingCard({
   const hasCscd = data.calledStrikeConversionDelta !== undefined && Math.abs(cscd) > 0.001;
   const cscdBarPct = Math.min(100, Math.max(0, ((cscd + 0.05) / 0.10) * 100));
   const cscdBarColor = cscd > 0 ? 'bg-emerald-500' : cscd < 0 ? 'bg-red-500' : 'bg-slate-500';
-  const cscdColor = cscd > 0 ? 'text-emerald-400' : cscd < 0 ? 'text-red-400' : 'text-white/70';
+  const cscdColor = cscd > 0 ? 'text-emerald-400' : cscd < 0 ? 'text-red-400' : 'text-[var(--text-secondary,var(--text-muted))]';
 
   function fmtPct(v: number): string {
     return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(0)}%`;
@@ -79,13 +79,13 @@ export function CatcherFramingCard({
           </span>
         </div>
         <div className="flex items-center gap-1.5 mb-1.5">
-          <span className="text-[9px] font-black uppercase tracking-widest text-white/60">{category}</span>
-          <span className="text-white/25">·</span>
-          <span className="text-[9px] text-white/40">{subcategory}</span>
+          <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)]">{category}</span>
+          <span className="text-[var(--text-faint)]">·</span>
+          <span className="text-[9px] text-[var(--text-faint)]">{subcategory}</span>
         </div>
-        <h3 className="text-sm font-black text-white leading-snug pr-28">{title}</h3>
+        <h3 className="text-sm font-black text-[var(--foreground)] leading-snug pr-28">{title}</h3>
         {data.catcherName && (
-          <p className="text-[10px] text-white/50 mt-0.5">Catcher: {data.catcherName}</p>
+          <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Catcher: {data.catcherName}</p>
         )}
       </div>
 
@@ -95,7 +95,7 @@ export function CatcherFramingCard({
         <div>
           <div className="flex justify-between items-center mb-1.5">
             <span className="text-[10px] text-[var(--text-faint)] uppercase tracking-wide">Framing Runs Above Avg / 1k</span>
-            <span className="text-sm font-black tabular-nums text-white/80">
+            <span className="text-sm font-black tabular-nums text-[var(--foreground)]">
               {fRAA >= 0 ? '+' : ''}{fRAA.toFixed(1)}
             </span>
           </div>
@@ -143,19 +143,19 @@ export function CatcherFramingCard({
         <div className="grid grid-cols-3 gap-2">
           <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
             <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">K Prop</p>
-            <p className={cn('text-sm font-black tabular-nums', kImpact > 0 ? 'text-emerald-400' : kImpact < 0 ? 'text-red-400' : 'text-white/70')}>
+            <p className={cn('text-sm font-black tabular-nums', kImpact > 0 ? 'text-emerald-400' : kImpact < 0 ? 'text-red-400' : 'text-[var(--text-secondary,var(--text-muted))]')}>
               {fmtPct(kImpact)}
             </p>
           </div>
           <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
             <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">BB Prop</p>
-            <p className={cn('text-sm font-black tabular-nums', bbImpact < 0 ? 'text-emerald-400' : bbImpact > 0 ? 'text-amber-400' : 'text-white/70')}>
+            <p className={cn('text-sm font-black tabular-nums', bbImpact < 0 ? 'text-emerald-400' : bbImpact > 0 ? 'text-amber-400' : 'text-[var(--text-secondary,var(--text-muted))]')}>
               {fmtPct(bbImpact)}
             </p>
           </div>
           <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
             <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">ERA Δ</p>
-            <p className={cn('text-sm font-black tabular-nums', eraImpact < 0 ? 'text-emerald-400' : eraImpact > 0 ? 'text-red-400' : 'text-white/70')}>
+            <p className={cn('text-sm font-black tabular-nums', eraImpact < 0 ? 'text-emerald-400' : eraImpact > 0 ? 'text-red-400' : 'text-[var(--text-secondary,var(--text-muted))]')}>
               {eraImpact >= 0 ? '+' : ''}{eraImpact.toFixed(2)}
             </p>
           </div>

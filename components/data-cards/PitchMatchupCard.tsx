@@ -56,11 +56,11 @@ export function PitchMatchupCard({
   const cfg = ADV_CONFIG[advantage];
   const edge = Number(data.compositeEdge ?? 0);
   const edgeStr = edge >= 0 ? `+${edge.toFixed(1)}` : edge.toFixed(1);
-  const edgeColor = edge >= 1.5 ? 'text-emerald-400' : edge <= -1.5 ? 'text-red-400' : 'text-white/80';
+  const edgeColor = edge >= 1.5 ? 'text-emerald-400' : edge <= -1.5 ? 'text-red-400' : 'text-[var(--foreground)]';
 
   const spinNum = Number(data.pitcherSpinRate ?? 0);
   const spinLabel = spinNum > 2500 ? 'elite' : spinNum > 2200 ? 'avg' : 'low';
-  const spinColor = spinNum > 2500 ? 'text-emerald-400' : spinNum > 2200 ? 'text-white/70' : 'text-amber-400';
+  const spinColor = spinNum > 2500 ? 'text-emerald-400' : spinNum > 2200 ? 'text-[var(--text-secondary,var(--text-muted))]' : 'text-amber-400';
 
   let mixEntries: [string, string][] = [];
   try {
@@ -85,11 +85,11 @@ export function PitchMatchupCard({
           </span>
         </div>
         <div className="flex items-center gap-1.5 mb-1.5">
-          <span className="text-[9px] font-black uppercase tracking-widest text-white/60">{category}</span>
-          <span className="text-white/25">·</span>
-          <span className="text-[9px] text-white/40">{subcategory}</span>
+          <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)]">{category}</span>
+          <span className="text-[var(--text-faint)]">·</span>
+          <span className="text-[9px] text-[var(--text-faint)]">{subcategory}</span>
         </div>
-        <h3 className="text-sm font-black text-white leading-snug pr-28">{title}</h3>
+        <h3 className="text-sm font-black text-[var(--foreground)] leading-snug pr-28">{title}</h3>
       </div>
 
       {/* Body */}
@@ -99,12 +99,12 @@ export function PitchMatchupCard({
           <div className="flex items-center rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-3 py-2">
             <div className="flex-1 text-center min-w-0">
               <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-0.5">Batter</p>
-              <p className="text-xs font-bold text-white truncate">{data.batterName ?? '—'}</p>
+              <p className="text-xs font-bold text-[var(--foreground)] truncate">{data.batterName ?? '—'}</p>
             </div>
             <span className="text-[10px] font-black text-[var(--text-faint)] px-3 shrink-0">vs</span>
             <div className="flex-1 text-center min-w-0">
               <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-0.5">Pitcher</p>
-              <p className="text-xs font-bold text-white truncate">{data.pitcherName ?? '—'}</p>
+              <p className="text-xs font-bold text-[var(--foreground)] truncate">{data.pitcherName ?? '—'}</p>
             </div>
           </div>
         )}
@@ -118,13 +118,13 @@ export function PitchMatchupCard({
           {data.pitcherAvgVelocity !== undefined && (
             <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
               <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Velo</p>
-              <p className="text-base font-black tabular-nums text-white">{data.pitcherAvgVelocity} <span className="text-[10px] font-normal text-[var(--text-faint)]">mph</span></p>
+              <p className="text-base font-black tabular-nums text-[var(--foreground)]">{data.pitcherAvgVelocity} <span className="text-[10px] font-normal text-[var(--text-faint)]">mph</span></p>
             </div>
           )}
           {data.dominantPitchType && (
             <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
               <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Primary</p>
-              <p className="text-base font-black text-white">{data.dominantPitchType}</p>
+              <p className="text-base font-black text-[var(--foreground)]">{data.dominantPitchType}</p>
             </div>
           )}
         </div>

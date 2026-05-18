@@ -91,8 +91,8 @@ export const ChatHeader = memo(function ChatHeader({ activeChat, messages = [] }
             className="group shrink-0 p-2.5 hover:bg-[var(--bg-elevated)] rounded-xl transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
           >
             {sidebarOpen
-              ? <X className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />
-              : <Menu className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors" />}
+              ? <X className="w-5 h-5 text-[var(--text-muted)] group-hover:text-[var(--foreground)] transition-colors" />
+              : <Menu className="w-5 h-5 text-[var(--text-muted)] group-hover:text-[var(--foreground)] transition-colors" />}
           </button>
 
           {/* Logo */}
@@ -104,7 +104,7 @@ export const ChatHeader = memo(function ChatHeader({ activeChat, messages = [] }
               </div>
             </div>
             <div className="flex flex-col leading-none gap-0.5">
-              <span className="text-sm font-black tracking-tight text-white">
+              <span className="text-sm font-black tracking-tight text-[var(--foreground)]">
                 Leverage<span className="text-blue-400"> AI</span>
               </span>
               <span className="hidden sm:block text-[9px] font-semibold text-[var(--text-muted)] tracking-widest uppercase">Sports Intelligence</span>
@@ -172,7 +172,7 @@ export const ChatHeader = memo(function ChatHeader({ activeChat, messages = [] }
             >
               {shareState === 'copied' ? <Check className="w-4 h-4 text-blue-400" />
                 : shareState === 'loading' ? <Copy className="w-4 h-4 text-[var(--text-muted)] animate-pulse" />
-                : <Share2 className="w-4 h-4 text-[var(--text-muted)] group-hover:text-white transition-colors" />}
+                : <Share2 className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--foreground)] transition-colors" />}
             </button>
           )}
 
@@ -196,7 +196,7 @@ export const ChatHeader = memo(function ChatHeader({ activeChat, messages = [] }
                 className="relative p-2 hover:bg-[var(--bg-elevated)] rounded-xl transition-all group active:scale-95"
                 title="Alerts"
               >
-                <Bell className="w-4 h-4 text-[var(--text-muted)] group-hover:text-white transition-colors" />
+                <Bell className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--foreground)] transition-colors" />
                 {alertCount > 0 && (
                   <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-[var(--bg-overlay)] animate-pulse" />
                 )}
@@ -207,14 +207,14 @@ export const ChatHeader = memo(function ChatHeader({ activeChat, messages = [] }
                 className="p-2 hover:bg-[var(--bg-elevated)] rounded-xl transition-all group active:scale-95"
                 title="Settings"
               >
-                <Settings className="w-4 h-4 text-[var(--text-muted)] group-hover:text-white transition-colors" />
+                <Settings className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--foreground)] transition-colors" />
               </button>
             </>
           ) : (
             <>
               <button
                 onClick={() => setShowLoginModal(true)}
-                className="px-3 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-overlay)] hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] text-[var(--text-muted)] hover:text-white text-xs font-semibold transition-all flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-overlay)] hover:bg-[var(--bg-elevated)] hover:border-[var(--border-hover)] text-[var(--text-muted)] hover:text-[var(--foreground)] text-xs font-semibold transition-all flex items-center gap-1.5"
               >
                 <LogIn className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Log in</span>

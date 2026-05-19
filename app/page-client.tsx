@@ -51,7 +51,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const toast = useToast();
   const { setTheme } = useTheme();
   const { user: authUser, loading: authLoading } = useAuth();
-  const prevAuthUserIdRef = useRef<string | null>(undefined as unknown as string | null);
+  const prevAuthUserIdRef = useRef<string | null | 'initial'>("initial");
 
   // ── Store reads ───────────────────────────────────────────────────────────────
   const {
@@ -142,7 +142,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [chatSearch, setChatSearch] = useState('');
-  const [currentCards, setCurrentCards] = useState<any[]>([]);
+  const [currentCards, setCurrentCards] = useState<any[]>(serverData?.initialCards || []);
   const [isFetchingCards, setIsFetchingCards] = useState(false);
   const [currentCardsFetchedAt, setCurrentCardsFetchedAt] = useState<number | null>(null);
 
@@ -435,7 +435,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     if (authLoading) return;
 
     const currentUserId = authUser?.id ?? null;
-    const prevUserId = prevAuthUserIdRef.current === (undefined as unknown as string | null)
+    const prevUserId = prevAuthUserIdRef.current === "initial"
       ? undefined
       : prevAuthUserIdRef.current;
     prevAuthUserIdRef.current = currentUserId;
@@ -687,6 +687,12 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() && uploadedFiles.length === 0) return;
+
+    // Ensure we have an active chat (avoid null race on first submit)
+    if (!activeChat) {
+      handleNewChat();
+      return;
+    }
 
     if (isTyping) { abortStream(); }
 

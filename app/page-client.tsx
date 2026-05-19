@@ -35,7 +35,6 @@ import { AddToHomeBanner } from '@/components/AddToHomeBanner';
 import { getHardcodedQuickActions } from '@/lib/prompt-data';
 import { useVoiceConversation } from '@/lib/hooks/use-voice-conversation';
 import { ChatMessageList } from '@/components/index/ChatMessageList';
-import { CardsPanel } from '@/components/index/CardsPanel';
 import { ChatInputSection } from '@/components/index/ChatInputSection';
 import { ChatModals } from '@/components/index/ChatModals';
 import { MobileNavBar } from '@/components/index/MobileNavBar';
@@ -883,17 +882,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             onVote={handleVote}
           />
 
-          {/* Live cards panel — desktop only */}
-          <div className="hidden xl:flex flex-col w-[400px] shrink-0 border-l border-[var(--border-subtle)] overflow-hidden">
-            <CardsPanel
-              cards={currentCards}
-              isLoading={isFetchingCards}
-              fetchedAt={currentCardsFetchedAt}
-              lastQueryText={lastUserQuery}
-              onRefresh={handleRefreshCards}
-              onAsk={(q) => generateRealResponse(q)}
-            />
-          </div>
+
         </div>
 
         <ChatInputSection

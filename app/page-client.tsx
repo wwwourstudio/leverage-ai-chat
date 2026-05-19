@@ -35,7 +35,6 @@ import { AddToHomeBanner } from '@/components/AddToHomeBanner';
 import { getHardcodedQuickActions } from '@/lib/prompt-data';
 import { useVoiceConversation } from '@/lib/hooks/use-voice-conversation';
 import { ChatMessageList } from '@/components/index/ChatMessageList';
-import { CardsPanel } from '@/components/index/CardsPanel';
 import { ChatInputSection } from '@/components/index/ChatInputSection';
 import { ChatModals } from '@/components/index/ChatModals';
 import { MobileNavBar } from '@/components/index/MobileNavBar';
@@ -52,7 +51,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const toast = useToast();
   const { setTheme } = useTheme();
   const { user: authUser, loading: authLoading } = useAuth();
-  const prevAuthUserIdRef = useRef<string | null>(undefined as unknown as string | null);
+  const prevAuthUserIdRef = useRef<string | null | 'initial'>("initial");
 
   // ── Store reads ───────────────────────────────────────────────────────────────
   const {
@@ -143,7 +142,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [chatSearch, setChatSearch] = useState('');
-  const [currentCards, setCurrentCards] = useState<any[]>([]);
+  const [currentCards, setCurrentCards] = useState<any[]>(serverData?.initialCards || []);
   const [isFetchingCards, setIsFetchingCards] = useState(false);
   const [currentCardsFetchedAt, setCurrentCardsFetchedAt] = useState<number | null>(null);
 
@@ -436,7 +435,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     if (authLoading) return;
 
     const currentUserId = authUser?.id ?? null;
-    const prevUserId = prevAuthUserIdRef.current === (undefined as unknown as string | null)
+    const prevUserId = prevAuthUserIdRef.current === "initial"
       ? undefined
       : prevAuthUserIdRef.current;
     prevAuthUserIdRef.current = currentUserId;
@@ -689,6 +688,12 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     e.preventDefault();
     if (!input.trim() && uploadedFiles.length === 0) return;
 
+    // Ensure we have an active chat (avoid null race on first submit)
+    if (!activeChat) {
+      handleNewChat();
+      return;
+    }
+
     if (isTyping) { abortStream(); }
 
     if (!consumeCredit()) { setShowStripeLightbox(true); return; }
@@ -883,17 +888,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
             onVote={handleVote}
           />
 
-          {/* Live cards panel — desktop only */}
-          <div className="hidden xl:flex flex-col w-[400px] shrink-0 border-l border-[var(--border-subtle)] overflow-hidden">
-            <CardsPanel
-              cards={currentCards}
-              isLoading={isFetchingCards}
-              fetchedAt={currentCardsFetchedAt}
-              lastQueryText={lastUserQuery}
-              onRefresh={handleRefreshCards}
-              onAsk={(q) => generateRealResponse(q)}
-            />
-          </div>
+
         </div>
 
         <ChatInputSection

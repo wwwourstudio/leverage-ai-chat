@@ -86,8 +86,9 @@ export async function POST(request: NextRequest) {
   let rateLimitUserId: string | undefined;
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    rateLimitUserId = user?.id;
+    // getSession() reads the cookie locally — no Supabase server round-trip needed for rate limiting
+    const { data: { session } } = await supabase.auth.getSession();
+    rateLimitUserId = session?.user?.id;
   } catch {
     // Supabase unavailable — fall through to IP-based limiting
   }
@@ -188,13 +189,13 @@ export async function POST(request: NextRequest) {
         const isNFLFile = fileName.includes('nfl') || fileName.includes('football') ||
           msgLower.includes('nfl') || msgLower.includes('nffc') || msgLower.includes('football');
         const sport = isNFLFile ? 'nfl' : 'mlb';
-        try {
-          await saveADPToSupabase(players, sport);
+        // Fire-and-forget — ADP save must not block the AI response
+        void saveADPToSupabase(players, sport).then(() => {
           if (sport === 'nfl') { clearNFLADPCache(); } else { clearADPCache(); }
           console.log(`[API/analyze] Auto-saved ${players.length} ${sport.toUpperCase()} ADP players`);
-        } catch (e) {
+        }).catch(e => {
           console.warn('[API/analyze] Failed to auto-save inline ADP upload:', e);
-        }
+        });
         break;
       }
     }
@@ -224,8 +225,34 @@ export async function POST(request: NextRequest) {
     const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const { cachedSystem, dynamicSystem } = buildSystemPrompt(detection, dateStr, customInstructions, body.deepThink);
 
-    // ── Phase 5: Prompt enrichment (odds / Kalshi / Statcast / schedule) ───────
-    const enrichment = await buildEnrichedPrompt(userMessage, context, detection, dateStr);
+    // ── Phase 5: Prompt enrichment + speculative card fetch (parallel) ────────
+    // Pre-compute prop-card intent here so Phase 7 reuses the same result and the
+    // early-fetch guard can exclude prop queries (which need a different card type).
+    const PROP_CARD_KEYWORDS = [
+      'pitcher prop','pitcher props','batter prop','batter props','player prop','player props',
+      'prop bet','prop bets','prop pick','prop picks','best props','top props','strikeout prop',
+      'hr prop','k prop','hits prop','rbi prop','points prop','assists prop','rebounds prop',
+      'anytime td','td scorer','receiving yards prop','rushing yards prop',
+    ];
+    const hasPropCardIntent = PROP_CARD_KEYWORDS.some(k => rawQueryLower.includes(k));
+
+    const enrichmentPromise = buildEnrichedPrompt(userMessage, context, detection, dateStr);
+
+    // For non-Kalshi, non-prop, non-player, non-fantasy betting/sports queries the card
+    // type is fully determined by detection — kick off the fetch now, in parallel with
+    // the odds/schedule/Statcast fetches inside buildEnrichedPrompt.  This saves the
+    // serial wait (typically 2–5 s) before the AI call begins.
+    let speculativeCardPromise: Promise<InsightCard[]> | null = null;
+    if (
+      !context.isPoliticalMarket && context.selectedCategory !== 'kalshi' &&
+      !isAmbiguous && !context.hasPlayerIntent && !context.hasFantasyIntent && !hasADPIntent &&
+      !context.oddsData?.events?.length && !hasPropCardIntent &&
+      (context.isSportsQuery || context.hasBettingIntent)
+    ) {
+      speculativeCardPromise = generateContextualCards('betting', context.sport ?? undefined, 7).catch(() => []);
+    }
+
+    const enrichment = await enrichmentPromise;
     const {
       enrichedPrompt: rawEnrichedPrompt,
       kalshiSportsFallbackMarkets, kalshiPromptMarkets,
@@ -345,8 +372,7 @@ export async function POST(request: NextRequest) {
         cardFetchPromise = generateContextualCards('player', context.sport ?? undefined, 1, false, undefined, { playerName: name }).catch(() => []);
 
       } else if (!context.isPoliticalMarket && context.selectedCategory !== 'kalshi' && (context.isSportsQuery || context.hasBettingIntent)) {
-        const PROP_CARD_KEYWORDS = ['pitcher prop','pitcher props','batter prop','batter props','player prop','player props','prop bet','prop bets','prop pick','prop picks','best props','top props','strikeout prop','hr prop','k prop','hits prop','rbi prop','points prop','assists prop','rebounds prop','anytime td','td scorer','receiving yards prop','rushing yards prop'];
-        const hasPropCardIntent = PROP_CARD_KEYWORDS.some(k => rawQueryLower.includes(k));
+        // hasPropCardIntent and PROP_CARD_KEYWORDS are hoisted to Phase 5 for parallel early-fetch
         const sportKey = context.sport || undefined;
         if (hasPropCardIntent) {
           cardFetchPromise = generateContextualCards('props', sportKey, 7).catch(() => generateContextualCards('betting', sportKey, 7).catch(() => []));
@@ -359,7 +385,8 @@ export async function POST(request: NextRequest) {
             })
             .catch(() => generateContextualCards('betting', sportKey, 7).catch(() => []));
         } else {
-          cardFetchPromise = generateContextualCards('betting', sportKey, 7).catch(() => []);
+          // Reuse the speculative fetch started in parallel with enrichment (Phase 5)
+          cardFetchPromise = speculativeCardPromise ?? generateContextualCards('betting', sportKey, 7).catch(() => []);
         }
 
       } else if (context.isPoliticalMarket || context.selectedCategory === 'kalshi' || kalshiPromptMarkets?.length) {

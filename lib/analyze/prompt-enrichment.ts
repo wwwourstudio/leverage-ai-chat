@@ -10,6 +10,7 @@
 import { getOddsApiKey } from '@/lib/config';
 import { getMarketIntelligenceSummary } from '@/lib/market-intelligence';
 import { LOG_PREFIXES, NFL_SEASON_YEAR } from '@/lib/constants';
+import { cacheGet, cacheSet, bucket } from '@/lib/cache/redis-cache';
 import type { AnalyzeContext, SportDetectionResult, EnrichmentResult } from './types';
 
 /** Format an American-odds number, returning 'N/A' for invalid values. */
@@ -95,24 +96,36 @@ export async function buildEnrichedPrompt(
   // ── Branch 4: Kalshi / prediction market query ───────────────────────────
   } else if (context.isPoliticalMarket || context.selectedCategory === 'kalshi') {
     try {
-      const { fetchElectionMarkets, fetchKalshiMarketsWithRetry, fetchEntertainmentMarkets } = await import('@/lib/kalshi/index');
       const sub = (context.kalshiSubcategory || '').toLowerCase();
-      const ENTERTAINMENT_SUBS = ['entertainment', 'culture', 'awards', 'oscars', 'grammys',
-        'emmys', 'films', 'movies', 'music', 'tv', 'celebrity', 'pop culture', 'arts',
-        'film', 'oscar', 'grammy', 'emmy'];
-      const fetchMarkets =
-        (sub === 'politics' || sub === 'elections' || sub === 'election')
-          ? fetchElectionMarkets({ limit: 50 })
-        : (sub === 'sports' || sub === 'sport')
-          ? fetchKalshiMarketsWithRetry({ search: 'NFL NBA MLB NHL Super Bowl March Madness', limit: 30, maxRetries: 2 })
-        : ENTERTAINMENT_SUBS.includes(sub)
-          ? fetchEntertainmentMarkets(50)
-        : fetchKalshiMarketsWithRetry({ limit: 50, maxRetries: 3 });
+      const _kalshiMainKey = `kalshi:main:v1:${sub || 'general'}:${bucket(180_000)}`; // 3-min buckets
 
-      const markets = await Promise.race([
-        fetchMarkets,
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000)),
-      ]).catch(() => null);
+      let markets: any[] | null = await cacheGet<any[]>(_kalshiMainKey).catch(() => null);
+
+      if (markets === null) {
+        const { fetchElectionMarkets, fetchKalshiMarketsWithRetry, fetchEntertainmentMarkets } = await import('@/lib/kalshi/index');
+        const ENTERTAINMENT_SUBS = ['entertainment', 'culture', 'awards', 'oscars', 'grammys',
+          'emmys', 'films', 'movies', 'music', 'tv', 'celebrity', 'pop culture', 'arts',
+          'film', 'oscar', 'grammy', 'emmy'];
+        const fetchMarkets =
+          (sub === 'politics' || sub === 'elections' || sub === 'election')
+            ? fetchElectionMarkets({ limit: 50 })
+          : (sub === 'sports' || sub === 'sport')
+            ? fetchKalshiMarketsWithRetry({ search: 'NFL NBA MLB NHL Super Bowl March Madness', limit: 30, maxRetries: 2 })
+          : ENTERTAINMENT_SUBS.includes(sub)
+            ? fetchEntertainmentMarkets(50)
+          : fetchKalshiMarketsWithRetry({ limit: 50, maxRetries: 3 });
+
+        markets = await Promise.race([
+          fetchMarkets,
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000)),
+        ]).catch(() => null);
+
+        if (Array.isArray(markets)) {
+          void cacheSet(_kalshiMainKey, markets, 180);
+        }
+      } else {
+        console.log(`[KALSHI] Cache hit for ${_kalshiMainKey}`);
+      }
 
       if (markets && (markets as any[]).length > 0) {
         const sorted = (markets as any[]).sort((a: any, b: any) => {
@@ -149,10 +162,23 @@ export async function buildEnrichedPrompt(
       try {
         const { fetchLiveOdds, validateSportKey } = await import('@/lib/odds/index');
         const _sportKey = validateSportKey(context.sport).normalizedKey ?? context.sport;
-        const _serverEvents = await Promise.race([
-          fetchLiveOdds(_sportKey, { apiKey: _oddsKey, markets: ['h2h', 'spreads', 'totals'], regions: ['us'], oddsFormat: 'american' }),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
-        ]).catch(() => null);
+
+        // 2-minute cache: odds change slowly; avoids hammering the Odds API on every request
+        const _oddsCacheKey = `odds:v1:${_sportKey}:${bucket(120_000)}`;
+        let _serverEvents: any[] | null = await cacheGet<any[]>(_oddsCacheKey).catch(() => null);
+
+        if (_serverEvents === null) {
+          _serverEvents = await Promise.race([
+            fetchLiveOdds(_sportKey, { apiKey: _oddsKey, markets: ['h2h', 'spreads', 'totals'], regions: ['us'], oddsFormat: 'american' }),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+          ]).catch(() => null);
+          // Cache the result (including empty arrays — no live games IS a valid cached state)
+          if (Array.isArray(_serverEvents)) {
+            void cacheSet(_oddsCacheKey, _serverEvents, 120);
+          }
+        } else {
+          console.log(`[v0] [ANALYZE] Odds cache hit for ${_sportKey}`);
+        }
 
         if (Array.isArray(_serverEvents) && _serverEvents.length > 0) {
           enrichedPrompt += formatOddsEvents(_serverEvents, context.sport);
@@ -206,11 +232,21 @@ export async function buildEnrichedPrompt(
       const sportKw = SPORT_TO_KALSHI_KW[context.sport]
         ?? context.sport.replace(/^[a-z]+_/, '').toUpperCase();
       try {
-        const { fetchKalshiMarketsWithRetry } = await import('@/lib/kalshi/index');
-        const markets = await Promise.race([
-          fetchKalshiMarketsWithRetry({ search: sportKw, limit: 10, maxRetries: 3 }),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)),
-        ]).catch(() => null);
+        const _kalshiSportKey = `kalshi:sport:v1:${sportKw}:${bucket(180_000)}`; // 3-min buckets
+        let markets: any[] | null = await cacheGet<any[]>(_kalshiSportKey).catch(() => null);
+
+        if (markets === null) {
+          const { fetchKalshiMarketsWithRetry } = await import('@/lib/kalshi/index');
+          markets = await Promise.race([
+            fetchKalshiMarketsWithRetry({ search: sportKw, limit: 10, maxRetries: 3 }),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)),
+          ]).catch(() => null);
+          if (Array.isArray(markets)) {
+            void cacheSet(_kalshiSportKey, markets, 180);
+          }
+        } else {
+          console.log(`[KALSHI] Sports fallback cache hit for ${sportKw}`);
+        }
         if (markets && (markets as any[]).length > 0) {
           const top = (markets as any[]).slice(0, 6);
           kalshiSportsFallbackMarkets = top;
@@ -249,13 +285,26 @@ export async function buildEnrichedPrompt(
   if (isMLBQuery && !hasADPIntent && !context.isPoliticalMarket) {
     const STATCAST_SEASON = new Date().getFullYear() - (new Date().getMonth() + 1 >= 4 ? 0 : 1);
     try {
-      const { getTopStatcastLeadersFromDB } = await import('@/lib/services/statcast-ingest');
-      const { batters: dbBatters, pitchers: dbPitchers } = await Promise.race([
-        getTopStatcastLeadersFromDB(STATCAST_SEASON, 5),
-        new Promise<{ batters: never[]; pitchers: never[] }>(
-          resolve => setTimeout(() => resolve({ batters: [], pitchers: [] }), 800)
-        ),
-      ]);
+      // Statcast leaders change daily — cache for 1 hour
+      const _statcastKey = `statcast:leaders:v1:${STATCAST_SEASON}:${bucket(3_600_000)}`;
+      let _statcastLeaders = await cacheGet<{ batters: any[]; pitchers: any[] }>(_statcastKey).catch(() => null);
+
+      if (_statcastLeaders === null) {
+        const { getTopStatcastLeadersFromDB } = await import('@/lib/services/statcast-ingest');
+        _statcastLeaders = await Promise.race([
+          getTopStatcastLeadersFromDB(STATCAST_SEASON, 5),
+          new Promise<{ batters: never[]; pitchers: never[] }>(
+            resolve => setTimeout(() => resolve({ batters: [], pitchers: [] }), 800)
+          ),
+        ]);
+        if ((_statcastLeaders?.batters?.length ?? 0) >= 3) {
+          void cacheSet(_statcastKey, _statcastLeaders, 3600);
+        }
+      } else {
+        console.log(`[v0] [ANALYZE] Statcast leaders cache hit (${_statcastLeaders.batters?.length ?? 0} batters)`);
+      }
+
+      const { batters: dbBatters, pitchers: dbPitchers } = _statcastLeaders ?? { batters: [], pitchers: [] };
 
       if (dbBatters.length >= 3 && dbPitchers.length >= 3) {
         const fmtB = (p: Record<string, unknown>) =>
@@ -331,11 +380,21 @@ export async function buildEnrichedPrompt(
   // ── MLB schedule injection — prevents recommending inactive pitchers ────────
   if (isMLBQuery && !context.isPoliticalMarket) {
     try {
-      const { fetchTodaysGames } = await import('@/lib/mlb-projections/mlb-stats-api');
-      const todaysGames = await Promise.race([
-        fetchTodaysGames(),
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000)),
-      ]).catch(() => [] as Awaited<ReturnType<typeof fetchTodaysGames>>);
+      const _mlbSchedKey = `mlb:schedule:v1:${new Date().toISOString().slice(0, 10)}:${bucket(300_000)}`; // 5-min buckets
+      let todaysGames = await cacheGet<Awaited<ReturnType<any>>>(_mlbSchedKey).catch(() => null);
+
+      if (todaysGames === null) {
+        const { fetchTodaysGames } = await import('@/lib/mlb-projections/mlb-stats-api');
+        todaysGames = await Promise.race([
+          fetchTodaysGames(),
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000)),
+        ]).catch(() => []);
+        if (Array.isArray(todaysGames) && todaysGames.length > 0) {
+          void cacheSet(_mlbSchedKey, todaysGames, 300);
+        }
+      } else {
+        console.log(`[v0] [ANALYZE] MLB schedule cache hit (${todaysGames.length} games)`);
+      }
 
       if (todaysGames.length > 0) {
         const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });

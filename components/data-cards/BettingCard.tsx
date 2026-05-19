@@ -155,14 +155,14 @@ export const BettingCard = memo(function BettingCard({
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {(isLiveGame || isExtremeOdds) && !isFinal && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-[10px] font-black text-emerald-300 uppercase tracking-wider">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/20 border border-blue-500/30 text-[10px] font-black text-blue-300 uppercase tracking-wider">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
                 LIVE
               </span>
             )}
             {data.realData && !isLiveGame && !isFinal && !isExtremeOdds && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-400/80">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/70" />
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-[10px] font-bold text-blue-400/80">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400/70" />
                 LIVE
               </span>
             )}
@@ -182,13 +182,13 @@ export const BettingCard = memo(function BettingCard({
               <span className="font-black text-[var(--foreground)] text-xs tracking-wide">{abbr(teams.away)}</span>
             </div>
             {awayML && (
-              <span className={cn('text-sm font-black tabular-nums', awayML.positive ? 'text-emerald-400' : 'text-[var(--foreground)]/90')}>
+              <span className={cn('text-sm font-black tabular-nums', awayML.positive ? 'text-blue-400' : 'text-[var(--foreground)]/90')}>
                 {awayML.display}
               </span>
             )}
             <span className="text-[9px] font-black text-[var(--foreground)]/40 mx-0.5">@</span>
             {homeML && (
-              <span className={cn('text-sm font-black tabular-nums', homeML.positive ? 'text-emerald-400' : 'text-[var(--foreground)]/90')}>
+              <span className={cn('text-sm font-black tabular-nums', homeML.positive ? 'text-blue-400' : 'text-[var(--foreground)]/90')}>
                 {homeML.display}
               </span>
             )}
@@ -210,7 +210,7 @@ export const BettingCard = memo(function BettingCard({
           {data.edge && (() => {
             const edgeNum = parseFloat(String(data.edge).replace(/[^0-9.-]/g, ''));
             const edgeCls = !isNaN(edgeNum) && edgeNum >= 5
-              ? 'bg-emerald-500/20 border-emerald-500/35 text-emerald-300'
+              ? 'bg-blue-500/20 border-blue-500/35 text-blue-300'
               : !isNaN(edgeNum) && edgeNum >= 2
               ? 'bg-amber-500/20 border-amber-500/35 text-amber-300'
               : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--foreground)]/70';
@@ -223,7 +223,7 @@ export const BettingCard = memo(function BettingCard({
           {hasLineMove && (
             <span className={cn(
               'inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full border text-[10px] font-bold',
-              moveDir === 'up'   ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+              moveDir === 'up'   ? 'bg-blue-500/15 border-blue-500/30 text-blue-300'
               : moveDir === 'down' ? 'bg-red-500/15 border-red-500/30 text-red-300'
               : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-muted)]',
             )}>
@@ -245,7 +245,7 @@ export const BettingCard = memo(function BettingCard({
               {data.stat && <p className="text-[11px] text-[var(--text-faint)] truncate">{data.stat}</p>}
             </div>
             {data.odds && (
-              <span className={cn('font-black tabular-nums shrink-0 text-xl', Number(data.odds) > 0 ? 'text-emerald-400' : 'text-red-400')}>
+              <span className={cn('font-black tabular-nums shrink-0 text-xl', Number(data.odds) > 0 ? 'text-blue-400' : 'text-red-400')}>
                 {Number(data.odds) > 0 ? `+${data.odds}` : data.odds}
               </span>
             )}
@@ -264,13 +264,13 @@ export const BettingCard = memo(function BettingCard({
             {data.hitRate != null && (
               <div className="flex flex-col items-center rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Hit Rate</span>
-                <span className={cn('text-base font-black tabular-nums', Number(data.hitRate) >= 65 ? 'text-emerald-400' : Number(data.hitRate) <= 35 ? 'text-red-400' : 'text-foreground')}>{data.hitRate}%</span>
+                <span className={cn('text-base font-black tabular-nums', Number(data.hitRate) >= 65 ? 'text-blue-400' : Number(data.hitRate) <= 35 ? 'text-red-400' : 'text-foreground')}>{data.hitRate}%</span>
               </div>
             )}
             {confPct !== null && (
               <div className="flex flex-col items-center rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] px-2 py-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Confidence</span>
-                <span className={cn('text-base font-black tabular-nums', confPct >= 70 ? 'text-emerald-400' : confPct >= 50 ? 'text-amber-400' : 'text-red-400')}>{confPct}%</span>
+                <span className={cn('text-base font-black tabular-nums', confPct >= 70 ? 'text-blue-400' : confPct >= 50 ? 'text-amber-400' : 'text-red-400')}>{confPct}%</span>
               </div>
             )}
           </div>
@@ -285,13 +285,13 @@ export const BettingCard = memo(function BettingCard({
                 <TeamLogo name={teams.away} sport={data.sport} avatarCls={theme.avatarCls} isLarge={isHero} />
                 <span className={cn('font-black text-foreground text-center leading-tight truncate w-full', isHero ? 'text-sm' : 'text-xs')}>{teams.away}</span>
                 {awayML && (
-                  <span className={cn('font-black tabular-nums', isHero ? 'text-xl' : 'text-lg', awayML.positive ? 'text-emerald-400' : 'text-foreground', isBestAway && 'ring-1 ring-emerald-400/40 rounded-md px-1 bg-emerald-500/8')}>
+                  <span className={cn('font-black tabular-nums', isHero ? 'text-xl' : 'text-lg', awayML.positive ? 'text-blue-400' : 'text-foreground', isBestAway && 'ring-1 ring-blue-400/40 rounded-md px-1 bg-blue-500/8')}>
                     {awayML.display}
-                    {isBestAway && <span className="text-[10px] ml-0.5 text-emerald-500 font-black">★</span>}
+                    {isBestAway && <span className="text-[10px] ml-0.5 text-blue-500 font-black">★</span>}
                   </span>
                 )}
                 {awayProb !== null && (
-                  <span className={cn('text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums', awayProb > 55 ? 'text-emerald-400 bg-emerald-500/12' : 'text-[var(--text-muted)] bg-[var(--bg-elevated)]')}>{awayProb}%</span>
+                  <span className={cn('text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums', awayProb > 55 ? 'text-blue-400 bg-blue-500/12' : 'text-[var(--text-muted)] bg-[var(--bg-elevated)]')}>{awayProb}%</span>
                 )}
               </div>
 
@@ -312,13 +312,13 @@ export const BettingCard = memo(function BettingCard({
                 <TeamLogo name={teams.home} sport={data.sport} avatarCls={theme.avatarCls} isLarge={isHero} />
                 <span className={cn('font-black text-foreground text-center leading-tight truncate w-full', isHero ? 'text-sm' : 'text-xs')}>{teams.home}</span>
                 {homeML && (
-                  <span className={cn('font-black tabular-nums', isHero ? 'text-xl' : 'text-lg', homeML.positive ? 'text-emerald-400' : 'text-foreground', isBestHome && 'ring-1 ring-emerald-400/40 rounded-md px-1 bg-emerald-500/8')}>
+                  <span className={cn('font-black tabular-nums', isHero ? 'text-xl' : 'text-lg', homeML.positive ? 'text-blue-400' : 'text-foreground', isBestHome && 'ring-1 ring-blue-400/40 rounded-md px-1 bg-blue-500/8')}>
                     {homeML.display}
-                    {isBestHome && <span className="text-[10px] ml-0.5 text-emerald-500 font-black">★</span>}
+                    {isBestHome && <span className="text-[10px] ml-0.5 text-blue-500 font-black">★</span>}
                   </span>
                 )}
                 {homeProb !== null && (
-                  <span className={cn('text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums', homeProb > 55 ? 'text-emerald-400 bg-emerald-500/12' : 'text-[var(--text-muted)] bg-[var(--bg-elevated)]')}>{homeProb}%</span>
+                  <span className={cn('text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums', homeProb > 55 ? 'text-blue-400 bg-blue-500/12' : 'text-[var(--text-muted)] bg-[var(--bg-elevated)]')}>{homeProb}%</span>
                 )}
               </div>
             </div>

@@ -117,7 +117,7 @@ const MarketCard = memo(function MarketCard({ market, onAnalyze, starred, onTogg
 
   const catColor: Record<string, string> = {
     Politics:    'text-blue-400  bg-blue-500/10  border-blue-500/20',
-    Sports:      'text-green-400 bg-green-500/10 border-green-500/20',
+    Sports:      'text-violet-400 bg-violet-500/10 border-violet-500/20',
     Finance:     'text-amber-400 bg-amber-500/10 border-amber-500/20',
     Crypto:      'text-violet-400 bg-violet-500/10 border-violet-500/20',
     Weather:     'text-cyan-400  bg-cyan-500/10  border-cyan-500/20',
@@ -131,7 +131,7 @@ const MarketCard = memo(function MarketCard({ market, onAnalyze, starred, onTogg
       flashing ? 'border-emerald-500/60 shadow-emerald-500/10' : 'border-[var(--border-subtle)] hover:border-[var(--border-subtle)]',
     )}>
       {flashing && (
-        <div className="h-0.5 w-full bg-gradient-to-r from-emerald-500 to-cyan-500 animate-pulse" />
+        <div className="h-0.5 w-full bg-gradient-to-r from-blue-500 to-cyan-500 animate-pulse" />
       )}
       {/* Header */}
       <div className="px-4 pt-4 pb-2">
@@ -157,12 +157,12 @@ const MarketCard = memo(function MarketCard({ market, onAnalyze, starred, onTogg
       <div className="px-4 pb-3">
         <div className="relative h-1.5 w-full rounded-full bg-[var(--bg-elevated)] overflow-hidden mt-2">
           <div
-            className="absolute left-0 top-0 h-full rounded-full bg-emerald-500 transition-all"
+            className="absolute left-0 top-0 h-full rounded-full bg-blue-500 transition-all"
             style={{ width: `${yesProb}%` }}
           />
         </div>
         <div className="flex justify-between text-[10px] mt-1">
-          <span className="text-emerald-400 font-bold">YES {yesProb}¢</span>
+          <span className="text-blue-400 font-bold">YES {yesProb}¢</span>
           <span className="text-rose-400 font-bold">NO {noProb}¢</span>
         </div>
       </div>
@@ -170,7 +170,7 @@ const MarketCard = memo(function MarketCard({ market, onAnalyze, starred, onTogg
       {/* Price change + volume */}
       <div className="px-4 pb-3 flex items-center justify-between text-[10px] text-[var(--text-muted)]">
         {market.priceChange !== 0 ? (
-          <span className={isUp ? 'text-emerald-400' : isDown ? 'text-rose-400' : 'text-[var(--text-muted)]'}>
+          <span className={isUp ? 'text-blue-400' : isDown ? 'text-rose-400' : 'text-[var(--text-muted)]'}>
             {isUp ? '▲' : '▼'} {Math.abs(market.priceChange)}¢
           </span>
         ) : <span />}

@@ -30,7 +30,7 @@ interface BullpenFatigueCardProps {
 }
 
 const RISK_CONFIG = {
-  low:      { bar: 'bg-emerald-500', badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', header: 'dark:from-emerald-900/30 dark:via-green-900/10',    icon: 'text-emerald-400' },
+  low:      { bar: 'bg-blue-500', badge: 'bg-blue-500/15 border-blue-500/40 text-blue-300', header: 'dark:from-blue-900/30 dark:via-blue-900/10',    icon: 'text-blue-400' },
   moderate: { bar: 'bg-amber-500',   badge: 'bg-amber-500/15 border-amber-500/40 text-amber-300',       header: 'dark:from-amber-900/30 dark:via-orange-900/10',   icon: 'text-amber-400'   },
   high:     { bar: 'bg-red-500',     badge: 'bg-red-500/15 border-red-500/40 text-red-400',             header: 'dark:from-red-900/35 dark:via-orange-900/15',     icon: 'text-red-400'     },
 };
@@ -48,7 +48,7 @@ export function BullpenFatigueCard({
   const fatigueScore = Number(data.fatigueScore ?? 0);
   const impact = Number(data.scoringEnvImpact ?? 0);
   const eraNum  = Number(data.eraLast14Days ?? 0);
-  const eraColor = eraNum > 5.0 ? 'text-red-400' : eraNum > 4.0 ? 'text-amber-400' : eraNum > 0 ? 'text-emerald-400' : 'text-[var(--text-secondary,var(--text-muted))]';
+  const eraColor = eraNum > 5.0 ? 'text-red-400' : eraNum > 4.0 ? 'text-amber-400' : eraNum > 0 ? 'text-blue-400' : 'text-[var(--text-secondary,var(--text-muted))]';
 
   return (
     <article className={cn(
@@ -118,7 +118,7 @@ export function BullpenFatigueCard({
           {data.scoringEnvImpact !== undefined && (
             <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
               <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Run Impact</p>
-              <p className={cn('text-base font-black tabular-nums', impact > 0 ? 'text-amber-400' : 'text-emerald-400')}>
+              <p className={cn('text-base font-black tabular-nums', impact > 0 ? 'text-amber-400' : 'text-blue-400')}>
                 {impact > 0 ? '+' : ''}{impact.toFixed(1)}
               </p>
             </div>
@@ -134,7 +134,7 @@ export function BullpenFatigueCard({
             'rounded-xl px-3 py-2.5 text-[10px] font-semibold border',
             impact > 0.5
               ? 'bg-amber-500/10 border-amber-500/20 text-amber-300'
-              : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300',
+              : 'bg-blue-500/10 border-blue-500/20 text-blue-300',
           )}>
             {impact > 0
               ? `+${impact.toFixed(1)} runs added — lean OVER on totals`

@@ -112,21 +112,21 @@ export function TabTeams({ data, teams, theme, onAnalyze, onAsk, loading = false
             <span className="text-[10px] text-[var(--text-faint)] self-center font-medium">{label}</span>
             <span className={cn(
               'text-[11px] font-black text-right self-center tabular-nums',
-              advantage === 'away' ? 'text-emerald-400' : 'text-white/75',
+              advantage === 'away' ? 'text-blue-400' : 'text-white/75',
             )}>
               {away ?? '—'}
             </span>
             {/* Advantage arrow */}
             <span className="flex items-center justify-center self-center text-[10px] font-black">
               {advantage === 'away'
-                ? <span className="text-emerald-400">▲</span>
+                ? <span className="text-blue-400">▲</span>
                 : advantage === 'home'
                 ? <span className="text-red-400">▼</span>
                 : <span className="text-white/15">·</span>}
             </span>
             <span className={cn(
               'text-[11px] font-black text-right self-center tabular-nums',
-              advantage === 'home' ? 'text-emerald-400' : 'text-white/75',
+              advantage === 'home' ? 'text-blue-400' : 'text-white/75',
             )}>
               {home ?? '—'}
             </span>

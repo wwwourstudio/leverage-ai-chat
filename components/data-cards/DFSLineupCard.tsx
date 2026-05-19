@@ -27,10 +27,10 @@ const POS_COLORS: Record<string, { bg: string; text: string; border: string }> =
   SP:   { bg: 'bg-blue-500/20',   text: 'text-blue-300',   border: 'border-blue-500/35' },
   RP:   { bg: 'bg-sky-500/20',    text: 'text-sky-300',    border: 'border-sky-500/35' },
   C:    { bg: 'bg-teal-500/20',   text: 'text-teal-300',   border: 'border-teal-500/35' },
-  '1B': { bg: 'bg-green-500/20',  text: 'text-green-300',  border: 'border-green-500/35' },
-  '2B': { bg: 'bg-green-500/20',  text: 'text-green-300',  border: 'border-green-500/35' },
-  '3B': { bg: 'bg-green-500/20',  text: 'text-green-300',  border: 'border-green-500/35' },
-  SS:   { bg: 'bg-green-500/20',  text: 'text-green-300',  border: 'border-green-500/35' },
+  '1B': { bg: 'bg-blue-500/20',  text: 'text-blue-300',  border: 'border-blue-500/35' },
+  '2B': { bg: 'bg-blue-500/20',  text: 'text-blue-300',  border: 'border-blue-500/35' },
+  '3B': { bg: 'bg-blue-500/20',  text: 'text-blue-300',  border: 'border-blue-500/35' },
+  SS:   { bg: 'bg-blue-500/20',  text: 'text-blue-300',  border: 'border-blue-500/35' },
   OF:   { bg: 'bg-amber-500/20',  text: 'text-amber-300',  border: 'border-amber-500/35' },
   UTIL: { bg: 'bg-slate-500/20',  text: 'text-slate-300',  border: 'border-slate-500/35' },
   P:    { bg: 'bg-blue-500/20',   text: 'text-blue-300',   border: 'border-blue-500/35' },
@@ -58,9 +58,9 @@ function PositionBubble({ position }: { position: string }) {
 
 /** Matchup score dot chip */
 function MatchupDot({ score }: { score: number }) {
-  const cls  = score >= 70 ? 'bg-emerald-500' : score >= 50 ? 'bg-amber-500' : 'bg-red-500';
+  const cls  = score >= 70 ? 'bg-blue-500' : score >= 50 ? 'bg-amber-500' : 'bg-red-500';
   const tip  = score >= 70 ? 'GREAT' : score >= 50 ? 'OK' : 'TOUGH';
-  const txt  = score >= 70 ? 'text-emerald-400' : score >= 50 ? 'text-amber-400' : 'text-red-400';
+  const txt  = score >= 70 ? 'text-blue-400' : score >= 50 ? 'text-amber-400' : 'text-red-400';
   return (
     <span className={cn('inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[8px] font-black uppercase tracking-wide shrink-0', txt)}>
       <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', cls)} />
@@ -83,7 +83,7 @@ function RangeTrack({ p10, p50, p90, mean }: { p10: number; p50: number; p90: nu
     <div className="space-y-0.5 min-w-0 flex-1">
       <div className="relative h-1.5 rounded-full overflow-visible" style={{ maxWidth: '110px' }}>
         {/* Track gradient */}
-        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-red-500/30 via-amber-400/20 to-emerald-500/30" />
+        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-red-500/30 via-amber-400/20 to-blue-500/30" />
         {/* Median marker */}
         <div
           className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white border-2 border-[var(--cat-dfs,oklch(0.72_0.20_80))] shadow-[0_0_4px_oklch(0.72_0.20_80/0.6)]"
@@ -93,7 +93,7 @@ function RangeTrack({ p10, p50, p90, mean }: { p10: number; p50: number; p90: nu
       <div className="flex items-center justify-between" style={{ maxWidth: '110px' }}>
         <span className="text-[7px] text-red-400 tabular-nums">{p10.toFixed(0)}</span>
         <span className="text-[7px] text-[var(--text-faint)] tabular-nums">{p50.toFixed(0)}</span>
-        <span className="text-[7px] text-emerald-400 tabular-nums">{p90.toFixed(0)}</span>
+        <span className="text-[7px] text-blue-400 tabular-nums">{p90.toFixed(0)}</span>
       </div>
     </div>
   );
@@ -146,13 +146,13 @@ export function DFSLineupCard({ lineup, totalProjected, site = 'DK', onAsk }: DF
             <div className="flex items-center gap-1.5 text-[10px] tabular-nums">
               <span className="text-red-400 font-bold">{totalP10.toFixed(0)}</span>
               <span className="text-[var(--text-faint)]">–</span>
-              <span className="text-emerald-400 font-bold">{totalP90.toFixed(0)}</span>
+              <span className="text-blue-400 font-bold">{totalP90.toFixed(0)}</span>
               <span className="text-[var(--text-faint)]">range</span>
             </div>
           )}
           {lineup.length > 0 && (
-            <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase tracking-wide">
-              <span className="w-1 h-1 rounded-full bg-emerald-400" />
+            <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[10px] font-bold uppercase tracking-wide">
+              <span className="w-1 h-1 rounded-full bg-blue-400" />
               {lineup.length} players
             </span>
           )}
@@ -230,7 +230,7 @@ export function DFSLineupCard({ lineup, totalProjected, site = 'DK', onAsk }: DF
               )}
               <span className="text-xl font-black text-white tabular-nums">{total.toFixed(1)}</span>
               {totalP90 !== null && (
-                <span className="text-[10px] text-emerald-400 tabular-nums font-bold">Ceil {totalP90.toFixed(1)}</span>
+                <span className="text-[10px] text-blue-400 tabular-nums font-bold">Ceil {totalP90.toFixed(1)}</span>
               )}
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[var(--cat-dfs,oklch(0.72_0.20_80))]/15 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 text-[var(--cat-dfs,oklch(0.72_0.20_80))] text-[9px] font-black uppercase">
                 PTS

@@ -89,13 +89,13 @@ export function KalshiMarketCard({ market, onAsk }: KalshiMarketCardProps) {
         {/* YES / NO hero prices */}
         <div className="grid grid-cols-2 gap-2">
           {/* YES */}
-          <div className="rounded-2xl bg-emerald-500/15 border border-emerald-500/30 p-4 text-center">
-            <div className="text-[9px] font-black text-emerald-400/80 uppercase tracking-widest mb-1.5">YES</div>
-            <div className="text-3xl font-black text-emerald-300 tabular-nums leading-none">
+          <div className="rounded-2xl bg-blue-500/15 border border-blue-500/30 p-4 text-center">
+            <div className="text-[9px] font-black text-blue-400/80 uppercase tracking-widest mb-1.5">YES</div>
+            <div className="text-3xl font-black text-blue-300 tabular-nums leading-none">
               {yesDisplay}
             </div>
             {market.priceIsReal && market.yesBid > 0 && (
-              <div className="text-[8px] text-emerald-400/50 mt-2 space-x-1">
+              <div className="text-[8px] text-blue-400/50 mt-2 space-x-1">
                 <span>Bid {market.yesBid}¢</span>
                 <span>·</span>
                 <span>Ask {market.yesAsk}¢</span>
@@ -123,12 +123,12 @@ export function KalshiMarketCard({ market, onAsk }: KalshiMarketCardProps) {
         {yesPct !== null && noPct !== null && (
           <div className="space-y-1.5">
             <div className="flex justify-between text-[9px] font-bold">
-              <span className="text-emerald-400">{yesPct}% YES</span>
+              <span className="text-blue-400">{yesPct}% YES</span>
               <span className="text-red-400">{noPct}% NO</span>
             </div>
             <div className="h-2.5 rounded-full overflow-hidden flex">
               <div
-                className="h-full bg-gradient-to-r from-emerald-600 to-emerald-500 rounded-l-full transition-all duration-500"
+                className="h-full bg-gradient-to-r from-blue-600 to-blue-500 rounded-l-full transition-all duration-500"
                 style={{ width: `${yesPct}%` }}
               />
               <div

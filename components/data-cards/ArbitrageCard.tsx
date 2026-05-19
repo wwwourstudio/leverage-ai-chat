@@ -48,11 +48,11 @@ function ROIBar({ roiPct }: { roiPct: string }) {
     <div className="space-y-1 mt-1">
       <div className="flex justify-between text-[8px] font-bold">
         <span className="text-[var(--text-faint)] uppercase tracking-wider">ROI</span>
-        <span className="text-emerald-400 tabular-nums">+{roiPct}%</span>
+        <span className="text-blue-400 tabular-nums">+{roiPct}%</span>
       </div>
       <div className="h-1.5 rounded-full overflow-hidden bg-[var(--bg-elevated)]">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-green-400 transition-all duration-700"
+          className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-700"
           style={{ width: animated ? `${barWidth}%` : '0%' }}
         />
       </div>
@@ -69,9 +69,9 @@ function BetLeg({
   leg: number;
 }) {
   const isLeg1 = leg === 1;
-  const borderCls = isLeg1 ? 'border-emerald-500/30' : 'border-teal-500/30';
+  const borderCls = isLeg1 ? 'border-blue-500/30' : 'border-cyan-500/30';
   const oddsPositive = bet.odds && (bet.odds.startsWith('+') || parseFloat(bet.odds) > 0);
-  const oddsCls = oddsPositive ? 'text-emerald-300' : 'text-foreground/90';
+  const oddsCls = oddsPositive ? 'text-blue-300' : 'text-foreground/90';
   const prob = impliedProb(bet.odds);
 
   return (
@@ -79,13 +79,13 @@ function BetLeg({
       {/* Leg header */}
       <div className={cn(
         'flex items-center justify-between px-3 py-2 border-b',
-        isLeg1 ? 'bg-emerald-500/8 border-emerald-500/20' : 'bg-teal-500/8 border-teal-500/20',
+        isLeg1 ? 'bg-blue-500/8 border-blue-500/20' : 'bg-cyan-500/8 border-cyan-500/20',
       )}>
         <div className="flex items-center gap-2">
-          <CheckCircle className={cn('w-3.5 h-3.5 shrink-0', isLeg1 ? 'text-emerald-400' : 'text-teal-400')}
+          <CheckCircle className={cn('w-3.5 h-3.5 shrink-0', isLeg1 ? 'text-blue-400' : 'text-cyan-400')}
                        aria-hidden="true" />
           <span className={cn('text-[9px] font-black uppercase tracking-widest',
-            isLeg1 ? 'text-emerald-500' : 'text-teal-500')}>
+            isLeg1 ? 'text-blue-500' : 'text-cyan-500')}>
             LEG {leg}
           </span>
           <span className="text-sm font-black text-foreground/90">{bet.team}</span>
@@ -102,7 +102,7 @@ function BetLeg({
         {[
           { label: 'Book',   val: bet.book,  cls: 'text-foreground/80' },
           { label: 'Stake',  val: bet.stake, cls: 'text-foreground/80' },
-          { label: 'To Win', val: bet.toWin, cls: 'text-emerald-300 font-black' },
+          { label: 'To Win', val: bet.toWin, cls: 'text-blue-300 font-black' },
         ].map(({ label, val, cls }) => (
           <div key={label}>
             <span className="text-[var(--text-faint)] text-[9px] uppercase tracking-wide font-bold">{label}</span>
@@ -118,7 +118,7 @@ function BetLeg({
 
 export function ArbitrageCard({
   data,
-  gradient = 'from-emerald-500 to-green-600',
+  gradient = 'from-blue-500 to-cyan-600',
   onAnalyze,
   isHero,
 }: ArbitrageCardProps) {
@@ -166,10 +166,10 @@ export function ArbitrageCard({
   const edgeConfirmed = combinedImpl !== null && combinedImpl < 100;
 
   const confColor =
-    data.confidence === 'HIGH'   ? 'text-emerald-400' :
+    data.confidence === 'HIGH'   ? 'text-blue-400' :
     data.confidence === 'MEDIUM' ? 'text-sky-400'     : 'text-[var(--text-muted)]';
   const confDot =
-    data.confidence === 'HIGH'   ? 'bg-emerald-400' :
+    data.confidence === 'HIGH'   ? 'bg-blue-400' :
     data.confidence === 'MEDIUM' ? 'bg-sky-400'     : 'bg-[var(--text-muted)]';
 
   return (
@@ -182,7 +182,7 @@ export function ArbitrageCard({
           : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-glow)]',
     )}>
       {/* Gradient header */}
-      <div className="absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-emerald-500/5 to-transparent dark:from-emerald-600/25 dark:via-teal-800/10 pointer-events-none" />
+      <div className="absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-blue-500/5 to-transparent dark:from-blue-600/25 dark:via-cyan-800/10 pointer-events-none" />
 
       <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)}
            aria-hidden="true" />
@@ -207,7 +207,7 @@ export function ArbitrageCard({
         {/* Header */}
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-2 min-w-0">
-            <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" aria-hidden="true" />
+            <TrendingUp className="w-4 h-4 text-blue-400 shrink-0" aria-hidden="true" />
             <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-faint)]">
               ARBITRAGE
             </span>
@@ -237,14 +237,14 @@ export function ArbitrageCard({
         </div>
 
         {/* Profit hero + ROI */}
-        <div className="rounded-2xl bg-[var(--bg-elevated)] border border-emerald-500/20 p-4 mb-4 text-center">
+        <div className="rounded-2xl bg-[var(--bg-elevated)] border border-blue-500/20 p-4 mb-4 text-center">
           <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Guaranteed Profit</p>
           <div className="flex items-end justify-center gap-3">
-            <div className="text-4xl font-black tabular-nums text-emerald-300 leading-none">
+            <div className="text-4xl font-black tabular-nums text-blue-300 leading-none">
               {data.profit}
             </div>
             {roiPct !== null && (
-              <span className="text-base font-black text-emerald-400 mb-0.5">+{roiPct}% ROI</span>
+              <span className="text-base font-black text-blue-400 mb-0.5">+{roiPct}% ROI</span>
             )}
           </div>
           {/* Investment vs profit comparison */}
@@ -256,7 +256,7 @@ export function ArbitrageCard({
             <div className="text-[var(--text-faint)] text-xs">→</div>
             <div className="flex-1 text-center">
               <div className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-0.5">Guaranteed Return</div>
-              <div className="text-sm font-black text-emerald-300 tabular-nums">{data.profitAmount}</div>
+              <div className="text-sm font-black text-blue-300 tabular-nums">{data.profitAmount}</div>
             </div>
           </div>
           {/* ROI progress bar */}
@@ -268,7 +268,7 @@ export function ArbitrageCard({
           <div className="mb-3 text-[9px] text-center text-[var(--text-faint)] bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] px-3 py-2">
             Combined implied: <span className="font-bold tabular-nums">{combinedImpl.toFixed(1)}%</span>
             {edgeConfirmed && (
-              <span className="ml-1.5 text-emerald-400 font-bold">← edge confirmed</span>
+              <span className="ml-1.5 text-blue-400 font-bold">← edge confirmed</span>
             )}
           </div>
         )}
@@ -293,7 +293,7 @@ export function ArbitrageCard({
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-2 w-full mt-4 px-4 py-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 hover:bg-emerald-500/25 hover:border-emerald-500/55 text-sm font-black text-emerald-300 hover:text-emerald-200 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+            className="flex items-center justify-center gap-2 w-full mt-4 px-4 py-3 rounded-xl bg-blue-500/15 border border-blue-500/30 hover:bg-blue-500/25 hover:border-blue-500/55 text-sm font-black text-blue-300 hover:text-blue-200 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             aria-label="Lock in arbitrage opportunity"
           >
             <CheckCircle className="w-4 h-4" aria-hidden="true" />

@@ -35,7 +35,7 @@ export function TabHistory({ data, onAnalyze, onAsk, loading = false }: {
                 <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">H2H</span>
                 {rec ? (
                   <div className="flex items-center gap-1">
-                    <span className="text-[12px] font-black text-emerald-400 tabular-nums">{rec.w}</span>
+                    <span className="text-[12px] font-black text-blue-400 tabular-nums">{rec.w}</span>
                     <span className="text-[10px] text-[var(--text-faint)]">-</span>
                     {rec.d > 0 && (
                       <>
@@ -77,7 +77,7 @@ export function TabHistory({ data, onAnalyze, onAsk, loading = false }: {
                   title={h.score ?? h.result ?? ''}
                   className={cn(
                     'w-5 h-5 rounded-md flex items-center justify-center text-[8px] font-black',
-                    isHit ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-400'
+                    isHit ? 'bg-blue-500/20 border border-blue-500/40 text-blue-400'
                     : isMiss ? 'bg-red-500/20 border border-red-500/40 text-red-400'
                     : 'bg-white/8 border border-white/15 text-white/40',
                   )}
@@ -115,7 +115,7 @@ export function TabHistory({ data, onAnalyze, onAsk, loading = false }: {
                 {(h.betResult != null || h.winner != null) && (
                   <div className={cn(
                     'w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-[9px] font-black',
-                    isHit ? 'bg-emerald-500/20 border border-emerald-500/35 text-emerald-400'
+                    isHit ? 'bg-blue-500/20 border border-blue-500/35 text-blue-400'
                     : isMiss ? 'bg-red-500/20 border border-red-500/35 text-red-400'
                     : 'bg-white/8 border border-white/15 text-white/40',
                   )}>

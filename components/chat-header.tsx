@@ -129,7 +129,7 @@ export const ChatHeader = memo(function ChatHeader({ activeChat, messages = [] }
               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full"
             >
               <span className={`w-1.5 h-1.5 rounded-full ${
-                systemStatus === 'ok' ? 'bg-emerald-500 animate-pulse' :
+                systemStatus === 'ok' ? 'bg-blue-500 animate-pulse' :
                 systemStatus === 'degraded' ? 'bg-amber-500' : 'bg-red-500'
               }`} />
             </span>

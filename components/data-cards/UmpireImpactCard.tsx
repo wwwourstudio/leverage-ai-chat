@@ -85,19 +85,19 @@ export function UmpireImpactCard({
         <div className="grid grid-cols-3 gap-2">
           <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
             <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">K Prop</p>
-            <p className={cn('text-base font-black tabular-nums', kImpact > 0 ? 'text-emerald-400' : kImpact < 0 ? 'text-red-400' : 'text-white/70')}>
+            <p className={cn('text-base font-black tabular-nums', kImpact > 0 ? 'text-blue-400' : kImpact < 0 ? 'text-red-400' : 'text-white/70')}>
               {fmtImpact(kImpact)}
             </p>
           </div>
           <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
             <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">BB Prop</p>
-            <p className={cn('text-base font-black tabular-nums', bbImpact > 0 ? 'text-amber-400' : bbImpact < 0 ? 'text-emerald-400' : 'text-white/70')}>
+            <p className={cn('text-base font-black tabular-nums', bbImpact > 0 ? 'text-amber-400' : bbImpact < 0 ? 'text-blue-400' : 'text-white/70')}>
               {fmtImpact(bbImpact)}
             </p>
           </div>
           <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
             <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Run Env</p>
-            <p className={cn('text-base font-black tabular-nums', runImpact > 0 ? 'text-amber-400' : runImpact < 0 ? 'text-emerald-400' : 'text-white/70')}>
+            <p className={cn('text-base font-black tabular-nums', runImpact > 0 ? 'text-amber-400' : runImpact < 0 ? 'text-blue-400' : 'text-white/70')}>
               {runImpact > 0 ? '+' : ''}{runImpact.toFixed(1)}
             </p>
           </div>

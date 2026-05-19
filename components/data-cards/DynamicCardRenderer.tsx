@@ -292,9 +292,9 @@ export function DynamicCardRenderer({
 
         {/* Top-left: LIVE pulse for confirmed real-time data */}
         {isLive && (
-          <span className="absolute top-2 left-2 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-sm pointer-events-none animate-badge-pop">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[8px] font-bold text-emerald-400 uppercase tracking-wider">Live</span>
+          <span className="absolute top-2 left-2 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 backdrop-blur-sm pointer-events-none animate-badge-pop">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+            <span className="text-[8px] font-bold text-blue-400 uppercase tracking-wider">Live</span>
           </span>
         )}
 
@@ -307,7 +307,7 @@ export function DynamicCardRenderer({
               aria-label="Copy card to clipboard"
             >
               {isShared
-                ? <Check className="w-3.5 h-3.5 text-emerald-400" />
+                ? <Check className="w-3.5 h-3.5 text-blue-400" />
                 : <Share2 className="w-3.5 h-3.5 text-[var(--text-faint)]" />
               }
             </button>
@@ -342,7 +342,7 @@ export function DynamicCardRenderer({
             {hasTrustOverlay && (
               <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--bg-overlay)]/80 backdrop-blur-sm border border-[var(--border-subtle)]">
                 <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                  trustLevel === 'high' ? 'bg-emerald-400' :
+                  trustLevel === 'high' ? 'bg-blue-400' :
                   trustLevel === 'medium' ? 'bg-yellow-400' :
                   'bg-red-400'
                 }`} />
@@ -352,7 +352,7 @@ export function DynamicCardRenderer({
             {deltaDir && (
               <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold border backdrop-blur-sm ${
                 deltaDir === 'up'
-                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                  ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
                   : 'bg-red-500/10 border-red-500/20 text-red-400'
               }`} aria-label={`Data ${deltaDir === 'up' ? 'increased' : 'decreased'} since last view`}>
                 {deltaDir === 'up' ? '↑' : '↓'} Updated

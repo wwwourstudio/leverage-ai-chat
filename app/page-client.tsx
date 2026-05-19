@@ -17,7 +17,7 @@ import { useSuggestedPrompts } from '@/lib/hooks/useSuggestedPrompts';
 import { useFileHandling, type FileAttachment } from '@/lib/hooks/useFileHandling';
 import { useKalshiStore } from '@/lib/store/kalshi-store';
 import { useGenerateResponse } from '@/lib/hooks/useGenerateResponse';
-import { useAppStore } from '@/lib/store/app-store';
+import { useAppStore, type AppCategory } from '@/lib/store/app-store';
 import { useUserStore } from '@/lib/store/user-store';
 import { useFantasyStore } from '@/lib/store/fantasy-store';
 import { TrendingUp, Trophy, Award, Layers, BarChart3, Sparkles } from 'lucide-react';
@@ -525,7 +525,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
         const hasBettingPlatformQuery =
           /\b(draftkings|fanduel|betmgm|caesars|pointsbet|barstool)\b/i.test(lastUserQuery || '') &&
           !/\b(lineup|slate|dfs|daily fantasy|gpp|showdown)\b/i.test(lastUserQuery || '');
-        const detectedCategory = hasPropQuery ? 'props'
+        const detectedCategory = hasPropQuery ? 'all'
           : (msgLow.includes('kalshi') || msgLow.includes('prediction market') || msgLow.includes('championship winner') || msgLow.includes('contract pricing') || msgLow.includes('winner contract')) ? 'kalshi'
           : hasBettingPlatformQuery ? 'betting'
           : hasFantasyOrDFSQuery && selectedCategory !== 'betting' && selectedCategory !== 'props'
@@ -567,7 +567,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     const handler = (e: Event) => {
       const { query, category } = (e as CustomEvent<{ query: string; category?: string }>).detail;
       const currentCategory = useAppStore.getState().selectedCategory;
-      if (category && category !== currentCategory) selectCategory(category);
+      if (category && category !== currentCategory) selectCategory(category as AppCategory);
       const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: query, timestamp: new Date() };
       setMessages((prev: Message[]) => [...prev, userMsg]);
       setInput('');

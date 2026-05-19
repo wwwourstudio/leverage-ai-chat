@@ -209,7 +209,7 @@ export const VPECard = memo(function VPECard({ card, onAnalyze, isHero }: VPECar
                 >
                   <span className="text-[11px] text-foreground/70 truncate flex-1">{m.title}</span>
                   <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded-md">
+                    <span className="text-[10px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/25 px-1.5 py-0.5 rounded-md">
                       YES {m.yesPrice}¢
                     </span>
                     {m.noPrice != null && (
@@ -228,8 +228,8 @@ export const VPECard = memo(function VPECard({ card, onAnalyze, isHero }: VPECar
         <div className="flex items-center gap-1.5">
           {benfordValid ? (
             <>
-              <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0" />
-              <span className="text-[10px] text-emerald-400 font-medium">
+              <CheckCircle className="w-3 h-3 text-blue-400 shrink-0" />
+              <span className="text-[10px] text-blue-400 font-medium">
                 Data Valid ({Math.round(benfordScore * 100)}% Benford match)
               </span>
             </>

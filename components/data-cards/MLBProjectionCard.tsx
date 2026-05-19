@@ -52,10 +52,10 @@ const STATUS_CONFIG: Record<string, { label: string; dot: string; text: string; 
   },
   edge: {
     label: 'EDGE',
-    dot: 'bg-emerald-400',
-    text: 'text-emerald-400',
-    bg: 'bg-emerald-500/15 border-emerald-500/30',
-    header: 'from-emerald-600/30 dark:via-teal-900/15 to-transparent',
+    dot: 'bg-blue-400',
+    text: 'text-blue-400',
+    bg: 'bg-blue-500/15 border-blue-500/30',
+    header: 'from-blue-600/30 dark:via-teal-900/15 to-transparent',
   },
   value: {
     label: 'VALUE',
@@ -88,17 +88,17 @@ function PercentileBar({ p10, p50, p90, label }: { p10: number; p50: number; p90
       </div>
       <div className="relative h-2 bg-[var(--bg-overlay)] rounded-full overflow-hidden">
         <div
-          className="absolute top-0 bottom-0 rounded-full bg-gradient-to-r from-blue-500/40 to-emerald-500/60"
+          className="absolute top-0 bottom-0 rounded-full bg-gradient-to-r from-blue-500/40 to-blue-500/60"
           style={{ left: `${p10Pct}%`, right: `${100 - (p90 / maxVal * 100)}%` }}
         />
         <div
-          className="absolute top-0 bottom-0 w-0.5 bg-emerald-400 rounded-full shadow-[0_0_4px_#10b981]"
+          className="absolute top-0 bottom-0 w-0.5 bg-blue-400 rounded-full shadow-[0_0_4px_#10b981]"
           style={{ left: `${p50Pct}%` }}
         />
       </div>
       <div className="flex justify-between text-[9px] text-[var(--foreground)]/40">
         <span>Floor</span>
-        <span className="text-emerald-400 font-bold">Median</span>
+        <span className="text-blue-400 font-bold">Median</span>
         <span>Ceiling</span>
       </div>
     </div>
@@ -181,13 +181,13 @@ function metricValueColor(label: string, value: string): string {
   if (isNaN(num)) return 'text-[var(--foreground)]';
   const lo = label.toLowerCase();
   if (lo.includes('barrel') || lo.includes(' ev') || lo.includes('hard') || lo.includes('k/9') || lo.includes('strikeout') || lo.includes('csw') || lo.includes('swstr') || lo.includes('stuff')) {
-    return num >= 12 ? 'text-emerald-400' : num >= 7 ? 'text-amber-400' : 'text-red-400';
+    return num >= 12 ? 'text-blue-400' : num >= 7 ? 'text-amber-400' : 'text-red-400';
   }
   if (lo.includes('era') || lo.includes('whip') || lo.includes('walk') || lo.includes('bb%') || lo.includes('chase')) {
-    return num <= 3 ? 'text-emerald-400' : num <= 4.5 ? 'text-amber-400' : 'text-red-400';
+    return num <= 3 ? 'text-blue-400' : num <= 4.5 ? 'text-amber-400' : 'text-red-400';
   }
   if (value.endsWith('%')) {
-    return num >= 60 ? 'text-emerald-400' : num >= 40 ? 'text-amber-400' : 'text-red-400';
+    return num >= 60 ? 'text-blue-400' : num >= 40 ? 'text-amber-400' : 'text-red-400';
   }
   return 'text-[var(--foreground)]';
 }
@@ -317,7 +317,7 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
             {[
               { label: hero1.label, value: hero1.value, accent: 'blue' as const, large: true },
               { label: hero2.label, value: hero2.value, accent: 'indigo' as const, large: true },
-              ...(dkPts ? [{ label: 'DK Pts', value: dkPts, accent: 'emerald' as const, large: false }] : []),
+              ...(dkPts ? [{ label: 'DK Pts', value: dkPts, accent: 'indigo' as const, large: false }] : []),
               ...(kProj > 0 && !isPitcher ? [{ label: 'K Proj', value: `${kProj}`, accent: 'slate' as const, large: false }] : []),
             ].map((tile, index) => (
               <StatTile
@@ -377,8 +377,8 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
           {(homeDkAvg || roadDkAvg) && (
             <div className="grid grid-cols-2 gap-2">
               {homeDkAvg && (
-                <div className="flex flex-col items-center gap-0.5 rounded-xl bg-emerald-500/8 border border-emerald-500/20 px-3 py-2.5">
-                  <span className="text-[8px] font-black uppercase tracking-widest text-emerald-400/60">Home</span>
+                <div className="flex flex-col items-center gap-0.5 rounded-xl bg-blue-500/8 border border-blue-500/20 px-3 py-2.5">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-blue-400/60">Home</span>
                   <span className="text-base font-black text-[var(--foreground)] tabular-nums">{homeDkAvg}</span>
                   {homeGames && <span className="text-[9px] text-[var(--foreground)]/30">{homeGames}</span>}
                 </div>
@@ -485,11 +485,10 @@ export const MLBProjectionCard = memo(function MLBProjectionCard({ data, onAnaly
 
 // ─── Sub-component ────────────────────────────────────────────────────────────
 
-function StatTile({ label, value, accent = 'blue', large = false, className, style }: { label: string; value: string; accent?: 'blue' | 'indigo' | 'emerald' | 'slate'; large?: boolean; className?: string; style?: React.CSSProperties }) {
+function StatTile({ label, value, accent = 'blue', large = false, className, style }: { label: string; value: string; accent?: 'blue' | 'indigo' | 'slate'; large?: boolean; className?: string; style?: React.CSSProperties }) {
   const accentMap = {
     blue:   { bg: 'bg-blue-500/10',   border: 'border-blue-500/20',   text: 'text-blue-300'   },
     indigo: { bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', text: 'text-indigo-300' },
-    emerald:{ bg: 'bg-emerald-500/10',border: 'border-emerald-500/20',text: 'text-emerald-300' },
     slate:  { bg: 'bg-[var(--bg-elevated)]', border: 'border-[var(--border-subtle)]', text: 'text-[var(--foreground)]/70' },
   };
   const a = accentMap[accent];

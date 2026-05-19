@@ -81,7 +81,7 @@ export function TabOdds({
           <div className={cn(
             'flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-[11px] font-bold border-l-2',
             edgeNum >= 5
-              ? 'bg-emerald-500/10 border border-emerald-500/25 border-l-emerald-400 text-emerald-300'
+              ? 'bg-blue-500/10 border border-blue-500/25 border-l-blue-400 text-blue-300'
               : 'bg-amber-500/10 border border-amber-500/25 border-l-amber-400 text-amber-300',
           )}>
             <Zap className="w-3.5 h-3.5 shrink-0" />
@@ -161,7 +161,7 @@ export function TabOdds({
                   <span className={cn(
                     'text-[11px] font-black tabular-nums px-2 py-0.5 rounded-lg border',
                     confPct >= 70
-                      ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20'
+                      ? 'text-blue-300 bg-blue-500/10 border-blue-500/20'
                       : confPct >= 50
                       ? 'text-blue-300 bg-blue-500/10 border-blue-500/20'
                       : 'text-amber-300 bg-amber-500/10 border-amber-500/20',
@@ -172,7 +172,7 @@ export function TabOdds({
                 <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                   <div
                     className={cn('h-full rounded-full transition-all duration-700',
-                      confPct >= 70 ? 'bg-emerald-400' : confPct >= 50 ? 'bg-blue-400' : 'bg-amber-400'
+                      confPct >= 70 ? 'bg-blue-400' : confPct >= 50 ? 'bg-blue-400' : 'bg-amber-400'
                     )}
                     style={{ width: `${Math.min(100, confPct)}%` }}
                   />
@@ -208,7 +208,7 @@ export function TabOdds({
                 <span className={cn(
                   'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black border',
                   moveDir === 'up'
-                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
+                    ? 'bg-blue-500/10 text-blue-400 border-blue-500/25'
                     : moveDir === 'down'
                     ? 'bg-red-500/10 text-red-400 border-red-500/25'
                     : 'bg-[var(--bg-elevated)] text-[var(--text-faint)] border-[var(--border-subtle)]',
@@ -238,7 +238,7 @@ export function TabOdds({
                     ? 'text-red-300 bg-red-500/10 border-red-500/20'
                     : vigPct > 3
                     ? 'text-amber-300 bg-amber-500/10 border-amber-500/20'
-                    : 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+                    : 'text-blue-300 bg-blue-500/10 border-blue-500/20',
                 )}>
                   {vigPct}%
                 </span>

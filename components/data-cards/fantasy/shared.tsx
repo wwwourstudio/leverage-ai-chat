@@ -26,7 +26,7 @@ export interface FantasyCardProps {
 export const POS_COLORS: Record<string, string> = {
   // NFL
   QB:  'text-red-400    bg-red-400/20    border-red-400/30',
-  RB:  'text-green-400  bg-green-400/20  border-green-400/30',
+  RB:  'text-blue-400  bg-blue-400/20  border-blue-400/30',
   WR:  'text-blue-400   bg-blue-400/20   border-blue-400/30',
   TE:  'text-orange-400 bg-orange-400/20 border-orange-400/30',
   K:   'text-purple-400 bg-purple-400/20 border-purple-400/30',
@@ -44,10 +44,10 @@ export const POS_COLORS: Record<string, string> = {
   // NBA
   PG:  'text-blue-400   bg-blue-400/20   border-blue-400/30',
   SG:  'text-indigo-400 bg-indigo-400/20 border-indigo-400/30',
-  SF:  'text-green-400  bg-green-400/20  border-green-400/30',
+  SF:  'text-blue-400  bg-blue-400/20  border-blue-400/30',
   PF:  'text-orange-400 bg-orange-400/20 border-orange-400/30',
   G:   'text-blue-400   bg-blue-400/20   border-blue-400/30',
-  F:   'text-green-400  bg-green-400/20  border-green-400/30',
+  F:   'text-blue-400  bg-blue-400/20  border-blue-400/30',
   UTIL:'text-sky-400    bg-sky-400/20    border-sky-400/30',
 };
 
@@ -71,7 +71,7 @@ export function TierBadge({ tier }: { tier: number }) {
   const labels = ['T1', 'T2', 'T3', 'T4'];
   const label = labels[Math.min(tier - 1, 3)] ?? 'T4';
   const c = tier === 1 ? 'text-yellow-400 bg-yellow-400/15 border-yellow-400/30'
-    : tier === 2       ? 'text-emerald-400 bg-emerald-400/15 border-emerald-400/30'
+    : tier === 2       ? 'text-blue-400 bg-blue-400/15 border-blue-400/30'
     : tier === 3       ? 'text-blue-400 bg-blue-400/15 border-blue-400/30'
     : 'text-slate-400 bg-slate-400/15 border-slate-400/30';
   return (

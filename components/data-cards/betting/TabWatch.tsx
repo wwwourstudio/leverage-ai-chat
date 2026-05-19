@@ -63,7 +63,7 @@ function WatchPlayerRow({ p, sport, onAsk }: { p: any; sport?: string; onAsk?: (
                 <span className="text-[10px] text-[var(--text-faint)]">{p.team}</span>
               )}
               {p.price && (
-                <span className="ml-1 text-[10px] font-black tabular-nums px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <span className="ml-1 text-[10px] font-black tabular-nums px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400">
                   {p.price}
                 </span>
               )}

@@ -35,10 +35,10 @@ const POS_COLORS: Record<string, { bg: string; text: string; border: string }> =
   SP:   { bg: 'bg-blue-500/20',   text: 'text-blue-300',   border: 'border-blue-500/35' },
   RP:   { bg: 'bg-sky-500/20',    text: 'text-sky-300',    border: 'border-sky-500/35' },
   C:    { bg: 'bg-teal-500/20',   text: 'text-teal-300',   border: 'border-teal-500/35' },
-  '1B': { bg: 'bg-green-500/20',  text: 'text-green-300',  border: 'border-green-500/35' },
-  '2B': { bg: 'bg-green-500/20',  text: 'text-green-300',  border: 'border-green-500/35' },
-  '3B': { bg: 'bg-green-500/20',  text: 'text-green-300',  border: 'border-green-500/35' },
-  SS:   { bg: 'bg-green-500/20',  text: 'text-green-300',  border: 'border-green-500/35' },
+  '1B': { bg: 'bg-blue-500/20',  text: 'text-blue-300',  border: 'border-blue-500/35' },
+  '2B': { bg: 'bg-blue-500/20',  text: 'text-blue-300',  border: 'border-blue-500/35' },
+  '3B': { bg: 'bg-blue-500/20',  text: 'text-blue-300',  border: 'border-blue-500/35' },
+  SS:   { bg: 'bg-blue-500/20',  text: 'text-blue-300',  border: 'border-blue-500/35' },
   OF:   { bg: 'bg-amber-500/20',  text: 'text-amber-300',  border: 'border-amber-500/35' },
   UTIL: { bg: 'bg-slate-500/20',  text: 'text-slate-300',  border: 'border-slate-500/35' },
   P:    { bg: 'bg-blue-500/20',   text: 'text-blue-300',   border: 'border-blue-500/35' },
@@ -63,7 +63,7 @@ function PositionBadge({ position }: { position: string }) {
 /** pts/$1K grade — 5.5=A, 4.5=B, 3.5=C, <3.5=D */
 function ValueGrade({ score }: { score: number }) {
   const grade = score >= 5.5 ? 'A' : score >= 4.5 ? 'B' : score >= 3.5 ? 'C' : 'D';
-  const cls   = grade === 'A' ? 'text-emerald-300 bg-emerald-500/15 border-emerald-500/35'
+  const cls   = grade === 'A' ? 'text-blue-300 bg-blue-500/15 border-blue-500/35'
               : grade === 'B' ? 'text-blue-300 bg-blue-500/15 border-blue-500/35'
               : grade === 'C' ? 'text-amber-300 bg-amber-500/15 border-amber-500/35'
               :                 'text-red-300 bg-red-500/15 border-red-500/35';
@@ -77,10 +77,10 @@ function ValueGrade({ score }: { score: number }) {
 /** Salary cap progress bar */
 function CapBar({ used, cap = 50000 }: { used: number; cap?: number }) {
   const pct = Math.min(100, (used / cap) * 100);
-  const barCls = pct < 90 ? 'from-emerald-500 to-teal-400'
+  const barCls = pct < 90 ? 'from-blue-500 to-teal-400'
                : pct < 98 ? 'from-amber-500 to-yellow-400'
                :             'from-red-500 to-rose-400';
-  const lblCls = pct < 90 ? 'text-emerald-400' : pct < 98 ? 'text-amber-400' : 'text-red-400';
+  const lblCls = pct < 90 ? 'text-blue-400' : pct < 98 ? 'text-amber-400' : 'text-red-400';
   const capStr = cap === 50000 ? '$50K' : `$${(cap / 1000).toFixed(0)}K`;
   const usedStr = used >= 1000 ? `$${(used / 1000).toFixed(1)}K` : `$${used}`;
 
@@ -151,8 +151,8 @@ export const DFSSlateCard = memo(function DFSSlateCard({ title, data, onAnalyze,
           </div>
           <div className="w-px h-8 bg-white/10" />
           <div className="flex flex-col">
-            <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400/70">Proj Pts</span>
-            <span className="text-lg font-black text-emerald-400 tabular-nums leading-tight">{totalProjPts}</span>
+            <span className="text-[8px] font-black uppercase tracking-wider text-blue-400/70">Proj Pts</span>
+            <span className="text-lg font-black text-blue-400 tabular-nums leading-tight">{totalProjPts}</span>
           </div>
           {topStack && (
             <>
@@ -215,7 +215,7 @@ export const DFSSlateCard = memo(function DFSSlateCard({ title, data, onAnalyze,
                     <span className="font-black text-[var(--foreground)] text-[12px] truncate">{p.player}</span>
                     <span className="text-[10px] font-bold text-[var(--foreground)]/40 shrink-0">{p.team}</span>
                     {p.confirmedStarter && (
-                      <span className="shrink-0 w-2 h-2 rounded-full bg-emerald-400" title="Confirmed starter" />
+                      <span className="shrink-0 w-2 h-2 rounded-full bg-blue-400" title="Confirmed starter" />
                     )}
                     {isStacked && (
                       <span className="ml-auto shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/25 text-[8px] font-black text-indigo-300 uppercase tracking-wide">
@@ -227,7 +227,7 @@ export const DFSSlateCard = memo(function DFSSlateCard({ title, data, onAnalyze,
                   <div className="mt-1 h-[3px] rounded-full bg-[var(--bg-elevated)] max-w-[80px] overflow-hidden">
                     <div
                       className={cn('h-full rounded-full transition-all duration-500',
-                        ownNum >= 35 ? 'bg-red-400' : ownNum >= 20 ? 'bg-amber-400' : ownNum >= 10 ? 'bg-blue-400' : 'bg-emerald-400'
+                        ownNum >= 35 ? 'bg-red-400' : ownNum >= 20 ? 'bg-amber-400' : ownNum >= 10 ? 'bg-blue-400' : 'bg-blue-400'
                       )}
                       style={{ width: `${Math.min(100, ownNum)}%` }}
                     />
@@ -241,14 +241,14 @@ export const DFSSlateCard = memo(function DFSSlateCard({ title, data, onAnalyze,
                 <span className="text-[11px] font-black text-[var(--cat-dfs,oklch(0.72_0.20_80))] tabular-nums w-16 text-right">{p.salary}</span>
 
                 {/* Projection */}
-                <span className="text-[11px] font-black text-emerald-400 tabular-nums w-12 text-right">{p.projection}</span>
+                <span className="text-[11px] font-black text-blue-400 tabular-nums w-12 text-right">{p.projection}</span>
 
                 {/* Matchup dot */}
                 {matchupNum !== null && !isNaN(matchupNum) && (
                   <div
                     className={cn(
                       'w-2 h-2 rounded-full shrink-0',
-                      matchupNum >= 70 ? 'bg-emerald-400' : matchupNum >= 50 ? 'bg-amber-400' : 'bg-red-400',
+                      matchupNum >= 70 ? 'bg-blue-400' : matchupNum >= 50 ? 'bg-amber-400' : 'bg-red-400',
                     )}
                     title={`Matchup: ${Math.round(matchupNum)}/100`}
                   />
@@ -268,8 +268,8 @@ export const DFSSlateCard = memo(function DFSSlateCard({ title, data, onAnalyze,
       <div className="mx-3 mb-3 mt-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-3 py-2 flex items-center justify-between text-[10px]">
         <span className="text-[var(--text-muted)]">Cap Status</span>
         <div className="flex items-center gap-1.5">
-          <span className={cn('w-1.5 h-1.5 rounded-full', capValid ? 'bg-emerald-400' : 'bg-red-400')} />
-          <span className={cn('font-black', capValid ? 'text-emerald-400' : 'text-red-400')}>{capValid ? 'Valid' : 'Over Cap'}</span>
+          <span className={cn('w-1.5 h-1.5 rounded-full', capValid ? 'bg-blue-400' : 'bg-red-400')} />
+          <span className={cn('font-black', capValid ? 'text-blue-400' : 'text-red-400')}>{capValid ? 'Valid' : 'Over Cap'}</span>
         </div>
       </div>
 

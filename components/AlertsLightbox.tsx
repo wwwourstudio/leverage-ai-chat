@@ -53,7 +53,7 @@ interface AiSuggestion {
 const ALERT_TYPES = [
   { value: 'odds_change',         label: 'Odds Change',    icon: TrendingUp, color: 'text-orange-400', bg: 'bg-orange-500/15', border: 'border-orange-500/30' },
   { value: 'line_movement',       label: 'Line Movement',  icon: Activity,   color: 'text-blue-400',   bg: 'bg-blue-500/15',   border: 'border-blue-500/30'   },
-  { value: 'player_prop',         label: 'Player Prop',    icon: Target,     color: 'text-green-400',  bg: 'bg-green-500/15',  border: 'border-green-500/30'  },
+  { value: 'player_prop',         label: 'Player Prop',    icon: Target,     color: 'text-violet-400',  bg: 'bg-violet-500/15',  border: 'border-violet-500/30'  },
   { value: 'arbitrage',           label: 'Arbitrage',      icon: Zap,        color: 'text-yellow-400', bg: 'bg-yellow-500/15', border: 'border-yellow-500/30' },
   { value: 'kalshi_price',        label: 'Kalshi Price',   icon: TrendingUp, color: 'text-purple-400', bg: 'bg-purple-500/15', border: 'border-purple-500/30' },
   { value: 'game_start',          label: 'Game Start',     icon: Bell,       color: 'text-cyan-400',   bg: 'bg-cyan-500/15',   border: 'border-cyan-500/30'   },

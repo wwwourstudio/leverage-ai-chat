@@ -46,7 +46,7 @@ function KellyDial({ fraction }: { fraction: number }) {
       {Array.from({ length: segments }).map((_, i) => {
         const isFilled = i < filled;
         const segColor =
-          i < segments * 0.25 ? (isFilled ? 'bg-emerald-500' : 'bg-emerald-500/15')
+          i < segments * 0.25 ? (isFilled ? 'bg-blue-500' : 'bg-blue-500/15')
           : i < segments * 0.5 ? (isFilled ? 'bg-amber-500' : 'bg-amber-500/15')
           : (isFilled ? 'bg-red-500' : 'bg-red-500/15');
         return (
@@ -82,7 +82,7 @@ export function KellyBetCard({
   const kellyFractionNum = parseNumeric(data.kellyFraction);
 
   const edgeColor =
-    edgeNum !== null && edgeNum >= 5 ? 'text-emerald-400' :
+    edgeNum !== null && edgeNum >= 5 ? 'text-blue-400' :
     edgeNum !== null && edgeNum >= 2 ? 'text-sky-400' :
     'text-[var(--text-muted)]';
 
@@ -94,7 +94,7 @@ export function KellyBetCard({
   const riskBadgeClass =
     riskLabel === 'Full Kelly'    ? 'text-red-400 bg-red-500/15 border-red-500/30'
     : riskLabel === 'Half Kelly'  ? 'text-amber-400 bg-amber-500/15 border-amber-500/30'
-    : 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30';
+    : 'text-blue-400 bg-blue-500/15 border-blue-500/30';
 
   return (
     <article
@@ -218,7 +218,7 @@ export function KellyBetCard({
               <div
                 className={cn(
                   'h-full rounded-full transition-all duration-700',
-                  confidenceNum >= 70 ? 'bg-emerald-500' :
+                  confidenceNum >= 70 ? 'bg-blue-500' :
                   confidenceNum >= 50 ? 'bg-sky-500' :
                   'bg-amber-500',
                 )}

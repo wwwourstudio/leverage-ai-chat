@@ -86,7 +86,7 @@ const DEFAULT_CONF: TypeConf = TYPE_CONFIG.statcast_summary_card;
 const STATUS_CONFIG: Record<string, { label: string; dotCls: string; textCls: string; bgCls: string; borderCls: string }> = {
   hot:     { label: 'HOT',     dotCls: 'bg-red-400',     textCls: 'text-red-400',     bgCls: 'bg-red-500/10',     borderCls: 'border-red-500/25' },
   edge:    { label: 'EDGE',    dotCls: 'bg-amber-400',   textCls: 'text-amber-400',   bgCls: 'bg-amber-500/10',   borderCls: 'border-amber-500/25' },
-  value:   { label: 'VALUE',   dotCls: 'bg-emerald-400', textCls: 'text-emerald-400', bgCls: 'bg-emerald-500/10', borderCls: 'border-emerald-500/25' },
+  value:   { label: 'VALUE',   dotCls: 'bg-blue-400', textCls: 'text-blue-400', bgCls: 'bg-blue-500/10', borderCls: 'border-blue-500/25' },
   optimal: { label: 'OPTIMAL', dotCls: 'bg-sky-400',     textCls: 'text-sky-400',     bgCls: 'bg-sky-500/10',     borderCls: 'border-sky-500/25' },
 };
 
@@ -166,7 +166,7 @@ function getValueStyle(value: string): { textCls: string; barWidth?: number } {
     const num = parseFloat(v);
     if (!isNaN(num)) {
       const pct = Math.min(100, Math.max(0, Math.abs(num)));
-      const textCls = num >= 60 ? 'text-emerald-400' : num >= 35 ? 'text-amber-400' : 'text-rose-400';
+      const textCls = num >= 60 ? 'text-blue-400' : num >= 35 ? 'text-amber-400' : 'text-rose-400';
       if (!v.startsWith('+') && !v.startsWith('-')) return { textCls, barWidth: pct };
       return { textCls };
     }
@@ -174,10 +174,10 @@ function getValueStyle(value: string): { textCls: string; barWidth?: number } {
   if (v.toLowerCase().includes('mph')) {
     const num = parseFloat(v);
     if (!isNaN(num))
-      return { textCls: num >= 92 ? 'text-emerald-400' : num >= 88 ? 'text-amber-400' : 'text-rose-400' };
+      return { textCls: num >= 92 ? 'text-blue-400' : num >= 88 ? 'text-amber-400' : 'text-rose-400' };
   }
-  if (/^[+-]\d{2,4}$/.test(v)) return { textCls: v.startsWith('+') ? 'text-emerald-400' : 'text-rose-400' };
-  if (/^[+-][\d.]+%$/.test(v)) return { textCls: v.startsWith('+') ? 'text-emerald-400' : 'text-rose-400' };
+  if (/^[+-]\d{2,4}$/.test(v)) return { textCls: v.startsWith('+') ? 'text-blue-400' : 'text-rose-400' };
+  if (/^[+-][\d.]+%$/.test(v)) return { textCls: v.startsWith('+') ? 'text-blue-400' : 'text-rose-400' };
   return { textCls: 'text-foreground' };
 }
 
@@ -207,7 +207,7 @@ function HeroMetrics({ metrics, conf }: { metrics: Metric[]; conf: TypeConf }) {
                 <div
                   className={cn(
                     'h-full rounded-full transition-all duration-700',
-                    barWidth >= 60 ? 'bg-emerald-400' : barWidth >= 35 ? 'bg-amber-400' : 'bg-rose-400',
+                    barWidth >= 60 ? 'bg-blue-400' : barWidth >= 35 ? 'bg-amber-400' : 'bg-rose-400',
                   )}
                   style={{ width: `${barWidth}%` }}
                 />
@@ -302,7 +302,7 @@ function MetricRow({ label, value }: Metric) {
           <div
             className={cn(
               'h-full rounded-full transition-all duration-500',
-              barWidth >= 60 ? 'bg-emerald-500/70' : barWidth >= 35 ? 'bg-amber-500/70' : 'bg-rose-500/70',
+              barWidth >= 60 ? 'bg-blue-500/70' : barWidth >= 35 ? 'bg-amber-500/70' : 'bg-rose-500/70',
             )}
             style={{ width: `${barWidth}%` }}
           />
@@ -535,14 +535,14 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
                 >
                   <span className="text-[10px] text-[var(--text-faint)] whitespace-nowrap">
                     {g.date}
-                    {isQS && <span className="ml-1 text-[7px] font-black text-emerald-400">QS</span>}
+                    {isQS && <span className="ml-1 text-[7px] font-black text-blue-400">QS</span>}
                   </span>
                   <span className="text-[10px] text-[var(--text-muted)] font-bold text-right truncate">{g.opp}</span>
                   <span className="text-[10px] text-[var(--foreground)]/70 font-bold text-right">{g.ip ?? '—'}</span>
-                  <span className="text-[10px] font-black text-emerald-400 text-right">{g.k ?? '—'}</span>
+                  <span className="text-[10px] font-black text-blue-400 text-right">{g.k ?? '—'}</span>
                   <span className={cn(
                     'text-[10px] font-black text-right',
-                    (g.er ?? 0) === 0 ? 'text-emerald-400' : (g.er ?? 0) <= 2 ? 'text-amber-400' : 'text-rose-400',
+                    (g.er ?? 0) === 0 ? 'text-blue-400' : (g.er ?? 0) <= 2 ? 'text-amber-400' : 'text-rose-400',
                   )}>
                     {g.er ?? '—'}
                   </span>
@@ -589,7 +589,7 @@ function TabProps({ data, propLines, onAnalyze }: {
               <span className={cn(
                 'text-[12px] font-black tabular-nums px-2.5 py-1 rounded-xl border',
                 prop.overOdds > 0
-                  ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/25'
+                  ? 'text-blue-300 bg-blue-500/10 border-blue-500/25'
                   : 'text-amber-300 bg-amber-500/10 border-amber-500/20',
               )}>
                 {fmtOdds(prop.overOdds)}
@@ -602,7 +602,7 @@ function TabProps({ data, propLines, onAnalyze }: {
                 <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Implied Probability</span>
                 <span className={cn(
                   'text-[10px] font-black',
-                  prop.impliedPct >= 60 ? 'text-emerald-400' : prop.impliedPct >= 45 ? 'text-amber-400' : 'text-rose-400',
+                  prop.impliedPct >= 60 ? 'text-blue-400' : prop.impliedPct >= 45 ? 'text-amber-400' : 'text-rose-400',
                 )}>
                   {prop.impliedPct}%
                 </span>
@@ -611,7 +611,7 @@ function TabProps({ data, propLines, onAnalyze }: {
                 <div
                   className={cn(
                     'h-full rounded-full transition-all duration-500',
-                    prop.impliedPct >= 60 ? 'bg-emerald-500'
+                    prop.impliedPct >= 60 ? 'bg-blue-500'
                     : prop.impliedPct >= 45 ? 'bg-amber-500'
                     : 'bg-rose-500',
                   )}
@@ -639,9 +639,9 @@ function TabProps({ data, propLines, onAnalyze }: {
           <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-2">K Projection Estimate</p>
           <div className="grid grid-cols-2 gap-2">
             {kPctRaw != null && (
-              <div className="rounded-2xl bg-emerald-500/8 border border-emerald-500/20 p-3 text-center">
-                <p className="text-xl font-black text-emerald-300 tabular-nums">{kPctRaw.toFixed(1)}%</p>
-                <p className="text-[9px] font-black uppercase tracking-wider text-emerald-400/70 mt-1">Season K%</p>
+              <div className="rounded-2xl bg-blue-500/8 border border-blue-500/20 p-3 text-center">
+                <p className="text-xl font-black text-blue-300 tabular-nums">{kPctRaw.toFixed(1)}%</p>
+                <p className="text-[9px] font-black uppercase tracking-wider text-blue-400/70 mt-1">Season K%</p>
               </div>
             )}
             {fbVeloRaw != null && (

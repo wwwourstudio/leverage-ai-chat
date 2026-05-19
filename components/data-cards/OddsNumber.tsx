@@ -20,7 +20,7 @@ const SIZE_CLASS: Record<string, string> = {
 function oddsColor(value: number | string): string {
   const n = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(n)) return '';
-  if (n > 0)   return 'odds-positive';   // emerald — positive EV feel
+  if (n > 0)   return 'odds-positive';   // blue — positive EV feel
   if (n >= -150) return 'odds-negative'; // near-even money — white
   return 'odds-heavy';                   // heavy chalk — muted
 }

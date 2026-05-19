@@ -46,8 +46,8 @@ export function SharpMoneyCard({
 
   const isBullish = !isShorting;
   const dirArrow = isBullish ? '▲' : '▼';
-  const dirColor = isBullish ? 'text-emerald-400' : 'text-red-400';
-  const dirBg = isBullish ? 'from-emerald-600/25 dark:via-emerald-800/10' : 'from-red-600/25 dark:via-red-800/10';
+  const dirColor = isBullish ? 'text-blue-400' : 'text-red-400';
+  const dirBg = isBullish ? 'from-blue-600/25 dark:via-blue-800/10' : 'from-red-600/25 dark:via-red-800/10';
 
   const magnitudeLabel = movementNum < 5 ? 'LOW' : movementNum < 15 ? 'MEDIUM' : 'HIGH';
   const confidenceColor =
@@ -121,7 +121,7 @@ export function SharpMoneyCard({
               <span className={cn(
                 'text-xs font-black px-2.5 py-1 rounded-lg border',
                 isBullish
-                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                  ? 'bg-blue-500/15 border-blue-500/30 text-blue-300'
                   : 'bg-red-500/15 border-red-500/30 text-red-300',
               )}>
                 {isShorting ? '−' : '+'}{movementNum} pts

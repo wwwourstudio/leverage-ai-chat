@@ -63,11 +63,11 @@ const statusConfig: Record<string, {
   },
   favorable: {
     label: 'FAVORABLE',
-    dotCls: 'bg-emerald-400',
-    textCls: 'text-emerald-400',
-    headerGrad: 'from-emerald-500/10 dark:from-emerald-600/70 dark:via-teal-700/55 dark:to-emerald-900/40',
+    dotCls: 'bg-blue-400',
+    textCls: 'text-blue-400',
+    headerGrad: 'from-blue-500/10 dark:from-blue-600/70 dark:via-teal-700/55 dark:to-blue-900/40',
     AlertIcon: CheckCircle,
-    alertBg: 'bg-emerald-500/10 border-emerald-500/25',
+    alertBg: 'bg-blue-500/10 border-blue-500/25',
   },
   neutral: {
     label: 'NEUTRAL',
@@ -177,7 +177,7 @@ function WindBar({ wind }: { wind: number }) {
   const color = wind > 35 ? 'from-red-500 to-rose-400'
     : wind > 25 ? 'from-amber-500 to-yellow-400'
     : wind > 15 ? 'from-blue-500 to-cyan-400'
-    : 'from-emerald-500 to-green-400';
+    : 'from-blue-500 to-blue-400';
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-[9px] font-semibold text-[var(--text-faint)]">
@@ -252,7 +252,7 @@ function getSportContext(category: string, wind: number, precip: number, temp: n
 type ImpactLevel = 'favorable' | 'neutral' | 'adverse';
 
 const IMPACT_BADGE_CLS: Record<ImpactLevel, string> = {
-  favorable: 'bg-emerald-500/15 border-emerald-500/25 text-emerald-300',
+  favorable: 'bg-blue-500/15 border-blue-500/25 text-blue-300',
   neutral:   'bg-slate-500/10 border-slate-500/20 text-slate-400',
   adverse:   'bg-red-500/15 border-red-500/25 text-red-300',
 };
@@ -294,7 +294,7 @@ interface ImpactBadgeProps {
 }
 
 function ImpactBadge({ label, level }: ImpactBadgeProps) {
-  const dot = level === 'favorable' ? 'bg-emerald-400' : level === 'adverse' ? 'bg-red-400' : 'bg-slate-400';
+  const dot = level === 'favorable' ? 'bg-blue-400' : level === 'adverse' ? 'bg-red-400' : 'bg-slate-400';
   return (
     <div className={cn(
       'flex flex-col items-center gap-1 px-2 py-2 rounded-xl border text-center',
@@ -319,7 +319,7 @@ function parsePositionImpact(val?: string): PositionImpact['level'] {
 }
 
 const POSITION_LEVEL_CLS: Record<ImpactLevel, string> = {
-  favorable: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300',
+  favorable: 'bg-blue-500/10 border-blue-500/20 text-blue-300',
   neutral:   'bg-slate-500/8 border-slate-500/15 text-slate-400',
   adverse:   'bg-red-500/10 border-red-500/20 text-red-300',
 };
@@ -378,7 +378,7 @@ export function WeatherCard({
       ? { label: 'HIGH IMPACT', cls: 'bg-red-500/15 border-red-500/30 text-red-300' }
       : impactScore >= 4
       ? { label: 'MEDIUM', cls: 'bg-amber-500/15 border-amber-500/30 text-amber-300' }
-      : { label: 'LOW', cls: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' }
+      : { label: 'LOW', cls: 'bg-blue-500/15 border-blue-500/30 text-blue-300' }
     : null;
 
   // ── Condition-based background tint for the header ──────────────────────────

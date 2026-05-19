@@ -288,11 +288,13 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
       `games-without-lineups=${diag.gamesWithoutLineups}`,
     );
 
-    // Games are scheduled but lineups haven't been posted yet (pre-dawn / early morning).
-    // Fall back to Statcast-only projections so DFS cards show real player data instead
-    // of empty game-stack cards from the odds API fallback.
-    if (diag.gamesWithoutLineups === games.length) {
-      console.warn('[MLBProj] All games lack lineups — using Statcast-only fallback for DFS cards');
+    // Games are scheduled but lineups and/or probable pitchers haven't been posted yet
+    // (pre-dawn / early morning). Fall back to Statcast-only projections so DFS cards
+    // show real player data instead of empty results.
+    const noPitchersAnnounced = diag.pitchersTotal === 0;
+    const noLineupsPosted = diag.gamesWithoutLineups === games.length;
+    if (noPitchersAnnounced || noLineupsPosted) {
+      console.warn(`[MLBProj] Falling back to Statcast-only cards (noPitchers=${noPitchersAnnounced}, noLineups=${noLineupsPosted})`);
       return buildNoGamesCards({ allHitters, allPitchers, playerType, playerName, limit });
     }
   }

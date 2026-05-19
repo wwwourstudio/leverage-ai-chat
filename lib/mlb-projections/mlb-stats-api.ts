@@ -156,7 +156,7 @@ export async function fetchTodaysGames(date?: string): Promise<MLBGame[]> {
     const now = Date.now();
     const THREE_HOURS = 3 * 60 * 60 * 1000;
     const needsBoxscore = games.filter(g => {
-      if ((g.homeLineup?.length ?? 0) > 0 || (g.awayLineup?.length ?? 0) > 0) return false;
+      if ((g.homeLineup?.length ?? 0) > 0 && (g.awayLineup?.length ?? 0) > 0) return false;
       const gameMsAgo = now - new Date(g.gameDate).getTime();
       // Within window: game started up to 3h ago OR starts within 3h
       return gameMsAgo > -THREE_HOURS && gameMsAgo < THREE_HOURS;
